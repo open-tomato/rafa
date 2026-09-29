@@ -397,6 +397,19 @@ from GitHub Issues:
   file `.rafa/position.json` holds your current place, where you were, and
   where you came from — the same two-slot pattern as `cd -` and
   `git checkout -`, plus a home anchor.
+- **Hopping between epics with `rafa next --roadmap`.** When your epic's
+  work is blocked by an issue in another epic, `rafa next --roadmap`
+  reaches for that blocker, works it, and comes home. You hold two slots:
+  home (your anchor) and current (the work in hand). Reaching for a third
+  would mean letting go of home, so rafa halts if a blocker is itself
+  blocked. The pattern keeps unattended work safe: a hop into another
+  team's epic asks for that team's review before it changes their code.
+  Solo projects see a dry hop — the useful part without the permission
+  check. One team hops between its own epics. Several teams open a pull
+  request when a hop crosses to another board, and `rafa status` says
+  `waiting on #C (owner review)` until the team reviews and approves. The
+  hop record (`.rafa/hop.json`) tracks where home is and what rafa works.
+  When `rafa next` finishes, it deletes the record and returns home.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request

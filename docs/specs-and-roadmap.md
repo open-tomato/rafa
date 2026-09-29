@@ -903,3 +903,102 @@ When you merge a pull request that closes an issue, `rafa pr merge`:
 So when you merge a member of an epic, both the board and the epic's own
 checklist update, keeping them in sync. The roadmap shows `done/total` on
 each epic line, which stays accurate as members close.
+
+## Hopping between epics with `rafa next --roadmap`
+
+When work on your current epic is blocked by an issue in another epic, you
+can reach for that blocker, work it, and return home with a single command:
+`rafa next --roadmap`. The command works one issue in the blocking epic and
+comes back.
+
+### The two-hands pattern
+
+Imagine climbing with two hands. One hand holds your **home** — the anchor
+place you came from. The other hand reaches for the next **handle** — the
+blocker you are about to work. Reaching for a third handle would mean
+letting go of home, and that is exactly where rafa halts. This two-slot
+pattern keeps work safe:
+
+- **Home**: where you started (a board and an epic)
+- **Current**: where you are working now (the blocker you reached for)
+- **One blocker ahead**: if that blocker is itself blocked (a third slot),
+  rafa refuses and prints `H ← C ← B` showing the chain, naming the halt
+
+### The worked example
+
+Your epic E on board X has an issue H blocked by issue C, which lives in
+epic F on a different board Y:
+
+```text
+H (board X, epic E) ← C (board Y, epic F)
+```
+
+You run `rafa next --roadmap`. rafa:
+
+1. Sees H is blocked by C
+2. Reads C's epic F and board Y
+3. Moves to board Y, epic F
+4. Runs a task to work C
+5. When done, moves home to board X, epic E
+6. Reports what changed and what blocked it
+
+If C were itself blocked by B:
+
+```text
+H ← C ← B
+```
+
+rafa halts at C with a message naming B, and you fix B first.
+
+### Solo projects: the dry hop
+
+When you work alone, a hop is just a reach into another epic on the same
+board. No permission is needed. `rafa next --roadmap` hands the blocker to
+an agent and comes home. Solo developers use this to follow work wherever
+it leads without getting lost.
+
+### One team: hops within your own board
+
+Your team's epic H on board #31 (Roadmap) is blocked by an issue C in
+another team epic F on the same board:
+
+```text
+H (board #31, epic E) ← C (board #31, epic F)
+```
+
+A hop between your own epics asks no permission. rafa works C and comes
+home, keeping your team focused on one board.
+
+### Several teams: hops across boards with review
+
+The backend team's epic H on board #254 is blocked by an issue C in the
+frontend team's epic F on board #257:
+
+```text
+H (board #254, backend) ← C (board #257, frontend)
+```
+
+When the hop crosses to another board with a different owner, rafa:
+
+1. Reads the `CODEOWNERS` file to find who owns the target epic's code
+2. Opens a pull request with the work on C
+3. Halts and tells you it is waiting for the owner's review:
+   `waiting on #C (owner review)`
+4. Once the team approves and merges the pull request, the loop resumes
+   and comes home
+
+This keeps a loop from changing another team's code without review. The
+same safeguard (the **owner gate**) applies when `rafa plan create` or
+`rafa loop start` is told to work on an issue owned by another team.
+
+### The hop record
+
+While a hop is in progress, rafa writes `.rafa/hop.json` to track:
+
+- The issue being worked (C)
+- Where home is (board X, epic E)
+
+When the work finishes, rafa deletes the record and returns home. If a
+person switches boards by hand, their position changes but the hop record
+stays: rafa detects the mismatch, drops the record, and follows the new
+position.

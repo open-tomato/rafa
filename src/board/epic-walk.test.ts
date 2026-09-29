@@ -21,6 +21,10 @@
  *  - The dry epic is read beside a second `now` epic further down, whose
  *    issue must be neither read nor walked.
  *  - Each passed epic line is paired with one that is walked into.
+ *  - The next `now` epic: each board that answers null is read beside
+ *    one that answers an epic, the epic BEFORE the given one is a good
+ *    `now` epic that must not be answered, and the epic after the answer
+ *    must be left unread.
  */
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue } from './roadmap-board.js';
@@ -40,6 +44,7 @@ import {
   isEpicIssue,
   isNowEpic,
   labelOnlySentence,
+  nextNowEpic,
   NOW_HORIZON_LABEL,
   pickDescendedLine,
 } from './epic-walk.js';
@@ -516,5 +521,134 @@ describe('the readings and sentences', () => {
 
     expect(epicSkipSentence({ line, reason: 'closed', detail: '' })).toBe('epic #7 done: the epic is closed');
     expect(epicSkipSentence({ line, reason: 'done', detail: '2/2' })).toBe('epic #7 done: every member is closed (2/2)');
+  });
+});
+
+/** A board row whose checklist names `lines`, a leading `x` ticking one. */
+function boardRow(number: number, ...lines: readonly string[]): BoardIssue {
+  const body = lines.map((line) => line.startsWith('x')
+    ? `- [x] #${line.slice(1)} why`
+    : `- [ ] #${line} why`).join('\n');
+  return issue(number, { labels: ['type:roadmap'], body });
+}
+
+/** `nextNowEpic` over `board` read as board #1, past epic `after`, with the world's readings. */
+async function nextAfter(after: number, board: readonly BoardIssue[], options: Parameters<typeof world>[1] = {}) {
+  const { seams, reads } = world(board, options);
+  const found = await nextNowEpic({ after, board: 1, listing: board, readings: seams.readings });
+  return { found, reads };
+}
+
+describe('the next now epic', () => {
+  /** Epic 10 ran dry; 20 is a good `now` epic before it, 60 one after every pass. */
+  const passes = [
+    epic(10, 'dry-home', [11]),
+    member(11, 'dry-home'),
+    epic(20, 'before', [21]),
+    member(21, 'before'),
+    epic(30, 'ticked', [31]),
+    member(31, 'ticked'),
+    issue(32, { labels: ['type:spec'] }),
+    epic(40, 'closed', [41], { state: 'CLOSED' }),
+    member(41, 'closed'),
+    epic(42, 'later', [43], { labels: ['type:epic', 'epic:later', 'horizon:next'] }),
+    member(43, 'later'),
+    epic(44, 'two-horizons', [45], { labels: ['type:epic', 'epic:two-horizons', NOW_HORIZON_LABEL, 'horizon:next'] }),
+    member(45, 'two-horizons'),
+    epic(46, 'done', [47]),
+    member(47, 'done', { state: 'CLOSED' }),
+    epic(50, 'dry-too', [51]),
+    member(51, 'dry-too'),
+    epic(60, 'answer', [61, 62]),
+    member(61, 'answer', { state: 'CLOSED' }),
+    member(62, 'answer'),
+    epic(70, 'after-answer', [71]),
+    member(71, 'after-answer'),
+  ];
+  const options = { branches: ['refs/heads/feat/rafa-11-x', 'refs/heads/feat/rafa-51-y'] };
+
+  it('passes every line that is not an open, now, undone, pickable epic, and answers the first that is', async () => {
+    const board = [boardRow(1, '20', '10', 'x30', '32', '40', '42', '44', '46', '50', '60', '70'), ...passes];
+
+    const { found, reads } = await nextAfter(10, board, options);
+
+    expect(found).toEqual({
+      number: 60,
+      title: 'issue 60',
+      slug: 'answer',
+      board: 1,
+      line: expect.objectContaining({ issue: 60, ticked: false }) as unknown as RoadmapLine,
+      progress: { done: 1, total: 2, notPlanned: 0 },
+    });
+    expect(reads).toEqual([51, 61, 62]);
+    expect(reads).not.toContain(71);
+  });
+
+  it('control: the same board with the dry epic given a free line answers it instead', async () => {
+    const board = [boardRow(1, '20', '10', '50', '60'), ...passes];
+
+    const { found } = await nextAfter(10, board, { branches: [] });
+
+    expect(found?.number).toBe(50);
+  });
+
+  it('answers null when no line after the given epic holds one, the good epic before it included', async () => {
+    const board = [boardRow(1, '20', '10', 'x30', '40', '46', '50'), ...passes];
+
+    const { found } = await nextAfter(10, board, options);
+
+    expect(found).toBeNull();
+  });
+
+  it('control: the same board with the good epic moved after the given one answers it', async () => {
+    const board = [boardRow(1, '10', 'x30', '40', '46', '50', '20'), ...passes];
+
+    const { found } = await nextAfter(10, board, options);
+
+    expect(found?.number).toBe(20);
+  });
+
+  it('answers null when the given epic is the last line', async () => {
+    const { found } = await nextAfter(10, [boardRow(1, '20', '10'), ...passes], options);
+
+    expect(found).toBeNull();
+  });
+
+  it('answers null when the board does not list the given epic, rather than its first now epic', async () => {
+    const { found, reads } = await nextAfter(10, [boardRow(1, '20', '60'), ...passes], options);
+
+    expect(found).toBeNull();
+    expect(reads).toEqual([]);
+  });
+
+  it('reads a dry epic taken by an open pull request as dry', async () => {
+    const board = [boardRow(1, '10', '50', '60'), ...passes];
+    const pulls = [{ number: 99, headRefName: 'feat/rafa-51-y', body: 'Closes #51' }];
+
+    const { found } = await nextAfter(10, board, { pulls, branches: ['refs/heads/feat/rafa-11-x'] });
+
+    expect(found?.number).toBe(60);
+  });
+
+  it('reads an empty epic as dry, never done, and passes it', async () => {
+    const board = [boardRow(1, '10', '80', '60'), epic(80, 'nobody', []), ...passes];
+
+    const { found } = await nextAfter(10, board, options);
+
+    expect(found?.number).toBe(60);
+  });
+
+  it('throws naming a board the listing does not hold', async () => {
+    const found = nextAfter(10, passes, options);
+
+    await expect(found).rejects.toThrow('board epic walk: board #1 is not on the board listing');
+  });
+
+  it('throws naming an unticked checklist line the listing does not hold, and passes a ticked one unread', async () => {
+    const missing = nextAfter(10, [boardRow(1, '10', '99', '60'), ...passes], options);
+    const ticked = await nextAfter(10, [boardRow(1, '10', 'x99', '60'), ...passes], options);
+
+    await expect(missing).rejects.toThrow('board epic walk: checklist line #99 is not on the board listing');
+    expect(ticked.found?.number).toBe(60);
   });
 });

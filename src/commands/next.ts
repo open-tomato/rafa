@@ -1,5 +1,5 @@
 /**
- * `rafa next [--dry-run] [--yes[=<action ids>]]`: where the project
+ * `rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]`: where the project
  * stands in one line, the one thing to do about it in the next, the
  * question, the action, and then the same again for what follows.
  *
@@ -8,12 +8,13 @@
  * proposes and the two sentences it is said in, `readings.ts` is what
  * that table is read over and `sources.ts` composes those readings for
  * a real project, `actions.ts` maps an action id onto the registered
- * command that does it, `sync.ts` holds the one action that runs none,
+ * command that does it, `sync.ts` holds `sync`, an action that runs none,
  * `ceiling.ts` reads `--yes` as how far a run may go by itself, and
  * `hint.ts` words the question and the command line, which the six
- * commands that end by naming what follows say the same way. This
- * module owns the loop, the action and the exit code, and of the eight
- * only `hint.ts` also prints — the one line it leaves a run that has
+ * commands that end by naming what follows say the same way, and
+ * `lines.ts` words the two lines and the stop line and reads
+ * `--dry-run`. This module owns the loop, the action and the exit code,
+ * and of the nine only `hint.ts` also prints — the one line it leaves a run that has
  * no terminal to be asked on.
  *
  * ## One turn of the chain
@@ -110,7 +111,7 @@
  * would allow the step, except for a step no list may name — `ready`
  * and `merge-unchecked` — where it says to drop `--yes` and be asked.
  *
- * Which ids a list may name — the eight, the four bare `--yes` allows,
+ * Which ids a list may name — the ten, the five bare `--yes` allows,
  * and the two lists refused with exit code 2, one naming `ready` or
  * `merge-unchecked` and one naming a word that is no action id — is
  * `src/next/ceiling.ts`, read here through {@link readYesCeiling}
@@ -149,10 +150,13 @@
  * question is spelled `[y/N]`.
  *
  * Nothing here spawns a shell line. Every action is a registered command
- * called as its own function, `sync` alone excepted — fast-forwarding
- * the base is no command, and it runs through the git seam
- * (`src/next/sync.ts`). So each action keeps its own refusals, and
- * {@link NextCommandSeams} is the whole of what a test replaces.
+ * called as its own function, the three in-process actions excepted:
+ * fast-forwarding the base is no command, and `sync` runs through the
+ * git seam (`src/next/sync.ts`), while `hop` and `home`, which only the
+ * hop rows propose, write the hop record and the position in-process
+ * and move through the registered `switch` (`src/next/hop-action.ts`).
+ * So each action keeps its own refusals, and {@link NextCommandSeams} is
+ * the whole of what a test replaces.
  *
  * An action writes through {@link actionOutput} (`src/next/ending.ts`),
  * which is the caller's output with its `result` taken: an invocation
@@ -173,6 +177,33 @@
  * and prints the same bytes. A release reading that failed is written
  * as a warning and leaves its line out.
  *
+ * ## Under `--roadmap`
+ *
+ * The flag is read here and changes four things, each left exactly as
+ * it was without it:
+ *
+ *  - the sources are opened with `roadmap` (`openNextSources`), so the
+ *    table reads its hop rows (`src/next/hop-rows.ts`) and the board its
+ *    hop reading, and nothing else sends a command more;
+ *  - `plan`, `start` and `resume` carry `--roadmap` among the words they
+ *    run with (`src/next/actions.ts`), and the proposal line prints it;
+ *  - once a loop action has run, {@link NextChainRoadmap.afterLoop} reads
+ *    the board again and, while a hop is away, answers the `home` step,
+ *    which is put as one more turn — two lines, the question or the
+ *    ceiling, then the action — BEFORE the chain stops `loop-started`.
+ *    The loop leaves the checkout on the target's branch, where no board
+ *    row is read, which is why this step is read here rather than by
+ *    the table. A `home` the person declines, or a `--yes` list that
+ *    leaves it out, stops the chain there instead, `declined` or
+ *    `unasked`, with the position still away; a walk that fails is
+ *    warned about and the chain stops `loop-started`, away, so the next
+ *    run reads the hop again. A loop action ends the chain before the
+ *    cap is weighed, so a chain whose last allowed action started a loop
+ *    may run one more, to come home;
+ *  - the report carries {@link NextChainReport.hops}, what each `hop`
+ *    and `home` action that ran wrote, and the stop lines name `hop` and
+ *    `home` in the lists they print (`src/next/lines.ts`).
+ *
  * ## The exit code
  *
  * 0 for every ending above, a pre-condition included: `rafa next` is a
@@ -186,42 +217,39 @@ import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
+import type { NextHopStep } from '../next/hop-rows.js';
+import type { NextDryRun, NextStop } from '../next/lines.js';
 import type { DryEpic, NextSources } from '../next/readings.js';
 import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
+import { messageOf } from '../config-sections.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
+import {
+  DRY_RUN_FLAG,
+  dryRunOf,
+  MAX_ACTIONS,
+  NEXT_USAGE,
+  proposalLine,
+  readDryRun,
+  readRoadmap,
+  ROADMAP_FLAG,
+  stateLine,
+  stopLine,
+} from '../next/lines.js';
 import { openNextSources } from '../next/sources.js';
-import { readNextState } from '../next/state.js';
+import { readHomeAfterLoop, readNextState } from '../next/state.js';
 import { fastForwardBase } from '../next/sync.js';
 import { REMOTE } from '../start/branch-decision.js';
 
 import { lazyPrompter } from './issue/ready.js';
 import { expectNoArgument } from './plan/plan-files.js';
-
-/** The usage line every refusal here names. */
-export const NEXT_USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
-
-/** The flag that prints the two lines and stops. */
-export const DRY_RUN_FLAG = 'dry-run';
-
-/** The mark the state line opens with. */
-const STATE_MARK = '📍';
-
-/** The mark the proposal line opens with. */
-const PROPOSAL_MARK = '👉';
-
-/** The mark a line saying why the chain stopped opens with. */
-const STOP_MARK = '⏹';
-
-/** How many actions may run in one chain; see the module note. */
-export const MAX_ACTIONS = 12;
 
 /** The actions that hand the checkout to a loop, after which the chain stops. */
 const LOOP_ACTIONS: readonly NextActionId[] = Object.freeze(['start', 'resume']);
@@ -234,13 +262,6 @@ export const QUESTION_HANDED_OVER: ReadonlySet<NextActionId> = new Set<NextActio
 
 /** Puts one question and answers whether it was said yes to. */
 export type NextAsk = (question: string) => Promise<boolean>;
-
-/**
- * Why a run prints the two lines and stops without running anything:
- * `flag` for the `--dry-run` that asked for it, `no-terminal` for the
- * run that has no terminal to answer on and named no `--yes`.
- */
-export type NextDryRun = 'flag' | 'no-terminal';
 
 /** What one state the chain read came to. */
 export interface NextStep {
@@ -256,22 +277,29 @@ export interface NextStep {
   readonly ran: boolean;
 }
 
-/** Why the chain stopped; the module note holds each one. */
-export type NextStop =
-  | 'dry-run'
-  | 'nothing-to-run'
-  | 'declined'
-  | 'unasked'
-  | 'loop-started'
-  | 'unchanged'
-  | 'capped';
-
 /** What one chain came to. */
 export interface NextChainReport {
   /** One per state read, in order; the last is the state that stopped it. */
   readonly steps: readonly NextStep[];
   /** Why it stopped. */
   readonly stop: NextStop;
+  /**
+   * Under `--roadmap`, what each `hop` and `home` action that ran wrote,
+   * in order: the record a hop opened, and the closing it came home on.
+   * Empty where none ran. The key is LEFT OUT, not set to undefined,
+   * without `--roadmap`.
+   */
+  readonly hops?: readonly NextHopStep[];
+}
+
+/** What {@link NextChainOptions.roadmap} holds: what a `rafa next --roadmap` chain reads beside the rest. */
+export interface NextChainRoadmap {
+  /**
+   * The `home` step to run once a loop action has run while a hop is
+   * away, or null when none is; see the module note's "Under
+   * `--roadmap`".
+   */
+  readonly afterLoop: () => Promise<NextState | null>;
 }
 
 /** What {@link runNextChain} reads, runs, asks and writes through. */
@@ -296,63 +324,20 @@ export interface NextChainOptions {
   readonly info: (line: string) => void;
   /** Where a reading that failed goes. */
   readonly warn: (line: string) => void;
+  /**
+   * Set by `rafa next --roadmap`: the actions' words carry `--roadmap`,
+   * the stop lines name `hop` and `home`, the home step runs after a loop
+   * while a hop is away, and the report carries `hops`. Left out, none of
+   * the four happens.
+   */
+  readonly roadmap?: NextChainRoadmap;
 }
 
-/** What is true, on one line. */
-export function stateLine(state: NextState): string {
-  return `${STATE_MARK} ${state.reading}.`;
-}
+/** How one turn ended: at a stop, with the step that stopped it, or with its action run. */
+type TurnEnd =
+  | { readonly stop: NextStop; readonly step: NextStep }
+  | { readonly stop: null; readonly step: NextStep };
 
-/** What to do about it, on one line, with the command that does it when an action runs one. */
-export function proposalLine(state: NextState, invocation: NextInvocation | null): string {
-  const runs = invocation === null
-    ? ''
-    : ` — rafa ${commandWords(invocation)}`;
-  return `${PROPOSAL_MARK} ${state.proposal}${runs}`;
-}
-
-/** The ids a ceiling names, as a sentence lists them. */
-function namedIds(ceiling: readonly NextActionId[]): string {
-  return ceiling.length === 0
-    ? 'no action'
-    : ceiling.join(', ');
-}
-
-/** Why a run that ran nothing ran nothing: the flag, or the terminal it has not got. */
-function dryRunLine(dryRun: NextDryRun | null): string {
-  if (dryRun === 'no-terminal') {
-    return `${STOP_MARK} There is no terminal to answer on, so nothing ran; run rafa next where you can answer,`
-      + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`;
-  }
-  return `${STOP_MARK} --${DRY_RUN_FLAG}: nothing ran.`;
-}
-
-/** Why the chain stopped, or null for an ending the two lines have already said. */
-export function stopLine(stop: NextStop, state: NextState, ceiling: NextCeiling, dryRun: NextDryRun | null): string | null {
-  if (stop === 'dry-run') return dryRunLine(dryRun);
-  if (stop === 'declined') return `${STOP_MARK} Nothing ran.`;
-  if (stop === 'unasked') {
-    const allows = `${STOP_MARK} --${YES_FLAG} allows ${namedIds(ceiling ?? [])}, and this step is ${state.action},`
-      + ' so nothing ran;';
-    if (ALWAYS_ASKED.has(state.action)) {
-      return `${allows} no --${YES_FLAG} list allows it, so drop --${YES_FLAG} to be asked.`;
-    }
-    return `${allows} type --${YES_FLAG}=${[...ceiling ?? [], state.action].join(',')} to allow it,`
-      + ` or drop --${YES_FLAG} to be asked.`;
-  }
-  if (stop === 'loop-started') {
-    return `${STOP_MARK} The loop has run; rafa next reads where it left the project.`;
-  }
-  if (stop === 'unchanged') {
-    return `${STOP_MARK} That last step left the project where it was, so the chain stops rather than repeating it.`;
-  }
-  if (stop === 'capped') {
-    return `${STOP_MARK} ${MAX_ACTIONS} actions have run, which is as many as one chain runs; run rafa next again.`;
-  }
-  return null;
-}
-
-/** True when a state read back names the same thing as the one an action just ran for. */
 function repeats(previous: NextState | null, state: NextState): boolean {
   if (previous === null) return false;
   return previous.id === state.id
@@ -376,9 +361,33 @@ function stepOf(state: NextState, invocation: NextInvocation | null, over: Parti
   });
 }
 
-/** A report ending on `step`, which is the state that stopped the chain. */
-function ended(steps: readonly NextStep[], step: NextStep, stop: NextStop): NextChainReport {
-  return Object.freeze({ steps: Object.freeze([...steps, step]), stop });
+/**
+ * One turn over `state`: its problems and its two lines written, then
+ * each ending the module note holds checked in order, the question put
+ * where one is, and the action run. `previous` is the state the last
+ * action ran for, or null where none is to be compared.
+ */
+async function playTurn(options: NextChainOptions, state: NextState, previous: NextState | null): Promise<TurnEnd> {
+  const { run, ask, handOver, ceiling, dryRun, info, warn, roadmap } = options;
+  for (const problem of state.problems) warn(problem);
+  const invocation = actionInvocation(state, { roadmap: roadmap !== undefined });
+  info(stateLine(state));
+  info(proposalLine(state, invocation));
+
+  const halt = (stop: NextStop, over: Partial<NextStep> = {}): TurnEnd => ({ stop, step: stepOf(state, invocation, over) });
+  if (dryRun !== null) return halt('dry-run');
+  if (state.action === 'none') return halt('nothing-to-run');
+  if (repeats(previous, state)) return halt('unchanged');
+
+  const unasked = allowedUnasked(state.action, ceiling);
+  if (!unasked && ceiling !== null) return halt('unasked');
+  const handedOver = QUESTION_HANDED_OVER.has(state.action);
+  const asks = !unasked && !handedOver;
+  if (asks && !await ask(nextQuestion(state))) return halt('declined', { asked: true });
+
+  if (handedOver) handOver?.();
+  await run(state);
+  return { stop: null, step: stepOf(state, invocation, { asked: asks, ran: true }) };
 }
 
 /**
@@ -387,90 +396,53 @@ function ended(steps: readonly NextStep[], step: NextStep, stop: NextStop): Next
  * holds. Whatever an action throws travels out unchanged.
  */
 export async function runNextChain(options: NextChainOptions): Promise<NextChainReport> {
-  const { read, run, ask, handOver, ceiling, dryRun, info, warn } = options;
+  const { read, ceiling, dryRun, info, roadmap } = options;
   let steps: readonly NextStep[] = [];
+  let hops: readonly NextHopStep[] = [];
   let previous: NextState | null = null;
+
+  /** The report, `hops` carried only under `--roadmap`. */
+  const report = (stop: NextStop): NextChainReport => Object.freeze({
+    steps: Object.freeze([...steps]),
+    stop,
+    ...roadmap === undefined
+      ? {}
+      : { hops: Object.freeze([...hops]) },
+  });
+  /** Says why the chain stopped, for an ending the two lines have not already said, and reports it. */
+  const stopOn = (stop: NextStop, state: NextState): NextChainReport => {
+    const line = stopLine(stop, state, ceiling, dryRun, roadmap !== undefined);
+    if (line !== null) info(line);
+    return report(stop);
+  };
+  /** Plays one turn over `state` and keeps what it came to; the stop, or null for an action run. */
+  const turn = async (state: NextState, before: NextState | null): Promise<NextStop | null> => {
+    const end = await playTurn(options, state, before);
+    steps = [...steps, end.step];
+    if (end.stop === null && state.hop !== undefined) hops = [...hops, state.hop];
+    return end.stop;
+  };
 
   for (;;) {
     const state = await read();
-    for (const problem of state.problems) warn(problem);
-    const invocation = actionInvocation(state);
-    info(stateLine(state));
-    info(proposalLine(state, invocation));
+    const stop = await turn(state, previous);
+    if (stop !== null) return stopOn(stop, state);
 
-    /** Says why the chain stopped, for an ending the two lines have not already said. */
-    const announce = (stop: NextStop): void => {
-      const line = stopLine(stop, state, ceiling, dryRun);
-      if (line !== null) info(line);
-    };
-    /** An ending reached before the action ran, which the state that stopped it closes. */
-    const stopHere = (stop: NextStop, over: Partial<NextStep> = {}): NextChainReport => {
-      announce(stop);
-      return ended(steps, stepOf(state, invocation, over), stop);
-    };
-    /** An ending reached with the action run, which is already a step of the report. */
-    const stopAfter = (stop: NextStop): NextChainReport => {
-      announce(stop);
-      return Object.freeze({ steps, stop });
-    };
-
-    if (dryRun !== null) return stopHere('dry-run');
-    if (state.action === 'none') return stopHere('nothing-to-run');
-    if (repeats(previous, state)) return stopHere('unchanged');
-
-    const unasked = allowedUnasked(state.action, ceiling);
-    if (!unasked && ceiling !== null) return stopHere('unasked');
-    const handedOver = QUESTION_HANDED_OVER.has(state.action);
-    const asks = !unasked && !handedOver;
-    if (asks && !await ask(nextQuestion(state))) return stopHere('declined', { asked: true });
-
-    if (handedOver) handOver?.();
-    await run(state);
-    steps = [...steps, stepOf(state, invocation, { asked: asks, ran: true })];
-
-    if (LOOP_ACTIONS.includes(state.action)) return stopAfter('loop-started');
-    if (steps.length >= MAX_ACTIONS) return stopAfter('capped');
+    if (LOOP_ACTIONS.includes(state.action)) {
+      const home = roadmap === undefined
+        ? null
+        : await roadmap.afterLoop();
+      const homeStop = home === null
+        ? null
+        : await turn(home, null);
+      return homeStop === null
+        ? stopOn('loop-started', state)
+        : stopOn(homeStop, home ?? state);
+    }
+    if (steps.length >= MAX_ACTIONS) return stopOn('capped', state);
     previous = state;
   }
 }
-
-/** A refusal of the line with exit code 1: the problem, then the usage line. */
-function lineRefusal(problem: string): CommandExit {
-  return new CommandExit(1, `❌ ${problem}\nUsage: ${NEXT_USAGE}`);
-}
-
-/**
- * True under `--dry-run`, false without it. A value that is neither
- * `true` nor `false` is refused: `parseArgs` hands a flag the word after
- * it whatever the flag declares, so `rafa next --dry-run sync` would
- * otherwise read `sync` as the flag's value and say nothing about it.
- */
-export function readDryRun(flags: RafaContext['flags']): boolean {
-  const value = flags[DRY_RUN_FLAG];
-  if (value === undefined) return false;
-  if (typeof value === 'boolean') return value;
-  if (value === 'true' || value === 'false') return value === 'true';
-  throw lineRefusal(`--${DRY_RUN_FLAG} takes no value, and read "${value}" as one`);
-}
-
-/**
- * Why the run prints the two lines and stops, or null for a run that
- * proposes and acts: `flag` where `--dry-run` asked for it, and
- * `no-terminal` where it did not, `--yes` named no ceiling and there is
- * no terminal to answer the question on.
- *
- * A ceiling is what makes a terminal beside the point: under `--yes`
- * every step either runs unasked or stops the chain, so nothing is ever
- * asked and the run is the same with a terminal and without one. The
- * flag outranks both, so `--dry-run` reads as itself wherever it is
- * typed.
- */
-export function dryRunOf(flag: boolean, ceiling: NextCeiling, hasTerminal: boolean): NextDryRun | null {
-  if (flag) return 'flag';
-  if (ceiling === null && !hasTerminal) return 'no-terminal';
-  return null;
-}
-
 /** How the command reaches the sources and the terminal; each left out is the system's own. */
 export interface NextCommandSeams extends NextSourceSeams {
   /** True when a question can be answered. `process.stdin.isTTY` when left out. */
@@ -483,13 +455,14 @@ export interface NextCommandSeams extends NextSourceSeams {
 export const DEFAULT_NEXT_SEAMS: NextCommandSeams = Object.freeze({});
 
 /**
- * Runs one state's action: the registered command it names, or, for
- * `sync`, the fast-forward through the git seam, whose refusal is this
- * command's own exit 1 and whose words git wrote are printed as they are.
+ * Runs one state's action: the registered command it names, `hop` and
+ * `home` in-process through `runAction` as well, or, for `sync`, the
+ * fast-forward through the git seam, whose refusal is this command's own
+ * exit 1 and whose words git wrote are printed as they are.
  */
 async function runStateAction(context: RafaContext, sources: NextSources, state: NextState): Promise<void> {
   if (state.action !== 'sync') {
-    await runAction({ ...context, output: actionOutput(context.output) }, state);
+    await runAction({ ...context, output: actionOutput(context.output) }, state, { roadmap: sources.roadmap !== undefined });
     return;
   }
 
@@ -512,6 +485,20 @@ function endOfEpic(context: RafaContext, sources: OpenedNextSources, report: Nex
 }
 
 /**
+ * The `home` step after a loop, read over a fresh answer; a walk that
+ * fails is warned about and answers null, so the hop stays away and the
+ * next `rafa next --roadmap` reads it again. See the module note.
+ */
+async function homeAfterLoop(context: RafaContext, sources: OpenedNextSources): Promise<NextState | null> {
+  try {
+    return await readHomeAfterLoop(sources.answer());
+  } catch (error) {
+    context.output.warn(`the hop could not be read after the loop, so rafa next does not go home: ${messageOf(error)}`);
+    return null;
+  }
+}
+
+/**
  * Reads the line, composes the sources and runs the chain over them,
  * asking through a prompter opened on the first question. See the module
  * note for the endings and the exit codes.
@@ -519,10 +506,13 @@ function endOfEpic(context: RafaContext, sources: OpenedNextSources, report: Nex
 export async function runNext(context: RafaContext, seams: NextCommandSeams): Promise<NextChainReport> {
   expectNoArgument(context.args, NEXT_USAGE);
   const flagged = readDryRun(context.flags);
+  const roadmap = readRoadmap(context.flags);
   const ceiling = readYesCeiling(context.flags, NEXT_USAGE);
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const dryRun = dryRunOf(flagged, ceiling, isTerminal());
-  const sources = openNextSources(context, seams);
+  const sources = openNextSources(context, seams, roadmap
+    ? { roadmap }
+    : {});
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
   const prompter = lazyPrompter(openPrompter);
   const dry = watchDryEpic();
@@ -543,6 +533,9 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
       warn: (line: string) => {
         context.output.warn(line);
       },
+      ...roadmap
+        ? { roadmap: { afterLoop: () => homeAfterLoop(context, sources) } }
+        : {},
     });
     endOfEpic(context, sources, report, dry.last());
     return report;
@@ -554,12 +547,21 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
 /** The action ids help names, as `src/next/ceiling.ts` accepts them. */
 const YES_ID_LIST = YES_ACTIONS.join(', ');
 
-/** The two flags the command declares. */
+/** The three flags the command declares. */
 const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
   {
     name: DRY_RUN_FLAG,
     description: 'Print where the project stands and what to do about it, and stop without asking or running it.'
       + ' A run with no terminal to answer on and no --yes does this whether or not the flag is typed.',
+    type: 'boolean',
+  },
+  {
+    name: ROADMAP_FLAG,
+    description: 'Follow one blocker into another epic or board and come home: where the walk stops at an issue'
+      + ' blocked by one in another epic, or at an epic with no line left, propose the hop there, pass'
+      + ' --roadmap to plan create and loop start, and go home once the loop has run. A blocker that is'
+      + ' itself blocked halts with the chain instead, and a pull request whose owner has not approved is'
+      + ' not merged.',
     type: 'boolean',
   },
   {
@@ -589,8 +591,11 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       + ' `rafa pr merge <n> --skip-checks`, which asks its own question after the warning it prints, so'
       + ' rafa next asks none before it. `--dry-run` prints the two lines and stops, and so does a run'
       + ' with no terminal to answer on and no `--yes`, since there is nobody to put the question to.'
+      + ' With `--roadmap` it follows one blocker into another epic or board, works it up to its pull'
+      + ' request and comes home, halting where that blocker is blocked in turn.'
       + ' With `--output=json`'
-      + ' the steps and why the chain stopped are the data of the terminal result event.',
+      + ' the steps and why the chain stopped are the data of the terminal result event, and under'
+      + ' `--roadmap` the hops that ran as well.',
     args: [],
     flags: [...NEXT_FLAGS],
     examples: [
@@ -605,6 +610,10 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       {
         cmd: 'rafa next --yes=sync,plan',
         note: 'Fast-forwards the base and creates the next plan unasked, stopping at any other step.',
+      },
+      {
+        cmd: 'rafa next --roadmap --yes=hop,plan,start,home',
+        note: 'Hops to the epic holding the blocker, plans and runs it, and comes home unasked.',
       },
     ],
     outputs: ['text', 'json'],

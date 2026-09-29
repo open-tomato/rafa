@@ -161,6 +161,8 @@ export function createPullRequestsDouble(
     listMerged: bind('listMerged'),
     get: bind('get'),
     checks: bind('checks'),
+    changedFiles: bind('changedFiles'),
+    reviews: bind('reviews'),
     browse: bind('browse'),
     merge: bind('merge'),
     editBody: bind('editBody'),

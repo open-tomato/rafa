@@ -23,6 +23,13 @@
  *   - `state`: one of {@link SESSION_STATES}.
  *   - `task`: the task running, its 1-based tracker line and its sentence,
  *     or null.
+ *   - `hop`: only on a run started with `loop start --roadmap` while a
+ *     `rafa next --roadmap` hop is away, the hop record as
+ *     `.rafa/hop.json` held it when the run began
+ *     (`src/next/hop-record.ts`, `start/session.ts`). A record of any
+ *     other run carries no `hop` key at all, never one set to null, so
+ *     such a record is written byte for byte as it was before the field.
+ *     Once written, every later write of the record keeps it as it is.
  *
  * ## One session is one `loop start`
  *
@@ -95,7 +102,8 @@
  * ## What is refused on read
  *
  * {@link SessionRecordError}, naming the file: text that is no JSON
- * object, a field of the wrong type or outside its set, a pid that is no
+ * object, a field of the wrong type or outside its set, a `hop` key whose
+ * value is not a hop record (null included), a pid that is no
  * positive whole number (signal 0 to pid 0 or below would reach a process
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. {@link readSessions} reads
@@ -103,6 +111,8 @@
  * does not exist. {@link readSession} reads the one record an id names,
  * and refuses a file that is not there.
  */
+import type { HopRecord } from '../next/hop-record.js';
+
 import {
   linkSync,
   mkdirSync,
@@ -115,6 +125,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
+import { asHopRecord } from '../next/hop-record.js';
 import { scopeAt } from '../project/scope.js';
 import { isStampableStub } from '../utils/plan-stamp.js';
 
@@ -151,6 +162,8 @@ export interface SessionRecord {
   readonly startedAt: string;
   readonly state: SessionState;
   readonly task: SessionTask | null;
+  /** The away hop the run was started under; left out of every other run's record. See the module note. */
+  readonly hop?: HopRecord;
 }
 
 /** What a new record is made from; it opens `running`, with no task. */
@@ -286,6 +299,15 @@ function taskProblem(task: unknown): string | null {
     : `task.text is ${describeValue(field(task, 'text'))}, expected a non-empty string`;
 }
 
+/** The problem with a record's `hop`, or null, a record without the key included. */
+function hopProblem(fields: object): string | null {
+  if (!Object.hasOwn(fields, 'hop')) return null;
+  const hop = field(fields, 'hop');
+  return asHopRecord(hop) === null
+    ? `hop is ${describeValue(hop)}, expected a hop record`
+    : null;
+}
+
 /** The problem with a record's `sessionId`, read from `file`, or null. */
 function sessionIdProblem(sessionId: unknown, file: string): string | null {
   if (typeof sessionId !== 'string' || !isSessionId(sessionId)) {
@@ -329,13 +351,21 @@ function recordProblems(fields: object, file: string): string[] {
       ? null
       : `state is ${describeValue(state)}, expected one of ${SESSION_STATES.join(', ')}`,
     taskProblem(field(fields, 'task')),
+    hopProblem(fields),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
 
-/** A frozen record of fields already checked, in the order it is written. */
+/** A checked `hop` value, frozen through to its places. */
+function freezeHop(value: unknown): HopRecord {
+  const hop = asHopRecord(value) as HopRecord;
+  return Object.freeze({ ...hop, home: Object.freeze(hop.home), from: Object.freeze(hop.from) });
+}
+
+/** A frozen record of fields already checked, in the order it is written; `hop` last, and only when there. */
 function freezeRecord(fields: object): SessionRecord {
   const task = field(fields, 'task');
+  const hop = field(fields, 'hop');
   return Object.freeze({
     sessionId: field(fields, 'sessionId') as string,
     planStub: field(fields, 'planStub') as string | null,
@@ -347,6 +377,9 @@ function freezeRecord(fields: object): SessionRecord {
     task: isObject(task)
       ? Object.freeze({ line: field(task, 'line') as number, text: field(task, 'text') as string })
       : null,
+    ...hop === undefined
+      ? {}
+      : { hop: freezeHop(hop) },
   });
 }
 

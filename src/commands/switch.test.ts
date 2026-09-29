@@ -34,10 +34,8 @@ import { positionFilePath, readPositionFile, writePositionFile } from '../projec
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
 import {
-  boardOfEpic,
   createSwitchCommand,
   kindOf,
-  openBoards,
   placeLine,
   readRehome,
   readSwitchTarget,
@@ -216,32 +214,6 @@ describe('kindOf', () => {
   it('refuses a closed board and a closed epic, naming which', async () => {
     expect(await kindOf(41, switchBoard())).toEqual({ why: '#41 is a closed board' });
     expect(await kindOf(95, switchBoard())).toEqual({ why: '#95 is a closed epic' });
-  });
-});
-
-describe('boardOfEpic', () => {
-  it('takes the current board first when it lists the epic', async () => {
-    expect(await boardOfEpic(50, at(40, 80), switchBoard())).toBe(40);
-    expect(await boardOfEpic(50, at(31, 60), switchBoard())).toBe(31);
-  });
-
-  it('takes the default board next, then the lowest-numbered listing it, then the default', async () => {
-    expect(await boardOfEpic(60, at(40, 80), switchBoard())).toBe(31);
-    expect(await boardOfEpic(85, at(31, 50), switchBoard())).toBe(40);
-    expect(await boardOfEpic(90, at(40, 80), switchBoard())).toBe(31);
-  });
-
-  it('passes a closed board that lists the epic', async () => {
-    const listing = boardIssues([raw(41, 'Old', checklist(50), BOARD_LABELS, 'CLOSED'), raw(45, 'Open', checklist(50), BOARD_LABELS)]);
-    const board = { listing, rows: new Map(listing.map((issue) => [issue.number, issue])), configured: null, defaultBoard: () => Promise.resolve(45) };
-
-    expect(await boardOfEpic(50, at(41, null), board)).toBe(45);
-  });
-});
-
-describe('openBoards', () => {
-  it('keeps the open labelled rows, lowest number first', () => {
-    expect(openBoards([...boardIssues()].reverse()).map((row) => row.number)).toEqual([31, 40, 45]);
   });
 });
 

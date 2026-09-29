@@ -81,7 +81,7 @@ module's note is the long form.
 | `src/status/seen.ts` | the local reading `takeSeenSnapshot` takes at the start of every command and writes for the next, held in `<root>/.rafa/status-seen.json`, through `readSeenFile` and `writeSeenFile` |
 | `src/status/notice.ts` | the since-last-command notice: `compareSeen` finds what changed between two snapshots (`idleWorktrees`, `mergedBranches`, `stoppedSessions`, `blockedSessions`), and `noticeLine` answers the one stderr line naming `rafa status` or `rafa cleanup` |
 | `src/status/hook.ts` | the since-last-command notice as the dispatcher's command hook: `before` compares snapshots and returns the line, `after` writes the current snapshot so the next command finds what this one did |
-| `src/commands/status.ts` | `rafa status`: where the project stands in five sections — branch and plan, loops, pull request, board, housekeeping — read by the five readers of `src/status/sections.ts` and worded by `src/status/render.ts`. It is all code: it starts no Claude session and declares no `spends`. The five sections are run in order and the pull request and board are read through `gh` under a short deadline with no fetch. A section that could not be read is one `warn` line saying why. Under the Board line, only when a position file exists or an open issue carries `type:roadmap`, sit the place line and, while away from home, the away line (`src/status/place-line.ts`), then each fallback notice `resolvePlace` gave but the absent-file one as an indented `warn` line; the board listing is read once for both the place and the walk. A project with neither prints what it did before boards. Everything else is `info`. Exit code 1 only for a config `loadConfig` refuses; 2 for a positional word; 0 otherwise |
+| `src/commands/status.ts` | `rafa status`: where the project stands in five sections — branch and plan, loops, pull request, board, housekeeping — read by the five readers of `src/status/sections.ts` and worded by `src/status/render.ts`. It is all code: it starts no Claude session and declares no `spends`. The five sections are run in order and the pull request and board are read through `gh` under a short deadline with no fetch. A section that could not be read is one `warn` line saying why. Under the Board line, only when a position file exists or an open issue carries `type:roadmap`, sit the place line, while away from home the away line, and `waiting on #C (owner review)` while a `.rafa/hop.json` record in state `waiting` names a pull request still open whose owner gate lets no merge through (`src/status/place-line.ts`), then each fallback notice `resolvePlace` gave but the absent-file one as an indented `warn` line; the board listing is read once for both the place and the walk. A project with neither prints what it did before boards. Everything else is `info`. Exit code 1 only for a config `loadConfig` refuses; 2 for a positional word; 0 otherwise |
 | `src/commands/cleanup.ts` | `rafa cleanup [--dry-run]`: the reading of `src/cleanup/` (`git fetch --prune` first, `pr.base`, the three `cleanup.*` settings, git run in the directory the command runs from, the provider `resolvePrProvider` resolves at the project root, or none) shown in four groups, in code and starting no session, so it declares no `spends`. With a terminal the groups are one grouped `multiSelect`, each row the line `./cleanup-render.ts` prints and ticked as the reading ticks it; each ticked Not-pushed row then asks a second `[y/N]` naming its commit count, and `Delete <n> branches and remove <m> worktrees? [y/N]` asks before `src/cleanup/steps.ts` runs the steps. The questions go through a line `Prompter` opened only after the checklist answers, so the two readers never share standard input. `--dry-run` asks the same checklist and second questions, then prints each step's command line in place of the final question. Without a terminal, or with `--output=json`, it prints the four groups (the json data being `cleanupData`), asks nothing and removes nothing, `--dry-run` included. Exit code 0 for every run that removed what was answered or nothing; 1 for an argument, a value typed after `--dry-run`, a config `loadConfig` refuses, a repository git cannot read, and a step that did not run clean |
 | `src/commands/doctor-render.ts` | the lines of `rafa doctor`'s plan section: the head, a line per check, the start-only items a resume passed over, the PREREQUISITES steps nothing checks, and the verdict |
 | `src/commands/doctor-cleanup.ts` | the cleanup row of `rafa doctor`: the four counts `rafa cleanup` would list (`cleanupCounts` over `readCleanup` with `fetch: false`, git in the project root, the provider the board's `gh` runner, or none), rendered as one line naming every count and `rafa cleanup`, only when any count is above zero |
@@ -94,10 +94,89 @@ module's note is the long form.
 | `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
 | `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
-| `src/commands/next.ts` | `rafa next [--dry-run] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap walked from the current place (`ghNextBoard`, `src/next/sources.ts`: the default board with no position file, else the place's board, or its epic's lines alone) — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eight ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan` and `unblock`; bare `--yes` allows `sync`, `wait`, `unblock` and `plan`. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`), whether `rafa next` asked about it, and whether it ran. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/next.ts` | `rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap walked from the current place (`ghNextBoard`, `src/next/sources.ts`: the default board with no position file, else the place's board, or its epic's lines alone) — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the ten ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `start`, `plan`, `unblock`, `hop` and `home`; bare `--yes` allows `sync`, `wait`, `unblock`, `plan` and `home`. `hop` and `home` (`ROADMAP_ACTIONS`) are proposed only by the hop rows, and the stop lines (`src/next/lines.ts`) leave them out of the lists they print unless the run was typed with `--roadmap`, so a plain run prints what it printed before they were ids. The `--roadmap` flag opens the sources with `roadmap` (`openNextSources`: the board's hop reading, and `NextSources.roadmap` holding the owner gate `src/next/owner-gate.ts` composes), passes `--roadmap` last among the words of the `plan`, `start` and `resume` actions (`ROADMAP_PASSED_ACTIONS`, `src/next/actions.ts`), and, once a loop action has run while a hop is away, puts the `home` step (`readHomeAfterLoop`, `src/next/state.ts`) as one more asked or allowed turn before the chain stops `loop-started`; without the flag none of these happens and no key is added. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`, `hop` and `home`, which run in-process), whether `rafa next` asked about it, and whether it ran. Under `--roadmap` the report also carries `hops`, what each `hop` and `home` action that ran wrote, in order; the key is left out without the flag. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
+### `rafa next --roadmap`: the hop rows
+
+The `--roadmap` flag enables five additional rows in the state table
+(`src/next/hop-rows.ts`, read under `--roadmap` alone), each proposing `hop`
+or `home` and none read without it. They sit just before their corresponding
+base rows in the action order:
+
+- `pr-owner-review` (action `none`) sits just before row 7, `pr-no-checks`.
+  It holds back an otherwise mergeable pull request when the owner gate
+  (`src/next/owner-gate.ts`) answers anything but `not-gated` or `approved`.
+  C is the hop record's target when the record names this pull request,
+  else its own number since the issue it closes is not read there. The gate
+  reading rejects a bad `gh` call and lets nothing through on it.
+- `away-ended` (action `home`) sits just before row 9, `plan-unstarted`.
+  It sends C back home when its work ended: C closed (closing `merged`), C
+  has an open pull request (closing `waiting`), or C became the line and
+  lacks `spec:ready` and is not blocked (closing `halted`).
+- `hop-halt` (action `home`) and `hop-blocked` (action `hop`) both sit just
+  before row 11, `issue-blocked`. `hop-halt` takes any halt the walk's
+  decision carries and proposes `home`, reading the halt's chain
+  (`halt: #H ← #C ← #B: …`). `hop-blocked` takes a hop decision at home
+  and proposes `hop`, reading the spec line (`hop from epic #e: #H blocked by
+  #C, in epic #f`).
+- `hop-dry` (action `hop`) sits just before row 13, `nothing-left`.
+  It takes a dry epic with a next `now` epic following it, when the move
+  passes the one-hop rule, and proposes `hop` to that next epic.
+
+The two rows `hop-halt` and `hop-blocked` partition a blocked-line reading
+between them: one that halts, and one that hops. The walk that read C closed
+never reaches either. When a loop action (`start`, `resume`) runs while a
+hop is away, `readHomeAfterLoop` (`src/next/state.ts`) asks the board afresh
+and answers `home` before the chain stops, reading the record's state as
+`away-ended` does — `merged` for C closed, `waiting` for C's open pull
+request — and `halted` where the loop left C open with no pull request.
+
+The `hop` and `home` action ids can be listed under `--yes` (as `hop,home` in
+the comma list), and they are proposed only by the hop rows, so a plain run
+prints nothing but what it printed before these rows existed. The stop lines
+that rafa prints omit the proposal words `hop` and `home` unless the run was
+typed with `--roadmap`.
+
+The hop record (`.rafa/hop.json`): Where a hop is under way, this per-project
+file holds the one record `src/next/hop-record.ts` defines. It names the kind
+(`blocker` for a hop to C's epic, `dry` for a hop to the next `now` epic),
+the places the hop comes back to (the position's `home`) and leaves from,
+the issue numbers H and C (null on a dry hop), the epic and board the hop
+goes to, the state (`away` while working, `waiting` with C's pull request
+open, `merged` with C closed, `halted` from a halt), C's open pull request
+number or null, and the hop's start time. A person switched by hand
+(`rafa switch <n>`), and the position's `home` no longer equals the record's,
+when the record is `staleAgainst` the position. Every turn reads the position
+and the record afresh; a stale record is dropped and no hop is away that
+turn. The `home` action writes the record's `state`, `pullRequest` and
+nothing else; every later write keeps the record.
+
+The owner gate reading: The gate (`src/next/owner-gate.ts`, read once per
+turn by `pr-owner-review`) composes `readOwnerApproval` (`src/pr/owner-approval.ts`)
+over the home board (the position's `home`, or the default board when there is
+no position file), every open `type:roadmap` board and their `Owner:` and `Owns:`
+lines, and CODEOWNERS. The gate answers `not-gated`, `approved`, `waiting`,
+`unresolved` or `unknown`; `waiting` and `unresolved` hold the merge back, and
+a failed reading is read as `unknown`, which also holds it back.
+
+The `--roadmap` flag passes through to `plan create` (so a hop can `--next`
+instead of checking the roadmap by hand) and to `loop start` (so the loop
+knows whether a hop is away), via `ROADMAP_PASSED_ACTIONS` (`src/next/actions.ts`).
+The plan route reads it to decide how to pick an issue: with the flag, a hop
+record that is `away` on a blocker names the target C to pick, and a C whose
+blocker is still open stops `blocked`; without it, `plan create --next` picks
+as a bare `--next` does. The loop reads it to read the hop record and stamp
+it as its `hop` when the record is `away` of either kind and its `home` is
+still the position's.
+
+The session record's `hop` field: When `loop start --roadmap` runs while a hop
+is `away`, its run record (`.rafa/runs/<session-id>.json`) carries the hop record
+itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
+none, and no position file stamp nothing. `parseSessionRecord` (`loop/sessions.ts`)
+refuses a `hop` key holding anything but a hop record, and every later write keeps
+it whole.
 
 ### Changing the `rafa next` table
 
@@ -111,11 +190,15 @@ New; it replaces no earlier text. What a row or an action added to
   `rows\? [0-9]` and renumbering each hit.
 - **A new `NextActionId` fails `check-types`** until `ACTION_COMMANDS`
   (`actions.ts`, a `Record` over `NextCommandActionId`) maps it to a
-  command.
+  command, or `NextCommandActionId` excludes it as an action that runs
+  none, as it excludes `sync`, `hop` and `home`.
 - **A mapped action can be listed under `--yes` straight away.**
-  `YES_ACTIONS` is `NEXT_COMMAND_ACTIONS` minus `ALWAYS_ASKED`, so an
-  action that must never run from a list goes into `ALWAYS_ASKED` and
-  `ALWAYS_ASKED_WHY` in the same change.
+  `YES_ACTIONS` is `sync`, then `NEXT_COMMAND_ACTIONS` minus
+  `ALWAYS_ASKED`, then `hop` and `home`, so an action that must never
+  run from a list goes into `ALWAYS_ASKED` and `ALWAYS_ASKED_WHY` in the
+  same change. An action that runs in-process (`NEXT_IN_PROCESS_ACTIONS`
+  in `actions.ts`: `sync`, `hop`, `home`) is spelled into `YES_ACTIONS`
+  by hand.
 - **An action whose command asks its own question is handed over.** The
   chain closes its prompter first (`handOver`, `prompter.close` in
   `runNext`). Two `createLinePrompter`s on one stdin both receive every
@@ -244,6 +327,16 @@ New; it replaces no earlier text. What a row or an action added to
   handed into `start`, which resolves the plan from `.rafa/plans/` unless
   `plan.dir` in the config names another directory, then uses that plan's
   stub to name the new branch.
+- **`loop start --roadmap` stamps the away hop on the session record**
+  (`start/session.ts`): `rafa next --roadmap` passes the flag to the loop
+  it starts, and the run's `.rafa/runs/<session-id>.json` then carries the
+  hop record (`.rafa/hop.json`) as its `hop` when that record is `away`,
+  of either kind, and its home is still the position's. A record back
+  home, a stale one, none, and no position file stamp nothing; a file
+  that is no hop record is warned about in one line and stamps nothing.
+  Without the flag neither file is read and the record carries no `hop`
+  key; `parseSessionRecord` (`loop/sessions.ts`) refuses a `hop` key
+  holding anything but a hop record, and every later write keeps it.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
@@ -427,6 +520,14 @@ New; it replaces no earlier text. What a row or an action added to
   titled `Roadmap` (`resolveDefaultBoard`, `src/board/boards.ts`) — and
   otherwise the place's board, or its epic's lines alone whatever its
   horizon, a place that no longer stands warned and fallen back from.
+  `--roadmap`, which `rafa next --roadmap` passes, is refused with exit
+  code 2 on a line without `--next`; with it, a hop record
+  (`.rafa/hop.json`) that is `away` on a blocker, and whose home is
+  still the position's, has the pick answer the record's target C on
+  its own board with no roadmap read (`readAwayHop`), a C whose
+  blocker is still open stopping `blocked`, and C then going through
+  the same checks as any pick. Any other record, or none, picks as a
+  bare `--next` does, a record that cannot be read warned first.
   It prints each line it skipped with why, and exits 0 with a message when nothing
   is left. `--dry-run` does every read and every refusal of checks 0–2
   and stops before the first write, on all three routes, so it never
@@ -525,7 +626,7 @@ New; it replaces no earlier text. What a row or an action added to
   readiness reading recognises. `src/tests/spec-template-source.test.ts`
   holds the file to the code and the filled template to no gap.
 - **The words `plan create` reads live in `src/board/flags.ts`**, the
-  eight of the board routes and the gate, because
+  nine of the board routes and the gate, because
   `src/commands/index.test.ts` holds the command's declared flags equal
   to the quoted `--` literals of the modules named for it and a module
   that also quotes a `gh` argument, as `src/board/issue.ts` does, cannot
@@ -1619,8 +1720,9 @@ New; it replaces no earlier text. What a row or an action added to
 - **`rafa board list` lists the open boards**
   (`src/commands/board/list.ts`), the one action of the `board` subject.
   It reads the board listing once, as `switch` does, and ranks the
-  default board over that listing through `defaultBoardOnce` and
-  `openBoards`, which it imports from `src/commands/switch.ts`. The
+  default board over that listing through `defaultBoardOnce`, which it imports from
+  `src/commands/switch.ts`, and `openBoards`, from
+  `src/board/epic-board.ts`. The
   boards are the listing's open `type:roadmap` rows, lowest first, plus
   the default board when it is open on the listing without the label (an
   issue titled "Roadmap" while nothing is labelled, or `roadmap.issue`),

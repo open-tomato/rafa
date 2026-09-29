@@ -66,6 +66,33 @@ by hand; pass `--no-rehome` to keep it still. Use "home" in prose and in
 settings, commands and specifications to name the anchor slot of the
 position triple.
 
+### Hopping between epics: the two-hands pattern
+
+**A hop** is a move from the current place to a blocker in another
+epic or board, with a return to home when done. The pattern holds two
+slots: home (the anchor you hold with one hand) and current (the work
+you reach with the other). A hop uses `rafa next --roadmap` to follow a
+blocker from `current` to `current`, stepping between epics or boards,
+and halts if the blocker is itself blocked (a three-handed reach the
+pattern refuses). Use "hop" in prose and command names for the
+two-slot reach; the action form is "hopping" or "to hop".
+
+**The hop record** is the file `.rafa/hop.json`, written when a hop
+starts to track which issue rafa works and where home is. When
+`rafa next` finishes the issue, it deletes the record and returns to
+home. A record is stale when the position's home no longer equals the
+record's home (a person switched by hand); rafa drops it and follows
+the new position.
+
+**The owner gate** is the permission check rafa runs before a hop
+into another epic or board. When the target epic's board has an
+`Owner:` line and it differs from the current board's owner, rafa
+reads which team owns the target code from `CODEOWNERS` and asks for
+permission before changing files outside the current team's code.
+Rejected hops leave the loop halted with the reason. Use "owner
+gate" in prose and specifications; in a test fixture, the rejection
+prints `owner review required` as the halt reason.
+
 ### Epic lifecycle: the closing gate and the trail
 
 **The closing gate** is the verification step `rafa epic close` runs

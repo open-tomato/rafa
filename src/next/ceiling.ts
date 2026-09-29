@@ -17,25 +17,36 @@
  * proposal and stopping the chain there is `src/commands/next.ts`, the
  * one module of the surface that writes a line.
  *
- * ## The eight ids
+ * ## The ten ids
  *
- * {@link YES_ACTIONS}: `sync`, the one action that runs no registered
- * command (`./sync.ts`), and the seven of {@link NEXT_COMMAND_ACTIONS}
- * that {@link ALWAYS_ASKED} does not hold. They are taken off that table
- * rather than spelled again, so an id the table gains is accepted here
- * the same day and the list `--yes` names cannot drift from the list
- * the chain can run. `none` is not among them: it is the state that
- * proposes nothing, and there is nothing there to allow.
+ * {@link YES_ACTIONS}: `sync`, an action that runs no registered command
+ * (`./sync.ts`), the seven of {@link NEXT_COMMAND_ACTIONS} that
+ * {@link ALWAYS_ASKED} does not hold, and `hop` and `home`, the two
+ * other actions that run none (`./hop-action.ts`), which only the hop
+ * rows of `rafa next --roadmap` propose (`./hop-rows.ts`). The seven are
+ * taken off that table rather than spelled again, so an id the table
+ * gains is accepted here the same day and the list `--yes` names cannot
+ * drift from the list the chain can run. `none` is not among them: it
+ * is the state that proposes nothing, and there is nothing there to
+ * allow.
  *
- * ## The four bare `--yes` allows
+ * ## The five bare `--yes` allows
  *
- * {@link BARE_YES_ACTIONS}: `sync`, `wait`, `unblock` and `plan` — the
- * four that neither merge, nor start a loop, nor push. So bare `--yes`
- * over a green pull request fast-forwards nothing it has to undo: the
- * chain prints the merge proposal and merges nothing. The other four
- * are typed out one at a time, `--yes=merge,start`, which is the shape
- * of a ceiling: the cheap steps are the default, the costly ones are
- * asked for by name.
+ * {@link BARE_YES_ACTIONS}: `sync`, `wait`, `unblock`, `plan` and
+ * `home` — the five that neither merge, nor start a loop, nor push, nor
+ * leave home. So bare `--yes` over a green pull request fast-forwards
+ * nothing it has to undo: the chain prints the merge proposal and
+ * merges nothing. `home` only ever comes back to where the run started,
+ * so it is as cheap as the other four; `hop`, which leaves home for
+ * another epic or another team's board, is typed out with the other
+ * four, one at a time, `--yes=merge,start,hop`, which is the shape of a
+ * ceiling: the cheap steps are the default, the costly ones are asked
+ * for by name.
+ *
+ * {@link ROADMAP_ACTIONS} names the two ids no run proposes without
+ * `--roadmap`: `src/next/lines.ts` leaves them out of the lists it
+ * prints in a run without that flag, so a plain `rafa next` says what it
+ * said before they were ids, and names them under it.
  *
  * ## The two refusals, both exit 2
  *
@@ -108,22 +119,28 @@ function isAlwaysAsked(action: string): action is AlwaysAskedId {
 /** The exit code a refused list ends with; see the module note. */
 export const CEILING_REFUSAL_EXIT = 2;
 
+/** The two ids only the hop rows of `rafa next --roadmap` propose; see the module note. */
+export const ROADMAP_ACTIONS: ReadonlySet<NextActionId> = new Set<NextActionId>(['hop', 'home']);
+
 /**
- * The eight ids a list may name: `sync`, which runs no command, and the
- * seven of the action table that {@link ALWAYS_ASKED} does not hold.
- * Taken off that table, so the two cannot drift; see the module note.
+ * The ten ids a list may name: `sync`, which runs no command, the seven
+ * of the action table that {@link ALWAYS_ASKED} does not hold, and `hop`
+ * and `home`. The seven are taken off that table, so the two cannot
+ * drift; see the module note.
  */
 export const YES_ACTIONS: readonly NextActionId[] = Object.freeze([
   'sync',
   ...NEXT_COMMAND_ACTIONS.filter((action) => !ALWAYS_ASKED.has(action)),
+  ...ROADMAP_ACTIONS,
 ]);
 
-/** The four bare `--yes` allows: the ones that neither merge, nor start a loop, nor push. */
+/** The five bare `--yes` allows: the ones that neither merge, nor start a loop, nor push, nor leave home. */
 export const BARE_YES_ACTIONS: readonly NextActionId[] = Object.freeze([
   'sync',
   'wait',
   'unblock',
   'plan',
+  'home',
 ] as const);
 
 /** The action ids that may run unasked, or null where every one is asked about. */

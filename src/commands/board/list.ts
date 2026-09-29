@@ -61,6 +61,7 @@ import type { Place } from '../../project/position.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readBoardBody } from '../../board/board-body.js';
+import { openBoards } from '../../board/epic-board.js';
 import { createOwnerResolver } from '../../board/owner-resolve.js';
 import { resolvePlace } from '../../board/place.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
@@ -68,7 +69,7 @@ import { ROADMAP_LABEL } from '../../board/setup.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
-import { defaultBoardOnce, openBoards } from '../switch.js';
+import { defaultBoardOnce } from '../switch.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa board list';

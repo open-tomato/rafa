@@ -89,6 +89,19 @@
  *  - the listing not kept across the place and the walk: 61 pass and 1
  *    fail, the epic case counting one listing.
  *
+ * ## Under `--roadmap`
+ *
+ * Each hop case plants a position whose current board is {@link BOARD},
+ * so a pick that did NOT follow the hop answers #42 and never C, #90,
+ * which no board lists: the pick of C is only the record's doing. The
+ * first hop case's control is the same checkout with no `followHop`.
+ * Five mutations were driven on 2026-09-28, one at a time, over this
+ * file and `./spec-source.test.ts` against 76 pass and 0 fail, each
+ * module restored from a scratch copy and verified with `shasum -c`:
+ * the stale check dropped, the `away` check dropped, C's blocked
+ * reading skipped and the `--roadmap` refusal dropped each went 75 pass
+ * and 1 fail; the funnel not passing `followHop` on went 70 and 6.
+ *
  * ## Mutations recorded before the move
  *
  * These cases lived in `./spec-source.test.ts` until the pick moved out
@@ -120,17 +133,19 @@ import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RoadmapSeams } from './spec-source-roadmap.js';
 import type { SpecSourceResolution } from './spec-source.js';
+import type { HopRecord } from '../next/hop-record.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
-import type { Place } from '../project/position.js';
+import type { Place, Position } from '../project/position.js';
 
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
 import { CommandExit } from '../cli/command.js';
+import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
 import { positionAt, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -153,13 +168,25 @@ import {
   blockedPickLine,
   descentPassLine,
   epicHeaderLine,
+  hopBlockedMessage,
+  hopHeaderLine,
+  hopPickLine,
   labelOnlyLine,
   pickLine,
   passedLine,
   roadmapHeaderLine,
   skipLine,
+  unfollowedHopNotice,
 } from './spec-source-roadmap.js';
-import { describeIssue, dryRunLine, resolveSpecSource } from './spec-source.js';
+import {
+  describeIssue,
+  dryRunLine,
+  readSpecSourceFlags,
+  resolveSpecSource,
+  ROADMAP_REFUSAL_EXIT,
+  roadmapWithoutNextMessage,
+  SOURCE_REFUSAL_EXIT,
+} from './spec-source.js';
 
 /** Where the per-case roots are made. */
 let parent = '';
@@ -339,9 +366,16 @@ function nextRun(options: {
   readonly dryRun?: boolean;
   readonly inspect?: (issue: SpecIssue) => Promise<void>;
   readonly output?: ReturnType<typeof sinkOutput>;
+  readonly followHop?: boolean;
 }): Promise<SpecSourceResolution> {
   return resolveSpecSource({
-    request: { kind: 'next', roadmap: options.roadmap ?? null },
+    request: {
+      kind: 'next',
+      roadmap: options.roadmap ?? null,
+      ...options.followHop === true
+        ? { followHop: true as const }
+        : {},
+    },
     refresh: false,
     dryRun: options.dryRun ?? false,
     repoRoot: root,
@@ -1192,5 +1226,300 @@ describe('pickRoadmapIssue from the current place', () => {
     expect(specOf(resolution).issue).toBe(20);
     expect(lines.warn).toEqual([unweighedPositionNotice(ROADMAP)]);
     expect(issues.asked()).not.toContain(BOARD);
+  });
+});
+
+/** C, the away hop's target: on no board a walk reads, so only the record can pick it. */
+const HOP_TARGET = 90;
+
+/** H, the home issue C blocks. */
+const HOP_BLOCKED = 20;
+
+/** B, the open blocker a halted C waits on. */
+const HOP_BLOCKER = 91;
+
+/** The epic C is in, on {@link BOARD}. */
+const HOP_EPIC = 95;
+
+/** The place a hop case calls home: the default roadmap, no epic. */
+const HOME: Place = { board: ROADMAP, epic: null };
+
+/**
+ * The board a hop case reads: the place fixture, C ready on {@link BOARD}'s
+ * far epic, and B open. `fields` changes one issue.
+ */
+function hopBoard(fields: Partial<Record<number, Partial<SpecIssue>>> = {}): readonly SpecIssue[] {
+  return [
+    ...placeBoard(),
+    issueOf(HOP_TARGET, { labels: [SPEC_LABEL, SPEC_READY_LABEL], ...fields[HOP_TARGET] }),
+    issueOf(HOP_BLOCKER, { labels: [SPEC_LABEL], ...fields[HOP_BLOCKER] }),
+  ];
+}
+
+/** A blocker hop from {@link HOME} to C, in `state`. */
+function hopRecord(fields: Partial<HopRecord> = {}): HopRecord {
+  return {
+    kind: 'blocker',
+    home: HOME,
+    from: HOME,
+    blocked: HOP_BLOCKED,
+    target: HOP_TARGET,
+    targetEpic: HOP_EPIC,
+    targetBoard: BOARD,
+    state: 'away',
+    pullRequest: null,
+    startedAt: '2026-09-28T10:00:00.000Z',
+    ...fields,
+  };
+}
+
+/**
+ * Writes a checkout away on a hop: the position at {@link BOARD} with
+ * `home` as its home, and the hop record. The position's current place
+ * is {@link BOARD} with no epic, so a walk that did not follow the hop
+ * picks #42, that board's first line, and never C.
+ */
+function awayOnHop(record: HopRecord | null, home: Place = HOME): void {
+  const position: Position = { current: { board: BOARD, epic: null }, previous: home, home };
+  writePositionFile(root, position);
+  if (record !== null) writeHopRecord(root, record);
+}
+
+/** The seams a hop case walks with: the listing counted, and no board or search a hop may reach. */
+function hopSeams(board: readonly SpecIssue[]): { seams: Partial<RoadmapSeams>; listing: ReturnType<typeof plantedListing> } {
+  const listing = plantedListing(board);
+  return { listing, seams: { listing: listing.listing } };
+}
+
+/** The lines a hop to C prints before it answers C. */
+const HOP_LINES: readonly string[] = [
+  hopHeaderLine({ record: hopRecord(), target: HOP_TARGET }),
+  hopPickLine(HOP_TARGET),
+];
+
+describe('readSpecSourceFlags with --roadmap', () => {
+  it('marks a --next request to follow the hop, bare and with a roadmap named', () => {
+    expect(readSpecSourceFlags(['--next', '--roadmap']).request).toEqual({ kind: 'next', roadmap: null, followHop: true });
+    expect(readSpecSourceFlags(['--roadmap', '--next=31']).request).toEqual({ kind: 'next', roadmap: 31, followHop: true });
+  });
+
+  it('leaves the key out of a --next request read without --roadmap', () => {
+    // `toEqual` ignores a key set to undefined, so the keys are counted.
+    const request = readSpecSourceFlags(['--next']).request;
+
+    expect(request).toEqual({ kind: 'next', roadmap: null });
+    expect(Object.keys(request ?? {})).toEqual(['kind', 'roadmap']);
+  });
+
+  it('refuses --roadmap without --next with exit 2, alone or beside another source', () => {
+    for (const args of [['--roadmap'], ['--issue=20', '--roadmap'], ['--spec=a.md', '--roadmap']]) {
+      let thrown: unknown = null;
+      try {
+        readSpecSourceFlags(args);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(CommandExit);
+      expect((thrown as CommandExit).exitCode).toBe(ROADMAP_REFUSAL_EXIT);
+      expect((thrown as CommandExit).message).toBe(roadmapWithoutNextMessage());
+    }
+    expect(ROADMAP_REFUSAL_EXIT).toBe(2);
+  });
+
+  it('refuses a line naming two sources for that first, exit 1, whatever --roadmap says', () => {
+    let thrown: unknown = null;
+    try {
+      readSpecSourceFlags(['--issue=20', '--next', '--roadmap']);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as CommandExit).exitCode).toBe(SOURCE_REFUSAL_EXIT);
+  });
+});
+
+describe('pickRoadmapIssue under --roadmap', () => {
+  it('plans the away hop\'s target C, reading no board, no roadmap and no listing', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    const issues = plantedIssues(board);
+    const { seams, listing } = hopSeams(board);
+    const git = countingGit();
+    let inspected: readonly number[] = [];
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({
+      issues,
+      output,
+      followHop: true,
+      seams: {
+        ...seams,
+        git: git.git,
+        listBoards: () => Promise.reject(new Error('a hop listed the boards')),
+        search: () => Promise.reject(new Error('a hop searched for the roadmap')),
+        inspectRoadmap: () => Promise.reject(new Error('a hop inspected a roadmap')),
+      },
+      inspect: (issue) => {
+        inspected = [...inspected, issue.number];
+        return Promise.resolve();
+      },
+    });
+
+    expect(specOf(resolution)).toEqual({ path: snapshotAt(HOP_TARGET), issue: HOP_TARGET, source: `issue #${String(HOP_TARGET)}` });
+    expect(lines.info).toEqual(HOP_LINES);
+    expect(lines.info[0]).toBe('🧭 Away on a hop: issue #90, the blocker of #20, in epic #95 on board #40');
+    expect(lines.warn).toEqual([]);
+    // C through the readiness gate, as a line picked at home goes.
+    expect(inspected).toEqual([HOP_TARGET]);
+    expect(issues.asked()).toEqual([HOP_TARGET]);
+    expect(listing.calls()).toBe(0);
+    expect(git.sent()).toEqual([]);
+  });
+
+  it('walks the current place as --next does over the same checkout when the request does not follow the hop', async () => {
+    // The control for the case above: the same record and position, no
+    // `followHop`, and the walk reads the position's board and picks #42.
+    const { lines, output } = capture();
+    const board = hopBoard();
+    const issues = plantedIssues(board);
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({ issues, output, seams: hopSeams(board).seams });
+
+    expect(specOf(resolution).issue).toBe(42);
+    expect(lines.info[0]).toBe(roadmapHeaderLine(BOARD));
+    expect(issues.asked()).not.toContain(HOP_TARGET);
+  });
+
+  it('follows the hop over a roadmap --next=<n> names', async () => {
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({ roadmap: ROADMAP, issues: plantedIssues(board), followHop: true, seams: hopSeams(board).seams });
+
+    expect(specOf(resolution).issue).toBe(HOP_TARGET);
+  });
+
+  it('carries the readiness gate\'s refusal of C through, writing nothing', async () => {
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const thrown = await refusal(() => nextRun({
+      issues: plantedIssues(board),
+      followHop: true,
+      seams: hopSeams(board).seams,
+      inspect: (issue) => Promise.reject(new CommandExit(ISSUE_REFUSAL_EXIT, `#${String(issue.number)} is not ready`)),
+    }));
+
+    expect(thrown.exitCode).toBe(ISSUE_REFUSAL_EXIT);
+    expect(thrown.message).toBe(`#${String(HOP_TARGET)} is not ready`);
+    expect(exists(snapshotAt(HOP_TARGET))).toBe(false);
+    expect(exists(snapshotAt(42))).toBe(false);
+  });
+
+  it('under --dry-run names C and stops before the snapshot', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({ issues: plantedIssues(board), output, dryRun: true, followHop: true, seams: hopSeams(board).seams });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'dry-run' });
+    expect(lines.info).toEqual([...HOP_LINES, dryRunLine(describeIssue(issueOf(HOP_TARGET)))]);
+    expect(exists(snapshotAt(HOP_TARGET))).toBe(false);
+  });
+
+  it('stops blocked, offering nothing, when C still has an open blocker', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard({
+      [HOP_TARGET]: { labels: [SPEC_LABEL, SPEC_READY_LABEL, SPEC_BLOCKED_LABEL], body: blockedBody(HOP_BLOCKER) },
+    });
+    const offer = plantedOffer(true);
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({
+      issues: plantedIssues(board),
+      output,
+      followHop: true,
+      seams: { ...hopSeams(board).seams, offerAlternative: offer.offer },
+    });
+
+    expect(resolution).toEqual({ outcome: 'stopped', reason: 'blocked' });
+    expect(lines.info).toEqual([
+      HOP_LINES[0],
+      blockedPickLine({ issue: HOP_TARGET, blockers: [HOP_BLOCKER], open: [HOP_BLOCKER], unread: [], fault: null }),
+      hopBlockedMessage(HOP_TARGET),
+    ]);
+    expect(offer.taken()).toEqual([]);
+    expect(exists(snapshotAt(HOP_TARGET))).toBe(false);
+
+    // The control: B closed, and the same C is planned.
+    const closed = hopBoard({
+      [HOP_TARGET]: { labels: [SPEC_LABEL, SPEC_READY_LABEL, SPEC_BLOCKED_LABEL], body: blockedBody(HOP_BLOCKER) },
+      [HOP_BLOCKER]: { state: 'CLOSED' },
+    });
+    const planned = await nextRun({ issues: plantedIssues(closed), followHop: true, seams: hopSeams(closed).seams });
+    expect(specOf(planned).issue).toBe(HOP_TARGET);
+  });
+
+  it('picks as --next does, printing the same lines, when the root holds no hop record', async () => {
+    const board = hopBoard();
+    awayOnHop(null);
+    const followed = capture();
+    const plain = capture();
+
+    const hop = await nextRun({ issues: plantedIssues(board), output: followed.output, followHop: true, seams: hopSeams(board).seams });
+    rmSync(join(root, SPECS_DIR), { recursive: true, force: true });
+    const bare = await nextRun({ issues: plantedIssues(board), output: plain.output, seams: hopSeams(board).seams });
+
+    expect(specOf(hop).issue).toBe(42);
+    expect(specOf(bare).issue).toBe(42);
+    expect(followed.lines).toEqual(plain.lines);
+  });
+
+  it('picks as --next does over a stale record, whose home a switch by hand has moved', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    awayOnHop(hopRecord(), { board: BOARD, epic: null });
+
+    const resolution = await nextRun({ issues: plantedIssues(board), output, followHop: true, seams: hopSeams(board).seams });
+
+    expect(specOf(resolution).issue).toBe(42);
+    expect(lines.info[0]).toBe(roadmapHeaderLine(BOARD));
+    expect(lines.warn).toEqual([]);
+  });
+
+  it('picks as --next does once the hop is no longer away, and on a dry hop', async () => {
+    const board = hopBoard();
+    const records = [
+      hopRecord({ state: 'waiting', pullRequest: 7 }),
+      hopRecord({ state: 'merged' }),
+      hopRecord({ state: 'halted' }),
+      hopRecord({ kind: 'dry', blocked: null, target: null }),
+    ];
+
+    for (const record of records) {
+      const { lines, output } = capture();
+      awayOnHop(record);
+      await nextRun({ issues: plantedIssues(board), output, dryRun: true, followHop: true, seams: hopSeams(board).seams });
+
+      // #42, the position's board's first line; C would name #90.
+      expect(lines.info.at(-1)).toBe(dryRunLine(describeIssue(issueOf(42))));
+    }
+  });
+
+  it('warns a record that is not one, and picks as --next does', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    awayOnHop(null);
+    const file = hopFilePath(root);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, '{"kind":"blocker"}\n');
+
+    const resolution = await nextRun({ issues: plantedIssues(board), output, followHop: true, seams: hopSeams(board).seams });
+
+    expect(specOf(resolution).issue).toBe(42);
+    expect(lines.warn).toEqual([unfollowedHopNotice(`${file} does not hold a hop record`)]);
   });
 });

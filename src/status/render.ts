@@ -25,9 +25,11 @@
  * The board line has the place lines, only when the board reading
  * carries a `place` (a position file, or an open `type:roadmap` issue;
  * see `./sections.ts`): the place line (`placeLine`, `./place-line.ts`),
- * the away line (`awayLine`) while the current place is not home, then
- * each notice the place fell back with, at the `warn` level. A project
- * with neither gets the board line alone, as it did before boards.
+ * the away line (`awayLine`) while the current place is not home, the
+ * waiting line (`waitingLine`) while the place carries a pull request a
+ * hop left waiting on its owner's review, then each notice the place
+ * fell back with, at the `warn` level. A project with neither gets the
+ * board line alone, as it did before boards.
  *
  * ## A section not read
  *
@@ -72,7 +74,7 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { planLabel, sessionLine } from '../commands/loop/loop-sessions.js';
 import { formatCounts } from '../commands/plan/plan-files.js';
 
-import { awayLine, placeLine } from './place-line.js';
+import { awayLine, placeLine, waitingLine } from './place-line.js';
 
 /** Each section's title, in the order the text lists them. */
 export const STATUS_SECTION_TITLES = Object.freeze({
@@ -176,7 +178,7 @@ function boardText(reading: BoardReading): string {
   return `${next}; ${blocked}`;
 }
 
-/** The lines under the board line: the place, the away line, the notices; none without a place. */
+/** The lines under the board line: the place, the away line, the waiting line, the notices; none without a place. */
 function boardBody(reading: BoardReading): readonly StatusLine[] {
   const { place } = reading;
   if (place === undefined) return [];
@@ -186,6 +188,9 @@ function boardBody(reading: BoardReading): readonly StatusLine[] {
     ...away === null
       ? []
       : [info(`${INDENT}${away}`)],
+    ...place.waiting === undefined
+      ? []
+      : [info(`${INDENT}${waitingLine(place.waiting.issue)}`)],
     ...place.notices.map((notice): StatusLine => ({ level: 'warn', text: `${INDENT}${notice}` })),
   ];
 }

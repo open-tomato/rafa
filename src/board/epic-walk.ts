@@ -101,6 +101,27 @@
  * issues. An epic with no members is `empty`, never `done`, so it is
  * walked into and runs dry at once unless its checklist holds a line.
  *
+ * ## The next `now` epic
+ *
+ * The walk above never crosses epics. {@link nextNowEpic} is the one
+ * reading that looks past a dry one, for the dry hop of `rafa next
+ * --roadmap` (`.rafa/specs/rafa-247-rafa-next-roadmap.md`); it moves
+ * nothing, and plain `rafa next` never asks it. It reads the board's own
+ * checklist, off the listing it is handed, from the line after the
+ * given epic's FIRST line on, and answers the first epic line that is
+ * not ticked, whose row the listing types `epic`, open, carrying
+ * {@link NOW_HORIZON_LABEL} as its one horizon, not `done`, and not dry:
+ * `pickNextRoadmapLine` over its {@link epicLines} with the walk's own
+ * readings finds a line. A checklist line that is no epic is passed, as
+ * is every epic that fails one of those, in that order, cheapest first:
+ * only the dry reading spends a read beyond the listing. It answers null
+ * when no line after the given epic holds one, and also when the board's
+ * checklist does not list the given epic, since there is then no "after"
+ * to read from; the board's first `now` epic is not guessed at in its
+ * place. A board, or an unticked checklist line, missing from the
+ * listing is refused with an error naming it, as a missing epic is
+ * below: a line the listing left out may be the epic to hop to.
+ *
  * ## What is not read here
  *
  * The epic's computed state is read only for `done`, which depends on its
@@ -122,7 +143,7 @@ import { typeOfLabels } from '../adapters/tracker/github.js';
 
 import { HORIZON_LABEL_PREFIX } from './epic-problems.js';
 import { EPIC_LABEL_PREFIX, readEpics } from './epics.js';
-import { pickNextRoadmapLine, readRoadmapSkip, skipSentence } from './roadmap.js';
+import { parseRoadmapBody, pickNextRoadmapLine, readRoadmapSkip, skipSentence } from './roadmap.js';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board epic walk';
@@ -413,4 +434,87 @@ export function dryEpicSentence(epic: DescendedEpic): string {
   return `epic #${String(epic.number)} ${epic.title} has run dry: every line of its checklist and every open member it labels`
     + ` is done or taken, though the epic is not done (${String(done)}/${String(total)});`
     + ' the walk stops here and does not move on to another epic';
+}
+
+/** What {@link nextNowEpic} reads. */
+export interface NextNowEpicRequest {
+  /** The epic to read past: the one that ran dry. */
+  readonly after: number;
+  /** The board whose checklist is read. */
+  readonly board: number;
+  /** The turn's one board listing; nothing is listed again. */
+  readonly listing: readonly BoardIssue[];
+  /** The walk's done and taken readings, which the dry reading asks. */
+  readonly readings: RoadmapReadings;
+}
+
+/** The epic {@link nextNowEpic} answers, and where it sits. */
+export interface NextNowEpic {
+  /** The epic issue's number. */
+  readonly number: number;
+  /** The epic issue's title. */
+  readonly title: string;
+  /** Its `epic:` slug, or null when it carries none. */
+  readonly slug: string | null;
+  /** The board whose checklist lists it. */
+  readonly board: number;
+  /** Its line on that checklist. */
+  readonly line: RoadmapLine;
+  /** Its `done/total` and not-planned tally. */
+  readonly progress: EpicProgress;
+}
+
+/** The row numbered `number` on `listing`; throws naming `what` when it is missing. */
+function rowOnListing(number: number, listing: readonly BoardIssue[], what: string): BoardIssue {
+  const row = listing.find((issue) => issue.number === number);
+  if (row === undefined) {
+    throw new Error(`${PREFIX}: ${what} #${String(number)} is not on the board listing, so the next ${NOW_HORIZON_LABEL} epic`
+      + ' cannot be read; the listing reads the newest issues only, and a line it leaves out is not passed as if it were none');
+  }
+  return row;
+}
+
+/** True when the open, `now`, not-done epic `epic` still has a line the walk would pick. */
+async function hasPickableLine(epic: Epic, row: BoardIssue, readings: RoadmapReadings): Promise<boolean> {
+  const pick = await pickNextRoadmapLine(epicLines(epic, row).lines, readings);
+  return pick.line !== null;
+}
+
+/** The epic `line` names, when it is one the dry hop may go to, else null. */
+async function nowEpicOf(line: RoadmapLine, listing: readonly BoardIssue[], readings: RoadmapReadings): Promise<Epic | null> {
+  if (line.ticked) return null;
+  const row = rowOnListing(line.issue, listing, 'checklist line');
+  if (row.type !== 'epic' || row.state !== 'OPEN' || !isNowEpic(row.labels)) return null;
+  const { epic } = epicOnListing(line.issue, listing);
+  if (epic.state === 'done') return null;
+  return await hasPickableLine(epic, row, readings)
+    ? epic
+    : null;
+}
+
+/**
+ * The first open {@link NOW_HORIZON_LABEL} epic after `after` on board
+ * `board`'s checklist that is neither done nor dry, or null when none is
+ * left; the module note holds what is passed and when it is refused.
+ * Throws what the readings throw.
+ */
+export async function nextNowEpic(request: NextNowEpicRequest): Promise<NextNowEpic | null> {
+  const { after, board, listing, readings } = request;
+  const lines = parseRoadmapBody(rowOnListing(board, listing, 'board').body);
+  const at = lines.findIndex((line) => line.issue === after);
+  if (at === -1) return null;
+
+  for (const line of lines.slice(at + 1)) {
+    const epic = await nowEpicOf(line, listing, readings);
+    if (epic === null) continue;
+    return Object.freeze({
+      number: epic.number,
+      title: epic.title,
+      slug: epic.slug,
+      board,
+      line,
+      progress: epic.progress,
+    });
+  }
+  return null;
 }

@@ -55,7 +55,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { tickSentence } from '../board/roadmap-tick.js';
 import { epicTickSentence } from '../commands/pr/merge-tick.js';
 import { summaryLine } from '../commands/pr/merge.js';
-import { BARE_YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
+import { YES_FLAG } from '../next/ceiling.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { projectConfigText } from '../project/scaffold.js';
 
@@ -473,7 +473,7 @@ describe('a project with no epic: rafa next and rafa pr merge print byte-identic
       `📍 the roadmap, issue #${String(ROADMAP)}, has no line left that is not done or taken (1 line passed).`,
       '👉 open the next spec issue and add it to the roadmap',
       '⏹ There is no terminal to answer on, so nothing ran; run rafa next where you can answer,'
-        + ` or type --${YES_FLAG}=${BARE_YES_ACTIONS.join(',')} to allow those steps unasked.`,
+        + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
     ].join('\n') + '\n';
 
     expect(run.exitCode).toBe(0);

@@ -26,7 +26,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { DRY_RUN_FLAG } from '../commands/next.js';
+import { DRY_RUN_FLAG } from '../next/lines.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import {

@@ -8,7 +8,7 @@
  * whose next word is no action of it, `rafa plan` alone included
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
- * `--no-progress` in that module, and the board's eight words in
+ * `--no-progress` in that module, and the board's nine words in
  * `src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
@@ -67,6 +67,13 @@ const wrapped = wrapPhaseZeroCommand({
       description: 'Plans the first line of the roadmap issue that is neither done nor taken, then as'
         + ' `--issue`. The roadmap is `roadmap.issue` in the config, else the pinned issue titled `Roadmap`;'
         + ' `--next=<n>` reads issue `<n>` as the roadmap instead.',
+      type: 'boolean',
+    },
+    {
+      name: 'roadmap',
+      description: 'With `--next`, plans the target of the `rafa next --roadmap` hop under way, the blocker it'
+        + ' went to another epic or board for, through the same checks as any line; with no hop away it picks'
+        + ' as `--next` does. Refused with exit 2 without `--next`.',
       type: 'boolean',
     },
     {
@@ -134,6 +141,11 @@ const wrapped = wrapPhaseZeroCommand({
       cmd: 'rafa plan create --next --dry-run',
       note: 'Prints the first roadmap line that is neither done nor taken, with what it skipped to reach'
         + ' it, and stops without writing a snapshot or starting a session.',
+    },
+    {
+      cmd: 'rafa plan create --next --roadmap',
+      note: 'While a rafa next --roadmap hop is away, plans the blocker it went for on that blocker\'s own'
+        + ' board; with none away, plans as rafa plan create --next does.',
     },
     {
       cmd: 'rafa plan create --issue=20 --refresh --skip-review --no-comment',
