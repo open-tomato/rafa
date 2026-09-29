@@ -55,12 +55,23 @@
  * A row of a merged table overlaps when the other store holds a row the
  * union (`merge-union.ts`) would match it to: the same origin pair, or
  * failing that the same values in the table's identity columns from
- * `MERGE_RULES`. The extract keeps every overlapping row on both sides,
- * then on each side the first `perSide` rows the other side does not
- * hold, in `seq` order: the rows nearest the divergence point, 200 each
- * unless the caller says otherwise. A `local` table, and any table the
- * registry does not name, is kept whole, as small and describing one
- * file. Each kept row keeps its `seq`.
+ * `MERGE_RULES`. Overlapping rows come in pairs, one on each side, and
+ * the extract keeps the last `overlap` pairs in store B's order, both
+ * rows of each: the shared rows nearest the divergence point, 200 unless
+ * the caller says otherwise, or every pair under `all`. A pair is kept
+ * or dropped whole, since keeping one row of it would turn a shared row
+ * into one only that side holds. Then on each side it keeps the first
+ * `perSide` rows the other side does not hold, in `seq` order: the rows
+ * just past the divergence point, 200 each unless the caller says
+ * otherwise. A `local` table, and any table the registry does not name,
+ * is kept whole, as small and describing one file. Each kept row keeps
+ * its `seq`.
+ *
+ * The overlap cap exists because a copy shares its whole history with
+ * the store it came from: over this project's two stores on 2026-09-29
+ * every overlapping row made an 8.2 MB extract, 934 shared sessions and
+ * 2,275 shared findings of it, for a test that needs the shared rows'
+ * shape and not their number.
  *
  * ## The files
  *
@@ -89,6 +100,12 @@ import { quoted } from './rebuild-aside.js';
 
 /** The rows kept on each side beyond the overlap, per merged table, unless the caller says otherwise. */
 export const DEFAULT_PER_SIDE = 200;
+
+/** The overlapping pairs kept per merged table, unless the caller says otherwise. */
+export const DEFAULT_OVERLAP = 200;
+
+/** How many overlapping pairs a merged table keeps: a whole number above zero, or every pair. */
+export type OverlapCap = number | 'all';
 
 /** What an extract file's `format` names. */
 export const EXTRACT_FORMAT = 'rafa-merge-fixture/1';
@@ -201,6 +218,8 @@ export interface TableSummary {
   readonly rowsB: number;
   /** Rows of each side the other side holds; the same count on both. */
   readonly overlap: number;
+  /** Overlapping pairs kept, both rows of each; at most the overlap cap. */
+  readonly overlapKept: number;
   readonly keptA: number;
   readonly keptB: number;
 }
@@ -210,6 +229,7 @@ export interface Extract {
   readonly a: ExtractSide;
   readonly b: ExtractSide;
   readonly perSide: number;
+  readonly overlap: OverlapCap;
   readonly summary: readonly TableSummary[];
 }
 
@@ -349,11 +369,11 @@ function identityKey(row: StoredRow, identity: readonly string[]): string {
   return JSON.stringify(identity.map((column) => row[column] ?? null));
 }
 
-/** The positions of the overlapping rows on each side, matched as the union matches them. */
-function overlapOf(rowsA: readonly StoredRow[], rowsB: readonly StoredRow[], identity: readonly string[]): {
-  readonly a: ReadonlySet<number>;
-  readonly b: ReadonlySet<number>;
-} {
+/** One overlapping row of each side: its position in A and in B. */
+type OverlapPair = readonly [a: number, b: number];
+
+/** The overlapping rows of the two sides, paired as the union matches them, in B's order. */
+function overlapOf(rowsA: readonly StoredRow[], rowsB: readonly StoredRow[], identity: readonly string[]): readonly OverlapPair[] {
   const byOrigin = new Map<string, number>();
   const byIdentity = new Map<string, number>();
   rowsA.forEach((row, index) => {
@@ -362,24 +382,33 @@ function overlapOf(rowsA: readonly StoredRow[], rowsB: readonly StoredRow[], ide
     const key = identityKey(row, identity);
     if (!byIdentity.has(key)) byIdentity.set(key, index);
   });
-  const a = new Set<number>();
-  const b = new Set<number>();
-  rowsB.forEach((row, index) => {
+  return rowsB.flatMap((row, index): OverlapPair[] => {
     const origin = originKey(row);
     const match = (origin === null
       ? undefined
       : byOrigin.get(origin)) ?? byIdentity.get(identityKey(row, identity));
-    if (match === undefined) return;
-    a.add(match);
-    b.add(index);
+    return match === undefined
+      ? []
+      : [[match, index]];
   });
-  return { a, b };
 }
 
-/** The positions kept of one side: every overlapping row, then the first `perSide` of the rest. */
-function sampled(count: number, overlap: ReadonlySet<number>, perSide: number): number[] {
+/** The pairs kept under `cap`: the last ones in B's order, nearest the divergence point. */
+function cappedPairs(pairs: readonly OverlapPair[], cap: OverlapCap): readonly OverlapPair[] {
+  return cap === 'all' || pairs.length <= cap
+    ? pairs
+    : pairs.slice(pairs.length - cap);
+}
+
+/**
+ * The positions kept of one side: its rows of the kept pairs, then the
+ * first `perSide` of the rows no pair holds. `overlap` is every position
+ * of this side a pair holds, kept or not, so a dropped shared row is
+ * never taken for one past the divergence.
+ */
+function sampled(count: number, overlap: ReadonlySet<number>, keptPairs: ReadonlySet<number>, perSide: number): number[] {
   const rest = Array.from({ length: count }, (_, index) => index).filter((index) => !overlap.has(index));
-  const kept = new Set([...overlap, ...rest.slice(0, perSide)]);
+  const kept = new Set([...keptPairs, ...rest.slice(0, perSide)]);
   return Array.from({ length: count }, (_, index) => index).filter((index) => kept.has(index));
 }
 
@@ -409,6 +438,18 @@ function checkPerSide(perSide: number): void {
   }
 }
 
+/**
+ * Throws unless `cap` is `all` or a whole number above zero. Zero is
+ * refused rather than read as "none": an extract keeping no shared row
+ * is no longer a copy then divergence, and `all` spells "no cap".
+ */
+function checkOverlapCap(cap: OverlapCap): void {
+  if (cap === 'all') return;
+  if (!Number.isSafeInteger(cap) || cap < 1) {
+    throw new Error(`overlap cap ${String(cap)} is not a whole number of rows above zero; use all to keep every overlapping row`);
+  }
+}
+
 /** Opens a store read-only, naming it when it is absent. */
 function openReadOnly(path: string): Database {
   guardTestProcess(path);
@@ -417,7 +458,7 @@ function openReadOnly(path: string): Database {
 }
 
 /** The extract of two read stores under `map`. */
-function extractRead(storeA: ReadStore, storeB: ReadStore, perSide: number, map: PlaceholderMap): Extract {
+function extractRead(storeA: ReadStore, storeB: ReadStore, perSide: number, cap: OverlapCap, map: PlaceholderMap): Extract {
   const names = [...new Set([...storeA.tables.keys(), ...storeB.tables.keys()])];
   const tablesA: Record<string, ExtractTable> = {};
   const tablesB: Record<string, ExtractTable> = {};
@@ -426,24 +467,26 @@ function extractRead(storeA: ReadStore, storeB: ReadStore, perSide: number, map:
     const readB = storeB.tables.get(table) ?? NO_TABLE;
     const rule = MERGE_RULES[table];
     const merged = rule?.scope === 'merged';
-    const overlap = merged
+    const pairs = merged
       ? overlapOf(readA.rows, readB.rows, rule.identity)
-      : { a: new Set<number>(), b: new Set<number>() };
+      : [];
+    const kept = cappedPairs(pairs, cap);
+    const positions = (list: readonly OverlapPair[], side: 0 | 1): Set<number> => new Set(list.map((pair) => pair[side]));
     const whole = (count: number): number[] => Array.from({ length: count }, (_, index) => index);
     const keptA = merged
-      ? sampled(readA.rows.length, overlap.a, perSide)
+      ? sampled(readA.rows.length, positions(pairs, 0), positions(kept, 0), perSide)
       : whole(readA.rows.length);
     const keptB = merged
-      ? sampled(readB.rows.length, overlap.b, perSide)
+      ? sampled(readB.rows.length, positions(pairs, 1), positions(kept, 1), perSide)
       : whole(readB.rows.length);
     if (storeA.tables.has(table)) tablesA[table] = mappedTable(table, readA, keptA, map);
     if (storeB.tables.has(table)) tablesB[table] = mappedTable(table, readB, keptB, map);
     return {
-      table, rowsA: readA.rows.length, rowsB: readB.rows.length, overlap: overlap.b.size,
-      keptA: keptA.length, keptB: keptB.length,
+      table, rowsA: readA.rows.length, rowsB: readB.rows.length, overlap: pairs.length,
+      overlapKept: kept.length, keptA: keptA.length, keptB: keptB.length,
     };
   });
-  return { a: sideOf('a', storeA, tablesA), b: sideOf('b', storeB, tablesB), perSide, summary };
+  return { a: sideOf('a', storeA, tablesA), b: sideOf('b', storeB, tablesB), perSide, overlap: cap, summary };
 }
 
 /**
@@ -451,8 +494,14 @@ function extractRead(storeA: ReadStore, storeB: ReadStore, perSide: number, map:
  * extract under a key drawn for this call and zeroed before it returns,
  * as the module note says.
  */
-export function extractStores(pathA: string, pathB: string, perSide: number = DEFAULT_PER_SIDE): Extract {
+export function extractStores(
+  pathA: string,
+  pathB: string,
+  perSide: number = DEFAULT_PER_SIDE,
+  overlap: OverlapCap = DEFAULT_OVERLAP,
+): Extract {
   checkPerSide(perSide);
+  checkOverlapCap(overlap);
   const dbA = openReadOnly(pathA);
   try {
     const dbB = openReadOnly(pathB);
@@ -462,7 +511,7 @@ export function extractStores(pathA: string, pathB: string, perSide: number = DE
         const map = createPlaceholderMap((value) => createHmac('sha256', key)
           .update(value, 'utf8')
           .digest('hex'));
-        return extractRead(readStore(dbA), readStore(dbB), perSide, map);
+        return extractRead(readStore(dbA), readStore(dbB), perSide, overlap, map);
       } finally {
         key.fill(0);
       }
@@ -489,7 +538,10 @@ export function writeExtract(extract: Extract, outDir: string): readonly string[
   const files: readonly [string, unknown][] = [
     [join(outDir, EXTRACT_FILE_NAMES.a), extract.a],
     [join(outDir, EXTRACT_FILE_NAMES.b), extract.b],
-    [join(outDir, EXTRACT_FILE_NAMES.summary), { format: EXTRACT_FORMAT, perSide: extract.perSide, tables: extract.summary }],
+    [
+      join(outDir, EXTRACT_FILE_NAMES.summary),
+      { format: EXTRACT_FORMAT, perSide: extract.perSide, overlap: extract.overlap, tables: extract.summary },
+    ],
   ];
   const present = files.map(([path]) => path).filter((path) => existsSync(path));
   if (present.length > 0) throw new Error(`the extract would replace ${present.join(', ')}; remove it first`);

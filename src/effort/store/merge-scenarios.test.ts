@@ -316,7 +316,7 @@ describe('the cloned disk', () => {
   });
 });
 
-/** Where a real scenario-4 extract, made with `scripts/extract-merge-fixture.ts`, would be committed. */
+/** Where the real scenario-4 extract, made with `scripts/extract-merge-fixture.ts`, is committed. */
 const REAL_SCENARIO_4_DIR = join(import.meta.dir, 'testdata', 'merge', 'scenario-4');
 
 const realFixtureFiles = Object.values(EXTRACT_FILE_NAMES);
