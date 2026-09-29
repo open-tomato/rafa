@@ -421,6 +421,27 @@ and `readSessionBudgets` the `dispatches` rows carrying a budget.
 of `rafa loop status`, and `readPlanChanges` (`store/changes.ts`) every
 `changes` row under one plan stub, in append order, for a release step to
 render.
+
+**A new table has a checklist, and each item lands in the table's own
+commit:**
+
+- its `SQLITE_MIGRATIONS` entry and its `migrations.lock.json` line;
+- **declare its merge rule** in `MERGE_RULES`
+  (`store/merge-rules.ts`): its scope, `merged` for a table whose rows
+  travel between stores or `local` for one that never leaves its
+  machine; for a merged table, the identity columns that match its
+  rows with a NULL origin and every column a production statement
+  changes after the insert, each with its rule; a merged table also
+  carries `origin_store` and `origin_seq` with its partial unique index
+  `<table>_by_origin`, and joins `ORIGIN_TABLES` (`store/origins.ts`)
+  with its inserts stamped. `merge-rules.test.ts` builds a store
+  through every migration and fails on a table with no entry, an entry
+  with no table, a merged table without both origin columns and that
+  index, and an `UPDATE <table> SET <column>` in a production module
+  under `src/` whose column has no rule; a new edit of an existing
+  table's column needs its rule the same way;
+- the table-list expectations below.
+
 A new table moves every full table-list expectation with it: two in
 `sqlite.test.ts`, one each in `triage.test.ts`, `absences.test.ts`,
 `reports.test.ts`, `preflight.test.ts`, `dispatches.test.ts`,
