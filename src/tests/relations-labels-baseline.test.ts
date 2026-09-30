@@ -8,15 +8,16 @@
  * ran under — to `src/tests/fixtures/relations-labels/`, committed
  * alongside this file.
  *
- * The comparison task the plan's last stage names reads these files
- * back and diffs them against the same four commands run over the same
- * fixture once the port and its `labels` adapter are wired in: the hard
- * rule "with `board.relationships` unset, every command prints
- * byte-identical output" has nothing to compare against without a
- * baseline taken while `src/board/roadmap-rows.ts`, `src/board/blocked.ts`
- * and `src/next/sources.ts` are still the only readers, which is what
- * this file is run for. It is not itself that comparison: every case
- * here also asserts on the capture it takes, so a fixture that stopped
+ * This same file also carries the labels comparison the plan's last
+ * stage names: `captureRun` reads each golden pair back BEFORE
+ * overwriting it with this run's own capture, so once the port and its
+ * `labels` adapter are wired in — as they now are — every case diffs
+ * today's stdout and `gh` call log against the bytes committed here
+ * from the pre-port baseline, byte for byte, instead of against bytes
+ * this same call just wrote. That diff is the hard rule itself: "with
+ * `board.relationships` unset, every command prints byte-identical
+ * output" (and sends the same `gh` calls) as before this plan. Every
+ * case also asserts on the capture directly, so a fixture that stopped
  * exercising what it claims to — the epic's checklist, the blocked
  * issue's two local blockers and its foreign token — fails loudly here
  * rather than baking a hollow capture into the golden files.
@@ -211,14 +212,30 @@ const ROADMAP_VIEW = issueRow(ROADMAP, 'Roadmap', ROADMAP_BODY, ['type:roadmap']
 interface Capture {
   readonly stdout: string;
   readonly ghCalls: readonly string[];
+  /** The bytes {@link FIXTURES_DIR} held for this name before this run's capture overwrote them. */
+  readonly golden: {
+    readonly stdout: string | undefined;
+    readonly ghCalls: string | undefined;
+  };
+}
+
+/** Reads `path`, or answers `undefined` when it does not exist yet. */
+function readIfExists(path: string): string | undefined {
+  return existsSync(path)
+    ? readFileSync(path, 'utf8')
+    : undefined;
 }
 
 /**
  * Runs `words` in `scratch`, over a `gh` call log reset first so the
- * capture holds only this run's own calls, then writes both files
- * `name.stdout.txt` and `name.gh-calls.txt` under {@link FIXTURES_DIR}.
- * Answers the capture, so a case can assert on it as well as on the
- * files just written.
+ * capture holds only this run's own calls. Reads the golden files
+ * {@link FIXTURES_DIR} already held for `name` BEFORE writing this run's
+ * own capture over them, so the labels comparison below diffs this
+ * run's bytes against the committed baseline rather than against bytes
+ * this same call just wrote — a case that only read back its own
+ * write would pass no matter what the command printed. Then refreshes
+ * both `name.stdout.txt` and `name.gh-calls.txt` with this run's own
+ * capture, and answers both, so a case can assert on either.
  */
 function captureRun(scratch: ScratchRepo, logPath: string, words: readonly string[], name: string): Capture {
   rmSync(logPath, { force: true });
@@ -231,9 +248,12 @@ function captureRun(scratch: ScratchRepo, logPath: string, words: readonly strin
       .filter((line) => line !== '')
     : [];
   mkdirSync(FIXTURES_DIR, { recursive: true });
-  writeFileSync(join(FIXTURES_DIR, `${name}.stdout.txt`), run.stdout, 'utf8');
-  writeFileSync(join(FIXTURES_DIR, `${name}.gh-calls.txt`), `${ghCalls.join('\n')}\n`, 'utf8');
-  return { stdout: run.stdout, ghCalls };
+  const stdoutPath = join(FIXTURES_DIR, `${name}.stdout.txt`);
+  const ghCallsPath = join(FIXTURES_DIR, `${name}.gh-calls.txt`);
+  const golden = { stdout: readIfExists(stdoutPath), ghCalls: readIfExists(ghCallsPath) };
+  writeFileSync(stdoutPath, run.stdout, 'utf8');
+  writeFileSync(ghCallsPath, `${ghCalls.join('\n')}\n`, 'utf8');
+  return { stdout: run.stdout, ghCalls, golden };
 }
 
 describe('golden captures of the labels-mode board, before board.relationships exists', () => {
@@ -260,7 +280,8 @@ describe('golden captures of the labels-mode board, before board.relationships e
     expect(capture.stdout).not.toContain(FOREIGN_TOKEN);
 
     expect(capture.ghCalls.some((call) => call.includes('issue view'))).toBe(true);
-    expect(readFileSync(join(FIXTURES_DIR, 'roadmap.stdout.txt'), 'utf8')).toBe(capture.stdout);
+    expect(capture.stdout).toBe(capture.golden.stdout);
+    expect(`${capture.ghCalls.join('\n')}\n`).toBe(capture.golden.ghCalls);
   });
 
   it('rafa roadmap --full: both epic members, and the blocked issue\'s two local blockers and its foreign token', RUN_TIMEOUT, () => {
@@ -281,7 +302,8 @@ describe('golden captures of the labels-mode board, before board.relationships e
     expect(doneMember).toBeGreaterThan(-1);
     expect(readyMember).toBeGreaterThan(doneMember);
 
-    expect(readFileSync(join(FIXTURES_DIR, 'roadmap-full.stdout.txt'), 'utf8')).toBe(capture.stdout);
+    expect(capture.stdout).toBe(capture.golden.stdout);
+    expect(`${capture.ghCalls.join('\n')}\n`).toBe(capture.golden.ghCalls);
   });
 
   it('rafa next --dry-run: descends into the epic and proposes its ready member, never the roadmap\'s second line', RUN_TIMEOUT, () => {
@@ -291,7 +313,8 @@ describe('golden captures of the labels-mode board, before board.relationships e
     expect(capture.stdout).not.toContain(`#${String(BLOCKED_ISSUE)}`);
     expect(capture.stdout).not.toContain(`#${String(DONE_MEMBER)}`);
 
-    expect(readFileSync(join(FIXTURES_DIR, 'next-dry-run.stdout.txt'), 'utf8')).toBe(capture.stdout);
+    expect(capture.stdout).toBe(capture.golden.stdout);
+    expect(`${capture.ghCalls.join('\n')}\n`).toBe(capture.golden.ghCalls);
   });
 
   it('rafa plan create --next --dry-run: the same epic member, reading and writing nothing', RUN_TIMEOUT, () => {
@@ -301,6 +324,7 @@ describe('golden captures of the labels-mode board, before board.relationships e
     expect(capture.stdout).not.toContain(`#${String(BLOCKED_ISSUE)}`);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
 
-    expect(readFileSync(join(FIXTURES_DIR, 'plan-create-next-dry-run.stdout.txt'), 'utf8')).toBe(capture.stdout);
+    expect(capture.stdout).toBe(capture.golden.stdout);
+    expect(`${capture.ghCalls.join('\n')}\n`).toBe(capture.golden.ghCalls);
   });
 });
