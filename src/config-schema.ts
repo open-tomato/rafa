@@ -15,7 +15,9 @@
  * are read through, `directory`, `trackerKind`, `releaseFile`,
  * `tierPins` and `routeTable`, and the readers of the release plan's
  * keys. `config-schema-release.ts` holds the `pr` and `release`
- * sections and `dangerous.acceptVersionCollision`, spread in here.
+ * sections and `dangerous.acceptVersionCollision`, and
+ * `config-schema-tests.ts` the `tests` section and its reader, both
+ * spread in here.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -69,7 +71,8 @@
  * entry naming no field does not either. {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
- * spec — in `config-schema-release.ts` for a `pr` or `release` key —
+ * spec — in `config-schema-release.ts` for a `pr` or `release` key,
+ * `config-schema-tests.ts` for a `tests` key —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
@@ -101,6 +104,7 @@ import type {
   PrSettings,
   ReleaseSettings,
 } from './config-schema-release.js';
+import type { TestsSettings } from './config-schema-tests.js';
 import type {
   ClaimsAhead,
   ClaimsStaleAfter,
@@ -142,6 +146,7 @@ import {
   RELEASE_DEFAULTS,
   RELEASE_SETTINGS,
 } from './config-schema-release.js';
+import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import {
   busyTimeoutMs,
   claimsAhead,
@@ -181,10 +186,12 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
 /**
  * Every setting, resolved. The module note maps each to its file key;
  * the `pr` and `release` fields are {@link PrSettings}' and
- * {@link ReleaseSettings}', and `dangerousAcceptVersionCollision` is
- * {@link DangerousReleaseSettings}'.
+ * {@link ReleaseSettings}', `dangerousAcceptVersionCollision` is
+ * {@link DangerousReleaseSettings}', and the `tests` fields are
+ * {@link TestsSettings}'.
  */
-export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleaseSettings {
+export interface RafaConfig
+  extends PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -363,6 +370,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   routing: DEFAULT_ROUTING,
   taskSkills: 'planner',
   taskLessons: 'on',
+  ...TESTS_DEFAULTS,
 });
 
 /** What the module knows about one setting. */
@@ -479,6 +487,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   routing: { key: 'routing', read: routeTable, cli: false },
   taskSkills: { key: 'task.skills', read: skillResolverName, cli: true },
   taskLessons: { key: 'task.lessons', read: lessonSwitch, cli: false },
+  ...TESTS_SETTINGS,
 };
 
 /** Every setting name, read off the closed record above. */

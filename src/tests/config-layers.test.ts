@@ -220,6 +220,9 @@ const PROJECT_TEXT = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'tests:',
+  '  fullSuiteTriggers: ["project/*.toml"]',
+  '  integration: ["project/**/*.e2e.ts"]',
   '',
 ].join('\n');
 
@@ -297,6 +300,8 @@ const PROJECT_VALUES: RafaConfig = {
   ]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  testsFullSuiteTriggers: ['project/*.toml'],
+  testsIntegration: ['project/**/*.e2e.ts'],
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -380,6 +385,9 @@ const USER_TEXT = [
   'task:',
   '  skills: none',
   '  lessons: on',
+  'tests:',
+  '  fullSuiteTriggers: []',
+  '  integration: ["user/**/*.e2e.ts"]',
   '',
 ].join('\n');
 
@@ -443,6 +451,8 @@ const USER_VALUES: RafaConfig = {
   routing: new Map([...CONFIG_DEFAULTS.routing, ['review', 'typescript-reviewer']]),
   taskSkills: 'none',
   taskLessons: 'on',
+  testsFullSuiteTriggers: [],
+  testsIntegration: ['user/**/*.e2e.ts'],
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -800,6 +810,16 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'task.lessons', 'task:\n  lessons: "Off"',
     'task.lessons is "Off", expected one of: on, off',
     'task:\n  lessons: off', 'taskLessons', 'off',
+  ],
+  [
+    'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: [""]',
+    'tests.fullSuiteTriggers[0] is "", expected a glob pattern relative to the repository root',
+    'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
+  ],
+  [
+    'tests.integration', 'tests:\n  integration: { e2e: true }',
+    'tests.integration is a mapping, expected a list of glob patterns',
+    'tests:\n  integration: []', 'testsIntegration', [],
   ],
 ];
 

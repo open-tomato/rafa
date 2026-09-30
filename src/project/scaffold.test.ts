@@ -212,6 +212,28 @@ describe('the config files', () => {
     ]);
   });
 
+  it('carries the tests section last, its globs quoted, which resolve from the file once uncommented', () => {
+    const tests = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# tests:'));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...tests].join('\n')), 'c.yaml') });
+
+    expect(tests.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
+      '# tests:',
+      '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
+      '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
+    ]);
+    expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration])
+      .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration]);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration]).toEqual(['file', 'file']);
+  });
+
+  it('answers each tests setting from the default once its line is dropped, so the reading above can fail', () => {
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration):/.test(line));
+    const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
+
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 2);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration]).toEqual(['default', 'default']);
+  });
+
   it('carries the loop section, worktreeDir at .rafa/worktrees, which resolves from the file once uncommented', () => {
     const loop = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# loop:'),
@@ -360,8 +382,11 @@ describe('the config files', () => {
     expect(resolved.config.routing.get('tests')).toBe('tdd-guide');
   });
 
-  it('closes on the task section at its defaults, which resolve from the file once uncommented', () => {
-    const task = CONFIG_SETTINGS_LINES.slice(CONFIG_SETTINGS_LINES.indexOf('# task:'));
+  it('carries the task section at its defaults, which resolve from the file once uncommented', () => {
+    const task = CONFIG_SETTINGS_LINES.slice(
+      CONFIG_SETTINGS_LINES.indexOf('# task:'),
+      CONFIG_SETTINGS_LINES.indexOf('# tests:'),
+    );
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...task].join('\n')), 'c.yaml') });
 
     expect(task.map((line) => line.replace(/ {2,}#.*$/, ''))).toEqual([
