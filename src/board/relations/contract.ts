@@ -7,7 +7,10 @@
  * Shaped like `src/adapters/tracker/contract.ts`: an adapter's test file
  * calls {@link runRelationsContract} with a factory answering a fresh
  * adapter for a `GhRunner` it hands in, `labels.test.ts` and
- * `native.test.ts` each with their own. The cases are also answered as a
+ * `native.test.ts` each with their own. Until the native writes land,
+ * `native.test.ts` registers the read cases from
+ * {@link relationsContractCases} and each write case as a named
+ * `it.todo`. The cases are also answered as a
  * list by {@link relationsContractCases}, each a name and a run that
  * rejects when the adapter breaks the case; `./contract.test.ts` drives
  * both against broken adapters to hold which cases reject: the control
