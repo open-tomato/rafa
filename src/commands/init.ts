@@ -591,6 +591,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const epicGuard = await runEpicGuardStep({
     wanted: wantsGuard,
     board,
+    relationships: scopes.config.boardRelationships,
     root: scopes.written.root,
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,

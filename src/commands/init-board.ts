@@ -65,6 +65,14 @@
  *
  *   - The board step did not run: nothing is asked or written, and a
  *     line that said `--epic-guard` is told so through the warnings.
+ *   - `board.relationships: native`: nothing is read, asked or written,
+ *     and a line that said `--epic-guard` is refused with
+ *     {@link EPIC_GUARD_NATIVE_REFUSAL}, which names the mode. The guard
+ *     removes a second `epic:` label, and in native mode an epic is the
+ *     issue's sub-issue parent, which the tracker keeps to one. The
+ *     refusal is a warning and not an exit code for the reason
+ *     `--board` on a non-GitHub repository is one: the project has been
+ *     set up by then, and a failing exit would read as if it had not.
  *   - `--no-epic-guard`: declined, nothing read.
  *   - Something is already at `.github/workflows/epic-guard.yml`: it is
  *     reported, `present` for a file and `refused` for anything else,
@@ -92,7 +100,7 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { PrProvider } from '../config-sections.js';
+import type { BoardRelationshipMode, PrProvider } from '../config-sections.js';
 
 import { join } from 'node:path';
 
@@ -345,7 +353,9 @@ export type EpicGuardStatus =
   /** Nobody said and there was no terminal to ask on. */
   | 'unasked'
   /** The board step did not run, so neither did this one. */
-  | 'not-run';
+  | 'not-run'
+  /** `board.relationships` is `native`, where the tracker keeps one parent per issue. */
+  | 'native';
 
 /** What one run of {@link runEpicGuardStep} came to. */
 export interface EpicGuardStepResult {
@@ -364,6 +374,8 @@ export interface EpicGuardStepOptions {
   readonly wanted: boolean | null;
   /** What the board step came to; the guard runs only after a board that ran. */
   readonly board: BoardStepResult;
+  /** The project's `board.relationships`; the guard runs in `labels` mode only. */
+  readonly relationships: BoardRelationshipMode;
   /** The project root: where the workflow is written. */
   readonly root: string;
   /** True when a question can be answered. */
@@ -377,6 +389,11 @@ export interface EpicGuardStepOptions {
 /** What a line asking for `--epic-guard` is told when the board step did not run. */
 export const EPIC_GUARD_NO_BOARD_WARNING = '--epic-guard installs the epic guard workflow with the GitHub board,'
   + ` and the board step did not run, so it was not installed; run ${EPIC_GUARD_FIX}.`;
+
+/** What a line asking for `--epic-guard` is told under `board.relationships: native`. */
+export const EPIC_GUARD_NATIVE_REFUSAL = 'board.relationships is native: --epic-guard was refused, since the'
+  + ' tracker keeps one parent per issue and there is no second epic: label for the workflow to remove,'
+  + ' so it was not installed.';
 
 /** A guard step that wrote nothing and found nothing. */
 function noGuard(status: EpicGuardStatus, asked: boolean, warnings: readonly string[] = []): EpicGuardStepResult {
@@ -400,10 +417,15 @@ async function askEpicGuard(openPrompter: () => Prompter): Promise<boolean> {
  * a path that would not take a write: that is a refused part.
  */
 export async function runEpicGuardStep(options: EpicGuardStepOptions): Promise<EpicGuardStepResult> {
-  const { wanted, board, root, isTerminal, openPrompter, moduleDir } = options;
+  const { wanted, board, relationships, root, isTerminal, openPrompter, moduleDir } = options;
   if (board.status !== 'ran') {
     return noGuard('not-run', false, wanted === true
       ? [EPIC_GUARD_NO_BOARD_WARNING]
+      : []);
+  }
+  if (relationships === 'native') {
+    return noGuard('native', false, wanted === true
+      ? [EPIC_GUARD_NATIVE_REFUSAL]
       : []);
   }
   if (wanted === false) return noGuard('declined', false);
