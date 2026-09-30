@@ -724,8 +724,8 @@ New; it replaces no earlier text. What a row or an action added to
   it cannot read or edit is a warning. It runs after the scopes and
   before the board step. `--release=<value>` is refused at the top of
   the run, while nothing has been written.
-- **The board step runs last, but for the epic guard after it, and only
-  where there is a board**
+- **The board step runs last, but for the epic guard and the
+  relationships move after it, and only where there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
   anything but `gh` ends the step before a runner is opened, with a
@@ -778,6 +778,31 @@ New; it replaces no earlier text. What a row or an action added to
   another, each sent one `--remove-label` for the added label and one
   comment. As a control, `min_by` swapped for `max_by` flipped four of
   those seven readings. A failing `gh api` exits 1 with no edit.
+- **The relationships move follows the epic guard, and only when
+  `board.relationships` is set** (`runRelationsMoveStep` in
+  `src/commands/init-board.ts`; the plan and the writer are
+  `src/board/relations/move.ts`'s). With the key at its default (the
+  config layers' `sources` say `default`) it answers null: nothing is
+  read, asked or printed, and json mode leaves `relationsMove` out of the
+  result. Otherwise, after a board that ran, it reads the board once in
+  the `native` listing fields plus one `gh repo view --json
+  nameWithOwner`, and plans moving the OTHER mode's relationships into
+  the configured one. A read that failed is a warning naming
+  `rafa init --board`; a plan with no write and no old mark prints
+  `Board relationships: nothing to move from <from> to <to>.`; no
+  terminal writes nothing and prints the line naming `rafa init --board`
+  (no flag answers it for a script). On a terminal every write, and
+  every relationship the plan skips, is printed on the prompter, and one
+  `[y/N]` question asks whether to send them; anything but yes writes
+  nothing. On a yes the writes are sent in order, the first refusal
+  stopping the move with a warning naming what went through and what was
+  left. Only once every write went through are the old marks printed and
+  a second `[y/N]` question asked whether to remove them; kept marks are
+  named under the rows. A plan whose writes are all on the board already
+  asks the second question alone. The rows touched are dropped from a
+  kept `native` listing (`invalidateRows`). The result prints under
+  `Board relationships, <from> to <to>:` as `sent`, `left`, `removed`
+  and `kept` rows, and json mode carries it as `relationsMove`.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read

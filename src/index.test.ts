@@ -1105,10 +1105,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-board.js', [
       'boardStepChanged',
       'epicGuardChanged',
+      'relationsMoveChanged',
       'renderBoardStep',
       'renderEpicGuardStep',
+      'renderRelationsMoveStep',
       'runBoardStep',
       'runEpicGuardStep',
+      'runRelationsMoveStep',
     ]],
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
