@@ -35,12 +35,21 @@
  * both runs read no `Blocked by:` line and send no `gh issue edit` at
  * all, `--dry-run` writing nothing and native mode never touching a
  * label to mark or clear a blocker.
+ *
+ * ## `rafa next --roadmap --dry-run`
+ *
+ * Board #1 lists epic #5, `horizon:now`, whose one member is #10, waiting
+ * (native `blockedBy`) on #21, a sub-issue (native `parent`) of epic #6,
+ * which board #2 lists. #10's blocker is on another epic, reached through
+ * its `parent` node rather than an `epic:<slug>` label, so the one-hop
+ * decision (`src/next/hop-chain.ts` over `src/board/blocker-epic.ts`)
+ * proposes the hop to epic #6 on board #2.
  */
 import type { ScratchRepo } from './cli-capture.js';
 
 import { execFileSync } from 'node:child_process';
 import {
-  chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -49,6 +58,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
+import { positionFilePath } from '../project/position.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
@@ -464,5 +474,186 @@ describe('rafa next --dry-run in native mode, spawned', () => {
       .filter((line) => line !== '');
     expect(calls.some((call) => call.startsWith('issue edit'))).toBe(false);
     expect(calls.join('\n')).not.toContain('spec:blocked');
+  });
+});
+
+describe('rafa next --roadmap in native mode, spawned', () => {
+  /** The board's own repository. */
+  const REPOSITORY = 'acme/board';
+
+  const BOARD_A = 1;
+  const EPIC_HOME = 5;
+  const H = 10;
+  const BOARD_B = 2;
+  const EPIC_FAR = 6;
+  const C = 21;
+
+  /** A linked issue as `gh issue list --json` answers it. */
+  function link(number: number, state: 'OPEN' | 'CLOSED' = 'OPEN'): object {
+    return { id: `I_${String(number)}`, number, state, title: `Issue ${String(number)}`, url: `https://github.com/${REPOSITORY}/issues/${String(number)}` };
+  }
+
+  /** A relationship list of `nodes`, none of it truncated. */
+  function links(nodes: readonly object[]): object {
+    return { nodes, totalCount: nodes.length };
+  }
+
+  /** The fields a case may set on a native row. */
+  interface Row {
+    readonly number: number;
+    readonly title: string;
+    readonly body?: string;
+    readonly labels?: readonly string[];
+    readonly parent?: number;
+    readonly blockedBy?: readonly object[];
+  }
+
+  /** `row` as `gh issue list --json` answers it in native mode. */
+  function rowOf(row: Row): object {
+    return {
+      number: row.number,
+      title: row.title,
+      body: row.body ?? '',
+      state: 'OPEN',
+      stateReason: '',
+      labels: (row.labels ?? []).map((name) => ({ name })),
+      parent: row.parent === undefined
+        ? null
+        : link(row.parent),
+      blockedBy: links(row.blockedBy ?? []),
+      blocking: links([]),
+      subIssuesSummary: { completed: 0, total: 0, percentCompleted: 0 },
+      subIssues: links([]),
+    };
+  }
+
+  /** `row` as `gh issue view` answers it: the same fields, none of the native five. */
+  function viewOf(row: Row): object {
+    return {
+      number: row.number, title: row.title, body: row.body ?? '', state: 'OPEN', stateReason: '', labels: (row.labels ?? []).map((name) => ({ name })), author: { login: 'octocat' },
+    };
+  }
+
+  /**
+   * Board #1 lists epic #5, whose member H (#10) waits on C (#21), a
+   * sub-issue of epic #6, which board #2 lists; see the module note.
+   */
+  const ROWS: readonly Row[] = [
+    { number: BOARD_A, title: 'Board Alpha', body: `- [ ] #${String(EPIC_HOME)}\n`, labels: ['type:roadmap'] },
+    { number: EPIC_HOME, title: 'Epic home', body: `- [ ] #${String(H)}\n`, labels: ['type:epic', 'horizon:now'] },
+    { number: H, title: 'H, blocked by C', labels: [SPEC_READY_LABEL], parent: EPIC_HOME, blockedBy: [link(C)] },
+    { number: BOARD_B, title: 'Board Beta', body: `- [ ] #${String(EPIC_FAR)}\n`, labels: ['type:roadmap'] },
+    { number: EPIC_FAR, title: 'Epic far', body: `- [ ] #${String(C)}\n`, labels: ['type:epic', 'horizon:now'] },
+    { number: C, title: 'C, in epic far', parent: EPIC_FAR },
+  ];
+
+  /** Prints `file` with builtins only: the PATH a spawn gets may hold no `cat`. */
+  function printFile(file: string): string {
+    return `while IFS= read -r l || [ -n "$l" ]; do printf '%s\\n' "$l"; done < '${file}'`;
+  }
+
+  /** Prints the file the shell variable `name` (e.g. `$f`) names, double-quoted so it is expanded. */
+  function printVarFile(name: string): string {
+    return `while IFS= read -r l || [ -n "$l" ]; do printf '%s\\n' "$l"; done < "${name}"`;
+  }
+
+  /**
+   * A commit on `main`, pushed to a bare `origin` beside the repository,
+   * so the branch scan's remote half never fails and warns onto stdout.
+   */
+  function gitSetup(scratch: ScratchRepo): void {
+    const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+    const git = (args: readonly string[]): void => {
+      execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
+    };
+    git(['checkout', '-q', '-B', 'main']);
+    writeFileSync(join(scratch.repo, 'README.md'), '# scratch\n', 'utf8');
+    writeFileSync(join(scratch.repo, '.gitignore'), '.rafa/\n', 'utf8');
+    git(['add', '-A']);
+    git(['-c', 'user.name=rafa tests', '-c', 'user.email=tests@example.com', 'commit', '-q', '-m', 'initial']);
+    const bare = join(dirname(scratch.repo), 'origin.git');
+    git(['init', '-q', '--bare', bare]);
+    git(['remote', 'add', 'origin', bare]);
+    git(['push', '-q', '-u', 'origin', 'main']);
+  }
+
+  /**
+   * Writes the stand-in `gh`: the repository, the native listing over
+   * both boards, a `type:roadmap`-labelled listing for the owner gate's
+   * own (label-mode) board lister, and one `issue view` answer per
+   * fixture issue. Anything unplanned fails loudly, naming the call.
+   */
+  function writeGhStub(scratch: ScratchRepo, data: string): void {
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, 'repo.json'), JSON.stringify({ nameWithOwner: REPOSITORY }), 'utf8');
+    writeFileSync(join(data, 'board.json'), JSON.stringify(ROWS.map(rowOf)), 'utf8');
+    const labelled = ROWS.filter((row) => (row.labels ?? []).includes('type:roadmap'));
+    writeFileSync(join(data, 'labelled.json'), JSON.stringify(labelled.map(rowOf)), 'utf8');
+    for (const row of ROWS) writeFileSync(join(data, `view-${String(row.number)}.json`), JSON.stringify(viewOf(row)), 'utf8');
+
+    const gh = join(scratch.bin, 'gh');
+    writeFileSync(gh, [
+      '#!/bin/sh',
+      // The board cache's own watermark read: answered with no timestamp, so the run reads the whole board again.
+      'case "$*" in *"issues?state=all&sort=updated"*) printf \'\'; exit 0;; esac',
+      // The owner gate's own (label-mode) board lister.
+      `case "$*" in *"--label type:roadmap"*) ${printFile(join(data, 'labelled.json'))}; exit 0;; esac`,
+      'case "$*" in *"--search "*) printf \'%s\' \'[]\'; exit 0;; esac',
+      'case "$1 $2" in',
+      '  "repo view")',
+      `    ${printFile(join(data, 'repo.json'))}`,
+      '    ;;',
+      '  "issue view")',
+      `    f='${data}'"/view-$3.json"`,
+      '    if [ -f "$f" ]; then',
+      `      ${printVarFile('$f')}`,
+      '    else',
+      '      echo "unplanned issue view: $3" >&2; exit 1',
+      '    fi',
+      '    ;;',
+      '  "pr list")',
+      '    printf \'%s\' \'[]\'',
+      '    ;;',
+      '  "issue list")',
+      `    ${printFile(join(data, 'board.json'))}`,
+      '    ;;',
+      '  *)',
+      '    echo "unplanned gh call: $*" >&2',
+      '    exit 1',
+      '    ;;',
+      'esac',
+      '',
+    ].join('\n'), 'utf8');
+    chmodSync(gh, 0o755);
+  }
+
+  let scratch: ScratchRepo;
+
+  beforeAll(() => {
+    scratch = plantScratchRepo(tempBase, { project: false });
+    plantProjectConfig(
+      scratch.repo,
+      `roadmap:\n  issue: ${String(BOARD_A)}\npr:\n  provider: gh\n  base: main\n${NATIVE_CONFIG}`,
+    );
+    gitSetup(scratch);
+    const data = join(dirname(scratch.repo), 'data');
+    writeGhStub(scratch, data);
+  });
+
+  it(`proposes the hop to epic #${String(EPIC_FAR)} on board #${String(BOARD_B)}, #${String(H)}'s blocker read off its native parent`, RUN_TIMEOUT, () => {
+    const position = positionFilePath(scratch.repo);
+    expect(existsSync(position)).toBe(false);
+
+    const run = runRafa(scratch, scratch.repo, ['next', '--roadmap', '--dry-run']);
+
+    expect(run.stderr).toBe('');
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toBe([
+      `📍 hop from epic #${String(EPIC_HOME)}: #${String(H)} blocked by #${String(C)}, in epic #${String(EPIC_FAR)}.`,
+      `👉 hop to epic #${String(EPIC_FAR)} on board #${String(BOARD_B)} and work #${String(C)}, keeping home`,
+      '⏹ --dry-run: nothing ran.',
+    ].join('\n') + '\n');
+    // A dry run proposes the hop; it never writes the position a real hop would move.
+    expect(existsSync(position)).toBe(false);
   });
 });
