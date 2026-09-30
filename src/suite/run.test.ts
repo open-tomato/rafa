@@ -191,6 +191,18 @@ describe('suiteCommand', () => {
     ]);
     expect(suitePathArgument('sub')).toBe('./sub');
   });
+
+  it('puts --changed=<commit> right after test when a commit is handed, and nothing without one', () => {
+    expect(suiteCommand('/r/j.xml', undefined, 'abc123')).toEqual([
+      'bun',
+      'test',
+      '--changed=abc123',
+      '--reporter=junit',
+      '--reporter-outfile=/r/j.xml',
+    ]);
+    // Control: the same call without the commit carries no --changed.
+    expect(suiteCommand('/r/j.xml').some((part) => part.startsWith('--changed'))).toBe(false);
+  });
 });
 
 describe('suiteEnv', () => {
@@ -251,6 +263,14 @@ describe('runSuite', () => {
     };
     const result = await runSuite({ cwd: dir, junitFile, spawn });
     expect(result).toMatchObject({ junit: 'unreadable', failures: [] });
+  });
+
+  it('spawns the --changed selection when changedSince is handed', async () => {
+    const seen: SeenSpawn[] = [];
+    const junitFile = join(dir, 'j.xml');
+    const result = await runSuite({ cwd: dir, junitFile, changedSince: 'base1', spawn: recordedSpawner('clean', 0, seen) });
+    expect(result.command).toEqual(['bun', 'test', '--changed=base1', '--reporter=junit', `--reporter-outfile=${junitFile}`]);
+    expect(seen[0]?.argv).toEqual(result.command);
   });
 
   it('refuses an empty path list rather than running the whole project', async () => {

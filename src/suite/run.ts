@@ -11,8 +11,9 @@
  *
  * ## What is spawned
  *
- * `bun test <paths...> --reporter=junit --reporter-outfile=<junitFile>`
- * in `cwd`, with `bun` looked up on the environment's `PATH`. The
+ * `bun test [--changed=<commit>] <paths...> --reporter=junit
+ * --reporter-outfile=<junitFile>` in `cwd`, with `bun` looked up on the
+ * environment's `PATH`. The
  * environment is the one handed in (`process.env` when left out) with
  * `CLAUDECODE` removed: with it set, Bun prints no per-test line, only
  * the counts. stdin and stdout are ignored; stderr is read to its end.
@@ -35,6 +36,14 @@
  *     write JUnit report` and exited 0. So the directory is created
  *     before the spawn, and any file already at `junitFile` is removed,
  *     so a run that writes none can never be read as the last run's.
+ *   - **`--changed=<commit>` runs the test files Bun's import graph
+ *     reaches from the files changed since that commit**, the working
+ *     tree's uncommitted and untracked files included (a run with no
+ *     commit since the base still counted an untracked file as changed).
+ *     When no test file is reached it printed `--changed: N changed
+ *     files, but no test files are affected`, `Ran 0 tests across 0
+ *     files.`, exited 0 and wrote NO JUnit file, so such a run reads
+ *     `junit: 'missing'` with exit code 0: green, with nothing run.
  *   - **The report, counts and summary go to stderr**; a test's own
  *     `console.log` goes to stdout. Reading stderr alone keeps a test
  *     printing ` 5 errors` from changing the counts read here.
@@ -134,6 +143,12 @@ export interface SuiteRunOptions {
    * run the whole project too, which no caller asking for paths means.
    */
   readonly paths?: readonly string[];
+  /**
+   * A commit: only the test files reached from what changed since it
+   * run, as `--changed=<commit>`; see the module note. Left out, no
+   * selection is made.
+   */
+  readonly changedSince?: string;
   /** Where Bun writes its JUnit report; its directory is created. */
   readonly junitFile: string;
   /** The environment to start from; `process.env` when left out. */
@@ -157,12 +172,18 @@ export function suitePathArgument(path: string): string {
   return `./${path}`;
 }
 
-/** The argv of one run over `paths`, or over the whole project when left out. */
-export function suiteCommand(junitFile: string, paths?: readonly string[]): readonly string[] {
+/**
+ * The argv of one run over `paths`, or over the whole project when left
+ * out, narrowed to what changed since `changedSince` when it is handed.
+ */
+export function suiteCommand(junitFile: string, paths?: readonly string[], changedSince?: string): readonly string[] {
   const pathArgs = paths === undefined
     ? []
     : paths.map(suitePathArgument);
-  return ['bun', 'test', ...pathArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
+  const changedArgs = changedSince === undefined
+    ? []
+    : [`--changed=${changedSince}`];
+  return ['bun', 'test', ...changedArgs, ...pathArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
 }
 
 /** `base` without `CLAUDECODE`, as a new object. */
@@ -317,14 +338,15 @@ export async function spawnSuite(argv: readonly string[], options: SuiteSpawnOpt
 
 /**
  * Runs `bun test` over `options.paths`, or the whole project when they
- * are left out, and answers what it found. Throws a `RangeError` for an
+ * are left out, narrowed by `options.changedSince` when it is handed,
+ * and answers what it found. Throws a `RangeError` for an
  * empty path list; a failing suite is an answer, never a throw.
  */
 export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   if (options.paths?.length === 0) {
     throw new RangeError('runSuite: an empty path list would run the whole project; leave paths out for that');
   }
-  const command = suiteCommand(options.junitFile, options.paths);
+  const command = suiteCommand(options.junitFile, options.paths, options.changedSince);
   mkdirSync(dirname(options.junitFile), { recursive: true });
   rmSync(options.junitFile, { force: true });
   const spawn = options.spawn ?? spawnSuite;
