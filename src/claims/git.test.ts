@@ -365,6 +365,31 @@ describe('pushNewClaimBranch', () => {
     expect(remoteTip(trio)).toBe(sha);
   });
 
+  it('lets exactly one of two racing claims land, naming the winner, and touches neither clone\'s tree or index', () => {
+    const trio = plantTrio('race');
+    /** `status --porcelain`, `HEAD`'s sha, and the staged paths of a clone. */
+    const snapshot = (git: GitRunner): { readonly status: string; readonly head: string; readonly staged: string } => ({
+      status: git(['status', '--porcelain']).stdout,
+      head: must(git, ['rev-parse', 'HEAD']),
+      staged: must(git, ['diff', '--cached', '--name-only']),
+    });
+    const winnerSha = claimOn(trio.a, STORE_A);
+    const loserSha = claimOn(trio.b, STORE_B);
+    const before = { a: snapshot(trio.a), b: snapshot(trio.b) };
+
+    const first = pushNewClaimBranch(trio.a, winnerSha, BRANCH);
+    const second = pushNewClaimBranch(trio.b, loserSha, BRANCH);
+
+    expect(first).toEqual({ outcome: 'pushed' });
+    expect(second.outcome).toBe('claimed');
+    const holder = holderOf(second);
+    expect(foundOf(holder).ownership).toEqual({ state: 'held', owner: STORE_A, pending: null, ignored: [] });
+    expect(foundOf(holder).tip).toBe(winnerSha);
+    expect(remoteTip(trio)).toBe(winnerSha);
+    expect(snapshot(trio.a)).toEqual(before.a);
+    expect(snapshot(trio.b)).toEqual(before.b);
+  });
+
   it('answers claimed naming the holder when the other clone pushed first and this one had not fetched', () => {
     const trio = plantTrio('fetch-first');
     const winner = claimOn(trio.a, STORE_A);
