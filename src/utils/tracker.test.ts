@@ -408,6 +408,7 @@ describe('a blocker comment on its way downstream', () => {
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });

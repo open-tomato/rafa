@@ -255,6 +255,19 @@ describe('the two directories start.ts points each call at', () => {
     expect(callTo(EVERY, 'renderProgressForDispatch').args).toEqual(['repoRoot', 'planStub', 'checkout']);
   });
 
+  it('dispatches each task with the HEAD the checkout is held to as its base', () => {
+    // `expected.head` is the task's base: `advanceExpectation` moves it on
+    // to each task's commit, so the next task is handed the commit it sits on.
+    expect(firstArgument('dispatchTask')).toContain('base: expected.head,');
+  });
+
+  it('reads a dispatch handed no base as handed none', () => {
+    // The control for the case above: a literal without the field reads without it.
+    const planted = everyCall('async function run() { await dispatchTask({ taskInfo, repoRoot, home }); }');
+
+    expect(callTo(planted, 'dispatchTask').args[0]).not.toContain('base:');
+  });
+
   it('reads a dispatch handed no checkout as handed none', () => {
     // The control for the case above: the reader answers what is written,
     // so a dispatch literal without the field reads without it.

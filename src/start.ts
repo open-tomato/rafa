@@ -541,6 +541,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         knownMissing,
         serving,
         handout,
+        // The HEAD the checkout is held to is the task's base commit: the
+        // session runs `bun test --changed=<base>` against it.
+        base: expected.head,
       });
       const { exitCode } = dispatch;
 

@@ -349,6 +349,7 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     settingSources: ['project', 'local'],
     serving: null,
     handout: null,
+    base: null,
     run,
   });
   return { result, prompts };

@@ -250,6 +250,7 @@ describe('a dispatched task session', () => {
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run,
       newSessionId,
     });
