@@ -53,6 +53,7 @@ const CONFIG: StatusConfig = {
   prBase: 'main',
   prProvider: null,
   roadmapIssue: 31,
+  claimsStaleAfter: '3d',
   cleanupKeep: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,

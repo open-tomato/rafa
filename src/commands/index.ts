@@ -63,7 +63,7 @@
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
  * `src/cleanup/` and removes the ticked ones through its steps, nor
- * `status`, which reads the five sections through `src/status/`, nor
+ * `status`, which reads the six sections through `src/status/`, nor
  * `epic show`, which reads one epic's lines into the same rows as
  * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
  * creates an epic's label, issue and board line through
@@ -209,8 +209,8 @@
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
  *     did not confirm it, its epic count, and `current` and `home` on
  *     the boards this checkout's position holds; writing nothing.
- *   - `status`, top-level: where the project stands in five sections,
- *     branch and plan, loops, pull request, board and housekeeping, a
+ *   - `status`, top-level: where the project stands in six sections,
+ *     branch and plan, loops, pull request, board, claims and housekeeping, a
  *     section that cannot be read one warning; exit code 1 only for a
  *     config that cannot be used. It starts no session.
  *   - `next [--dry-run] [--yes[=<action ids>]]`, top-level: where the

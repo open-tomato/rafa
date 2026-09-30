@@ -21,7 +21,7 @@
  *    needed to keep the run from acting. Every line printed is hand
  *    derived from the source each command's row is read off
  *    (`src/next/state.ts`'s row 13, `src/commands/epic/show.ts`'s
- *    `noNowEpicLine`, `src/status/render.ts`'s five section lines), the
+ *    `noNowEpicLine`, `src/status/render.ts`'s six section lines), the
  *    same way `epic-descent-cli.test.ts`'s own byte-for-byte case is.
  *
  * Both suites push `main` to a bare `origin`, so the branch scan's
@@ -254,7 +254,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
     expect(run.stdout).toBe(expected);
   });
 
-  it('rafa status prints its five section lines, byte for byte, with no place line under Board', RUN_TIMEOUT, () => {
+  it('rafa status prints its six section lines, byte for byte, with no place line under Board', RUN_TIMEOUT, () => {
     const run = runRafa(scratch, scratch.repo, ['status']);
 
     const expected = [
@@ -262,6 +262,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
       'Loops: 0 running, 0 tasks blocked',
       'Pull request: none open',
       `Board: roadmap #${String(ROADMAP)} has no line left; 0 issues labelled spec:blocked`,
+      'Claims: none on origin as last fetched',
       'Housekeeping: 0 merged, 0 stale, 0 not pushed, 0 worktrees (0 idle)',
     ].join('\n') + '\n';
 
