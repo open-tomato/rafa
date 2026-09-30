@@ -15,8 +15,9 @@
  * note names).
  *
  * The `labels` half wraps `../epics.ts` and `../blocked.ts`, as the real
- * adapter will (`./labels.ts`, not written yet); the `native` half reads
- * the fixture's `parent`, `blockedBy` and `subIssues` fields directly.
+ * adapter (`./labels.ts`, run through the contract by `./labels.test.ts`)
+ * does; the `native` half reads the fixture's `parent`, `blockedBy` and
+ * `subIssues` fields directly.
  * Neither is the real adapter — both exist only to hold the contract
  * mechanism itself to account, exactly as `contract.test.ts`'s
  * `memoryTracker` is not the `local` or `github` Tracker.
@@ -83,7 +84,7 @@ const CASES = {
 
 // ---------------------------------------------------------------------------
 // A small `labels`-mode reader: wraps `../epics.ts` and `../blocked.ts`, as
-// the real adapter (`./labels.ts`) will.
+// the real adapter (`./labels.ts`) does.
 // ---------------------------------------------------------------------------
 
 /** `issue`'s epic, read off its `epic:` labels. */

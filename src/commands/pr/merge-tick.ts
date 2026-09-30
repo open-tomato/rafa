@@ -95,6 +95,11 @@
  * {@link epicTickSentence} for it: one sentence per epic, a warning for
  * one that failed. A listing that fails is one {@link epicTickProblemLine}
  * warning, and the boards are ticked all the same.
+ *
+ * The epic half is exported as {@link tickEpics}: the `labels`
+ * relationships adapter (`src/board/relations/labels.ts`) runs it in its
+ * `afterMerge`, since an epic's checklist is where that mode keeps its
+ * order. The boards are not a relationship and stay here alone.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ChecklistEditResult } from '../../board/epic-checklist.js';
@@ -205,8 +210,16 @@ function epicsListing(
   return new Map([...members].sort(([a], [b]) => a - b));
 }
 
-/** Ticks each closed member's line on its epic's checklist; see the module note. Never throws. */
-async function tickEpics(options: MergeTickOptions, issues: readonly number[]): Promise<void> {
+/** What {@link tickEpics} is asked: the three of {@link MergeTickOptions} the epic tick reads. */
+export type EpicTickOptions = Pick<MergeTickOptions, 'gh' | 'warn' | 'epicTicked'>;
+
+/**
+ * Ticks each of `issues`' lines on its epic's checklist, handing each
+ * epic's result to `epicTicked`; see the module note. Never throws.
+ * `src/board/relations/labels.ts` runs it as the epic half of its
+ * `afterMerge`, so the adapter and this tick read one rule.
+ */
+export async function tickEpics(options: EpicTickOptions, issues: readonly number[]): Promise<void> {
   const { gh, warn, epicTicked } = options;
   let members: ReadonlyMap<number, readonly number[]>;
   try {
