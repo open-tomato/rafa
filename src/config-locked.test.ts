@@ -1,6 +1,6 @@
 /**
  * Tests for the locked-settings declaration: every entry is a
- * `SETTINGS` key, and the set is exactly the two of the first release,
+ * `SETTINGS` key, and the set is exactly the four declared so far,
  * spelled here by their dotted file keys rather than read off the
  * module.
  */
@@ -16,10 +16,15 @@ describe('LOCKED_SETTINGS', () => {
     expect(LOCKED_SETTINGS.filter((name) => !names.has(name))).toEqual([]);
   });
 
-  it('locks effort.sync and prerequisites.required and nothing else', () => {
+  it('locks effort.sync, prerequisites.required and the claims keys and nothing else', () => {
     const keys = LOCKED_SETTINGS.map((name) => SETTINGS[name].key);
 
-    expect(keys).toEqual(['effort.sync', 'prerequisites.required']);
+    expect(keys).toEqual([
+      'effort.sync',
+      'prerequisites.required',
+      'claims.staleAfter',
+      'claims.ahead',
+    ]);
   });
 
   it('holds no entry twice', () => {
