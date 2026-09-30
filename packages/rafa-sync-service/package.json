@@ -8,5 +8,16 @@
   "scripts": {
     "test": "bun test",
     "check-types": "tsc --noEmit"
+  },
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["sync"],
+    "provides": {
+      "sync": { "kind": "service", "entry": "./src/sync.ts" }
+    },
+    "requires": {
+      "rafa": ">=0.31 <1",
+      "ports": { "sync": 1 }
+    }
   }
 }
