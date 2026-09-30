@@ -12,6 +12,7 @@
  * back-dating commits, and each stale case keeps a control whose only
  * difference is the clock, the labels or the setting.
  */
+import type { AheadCandidate, AheadRequest } from './ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from './plan-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { GitRunner } from '../pr/index.js';
@@ -23,6 +24,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGhIssueBoard } from '../board/issue-board.js';
+import { branchName } from '../board/naming.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from './git.js';
@@ -135,6 +137,7 @@ function context(git: GitRunner, store: string | null, overrides: Partial<PlanCl
       ? { ok: false, cause: 'ndjson', reason: 'NDJSON store; Next safe step: rafa effort move --to=sqlite' }
       : { ok: true, storeId: store },
     staleAfter: '3d',
+    claimsAhead: 'off',
     now: new Date(),
     ...overrides,
   };
@@ -431,5 +434,216 @@ describe('claimPlanIssue: no push', () => {
     expect(answer.reason).toContain('pre-receive hook declined');
     expect(answer.pending?.branch).toBe(BRANCH);
     expect(remoteTip(trio)).toBeNull();
+  });
+});
+
+const AHEAD_ISSUE = 8;
+const AHEAD_TITLE = 'Claim the next line';
+const AHEAD_BRANCH = branchName(AHEAD_ISSUE, AHEAD_TITLE);
+
+/** The ahead request of a walk whose next undone line is #8, on the home issue's board unless given. */
+function aheadOf(overrides: Partial<AheadRequest> = {}, candidate: Partial<AheadCandidate> = {}): AheadRequest {
+  return {
+    flag: false,
+    homeBoard: 1,
+    candidate: { issue: AHEAD_ISSUE, title: AHEAD_TITLE, board: 1, labels: null, ...candidate },
+    ...overrides,
+  };
+}
+
+/** The context of device `store` with `claims.ahead: allow`. */
+function aheadContext(git: GitRunner, store: string, overrides: Partial<PlanClaimContext> = {}): PlanClaimContext {
+  return context(git, store, { claimsAhead: 'allow', ...overrides });
+}
+
+/** Pushes a claim by `store` on the line ahead from `git`, or throws; answers its sha. */
+function claimAheadBy(trio: Trio, git: GitRunner, store: string): string {
+  const main = must(git, ['rev-parse', 'origin/main']);
+  const made = makeOwnershipCommit(git, main, { action: 'claim', issue: AHEAD_ISSUE, store });
+  if (!made.ok) throw new Error(made.reason);
+  const pushed = pushNewClaimBranch(git, made.sha, AHEAD_BRANCH);
+  if (pushed.outcome !== 'pushed') throw new Error(`ahead claim: ${JSON.stringify(pushed)}`);
+  return must(trio.origin, ['rev-parse', `refs/heads/${AHEAD_BRANCH}`]);
+}
+
+/** `git`, running `before` once, just before its first `push --atomic`. */
+function racing(git: GitRunner, before: () => void): { readonly git: GitRunner; readonly pushes: (readonly string[])[] } {
+  const pushes: (readonly string[])[] = [];
+  const wrapped: GitRunner = (args) => {
+    if (args[0] === 'push' && args.includes('--atomic')) {
+      if (pushes.length === 0) before();
+      pushes.push(args);
+    }
+    return git(args);
+  };
+  return { git: wrapped, pushes };
+}
+
+describe('claimPlanIssue: claim ahead', () => {
+  it('claims the home issue alone, reporting nothing ahead, while claims.ahead is off and no flag is given', async () => {
+    const trio = plantTrio('ahead-off');
+    const { board, calls } = boardWorld();
+
+    const answer = await claimPlanIssue(request({ ahead: aheadOf() }), context(trio.a, STORE_A, { board }));
+
+    expect(answer).toEqual({ outcome: 'claimed', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'claim', warnings: [] });
+    expect(remoteTip(trio)).not.toBeNull();
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBeNull();
+    expect(calls).toEqual([['issue', 'edit', String(ISSUE), '--add-label', CLAIMED_LABEL]]);
+  });
+
+  it('lands both claims in one atomic push and labels both, under claims.ahead: allow', async () => {
+    const trio = plantTrio('ahead-both');
+    const { board, calls } = boardWorld();
+    const { git, pushes } = racing(trio.a, () => undefined);
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(git, STORE_A, { board })), 'claimed');
+
+    expect(answer.via).toBe('claim');
+    expect(answer.ahead).toEqual({ outcome: 'claimed', issue: AHEAD_ISSUE, branch: AHEAD_BRANCH, via: 'claim' });
+    expect(answer.warnings).toEqual([]);
+    expect(pushes).toHaveLength(1);
+    const [home, ahead] = [remoteTip(trio), remoteTip(trio, AHEAD_BRANCH)];
+    if (home === null || ahead === null) throw new Error('a claim of the pair did not land');
+    expect(recordAt(trio, home)).toEqual({ action: 'claim', issue: ISSUE, store: STORE_A });
+    expect(recordAt(trio, ahead)).toEqual({ action: 'claim', issue: AHEAD_ISSUE, store: STORE_A });
+    expect(calls).toEqual([
+      ['issue', 'edit', String(ISSUE), '--add-label', CLAIMED_LABEL],
+      ['issue', 'edit', String(AHEAD_ISSUE), '--add-label', CLAIMED_LABEL],
+    ]);
+    expect(tipAt(trio.a, `refs/remotes/origin/${AHEAD_BRANCH}`)).toBe(ahead);
+  });
+
+  it('runs under --claim-ahead with claims.ahead: off', async () => {
+    const trio = plantTrio('ahead-flag');
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf({ flag: true }) }), context(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.ahead?.outcome).toBe('claimed');
+    expect(remoteTip(trio, AHEAD_BRANCH)).not.toBeNull();
+  });
+
+  it('lands neither when another device holds the line ahead, keeping the home claim on the local branch', async () => {
+    const trio = plantTrio('ahead-taken');
+    const theirs = claimAheadBy(trio, trio.b, STORE_B);
+    const { board, calls } = boardWorld();
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(trio.a, STORE_A, { board })), 'unclaimed');
+
+    expect(answer.cause).toBe('ahead-taken');
+    expect(answer.reason).toContain('claim ahead takes both claims or neither');
+    expect(answer.reason).toContain(`#${String(AHEAD_ISSUE)} is claimed by store ${STORE_B}`);
+    expect(answer.ahead).toMatchObject({ outcome: 'not-claimed', issue: AHEAD_ISSUE, cause: 'taken' });
+    expect(remoteTip(trio)).toBeNull();
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBe(theirs);
+    expect(answer.pending?.branch).toBe(BRANCH);
+    expect(tipAt(trio.a, `refs/heads/${BRANCH}`)).toBe(answer.pending?.sha ?? '');
+    expect(calls).toEqual([]);
+  });
+
+  it('lands neither when the line ahead is claimed between the reading and the atomic push', async () => {
+    const trio = plantTrio('ahead-race');
+    let theirs = '';
+    const { git, pushes } = racing(trio.a, () => {
+      theirs = claimAheadBy(trio, trio.b, STORE_B);
+    });
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(git, STORE_A)), 'unclaimed');
+
+    expect(pushes).toHaveLength(1);
+    expect(answer.cause).toBe('ahead-taken');
+    expect(answer.ahead).toMatchObject({ cause: 'taken', reason: expect.stringContaining(`store ${STORE_B}`) });
+    expect(remoteTip(trio)).toBeNull();
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBe(theirs);
+  });
+
+  it('refuses the run, naming the new owner, when the home issue is claimed between the reading and the atomic push', async () => {
+    const trio = plantTrio('home-race');
+    const raced = racing(trio.a, () => {
+      const main = must(trio.b, ['rev-parse', 'origin/main']);
+      const made = makeOwnershipCommit(trio.b, main, { action: 'claim', issue: ISSUE, store: STORE_B });
+      if (!made.ok) throw new Error(made.reason);
+      must(trio.b, ['push', '--quiet', 'origin', `${made.sha}:refs/heads/${BRANCH}`]);
+    });
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(raced.git, STORE_A)), 'refused');
+
+    expect(answer.owner).toBe(STORE_B);
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBeNull();
+  });
+
+  it('claims the home issue alone and reports a line ahead on another board as not claimed', async () => {
+    const trio = plantTrio('ahead-board');
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf({}, { board: 2 }) }), aheadContext(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.via).toBe('claim');
+    expect(answer.ahead).toMatchObject({ outcome: 'not-claimed', issue: AHEAD_ISSUE, cause: 'other-board' });
+    expect(remoteTip(trio)).not.toBeNull();
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBeNull();
+  });
+
+  it('claims the home issue alone and reports no line ahead when the walk found none', async () => {
+    const trio = plantTrio('ahead-none');
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf({ candidate: null }) }), aheadContext(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.ahead).toMatchObject({ outcome: 'not-claimed', issue: null, cause: 'no-line' });
+    expect(remoteTip(trio)).not.toBeNull();
+  });
+
+  it('pushes the home claim alone when this store already holds the line ahead', async () => {
+    const trio = plantTrio('ahead-held');
+    const ours = claimAheadBy(trio, trio.a, STORE_A);
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.ahead).toEqual({ outcome: 'claimed', issue: AHEAD_ISSUE, branch: AHEAD_BRANCH, via: 'held' });
+    expect(remoteTip(trio)).not.toBeNull();
+    expect(remoteTip(trio, AHEAD_BRANCH)).toBe(ours);
+  });
+
+  it('pushes the line ahead alone when this store already holds the home issue, and keeps the home claim when it is taken', async () => {
+    const free = plantTrio('home-held');
+    const home = await claimByA(free);
+    const taken = plantTrio('home-held-taken');
+    const takenHome = await claimByA(taken);
+    claimAheadBy(taken, taken.b, STORE_B);
+
+    const landed = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(free.a, STORE_A)), 'claimed');
+    const kept = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(taken.a, STORE_A)), 'claimed');
+
+    expect([landed.via, landed.ahead?.outcome]).toEqual(['held', 'claimed']);
+    expect(remoteTip(free)).toBe(home);
+    expect(remoteTip(free, AHEAD_BRANCH)).not.toBeNull();
+    expect([kept.via, kept.ahead?.outcome]).toEqual(['held', 'not-claimed']);
+    expect(remoteTip(taken)).toBe(takenHome);
+  });
+
+  it('takes over a released line ahead with a take commit leased on its tip', async () => {
+    const trio = plantTrio('ahead-released');
+    const theirs = claimAheadBy(trio, trio.b, STORE_B);
+    const release = makeOwnershipCommit(trio.b, theirs, { action: 'release', issue: AHEAD_ISSUE, store: STORE_B });
+    if (!release.ok) throw new Error(release.reason);
+    expect(pushOwnershipCommit(trio.b, release.sha, AHEAD_BRANCH, theirs).outcome).toBe('pushed');
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(trio.a, STORE_A)), 'claimed');
+
+    expect(answer.ahead).toMatchObject({ outcome: 'claimed', via: 'take' });
+    const tip = remoteTip(trio, AHEAD_BRANCH);
+    if (tip === null) throw new Error('the take did not land');
+    expect(recordAt(trio, tip)).toEqual({ action: 'take', issue: AHEAD_ISSUE, store: STORE_A });
+    expect(must(trio.origin, ['rev-parse', `${tip}^`])).toBe(release.sha);
+  });
+
+  it('reports the line ahead as not tried when the remote cannot be reached', async () => {
+    const trio = plantTrio('ahead-offline');
+    must(trio.a, ['remote', 'set-url', 'origin', join(scope, 'no-such-remote.git')]);
+
+    const answer = as(await claimPlanIssue(request({ ahead: aheadOf() }), aheadContext(trio.a, STORE_A)), 'unclaimed');
+
+    expect(answer.cause).toBe('offline');
+    expect(answer.ahead).toMatchObject({ outcome: 'not-claimed', issue: AHEAD_ISSUE, cause: 'not-tried' });
+    expect(tipAt(trio.a, `refs/heads/${AHEAD_BRANCH}`)).toBeNull();
   });
 });

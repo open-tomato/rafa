@@ -177,6 +177,23 @@ describe('resolveAndClaim on a claim that lands', () => {
     expect(kept.warn).toEqual(['⚠️  claim labels: #20 was not labelled']);
   });
 
+  it('prints a claim ahead report after the claim and before the warnings', async () => {
+    const ahead: PlanClaim = { ...claimedOn(20, 'claim', ['w']), ahead: { outcome: 'claimed', issue: 21, branch: 'feat/rafa-21-next', via: 'claim' } };
+    const other: PlanClaim = {
+      ...claimedOn(20),
+      ahead: { outcome: 'not-claimed', issue: 30, cause: 'other-board', reason: '#30, the line ahead, was not claimed: board' },
+    };
+    const landed = planted([specResolution(20)], [ahead]);
+    const reported = planted([specResolution(20)], [other]);
+
+    await resolveAndClaim(landed.seams);
+    await resolveAndClaim(reported.seams);
+
+    expect(landed.kept.info).toEqual([`🔒 Claimed #20 on feat/rafa-20-issue for store ${OWN_STORE}.`, '🔒 Claimed #21, the line ahead, on feat/rafa-21-next.']);
+    expect(landed.kept.warn).toEqual(['⚠️  w']);
+    expect(reported.kept.warn).toEqual(['⚠️  Claim ahead: #30, the line ahead, was not claimed: board']);
+  });
+
   it('names a takeover and a claim already held in lines of their own', () => {
     const take = claimedOn(20, 'take') as Extract<PlanClaim, { outcome: 'claimed' }>;
     const held = claimedOn(20, 'held') as Extract<PlanClaim, { outcome: 'claimed' }>;
@@ -353,17 +370,24 @@ describe('createPlanClaimContext', () => {
   });
 
   it('opens no board for a provider that is not gh, and one for gh', () => {
-    const none = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled' });
-    const gh = createPlanClaimContext(root, { prProvider: 'gh', store: 'sqlite', claimsStaleAfter: 'disabled' });
+    const none = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+    const gh = createPlanClaimContext(root, { prProvider: 'gh', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
 
     expect(none.board).toBeNull();
     expect(gh.board).not.toBeNull();
     expect(none.staleAfter).toBe('disabled');
   });
 
+  it('carries claims.ahead as configured', () => {
+    const allow = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'allow' });
+    const off = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+
+    expect([allow.claimsAhead, off.claimsAhead]).toEqual(['allow', 'off']);
+  });
+
   it('reads the store id under the configured store: an NDJSON store names no claimant', () => {
-    const ndjson = createPlanClaimContext(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: 'disabled' });
-    const sqlite = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled' });
+    const ndjson = createPlanClaimContext(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+    const sqlite = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
 
     const fromNdjson = ndjson.readStoreId();
     const fromSqlite = sqlite.readStoreId();

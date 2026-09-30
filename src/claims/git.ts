@@ -77,6 +77,10 @@
  * that matched would otherwise let the push drop the branch's commits:
  * work commits never leave the branch.
  *
+ * The pair of claims a claim ahead makes is pushed in ONE
+ * `git push --atomic` by `./ahead.ts`, which reads each ref's porcelain
+ * line with {@link porcelainFor} and the refusals above.
+ *
  * ## What was measured
  *
  * On git 2.53.0 under Linux with `LC_ALL=C`, over a bare repository and
@@ -118,13 +122,13 @@ const CLAIM_BRANCH = /^feat\/rafa-([1-9]\d*)(?:-\S+)?$/;
 const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 /** The porcelain flags of a push that left the ref at the pushed sha. */
-const LANDED_FLAGS: readonly string[] = ['*', ' ', '+', '='];
+export const LANDED_FLAGS: readonly string[] = ['*', ' ', '+', '='];
 
 /** The refusals a push without force meets when the branch holds another commit. */
-const CLAIMED_REASONS: readonly string[] = ['[rejected] (non-fast-forward)', '[rejected] (fetch first)'];
+export const CLAIMED_REASONS: readonly string[] = ['[rejected] (non-fast-forward)', '[rejected] (fetch first)'];
 
 /** The refusal a lease meets when the tip is no longer the sha it names. */
-const STALE_LEASE = '[rejected] (stale info)';
+export const STALE_LEASE = '[rejected] (stale info)';
 
 /** What {@link makeOwnershipCommit} answered. */
 export type OwnershipCommit =
@@ -310,7 +314,7 @@ function belongsTo(commit: BranchCommit, issue: number): boolean {
 }
 
 /** The porcelain line `push --porcelain` wrote for `ref`, split into flag and summary, or null. */
-function porcelainFor(stdout: string, ref: string): { readonly flag: string; readonly summary: string } | null {
+export function porcelainFor(stdout: string, ref: string): { readonly flag: string; readonly summary: string } | null {
   for (const line of stdout.split('\n')) {
     const [flag, refs, summary] = line.split('\t');
     if (flag !== undefined && refs?.endsWith(`:${ref}`) === true && summary !== undefined) {

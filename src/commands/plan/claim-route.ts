@@ -29,10 +29,14 @@
  * the one it always was. Every other unclaimed answer is a warning:
  * no reachable remote (the claim commit waits on the local branch for
  * `loop start`'s preflight to push), a store that names no claimant
- * (its reason names `rafa effort move --to=sqlite`), or a `--stub` that
- * is no claim branch of the issue. The warnings a claimed or unclaimed
- * answer carries, a label that could not be written among them, are
- * printed after it.
+ * (its reason names `rafa effort move --to=sqlite`), a `--stub` that
+ * is no claim branch of the issue, or a claim ahead whose line ahead
+ * could not be claimed (both or neither: the home claim commit waits on
+ * the local branch as with no remote). An answer that carries a claim
+ * ahead report (`src/claims/ahead.ts`) prints it next, one line for the
+ * line ahead claimed and a warning for one not claimed. The warnings a
+ * claimed or unclaimed answer carries, a label that could not be
+ * written among them, are printed after it.
  *
  * ## `--next` walks on
  *
@@ -58,6 +62,7 @@ import type { Output } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
+import { aheadClaimedLine, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
 import { CommandExit } from '../../cli/command.js';
 import { createGitRunner } from '../../pr/git.js';
@@ -126,6 +131,8 @@ function report(claim: Exclude<PlanClaim, { outcome: 'refused' }>, output: Outpu
     const warning = unclaimedWarning(claim);
     if (warning !== null) output.warn(warning);
   }
+  if (claim.ahead?.outcome === 'claimed') output.info(aheadClaimedLine(claim.ahead));
+  if (claim.ahead?.outcome === 'not-claimed') output.warn(aheadNotClaimedWarning(claim.ahead));
   claim.warnings.forEach((warning) => output.warn(`⚠️  ${warning}`));
 }
 
@@ -167,12 +174,12 @@ export async function resolveAndClaim(seams: ClaimRouteSeams): Promise<ClaimedRo
  * The seams and settings a `plan create` run in `repoRoot` claims
  * through: `git` in the project root, the `gh` issue board when the
  * repository resolves to `pr.provider: gh` and none otherwise, this
- * device's store id read under `config.store`, `claims.staleAfter`, and
- * the clock at the call.
+ * device's store id read under `config.store`, `claims.staleAfter`,
+ * `claims.ahead`, and the clock at the call.
  */
 export function createPlanClaimContext(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter'>,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead'>,
 ): PlanClaimContext {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
@@ -182,6 +189,7 @@ export function createPlanClaimContext(
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
     staleAfter: config.claimsStaleAfter,
+    claimsAhead: config.claimsAhead,
     now: new Date(),
   };
 }

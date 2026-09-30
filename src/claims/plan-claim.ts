@@ -66,11 +66,37 @@
  * the issue is not known to carry a stage label already, so a takeover
  * of a stale `rafa:claimed` claim sends nothing and an issue in
  * development is never given `rafa:claimed` beside it.
+ *
+ * ## Claim ahead
+ *
+ * A request carrying an `ahead` request, with `claims.ahead: allow` or
+ * its `--claim-ahead`, also claims the line ahead, C (`./ahead.ts`). The
+ * home issue's branches are read first, as above, and a home refusal
+ * refuses the run with no ahead tried. A C that is not on the home
+ * issue's board is reported not claimed, and the home issue is claimed
+ * alone. Otherwise C's branches are read the same way, off the same
+ * fetch, and the answer carries an `ahead` report:
+ *
+ * | C's reading | Home | C |
+ * |---|---|---|
+ * | held by this store | claimed alone, as above | `claimed` via `held` |
+ * | refused (another store, or a branch that keeps it taken) | neither: `unclaimed`, `ahead-taken` | `taken` |
+ * | absent, released or stale `rafa:claimed` | one `git push --atomic` of both | `claimed` via `claim` or `take` |
+ *
+ * The atomic push lands both or neither. A refusal over the home branch
+ * refuses the run as a lone push would; one over C's answers the home
+ * issue `unclaimed` (`ahead-taken`), naming who holds C; any other
+ * failure answers it `push-failed`. In every "neither" the home claim
+ * commit waits on the local branch as a failed push leaves it, for
+ * `loop start` to push, and a home claim this store already held stands.
+ * A landed C gets `rafa:claimed` by the home label's rule, over the
+ * labels the request read off C, and never `rafa:in-development`.
  */
+import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
 import type { DeviceStoreId } from './device.js';
 import type { ClaimBranchReading } from './git.js';
 import type { IssueBoard } from '../board/issue-board.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
+import type { ClaimsAhead, ClaimsStaleAfter } from '../config-sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import path from 'node:path';
@@ -79,6 +105,7 @@ import { weighBranchClaim } from '../board/roadmap-claims.js';
 import { gitSaid } from '../pr/index.js';
 import { BRANCH_PREFIX, branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
 
+import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
 import {
   claimBranchIssue,
   fetchClaimBranches,
@@ -92,7 +119,14 @@ import { parseClaimMessage } from './record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from './stale.js';
 
 /** Why a run made no claim. */
-export type UnclaimedCause = 'no-issue' | 'branch-mismatch' | 'no-store-id' | 'offline' | 'commit-failed' | 'push-failed';
+export type UnclaimedCause =
+  | 'no-issue'
+  | 'branch-mismatch'
+  | 'no-store-id'
+  | 'offline'
+  | 'commit-failed'
+  | 'push-failed'
+  | 'ahead-taken';
 
 /** How a claimed run came to hold its claim. */
 export type ClaimVia = 'claim' | 'take' | 'held';
@@ -112,6 +146,8 @@ export type PlanClaim =
     readonly storeId: string;
     readonly via: ClaimVia;
     readonly warnings: readonly string[];
+    /** What claim ahead did with the line ahead; absent when claim ahead did not run. */
+    readonly ahead?: AheadClaim;
   }
   | {
     readonly outcome: 'refused';
@@ -129,6 +165,8 @@ export type PlanClaim =
     readonly reason: string;
     readonly pending: PendingClaim | null;
     readonly warnings: readonly string[];
+    /** What claim ahead did with the line ahead; absent when claim ahead did not run. */
+    readonly ahead?: AheadClaim;
   };
 
 /** What the run knows of its issue and its plan. */
@@ -143,6 +181,8 @@ export interface PlanClaimRequest {
   readonly labels: readonly string[] | null;
   /** What a claim commit is made on when this checkout has no `feat/<stub>`; `HEAD` when left out. */
   readonly base?: string;
+  /** The line ahead, for a run that walked a board; left out, claim ahead does not run. */
+  readonly ahead?: AheadRequest;
 }
 
 /** The seams and settings a claim is made through. */
@@ -154,6 +194,8 @@ export interface PlanClaimContext {
   readonly readStoreId: () => DeviceStoreId;
   /** `claims.staleAfter`. */
   readonly staleAfter: ClaimsStaleAfter;
+  /** `claims.ahead`; `--claim-ahead` rides on the request. */
+  readonly claimsAhead: ClaimsAhead;
   /** The clock a claim's idle time is read against. */
   readonly now: Date;
 }
@@ -215,9 +257,10 @@ function needsClaimedLabel(labels: readonly string[] | null): boolean {
 }
 
 /**
- * Claims the issue of a `plan create` run: see the module note for the
- * order and every answer. Never throws for what git or the board says;
- * throws only what `readStoreId` throws for a store it cannot read.
+ * Claims the issue of a `plan create` run, and the line ahead when claim
+ * ahead runs: see the module note for the order and every answer. Never
+ * throws for what git or the board says; throws only what `readStoreId`
+ * throws for a store it cannot read.
  */
 export async function claimPlanIssue(request: PlanClaimRequest, context: PlanClaimContext): Promise<PlanClaim> {
   const target = resolveClaimTarget(request);
@@ -232,32 +275,97 @@ export async function claimPlanIssue(request: PlanClaimRequest, context: PlanCla
     base: request.base ?? 'HEAD',
     labels: request.labels,
   };
-  const answer = claimOnRemote(attempt, context);
-  if (answer.outcome !== 'claimed' || !needsClaimedLabel(request.labels)) return answer;
-  const label = await labelClaimed(context.board, answer.issue);
-  return label.outcome === 'written'
+  const ahead = request.ahead !== undefined && aheadEnabled(context.claimsAhead, request.ahead.flag)
+    ? request.ahead
+    : null;
+  const answer = claimOnRemote(attempt, ahead, context);
+  if (answer.outcome === 'refused') return answer;
+  const homeLabel = answer.outcome === 'claimed' && needsClaimedLabel(request.labels)
+    ? await labelWarning(context.board, answer.issue)
+    : null;
+  const aheadLabel = answer.ahead?.outcome === 'claimed' && needsClaimedLabel(ahead?.candidate?.labels ?? null)
+    ? await labelWarning(context.board, answer.ahead.issue)
+    : null;
+  const warnings = [homeLabel, aheadLabel].filter((warning) => warning !== null);
+  return warnings.length === 0
     ? answer
-    : { ...answer, warnings: [...answer.warnings, label.warning] };
+    : { ...answer, warnings: [...answer.warnings, ...warnings] };
 }
 
-/** The claim as the remote decides it, after one fetch. */
-function claimOnRemote(attempt: Attempt, context: PlanClaimContext): PlanClaim {
+/** The warning a `rafa:claimed` write left, or null when the board took it. */
+async function labelWarning(board: IssueBoard | null, issue: number): Promise<string | null> {
+  const label = await labelClaimed(board, issue);
+  return label.outcome === 'written'
+    ? null
+    : label.warning;
+}
+
+/** `answer` carrying the claim ahead report `ahead`; a refusal carries none. */
+function withAhead(answer: PlanClaim, ahead: AheadClaim): PlanClaim {
+  return answer.outcome === 'refused'
+    ? answer
+    : { ...answer, ahead };
+}
+
+/** The claim as the remote decides it, after one fetch; the pair when claim ahead runs. */
+function claimOnRemote(attempt: Attempt, ahead: AheadRequest | null, context: PlanClaimContext): PlanClaim {
   const { git } = context;
   const fetched = fetchClaimBranches(git);
-  if (!fetched.ok) return keepLocally(attempt, git, 'offline', fetched.reason);
+  if (!fetched.ok) {
+    const answer = keepLocally(attempt, git, 'offline', fetched.reason);
+    return ahead === null
+      ? answer
+      : withAhead(answer, notTried(ahead, `${REMOTE} could not be reached`));
+  }
 
   const listed = git(['for-each-ref', '--format=%(refname:lstrip=3)', `refs/remotes/${REMOTE}/${BRANCH_PREFIX}`]);
   if (!listed.ok) {
     return refused(attempt, attempt.branch, null, `the ${REMOTE} branches of #${String(attempt.issue)} could not be listed: ${gitSaid(listed)}`);
   }
-  const others = listed.stdout.split('\n')
-    .map((line) => line.trim())
-    .filter((name) => name !== attempt.branch && claimBranchIssue(name) === attempt.issue);
+  const names = listed.stdout.split('\n').map((line) => line.trim());
+  const move = readMove(attempt, names, context);
+  if (ahead === null || move.kind === 'answer') return carryOut(attempt, move, git);
+
+  const target = resolveAheadTarget(ahead, attempt.issue);
+  if (!target.ok) return withAhead(carryOut(attempt, move, git), target.report);
+  const forward: Attempt = { ...attempt, issue: target.issue, branch: target.branch, labels: target.labels };
+  return claimPair({ attempt, move }, { attempt: forward, move: readMove(forward, names, context) }, git);
+}
+
+/** The report of a line ahead no claim was tried on, since the home issue's could not be pushed. */
+function notTried(ahead: AheadRequest, why: string): AheadClaim {
+  const issue = ahead.candidate?.issue ?? null;
+  const line = issue === null
+    ? 'the line ahead'
+    : `#${String(issue)}, the line ahead,`;
+  return aheadNotClaimed(issue, 'not-tried', `${line} was not claimed: ${why}`);
+}
+
+/** What the remote's reading of an attempt's branches leaves to do; see the module note's table. */
+type Move =
+  | { readonly kind: 'answer'; readonly answer: PlanClaim }
+  | { readonly kind: 'held' }
+  | { readonly kind: 'fresh' }
+  | { readonly kind: 'take'; readonly tip: string };
+
+/** What {@link claimOwnBranch} and the other branches of the issue among `names` leave to do. */
+function readMove(attempt: Attempt, names: readonly string[], context: PlanClaimContext): Move {
+  const { git } = context;
+  const others = names.filter((name) => name !== attempt.branch && claimBranchIssue(name) === attempt.issue);
   for (const other of others) {
     const refusal = otherBranchRefusal(attempt, readClaimBranch(git, other), context);
-    if (refusal !== null) return refusal;
+    if (refusal !== null) return { kind: 'answer', answer: refusal };
   }
   return claimOwnBranch(attempt, readClaimBranch(git, attempt.branch), context);
+}
+
+/** Carries out one attempt's move alone, as a run without claim ahead does. */
+function carryOut(attempt: Attempt, move: Move, git: GitRunner): PlanClaim {
+  if (move.kind === 'answer') return move.answer;
+  if (move.kind === 'held') return claimed(attempt, 'held');
+  return move.kind === 'fresh'
+    ? pushFreshClaim(attempt, git)
+    : pushTake(attempt, move.tip, git);
 }
 
 /** The owner a reading names, or null when it names none. */
@@ -302,23 +410,25 @@ function otherBranchRefusal(attempt: Attempt, reading: ClaimBranchReading, conte
     : refused(attempt, branch, owner, `${issue} is claimed by store ${owner} on ${branch}`);
 }
 
-/** The claim on `feat/<stub>` itself; see the module note's table. */
-function claimOwnBranch(attempt: Attempt, reading: ClaimBranchReading, context: PlanClaimContext): PlanClaim {
-  if (reading.state === 'absent') return pushFreshClaim(attempt, context.git);
+/** What the claim on `feat/<stub>` itself leaves to do; see the module note's table. */
+function claimOwnBranch(attempt: Attempt, reading: ClaimBranchReading, context: PlanClaimContext): Move {
+  if (reading.state === 'absent') return { kind: 'fresh' };
+  const unreadable = (): Move => ({
+    kind: 'answer',
+    answer: refused(attempt, attempt.branch, null, `the claim on ${attempt.branch} could not be read`),
+  });
   const unnamed = unnamedRefusal(attempt, reading);
-  if (unnamed !== null || reading.state !== 'found') {
-    return unnamed ?? refused(attempt, attempt.branch, null, `the claim on ${attempt.branch} could not be read`);
-  }
+  if (unnamed !== null) return { kind: 'answer', answer: unnamed };
+  if (reading.state !== 'found') return unreadable();
   const weighed = weighBranchClaim(reading, { labels: attempt.labels ?? [], staleAfter: context.staleAfter, now: context.now });
-  if (weighed.state === 'released' || weighed.state === 'stale-claimed') return pushTake(attempt, reading.tip, context.git);
-  if (weighed.state === 'none' || weighed.state === 'unreadable') {
-    return refused(attempt, attempt.branch, null, `the claim on ${attempt.branch} could not be read`);
-  }
-  if (weighed.owner === attempt.storeId) return claimed(attempt, 'held');
+  if (weighed.state === 'released' || weighed.state === 'stale-claimed') return { kind: 'take', tip: reading.tip };
+  if (weighed.state === 'none' || weighed.state === 'unreadable') return unreadable();
+  if (weighed.owner === attempt.storeId) return { kind: 'held' };
   const note = weighed.state === 'stale-in-development'
     ? ', stale but in development, which is never taken over automatically'
     : '';
-  return refused(attempt, attempt.branch, weighed.owner, `#${String(attempt.issue)} is claimed by store ${weighed.owner} on ${attempt.branch}${note}`);
+  const reason = `#${String(attempt.issue)} is claimed by store ${weighed.owner} on ${attempt.branch}${note}`;
+  return { kind: 'answer', answer: refused(attempt, attempt.branch, weighed.owner, reason) };
 }
 
 /** The sha `ref` points at, or null when it names no commit. */
@@ -409,45 +519,200 @@ function warningsOf(warning: string | null): readonly string[] {
     : [warning];
 }
 
-/** Pushes a claim commit to a branch the remote does not hold, without force. */
-function pushFreshClaim(attempt: Attempt, git: GitRunner): PlanClaim {
-  const prepared = prepareClaim(attempt, git);
-  if (!prepared.ok) return unclaimed(attempt.issue, 'commit-failed', prepared.reason);
-  const { sha, localTip } = prepared;
-  const pushed = pushNewClaimBranch(git, sha, attempt.branch);
-  if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, sha, localTip);
-  if (pushed.outcome === 'claimed') {
-    const owner = ownerOf(pushed.holder);
+/** How a push of one claim commit was refused: the branch held another claim, or moved since the lease. */
+type Race = 'claimed' | 'moved';
+
+/** Why a claim lost its race for `attempt`'s branch, naming the store that holds it when one does. */
+function raceReason(attempt: Attempt, race: Race, owner: string | null): string {
+  const issue = `#${String(attempt.issue)}`;
+  if (race === 'claimed') {
     const holder = owner === null
       ? 'another commit'
       : `store ${owner}`;
-    return refused(attempt, attempt.branch, owner, `#${String(attempt.issue)} is claimed by ${holder} on ${attempt.branch}: ${REMOTE} refused this device's claim`);
+    return `${issue} is claimed by ${holder} on ${attempt.branch}: ${REMOTE} refused this device's claim`;
   }
-  const warning = localTip === null
+  const holder = owner === null
+    ? ''
+    : `, now held by store ${owner}`;
+  return `${attempt.branch} moved on ${REMOTE} while ${issue} was being taken over${holder}`;
+}
+
+/** The store holding `branch` after one more fetch, or null when none is named or the fetch failed. */
+function refetchedOwner(git: GitRunner, branch: string): string | null {
+  const fetched = fetchClaimBranches(git);
+  return fetched.ok
+    ? ownerOf(readClaimBranch(git, branch))
+    : null;
+}
+
+/** A claim or take commit made and ready to push, with its lease and the local tip before it. */
+type Staged =
+  | {
+    readonly ok: true;
+    readonly sha: string;
+    readonly localTip: string | null;
+    readonly lease: string | null;
+    readonly via: 'claim' | 'take';
+  }
+  | { readonly ok: false; readonly reason: string };
+
+/** The commit a fresh claim or a take pushes; see "The local branch". */
+function stage(attempt: Attempt, move: Extract<Move, { kind: 'fresh' | 'take' }>, git: GitRunner): Staged {
+  if (move.kind === 'fresh') {
+    const prepared = prepareClaim(attempt, git);
+    return prepared.ok
+      ? { ...prepared, lease: null, via: 'claim' }
+      : prepared;
+  }
+  const made = makeOwnershipCommit(git, move.tip, { action: 'take', issue: attempt.issue, store: attempt.storeId });
+  if (!made.ok) return made;
+  return { ok: true, sha: made.sha, localTip: tipOf(git, localRef(attempt.branch)), lease: move.tip, via: 'take' };
+}
+
+/** The warning left by fast-forwarding a local branch that exists to a landed commit, or null; see "The local branch". */
+function landLocal(attempt: Attempt, staged: Extract<Staged, { ok: true }>, git: GitRunner): string | null {
+  return staged.localTip === null
     ? null
-    : moveLocal(git, attempt.branch, sha, localTip);
-  return claimed(attempt, 'claim', warningsOf(warning));
+    : moveLocal(git, attempt.branch, staged.sha, staged.localTip);
+}
+
+/** Pushes a claim commit to a branch the remote does not hold, without force. */
+function pushFreshClaim(attempt: Attempt, git: GitRunner): PlanClaim {
+  const staged = stage(attempt, { kind: 'fresh' }, git);
+  if (!staged.ok) return unclaimed(attempt.issue, 'commit-failed', staged.reason);
+  const pushed = pushNewClaimBranch(git, staged.sha, attempt.branch);
+  if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, staged.sha, staged.localTip);
+  if (pushed.outcome === 'claimed') {
+    const owner = ownerOf(pushed.holder);
+    return refused(attempt, attempt.branch, owner, raceReason(attempt, 'claimed', owner));
+  }
+  return claimed(attempt, 'claim', warningsOf(landLocal(attempt, staged, git)));
 }
 
 /** Pushes a take commit on a released or stale claimed branch's tip, leased on that tip. */
 function pushTake(attempt: Attempt, tip: string, git: GitRunner): PlanClaim {
-  const made = makeOwnershipCommit(git, tip, { action: 'take', issue: attempt.issue, store: attempt.storeId });
-  if (!made.ok) return unclaimed(attempt.issue, 'commit-failed', made.reason);
-  const localTip = tipOf(git, localRef(attempt.branch));
-  const pushed = pushOwnershipCommit(git, made.sha, attempt.branch, tip);
-  if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, made.sha, localTip);
+  const staged = stage(attempt, { kind: 'take', tip }, git);
+  if (!staged.ok) return unclaimed(attempt.issue, 'commit-failed', staged.reason);
+  const pushed = pushOwnershipCommit(git, staged.sha, attempt.branch, tip);
+  if (pushed.outcome === 'failed') return keepPending(attempt, git, 'push-failed', pushed.reason, staged.sha, staged.localTip);
   if (pushed.outcome === 'moved') {
-    const fetched = fetchClaimBranches(git);
-    const owner = fetched.ok
-      ? ownerOf(readClaimBranch(git, attempt.branch))
-      : null;
-    const holder = owner === null
-      ? ''
-      : `, now held by store ${owner}`;
-    return refused(attempt, attempt.branch, owner, `${attempt.branch} moved on ${REMOTE} while #${String(attempt.issue)} was being taken over${holder}`);
+    const owner = refetchedOwner(git, attempt.branch);
+    return refused(attempt, attempt.branch, owner, raceReason(attempt, 'moved', owner));
   }
-  const warning = localTip === null
+  return claimed(attempt, 'take', warningsOf(landLocal(attempt, staged, git)));
+}
+
+/** One half of a claim ahead: the attempt and what its reading left to do. */
+interface Side {
+  readonly attempt: Attempt;
+  readonly move: Move;
+}
+
+/** The report of a claimed line ahead. */
+function aheadClaimed(attempt: Attempt, via: ClaimVia): AheadClaim {
+  return { outcome: 'claimed', issue: attempt.issue, branch: attempt.branch, via };
+}
+
+/** The ref a staged commit is pushed as. */
+function refOf(attempt: Attempt, staged: Extract<Staged, { ok: true }>): AtomicClaimRef {
+  return { branch: attempt.branch, sha: staged.sha, lease: staged.lease };
+}
+
+/**
+ * The home issue's answer when its claim ahead failed, so neither claim
+ * lands: a claim this store already held stands; otherwise the home
+ * claim commit waits on the local branch, as a push that failed leaves it.
+ */
+function neither(home: Side, git: GitRunner, cause: UnclaimedCause, why: string, ahead: AheadClaim): PlanClaim {
+  const { attempt, move } = home;
+  if (move.kind === 'answer') return move.answer;
+  if (move.kind === 'held') return withAhead(claimed(attempt, 'held'), ahead);
+  const staged = stage(attempt, move, git);
+  const answer = staged.ok
+    ? keepPending(attempt, git, cause, why, staged.sha, staged.localTip)
+    : unclaimed(attempt.issue, 'commit-failed', staged.reason);
+  return withAhead(answer, ahead);
+}
+
+/** Why the home claim was not pushed when the line ahead `issue` could not be claimed. */
+function pairWhy(issue: number, reason: string): string {
+  return `claim ahead takes both claims or neither, and #${String(issue)}, the line ahead, was not claimed: ${reason}`;
+}
+
+/**
+ * The home issue and the line ahead claimed together, or neither; see
+ * the module note's "Claim ahead". The home move is never an answer here.
+ */
+function claimPair(home: Side, ahead: Side, git: GitRunner): PlanClaim {
+  if (home.move.kind === 'answer') return home.move.answer;
+  const forward = ahead.attempt;
+  const line = `#${String(forward.issue)}, the line ahead, was not claimed`;
+  if (ahead.move.kind === 'answer') {
+    const reason = ahead.move.answer.outcome === 'refused'
+      ? ahead.move.answer.reason
+      : `the claim on ${forward.branch} could not be read`;
+    const report = aheadNotClaimed(forward.issue, 'taken', `${line}: ${reason}`);
+    return neither(home, git, 'ahead-taken', pairWhy(forward.issue, reason), report);
+  }
+  if (ahead.move.kind === 'held') return withAhead(carryOut(home.attempt, home.move, git), aheadClaimed(forward, 'held'));
+
+  const aheadStaged = stage(forward, ahead.move, git);
+  if (!aheadStaged.ok) {
+    const report = aheadNotClaimed(forward.issue, 'failed', `${line}: ${aheadStaged.reason}`);
+    return neither(home, git, 'commit-failed', pairWhy(forward.issue, aheadStaged.reason), report);
+  }
+  const homeStaged = home.move.kind === 'held'
     ? null
-    : moveLocal(git, attempt.branch, made.sha, localTip);
-  return claimed(attempt, 'take', warningsOf(warning));
+    : stage(home.attempt, home.move, git);
+  if (homeStaged?.ok === false) {
+    const report = aheadNotClaimed(forward.issue, 'not-tried', `${line}: the claim on #${String(home.attempt.issue)} could not be made`);
+    return withAhead(unclaimed(home.attempt.issue, 'commit-failed', homeStaged.reason), report);
+  }
+  return pushPair(home, homeStaged, { attempt: forward, staged: aheadStaged }, git);
+}
+
+/** A staged half of a pair: its attempt and its commit. */
+interface StagedSide {
+  readonly attempt: Attempt;
+  readonly staged: Extract<Staged, { ok: true }>;
+}
+
+/** Pushes the pair in one `git push --atomic` and answers what landed; `homeStaged` is null for a home claim already held. */
+function pushPair(home: Side, homeStaged: Extract<Staged, { ok: true }> | null, ahead: StagedSide, git: GitRunner): PlanClaim {
+  const forward = ahead.attempt;
+  const refs = homeStaged === null
+    ? [refOf(forward, ahead.staged)]
+    : [refOf(home.attempt, homeStaged), refOf(forward, ahead.staged)];
+  const pushed = pushClaimsAtomic(git, refs);
+  const line = `#${String(forward.issue)}, the line ahead, was not claimed`;
+
+  if (pushed.outcome === 'pushed') {
+    const warnings = [
+      homeStaged === null
+        ? null
+        : landLocal(home.attempt, homeStaged, git),
+      landLocal(forward, ahead.staged, git),
+    ].filter((warning) => warning !== null);
+    const via = homeStaged?.via ?? 'held';
+    return withAhead(claimed(home.attempt, via, warnings), aheadClaimed(forward, ahead.staged.via));
+  }
+  if (pushed.outcome === 'refused' && pushed.branch === home.attempt.branch) {
+    const owner = refetchedOwner(git, home.attempt.branch);
+    return refused(home.attempt, home.attempt.branch, owner, raceReason(home.attempt, pushed.by, owner));
+  }
+  const reason = pushed.outcome === 'refused'
+    ? raceReason(forward, pushed.by, refetchedOwner(git, forward.branch))
+    : pushed.reason;
+  const cause = pushed.outcome === 'refused'
+    ? 'taken'
+    : 'failed';
+  const report = aheadNotClaimed(forward.issue, cause, `${line}: ${reason}`);
+  if (homeStaged === null) return withAhead(claimed(home.attempt, 'held'), report);
+  const homeCause = pushed.outcome === 'refused'
+    ? 'ahead-taken'
+    : 'push-failed';
+  const why = pushed.outcome === 'refused'
+    ? pairWhy(forward.issue, reason)
+    : reason;
+  return withAhead(keepPending(home.attempt, git, homeCause, why, homeStaged.sha, homeStaged.localTip), report);
 }
