@@ -159,8 +159,8 @@ function normalBlocker(blocker: RelatedIssue, board: string, member: string): Re
   return { number, repository };
 }
 
-/** `blocker` as `gh issue edit` takes it: its number on the board, its URL elsewhere. */
-function blockerArg(blocker: RelatedIssue): string {
+/** `blocker` as `gh issue edit` takes it: its number on the board, its URL elsewhere; the move's writer (`./move.ts`) sends it too. */
+export function blockerArg(blocker: RelatedIssue): string {
   return blocker.repository === null
     ? String(blocker.number)
     : `${GITHUB_HOST}/${blocker.repository}/issues/${String(blocker.number)}`;

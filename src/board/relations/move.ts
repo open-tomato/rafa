@@ -88,6 +88,51 @@
  * The marks are answered even when no write is planned, so a second run
  * after a move whose old marks were kept still names them for the second
  * question; once they are removed a run answers none.
+ *
+ * ## Sending a plan
+ *
+ * {@link writeRelationsMove} sends a plan's writes in order through the
+ * `GhRunner` it is made with, and the argv is assembled here:
+ *
+ * | Write | argv |
+ * |---|---|
+ * | `sub-issues` | `issue edit <epic> --add-sub-issue <n>,<n>,…` |
+ * | `blocked-by` | `issue edit <n> --add-blocked-by <blocker>,…`, a foreign one by URL (`blockerArg`, `./native-writes.ts`) |
+ * | `epic-label` | `issue edit <n> --add-label epic:<slug>` |
+ * | `checklist` | the epic's body read, appended to and read back (`editChecklist`, `../epic-checklist.ts`) |
+ * | `blocked-line` | the body read, then ONE `issue edit <n>` with `--add-label spec:blocked` when planned and `--body=<body>` |
+ *
+ * `gh issue edit --help` (2.100.0) takes the two lists comma-separated
+ * (`--add-sub-issue 123,124`); whether it adds them in the order given
+ * has not been measured, and a rerun plans any member it left out.
+ * A body is read afresh before it is written, never taken off the
+ * listing, since an epic that also waits on an issue has its body
+ * edited twice in one move.
+ *
+ * The first write the board refuses STOPS the move: the result names what
+ * was done and what was left, the refused write first, and nothing after
+ * it is sent. The old marks are then kept and the second question is not
+ * asked, so a mark is never removed while the relationship it marks is
+ * missing from the target. Every write is idempotent, so a rerun plans
+ * exactly what was left and finishes the move.
+ *
+ * Once every write went through, and only then, the second question is
+ * asked when the plan names marks, and on a yes they are removed in
+ * order, stopping at the first refusal in the same way:
+ *
+ * | Mark | argv |
+ * |---|---|
+ * | `epic-label` | `issue edit <n> --remove-label epic:<slug>` |
+ * | `blocked-line` | the body read, then ONE `issue edit <n>` with `--remove-label` per `spec:blocked` label and `--body=<body>` without its `Blocked by:` line |
+ * | `parent` | `issue edit <n> --remove-parent` |
+ * | `blocked-by` | `issue edit <n> --remove-blocked-by <blocker>,…` |
+ *
+ * The writer never rejects for the board: a refused call, a body that
+ * could not be read and a checklist edit that ended `failed` are each a
+ * {@link RelationsMoveFailure}. It answers every issue it touched,
+ * including a refused call's, since a relationship write moves no
+ * `updated_at` and a kept listing must drop those rows itself
+ * (`invalidateRows`, `../board-cache.ts`).
  */
 import type {
   Blocker,
@@ -95,17 +140,23 @@ import type {
   BoardRelations,
   EpicOfReading,
   RelatedIssue,
+  RelationAsk,
   RelationsReading,
 } from './port.js';
+import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { BoardIssue } from '../roadmap-board.js';
+import type { RoadmapBody } from '../roadmap-tick.js';
 
-import { hasSpecBlockedLabel, SPEC_BLOCKED_LABEL } from '../blocked.js';
+import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../blocked.js';
+import { appendLine, editChecklist, tickLine } from '../epic-checklist.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../epics.js';
+import { createGhRoadmapBody } from '../roadmap-tick.js';
 import { parseRoadmapBody } from '../roadmap.js';
 
-import { blockerToken } from './labels-blocked-edit.js';
+import { addBlockerToBody, blockerToken } from './labels-blocked-edit.js';
 import { labelsLineBlockersOf } from './labels.js';
+import { blockerArg } from './native-writes.js';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board relations move';
@@ -508,4 +559,224 @@ export function planRelationsMove(
     marks: Object.freeze(plan.marks),
     skipped: Object.freeze(plan.skipped),
   });
+}
+
+/** What {@link writeRelationsMove} is made with. */
+export interface RelationsMoveSeams {
+  /** Runs every write and removal, and the body reads and writes behind them. */
+  readonly gh: GhRunner;
+  /** Asks the second question, whether to remove the old marks; asked only once every write went through. */
+  readonly ask: RelationAsk;
+}
+
+/** The write or removal the board refused, which stopped the move. */
+export interface RelationsMoveFailure {
+  /** The refused write's or mark's line. */
+  readonly what: string;
+  /** What the board said. */
+  readonly problem: string;
+}
+
+/** What {@link writeRelationsMove} answers; see the module note. */
+export interface RelationsMoveResult {
+  /** The writes the board took, in the order they were sent. */
+  readonly done: readonly RelationsMoveWrite[];
+  /** The writes it did not take, the refused one first; empty once every write went through. */
+  readonly left: readonly RelationsMoveWrite[];
+  /** True when the second question was asked. */
+  readonly asked: boolean;
+  /** The old marks removed, in order. */
+  readonly removed: readonly RelationsMoveMark[];
+  /** The old marks still on the board: all of them unless a yes removed them, the refused one first. */
+  readonly kept: readonly RelationsMoveMark[];
+  /** The refusal that stopped the move, or null when nothing was refused. */
+  readonly failure: RelationsMoveFailure | null;
+  /** Every issue a sent or refused call touched, ascending: the rows a kept listing drops. */
+  readonly touched: readonly number[];
+}
+
+/** One sent step: the refusal's problem, or null when the board took it. */
+type Sent = Promise<string | null>;
+
+/** What a failed `gh` call wrote, for a message. Never empty. */
+function detailOf(result: GhResult): string {
+  return result.stderr.trim() || result.stdout.trim() || 'gh failed and wrote nothing';
+}
+
+/** Sends `gh issue edit <issue> ...flags`. */
+async function editIssue(gh: GhRunner, issue: number, flags: readonly string[]): Sent {
+  const result = await gh(['issue', 'edit', String(issue), ...flags]);
+  return result.ok
+    ? null
+    : detailOf(result);
+}
+
+/** `blockers` as one comma-separated `gh issue edit` list. */
+function blockerList(blockers: readonly RelatedIssue[]): string {
+  return blockers.map(blockerArg).join(',');
+}
+
+/** Reads `issue`'s body afresh, edits it, and sends `flags` with the body when it changed, in one call. */
+async function editBody(
+  gh: GhRunner,
+  bodies: RoadmapBody,
+  issue: number,
+  flags: readonly string[],
+  edit: (body: string) => string,
+): Sent {
+  let body: string;
+  try {
+    body = await bodies.read(issue);
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : String(error);
+  }
+  const next = edit(body);
+  const sent = next === body
+    ? flags
+    : [...flags, `--body=${next}`];
+  return sent.length === 0
+    ? null
+    : editIssue(gh, issue, sent);
+}
+
+/** `body` without issue `issue`'s `Blocked by:` line, as `readBlockedBy` finds it; `body` itself when it has none. */
+function withoutBlockedLine(issue: number, body: string): string {
+  const { line } = readBlockedBy(issue, body);
+  if (line === null) return body;
+  const lines = body.split('\n');
+  return [...lines.slice(0, line - 1), ...lines.slice(line)].join('\n');
+}
+
+/** Sends one planned write; the module note holds each argv. */
+async function sendWrite(gh: GhRunner, bodies: RoadmapBody, write: RelationsMoveWrite): Sent {
+  switch (write.kind) {
+    case 'sub-issues':
+      return editIssue(gh, write.epic, ['--add-sub-issue', write.issues.join(',')]);
+    case 'blocked-by':
+      return editIssue(gh, write.issue, ['--add-blocked-by', blockerList(write.blockers)]);
+    case 'epic-label':
+      return editIssue(gh, write.issue, ['--add-label', write.label]);
+    case 'checklist': {
+      const result = await editChecklist({
+        issue: write.epic,
+        edit: (body) => write.lines.reduce((edited, line) => (line.ticked
+          ? tickLine(appendLine(edited, line.issue, line.why), line.issue)
+          : appendLine(edited, line.issue, line.why)), body),
+        board: bodies,
+      });
+      return result.status === 'failed'
+        ? result.problem
+        : null;
+    }
+    case 'blocked-line': {
+      const flags = write.label
+        ? ['--add-label', SPEC_BLOCKED_LABEL]
+        : [];
+      return editBody(gh, bodies, write.issue, flags, (body) => write.blockers
+        .reduce((edited, blocker) => addBlockerToBody(write.issue, edited, blocker), body));
+    }
+  }
+}
+
+/** Removes one old mark; the module note holds each argv. */
+async function removeMark(gh: GhRunner, bodies: RoadmapBody, mark: RelationsMoveMark): Sent {
+  switch (mark.kind) {
+    case 'epic-label':
+      return editIssue(gh, mark.issue, ['--remove-label', mark.label]);
+    case 'blocked-line':
+      return editBody(gh, bodies, mark.issue, mark.labels.flatMap((label) => ['--remove-label', label]), (body) => withoutBlockedLine(mark.issue, body));
+    case 'parent':
+      return editIssue(gh, mark.issue, ['--remove-parent']);
+    case 'blocked-by':
+      return editIssue(gh, mark.issue, ['--remove-blocked-by', blockerList(mark.blockers)]);
+  }
+}
+
+/** The local issues among `blockers`. */
+function localNumbers(blockers: readonly RelatedIssue[]): readonly number[] {
+  return blockers.filter((blocker) => blocker.repository === null).map((blocker) => blocker.number);
+}
+
+/** The issues `step` edits: both ends of a native link, the one issue or epic otherwise. */
+function touchedBy(step: RelationsMoveWrite | RelationsMoveMark): readonly number[] {
+  switch (step.kind) {
+    case 'sub-issues':
+      return [step.epic, ...step.issues];
+    case 'checklist':
+      return [step.epic];
+    case 'parent':
+      return [step.issue, step.parent];
+    case 'blocked-by':
+      return [step.issue, ...localNumbers(step.blockers)];
+    case 'epic-label':
+    case 'blocked-line':
+      return [step.issue];
+  }
+}
+
+/** How sending a list in order came out. */
+interface SentList<T> {
+  readonly done: readonly T[];
+  readonly left: readonly T[];
+  readonly failure: RelationsMoveFailure | null;
+}
+
+/** Sends `steps` one after another, stopping at the first the board refuses. */
+async function sendInOrder<T extends { readonly what: string }>(steps: readonly T[], send: (step: T) => Sent): Promise<SentList<T>> {
+  for (const [index, step] of steps.entries()) {
+    const problem = await send(step);
+    if (problem !== null) {
+      return { done: steps.slice(0, index), left: steps.slice(index), failure: Object.freeze({ what: step.what, problem }) };
+    }
+  }
+  return { done: steps, left: [], failure: null };
+}
+
+/** The question asking whether to remove `plan`'s old marks. */
+function marksQuestion(plan: RelationsMovePlan): string {
+  const count = plan.marks.length;
+  return `Remove the ${String(count)} old ${plan.from} mark${count === 1
+    ? ''
+    : 's'} from the board?`;
+}
+
+/** The steps of `list` that reached the board: those it took, and the one it refused. */
+function sentSteps<T>(list: SentList<T>): readonly T[] {
+  return list.failure === null
+    ? list.done
+    : [...list.done, ...list.left.slice(0, 1)];
+}
+
+/** The result, frozen, with the issues its sent and refused steps touched. */
+function result(writes: SentList<RelationsMoveWrite>, asked: boolean, marks: SentList<RelationsMoveMark>): RelationsMoveResult {
+  const steps = [...sentSteps(writes), ...sentSteps(marks)];
+  const touched = [...new Set(steps.flatMap(touchedBy))].sort((left, right) => left - right);
+  return Object.freeze({
+    done: Object.freeze([...writes.done]),
+    left: Object.freeze([...writes.left]),
+    asked,
+    removed: Object.freeze([...marks.done]),
+    kept: Object.freeze([...marks.left]),
+    failure: writes.failure ?? marks.failure,
+    touched: Object.freeze(touched),
+  });
+}
+
+/**
+ * Sends `plan`'s writes in order through `seams.gh`, stopping at the
+ * first refusal; then, only when every write went through and the plan
+ * names old marks, asks `seams.ask` the second question and on a yes
+ * removes them. The module note holds each argv and why the marks wait.
+ * Never rejects for the board; rejects only when `seams.ask` does.
+ */
+export async function writeRelationsMove(seams: RelationsMoveSeams, plan: RelationsMovePlan): Promise<RelationsMoveResult> {
+  const bodies = createGhRoadmapBody({ gh: seams.gh });
+  const writes = await sendInOrder(plan.writes, (write) => sendWrite(seams.gh, bodies, write));
+  const keptAll: SentList<RelationsMoveMark> = { done: [], left: plan.marks, failure: null };
+  if (writes.failure !== null || plan.marks.length === 0) return result(writes, false, keptAll);
+  if (!await seams.ask(marksQuestion(plan))) return result(writes, true, keptAll);
+  const marks = await sendInOrder(plan.marks, (mark) => removeMark(seams.gh, bodies, mark));
+  return result(writes, true, marks);
 }

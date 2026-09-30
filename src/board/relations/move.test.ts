@@ -9,10 +9,15 @@
  * The control that this can fail is the first plan itself, which holds
  * writes over the untouched listing, and the half-finished case, which
  * sends only the first k writes and finds exactly the rest planned.
+ *
+ * `writeRelationsMove` is held over {@link fakeBoard}, an in-process `gh`
+ * that edits the fixture listing as GitHub would for each argv the writer
+ * sends, so a move it stopped is planned again over what the board then
+ * holds, and a rerun is sent over the same board.
  */
 import type { RelationsMoveMark, RelationsMovePlan, RelationsMoveSide, RelationsMoveWrite } from './move.js';
 import type { RelatedIssue } from './port.js';
-import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink } from '../roadmap-board.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -22,7 +27,7 @@ import { appendLine, tickLine } from '../epic-checklist.js';
 
 import { addBlockerToBody } from './labels-blocked-edit.js';
 import { LABELS_READS } from './labels.js';
-import { planRelationsMove } from './move.js';
+import { planRelationsMove, writeRelationsMove } from './move.js';
 import { createNativeRelations } from './native.js';
 
 const REPOSITORY = 'acme/board';
@@ -387,5 +392,332 @@ describe('planRelationsMove refusals', () => {
     expect(bare.every((issue) => !Object.hasOwn(issue, 'parent'))).toBe(true);
     expect(() => planRelationsMove(bare, LABELS, NATIVE)).toThrow('board.relationships');
     expect(() => planRelationsMove(bare, NATIVE, LABELS)).toThrow('board.relationships');
+  });
+});
+
+/** What the fake board answers a call it takes with no output. */
+const TAKEN: GhResult = { ok: true, stdout: '', stderr: '' };
+
+/** What it answers a call it refuses. */
+const DOWN: GhResult = { ok: false, stdout: '', stderr: 'HTTP 502: the board is down' };
+
+/** The path `createGhRoadmapBody` reads and writes a body at. */
+const BODY_PATH = /^repos\/\{owner\}\/\{repo\}\/issues\/(\d+)$/u;
+
+/** A foreign blocker's URL, as the writer sends it. */
+const ISSUE_URL = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/u;
+
+/** A `gh issue edit` list item as a link node: a number on the board, a URL elsewhere. */
+function linkOfArg(arg: string): BoardIssueLink {
+  const url = ISSUE_URL.exec(arg);
+  return url === null
+    ? link(Number(arg))
+    : link(Number(url[2]), url[1]);
+}
+
+/** `listing` with `issue` made a sub-issue of `epic`, last. */
+function withSubIssue(listing: readonly BoardIssue[], epic: number, issue: number): readonly BoardIssue[] {
+  return edited(
+    edited(listing, issue, (member) => ({ ...member, parent: link(epic) })),
+    epic,
+    (row) => ({ ...row, subIssues: { nodes: [...row.subIssues?.nodes ?? [], link(issue)] } }),
+  );
+}
+
+/** `listing` with `issue` taken out of its parent's sub-issues. */
+function withoutParent(listing: readonly BoardIssue[], issue: number): readonly BoardIssue[] {
+  const parent = listing.find((row) => row.number === issue)?.parent?.number ?? 0;
+  return edited(
+    edited(listing, issue, (member) => ({ ...member, parent: null })),
+    parent,
+    (row) => ({ ...row, subIssues: { nodes: (row.subIssues?.nodes ?? []).filter((node) => node.number !== issue) } }),
+  );
+}
+
+/** `listing` once `flag` with `value` went through on `issue`. */
+function editFlag(listing: readonly BoardIssue[], issue: number, flag: string, value: string): readonly BoardIssue[] {
+  const on = (edit: (row: BoardIssue) => BoardIssue): readonly BoardIssue[] => edited(listing, issue, edit);
+  const items = value.split(',');
+  switch (flag) {
+    case '--add-sub-issue':
+      return items.reduce((current, item) => withSubIssue(current, issue, Number(item)), listing);
+    case '--remove-parent':
+      return withoutParent(listing, issue);
+    case '--add-blocked-by':
+      return on((row) => ({ ...row, blockedBy: { nodes: [...row.blockedBy?.nodes ?? [], ...items.map(linkOfArg)] } }));
+    case '--remove-blocked-by': {
+      const gone = items.map(linkOfArg);
+      return on((row) => ({ ...row, blockedBy: { nodes: (row.blockedBy?.nodes ?? []).filter((node) => !gone
+        .some((each) => each.number === node.number && each.repository === node.repository)) } }));
+    }
+    case '--add-label':
+      return on((row) => ({ ...row, labels: [...row.labels, value] }));
+    case '--remove-label':
+      return on((row) => ({ ...row, labels: row.labels.filter((label) => label !== value) }));
+    case '--body':
+      return on((row) => ({ ...row, body: value }));
+    default:
+      throw new Error(`fake board: no flag ${flag}`);
+  }
+}
+
+/** `listing` once `gh issue edit <issue> ...flags` went through. */
+function editIssue(listing: readonly BoardIssue[], issue: number, flags: readonly string[]): readonly BoardIssue[] {
+  const [flag, ...rest] = flags;
+  if (flag === undefined) return listing;
+  if (flag.startsWith('--body=')) return editIssue(editFlag(listing, issue, '--body', flag.slice('--body='.length)), issue, rest);
+  if (flag === '--remove-parent') return editIssue(editFlag(listing, issue, flag, ''), issue, rest);
+  return editIssue(editFlag(listing, issue, flag, rest[0] ?? ''), issue, rest.slice(1));
+}
+
+/** A fixture board behind an in-process `gh`, and what it was sent. */
+interface FakeBoard {
+  readonly gh: GhRunner;
+  /** The board as it reads now. */
+  readonly listing: () => readonly BoardIssue[];
+  /** Every call, in order. */
+  readonly calls: () => readonly (readonly string[])[];
+}
+
+/**
+ * A board holding `start` that answers the writer's calls as GitHub
+ * would: `gh issue edit` flags and the body read and write. From the
+ * `downFrom`th call that changes something (1 for the first), every such
+ * call is refused, as a board gone down mid-move.
+ */
+function fakeBoard(start: readonly BoardIssue[], downFrom = Number.POSITIVE_INFINITY): FakeBoard {
+  let listing = start;
+  let changes = 0;
+  const calls: (readonly string[])[] = [];
+  const bodyOf = (issue: number): GhResult => ({
+    ok: true,
+    stdout: JSON.stringify({ body: listing.find((row) => row.number === issue)?.body ?? '' }),
+    stderr: '',
+  });
+  const gh: GhRunner = (args) => {
+    calls.push([...args]);
+    const path = args[0] === 'api'
+      ? BODY_PATH.exec(args[1] ?? '')
+      : null;
+    if (path !== null && args[2] !== '-X') return Promise.resolve(bodyOf(Number(path[1])));
+    changes += 1;
+    if (changes >= downFrom) return Promise.resolve(DOWN);
+    if (path !== null) {
+      listing = edited(listing, Number(path[1]), (row) => ({ ...row, body: (args[5] ?? '').slice('body='.length) }));
+      return Promise.resolve(bodyOf(Number(path[1])));
+    }
+    if (args[0] !== 'issue' || args[1] !== 'edit') throw new Error(`fake board: no call ${args.join(' ')}`);
+    listing = editIssue(listing, Number(args[2]), args.slice(3));
+    return Promise.resolve(TAKEN);
+  };
+  return { gh, listing: () => listing, calls: () => calls };
+}
+
+/** An ask answering `answer`, and the questions it was asked. */
+function asking(answer: boolean): { readonly ask: (question: string) => Promise<boolean>; readonly asked: () => readonly string[] } {
+  const asked: string[] = [];
+  return {
+    ask: (question) => {
+      asked.push(question);
+      return Promise.resolve(answer);
+    },
+    asked: () => asked,
+  };
+}
+
+/** The `gh issue edit` calls among `calls`, as one line each. */
+function issueEdits(calls: readonly (readonly string[])[]): readonly string[] {
+  return calls.filter((call) => call[1] === 'edit').map((call) => call.slice(2).join(' '));
+}
+
+describe('writeRelationsMove sends a plan', () => {
+  it('labels to native: one --add-sub-issue per epic in checklist order, one --add-blocked-by per issue, a foreign one by URL', async () => {
+    const board = fakeBoard(LABELS_BOARD);
+    const plan = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(false).ask }, plan);
+    expect(issueEdits(board.calls())).toEqual([
+      '1 --add-sub-issue 11,10,12,13',
+      '2 --add-sub-issue 21,20',
+      `30 --add-blocked-by 31,https://github.com/${FOREIGN}/issues/7`,
+    ]);
+    expect(board.calls()).toHaveLength(3);
+    expect(result.done).toEqual(plan.writes);
+    expect(result.left).toEqual([]);
+    expect(result.failure).toBeNull();
+    expect(result.touched).toEqual([1, 2, 10, 11, 12, 13, 20, 21, 30, 31]);
+    expect(planRelationsMove(board.listing(), LABELS, NATIVE).writes).toEqual([]);
+  });
+
+  it('native to labels: labels, then the checklist through the body, then the blocked line with its label in one call', async () => {
+    const board = fakeBoard(NATIVE_BOARD);
+    const plan = planRelationsMove(NATIVE_BOARD, NATIVE, LABELS);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(false).ask }, plan);
+    expect(result.failure).toBeNull();
+    expect(issueEdits(board.calls())).toEqual([
+      '11 --add-label epic:alpha',
+      '10 --add-label epic:alpha',
+      '13 --add-label epic:alpha',
+      `30 --add-label ${SPEC_BLOCKED_LABEL} --body=Blocked by: #31 ${FOREIGN}#7\n`,
+      '35 --body=Blocked by: #31 #32\n',
+    ]);
+    const epic = board.listing().find((issue) => issue.number === 1);
+    expect(epic?.body).toBe('## Acceptance criteria\n\n- Alpha ships.\n- [ ] #11 Issue #11\n- [ ] #10 Issue #10\n- [x] #13 Issue #13\n');
+    expect(planRelationsMove(board.listing(), NATIVE, LABELS).writes).toEqual([]);
+  });
+
+  it('reads a body afresh, so an epic that also waits keeps the checklist lines written before its blocked line', async () => {
+    const start = edited(NATIVE_BOARD, 1, (epic) => ({ ...epic, blockedBy: { nodes: [link(31)] } }));
+    const plan = planRelationsMove(start, NATIVE, LABELS);
+    expect(plan.writes.filter((write) => write.kind === 'checklist' && write.epic === 1
+      || write.kind === 'blocked-line' && write.issue === 1).map((write) => write.kind)).toEqual(['checklist', 'blocked-line']);
+    const board = fakeBoard(start);
+    await writeRelationsMove({ gh: board.gh, ask: asking(false).ask }, plan);
+    const body = board.listing().find((issue) => issue.number === 1)?.body ?? '';
+    expect(body).toContain('- [ ] #11 Issue #11');
+    expect(body).toContain('Blocked by: #31');
+  });
+
+  it('sends nothing and asks nothing for a plan with neither writes nor marks', async () => {
+    const board = fakeBoard(LABELS_BOARD);
+    const questions = asking(true);
+    const empty: RelationsMovePlan = { from: 'labels', to: 'native', writes: [], marks: [], skipped: [] };
+    const result = await writeRelationsMove({ gh: board.gh, ask: questions.ask }, empty);
+    expect(board.calls()).toEqual([]);
+    expect(questions.asked()).toEqual([]);
+    expect(result).toEqual({ done: [], left: [], asked: false, removed: [], kept: [], failure: null, touched: [] });
+  });
+});
+
+describe('writeRelationsMove stops at the first refusal', () => {
+  it('names the refused write and every write after it as left, and asks nothing', async () => {
+    const plan = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const board = fakeBoard(LABELS_BOARD, 2);
+    const questions = asking(true);
+    const result = await writeRelationsMove({ gh: board.gh, ask: questions.ask }, plan);
+    expect(result.done).toEqual(plan.writes.slice(0, 1));
+    expect(result.left).toEqual(plan.writes.slice(1));
+    expect(result.failure).toEqual({ what: 'make #21, #20 sub-issues of epic #2', problem: 'HTTP 502: the board is down' });
+    expect(board.calls()).toHaveLength(2);
+    expect(questions.asked()).toEqual([]);
+    expect(result.asked).toBe(false);
+    expect(result.removed).toEqual([]);
+    expect(result.kept).toEqual(plan.marks);
+    expect(result.touched).toEqual([1, 2, 10, 11, 12, 13, 20, 21]);
+  });
+
+  it('answers a body it could not read and a checklist edit that failed as the refusal', async () => {
+    const plan = planRelationsMove(NATIVE_BOARD, NATIVE, LABELS);
+    const checklist = plan.writes.findIndex((write) => write.kind === 'checklist');
+    const board = fakeBoard(NATIVE_BOARD, checklist + 1);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(true).ask }, plan);
+    expect(result.done).toEqual(plan.writes.slice(0, checklist));
+    expect(result.failure?.what).toBe('put #11, #10, #13 on epic #1\'s checklist');
+    expect(result.failure?.problem).toContain('HTTP 502: the board is down');
+
+    const unreadable: GhRunner = (args) => Promise.resolve(args[0] === 'api'
+      ? DOWN
+      : TAKEN);
+    const line = plan.writes.filter((write) => write.kind === 'blocked-line');
+    const refused = await writeRelationsMove({ gh: unreadable, ask: asking(true).ask }, { ...plan, writes: line });
+    expect(refused.left).toEqual(line);
+    expect(refused.failure?.problem).toContain('HTTP 502: the board is down');
+  });
+
+  const directions: readonly (readonly [string, readonly BoardIssue[], RelationsMoveSide, RelationsMoveSide])[] = [
+    ['labels to native', LABELS_BOARD, LABELS, NATIVE],
+    ['native to labels', NATIVE_BOARD, NATIVE, LABELS],
+  ];
+
+  for (const [name, start, from, to] of directions) {
+    it(`${name}: a move stopped at any write reruns exactly what was left, then finishes and plans nothing`, async () => {
+      const first = planRelationsMove(start, from, to);
+      expect(first.writes.length).toBeGreaterThan(1);
+      for (let stop = 1; stop <= first.writes.length; stop += 1) {
+        const broken = fakeBoard(start, stop);
+        const stopped = await writeRelationsMove({ gh: broken.gh, ask: asking(true).ask }, first);
+        expect(stopped.done).toEqual(first.writes.slice(0, stop - 1));
+        expect(stopped.left).toEqual(first.writes.slice(stop - 1));
+        expect(stopped.asked).toBe(false);
+        expect(issueEdits(broken.calls()).some((call) => call.includes('--remove-'))).toBe(false);
+
+        const rerun = planRelationsMove(broken.listing(), from, to);
+        expect(rerun.writes).toEqual(stopped.left);
+        expect(rerun.marks).toEqual(first.marks);
+        const healthy = fakeBoard(broken.listing());
+        const finished = await writeRelationsMove({ gh: healthy.gh, ask: asking(true).ask }, rerun);
+        expect(finished.failure).toBeNull();
+        expect(finished.removed).toEqual(first.marks);
+        const after = planRelationsMove(healthy.listing(), from, to);
+        expect(after.writes).toEqual([]);
+        expect(after.marks).toEqual([]);
+      }
+    });
+  }
+});
+
+describe('writeRelationsMove and the old marks', () => {
+  it('asks once every write went through, and keeps every mark on a no', async () => {
+    const plan = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const board = fakeBoard(LABELS_BOARD);
+    const questions = asking(false);
+    const result = await writeRelationsMove({ gh: board.gh, ask: questions.ask }, plan);
+    expect(questions.asked()).toEqual(['Remove the 7 old labels marks from the board?']);
+    expect(result.asked).toBe(true);
+    expect(result.removed).toEqual([]);
+    expect(result.kept).toEqual(plan.marks);
+    expect(issueEdits(board.calls()).some((call) => call.includes('--remove-'))).toBe(false);
+    expect(planRelationsMove(board.listing(), LABELS, NATIVE).marks).toEqual(plan.marks);
+  });
+
+  it('labels to native: on a yes takes each epic: label off, and spec:blocked with the Blocked by: line in one call', async () => {
+    const plan = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const board = fakeBoard(LABELS_BOARD);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(true).ask }, plan);
+    expect(issueEdits(board.calls()).slice(3)).toEqual([
+      ...[11, 10, 12, 13].map((issue) => `${String(issue)} --remove-label epic:alpha`),
+      ...[21, 20].map((issue) => `${String(issue)} --remove-label epic:beta`),
+      `30 --remove-label ${SPEC_BLOCKED_LABEL} --body=`,
+    ]);
+    expect(result.removed).toEqual(plan.marks);
+    expect(result.kept).toEqual([]);
+    expect(planRelationsMove(board.listing(), LABELS, NATIVE).marks).toEqual([]);
+  });
+
+  it('native to labels: on a yes takes each member out of its parent and unlinks each blocked issue, a foreign blocker by URL', async () => {
+    const plan = planRelationsMove(NATIVE_BOARD, NATIVE, LABELS);
+    const board = fakeBoard(NATIVE_BOARD);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(true).ask }, plan);
+    expect(issueEdits(board.calls()).slice(-5)).toEqual([
+      '11 --remove-parent',
+      '10 --remove-parent',
+      '13 --remove-parent',
+      `30 --remove-blocked-by 31,https://github.com/${FOREIGN}/issues/7`,
+      '35 --remove-blocked-by 31,32',
+    ]);
+    expect(result.removed).toEqual(plan.marks);
+    expect(result.touched).toContain(32);
+  });
+
+  it('asks about marks kept by an earlier run even when no write is left', async () => {
+    const first = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const moved = applyWrites(LABELS_BOARD, first.writes);
+    const second = planRelationsMove(moved, LABELS, NATIVE);
+    expect(second.writes).toEqual([]);
+    const board = fakeBoard(moved);
+    const questions = asking(true);
+    const result = await writeRelationsMove({ gh: board.gh, ask: questions.ask }, second);
+    expect(questions.asked()).toHaveLength(1);
+    expect(result.removed).toEqual(first.marks);
+  });
+
+  it('stops removing at the first refusal, naming the removed marks and the kept ones', async () => {
+    const plan = planRelationsMove(LABELS_BOARD, LABELS, NATIVE);
+    const board = fakeBoard(LABELS_BOARD, plan.writes.length + 3);
+    const result = await writeRelationsMove({ gh: board.gh, ask: asking(true).ask }, plan);
+    expect(result.done).toEqual(plan.writes);
+    expect(result.removed).toEqual(plan.marks.slice(0, 2));
+    expect(result.kept).toEqual(plan.marks.slice(2));
+    expect(result.failure).toEqual({ what: 'take epic:alpha off #12', problem: 'HTTP 502: the board is down' });
+    expect(planRelationsMove(board.listing(), LABELS, NATIVE).marks).toEqual(plan.marks.slice(2));
   });
 });
