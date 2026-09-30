@@ -128,7 +128,7 @@ describe('waitingPick', () => {
   test('passes a line whose every open blocker a branch has taken, and picks the next', async () => {
     const readings = readingsOver([], new Map([[118, 'rafa-118-far']]));
 
-    const pick = await waitingPick(blocking)(lines, readings);
+    const pick = await waitingPick(blocking)(lines, readings, null);
 
     expect(pick.line?.issue).toBe(101);
     expect(pick.passed).toBe(1);
@@ -137,7 +137,7 @@ describe('waitingPick', () => {
   });
 
   test('stops at a line with a free blocker, the control for the case above', async () => {
-    const pick = await waitingPick(blocking)(lines, readingsOver([], new Map()));
+    const pick = await waitingPick(blocking)(lines, readingsOver([], new Map()), null);
 
     expect(pick.line?.issue).toBe(100);
     expect(pick.passed).toBe(0);

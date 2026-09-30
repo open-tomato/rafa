@@ -206,11 +206,47 @@
  * taken here as well as by `./readings.ts`'s row 9, so an answer that
  * reaches both spends two `git for-each-ref` calls — both local, both
  * free of the network, and each memoised where it is taken.
+ *
+ * ## The mode
+ *
+ * Every relationship the board reads — what a line waits on, an epic's
+ * members and their order, the hop's decision and the next `now` epic —
+ * is asked of the board's relationships port
+ * (`src/board/relations/port.ts`), {@link NextBoardOptions.relations}.
+ * Left out, or in `labels` mode, the board reads what it read before the
+ * port, sends the same `gh` commands, and everything above holds as
+ * written.
+ *
+ * In `native` mode:
+ *
+ * - the listing asks for the mode's fields (`createGhBoardListing`), and
+ *   `blocking` reads the line's `blockedBy` nodes off it, each with the
+ *   state GitHub holds, so no `Blocked by:` line, `spec:blocked` label or
+ *   per-blocker `gh issue view` is read, and the listing is read the
+ *   first time a line is asked about even with no epic line and no
+ *   position file. An issue the listing does not hold is blocked with a
+ *   fault (`notOnListingMessage`, `src/board/blocked-line.ts`);
+ * - an epic's lines are its open sub-issues in the epic's order
+ *   (`epicLines`, `src/board/epic-walk.ts`);
+ * - without `roadmap`, the pick PASSES every blocked line, fault or not,
+ *   and picks the next, counting it in `passed`: the tracker clears a
+ *   blocker when it closes, so there is nothing to unblock, and the line
+ *   is picked again on the first turn after its blockers close;
+ * - under `roadmap`, a line whose blockers are all taken is still passed
+ *   as waiting, and one held by a blocker on another repository, or by a
+ *   list `gh` stopped short of, never is. Any other blocked line stops the
+ *   walk only when the hop rows (`./hop-rows.ts`) take its decision: a
+ *   halt, or a hop while no hop is away. Every other blocked line is
+ *   passed as above, so an epic whose lines are all passed runs dry;
+ * - the answer carries {@link NextBoard.mode}, `native`, which is how
+ *   `./state.ts` leaves out its `unblock` row. The key is left out in
+ *   `labels` mode.
  */
 import type { EpicEndRelease } from './epic-end.js';
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { SettleReader } from './settle-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { RafaContext } from '../cli/command.js';
@@ -240,9 +276,8 @@ import {
   awayTargetOf,
   blockedLineReadings,
   followHopRecord,
-  plainPick,
+  pickerFor,
   readHopAnswer,
-  waitingPick,
   walkBoard,
   walkEpic,
   walkTarget,
@@ -298,6 +333,12 @@ export interface NextBoardOptions {
    * see the module note's "The hop, under `roadmap`".
    */
   readonly roadmap?: boolean;
+  /**
+   * The board's relationships, which every relationship the board reads is
+   * asked of; `labels` mode, what the board read before the port, when
+   * left out. See the module note's "The mode".
+   */
+  readonly relations?: EpicRelations;
 }
 
 /** The settings the composition reads off the config. */
@@ -338,8 +379,10 @@ async function cancelledNotices(listing: BoardListing): Promise<readonly string[
  * for the problems it carries.
  */
 export function ghNextBoard(options: NextBoardOptions): NextBoard {
-  const { gh, git, configured, remote, root } = options;
-  const listed = options.listing ?? createGhBoardListing({ gh });
+  const { gh, git, configured, remote, root, relations } = options;
+  const listed = options.listing ?? createGhBoardListing(relations === undefined
+    ? { gh }
+    : { gh, mode: relations.mode });
   let asked = false;
   const listing = listOnce(() => {
     asked = true;
@@ -347,7 +390,10 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
   });
   const issues = memoiseIssues(createGhSpecIssueReader({ gh }));
 
-  const board = blockedLineReadings(issues);
+  const board = blockedLineReadings(issues, relations === undefined
+    ? undefined
+    : { relations, listing });
+  const native = relations?.mode === 'native';
 
   return Object.freeze({
     next: async (): Promise<NextRoadmapReading> => {
@@ -370,20 +416,19 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
       const followed = options.roadmap === true
         ? followHopRecord(root)
         : null;
-      const picker = followed === null
-        ? plainPick
-        : waitingPick(board.blocking);
+      const seams = { blocking: board.blocking, readings, listing, fallback, roadmap, relations };
+      const picker = pickerFor(followed, seams);
       const record = followed?.record ?? null;
       const target = awayTargetOf(record);
       const away = record !== null && target !== null
         ? await walkTarget(record, target, readings)
         : null;
       const walk = away?.walk ?? (epic === null
-        ? await walkBoard(roadmap, { issues, readings, listing }, picker)
-        : await walkEpic(epic, listing, readings, picker));
+        ? await walkBoard(roadmap, { issues, readings, listing, relations }, picker)
+        : await walkEpic(epic, listing, readings, picker, relations));
       const answer = followed === null
         ? null
-        : await readHopAnswer(walk, followed, { blocking: board.blocking, readings, listing, fallback, roadmap });
+        : await readHopAnswer(walk, followed, seams);
       const cancelled = options.noticeCancelled === true && asked
         ? await cancelledNotices(listing)
         : [];
@@ -413,6 +458,9 @@ export function ghNextBoard(options: NextBoardOptions): NextBoard {
 
     blocking: board.blocking,
     isReady: board.isReady,
+    ...native
+      ? { mode: 'native' as const }
+      : {},
   });
 }
 

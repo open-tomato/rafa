@@ -9,22 +9,32 @@
  * composed before they were split out of it.
  *
  * What each reading answers, and when it is read at all, is the module
- * note of `./sources.ts`: its "Where the walk starts" and "The hop,
- * under `roadmap`" sections are the authority, and the TSDoc below
- * points at them rather than saying it twice.
+ * note of `./sources.ts`: its "Where the walk starts", "The hop, under
+ * `roadmap`" and "The mode" sections are the authority, and the TSDoc
+ * below points at them rather than saying it twice.
+ *
+ * Every relationship is asked of the board's relationships port
+ * (`src/board/relations/port.ts`) the readings are handed: `blocking`
+ * through `blockingOf`, an epic's lines through `readEpics` and
+ * `epicLines`, the hop through `decideHop` and `nextNowEpic`. Left out,
+ * each reads `labels` mode, what every reading read before the port.
+ * {@link pickerFor} chooses how the walk picks among lines, and it is
+ * the one place a reading here differs by mode: in `native` mode no
+ * line is left for the `unblock` row of `./state.ts`.
  */
 import type { HopDecision, TakenReadings } from './hop-chain.js';
 import type { HopRecord } from './hop-record.js';
 import type { DryEpic, HopTarget, NextBoard, NextHopReading, TakenBlocker, WaitingLine } from './readings.js';
-import type { BlockedLine } from '../board/blocked-line.js';
+import type { BlockedLine, BlockerWaiting } from '../board/blocked-line.js';
 import type { BoardView } from '../board/epic-board.js';
 import type { EpicDescentSeams } from '../board/epic-walk.js';
+import type { EpicRelations } from '../board/epics.js';
 import type { SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { Place, Position } from '../project/position.js';
 
-import { blockerStatesOf, readBlockedLine } from '../board/blocked-line.js';
+import { blockingOf } from '../board/blocked-line.js';
 import { descendRoadmap, epicLines, nextNowEpic } from '../board/epic-walk.js';
 import { readEpics } from '../board/epics.js';
 import { samePlace } from '../board/place.js';
@@ -41,16 +51,18 @@ const PREFIX = 'rafa next';
 
 /**
  * The two readings over a line's issue, both off `issues`: `blocking`,
- * its `Blocked by:` line with each blocker's state, and `isReady`, its
- * `spec:ready` label. Handed the memoised reader, they cost no
- * `gh issue view` beyond the walk's own; see `./sources.ts`'s module note.
+ * what it waits on with each blocker's state, and `isReady`, its
+ * `spec:ready` label. `blocking` is `blockingOf`'s in the mode `waiting`
+ * names: left out, or in `labels` mode, the `Blocked by:` line read off
+ * the memoised reader, costing no `gh issue view` beyond the walk's own;
+ * in `native` mode the `blockedBy` nodes of the line's row on `waiting`'s
+ * listing. See `./sources.ts`'s module note.
  */
-export function blockedLineReadings(issues: SpecIssueReader): Pick<NextBoard, 'blocking' | 'isReady'> {
+export function blockedLineReadings(issues: SpecIssueReader, waiting?: BlockerWaiting): Pick<NextBoard, 'blocking' | 'isReady'> {
   return {
-    blocking: async (issue: number): Promise<BlockedLine | null> => readBlockedLine(
-      await issues(issue),
-      blockerStatesOf(issues),
-    ),
+    blocking: blockingOf(waiting === undefined
+      ? { issues }
+      : { issues, waiting }),
     isReady: async (issue: number): Promise<boolean> => hasSpecReadyLabel((await issues(issue)).labels),
   };
 }
@@ -73,8 +85,13 @@ export interface LinePick {
   readonly waiting: readonly WaitingLine[];
 }
 
-/** How the walk picks among lines: `pickNextRoadmapLine` alone, or passing waiting lines too. */
-export type LinePicker = (lines: readonly RoadmapLine[], readings: RoadmapReadings) => Promise<LinePick>;
+/**
+ * How the walk picks among lines: `pickNextRoadmapLine` alone, or passing
+ * waiting or blocked lines too. `epic` is the epic the lines are read in,
+ * null for a board's own checklist, which the `native` pick under
+ * `roadmap` reads the hop at.
+ */
+export type LinePicker = (lines: readonly RoadmapLine[], readings: RoadmapReadings, epic: number | null) => Promise<LinePick>;
 
 /** `pickNextRoadmapLine`, as every walk without `roadmap` picks. */
 export const plainPick: LinePicker = async (lines, readings) => {
@@ -82,9 +99,15 @@ export const plainPick: LinePicker = async (lines, readings) => {
   return { line: pick.line, passed: pick.skipped.length, waiting: [] };
 };
 
-/** The blockers `blocked` waits on, each with what took it, when every open or unread one is taken; else null. */
+/**
+ * The blockers `blocked` waits on, each with what took it, when every open
+ * or unread one is taken; else null. A `native` line held by a blocker on
+ * another repository, or by a list `gh` stopped short of, is never
+ * waiting: nothing here can read whether those are taken.
+ */
 async function everyBlockerTaken(blocked: BlockedLine | null, readings: RoadmapReadings): Promise<readonly TakenBlocker[] | null> {
   if (blocked === null || blocked.fault !== null) return null;
+  if (blocked.foreignOpen !== undefined || blocked.truncated !== undefined) return null;
   const held = blocked.blockers.filter((id) => blocked.open.includes(id) || blocked.unread.includes(id));
   if (held.length === 0) return null;
   let taken: readonly TakenBlocker[] = [];
@@ -96,34 +119,80 @@ async function everyBlockerTaken(blocked: BlockedLine | null, readings: RoadmapR
   return Object.freeze(taken);
 }
 
-/** A picker passing, as waiting, every line whose open blockers are all taken; see `./sources.ts`'s module note, "The hop, under `roadmap`". */
-export function waitingPick(blocking: NextBoard['blocking']): LinePicker {
-  const pick = async (lines: readonly RoadmapLine[], readings: RoadmapReadings, before: LinePick): Promise<LinePick> => {
+/** What a picker makes of the line `pickNextRoadmapLine` answered: stop at it, pass it, or pass it as waiting. */
+type LineVerdict =
+  | { readonly kind: 'stop' }
+  | { readonly kind: 'pass' }
+  | { readonly kind: 'wait'; readonly blockers: readonly TakenBlocker[] };
+
+/** Reads the verdict on one line, in the epic the lines are read in. */
+type LineJudge = (line: RoadmapLine, readings: RoadmapReadings, epic: number | null) => Promise<LineVerdict>;
+
+const STOP: LineVerdict = Object.freeze({ kind: 'stop' });
+const PASS: LineVerdict = Object.freeze({ kind: 'pass' });
+
+/** A pick walking on past every line `judge` passes, each counted in `passed` and a waiting one named. */
+function passingPick(judge: LineJudge): LinePicker {
+  const pick = async (lines: readonly RoadmapLine[], readings: RoadmapReadings, epic: number | null, before: LinePick): Promise<LinePick> => {
     const next = await pickNextRoadmapLine(lines, readings);
     const passed = before.passed + next.skipped.length;
     if (next.line === null) return { line: null, passed, waiting: before.waiting };
-    const blockers = await everyBlockerTaken(await blocking(next.line.issue), readings);
-    if (blockers === null) return { line: next.line, passed, waiting: before.waiting };
-    const waiting = [...before.waiting, Object.freeze({ line: next.line, blockers })];
-    return pick(lines.slice(lines.indexOf(next.line) + 1), readings, { line: null, passed: passed + 1, waiting });
+    const verdict = await judge(next.line, readings, epic);
+    if (verdict.kind === 'stop') return { line: next.line, passed, waiting: before.waiting };
+    const waiting = verdict.kind === 'wait'
+      ? [...before.waiting, Object.freeze({ line: next.line, blockers: verdict.blockers })]
+      : before.waiting;
+    return pick(lines.slice(lines.indexOf(next.line) + 1), readings, epic, { line: null, passed: passed + 1, waiting });
   };
-  return (lines, readings) => pick(lines, readings, { line: null, passed: 0, waiting: [] });
+  return (lines, readings, epic) => pick(lines, readings, epic, { line: null, passed: 0, waiting: [] });
+}
+
+/** The waiting verdict on `blocked`, or null when some blocker is free. */
+async function waitingVerdict(blocked: BlockedLine | null, readings: RoadmapReadings): Promise<LineVerdict | null> {
+  const blockers = await everyBlockerTaken(blocked, readings);
+  return blockers === null
+    ? null
+    : { kind: 'wait', blockers };
+}
+
+/** A picker passing, as waiting, every line whose open blockers are all taken; see `./sources.ts`'s module note, "The hop, under `roadmap`". */
+export function waitingPick(blocking: NextBoard['blocking']): LinePicker {
+  return passingPick(async (line, readings) => await waitingVerdict(await blocking(line.issue), readings) ?? STOP);
+}
+
+/**
+ * The `native` picker without `roadmap`: every blocked line passed,
+ * counted in `passed`, since the tracker clears a blocker when it closes
+ * and nothing is left to unblock; see `./sources.ts`'s module note,
+ * "The mode".
+ */
+export function nativePick(blocking: NextBoard['blocking']): LinePicker {
+  return passingPick(async (line) => await blocking(line.issue) === null
+    ? STOP
+    : PASS);
 }
 
 /**
  * The walk inside `epic` alone, whatever its horizon: its lines as
- * `epicLines` orders them, picked with the roadmap's own readings. See
- * `./sources.ts`'s module note, "Where the walk starts".
+ * `epicLines` orders them, its members read in `relations`' mode, picked
+ * with the roadmap's own readings. See `./sources.ts`'s module note,
+ * "Where the walk starts".
  */
-export async function walkEpic(epic: number, listing: BoardListing, readings: RoadmapReadings, picker: LinePicker): Promise<WalkAnswer> {
+export async function walkEpic(
+  epic: number,
+  listing: BoardListing,
+  readings: RoadmapReadings,
+  picker: LinePicker,
+  relations?: EpicRelations,
+): Promise<WalkAnswer> {
   const rows = await listing();
-  const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0) }).epics
+  const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0), relations }).epics
     .find((candidate) => candidate.number === epic);
   const row = rows.find((issue) => issue.number === epic);
   if (read === undefined || row === undefined) {
     throw new Error(`${PREFIX}: epic #${String(epic)}, the current place, is not on the board listing, so its members cannot be read`);
   }
-  const pick = await picker(epicLines(read, row).lines, readings);
+  const pick = await picker(epicLines(read, row).lines, readings, epic);
   return {
     line: pick.line,
     passed: pick.passed,
@@ -196,6 +265,8 @@ export interface HopSeams {
   readonly listing: BoardListing;
   readonly fallback: number;
   readonly roadmap: number;
+  /** The board's relationships, which read C's epic, what C waits on and an epic's members; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /** The turn's one listing as a {@link BoardView}, the default board already resolved. */
@@ -216,7 +287,7 @@ async function decideAtHome(line: RoadmapLine, places: Pick<Position, 'current' 
   const view = await boardView(seams);
   let last: HopDecision | null = null;
   for (const blocker of held) {
-    last = await decideHop({ blocked: line.issue, blocker, position: places, view, taken: seams.readings });
+    last = await decideHop({ blocked: line.issue, blocker, position: places, view, taken: seams.readings, relations: seams.relations });
     if (last.kind !== 'wait') return last;
   }
   return last;
@@ -231,12 +302,13 @@ async function decideAway(record: HopRecord, target: number, seams: HopSeams): P
     position: { current: record.from, home: record.home },
     view: await boardView(seams),
     taken: NOTHING_TAKEN,
+    relations: seams.relations,
   });
 }
 
 /** Where H was read, and home: the position's home while it stands away, else that same place. */
-function placesOf(walk: WalkAnswer, roadmap: number, position: Position | null): Pick<Position, 'current' | 'home'> {
-  const current: Place = { board: roadmap, epic: walk.epic };
+function placesOf(epic: number | null, roadmap: number, position: Position | null): Pick<Position, 'current' | 'home'> {
+  const current: Place = { board: roadmap, epic };
   const away = position !== null && !samePlace(position.current, position.home);
   return {
     current,
@@ -254,7 +326,7 @@ async function decisionFor(walk: WalkAnswer, followed: FollowedHop, seams: HopSe
   if (walk.line === null) return null;
   const target = awayTargetOf(followed.record);
   if (followed.record !== null && target !== null) return decideAway(followed.record, target, seams);
-  return decideAtHome(walk.line, placesOf(walk, seams.roadmap, followed.position), seams);
+  return decideAtHome(walk.line, placesOf(walk.epic, seams.roadmap, followed.position), seams);
 }
 
 /** The decision for the line the walk answered and the next `now` epic after a dry one; a failed reading a problem. */
@@ -263,7 +335,13 @@ export async function readHopAnswer(walk: WalkAnswer, followed: FollowedHop, sea
     const decision = await decisionFor(walk, followed, seams);
     const nextEpic = walk.dry === null
       ? null
-      : await nextNowEpic({ after: walk.dry.number, board: seams.roadmap, listing: await seams.listing(), readings: seams.readings });
+      : await nextNowEpic({
+        after: walk.dry.number,
+        board: seams.roadmap,
+        listing: await seams.listing(),
+        readings: seams.readings,
+        relations: seams.relations,
+      });
     return { decision, nextEpic, problems: [] };
   } catch (error) {
     return { decision: null, nextEpic: null, problems: [`the hop could not be read, so none is proposed: ${messageOf(error)}`] };
@@ -278,7 +356,7 @@ export async function readHopAnswer(walk: WalkAnswer, followed: FollowedHop, sea
 export async function walkBoard(roadmap: number, seams: EpicDescentSeams, picker: LinePicker): Promise<WalkAnswer> {
   const read = await seams.issues(roadmap);
   const descent = await descendRoadmap(parseRoadmapBody(read.body), seams);
-  const pick = await picker(descent.lines, seams.readings);
+  const pick = await picker(descent.lines, seams.readings, descent.epic?.number ?? null);
   return {
     line: pick.line,
     passed: descent.passed.length + pick.passed,
@@ -290,3 +368,54 @@ export async function walkBoard(roadmap: number, seams: EpicDescentSeams, picker
   };
 }
 
+/**
+ * True when the hop rows of `./hop-rows.ts` take `line`, blocked, read in
+ * `epic`: its decision at home is a halt, or a hop while no hop is away,
+ * as `hop-halt` and `hop-blocked` answer them. A decision that could not
+ * be read keeps the line too, so `readHopAnswer` carries its problem.
+ */
+async function hopRowsTake(line: RoadmapLine, epic: number | null, followed: FollowedHop, seams: HopSeams): Promise<boolean> {
+  try {
+    const decision = await decideAtHome(line, placesOf(epic, seams.roadmap, followed.position), seams);
+    if (decision?.kind === 'halt') return true;
+    return decision?.kind === 'hop' && followed.record?.state !== 'away';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The `native` picker under `roadmap`: a line whose blockers are all
+ * taken passed as waiting, as {@link waitingPick} passes it; any other
+ * blocked line passed unless the hop rows take it; see `./sources.ts`'s
+ * module note, "The mode".
+ */
+export function nativeHopPick(followed: FollowedHop, seams: HopSeams): LinePicker {
+  return passingPick(async (line, readings, epic) => {
+    const blocked = await seams.blocking(line.issue);
+    if (blocked === null) return STOP;
+    const waiting = await waitingVerdict(blocked, readings);
+    if (waiting !== null) return waiting;
+    return await hopRowsTake(line, epic, followed, seams)
+      ? STOP
+      : PASS;
+  });
+}
+
+/**
+ * The picker a turn walks with: {@link plainPick} or {@link nativePick}
+ * without `roadmap`, {@link waitingPick} or {@link nativeHopPick} with
+ * it (`followed` not null), by the mode `seams.relations` names, left out
+ * `labels`.
+ */
+export function pickerFor(followed: FollowedHop | null, seams: HopSeams): LinePicker {
+  const native = seams.relations?.mode === 'native';
+  if (followed === null) {
+    return native
+      ? nativePick(seams.blocking)
+      : plainPick;
+  }
+  return native
+    ? nativeHopPick(followed, seams)
+    : waitingPick(seams.blocking);
+}

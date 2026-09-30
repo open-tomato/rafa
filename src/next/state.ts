@@ -60,7 +60,7 @@
  * | 8 | `pr-green` | `merge` | that pull request is green and merges |
  * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run and no branch |
  * | 10 | `issue-ready` | `plan` | the branch is the base and the roadmap's next line is ready |
- * | 11 | `issue-blocked` | `unblock` | that line waits on issues that have not closed |
+ * | 11 | `issue-blocked` | `unblock` | that line waits on issues that have not closed, in `labels` mode |
  * | 12 | `issue-not-ready` | `ready` | that line carries no `spec:ready` label |
  * | 13 | `nothing-left` | none | nothing above is true |
  *
@@ -101,6 +101,12 @@
  * `conflicting` is row 6, then a `none` verdict that merges is row 7,
  * and what is left — green and mergeable — is row 8.
  *
+ * Row 12 also requires the line NOT to be blocked. In `labels` mode row
+ * 11 has taken every blocked line by then, so the conjunct changes
+ * nothing there; it is what keeps a blocked line from being named "not
+ * ready" in `native` mode, where row 11 is not read (see "In `native`
+ * mode" below).
+ *
  * ## Row 7: no check at all
  *
  * A pull request reporting no check at all (verdict `none`, zero check
@@ -110,6 +116,23 @@
  * asks its own question. Row 6 still takes such a pull request when it
  * conflicts, since a conflict is what triage repairs and a pull request
  * that conflicts is often one GitHub never scheduled a check for.
+ *
+ * ## In `native` mode
+ *
+ * Row 11 proposes `unblock`: re-read the blockers and take
+ * `spec:blocked` off, a label only `labels` mode holds. With the board's
+ * relationships read natively ({@link NextSources.board}'s `mode` is
+ * `native`, `./sources.ts`'s "The mode"), the tracker clears a blocker
+ * when it closes and there is nothing to unblock, so row 11 answers
+ * nothing and is never asked for its reading.
+ *
+ * The walk sees to it that no line needs it: a `native` board passes a
+ * blocked line and picks the next (`pickerFor`,
+ * `./relation-readings.ts`), and under `roadmap` stops at one only when
+ * `hop-halt` or `hop-blocked` takes it. The one line that can still
+ * reach row 11's place blocked is an away hop's target C that is
+ * blocked in turn and whose epic can no longer be read; it falls through
+ * rows 11 and 12 to row 13.
  *
  * ## Under `roadmap`: the hop rows
  *
@@ -513,8 +536,9 @@ async function readIssueReady(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 11: that line waits on issues that have not closed. */
+/** Row 11: that line waits on issues that have not closed; `labels` mode only, see the module note. */
 async function readIssueBlocked(world: NextWorld): Promise<RowAnswer | null> {
+  if (world.sources.board.mode === 'native') return null;
   const picked = await world.picked();
   if (picked === null || picked.blocked === null) return null;
 
@@ -530,12 +554,14 @@ async function readIssueBlocked(world: NextWorld): Promise<RowAnswer | null> {
 
 /**
  * Row 12: that line carries no `spec:ready` label. Rows 10 and 11 have
- * taken every line that is ready and unblocked and every line that is
- * blocked, so a line reaching this row carries neither label.
+ * taken every line that is ready and unblocked and, in `labels` mode,
+ * every line that is blocked, so a line reaching this row carries neither
+ * label; a blocked line reaching it in `native` mode is not answered,
+ * see the module note.
  */
 async function readIssueNotReady(world: NextWorld): Promise<RowAnswer | null> {
   const picked = await world.picked();
-  if (picked === null) return null;
+  if (picked === null || picked.blocked !== null) return null;
 
   const { issue } = picked.line;
   return {
