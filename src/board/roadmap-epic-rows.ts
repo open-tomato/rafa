@@ -15,6 +15,28 @@
  * spends one board listing, one pull request list, one plan dir read and
  * one branch scan, as the spec's "one board read per command" asks.
  *
+ * ## The mode
+ *
+ * Who is in an epic and what it waits on are read in the mode
+ * {@link RoadmapRowsOptions.relations} answers (`./relations/port.ts`),
+ * `labels` when it is left out, and only in that mode. The port is
+ * handed to `readEpics` and to `readRoadmapRows`, whose `blocked by`
+ * column it reads, and it reads the one listing both already share.
+ *
+ * - In `labels` mode everything below reads as it did before the port:
+ *   membership by `epic:<slug>`, `done/total` counted on the listing,
+ *   the label problems and the cancelled-epic notice.
+ * - In `native` mode an epic's members are its sub-issues, and its
+ *   `done/total` and state are GitHub's own count of them,
+ *   `subIssuesSummary`, laid over `readEpics`' reading by
+ *   `withSubIssuesSummary` (`./epic-summary.ts`), which counts a
+ *   sub-issue the listing does not hold. The problems are the
+ *   `horizon:` ones alone (`readHorizonProblems`, `./epic-problems.ts`):
+ *   the two-labels, orphan-label and checklist problems are marks only
+ *   the `labels` mode reads. The cancelled-epic notice is not read: its
+ *   dependents are read from `Blocked by:` lines
+ *   (`./epic-dependents.ts`), which `native` mode does not read.
+ *
  * ## Which lines are epic lines
  *
  * A line is an EPIC LINE when the issue it names is on the listing with
@@ -65,14 +87,14 @@
  * ## Warnings
  *
  * `readRoadmapRows`' warnings come first, unchanged. When at least one
- * epic line was found, shown or hidden, each label problem on the listing
+ * epic line was found, shown or hidden, each problem the mode reads on the listing
  * follows as the sentence `epicProblemMessage` spells, in the order
  * `readEpicProblems` answers them; {@link RoadmapEpicRows.problems}
  * carries them as data for json mode. A roadmap with no epic line
  * carries no problem, so its output stays today's; `rafa doctor` is the
  * reader that reports problems on a board whose roadmap names no epic.
  *
- * Last, whenever the listing was read and whether or not the roadmap
+ * Last, in `labels` mode, whenever the listing was read and whether or not the roadmap
  * names an epic, each line of the cancelled-epic notice
  * (`cancelledEpicNoticeLines`, `./epic-cancel-notice.ts`): one per epic
  * closed as not planned that open issues outside it still wait on. A
@@ -83,10 +105,10 @@
  * {@link RoadmapEpicRows.epics} is `readEpics`' whole answer, every
  * `type:epic` issue on the listing and not only those the roadmap names,
  * for `--check`, which weighs every epic's stored state against its
- * computed one.
+ * computed one; in `native` mode each carries the summary's count.
  */
 import type { EpicProblem } from './epic-problems.js';
-import type { Epic, Epics } from './epics.js';
+import type { Epic, EpicRelations, Epics } from './epics.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapPullRequest } from './roadmap.js';
@@ -95,7 +117,8 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 import { messageOf } from '../config-sections.js';
 
 import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
-import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems } from './epic-problems.js';
+import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';
+import { withSubIssuesSummary } from './epic-summary.js';
 import { readEpics } from './epics.js';
 import { hasPlanFor, readRoadmapRows } from './roadmap-rows.js';
 import { branchClaims, closedIssuesIn, scanClaimBranches } from './roadmap.js';
@@ -141,7 +164,7 @@ export interface RoadmapEpicRows {
   readonly epics: Epics;
   /** Why the listing failed, so no epic could be read; null when it was read. */
   readonly unknown: string | null;
-  /** Every label problem on the listing; empty when the roadmap names no epic. */
+  /** Every problem the mode reads on the listing; empty when the roadmap names no epic. See the module note. */
   readonly problems: readonly EpicProblem[];
   /** `readRoadmapRows`' warnings, then one sentence per problem, then the cancelled-epic notice's lines. */
   readonly warnings: readonly string[];
@@ -263,6 +286,45 @@ export async function claimsOf(issues: readonly BoardIssue[], seams: ClaimSeams)
   return new Set(claimed);
 }
 
+/** True when `relations` read the `native` mode; left out, the mode is `labels`. */
+function isNative(relations: EpicRelations | undefined): relations is EpicRelations {
+  return relations !== undefined && relations.mode === 'native';
+}
+
+/** What {@link readListedEpics} reads. */
+interface ListedEpicsInput {
+  readonly issues: readonly BoardIssue[];
+  readonly claims: ReadonlySet<number>;
+  readonly today: Date;
+  readonly relations: EpicRelations | undefined;
+}
+
+/**
+ * Every epic on the listing, read in the mode `input.relations` answers:
+ * `readEpics` alone in `labels` mode, and in `native` mode each epic with
+ * its `done/total` and state taken off its row's `subIssuesSummary`.
+ */
+function readListedEpics(input: ListedEpicsInput): Epics {
+  const { issues, claims, today, relations } = input;
+  if (!isNative(relations)) return readEpics({ issues, claims, today });
+  const read = readEpics({ issues, claims, today, relations });
+  const rows = new Map(issues.map((issue) => [issue.number, issue]));
+  const epics = read.epics.map((epic) => {
+    const row = rows.get(epic.number);
+    return row === undefined
+      ? epic
+      : withSubIssuesSummary(epic, row, claims, today);
+  });
+  return Object.freeze({ epics: Object.freeze(epics), unknown: read.unknown });
+}
+
+/** The problems the mode reads on `issues`; see the module note. */
+function problemsOf(issues: readonly BoardIssue[], relations: EpicRelations | undefined): readonly EpicProblem[] {
+  return isNative(relations)
+    ? readHorizonProblems(issues)
+    : readEpicProblems(issues);
+}
+
 /** The epic row `row` is, or null when its line is a spec line. */
 function epicRowOf(row: RoadmapRow, byNumber: ReadonlyMap<number, Epic>): EpicRow | null {
   if (row.issue?.type !== 'epic') return null;
@@ -297,9 +359,10 @@ export function groupByHorizon(rows: readonly EpicRow[]): readonly EpicHorizonGr
 
 /**
  * The Roadmap's lines as epic rows grouped by horizon and spec rows in
- * roadmap order, with the label problems carried as warnings. Rejects
+ * roadmap order, with the mode's problems carried as warnings. Rejects
  * where `readRoadmapRows` rejects — a Roadmap that cannot be found or
- * read — and otherwise answers; the module note holds which line is an
+ * read, or in `native` mode a listing read without the native fields —
+ * and otherwise answers; the module note holds the mode, which line is an
  * epic line, which groups are shown, and what a failed listing gives.
  */
 export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Promise<RoadmapEpicRows> {
@@ -308,18 +371,19 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
   const listed = await listingOf(seams.board);
   const epics = listed.issues === null
     ? readEpics({ issues: null, reason: listed.reason, claims: new Set(), today: options.today ?? new Date() })
-    : readEpics({
+    : readListedEpics({
       issues: listed.issues,
       claims: await claimsOf(listed.issues, seams),
       today: options.today ?? new Date(),
+      relations: options.relations,
     });
 
   const { epicRows, specs } = splitRows(read.rows, epics);
   const shown = epicRows.filter((row) => options.all === true || row.horizon === 'now');
   const problems = epicRows.length === 0 || listed.issues === null
     ? []
-    : readEpicProblems(listed.issues);
-  const cancelled = listed.issues === null
+    : problemsOf(listed.issues, options.relations);
+  const cancelled = listed.issues === null || isNative(options.relations)
     ? []
     : cancelledEpicNoticeLines(listed.issues);
 
