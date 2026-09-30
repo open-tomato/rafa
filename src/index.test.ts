@@ -115,6 +115,7 @@ import * as registryModule from './adapters/registry.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
+  BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -191,6 +192,7 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'BOARD_RELATIONSHIP_MODES',
   'CLAUDE_SETTING_SOURCES',
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
@@ -257,6 +259,7 @@ const RUNTIME_EXPORTS = [
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['BOARD_RELATIONSHIP_MODES', entry.BOARD_RELATIONSHIP_MODES, BOARD_RELATIONSHIP_MODES],
   ['CLAUDE_SETTING_SOURCES', entry.CLAUDE_SETTING_SOURCES, CLAUDE_SETTING_SOURCES],
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],

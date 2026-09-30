@@ -176,6 +176,7 @@ export type {
 } from './config-schema.js';
 export { CONFIG_DEFAULTS, CONFIG_FILE } from './config-schema.js';
 export type {
+  BoardRelationshipMode,
   ClaudeSettingSource,
   ConfigExtra,
   ConfigVersion,
@@ -197,6 +198,7 @@ export type {
   TierSwitch,
 } from './config-sections.js';
 export {
+  BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
   INJECT_MODES,
@@ -353,6 +355,7 @@ function readLayer(
     prResolveBudget: read('prResolveBudget'),
     prVersionCollision: read('prVersionCollision'),
     boardTrustedAuthors: read('boardTrustedAuthors'),
+    boardRelationships: read('boardRelationships'),
     roadmapIssue: read('roadmapIssue'),
     releaseEnabled: read('releaseEnabled'),
     releaseVersionFile: read('releaseVersionFile'),

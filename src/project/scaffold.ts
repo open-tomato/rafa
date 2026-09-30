@@ -130,6 +130,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   PR_VERSION_COLLISION_LINE,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
+  `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,
   '# roadmap:',
   '#   issue:                       # the issue plan create --next reads; unset is the one titled Roadmap',
   '# release:',
