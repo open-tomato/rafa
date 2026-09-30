@@ -7,7 +7,7 @@
  * `src/start.ts`, `src/start/run-config.ts`, `src/start/run-setup.ts`,
  * `src/start/session.ts`, `src/start/pause.ts`,
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
- * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
+ * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
@@ -21,7 +21,7 @@
  * ## The release lines
  *
  * A run that reaches its wrap-up now runs the release around that
- * session (`src/start.ts`), and no scratch repository here carries a
+ * session (`src/start/wrap-up-run.ts`), and no scratch repository here carries a
  * `package.json` or a `CHANGELOG.md`, so every such run writes the
  * three lines of {@link NO_RELEASE_PREPARED}, {@link
  * NO_RELEASE_REPORTED} and {@link NO_RELEASE_BODY}: step 1 saying it
@@ -172,6 +172,7 @@ const ROUTED_MODULES: string[] = [
   'preflight/run.ts',
   'start/commit.ts',
   'start/wrap-up.ts',
+  'start/wrap-up-run.ts',
   'start/promoted-check.ts',
   'start/dispatch.ts',
   'start/triage.ts',

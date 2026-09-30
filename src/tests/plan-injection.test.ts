@@ -482,12 +482,18 @@ describe('the wrap-up session', () => {
 
   it('is started with the plan and never with a rendering', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
+    const wrapUpRun = readFileSync(new URL('../start/wrap-up-run.ts', import.meta.url), 'utf8');
     const wrapUp = readFileSync(new URL('../start/wrap-up.ts', import.meta.url), 'utf8');
 
-    expect(start).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);');
+    // `start()` hands the plan it read to the wrap-up branch, which hands
+    // it on to the session (`start/wrap-up-run.ts`).
+    expect(start).toContain('await runWrapUp({');
+    expect(start).toContain('          planContent,\n');
+    expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);');
     expect(wrapUp).toContain('buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons)');
     expect(start).toContain('inject: injectMode,');
     expect(start).not.toContain('await preserveProgress(injection');
+    expect(wrapUpRun).not.toContain('await preserveProgress(injection');
   });
 });
 

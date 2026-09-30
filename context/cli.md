@@ -389,7 +389,7 @@ New; it replaces no earlier text. What a row or an action added to
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
-  `start/wrap-up.ts`,
+  `start/wrap-up.ts`, `start/wrap-up-run.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
   `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
