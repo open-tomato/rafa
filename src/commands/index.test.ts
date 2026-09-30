@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the sixty-seven commands it registers: what the registry
+ * declarations of the seventy-nine commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -9,7 +9,7 @@
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`,
- * and the seven `pr` actions
+ * the four `claim` actions and the seven `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -176,6 +176,10 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release settle': ['text', 'json'],
   'release tag': ['text', 'json'],
   'board list': ['text', 'json'],
+  'claim release': ['text', 'json'],
+  'claim hand': ['text', 'json'],
+  'claim accept': ['text', 'json'],
+  'claim take': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -248,6 +252,10 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'effort merge': [['file'], ['dry-run']],
   'effort import': [['file'], ['dry-run']],
   'effort move': [[], ['to']],
+  'claim release': [['n'], []],
+  'claim hand': [['n'], ['to', 'withdraw']],
+  'claim accept': [['n'], []],
+  'claim take': [['n'], ['stale']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -347,6 +355,11 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['epic move 12 --to=40', 'epic move', ['12', '--to=40'], ''],
   ['epic close 40 --accept-unchecked', 'epic close', ['40', '--accept-unchecked'], ''],
   ['epic cancel 40 --reason=moved', 'epic cancel', ['40', '--reason=moved'], ''],
+  ['claim release 324', 'claim release', ['324'], ''],
+  ['claims hand 324 --to=store-b', 'claim hand', ['324', '--to=store-b'], ''],
+  ['claim hand 324 --withdraw', 'claim hand', ['324', '--withdraw'], ''],
+  ['claim accept 324', 'claim accept', ['324'], ''],
+  ['claim take 324 --stale', 'claim take', ['324', '--stale'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -445,12 +458,12 @@ function numberWord(word: string): number {
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the twelve subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic']);
+  it('registers the thirteen subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -517,6 +530,10 @@ describe('the core roster', () => {
       'epic move',
       'epic close',
       'epic cancel',
+      'claim release',
+      'claim hand',
+      'claim accept',
+      'claim take',
       'status',
       'next',
       'roadmap',

@@ -247,6 +247,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('import');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('move');
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
+    expect(document.subjects.find((subject) => subject.name === 'claim')?.actions.map((action) => action.name)).toEqual(['release', 'hand', 'accept', 'take']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -287,6 +288,11 @@ describe('the document over the core registry', () => {
     expect(spendsOf('effort', 'merge')).toBeNull();
     expect(spendsOf('effort', 'import')).toBeNull();
     expect(spendsOf('effort', 'move')).toBeNull();
+    expect(spendsOf('claim', 'release')).toBeNull();
+    expect(spendsOf('claim', 'hand')).toBeNull();
+    expect(spendsOf('claim', 'accept')).toBeNull();
+    expect(spendsOf('claim', 'take')).toBeNull();
+    expect(['release', 'hand', 'accept', 'take'].map((name) => actionOf(document, 'claim', name)?.aliases)).toEqual([[], [], [], []]);
   });
 });
 
