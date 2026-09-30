@@ -1878,8 +1878,9 @@ New; it replaces no earlier text. What a row or an action added to
   line ends with is not printed, since naming the next issue needs the
   claims the walk reads. Json mode's result is `SwitchResult`. A number
   that is no open board or epic, a closed one, `-` with no previous place
-  or one that no longer stands, and a board listing or default board that
-  cannot be read are refused with exit code 2 and write nothing; a line
+  or one that no longer stands, and a board listing, a `native` board's
+  repository or a default board that cannot be read are refused with
+  exit code 2 and write nothing; a line
   naming no target, an unusable config and a file that cannot be written,
   with 1. It declares no `spends`.
 - **`rafa board list` lists the open boards**

@@ -197,6 +197,19 @@ describe('what the resolution is handed', () => {
     expect([asked().roadmapIssue, asked().trustedAuthors]).toEqual([31, ['octocat']]);
   });
 
+  it('hands over board.relationships as the config resolved it, and leaves the key out when none was given', async () => {
+    const native = recording();
+    const unset = recording();
+    const options = { args: ['--next', '--dry-run'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: 31, trustedAuthors: [] };
+
+    await resolveCreateSpec({ ...options, relationships: 'native' }, native.seams);
+    await resolveCreateSpec(options, unset.seams);
+
+    expect(native.asked().relationships).toBe('native');
+    // `toEqual` ignores a key set to undefined, so the key itself is looked for.
+    expect(Object.keys(unset.asked())).not.toContain('relationships');
+  });
+
   it('hands over the candidate rule as findSpec, not the path as typed', async () => {
     const repoRoot = plant(join(SPECS_DIR, 'my-feature.md'));
     const { seams, asked } = recording();

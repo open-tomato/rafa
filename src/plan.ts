@@ -565,6 +565,7 @@ export default async function plan(
     specsDir,
     roadmapIssue,
     boardTrustedAuthors,
+    boardRelationships,
     dangerousAcceptStaleRefs,
   } = config;
   const flags = readGateFlags(args);
@@ -578,6 +579,7 @@ export default async function plan(
     specsDir,
     roadmapIssue,
     trustedAuthors: boardTrustedAuthors,
+    relationships: boardRelationships,
   });
   // `--dry-run`, a roadmap with nothing left and a blocked next line
   // nobody said yes past have each said their piece already; the run is

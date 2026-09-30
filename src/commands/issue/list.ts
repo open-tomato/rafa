@@ -54,6 +54,19 @@
  * always, as json mode does: a `-` there would claim no saved copy where
  * the truth is that none was read.
  *
+ * ## The relationships mode
+ *
+ * Who is in an epic and what a line waits on are read in the mode
+ * `board.relationships` names (`readConfiguredRelations`,
+ * `board/configured-relations.ts`), handed to `readRoadmapEpicRows` as
+ * its `relations`. In `labels`, the default, nothing more is sent and the
+ * reading is the one it was before the port. In `native` the board's
+ * repository is read once, with one `gh repo view`, before the listing,
+ * which is then asked for the native fields; epics count their
+ * sub-issues, the `blocked by` column and `--full`'s member rows read
+ * each `blockedBy` node, and a repository `gh` will not name refuses the
+ * line as a Roadmap that cannot be read does.
+ *
  * ## One board read
  *
  * The board listing is {@link roadmapBoard}'s: asked once for the
@@ -184,7 +197,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
 import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
-import type { EpicHorizonGroup } from '../../board/roadmap-epic-rows.js';
+import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
 import type { BoardRelationshipMode } from '../../config-sections.js';
@@ -194,6 +207,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { createCachedBoardListing } from '../../board/board-cache.js';
 import { createGhBoardLister } from '../../board/boards.js';
+import { readConfiguredRelations } from '../../board/configured-relations.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { createGhBoardListing, keepListing } from '../../board/roadmap-board.js';
 import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
@@ -279,6 +293,8 @@ export interface RoadmapListing {
   readonly epics: Epics;
   /** Each issue's state on the listing, for the blockers `--full` prints under a member; empty when it failed. */
   readonly states: ReadonlyMap<number, BoardIssueState>;
+  /** A member's blockers through the port, kept in `native` mode with the listing read; left out otherwise. */
+  readonly memberBlockers?: MemberBlockers;
 }
 
 /**
@@ -403,9 +419,13 @@ export function renderRoadmapList(
   full = false,
   style?: TableStyle,
   states?: ReadonlyMap<number, BoardIssueState>,
+  memberBlockers?: MemberBlockers,
 ): string[] {
   if (listed.epics !== undefined) {
-    return renderEpicTable({ ...listed.epics, roadmap: listed.roadmap, specs: listed.rows, states }, width, full, style);
+    const rows = { ...listed.epics, roadmap: listed.roadmap, specs: listed.rows, states };
+    return renderEpicTable(memberBlockers === undefined
+      ? rows
+      : { ...rows, memberBlockers }, width, full, style);
   }
   const head = `Roadmap: #${String(listed.roadmap)}`;
   if (listed.rows.length === 0) return [head, 'No issues.'];
@@ -458,36 +478,32 @@ export async function listRoadmap(
   };
   const config = issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
+  const relations = await refusingRoadmap(() => readConfiguredRelations(config, gh));
   const plans = plansDirAt(project.root, config.planDir);
   const planNames = (seams.planNames ?? createPlanDirNames)(plans.path);
-  const board = roadmapBoard(seams, gh, project.root, how.refresh === true);
+  const board = roadmapBoard(seams, gh, project.root, how.refresh === true, relations?.mode);
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
     { root: project.root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
 
-  let read;
-  try {
-    read = await readRoadmapEpicRows({
-      configured: config.roadmapIssue,
-      listBoards: createGhBoardLister({ gh }),
-      search: createGhRoadmapSearch({ gh }),
-      issues: createGhSpecIssueReader({ gh }),
-      board,
-      git: seams.git ?? createGitRunner(project.root),
-      pullRequests: createGhOpenPullRequests({ gh }),
-      planNames,
-      refs,
-      refsWhen: how.refsWhen,
-      all,
-      root: project.root,
-    });
-  } catch (error) {
-    const code = error instanceof CommandExit
-      ? error.exitCode
-      : ROADMAP_REFUSAL_EXIT;
-    throw new CommandExit(code, `❌ Could not read the roadmap: ${messageOf(error)}`);
-  }
+  const read = await refusingRoadmap(() => readRoadmapEpicRows({
+    configured: config.roadmapIssue,
+    listBoards: createGhBoardLister({ gh }),
+    search: createGhRoadmapSearch({ gh }),
+    issues: createGhSpecIssueReader({ gh }),
+    board,
+    git: seams.git ?? createGitRunner(project.root),
+    pullRequests: createGhOpenPullRequests({ gh }),
+    planNames,
+    refs,
+    refsWhen: how.refsWhen,
+    all,
+    root: project.root,
+    ...relations === undefined
+      ? {}
+      : { relations },
+  }));
 
   for (const warning of read.warnings) warn(warning);
   const listed: RoadmapListResult = {
@@ -497,12 +513,27 @@ export async function listRoadmap(
     rows: narrowRoadmapRows(read.specs, filter),
     warnings: read.warnings,
   };
+  const members = read.memberBlockers === undefined
+    ? { epics: read.epics, states: read.states }
+    : { epics: read.epics, states: read.states, memberBlockers: read.memberBlockers };
   if (!hasEpicLines(read) && read.unknown === null) {
-    return Object.freeze({ result: Object.freeze(listed), epics: read.epics, states: read.states });
+    return Object.freeze({ result: Object.freeze(listed), ...members });
   }
   const { groups, hidden, unknown, problems } = read;
   const result = Object.freeze({ ...listed, epics: Object.freeze({ groups, hidden, unknown, problems }) });
-  return Object.freeze({ result, epics: read.epics, states: read.states });
+  return Object.freeze({ result, ...members });
+}
+
+/** `read`'s answer; a refusal naming the roadmap for whatever it throws, its own exit code kept. */
+async function refusingRoadmap<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    const code = error instanceof CommandExit
+      ? error.exitCode
+      : ROADMAP_REFUSAL_EXIT;
+    throw new CommandExit(code, `❌ Could not read the roadmap: ${messageOf(error)}`);
+  }
 }
 
 /** Lists the issues a line asks for; see the module note. */
@@ -530,7 +561,7 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
 
   expectNoArgument(context.args, USAGE);
   const filter: RoadmapFilter = readIssueQuery(context.flags);
-  const { result, epics, states } = await listRoadmap(context, seams, {
+  const { result, epics, states, memberBlockers } = await listRoadmap(context, seams, {
     all: line.all,
     refresh: line.refresh,
     refsWhen: context.outputMode === 'json' || line.full
@@ -548,7 +579,7 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
   }
   const width = (seams.terminalWidth ?? ((): number | undefined => process.stdout.columns))();
   const style: TableStyle = { labels: line.labels, texts: line.texts };
-  for (const text of renderRoadmapList(result, width, line.full, style, states)) context.output.info(text);
+  for (const text of renderRoadmapList(result, width, line.full, style, states, memberBlockers)) context.output.info(text);
   if (failure !== null) throw new CommandExit(EPIC_CHECK_EXIT, failure);
 }
 

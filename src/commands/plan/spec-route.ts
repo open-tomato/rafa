@@ -90,6 +90,7 @@
 import type { AlternativeOffer } from '../../board/blocked-line.js';
 import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
 import type { RefreshOffer } from '../../board/snapshot-settle.js';
+import type { BoardRelationshipMode } from '../../config-sections.js';
 
 import fs from 'fs';
 import path from 'path';
@@ -153,6 +154,8 @@ export interface SpecRouteOptions {
   readonly roadmapIssue: number | null;
   /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
   readonly trustedAuthors: readonly string[];
+  /** `board.relationships` as config resolved it, which `--next` walks in; `labels` when left out. */
+  readonly relationships?: BoardRelationshipMode;
 }
 
 /** The resolution itself, as `board/plan-spec.ts` performs it. */
@@ -203,6 +206,9 @@ export async function resolveCreateSpec(
     specsDir,
     roadmapIssue: options.roadmapIssue,
     trustedAuthors: options.trustedAuthors,
+    ...options.relationships === undefined
+      ? {}
+      : { relationships: options.relationships },
     findSpec: (spec) => findSpec(repoRoot, spec, specsDir),
     // All three are read for the terminal when they are made, which is once
     // per run and before any body is: see `./ready-offer.ts` for why

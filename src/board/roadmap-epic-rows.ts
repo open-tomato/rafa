@@ -107,11 +107,18 @@
  * `type:epic` issue on the listing and not only those the roadmap names,
  * for `--check`, which weighs every epic's stored state against its
  * computed one; in `native` mode each carries the summary's count.
+ *
+ * {@link RoadmapEpicRows.memberBlockers} is kept in `native` mode only:
+ * each member's blockers as the port's `blockersOf` reads them off its
+ * `blockedBy` nodes (`readNativeBlockersColumn`, `./roadmap-rows.ts`),
+ * for the second row `--full` prints under an open member. In `labels`
+ * mode the key is left out and that row reads the member's `Blocked by:`
+ * line against {@link RoadmapEpicRows.states}, as it did before the port.
  */
 import type { EpicProblem } from './epic-problems.js';
 import type { Epic, EpicRelations, Epics } from './epics.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
-import type { LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
+import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapPullRequest } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
@@ -121,7 +128,7 @@ import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';
 import { withSubIssuesSummary } from './epic-summary.js';
 import { readEpics } from './epics.js';
-import { hasPlanFor, readRoadmapRows } from './roadmap-rows.js';
+import { hasPlanFor, readNativeBlockersColumn, readRoadmapRows } from './roadmap-rows.js';
 import { branchClaims, closedIssuesIn, scanClaimBranches } from './roadmap.js';
 
 /** The three horizons, in the order their groups are printed. */
@@ -171,7 +178,12 @@ export interface RoadmapEpicRows {
   readonly warnings: readonly string[];
   /** Each issue's state on the listing, by number, for a member's blockers; empty when the listing failed. */
   readonly states: ReadonlyMap<number, BoardIssueState>;
+  /** A member's blockers through the port, kept in `native` mode with the listing read; left out otherwise. See the module note. */
+  readonly memberBlockers?: MemberBlockers;
 }
+
+/** A member's blockers as the `--full` row under it prints them. */
+export type MemberBlockers = (member: BoardIssue) => readonly BlockerCell[];
 
 /** What {@link readRoadmapEpicRows} is made with: the rows' own options, and today. */
 export interface RoadmapEpicRowsOptions extends RoadmapRowsOptions {
@@ -292,6 +304,12 @@ function isNative(relations: EpicRelations | undefined): relations is EpicRelati
   return relations !== undefined && relations.mode === 'native';
 }
 
+/** Each member's blockers off `issues` through the `native` port; see the module note. */
+function nativeMemberBlockers(issues: readonly BoardIssue[], relations: EpicRelations): MemberBlockers {
+  const { blockersOf } = relations.read(issues);
+  return (member) => readNativeBlockersColumn(blockersOf(member));
+}
+
 /** What {@link readListedEpics} reads. */
 export interface ListedEpicsInput {
   readonly issues: readonly BoardIssue[];
@@ -394,6 +412,10 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
     ? []
     : cancelledEpicNoticeLines(listed.issues);
 
+  const memberBlockers = listed.issues !== null && isNative(options.relations)
+    ? nativeMemberBlockers(listed.issues, options.relations)
+    : undefined;
+
   return Object.freeze({
     roadmap: read.roadmap,
     groups: groupByHorizon(shown),
@@ -404,5 +426,8 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
     problems: Object.freeze([...problems]),
     warnings: Object.freeze([...read.warnings, ...problems.map(epicProblemMessage), ...cancelled]),
     states: new Map((listed.issues ?? []).map((issue) => [issue.number, issue.state])),
+    ...memberBlockers === undefined
+      ? {}
+      : { memberBlockers },
   });
 }

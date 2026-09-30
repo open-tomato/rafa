@@ -228,6 +228,24 @@
  * Only the issue routes have a gate issue, so this module answers it
  * beside the spec — null under `--spec=<file>`, which has no labels to
  * move and nothing to comment on.
+ *
+ * ## The relationships mode `--next` walks in
+ *
+ * Which epic a line is in and what a pick waits on are read in the mode
+ * {@link PlanSpecOptions.relationships} names, `board.relationships` as
+ * the config resolved it, through `readConfiguredRelations`
+ * (`./configured-relations.ts`), and handed to the roadmap walk
+ * (`./spec-source-roadmap.ts`) with a listing asking for that mode's
+ * fields. Only the `--next` route walks the roadmap, so only it reads
+ * the mode:
+ *
+ * - In `labels`, the default and what a caller leaving the key out
+ *   gets, nothing more is sent and the walk reads as it did before the
+ *   port.
+ * - In `native` the board's repository is read once, with one
+ *   `gh repo view`, before the walk; a repository `gh` will not name
+ *   rejects as a listing `gh` will not answer does. `--spec=<file>` and
+ *   `--issue=<n>` send no such read.
  */
 import type { AlternativeOffer } from './blocked-line.js';
 import type { GateIssue } from './gate.js';
@@ -236,6 +254,7 @@ import type { RefreshOffer } from './snapshot-settle.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
 import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
@@ -245,6 +264,7 @@ import { createGitRunner } from '../pr/git.js';
 import { normalizeRemote } from '../schema/project-id.js';
 
 import { createGhBoardLister } from './boards.js';
+import { readConfiguredRelations } from './configured-relations.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
@@ -425,6 +445,8 @@ export interface PlanSpecOptions {
   readonly roadmapIssue: number | null;
   /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
   readonly trustedAuthors: readonly string[];
+  /** `board.relationships` as config resolved it, which `--next` walks in; `labels` when left out. See the module note. */
+  readonly relationships?: BoardRelationshipMode;
   /** Where `--spec` looks for its file; `src/commands/plan/spec-route.ts`'s own candidate rule. */
   readonly findSpec: (spec: string) => string;
   /**
@@ -520,6 +542,11 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     ? null
     : options.offerRefresh ?? null;
 
+  // Only `--next` walks the roadmap, so only it reads the mode; see the module note.
+  const relations = options.request.kind === 'next'
+    ? await readConfiguredRelations({ boardRelationships: options.relationships ?? 'labels' }, gh)
+    : undefined;
+
   const resolution = await resolveSpecSource({
     request: options.request,
     refresh: options.refresh,
@@ -536,7 +563,9 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
       search: createGhRoadmapSearch({ gh }),
       git,
       pullRequests: createGhOpenPullRequests({ gh }),
-      listing: createGhBoardListing({ gh }),
+      ...relations === undefined
+        ? { listing: createGhBoardListing({ gh }) }
+        : { listing: createGhBoardListing({ gh, mode: relations.mode }), relations },
       inspectRoadmap: (issue) => inspectRoadmapIssue(issue, trust()),
       offerAlternative: alternative,
     },

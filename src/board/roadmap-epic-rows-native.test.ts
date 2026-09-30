@@ -251,3 +251,34 @@ describe('readRoadmapEpicRows in labels mode with a port', () => {
     expect(withPort.epics.epics.map((one) => Object.keys(one))).toEqual(without.epics.epics.map((one) => Object.keys(one)));
   });
 });
+
+describe('readRoadmapEpicRows: the member blockers --full prints', () => {
+  /** {@link LISTING} with #102 waiting on #50, open, and on `other/lib#7`, closed, through its `blockedBy` nodes. */
+  const BLOCKED: readonly BoardIssue[] = LISTING.map((row) => row.number === 102
+    ? { ...row, blockedBy: { nodes: [link(50), { number: 7, title: 'Foreign', state: 'CLOSED', repository: 'other/lib' }] } }
+    : row);
+  const board: BoardListing = () => Promise.resolve(BLOCKED);
+  const member = (number: number): BoardIssue => BLOCKED.find((row) => row.number === number) ?? issue(number);
+
+  it('reads each member\'s blockers off its blockedBy nodes in native mode, a foreign one named with its repository', async () => {
+    const read = await readRoadmapEpicRows({ ...planted({ relations: NATIVE, board }).options, today: TODAY });
+
+    expect(read.memberBlockers?.(member(102))).toEqual([
+      { reference: '#50', state: 'open' },
+      { reference: 'other/lib#7', state: 'closed' },
+    ]);
+    expect(read.memberBlockers?.(member(101))).toEqual([]);
+  });
+
+  it('leaves the key out in labels mode, with a port or without, and when the listing failed', async () => {
+    const failed: BoardListing = () => Promise.reject(new Error('the board is down'));
+    const labels = await readRoadmapEpicRows({ ...planted({ board }).options, today: TODAY });
+    const labelsPort = await readRoadmapEpicRows({ ...planted({ relations: LABELS_UNCALLED, board }).options, today: TODAY });
+    const nativeFailed = await readRoadmapEpicRows({ ...planted({ relations: NATIVE, board: failed }).options, today: TODAY });
+
+    // `toEqual` ignores a key set to undefined, so the keys are looked at.
+    expect(Object.keys(labels)).not.toContain('memberBlockers');
+    expect(Object.keys(labelsPort)).not.toContain('memberBlockers');
+    expect(Object.keys(nativeFailed)).not.toContain('memberBlockers');
+  });
+});
