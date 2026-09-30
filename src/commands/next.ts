@@ -205,6 +205,16 @@
  *    and `home` action that ran wrote, and the stop lines name `hop` and
  *    `home` in the lists they print (`src/next/lines.ts`).
  *
+ * ## The relationships mode
+ *
+ * Before the first turn, {@link runNext} reads the mode
+ * `board.relationships` names (`src/next/relations-mode.ts`) and opens
+ * the sources with what it answers, so every turn's board reads epics
+ * and blockers through that adapter. In `labels`, the default, that
+ * sends nothing and the sources are opened as before; in `native` it
+ * sends one `gh repo view` for the whole run, and a repository `gh` will
+ * not name fails the command before any line is printed.
+ *
  * ## After a merge: the settle step
  *
  * Once a `merge` or `merge-unchecked` action has run,
@@ -231,7 +241,7 @@
  * for a line it refuses and for a `sync` that would not fast-forward, 2
  * for a `--yes` list `src/next/ceiling.ts` refuses and for a repository
  * whose `pr.provider` is not `gh`, and whatever an action threw for an
- * action that failed.
+ * action that failed, or the native-mode repository read threw.
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
@@ -263,6 +273,7 @@ import {
   stateLine,
   stopLine,
 } from '../next/lines.js';
+import { openNextRelations } from '../next/relations-mode.js';
 import { followsMerge, readSettleAfterMerge } from '../next/settle-step.js';
 import { openNextSources } from '../next/sources.js';
 import { readHomeAfterLoop, readNextState } from '../next/state.js';
@@ -544,9 +555,15 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   const ceiling = readYesCeiling(context.flags, NEXT_USAGE);
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const dryRun = dryRunOf(flagged, ceiling, isTerminal());
-  const sources = openNextSources(context, seams, roadmap
-    ? { roadmap }
-    : {});
+  const relations = await openNextRelations(context, seams);
+  const sources = openNextSources(context, seams, {
+    ...roadmap
+      ? { roadmap }
+      : {},
+    ...relations === undefined
+      ? {}
+      : { relations },
+  });
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
   const prompter = lazyPrompter(openPrompter);
   const dry = watchDryEpic();

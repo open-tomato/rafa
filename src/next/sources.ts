@@ -213,6 +213,9 @@
  * members and their order, the hop's decision and the next `now` epic —
  * is asked of the board's relationships port
  * (`src/board/relations/port.ts`), {@link NextBoardOptions.relations}.
+ * {@link openNextSources} hands every board it opens the relations
+ * {@link NextSourcesOptions.relations} carries, which `rafa next` and a
+ * command's hint read in the configured mode (`./relations-mode.ts`).
  * Left out, or in `labels` mode, the board reads what it read before the
  * port, sends the same `gh` commands, and everything above holds as
  * written.
@@ -486,6 +489,8 @@ function nextConfig(project: ProjectFound, warn: (message: string) => void): Nex
 export interface NextSourcesOptions {
   /** Open them for `rafa next --roadmap`; see {@link openNextSources}. False when left out. */
   readonly roadmap?: boolean;
+  /** The relations every board is read in (`./relations-mode.ts`); `labels` when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /**
@@ -560,6 +565,9 @@ export function openNextSources(
     ...roadmap
       ? { roadmap }
       : {},
+    ...options.relations === undefined
+      ? {}
+      : { relations: options.relations },
   });
   const pulls = (seams.pullRequests ?? ghPullRequestsIn)(project.root);
   const held = {

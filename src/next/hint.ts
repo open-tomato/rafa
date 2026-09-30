@@ -22,6 +22,11 @@
  * line, which is also why a hint needs none of the guards the chain
  * carries — no repeat check, no cap: one reading cannot repeat itself.
  *
+ * The sources are opened in the relationships mode `board.relationships`
+ * names, as `rafa next` opens them (`./relations-mode.ts`): nothing more
+ * is sent in `labels`, and one `gh repo view` in `native`, inside the
+ * reading and so inside its two seconds.
+ *
  * ## The question, and the command
  *
  * What the hint answers with depends on whether there is anybody to
@@ -100,6 +105,7 @@ import type { RafaContext } from '../cli/command.js';
 import type { Output } from '../ports/index.js';
 
 import { actionInvocation } from './actions.js';
+import { openNextRelations } from './relations-mode.js';
 import { openNextSources } from './sources.js';
 import { readNextState } from './state.js';
 
@@ -192,6 +198,15 @@ function silenced(): Output {
   });
 }
 
+/** The one state, read over sources opened in the configured relationships mode (`./relations-mode.ts`). */
+async function readOnce(context: RafaContext, seams: NextSourceSeams): Promise<NextState> {
+  const relations = await openNextRelations(context, seams);
+  const sources = openNextSources({ ...context, output: silenced() }, seams, relations === undefined
+    ? {}
+    : { relations });
+  return readNextState(sources);
+}
+
 /** The state, or null where reading it failed or took longer than the hint has. */
 async function readWithin(read: () => Promise<NextState>, expire: (ms: number) => Promise<void>): Promise<NextState | null> {
   const reading = Promise.resolve()
@@ -219,8 +234,7 @@ export async function nextStepHint(
   if (!wantsHint(context.flags)) return null;
 
   try {
-    const read = seams.readState
-      ?? ((): Promise<NextState> => readNextState(openNextSources({ ...context, output: silenced() }, seams)));
+    const read = seams.readState ?? ((): Promise<NextState> => readOnce(context, seams));
     const state = await readWithin(read, seams.expire ?? afterDelay);
     if (state === null) return null;
 
