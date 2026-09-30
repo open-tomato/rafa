@@ -3,6 +3,11 @@
  * labels, and every `epic:` label that no epic carries, named under
  * `Epic labels:` with what fixes each.
  *
+ * It runs in the `labels` mode of `board.relationships` alone
+ * (`./doctor-board.ts`, "The mode"): the `epic:` label is that mode's
+ * mark, and a `native` issue holds one parent, so neither fault exists
+ * there; the relationships row (`./doctor-relations.ts`) runs instead.
+ *
  * An issue belongs to exactly one epic, and a mistyped slug drops a
  * member from its epic without a trace, so the epic reads done early
  * (`.rafa/specs/rafa-244-epics-group-issues-features.md`). Both faults

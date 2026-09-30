@@ -1126,7 +1126,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../start/risk-total.js', ['announceRiskTotal']],
     ['../utils/tracker.js', ['trackerPathFor']],
-    ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'renderDoctorBoard']],
+    ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'relationsResultOf', 'renderDoctorBoard']],
     ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
     ['./doctor-deep.js', ['readDeep', 'renderDeep']],
     ['./doctor-description.js', ['DOCTOR_DESCRIPTION']],
