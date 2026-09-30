@@ -953,6 +953,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./move-native.js', ['NATIVE_MODE']],
   ]],
   ['./commands/epic/defer.js', [
     ['../../board/epic-trail.js', ['REASON_FLAG']],
