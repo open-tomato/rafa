@@ -109,6 +109,17 @@
  *     one write of the tag, and `settle` has settle put it on the
  *     commit it pushes.
  *
+ * One more `release` setting is text rafa prints and never runs:
+ *
+ *   - `release.publishCommand` defaults to `npm publish`, the command
+ *     `rafa release tag` names for the publish after the tag. It is free
+ *     text, so a project that publishes with another tool, or with a
+ *     flag such as `--tag next`, says so here. It was read off the
+ *     manifest's `packageManager` field until 2026-09-30, which named
+ *     `bun publish` for this repository while its releases are
+ *     published with `npm publish`: the tool a project installs with is
+ *     not the tool it publishes with.
+ *
  * ## The `dangerous` key
  *
  * `dangerous.acceptVersionCollision` has `rafa pr merge` accept, on
@@ -208,6 +219,8 @@ export interface ReleaseSettings {
   releaseSettle: ReleaseSettleMode;
   /** Who tags a settled version. `release.tag`. */
   releaseTag: ReleaseTagMode;
+  /** The command `rafa release tag` prints for the publish, which it never runs. `release.publishCommand`. */
+  releasePublishCommand: string;
 }
 
 /** The `dangerous` setting the release plan adds, resolved. */
@@ -238,6 +251,7 @@ export const RELEASE_DEFAULTS: Readonly<ReleaseSettings> = Object.freeze({
   releaseStrategy: 'semver-by-level',
   releaseSettle: 'push',
   releaseTag: 'manual',
+  releasePublishCommand: 'npm publish',
 });
 
 /** What the release plan's `dangerous` setting resolves to when no layer names it. */
@@ -284,6 +298,11 @@ export const RELEASE_SETTINGS: {
   releaseStrategy: { key: 'release.strategy', read: releaseStrategy, cli: false },
   releaseSettle: { key: 'release.settle', read: releaseSettleMode, cli: false },
   releaseTag: { key: 'release.tag', read: releaseTagMode, cli: false },
+  releasePublishCommand: {
+    key: 'release.publishCommand',
+    read: text('a publish command'),
+    cli: false,
+  },
 };
 
 /** The release plan's `dangerous` setting spec. */
