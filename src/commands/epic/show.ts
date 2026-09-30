@@ -63,7 +63,9 @@
  * The seams are `onceSeams` (`src/board/roadmap-epic-rows.ts`): the
  * listing, the open pull requests, the plan dir and the branch scan are
  * each asked once, and the claims `readEpics` weighs for the state
- * (`claimsOf`) and the rows' `has` column read the same answers.
+ * (`claimsOf`) and the rows' `has` column read the same answers. The
+ * claims also weigh each branch's claim as the roadmap walk does, so a
+ * released claim's branch still shows under `has` but claims nothing.
  *
  * ## What it writes
  *

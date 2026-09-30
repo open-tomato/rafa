@@ -1459,9 +1459,13 @@ New; it replaces no earlier text. What a row or an action added to
   `readRoadmapEpicRows`, which asks `readRoadmapRows` for the rows and
   tells the lines whose issue the board listing labels `type:epic` from
   the spec lines over the same one listing, so the command still spends
-  one board read. Epic rows print grouped by horizon under `Roadmap #<n>
-  · <horizon>` with the columns `#`, `state`, `done/total`, `blocked`,
-  `date` and `title`, the `now` horizon only; `--all` widens to every
+  one board read. An epic's state counts a member claimed by a plan, an
+  open pull request, or a branch weighed by the walk's taken reading
+  (`claimsOf`, over `createRoadmapReadings`): a branch whose claim was
+  released claims nothing, and weighing a claim branch the remote holds
+  costs at most one `git fetch` per command. Epic rows print grouped by
+  horizon under `Roadmap #<n> · <horizon>` with the columns `#`,
+  `state`, `done/total`, `blocked`, `date` and `title`, the `now` horizon only; `--all` widens to every
   horizon as it widens to the ticked lines, and without it a line counts
   the epics a horizon hides. A Roadmap is a list of epics, so no issue
   row prints beside them: lines naming no epic are counted on one line,
