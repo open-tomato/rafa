@@ -145,6 +145,32 @@ describe('release.tag', () => {
   });
 });
 
+describe('release.publishCommand', () => {
+  it('spells the key file-only, and defaults to npm publish in its section object', () => {
+    expect(SETTINGS.releasePublishCommand.key).toBe('release.publishCommand');
+    expect(SETTINGS.releasePublishCommand.cli).toBe(false);
+    expect(RELEASE_DEFAULTS.releasePublishCommand).toBe('npm publish');
+    expect(resolveConfig().config.releasePublishCommand).toBe('npm publish');
+    expect(resolveConfig().sources.releasePublishCommand).toBe('default');
+  });
+
+  it.each(['npm publish', 'bun publish', 'pnpm publish --tag next'])('accepts %p as written', (raw) => {
+    expectAccepted('releasePublishCommand', raw);
+  });
+
+  it.each(['', '   '])('refuses %p, which names no command', (raw) => {
+    expectRefused(
+      'releasePublishCommand',
+      raw,
+      `F: release.publishCommand is ${JSON.stringify(raw)}, expected a publish command`,
+    );
+  });
+
+  it('refuses a value that is not a string', () => {
+    expectRefused('releasePublishCommand', true, 'F: release.publishCommand is true, expected a publish command');
+  });
+});
+
 describe('pr.versionCollision', () => {
   it.each(['allow', 'report', 'ask', 'refuse'])('accepts %s', (raw) => {
     expectAccepted('prVersionCollision', raw);

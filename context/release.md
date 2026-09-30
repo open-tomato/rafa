@@ -162,7 +162,7 @@ base branch. It warns when fragments wait and names `rafa release settle`.
 
 ### Config keys
 
-Six keys control the release flow, all under the `release` section except two:
+Seven keys control the release flow, all under the `release` section except two:
 
 **`release.fragments`** — Path to the fragments directory (default `.changes/`).
 Tracked, not gitignored. Fragment filenames are `<plan id>.md`, or `-2`, `-3`
@@ -182,6 +182,15 @@ branch) or `pr` (open or update one pending release pull request on
 `rafa release settle` and `rafa release tag`. Under `release.settle: pr`, the
 tag waits for `rafa release tag` after that pull request merges.
 
+**`release.publishCommand`** — The command `rafa release tag` prints for the
+publish, default `npm publish`. Free text, printed as written and never run, so
+a project that publishes with another tool or a flag (`pnpm publish --tag
+next`) spells it here. When HEAD is past the tagged commit the line becomes
+`git switch --detach <tag> && <publishCommand> && git switch <branch>`, so the
+tagged tree is the one published. The manifest's `packageManager` field is not
+read for it: that field names the tool a project installs with, and tagging
+0.24.1 printed `bun publish` from it while rafa is published with `npm publish`.
+
 **`pr.versionCollision`** — Reaction to `missing` and `stale` preflight
 findings: `report` (default, warn and proceed), `ask` (ask the user), `refuse`
 (error and stop). `collision` always refuses, requiring
@@ -194,5 +203,6 @@ another.
 
 All keys are optional. An absent `release.fragments` defaults to `.changes/`, an
 absent `release.strategy` defaults to `semver-by-level`, an absent
-`release.settle` defaults to `push`, and an absent `release.tag` defaults to
-`manual`. They're set by `rafa init` and read by `loadConfig`.
+`release.settle` defaults to `push`, an absent `release.tag` defaults to
+`manual`, and an absent `release.publishCommand` defaults to `npm publish`.
+They're set by `rafa init` and read by `loadConfig`.

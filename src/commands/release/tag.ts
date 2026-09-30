@@ -68,8 +68,8 @@
  * run reads exactly as it did when it always tagged HEAD. When HEAD is
  * past it the run still tags, says how far past in a warning, and
  * spells the publish line so it publishes the TAGGED tree:
- * `git switch --detach <tag> && <manager> publish && git switch
- * <branch>`, because a publish from HEAD would ship the later commits
+ * `git switch --detach <tag> && <publish> && git switch <branch>`,
+ * because a publish from HEAD would ship the later commits
  * under the older version. Whether the registry has that version
  * already is not read (no network here), so the line says to skip it
  * when it does.
@@ -99,18 +99,26 @@
  * it" (the spec, step 4). The configured registry is the version
  * file's own `publishConfig.registry`, and the default when it names
  * none is npm's, {@link DEFAULT_REGISTRY}. The command is
- * `<manager> publish` with no flags on purpose: `publishConfig`
- * carries the access and the registry, and both bun and npm read that
- * block themselves, so a `--registry` this module spelled would be a
- * second place for the same fact to be wrong.
+ * `release.publishCommand`, `npm publish` by default, printed as the
+ * config spells it. Nothing here adds a flag: `publishConfig` carries
+ * the access and the registry, and npm reads that block itself, so a
+ * `--registry` this module spelled would be a second place for the
+ * same fact to be wrong. A project that wants a flag, or another tool,
+ * spells it in the setting.
  *
- * The manager is read off the manifest's `packageManager` field, the
- * one field both tools already agree on. A version file that is no
- * manifest at all, or one that is `"private": true`, gets NO publish
- * line: the first has nothing to publish and the second refuses to be
- * published, and naming a command that would refuse is what
- * `merge-followups.ts` calls sending the operator at a guaranteed
- * refusal.
+ * The command is a setting rather than a reading of the manifest. Until
+ * 2026-09-30 it was `<manager> publish`, the manager read off the
+ * manifest's `packageManager` field, and tagging 0.24.1 of this
+ * repository printed `bun publish`, while its releases are published
+ * with `npm publish`. `packageManager` names the tool a project
+ * installs with, and that is not always the one it publishes with, so
+ * the field answered a question nobody had asked it.
+ *
+ * A version file that is no manifest at all, or one that is
+ * `"private": true`, gets NO publish line: the first has nothing to
+ * publish and the second refuses to be published, and naming a
+ * command that would refuse is what `merge-followups.ts` calls
+ * sending the operator at a guaranteed refusal.
  *
  * The push line is printed beside it for the same reason: the tag this
  * action writes is local until something pushes it, and a release
@@ -207,13 +215,8 @@ export interface ChangelogReading {
   readonly problem: string | null;
 }
 
-/** Which package manager the publish line is spelled for. */
-export type PackageManager = 'bun' | 'npm';
-
 /** Where a publish would go, read off the version file; see the module note. */
 export interface PublishTarget {
-  /** The manager the manifest's `packageManager` names, npm when it names none. */
-  readonly manager: PackageManager;
   /** `publishConfig.registry`, or {@link DEFAULT_REGISTRY}. */
   readonly registry: string;
   /** The package name, or null when the file names none. */
@@ -373,7 +376,6 @@ function fieldsOf(value: unknown): Record<string, unknown> | null {
 
 /** What a version file that is no manifest at all reads as: nothing to publish. */
 const NO_PACKAGE: PublishTarget = Object.freeze({
-  manager: 'npm',
   registry: DEFAULT_REGISTRY,
   name: null,
   isPrivate: false,
@@ -396,11 +398,7 @@ export function readPublishTarget(text: string | null): PublishTarget {
   if (fields === null) return NO_PACKAGE;
 
   const publishConfig = fieldsOf(fields['publishConfig']);
-  const declared = trimmedOrNull(fields['packageManager']);
   return {
-    manager: declared !== null && declared.startsWith('bun@')
-      ? 'bun'
-      : 'npm',
     registry: trimmedOrNull(publishConfig?.['registry']) ?? DEFAULT_REGISTRY,
     name: trimmedOrNull(fields['name']),
     isPrivate: fields['private'] === true,
@@ -420,13 +418,15 @@ const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRAN
 
 /**
  * What the operator does next once `tag` is written: push it, and
- * publish `version` when there is something to publish — from the tag
- * when HEAD is past it; see the module note. Pure and total.
+ * publish `version` with `publish`, `release.publishCommand`, when
+ * there is something to publish — from the tag when HEAD is past it;
+ * see the module note. Pure and total.
  */
 export function followUpsFor(
   tag: string,
   version: string,
   target: PublishTarget,
+  publish: string,
   place: TagPlace = ON_HEAD,
 ): readonly ReleaseFollowUp[] {
   const push: ReleaseFollowUp = {
@@ -435,11 +435,11 @@ export function followUpsFor(
   };
   if (target.name === null || target.isPrivate) return [push];
   const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
-  if (place.ahead === 0) return [push, { command: `${target.manager} publish`, why: publishes }];
+  if (place.ahead === 0) return [push, { command: publish, why: publishes }];
   return [
     push,
     {
-      command: `git switch --detach ${tag} && ${target.manager} publish && git switch ${place.branch}`,
+      command: `git switch --detach ${tag} && ${publish} && git switch ${place.branch}`,
       why: `${publishes} from the tagged commit, not HEAD; skip it if ${target.registry} has that version already`,
     },
   ];
@@ -519,7 +519,7 @@ function projectOf(context: RafaContext): ProjectFound {
   return context.project;
 }
 
-/** The three settings one run reads out of the config. */
+/** The four settings one run reads out of the config. */
 export interface TagSettings {
   /** `release.versionFile`, relative to the repository root. */
   readonly versionFile: string;
@@ -527,9 +527,11 @@ export interface TagSettings {
   readonly changelog: string;
   /** `pr.base`, or {@link DEFAULT_RELEASE_BRANCH}; see the module note. */
   readonly releaseBranch: string;
+  /** `release.publishCommand`, the publish line's command; see the module note. */
+  readonly publishCommand: string;
 }
 
-/** The three settings this action reads, refusing a config `loadConfig` refuses. */
+/** The four settings this action reads, refusing a config `loadConfig` refuses. */
 function tagConfig(project: ProjectFound, warn: (message: string) => void): TagSettings {
   try {
     const { config } = loadConfig({ root: project.root, home: project.home }, {}, warn);
@@ -537,6 +539,7 @@ function tagConfig(project: ProjectFound, warn: (message: string) => void): TagS
       versionFile: config.releaseVersionFile,
       changelog: config.releaseChangelog,
       releaseBranch: config.prBase ?? DEFAULT_RELEASE_BRANCH,
+      publishCommand: config.releasePublishCommand,
     };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
@@ -622,7 +625,8 @@ export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEA
 
   writeTag(git, decision.tag, decision.commit);
   const place: TagPlace = { ahead: decision.ahead, branch: config.releaseBranch };
-  const followUps = followUpsFor(decision.tag, decision.version, readPublishTarget(inputs.version.text), place);
+  const target = readPublishTarget(inputs.version.text);
+  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place);
   return { inputs, written: decision, followUps };
 }
 
@@ -643,7 +647,8 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
       + ' when no commit holds the version yet, and when the version'
       + ' file, the tag list or the history could not be read. After the tag it prints what to run next: the'
       + ' push that puts the tag on the remote, and the publish line for the registry the version file'
-      + ' configures, spelled to publish from the tag when HEAD is past it, which it does not run. With'
+      + ' configures, with the command `release.publishCommand` names (`npm publish` by default),'
+      + ' spelled to publish from the tag when HEAD is past it, which it does not run. With'
       + ' `--output=json` the readings, the decision and the follow-ups are the data of the terminal result'
       + ' event.',
     args: [],

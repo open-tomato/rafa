@@ -25,6 +25,9 @@
  *     working would name 9.9.9 as the newest release and redden;
  *   - the private-package case is paired with the same manifest
  *     without `"private": true`, which DOES get a publish line;
+ *   - the manifest names `packageManager: bun@…`, as this repository's
+ *     does, and the dispatched run still prints `npm publish`, so a
+ *     publish line read off that field again would redden;
  *   - cases run against a real git repository through the default
  *     seams, so `git tag <tag> <commit>` is known to write a tag git
  *     then lists, a second run refuses on the tag the first wrote, and
@@ -106,7 +109,10 @@ const SET_COMMIT = '7db04a24932a061f36518918f1e776a67cd601f8';
 /** The decision a run that tags {@link SET_COMMIT}, with HEAD on it, makes. */
 const READY: TagReady = Object.freeze({ kind: 'ready', version: VERSION, tag: TAG, commit: SET_COMMIT, ahead: 0 });
 
-/** A manifest shaped like this repository's own. */
+/** The publish command `release.publishCommand` names when no layer sets it. */
+const DEFAULT_PUBLISH = 'npm publish';
+
+/** A manifest shaped like this repository's own, `packageManager` included; see the module note. */
 const MANIFEST = JSON.stringify({
   name: '@open-tomato/rafa',
   version: VERSION,
@@ -182,7 +188,7 @@ function inputs(over: Partial<TagInputs> = {}): TagInputs {
 
 /** A publish target, narrowed by `over`. */
 function target(over: Partial<PublishTarget> = {}): PublishTarget {
-  return { manager: 'bun', registry: DEFAULT_REGISTRY, name: '@open-tomato/rafa', isPrivate: false, ...over };
+  return { registry: DEFAULT_REGISTRY, name: '@open-tomato/rafa', isPrivate: false, ...over };
 }
 
 /** The seams a dispatch case runs with, and what they recorded. */
@@ -346,7 +352,7 @@ describe('the changelog reading', () => {
 });
 
 describe('where a publish would go', () => {
-  it('reads the name, the registry publishConfig names and bun off packageManager', () => {
+  it('reads the name and the registry publishConfig names, and nothing off packageManager', () => {
     const manifest = JSON.stringify({
       name: '@open-tomato/rafa',
       version: VERSION,
@@ -355,16 +361,15 @@ describe('where a publish would go', () => {
     });
 
     expect(readPublishTarget(manifest)).toEqual({
-      manager: 'bun',
       registry: 'https://npm.example.com',
       name: '@open-tomato/rafa',
       isPrivate: false,
     });
   });
 
-  it('falls back to npm and the npm registry when the manifest names neither', () => {
+  it('falls back to the npm registry when the manifest names none', () => {
     expect(readPublishTarget('{"name": "a", "version": "1.0.0"}'))
-      .toEqual({ manager: 'npm', registry: DEFAULT_REGISTRY, name: 'a', isPrivate: false });
+      .toEqual({ registry: DEFAULT_REGISTRY, name: 'a', isPrivate: false });
   });
 
   it('reads a private manifest as private', () => {
@@ -380,25 +385,26 @@ describe('where a publish would go', () => {
 
 describe('what the operator is told to do next', () => {
   it('names the push and the publish, the publish saying what goes where', () => {
-    const followUps = followUpsFor(TAG, VERSION, target());
+    const followUps = followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH);
 
     expect(followUps.map((followUp) => followUp.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, 'bun publish']);
+      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
     expect(followUps[1]?.why).toBe(`publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
   });
 
-  it('names npm for a project npm publishes', () => {
-    expect(followUpsFor(TAG, VERSION, target({ manager: 'npm' }))[1]?.command).toBe('npm publish');
+  it('names the publish command it is handed, flags and all', () => {
+    expect(followUpsFor(TAG, VERSION, target(), 'pnpm publish --tag next')[1]?.command)
+      .toBe('pnpm publish --tag next');
   });
 
   it('names the push alone for a private package, where the same one public gets a publish line', () => {
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true })).map((each) => each.command))
+    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH).map((each) => each.command))
       .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`]);
-    expect(followUpsFor(TAG, VERSION, target({ isPrivate: false }))).toHaveLength(2);
+    expect(followUpsFor(TAG, VERSION, target({ isPrivate: false }), DEFAULT_PUBLISH)).toHaveLength(2);
   });
 
   it('names the push alone when the version file names no package to publish', () => {
-    expect(followUpsFor(TAG, VERSION, target({ name: null }))).toHaveLength(1);
+    expect(followUpsFor(TAG, VERSION, target({ name: null }), DEFAULT_PUBLISH)).toHaveLength(1);
   });
 });
 
@@ -556,14 +562,14 @@ describe('the lines a run that tagged prints', () => {
     const lines = renderTagged(
       READY,
       'main',
-      followUpsFor(TAG, VERSION, target()),
+      followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH),
     );
 
     expect(lines).toEqual([
       `✅ Tagged ${TAG} at the HEAD of main.`,
       'Next:',
       `  git push ${RELEASE_REMOTE} ${TAG} — the tag is local until ${RELEASE_REMOTE} has it`,
-      `  bun publish — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
+      `  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
     ]);
   });
 });
@@ -580,10 +586,10 @@ describe('a tag written behind HEAD', () => {
   });
 
   it('spells the publish line to publish the tagged tree and switch back to the branch', () => {
-    expect(followUpsFor(TAG, VERSION, target(), { ahead: 3, branch: 'main' })).toEqual([
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 3, branch: 'main' })).toEqual([
       { command: `git push ${RELEASE_REMOTE} ${TAG}`, why: `the tag is local until ${RELEASE_REMOTE} has it` },
       {
-        command: `git switch --detach ${TAG} && bun publish && git switch main`,
+        command: `git switch --detach ${TAG} && ${DEFAULT_PUBLISH} && git switch main`,
         why: `publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY} from the tagged commit, not HEAD;`
           + ` skip it if ${DEFAULT_REGISTRY} has that version already`,
       },
@@ -591,7 +597,7 @@ describe('a tag written behind HEAD', () => {
   });
 
   it('names the commit it tagged in place of the HEAD of the branch', () => {
-    const lines = renderTagged(behind, 'main', followUpsFor(TAG, VERSION, target(), { ahead: 3, branch: 'main' }));
+    const lines = renderTagged(behind, 'main', followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 3, branch: 'main' }));
 
     expect(lines[0]).toBe(`✅ Tagged ${TAG} at 7db04a2, the commit of main that set ${VERSION}.`);
   });
@@ -606,8 +612,21 @@ describe('the dispatched action', () => {
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain(`✅ Tagged ${TAG} at the HEAD of ${DEFAULT_RELEASE_BRANCH}.`);
     expect(run.stdout).toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
-    expect(run.stdout).toContain(`bun publish — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
+    expect(run.stdout).toContain(`${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`);
+    expect(run.stdout).not.toContain('bun publish');
     expect(seams.calls).toContain(`tag ${TAG} ${SET_COMMIT}`);
+  });
+
+  it('prints the publish command release.publishCommand names, from the tag too', async () => {
+    const project = plantProject(scratch(), 'release:\n  publishCommand: pnpm publish --tag next\n');
+    writeFileSync(join(project.root, 'package.json'), MANIFEST, 'utf8');
+    writeFileSync(join(project.root, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    const seams = recorded(gitTable(DEFAULT_RELEASE_BRANCH, 'v0.4.0\n', said(''), 3));
+
+    const run = await ran(seams.seams, project);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`git switch --detach ${TAG} && pnpm publish --tag next && git switch main`);
   });
 
   it('tags the commit that set the version when HEAD is past it, warning and publishing from the tag', async () => {
@@ -619,7 +638,7 @@ describe('the dispatched action', () => {
     expect(seams.calls).toContain(`tag ${TAG} ${SET_COMMIT}`);
     expect(run.stdout).toContain(`HEAD of main is 3 commits past 7db04a2, where ${VERSION} was set`);
     expect(run.stdout).toContain(`✅ Tagged ${TAG} at 7db04a2, the commit of main that set ${VERSION}.`);
-    expect(run.stdout).toContain(`git switch --detach ${TAG} && bun publish && git switch main`);
+    expect(run.stdout).toContain(`git switch --detach ${TAG} && ${DEFAULT_PUBLISH} && git switch main`);
   });
 
   it('makes its git runner for the project the dispatcher resolved', async () => {
@@ -683,7 +702,7 @@ describe('the dispatched action', () => {
     expect(data.inputs.branch.branch).toBe(DEFAULT_RELEASE_BRANCH);
     expect(data.inputs.changelog.version).toBe(VERSION);
     expect(data.followUps.map((followUp) => followUp.command))
-      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, 'bun publish']);
+      .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
   });
 
   it('tags the branch pr.base names rather than main', async () => {

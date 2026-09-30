@@ -362,6 +362,7 @@ function readLayer(
     releaseStrategy: read('releaseStrategy'),
     releaseSettle: read('releaseSettle'),
     releaseTag: read('releaseTag'),
+    releasePublishCommand: read('releasePublishCommand'),
     cleanupStaleDays: read('cleanupStaleDays'),
     cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
     cleanupKeep: read('cleanupKeep'),
