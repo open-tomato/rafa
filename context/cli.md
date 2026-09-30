@@ -32,6 +32,7 @@ module's note is the long form.
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery and the tag as the terminal result's data. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
 | `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned |
+| `src/commands/claim/` | `claim release <n>`, which releases a claim the store owns, leaving the issue claimable by other devices; `claim hand <n> --to=<store id>`, which hands over a claim to another device for acceptance; `claim accept <n>`, which accepts a handed-over claim from another device; and `claim take <n> [--stale]`, which takes a claim held too long, failing if the claimed issue was written in this run or if `--stale` is not named and the claim is not stale by `claims.staleAfter` |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -663,7 +664,12 @@ New; it replaces no earlier text. What a row or an action added to
   `--spec` with exit 1 naming the owner; under `--next` the pick is
   passed over and the spec resolved again with it handed in as
   `passOver`, which the walk reads as taken. A claim that could not be
-  made or pushed writes the plan with a warning saying why.
+  made or pushed writes the plan with a warning saying why. When `plan
+  create` runs with `--claim-ahead` beside `--next`, it reads the issue
+  that follows the pick on the roadmap walk (one handle ahead) and, when
+  `claims.ahead: allow` or `--claim-ahead` names it, runs the same claim
+  for it; each refusal, success or warning of the ahead claim is printed
+  after the main claim report with context naming it as ahead.
 - **The spec issue template is `src/board/templates/spec.md`**, a
   package asset the build copies to `dist/templates/` and `rafa init
   --board` writes to `.github/ISSUE_TEMPLATE/spec.md`. Its front matter
@@ -1917,13 +1923,16 @@ New; it replaces no earlier text. What a row or an action added to
   of every probe, a claim on the issue the plan's stub names that this
   device does not own, named with its owner, or that it left unpushed on
   the local `feat/<stub>` and cannot push, also checked ahead of every
-  probe (`start/preflight-claim.ts`), a failed required prerequisite — the two automatic
-  items a `gh` pull request provider contributes, `gh` on `PATH` and
-  `gh auth status` for `origin`'s host, checked ahead of the configured
-  tiers, and the plan's `[start]` items, checked between the two on a
-  first dispatch and named in one line each on a resume
-  (`src/preflight/first-dispatch.ts`), included — a PREREQUISITES file
-  that cannot be read, or checks the store refused
+  probe (`start/preflight-claim.ts`): it reads the claim on the branch from
+  `origin`, retries its push if held unpushed locally, and refuses the run
+  naming the owner when another store holds the claim or when the push still
+  fails (a "claim lost" halt), so no two devices work the same issue; a
+  failed required prerequisite — the two automatic items a `gh` pull request
+  provider contributes, `gh` on `PATH` and `gh auth status` for `origin`'s
+  host, checked ahead of the configured tiers, and the plan's `[start]`
+  items, checked between the two on a first dispatch and named in one line
+  each on a resume (`src/preflight/first-dispatch.ts`), included — a
+  PREREQUISITES file that cannot be read, or checks the store refused
   (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
