@@ -13,8 +13,12 @@
  * {@link SpecIssueReader} the walk already reads through, the done and
  * taken readings through its {@link RoadmapReadings}, and the board
  * through a {@link BoardListing}; every case in `./epic-walk.test.ts`
- * plants fakes behind those three seams. The sentences are pure
- * functions of what was read, and printing them is the caller's.
+ * plants fakes behind those three seams. An epic's members are read
+ * through the board's relationships port, {@link EpicDescentSeams.relations}
+ * (`./relations/port.ts`), by `readEpics`, in the mode
+ * `board.relationships` names; left out, the mode is `labels`, and
+ * `./epic-walk-native.test.ts` holds the `native` cases. The sentences
+ * are pure functions of what was read, and printing them is the caller's.
  *
  * ## Which roadmap lines are passed over
  *
@@ -71,7 +75,7 @@
  *
  * ## Order inside an epic
  *
- * First its body's checklist, as `./epic-body.ts` reads it with
+ * In `labels` mode, first its body's checklist, as `./epic-body.ts` reads it with
  * `parseRoadmapBody`: a ticked line there is passed as a ticked roadmap
  * line is, and a checklist spec missing the epic's label is still walked,
  * since the checklist is the order. Then every OPEN member carrying the
@@ -85,6 +89,17 @@
  * the epic body's last line, one apiece. `pickPlannableLine` resumes
  * after a blocked line by its number, and every number in one epic's
  * lines is distinct that way.
+ *
+ * In `native` mode the epic's order is its sub-issue order, which
+ * `readEpics` hands over as the epic's members (`Epic.order` reads
+ * `sub-issues`): every OPEN sub-issue, in that order, each named in
+ * {@link DescendedEpic.subIssues}, and nothing else. The body's checklist
+ * is not read for order or for who is walked, since only the configured
+ * mode's marks are read, and a closed sub-issue is not walked, for the
+ * reason a closed label-only member is not. Each line is numbered past
+ * the body's last line as a label-only line is, and the walk's header
+ * and dry sentences name sub-issues rather than a checklist and labels;
+ * there are no label-only members to name.
  *
  * {@link epicLines} answers that order for an epic already read, and is
  * the one spelling of it: `rafa epics` (`src/commands/epic/show.ts`) prints
@@ -118,7 +133,9 @@
  * when no line after the given epic holds one, and also when the board's
  * checklist does not list the given epic, since there is then no "after"
  * to read from; the board's first `now` epic is not guessed at in its
- * place. A board, or an unticked checklist line, missing from the
+ * place. The board's own checklist is its roadmap, not a relationship,
+ * so it is read in both modes; each epic on it is read in the mode
+ * {@link NextNowEpicRequest.relations} answers. A board, or an unticked checklist line, missing from the
  * listing is refused with an error naming it, as a missing epic is
  * below: a line the listing left out may be the epic to hop to.
  *
@@ -134,7 +151,7 @@
  * listing that fails throws its own error, as a failed `gh issue view`
  * does in the walk: neither is guessed at as `backlog`.
  */
-import type { Epic, EpicProgress } from './epics.js';
+import type { Epic, EpicProgress, EpicRelations } from './epics.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapLine, RoadmapPick, RoadmapReadings, RoadmapSkip } from './roadmap.js';
@@ -194,10 +211,12 @@ export interface DescendedEpic {
   readonly slug: string | null;
   /** Its `done/total` and not-planned tally. */
   readonly progress: EpicProgress;
-  /** Its checklist's lines, as its body writes them. */
+  /** Its checklist's lines, as its body writes them; empty in `native` mode. */
   readonly checklist: readonly RoadmapLine[];
-  /** Its open members missing from the checklist, walked after it by ascending number. */
+  /** Its open members missing from the checklist, walked after it by ascending number; empty in `native` mode. */
   readonly labelOnly: readonly BoardIssue[];
+  /** Its open sub-issues, walked in the epic's order. `native` mode only; left out in `labels` mode. */
+  readonly subIssues?: readonly BoardIssue[];
 }
 
 /** The lines a walk reads, and what the descent passed to reach them. */
@@ -210,7 +229,7 @@ export interface EpicDescent {
   readonly epic: DescendedEpic | null;
 }
 
-/** The three seams the descent reads through. */
+/** The seams the descent reads through: three, and the relationships port. */
 export interface EpicDescentSeams {
   /** The walk's own memoised issue reader; the module note holds why it must be. */
   readonly issues: SpecIssueReader;
@@ -218,6 +237,8 @@ export interface EpicDescentSeams {
   readonly readings: RoadmapReadings;
   /** The board listing, read at most once, and only for an open `now` epic line. */
   readonly listing: BoardListing;
+  /** The board's relationships, which read an epic's members; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /** What one epic line comes to: passed, or walked into. */
@@ -245,9 +266,16 @@ export function isNowEpic(labels: readonly string[]): boolean {
   return horizons.length === 1 && horizons[0] === NOW_HORIZON_LABEL;
 }
 
-/** The epic numbered `number` on `listing`, read, with its row; throws when it is missing. */
-function epicOnListing(number: number, listing: readonly BoardIssue[]): { readonly epic: Epic; readonly row: BoardIssue } {
-  const epic = readEpics({ issues: listing, claims: NO_CLAIMS, today: UNREAD_DAY }).epics
+/** The epic numbered `number` on `listing`, read in `relations`' mode, with its row; throws when it is missing. */
+function epicOnListing(
+  number: number,
+  listing: readonly BoardIssue[],
+  relations: EpicRelations | undefined,
+): { readonly epic: Epic; readonly row: BoardIssue } {
+  const input = { issues: listing, claims: NO_CLAIMS, today: UNREAD_DAY };
+  const epic = readEpics(relations === undefined
+    ? input
+    : { ...input, relations }).epics
     .find((read) => read.number === number);
   const row = listing.find((issue) => issue.number === number);
   if (epic === undefined || row === undefined) {
@@ -257,65 +285,93 @@ function epicOnListing(number: number, listing: readonly BoardIssue[]): { readon
   return { epic, row };
 }
 
-/** An epic's lines in walk order, and the two parts they are made of. */
+/** An epic's lines in walk order, and the parts they are made of. */
 export interface EpicLines {
-  /** Its checklist's lines, as its body writes them. */
+  /** Its checklist's lines, as its body writes them; empty in `native` mode. */
   readonly checklist: readonly RoadmapLine[];
-  /** Its open members missing from the checklist, in ascending number. */
+  /** Its open members missing from the checklist, in ascending number; empty in `native` mode. */
   readonly labelOnly: readonly BoardIssue[];
-  /** The checklist, then one line per label-only member, numbered past the body's last line. */
+  /** Its open sub-issues, in the epic's order. `native` mode only; left out in `labels` mode. */
+  readonly subIssues?: readonly BoardIssue[];
+  /**
+   * The checklist, then one line per label-only member, or one line per
+   * open sub-issue in `native` mode, each of those numbered past the
+   * body's last line.
+   */
   readonly lines: readonly RoadmapLine[];
 }
 
-/**
- * `epic`'s lines, read off its listing row `row`: its checklist, then its
- * label-only members; the module note holds the order and the numbering.
- * The walk reads these, and `rafa epics` prints them as rows.
- */
-export function epicLines(epic: Epic, row: Pick<BoardIssue, 'body'>): EpicLines {
-  const checklist = epic.body?.lines ?? [];
-  const listed = new Set(checklist.map((item) => item.issue));
-  const labelOnly = epic.members.filter((member) => member.state === 'OPEN' && !listed.has(member.number));
+/** One line per member in `members`, numbered one apiece past `row`'s body's last line. */
+function linesPastBody(members: readonly BoardIssue[], row: Pick<BoardIssue, 'body'>): readonly RoadmapLine[] {
   const past = row.body.split(LINE_BREAK).length;
-  const extra = labelOnly.map((member, index) => Object.freeze({
+  return members.map((member, index) => Object.freeze({
     issue: member.number,
     ticked: false,
     why: member.title,
     lineNumber: past + index + 1,
   }));
+}
+
+/**
+ * `epic`'s lines, read off its listing row `row`: its checklist, then its
+ * label-only members, or in `native` mode its open sub-issues in order;
+ * the module note holds the order and the numbering. The walk reads
+ * these, and `rafa epics` prints them as rows.
+ */
+export function epicLines(epic: Epic, row: Pick<BoardIssue, 'body'>): EpicLines {
+  if (epic.order === 'sub-issues') {
+    const subIssues = Object.freeze(epic.members.filter((member) => member.state === 'OPEN'));
+    return Object.freeze({
+      checklist: Object.freeze([]),
+      labelOnly: Object.freeze([]),
+      subIssues,
+      lines: Object.freeze(linesPastBody(subIssues, row)),
+    });
+  }
+  const checklist = epic.body?.lines ?? [];
+  const listed = new Set(checklist.map((item) => item.issue));
+  const labelOnly = epic.members.filter((member) => member.state === 'OPEN' && !listed.has(member.number));
   return Object.freeze({
     checklist,
     labelOnly: Object.freeze([...labelOnly]),
-    lines: Object.freeze([...checklist, ...extra]),
+    lines: Object.freeze([...checklist, ...linesPastBody(labelOnly, row)]),
   });
 }
 
 /** The epic walked into, with its lines. */
 function descended(line: RoadmapLine, epic: Epic, row: BoardIssue): EpicLineOutcome {
-  const { checklist, labelOnly, lines } = epicLines(epic, row);
+  const { checklist, labelOnly, subIssues, lines } = epicLines(epic, row);
+  const walked: DescendedEpic = {
+    line,
+    number: epic.number,
+    title: epic.title,
+    slug: epic.slug,
+    progress: epic.progress,
+    checklist,
+    labelOnly,
+  };
   return {
-    epic: Object.freeze({
-      line,
-      number: epic.number,
-      title: epic.title,
-      slug: epic.slug,
-      progress: epic.progress,
-      checklist,
-      labelOnly,
-    }),
+    epic: Object.freeze(subIssues === undefined
+      ? walked
+      : { ...walked, subIssues }),
     lines,
   };
 }
 
 /** What `line`, naming the epic `issue`, comes to; the module note holds the order asked. */
-async function readEpicLine(line: RoadmapLine, issue: SpecIssue, listing: BoardListing): Promise<EpicLineOutcome> {
+async function readEpicLine(
+  line: RoadmapLine,
+  issue: SpecIssue,
+  listing: BoardListing,
+  relations: EpicRelations | undefined,
+): Promise<EpicLineOutcome> {
   if (issue.state === 'CLOSED') return { skip: { line, reason: 'closed', detail: '' } };
   if (!isNowEpic(issue.labels)) {
     const horizons = issue.labels.filter((label) => label.startsWith(HORIZON_LABEL_PREFIX));
     return { skip: { line, reason: 'horizon', detail: horizons.join(', ') } };
   }
 
-  const { epic, row } = epicOnListing(line.issue, await listing());
+  const { epic, row } = epicOnListing(line.issue, await listing(), relations);
   if (epic.state === 'done') {
     const { done, total } = epic.progress;
     return { skip: { line, reason: 'done', detail: `${String(done)}/${String(total)}` } };
@@ -361,7 +417,7 @@ export async function descendRoadmap(lines: readonly RoadmapLine[], seams: EpicD
     }
 
     metEpic = true;
-    const outcome = await readEpicLine(line, issue, listing);
+    const outcome = await readEpicLine(line, issue, listing, seams.relations);
     if ('skip' in outcome) {
       passed = [...passed, { kind: 'epic', skip: outcome.skip }];
       continue;
@@ -415,8 +471,10 @@ export function descentPassSentence(pass: DescentPass): string {
 /** The sentence a walk prints on walking into `epic`. */
 export function epicHeaderSentence(epic: DescendedEpic): string {
   const { done, total } = epic.progress;
-  return `walking into epic #${String(epic.number)} ${epic.title} (${String(done)}/${String(total)} done):`
-    + ' its checklist, then its labelled members missing from it';
+  const order = epic.subIssues === undefined
+    ? 'its checklist, then its labelled members missing from it'
+    : 'its open sub-issues, in the order the epic holds them';
+  return `walking into epic #${String(epic.number)} ${epic.title} (${String(done)}/${String(total)} done): ${order}`;
 }
 
 /** The sentence a walk prints for one open member missing from `epic`'s checklist. */
@@ -431,7 +489,10 @@ export function labelOnlySentence(epic: DescendedEpic, member: BoardIssue): stri
 /** The sentence a walk prints when `epic` has run dry. */
 export function dryEpicSentence(epic: DescendedEpic): string {
   const { done, total } = epic.progress;
-  return `epic #${String(epic.number)} ${epic.title} has run dry: every line of its checklist and every open member it labels`
+  const lines = epic.subIssues === undefined
+    ? 'every line of its checklist and every open member it labels'
+    : 'every open sub-issue';
+  return `epic #${String(epic.number)} ${epic.title} has run dry: ${lines}`
     + ` is done or taken, though the epic is not done (${String(done)}/${String(total)});`
     + ' the walk stops here and does not move on to another epic';
 }
@@ -446,6 +507,8 @@ export interface NextNowEpicRequest {
   readonly listing: readonly BoardIssue[];
   /** The walk's done and taken readings, which the dry reading asks. */
   readonly readings: RoadmapReadings;
+  /** The board's relationships, which read each epic's members; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /** The epic {@link nextNowEpic} answers, and where it sits. */
@@ -481,11 +544,12 @@ async function hasPickableLine(epic: Epic, row: BoardIssue, readings: RoadmapRea
 }
 
 /** The epic `line` names, when it is one the dry hop may go to, else null. */
-async function nowEpicOf(line: RoadmapLine, listing: readonly BoardIssue[], readings: RoadmapReadings): Promise<Epic | null> {
+async function nowEpicOf(line: RoadmapLine, request: NextNowEpicRequest): Promise<Epic | null> {
+  const { listing, readings, relations } = request;
   if (line.ticked) return null;
   const row = rowOnListing(line.issue, listing, 'checklist line');
   if (row.type !== 'epic' || row.state !== 'OPEN' || !isNowEpic(row.labels)) return null;
-  const { epic } = epicOnListing(line.issue, listing);
+  const { epic } = epicOnListing(line.issue, listing, relations);
   if (epic.state === 'done') return null;
   return await hasPickableLine(epic, row, readings)
     ? epic
@@ -499,13 +563,13 @@ async function nowEpicOf(line: RoadmapLine, listing: readonly BoardIssue[], read
  * Throws what the readings throw.
  */
 export async function nextNowEpic(request: NextNowEpicRequest): Promise<NextNowEpic | null> {
-  const { after, board, listing, readings } = request;
+  const { after, board, listing } = request;
   const lines = parseRoadmapBody(rowOnListing(board, listing, 'board').body);
   const at = lines.findIndex((line) => line.issue === after);
   if (at === -1) return null;
 
   for (const line of lines.slice(at + 1)) {
-    const epic = await nowEpicOf(line, listing, readings);
+    const epic = await nowEpicOf(line, request);
     if (epic === null) continue;
     return Object.freeze({
       number: epic.number,
