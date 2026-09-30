@@ -791,7 +791,8 @@ So a foreign blocker arrives in the blocked repository's one board read,
 with its number, state and repository. The native reader gets it from the
 `blockedBy` node and needs no per-blocker `gh issue view`. A blocker's
 `number` alone is ambiguous across repositories. The reader keys a blocker
-by `repository.nameWithOwner` and `number` together.
+by its repository (`owner/name`) and `number` together; see the next
+answer for where the listing's repository comes from.
 `gh issue edit --add-blocked-by` takes a number or a URL.
 `ResolveIssueRef` (`pkg/cmd/issue/shared/lookup.go`) resolves a URL to its
 own repository. It refuses only a URL on another host, so a foreign blocker
@@ -800,3 +801,25 @@ the node count is its truncation reading.
 
 Not measured: a blocker in a repository the reading account cannot see.
 Both scratch repositories belong to the same account.
+
+#### `gh issue list --json` answers a linked issue without its repository
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`, running
+`gh issue list -R <A> --state all --limit 50 --json number,parent,blockedBy,blocking,subIssues,subIssuesSummary`
+itself, and the same fields on `open-tomato/rafa` with `--limit 2`. Every
+linked issue — `parent`, and each node of `blockedBy`, `blocking` and
+`subIssues` — came back with the keys `id`, `number`, `state`, `title`
+and `url`, and no `repository`, although the query `gh` sends asks for
+`repository{nameWithOwner}` (see the `subIssues` answer above). The
+foreign blocker of A#14 read as
+`{"number":1,"state":"CLOSED","url":"https://github.com/<B>/issues/1",…}`.
+`parent` is null or one such node. The three lists are
+`{"nodes":[…],"totalCount":n}`, and `subIssuesSummary` is
+`{"completed","percentCompleted","total"}`.
+
+What follows for the native mode: the listing reads a linked issue's
+repository off its `url` (`https://<host>/<owner>/<name>/issues/<n>`),
+and `parseBoardListing` (`src/board/roadmap-board.ts`) refuses a node
+whose `url` is not issue `number`'s. A read that asks GraphQL directly
+may take `repository.nameWithOwner`, but it must answer the same row
+shape as the listing.
