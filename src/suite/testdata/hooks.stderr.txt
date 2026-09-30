@@ -1,0 +1,85 @@
+
+afterall.test.ts:
+(pass) aa ok [0.01ms]
+1 | import { afterAll, test } from 'bun:test';
+2 | afterAll(() => { throw new Error('aa'); });
+                                         ^
+error: aa
+      at <anonymous> (/tmp/scratch/afterall.test.ts:2:38)
+(fail) (unnamed) [0.12ms]
+
+beforeall.test.ts:
+1 | import { beforeAll, describe, test } from 'bun:test';
+2 | describe('grp', () => { beforeAll(() => { throw new Error('ba'); }); test('t1', () => {}); test('t2', () => {}); });
+                                                                  ^
+error: ba
+      at <anonymous> (/tmp/scratch/beforeall.test.ts:2:63)
+(fail) grp > (unnamed) [0.03ms]
+
+dup.test.ts:
+1 | import { test, expect } from 'bun:test';
+2 | test('same', () => { expect(1).toBe(2); });
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/tmp/scratch/dup.test.ts:2:32)
+(fail) same [0.04ms]
+1 | import { test, expect } from 'bun:test';
+2 | test('same', () => { expect(1).toBe(2); });
+3 | test('same', () => { expect(1).toBe(2); });
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/tmp/scratch/dup.test.ts:3:32)
+(fail) same [0.02ms]
+(pass) each 1
+1 | import { test, expect } from 'bun:test';
+2 | test('same', () => { expect(1).toBe(2); });
+3 | test('same', () => { expect(1).toBe(2); });
+4 | test.each([1,2])('each %p', (n) => { expect(n).toBe(1); });
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (/tmp/scratch/dup.test.ts:4:48)
+(fail) each 2 [0.02ms]
+
+empty.test.ts:
+
+timeout.test.ts:
+(fail) slow [50.19ms]
+  ^ this test timed out after 50ms.
+1 | import { test } from 'bun:test';
+2 | test('slow', async () => { await Bun.sleep(200); }, 50);
+3 | test('rej', () => { Promise.reject(new Error('unh')); });
+                                           ^
+error: unh
+      at <anonymous> (/tmp/scratch/timeout.test.ts:3:40)
+(fail) rej [0.17ms]
+
+toplevel.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+1 | import { test } from 'bun:test';
+2 | test('before throw', () => {});
+3 | throw new Error('top');
+              ^
+error: top
+      at /tmp/scratch/toplevel.test.ts:3:11
+-------------------------------
+
+
+ 2 pass
+ 8 fail
+ 1 error
+ 4 expect() calls
+Ran 10 tests across 6 files. [53.00ms]

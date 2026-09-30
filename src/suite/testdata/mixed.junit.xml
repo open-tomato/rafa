@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="6" assertions="3" failures="2" skipped="2" time="0.0031708">
+  <testsuite name="a.test.ts" file="a.test.ts" tests="4" assertions="2" failures="1" skipped="2" time="0.000896394" hostname="fixture-host">
+    <testcase name="passes" classname="" time="0.00001" file="a.test.ts" line="2" assertions="1" />
+    <testsuite name="outer" file="a.test.ts" line="3" tests="1" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+      <testsuite name="inner" file="a.test.ts" line="3" tests="1" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+        <testcase name="fails &quot;quoted&quot; &amp; &lt;x&gt;" classname="inner &gt; outer" time="0.000161" file="a.test.ts" line="3" assertions="1">
+          <failure type="AssertionError" message="expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;">AssertionError: expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;&#10;      at a.test.ts:3:100&#10;</failure>
+        </testcase>
+      </testsuite>
+    </testsuite>
+    <testcase name="skipped" classname="" time="0" file="a.test.ts" line="4" assertions="0">
+      <skipped />
+    </testcase>
+    <testcase name="todo one" classname="" time="0" file="a.test.ts" line="5" assertions="0">
+      <skipped message="TODO" />
+    </testcase>
+  </testsuite>
+  <testsuite name="sub/b.test.ts" file="sub/b.test.ts" tests="2" assertions="1" failures="1" skipped="0" time="0.00017214" hostname="fixture-host">
+    <testcase name="b fails" classname="" time="0.000038" file="sub/b.test.ts" line="2" assertions="0">
+      <failure type="Error" message="boom">Error: boom&#10;      at sub/b.test.ts:2:47&#10;</failure>
+    </testcase>
+    <testcase name="b ok" classname="" time="0.00001" file="sub/b.test.ts" line="3" assertions="1" />
+  </testsuite>
+</testsuites>
