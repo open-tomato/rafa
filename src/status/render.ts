@@ -14,7 +14,7 @@
  * | `branch` | the branch, and the plan it names with `formatCounts`'s task counts, or `no plan` |
  * | `loops` | how many sessions are running and how many tasks are blocked |
  * | `pull` | the number, title, mergeability and checks, or `none open` |
- * | `board` | the roadmap's next issue and whether it is ready, then how many issues carry `spec:blocked` |
+ * | `board` | the roadmap's next issue and whether it is ready, then how many issues carry `spec:blocked`, or in `native` mode how many have an open blocker |
  * | `housekeeping` | the four `rafa cleanup` group counts, and how many worktrees are idle |
  *
  * Two lines have lines under them, indented two spaces. The loops line
@@ -166,16 +166,30 @@ function pullText(reading: PullReading): string {
   return `#${String(summary.number)} ${summary.title}, ${MERGEABILITY_WORDS[mergeable]}, ${VERDICT_WORDS[verdict]}`;
 }
 
+/**
+ * The blocked count ending the board line, worded in the mode it was read
+ * in: the `spec:blocked` label, or in `native` mode an open blocker, which
+ * is what `./blocked-count.ts` counts there.
+ */
+function blockedText(reading: BoardReading): string {
+  const { blockedIssues } = reading;
+  if (reading.mode === 'native') {
+    return blockedIssues === null
+      ? 'the issues with an open blocker were not read'
+      : `${counted(blockedIssues, 'issue')} with an open blocker`;
+  }
+  return blockedIssues === null
+    ? `the ${SPEC_BLOCKED_LABEL} issues were not read`
+    : `${counted(blockedIssues, 'issue')} labelled ${SPEC_BLOCKED_LABEL}`;
+}
+
 /** The board line. */
 function boardText(reading: BoardReading): string {
   const roadmap = `roadmap #${String(reading.roadmap)}`;
   const next = reading.next === null
     ? `${roadmap} has no line left`
     : `next is #${String(reading.next.line.issue)} on ${roadmap}, ${nextStanding(reading.next)}`;
-  const blocked = reading.blockedIssues === null
-    ? `the ${SPEC_BLOCKED_LABEL} issues were not read`
-    : `${counted(reading.blockedIssues, 'issue')} labelled ${SPEC_BLOCKED_LABEL}`;
-  return `${next}; ${blocked}`;
+  return `${next}; ${blockedText(reading)}`;
 }
 
 /** The lines under the board line: the place, the away line, the waiting line, the notices; none without a place. */

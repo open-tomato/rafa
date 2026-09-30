@@ -8,7 +8,7 @@
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/commands/loop/loop-sessions.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedIssues` (`src/commands/doctor-blocked.ts`), `resolvePlace` (`src/board/place.ts`), `readHopRecord` (`src/next/hop-record.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readHopRecord` (`src/next/hop-record.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/commands/doctor-cleanup.ts`) | git, the disk, `gh` for merged pull requests |
  *
  * Nothing here prints, and nothing spawns except through
@@ -101,6 +101,17 @@
  * default board's first `now` epic therefore prints no `next` field
  * rather than the default board's.
  *
+ * ## The blocked count, in the board's mode
+ *
+ * `blockedIssues` is `readBlockedCount`'s count, in the mode of the
+ * relationships port {@link StatusSeams.relations} hands in. Left out, or
+ * in `labels` mode, it is the open issues labelled `spec:blocked`, read
+ * as before the port, and the board reading carries no `mode` key. In
+ * `native` mode the listing asks for the mode's fields, the walk is
+ * handed the port, and the count is the open issues on that one listing
+ * a blocker still holds, with no command of its own; the reading then
+ * carries `mode: 'native'`, which is how `./render.ts` words it.
+ *
  * ## The pull request a hop left waiting
  *
  * `place.waiting` is set while `rafa next --roadmap` came home from a
@@ -143,6 +154,7 @@
  * within `cleanup.worktreeIdleDays` (`src/cleanup/worktrees.ts`). A
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
+import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
 import type { EpicView, PlaceView } from './place-line.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Epic } from '../board/epics.js';
@@ -163,7 +175,6 @@ import type { Place } from '../project/position.js';
 import { existsSync } from 'node:fs';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { readEpics } from '../board/epics.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
@@ -183,6 +194,8 @@ import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/rea
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
 import { positionFilePath, readPositionFile } from '../project/position.js';
+
+import { readBlockedCount } from './blocked-count.js';
 
 /** How long the network sections may take together, in milliseconds; see the module note. */
 export const STATUS_NETWORK_TIMEOUT_MS = 5_000;
@@ -241,8 +254,13 @@ export interface BoardReading {
   readonly next: PickedLine | null;
   /** How many lines the walk passed to reach it. */
   readonly passed: number;
-  /** How many open issues carry `spec:blocked`, or null when they could not be listed. */
+  /**
+   * How many open issues carry `spec:blocked`, or in `native` mode have a
+   * blocker that still holds them; null when they could not be read.
+   */
   readonly blockedIssues: number | null;
+  /** `native` when the count was read natively; left out in `labels` mode. See the module note. */
+  readonly mode?: 'native';
   /** What was read around: a branch scan, a blocked listing that failed, a place not read. */
   readonly notes: readonly string[];
   /** Where this checkout stands; left out for a project with no position file and no board label. */
@@ -331,7 +349,13 @@ export interface StatusSeams {
   readonly listing?: (gh: GhRunner) => BoardListing;
   /** The owner gate a waiting hop's pull request is read through. `nextOwnerGate` when left out. */
   readonly ownerGate?: (options: NextOwnerGateOptions) => (pullRequest: number) => Promise<OwnerApproval>;
-  /** The blocked-issue listing over the bounded runner. `readBlockedIssues` when left out. */
+  /**
+   * The board's relationships, which the blocked count, the listing's
+   * fields and the walk are read in; `labels` mode when left out. See the
+   * module note's "The blocked count, in the board's mode".
+   */
+  readonly relations?: BlockedCountRelations;
+  /** The blocked-issue listing over the bounded runner, read in `labels` mode only. `readBlockedIssues` when left out. */
   readonly blockedIssues?: (gh: GhRunner) => Promise<BlockedIssuesReport>;
   /** The `origin` probe `resolvePrProvider` takes. `gitRemoteUrl` when left out. */
   readonly readRemote?: (dir: string) => string | null;
@@ -656,26 +680,25 @@ async function readBoard(
   sources: PlaceSources,
   board: NextBoard,
   listing: BoardListing,
-  blocked: Promise<BlockedIssuesReport>,
+  blocked: Promise<BlockedCount>,
+  native: boolean,
 ): Promise<BoardReading> {
-  const [walk, report] = await Promise.all([board.next(), blocked]);
+  const [walk, counted] = await Promise.all([board.next(), blocked]);
   const { line } = walk;
   const next = line === null
     ? null
     : { line, ready: await board.isReady(line.issue), blocked: await board.blocking(line.issue) };
-  const listed = report.problem === null
-    ? []
-    : [`the issues labelled ${SPEC_BLOCKED_LABEL} could not be read: ${report.problem}`];
   const { place, notes } = await placeOrNote(sources, walk, listing);
-  const reading: BoardReading = {
+  const read: BoardReading = {
     roadmap: walk.roadmap,
     next,
     passed: walk.passed,
-    blockedIssues: report.problem === null
-      ? report.readings.length
-      : null,
-    notes: [...walk.problems, ...listed, ...notes],
+    blockedIssues: counted.count,
+    notes: [...walk.problems, ...counted.notes, ...notes],
   };
+  const reading: BoardReading = native
+    ? { ...read, mode: 'native' }
+    : read;
   return place === null
     ? reading
     : { ...reading, place };
@@ -710,8 +733,14 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
   const deadline = openDeadline(seams.timeoutMs ?? STATUS_NETWORK_TIMEOUT_MS);
   const gh = boundedRunner(openGh, root, deadline);
   const pulls = (seams.pullRequests ?? ((runner: GhRunner): PullRequests => createGhPullRequests({ gh: runner })))(gh);
-  const listing = once((seams.listing ?? ((runner: GhRunner): BoardListing => createGhBoardListing({ gh: runner })))(gh));
-  const board = (seams.board ?? ghNextBoard)({ gh, git, configured: config.roadmapIssue, listing });
+  const { relations } = seams;
+  const native = relations?.mode === 'native';
+  const listing = once((seams.listing ?? ((runner: GhRunner): BoardListing => createGhBoardListing(native
+    ? { gh: runner, mode: 'native' }
+    : { gh: runner })))(gh));
+  const board = (seams.board ?? ghNextBoard)(native
+    ? { gh, git, configured: config.roadmapIssue, listing, relations }
+    : { gh, git, configured: config.roadmapIssue, listing });
   const openGate = seams.ownerGate ?? nextOwnerGate;
   const place: PlaceSources = {
     root,
@@ -741,7 +770,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
   deadline.start();
   const pull = pullSection(sources, branch, provider, deadline);
   const boardSection = isGh
-    ? networkSection('board', deadline, () => readBoard(place, board, listing, blockedIssues(gh)))
+    ? networkSection('board', deadline, () => readBoard(place, board, listing, readBlockedCount({ gh, relations, listing, blockedIssues }), native))
     : Promise.resolve(unread(notGhProblem('board', provider)));
   const housekeeping = readHousekeeping(input, cleanup, now);
 
