@@ -61,7 +61,9 @@
  * The reading and pushing steps are exported, each taking the refusal
  * its caller makes and a {@link ClaimDoing} for the words, so
  * `./hand.ts` reads the line, the store id, the issue's branches and
- * this store's claim, and pushes its commit, exactly as a release does.
+ * this store's claim, and pushes its commit, exactly as a release does,
+ * and `./accept.ts` reads the line, the store id and the issue's
+ * branches the same way and pushes its commit the same way.
  */
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId } from '../../claims/device.js';
