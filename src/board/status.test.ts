@@ -179,6 +179,8 @@ describe('readLabelRows', () => {
         'horizon:next',
         'horizon:later',
         'type:roadmap',
+        'rafa:claimed',
+        'rafa:in-development',
       ]);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list']);
   });
@@ -344,7 +346,7 @@ describe('readBoardStatus', () => {
     expect(snapshot(root)).toEqual(before);
   });
 
-  it('answers all fifteen rows missing over a bare repository and writes nothing', async () => {
+  it('answers all seventeen rows missing over a bare repository and writes nothing', async () => {
     const root = freshRoot('whole-bare');
     const gh = fakeBoard();
     const before = snapshot(root);
@@ -352,7 +354,7 @@ describe('readBoardStatus', () => {
     const status = await readBoardStatus({ gh: gh.run, root });
 
     expect(outcomes(status.rows)).toEqual(status.rows.map(() => 'missing'));
-    expect(boardGaps(status)).toHaveLength(15);
+    expect(boardGaps(status)).toHaveLength(17);
     expect(status.roadmapIssue).toBe(null);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list', 'issue list']);
     expect(snapshot(root)).toEqual(before);
@@ -377,6 +379,8 @@ describe('readBoardStatus', () => {
         'horizon:next',
         'horizon:later',
         'type:roadmap',
+        'rafa:claimed',
+        'rafa:in-development',
         ROADMAP_SETTING,
       ]);
     expect(boardGaps(status).every((row) => row.outcome === 'missing')).toBe(true);

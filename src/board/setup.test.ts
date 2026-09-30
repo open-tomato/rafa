@@ -1,5 +1,5 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the twelve labels, the
+ * Tests for the board setup (`src/board/setup.ts`): the fourteen labels, the
  * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
  * line written into the project config, and a second run that writes
  * nothing.
@@ -62,6 +62,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
@@ -221,7 +222,7 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the twelve labels the workflow files under, each with a description', () => {
+  it('names the fourteen labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
@@ -235,6 +236,8 @@ describe('BOARD_LABELS', () => {
       'horizon:next',
       'horizon:later',
       'type:roadmap',
+      'rafa:claimed',
+      'rafa:in-development',
     ]);
     expect(BOARD_LABELS.every((label) => label.description.trim() !== '')).toBe(true);
   });
@@ -248,6 +251,8 @@ describe('BOARD_LABELS', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.modulePrefix}unassigned`);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(`${GITHUB_LABELS.typePrefix}epic`);
     expect(BOARD_LABELS.map((label) => label.name)).toContain(ROADMAP_LABEL);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(CLAIMED_LABEL);
+    expect(BOARD_LABELS.map((label) => label.name)).toContain(IN_DEVELOPMENT_LABEL);
     expect(ROADMAP_LABEL).toBe('type:roadmap');
   });
 });
@@ -271,6 +276,8 @@ describe('setUpLabels', () => {
       ['horizon:next', 'created'],
       ['horizon:later', 'created'],
       ['type:roadmap', 'created'],
+      ['rafa:claimed', 'created'],
+      ['rafa:in-development', 'created'],
     ]);
     expect(callsTo(gh.calls(), 'label list')).toEqual([LABEL_LIST_CALL]);
     expect(callsTo(gh.calls(), 'label create').map((args) => args[2])).toEqual([
@@ -284,6 +291,8 @@ describe('setUpLabels', () => {
       'horizon:next',
       'horizon:later',
       'type:roadmap',
+      'rafa:claimed',
+      'rafa:in-development',
     ]);
   });
 
@@ -359,6 +368,8 @@ describe('missingBoardLabels', () => {
         'horizon:next',
         'horizon:later',
         'type:roadmap',
+        'rafa:claimed',
+        'rafa:in-development',
       ]);
     expect(missingBoardLabels(BOARD_LABELS.map((label) => label.name))).toEqual([]);
   });
