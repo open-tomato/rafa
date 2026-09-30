@@ -1,12 +1,9 @@
 /**
- * Tests for the `native` relationships adapter's reads (`./native.ts`).
+ * Tests for the `native` relationships adapter (`./native.ts`).
  *
- * The contract suite (`./contract.ts`) runs first, over the adapter made
- * with a recording `gh` on the fixture's repository. Its read cases are
- * registered as they stand. Its write cases are registered as `it.todo`,
- * named, never dropped: the native writes are the plan's next task, and
- * until they land every write member rejects (held below). The task that
- * builds them registers the whole suite through `runRelationsContract`.
+ * The contract suite (`./contract.ts`) runs first, whole, over the
+ * adapter made with a recording `gh` on the fixture's repository. The
+ * writes' exact argv is held in `./native-writes.test.ts`.
  *
  * The cases after it hold what the contract's one board leaves open: a
  * listing read without the native fields, a parent that names no epic,
@@ -24,36 +21,14 @@ import {
   nativeRelationsFixture,
   recordingGhFixture,
   RELATIONS_FIXTURE_REPOSITORY,
-  relationsContractCases,
+  runRelationsContract,
 } from './contract.js';
 import { createNativeRelations } from './native.js';
 import { isWaiting } from './port.js';
 
-/** The adapter members whose contract cases wait for the native writes. */
-const WRITE_MEMBERS = ['setParent', 'removeParent', 'addBlocker', 'removeBlocker', 'afterMerge'] as const;
-
-/** True when the contract case named `name` exercises a write member. */
-function isWriteCase(name: string): boolean {
-  return WRITE_MEMBERS.some((member) => name.startsWith(`${member} `));
-}
-
-const contractCases = relationsContractCases({
+runRelationsContract({
   name: 'native',
   create: (gh) => createNativeRelations({ gh, repository: RELATIONS_FIXTURE_REPOSITORY }),
-});
-
-describe('native: BoardRelations contract', () => {
-  for (const contractCase of contractCases) {
-    if (isWriteCase(contractCase.name)) it.todo(contractCase.name);
-    else it(contractCase.name, contractCase.run);
-  }
-
-  it('leaves only the write members\' cases for the next task', () => {
-    const todo = contractCases.filter((contractCase) => isWriteCase(contractCase.name));
-
-    expect(todo.length).toBe(10);
-    expect(contractCases.length - todo.length).toBe(15);
-  });
 });
 
 /** The board every case below reads. */
@@ -338,16 +313,21 @@ describe('native freedBy', () => {
   });
 });
 
-describe('native writes before the next task', () => {
-  it('reject naming the member and send nothing', async () => {
+describe('native afterMerge', () => {
+  it('answers no writes and sends nothing, whatever the body closes', async () => {
     const { gh, calls } = recordingGhFixture({ ok: true, stdout: '{}', stderr: '' });
     const relations = createNativeRelations({ gh, repository: BOARD });
+    const said: string[] = [];
 
-    await expect(relations.setParent([], { issue: 10, parent: 1 })).rejects.toThrow('setParent is not built yet');
-    await expect(relations.removeParent([], { issue: 10 })).rejects.toThrow('removeParent is not built yet');
-    await expect(relations.addBlocker([], { issue: 10, blocker: { number: 1, repository: null } })).rejects.toThrow('addBlocker');
-    await expect(relations.removeBlocker([], { issue: 10, blocker: { number: 1, repository: null } })).rejects.toThrow('removeBlocker');
-    await expect(relations.afterMerge({ body: '', ask: null, info: () => {}, warn: () => {} })).rejects.toThrow('afterMerge');
+    const writes = await relations.afterMerge({
+      body: 'Closes #31\nFixes #10',
+      ask: () => Promise.resolve(true),
+      info: (message) => { said.push(message); },
+      warn: (message) => { said.push(message); },
+    });
+
+    expect(writes).toEqual([]);
     expect(calls()).toEqual([]);
+    expect(said).toEqual([]);
   });
 });

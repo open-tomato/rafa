@@ -71,11 +71,14 @@
  *
  * ## Writes
  *
- * The native writes (`gh issue edit --parent`, `--remove-parent`,
- * `--add-blocked-by`, `--remove-blocked-by`) and an `afterMerge` that
- * writes nothing are the plan's next task. Until it lands, every write
- * member rejects naming itself and sends nothing; no command reaches this
- * adapter before `selectBoardRelations` does, which comes after them.
+ * `setParent`, `removeParent`, `addBlocker` and `removeBlocker` are one
+ * `gh issue edit` each (`--parent`, `--remove-parent`, `--add-blocked-by`,
+ * `--remove-blocked-by`), spelled in `./native-writes.ts`: a move into
+ * an epic is one call even for an issue that has one, since `--parent`
+ * replaces the old parent (`context/pull-requests.md`, "Native
+ * relationships"). `afterMerge` answers no writes and sends nothing: a
+ * blocker that closes reads `CLOSED` on its `blockedBy` node, which is
+ * waiting done, and a sub-issue has no checklist line to tick.
  */
 import type {
   Blocker,
@@ -85,7 +88,6 @@ import type {
   MembersReading,
   RelatedIssue,
   RelationsReading,
-  RelationWrite,
 } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks } from '../roadmap-board.js';
@@ -93,6 +95,7 @@ import type { BoardIssue, BoardIssueLink, BoardIssueLinks } from '../roadmap-boa
 import { boardListFields } from '../roadmap-board.js';
 
 import { freedByOver } from './freed.js';
+import { addNativeBlocker, removeNativeBlocker, removeNativeParent, setNativeParent } from './native-writes.js';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board relations native';
@@ -220,9 +223,9 @@ function readNative(listing: readonly BoardIssue[], board: string): RelationsRea
   });
 }
 
-/** A write member not yet built; rejects naming it and sends nothing. See the module note. */
-function pendingWrite(member: string): Promise<readonly RelationWrite[]> {
-  return Promise.reject(new Error(`${PREFIX}: ${member} is not built yet; the native writes land with the plan's next task`));
+/** `afterMerge` in `native` mode: nothing to write, see the module note. */
+function afterNativeMerge(): Promise<readonly never[]> {
+  return Promise.resolve(Object.freeze([]));
 }
 
 /**
@@ -235,15 +238,16 @@ export function createNativeRelations(options: NativeRelationsOptions): BoardRel
   if (!REPOSITORY.test(repository)) {
     throw new TypeError(`${PREFIX}: the board's repository "${repository}" is not owner/name`);
   }
+  const seams = { gh: options.gh, repository };
   const relations: BoardRelations = {
     mode: 'native',
     listFields: boardListFields('native'),
     read: (listing) => readNative(listing, repository),
-    setParent: () => pendingWrite('setParent'),
-    removeParent: () => pendingWrite('removeParent'),
-    addBlocker: () => pendingWrite('addBlocker'),
-    removeBlocker: () => pendingWrite('removeBlocker'),
-    afterMerge: () => pendingWrite('afterMerge'),
+    setParent: (listing, change) => setNativeParent(seams, listing, change),
+    removeParent: (listing, change) => removeNativeParent(seams, listing, change),
+    addBlocker: (listing, change) => addNativeBlocker(seams, listing, change),
+    removeBlocker: (listing, change) => removeNativeBlocker(seams, listing, change),
+    afterMerge: afterNativeMerge,
   };
   return Object.freeze(relations);
 }
