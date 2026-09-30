@@ -61,6 +61,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prResolveBudget', 'pr.resolveBudget'],
   ['prVersionCollision', 'pr.versionCollision'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
+  ['boardRelationships', 'board.relationships'],
   ['roadmapIssue', 'roadmap.issue'],
   ['claimsStaleAfter', 'claims.staleAfter'],
   ['claimsAhead', 'claims.ahead'],

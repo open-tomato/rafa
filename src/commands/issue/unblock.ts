@@ -114,6 +114,14 @@
  * UnblockOptions.issues} does for a line that names numbers and nobody
  * has read a body for yet.
  *
+ * ## Native mode
+ *
+ * Under `board.relationships: native` a blocker is GitHub's blocked-by
+ * link, which the tracker clears when the blocking issue closes. The
+ * command reads the line, so a refused line is refused in both modes,
+ * then prints `./unblock-native.ts`'s one line, sends no `gh` call and
+ * exits 0. Everything above is the labels mode, the default.
+ *
  * ## Nothing here spawns
  *
  * GitHub arrives through the {@link GhRunner} seam, the terminal and
@@ -138,7 +146,8 @@ import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 import { plural } from '../plan/plan-files.js';
 
-import { lineRefusal } from './issue-tracker.js';
+import { issueProject, lineRefusal } from './issue-tracker.js';
+import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, unblockRelationshipsMode } from './unblock-native.js';
 
 /** The usage line a refusal names. */
 export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all]';
@@ -682,7 +691,8 @@ export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_
       + ` changes nothing. An issue labelled ${SPEC_BLOCKED_LABEL} whose "Blocked by:" line is missing, names`
       + ' itself or names an id the board has no issue for is reported and never guessed at. Without a'
       + ' terminal it asks nothing and writes nothing. With `--output=json` the outcome of each issue is the'
-      + ' data of the terminal result event.',
+      + ' data of the terminal result event. With board.relationships set to native it reads nothing and'
+      + ' writes nothing: GitHub clears a blocker by itself when the blocking issue closes.',
     args: [
       {
         name: 'n',
@@ -710,6 +720,12 @@ export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
+      readUnblockLine(context);
+      if (unblockRelationshipsMode(issueProject(context)) === 'native') {
+        if (context.outputMode === 'json') context.output.result(nativeUnblockReport());
+        else context.output.info(NATIVE_UNBLOCK_LINE);
+        return;
+      }
       const report = await unblockIssues(context, seams);
       if (report.problem !== null) throw new CommandExit(1, `❌ ${report.problem}`);
       if (context.outputMode === 'json') {

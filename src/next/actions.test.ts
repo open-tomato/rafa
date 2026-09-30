@@ -54,6 +54,12 @@
  *    pass and 7 fail, every case that runs a command at all. The
  *    refusal case passes, because a lookup that finds nothing is what
  *    it plants.
+ *
+ * One more was driven on 2026-09-30, over this file and
+ * `./ceiling.test.ts`, against 52 pass and 0 fail: the `native` guard
+ * dropped from `actionInvocation`, so an `unblock` state runs `issue
+ * unblock` in `native` mode: 50 pass and 2 fail, the throw case and
+ * the case that reads no command ran.
  */
 import type { NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -81,6 +87,7 @@ import {
   CLAIM_AHEAD_WORD,
   NEXT_COMMAND_ACTIONS,
   NEXT_IN_PROCESS_ACTIONS,
+  offeredCommandActions,
   ROADMAP_PASSED_ACTIONS,
   ROADMAP_WORD,
   runAction,
@@ -314,6 +321,43 @@ describe('the command each action runs', () => {
     expect(() => actionInvocation(noPull)).toThrow(/state "pr-pending" proposes "wait" and names no pull request/);
     expect(() => actionInvocation(noIssue)).toThrow(/names no issue/);
     expect(() => actionInvocation(noPlan)).toThrow(/names no plan file/);
+  });
+});
+
+describe('the actions each mode offers', () => {
+  it('offers all ten in labels mode, handed or left out, and nine in native mode, the ten without unblock', () => {
+    expect(offeredCommandActions('labels')).toEqual(NEXT_COMMAND_ACTIONS);
+    expect(offeredCommandActions('native'))
+      .toEqual(['resume', 'wait', 'triage', 'merge', 'merge-unchecked', 'settle', 'start', 'plan', 'ready']);
+  });
+
+  it('answers the unblock invocation in labels mode, whether the mode is handed or left out', () => {
+    expect(actionInvocation(STATES.unblock, { mode: 'labels' })).toEqual(actionInvocation(STATES.unblock));
+    expect(actionInvocation(STATES.unblock)?.argv).toEqual([String(ISSUE)]);
+  });
+
+  it('throws over an unblock state in native mode, naming the state and the mode', () => {
+    expect(() => actionInvocation(STATES.unblock, { mode: 'native' }))
+      .toThrow(`rafa next: state "${STATES.unblock.id}" proposes "unblock", which is offered in labels mode only`
+        + ' and board.relationships is native: the tracker clears a blocker when it closes');
+  });
+
+  it('answers every other action in native mode as it answers it in labels mode', () => {
+    const others = offeredCommandActions('native');
+
+    expect(others.map((action) => actionInvocation(STATES[action], { mode: 'native' })))
+      .toEqual(others.map((action) => actionInvocation(STATES[action])));
+  });
+
+  it('runs no command for an unblock state in native mode, and runs issue unblock in labels mode', async () => {
+    const { caller, seen } = harnessFor();
+
+    const thrown = await runAction(caller, STATES.unblock, { mode: 'native' }).catch((error: unknown) => error);
+    expect(thrown).toBeInstanceOf(Error);
+    expect(seen).toEqual([]);
+
+    await runAction(caller, STATES.unblock, { mode: 'labels' });
+    expect(seen.map((call) => call.spelling)).toEqual(['issue unblock']);
   });
 });
 

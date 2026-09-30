@@ -586,6 +586,7 @@ describe('the epic guard step', () => {
     const result = await runEpicGuardStep({
       wanted: true,
       board,
+      relationships: 'labels',
       root,
       isTerminal: () => true,
       openPrompter: noPrompter,
@@ -604,6 +605,7 @@ describe('the epic guard step', () => {
     const result = await runEpicGuardStep({
       wanted: null,
       board,
+      relationships: 'labels',
       root,
       isTerminal: () => true,
       openPrompter: prompter.open,
@@ -623,6 +625,7 @@ describe('the epic guard step', () => {
     const no = await runEpicGuardStep({
       wanted: null,
       board: answered.board,
+      relationships: 'labels',
       root: answered.root,
       isTerminal: () => true,
       openPrompter: prompter.open,
@@ -630,6 +633,7 @@ describe('the epic guard step', () => {
     const noFlag = await runEpicGuardStep({
       wanted: false,
       board: flagged.board,
+      relationships: 'labels',
       root: flagged.root,
       isTerminal: () => true,
       openPrompter: noPrompter,
@@ -648,6 +652,7 @@ describe('the epic guard step', () => {
     const result = await runEpicGuardStep({
       wanted: null,
       board,
+      relationships: 'labels',
       root,
       isTerminal: () => false,
       openPrompter: noPrompter,
@@ -669,8 +674,22 @@ describe('the epic guard step', () => {
       openPrompter: noPrompter,
     });
 
-    const flagged = await runEpicGuardStep({ wanted: true, board, root, isTerminal: () => true, openPrompter: noPrompter });
-    const silent = await runEpicGuardStep({ wanted: null, board, root, isTerminal: () => true, openPrompter: noPrompter });
+    const flagged = await runEpicGuardStep({
+      wanted: true,
+      board,
+      relationships: 'labels',
+      root,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
+    const silent = await runEpicGuardStep({
+      wanted: null,
+      board,
+      relationships: 'labels',
+      root,
+      isTerminal: () => true,
+      openPrompter: noPrompter,
+    });
 
     expect([flagged.status, flagged.warnings]).toEqual(['not-run', [EPIC_GUARD_NO_BOARD_WARNING]]);
     expect([silent.status, silent.warnings]).toEqual(['not-run', []]);
@@ -686,6 +705,7 @@ describe('the epic guard step', () => {
     const result = await runEpicGuardStep({
       wanted: null,
       board,
+      relationships: 'labels',
       root,
       isTerminal: () => true,
       openPrompter: noPrompter,

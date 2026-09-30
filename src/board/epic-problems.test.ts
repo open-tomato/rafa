@@ -23,7 +23,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
 
-import { EPIC_PROBLEM_KINDS, epicProblemMessage, readEpicProblems } from './epic-problems.js';
+import { EPIC_PROBLEM_KINDS, epicProblemMessage, readEpicProblems, readHorizonProblems } from './epic-problems.js';
 
 /** The fields a case may set on an issue. */
 interface IssueFields {
@@ -256,4 +256,33 @@ describe('epicProblemMessage', () => {
       expect(epicProblemMessage(problem)).toBe(sentence);
     });
   }
+});
+
+describe('readHorizonProblems, the native mode\'s reading', () => {
+  /** Every label fault at once: two epic labels, an orphan, an unlabelled checklist line, and two horizon faults. */
+  const FAULTY: readonly BoardIssue[] = [
+    epic(20, 'views', [21], []),
+    member(21, 'views', ['epic:board']),
+    epic(10, 'board', [30], ['horizon:now', 'horizon:later']),
+    member(14, 'orphan'),
+    issue(30),
+  ];
+
+  it('answers the horizon problems alone, in ascending epic number, each with a null slug', () => {
+    expect(readHorizonProblems(FAULTY)).toEqual([
+      { kind: 'horizon', issue: 10, slug: null, horizons: ['horizon:now', 'horizon:later'] },
+      { kind: 'horizon', issue: 20, slug: null, horizons: [] },
+    ]);
+  });
+
+  it('is the labels reading\'s horizon kind with the slug dropped, which also reads the rest (control)', () => {
+    const labels = readEpicProblems(FAULTY);
+    expect(new Set(labels.map((found) => found.kind)).size).toBeGreaterThan(1);
+    expect(labels.filter((found) => found.kind === 'horizon').map((found) => ({ ...found, slug: null })))
+      .toEqual([...readHorizonProblems(FAULTY)]);
+  });
+
+  it('answers no problem on the clean board', () => {
+    expect(readHorizonProblems(CLEAN)).toEqual([]);
+  });
 });

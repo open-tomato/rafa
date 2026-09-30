@@ -65,6 +65,7 @@ import type { NextNowEpic } from '../board/epic-walk.js';
 import type { RoadmapLine } from '../board/roadmap.js';
 import type { PlanListing } from '../commands/plan/list.js';
 import type { PlansDir } from '../commands/plan/plan-files.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
@@ -180,6 +181,13 @@ export interface NextBoard {
   readonly blocking: (issue: number) => Promise<BlockedLine | null>;
   /** Whether the issue carries `spec:ready`. */
   readonly isReady: (issue: number) => Promise<boolean>;
+  /**
+   * `native` when the board reads its relationships natively, where the
+   * tracker clears a blocker when it closes and `./state.ts` proposes no
+   * `unblock`. The key is LEFT OUT, not set to undefined, in `labels`
+   * mode, the default.
+   */
+  readonly mode?: Extract<BoardRelationshipMode, 'native'>;
 }
 
 /** What the readings are taken over; see the module note. */

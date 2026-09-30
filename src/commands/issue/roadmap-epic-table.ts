@@ -93,23 +93,29 @@
  *    cell counts on neither side) padded to the epic's widest, and its
  *    title.
  *  - A second row, under the member's state and led by `└→`, carries its
- *    blockers while it is open — the issues its `Blocked by:` line names,
- *    read with `readBlockedBy` (`src/board/blocked.ts`), grouped by their
- *    state on the listing as the issue table groups them — and, under
- *    `--labels`, its labels after them. A closed member's blockers are
- *    history and are not printed, so a closed member with no label to
- *    print, like an open one with no blocker, has no second row.
+ *    blockers while it is open — grouped by their state as the issue
+ *    table groups them — and, under `--labels`, its labels after them. In
+ *    `labels` mode the blockers are the issues its `Blocked by:` line
+ *    names, read with `readBlockedBy` (`src/board/blocked.ts`), each
+ *    state off the listing; in `native` mode they are what the rows'
+ *    `memberBlockers` answers, the port's reading of its `blockedBy`
+ *    nodes, each with the state GitHub holds for it, a foreign one named
+ *    `owner/name#<n>`. A closed member's blockers are history and are not
+ *    printed, so a closed member with no label to print, like an open one
+ *    with no blocker, has no second row.
  *
  * Members come in the epic's checklist order, then the rest by number
  * ({@link orderedMembers}): the label says which epic, the checklist in
- * what order. An epic with no members adds no line; its row already
+ * what order. A `native` epic ({@link Epic.order} `sub-issues`) keeps its
+ * members in the sub-issue order they were read in, whatever its body
+ * lists. An epic with no members adds no line; its row already
  * reads `empty`. With a terminal width, a member's title is cut to fit,
  * and then its second row, each down to its floor.
  */
 import type { TableStyle } from './roadmap-table.js';
 import type { Epic } from '../../board/epics.js';
 import type { BoardIssue, BoardIssueState } from '../../board/roadmap-board.js';
-import type { RoadmapEpicRows, EpicHorizonGroup, EpicRow } from '../../board/roadmap-epic-rows.js';
+import type { RoadmapEpicRows, EpicHorizonGroup, EpicRow, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { BlockerCell, RoadmapRow } from '../../board/roadmap-rows.js';
 
 import { readBlockedBy } from '../../board/blocked.js';
@@ -135,7 +141,7 @@ export const EPIC_COLUMNS = Object.freeze(['#', 'state', 'done/total', 'blocked'
 
 /** What the table is printed from: the reading's shown parts, `specs` as the caller narrowed them. */
 export type EpicTableRows = Pick<RoadmapEpicRows, 'roadmap' | 'groups' | 'hidden' | 'unknown' | 'specs'>
-  & Partial<Pick<RoadmapEpicRows, 'states'>>;
+  & Partial<Pick<RoadmapEpicRows, 'states' | 'memberBlockers'>>;
 
 /** The heading over every line when the listing failed, so no line could be told an epic. */
 export const SPECS_HEADING = 'Specs';
@@ -245,8 +251,9 @@ export function memberState(member: BoardIssue): string {
   return member.state.toLowerCase();
 }
 
-/** `epic`'s members in its checklist's order, then the rest by number. */
+/** `epic`'s members in its checklist's order, then the rest by number; a `native` epic's in sub-issue order. */
 export function orderedMembers(epic: Epic): readonly BoardIssue[] {
+  if (epic.order === 'sub-issues') return epic.members;
   const listed = (epic.body?.lines ?? []).map((line) => line.issue);
   const rank = (member: BoardIssue): number => {
     const at = listed.indexOf(member.number);
@@ -289,7 +296,8 @@ function fitCell(text: string, floor: number, rest: number, width: number | unde
  * The rows each of `epic`'s members prints under its epic row, starting
  * `indent` columns in, in {@link orderedMembers} order; the module note
  * holds what each row says. `width` is the terminal's, or undefined for
- * none.
+ * none. `blockersOf` reads an open member's blockers in `native` mode;
+ * left out, they are its `Blocked by:` line's, each state off `states`.
  */
 export function memberLines(
   epic: Epic,
@@ -297,6 +305,7 @@ export function memberLines(
   width?: number,
   style: TableStyle = DEFAULT_STYLE,
   states: ReadonlyMap<number, BoardIssueState> = new Map(),
+  blockersOf: MemberBlockers = (member) => memberBlockers(member, states),
 ): string[] {
   const members = orderedMembers(epic);
   if (members.length === 0) return [];
@@ -310,7 +319,7 @@ export function memberLines(
     const first = `${head}${fitCell(cell(member.title), TITLE_FLOOR, widthOf(head), width)}`;
     const second = [
       member.state === 'OPEN'
-        ? blockersCell(memberBlockers(member, states), style)
+        ? blockersCell(blockersOf(member), style)
         : '',
       style.labels
         ? cell(member.labels.join(', '))
@@ -342,7 +351,7 @@ function groupLines(
       ? []
       : [`${indent}${row.epic.disagreement}`];
     const members = full
-      ? memberLines(row.epic, indentWidth, width, style, rows.states)
+      ? memberLines(row.epic, indentWidth, width, style, rows.states, rows.memberBlockers)
       : [];
     return [line, ...disagreement, ...members];
   });

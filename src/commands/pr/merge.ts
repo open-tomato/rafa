@@ -138,6 +138,22 @@
  * the reading asks nothing and writes nothing, as it does under `rafa
  * issue unblock`.
  *
+ * ## Native mode
+ *
+ * Under `board.relationships: native` an epic is a sub-issue parent and a
+ * blocker a blocked-by link, which GitHub clears by itself when the
+ * blocking issue closes. So the epic checklist tick is left out
+ * (`./merge-tick.ts`'s `epics`), the roadmap boards are ticked as above,
+ * and in the unblock reading's place, after the clean-up, the command
+ * prints the issues the merge freed, read from one board listing through
+ * the relationships port's `freedBy`, asking nothing and writing nothing
+ * (`./merge-freed.ts`). What that reading came to is the result's
+ * `freed`, a key the `labels` mode leaves out; `unblocked` is null there.
+ * The `labels` mode, the default, runs `./merge-tick.ts` and
+ * `./merge-unblock.ts` exactly as above: they are what that mode's
+ * `afterMerge` is (`src/board/relations/labels.ts`), called here at the
+ * two points their own notes name.
+ *
  * ## The ending, on a merge that went through
  *
  * Last of all, after the follow-ups, the command names the one
@@ -164,6 +180,7 @@
  */
 import type { MergeStepReport } from './merge-cleanup.js';
 import type { FollowUp } from './merge-followups.js';
+import type { FreedReport } from './merge-freed.js';
 import type { MergeGuardReport } from './merge-guard.js';
 import type { UncheckedMerge } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
@@ -195,6 +212,7 @@ import {
 } from '../../pr/index.js';
 
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
+import { freedAfterMerge } from './merge-freed.js';
 import { guardBeforeMerge } from './merge-guard.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
@@ -275,8 +293,10 @@ export interface PrMergeResult {
   readonly roadmapTick: RoadmapTickResult | null;
   /** What the tick of every board listing a closed issue came to, or null when the pull request closes no issue. */
   readonly roadmapTicks: readonly RoadmapTickResult[] | null;
-  /** What the unblock reading came to, or null when the pull request closes no issue. */
+  /** What the unblock reading came to, or null when the pull request closes no issue or the mode is `native`. */
   readonly unblocked: UnblockReport | null;
+  /** What the freed-issue reading came to under `native`, null when it closes no issue; left out in `labels`. */
+  readonly freed?: FreedReport | null;
   /** What `--skip-checks` read and posted, or null when the flag was not given. */
   readonly unchecked: UncheckedMergeReport | null;
   /** What the release guard answered and how the merge met it, or null where the release does not run. */
@@ -446,6 +466,7 @@ async function reportTick(
     configured: pr.roadmapIssue,
     gh: openGh(pr, seams),
     warn,
+    epics: pr.relationships !== 'native',
     epicTicked: (epic) => {
       if (epic.status === 'failed') warn(epicTickSentence(epic));
       else context.output.info(epicTickSentence(epic));
@@ -459,6 +480,31 @@ async function reportTick(
     else context.output.info(tickSentence(board));
   }
   return tick;
+}
+
+/**
+ * The board reading after the clean-up: the unblock reading in `labels`,
+ * the freed issues in `native`, the result's key for which it adds; see
+ * the module note. Every failure is a warning and nothing else.
+ */
+async function reportAfterCleanUp(
+  context: RafaContext,
+  pr: PrContext,
+  seams: MergeSeams,
+  detail: PullRequestDetail,
+): Promise<Pick<PrMergeResult, 'unblocked' | 'freed'>> {
+  if (pr.relationships !== 'native') return { unblocked: await reportUnblock(context, pr, seams, detail) };
+  const freed = await freedAfterMerge({
+    body: detail.body,
+    gh: openGh(pr, seams),
+    info: (message: string): void => {
+      context.output.info(message);
+    },
+    warn: (message: string): void => {
+      context.output.warn(message);
+    },
+  });
+  return { unblocked: null, freed };
 }
 
 /** What {@link askToMerge} decided: whether to merge, and what `--skip-checks` read when it was given. */
@@ -601,7 +647,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     context.output.info(message);
   };
   const steps = cleanUpAfterMerge(git, detail, { info, warn });
-  const unblocked = await reportUnblock(context, pr, seams, detail);
+  const board = await reportAfterCleanUp(context, pr, seams, detail);
   const followUps = reportFollowUps(
     {
       root: pr.project.root,
@@ -623,7 +669,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     followUps,
     roadmapTick: roadmapTicks?.[0] ?? null,
     roadmapTicks,
-    unblocked,
+    ...board,
     unchecked: uncheckedReport(answer.unchecked, commentUrl),
   };
 }
@@ -654,8 +700,10 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
       + ' request closes, asking whether to remove `spec:blocked` from each one whose blockers have all closed;'
       + ' `--yes` does not answer that question, and every failure of that reading is a warning. With'
+      + ' board.relationships set to native it ticks no epic checklist and, in place of that reading, prints the'
+      + ' open issues the merge freed, whose blockers GitHub clears by itself, asking nothing and writing nothing. With'
       + ' `--output=json` the pull request, the method, the steps that ran, the follow-ups, the roadmap tick and'
-      + ' the unblock reading are the data of the terminal result event. Refuses with exit code 2 where'
+      + ' the unblock reading, or the freed issues in native mode, are the data of the terminal result event. Refuses with exit code 2 where'
       + ' `pr.provider` is not `gh`.',
     args: [
       {

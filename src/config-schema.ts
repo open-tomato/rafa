@@ -102,6 +102,7 @@ import type {
   ReleaseSettings,
 } from './config-schema-release.js';
 import type {
+  BoardRelationshipMode,
   ClaimsAhead,
   ClaimsStaleAfter,
   ClaudeSettingSource,
@@ -143,6 +144,7 @@ import {
   RELEASE_SETTINGS,
 } from './config-schema-release.js';
 import {
+  BOARD_RELATIONSHIP_MODES,
   busyTimeoutMs,
   claimsAhead,
   claimsStaleAfter,
@@ -242,6 +244,13 @@ export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleas
    * write-holders. `board.trustedAuthors`.
    */
   boardTrustedAuthors: readonly string[];
+  /**
+   * Where the board's epics and blockers are read and written: `labels`
+   * (`epic:` labels, `spec:blocked` and `Blocked by:` lines) or `native`
+   * (GitHub's sub-issue parent and blocked-by links).
+   * `board.relationships`.
+   */
+  boardRelationships: BoardRelationshipMode;
   /**
    * The issue whose task list `plan create --next` reads its order off,
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
@@ -346,6 +355,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   loopWorktreeDir: join('.rafa', 'worktrees'),
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
+  boardRelationships: 'labels',
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -444,6 +454,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
     read: listOf(githubLogin, 'GitHub logins'),
+    cli: false,
+  },
+  boardRelationships: {
+    key: 'board.relationships',
+    read: oneOf(BOARD_RELATIONSHIP_MODES),
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },

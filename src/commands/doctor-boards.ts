@@ -55,8 +55,9 @@
  *
  * A listing that failed is {@link DoctorBoardsReport.listing} and prints
  * NOTHING here: the epic labels row reads the same answer and always
- * prints that failure under `Epic labels:`, so a line here would name
- * one failed command twice in one report. Json mode still carries it.
+ * prints that failure under `Epic labels:` (the relationships row under
+ * `Relationships:`, in `native` mode), so a line here would name one
+ * failed command twice in one report. Json mode still carries it.
  *
  * ## Nothing here writes
  *

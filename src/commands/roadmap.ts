@@ -13,7 +13,10 @@
  * `runIssueList` (`./issue/list.ts`) handed the line with `roadmap` set,
  * so every reading, narrowing, refusal, warning and exit code is that
  * command's own, and both spellings print the same bytes for the same
- * line. The flags are `ISSUE_LIST_FLAGS`, the same objects, less the two
+ * line. That includes the relationships mode: the board is read in the
+ * one `board.relationships` names, `labels` sending what it always sent
+ * and `native` one `gh repo view` more (`./issue/list.ts`, "The
+ * relationships mode"). The flags are `ISSUE_LIST_FLAGS`, the same objects, less the two
  * this command has no use for: `--roadmap`, which it always sets, and
  * `--state`, which `issue list` refuses beside `--roadmap` whatever its
  * value. Typed anyway, `--state` is refused here with that same message,

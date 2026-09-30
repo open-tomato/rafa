@@ -59,8 +59,42 @@
  * the same reading `issue list --type=bug` does: the first `type:`
  * label when it names a port type, else `code`; the first `module:`
  * label, else `unassigned`.
+ *
+ * ## Native relationships
+ *
+ * `board.relationships: native` (`.rafa/specs/rafa-340-relationships-
+ * epics-blockers-github.md`) reads epics and blockers from GitHub's own
+ * links. The listing asks `gh` for them only in that mode: its `--json`
+ * list is {@link boardListFields} of the mode, {@link BOARD_LIST_FIELDS}
+ * in `labels` and {@link nativeBoardListFields} in `native`, so a
+ * labels-mode listing sends the command above unchanged.
+ * {@link parseBoardListing} reads them only when handed that mode:
+ * `parent`, `blockedBy`, `blocking`, `subIssuesSummary` and `subIssues`.
+ * `subIssues` is read because `context/pull-requests.md` ("Native
+ * relationships") records that it answers the order GitHub holds. In the
+ * `labels` mode, the default, none of the five is read and none is a key
+ * on the issue: a labels-mode issue has exactly the keys it had before
+ * the mode existed.
+ *
+ * In the `native` mode every row must carry all five, checked like the
+ * other fields, so a listing that lost one is refused rather than read
+ * as an issue with no links. `parent` is null or one linked issue; the
+ * other three lists are `{nodes, totalCount}`. A linked issue is read as
+ * its number, title, state and repository. Measured 2026-09-30 with `gh`
+ * 2.100.0: `gh issue list --json` answers each linked issue as `id`,
+ * `number`, `state`, `title` and `url`, with no `repository` key, so the
+ * repository (`owner/name`) is read off the `url`, whose issue number
+ * must be the node's own. A blocker's number alone is ambiguous across
+ * repositories; the pair is not.
+ *
+ * `gh` answers the first 50 `blockedBy` and `blocking` nodes and the
+ * first 100 `subIssues`. When `totalCount` is above the nodes answered,
+ * the list keeps `truncated` with that total, so a reader reports a
+ * short list rather than reading it as the whole; otherwise `truncated`
+ * is left out. A `totalCount` below the nodes answered is refused.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 import type { IssueType } from '../ports/index.js';
 
 import { moduleOfLabels, typeOfLabels } from '../adapters/tracker/github.js';
@@ -69,8 +103,23 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 /** What every refusal this module raises opens with. */
 const PREFIX = 'board listing';
 
-/** The fields the listing asks `gh issue list` for. */
+/** The fields the listing asks `gh issue list` for in the `labels` mode, the default. */
 export const BOARD_LIST_FIELDS = 'number,title,body,state,stateReason,labels';
+
+/**
+ * The fields the listing asks `gh issue list` for in the `native` mode:
+ * {@link BOARD_LIST_FIELDS} and then the five relationship fields
+ * {@link parseBoardListing} reads in that mode, in the order the module
+ * note lists them.
+ */
+export const nativeBoardListFields = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
+
+/** The `--json` fields a listing read in `mode` asks for. */
+export function boardListFields(mode: BoardRelationshipMode): string {
+  return mode === 'native'
+    ? nativeBoardListFields
+    : BOARD_LIST_FIELDS;
+}
 
 /** How many issues one listing reads when the caller names no limit; see the module note. */
 export const BOARD_LISTING_LIMIT = 1000;
@@ -92,6 +141,40 @@ export interface BoardIssue {
   readonly type: IssueType;
   /** The module the labels carry, read as the github tracker reads it. */
   readonly module: string;
+  /** The sub-issue parent, or null for none. Native mode only; left out otherwise. */
+  readonly parent?: BoardIssueLink | null;
+  /** The issues this one is blocked by. Native mode only; left out otherwise. */
+  readonly blockedBy?: BoardIssueLinks;
+  /** The issues this one blocks. Native mode only; left out otherwise. */
+  readonly blocking?: BoardIssueLinks;
+  /** GitHub's count of this issue's sub-issues. Native mode only; left out otherwise. */
+  readonly subIssuesSummary?: BoardSubIssuesSummary;
+  /** This issue's sub-issues, in the order GitHub holds. Native mode only; left out otherwise. */
+  readonly subIssues?: BoardIssueLinks;
+}
+
+/** The issue at the other end of a native relationship, as the listing answered it. */
+export interface BoardIssueLink {
+  readonly number: number;
+  readonly title: string;
+  readonly state: BoardIssueState;
+  /** `owner/name`, read off the node's `url`; see the module note. */
+  readonly repository: string;
+}
+
+/** One native relationship list: the nodes `gh` answered, and whether they are all of it. */
+export interface BoardIssueLinks {
+  /** The linked issues, in the order `gh` answered them. */
+  readonly nodes: readonly BoardIssueLink[];
+  /** GitHub's `totalCount`, kept only when it is above the nodes answered; left out otherwise. */
+  readonly truncated?: { readonly total: number };
+}
+
+/** `subIssuesSummary` as `gh` answers it. */
+export interface BoardSubIssuesSummary {
+  readonly total: number;
+  readonly completed: number;
+  readonly percentCompleted: number;
 }
 
 /** Every issue on the board; the seam the roadmap rows read through. */
@@ -103,16 +186,18 @@ export interface GhBoardListingOptions {
   readonly gh: GhRunner;
   /** How many issues to list: a positive whole number. {@link BOARD_LISTING_LIMIT} when left out. */
   readonly limit?: number;
+  /** `board.relationships`: which fields are asked for and read. `labels` when left out. */
+  readonly mode?: BoardRelationshipMode;
 }
 
-/** The arguments the listing hands `gh` for `limit`. */
-function listingArgs(limit: number): readonly string[] {
-  return ['issue', 'list', '--state', 'all', '--limit', String(limit), '--json', BOARD_LIST_FIELDS];
+/** The arguments the listing hands `gh` for `limit` in `mode`. */
+function listingArgs(limit: number, mode: BoardRelationshipMode): readonly string[] {
+  return ['issue', 'list', '--state', 'all', '--limit', String(limit), '--json', boardListFields(mode)];
 }
 
-/** The command a refusal names for `limit`. */
-export function boardListingCommand(limit: number): string {
-  return `gh ${listingArgs(limit).join(' ')}`;
+/** The command a refusal names for `limit` in `mode`, `labels` when left out. */
+export function boardListingCommand(limit: number, mode: BoardRelationshipMode = 'labels'): string {
+  return `gh ${listingArgs(limit, mode).join(' ')}`;
 }
 
 /** What a failed command wrote, for a message. Never empty. */
@@ -171,11 +256,110 @@ function issueOf(row: Readonly<Record<string, unknown>>): BoardIssue {
   });
 }
 
+/** A native field refused: {@link nativeIssueOf} names the command and the row around it. */
+class NativeFieldProblem extends Error {}
+
+/** Refuses the row being read with `problem`. */
+function refuse(problem: string): never {
+  throw new NativeFieldProblem(problem);
+}
+
+/** An issue's URL on any host: owner, name and number. */
+const ISSUE_URL = /^https?:\/\/[^/]+\/([^/]+)\/([^/]+)\/issues\/(\d+)$/;
+
+/** Whether `value` is a whole number no less than `least`. */
+function isWholeNumber(value: unknown, least: number): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= least;
+}
+
+/** `owner/name` of the issue `url` points at, refusing a URL that is not issue `number`'s. */
+function repositoryOf(url: unknown, number: number, at: string): string {
+  const match = typeof url === 'string'
+    ? ISSUE_URL.exec(url)
+    : null;
+  const [, owner, name, issue] = match ?? [];
+  if (owner === undefined || name === undefined || Number(issue) !== number) {
+    refuse(`${at}.url ${describeValue(url)}, expected the URL of issue ${number}`);
+  }
+  return `${owner}/${name}`;
+}
+
+/** The linked issue node `value` holds; `at` names it in a refusal. */
+function linkOf(value: unknown, at: string): BoardIssueLink {
+  if (!isMapping(value)) refuse(`${at} ${describeValue(value)}, expected a mapping`);
+  const { number, title, state, url } = value;
+  if (!isWholeNumber(number, 1)) refuse(`${at}.number ${describeValue(number)}, expected a positive whole number`);
+  if (typeof title !== 'string') refuse(`${at}.title ${describeValue(title)}, expected a string`);
+  if (state !== 'OPEN' && state !== 'CLOSED') refuse(`${at}.state ${describeValue(state)}, expected "OPEN" or "CLOSED"`);
+  return Object.freeze({ number, title, state, repository: repositoryOf(url, number, at) });
+}
+
+/** The relationship list `value` holds, with `truncated` kept only when `totalCount` is above its nodes. */
+function linksOf(value: unknown, at: string): BoardIssueLinks {
+  if (!isMapping(value)) refuse(`${at} ${describeValue(value)}, expected a mapping with nodes and totalCount`);
+  const { nodes, totalCount } = value;
+  if (!Array.isArray(nodes)) refuse(`${at}.nodes ${describeValue(nodes)}, expected a list`);
+  const links = Object.freeze(nodes.map((node: unknown, index) => linkOf(node, `${at}.nodes[${index}]`)));
+  if (!isWholeNumber(totalCount, links.length)) {
+    refuse(`${at}.totalCount ${describeValue(totalCount)}, expected a whole number no less than the ${links.length} nodes answered`);
+  }
+  return totalCount > links.length
+    ? Object.freeze({ nodes: links, truncated: Object.freeze({ total: totalCount }) })
+    : Object.freeze({ nodes: links });
+}
+
+/** The `subIssuesSummary` `value` holds. */
+function summaryOf(value: unknown): BoardSubIssuesSummary {
+  if (!isMapping(value)) refuse(`subIssuesSummary ${describeValue(value)}, expected a mapping`);
+  const { total, completed, percentCompleted } = value;
+  if (!isWholeNumber(total, 0)) refuse(`subIssuesSummary.total ${describeValue(total)}, expected a whole number`);
+  if (!isWholeNumber(completed, 0) || completed > total) {
+    refuse(`subIssuesSummary.completed ${describeValue(completed)}, expected a whole number from 0 to ${total}`);
+  }
+  if (typeof percentCompleted !== 'number' || percentCompleted < 0 || percentCompleted > 100) {
+    refuse(`subIssuesSummary.percentCompleted ${describeValue(percentCompleted)}, expected a number from 0 to 100`);
+  }
+  return Object.freeze({ total, completed, percentCompleted });
+}
+
+/** `issue` with the five native fields `row` carries, in the order the module note lists them. */
+function withNativeFields(issue: BoardIssue, row: Readonly<Record<string, unknown>>): BoardIssue {
+  const { parent, blockedBy, blocking, subIssuesSummary, subIssues } = row;
+  if (parent !== null && !isMapping(parent)) refuse(`parent ${describeValue(parent)}, expected null or a mapping`);
+  return Object.freeze({
+    ...issue,
+    parent: parent === null
+      ? null
+      : linkOf(parent, 'parent'),
+    blockedBy: linksOf(blockedBy, 'blockedBy'),
+    blocking: linksOf(blocking, 'blocking'),
+    subIssuesSummary: summaryOf(subIssuesSummary),
+    subIssues: linksOf(subIssues, 'subIssues'),
+  });
+}
+
+/** {@link withNativeFields}, a refusal opening with `refusal` (the command and the row). */
+function nativeIssueOf(issue: BoardIssue, row: Readonly<Record<string, unknown>>, refusal: string): BoardIssue {
+  try {
+    return withNativeFields(issue, row);
+  } catch (error) {
+    if (error instanceof NativeFieldProblem) throw new Error(`${refusal} with ${error.message}`);
+    throw error;
+  }
+}
+
 /**
  * The issues `command` wrote. Throws, naming the command and the first
- * row refused, when the output is not a list of issues.
+ * row refused, when the output is not a list of issues. In the `native`
+ * `mode` each issue also carries the five relationship fields and a row
+ * lacking one is refused; in `labels`, the default, none is read and
+ * none is a key on the issue (see the module note).
  */
-export function parseBoardListing(stdout: string, command: string): readonly BoardIssue[] {
+export function parseBoardListing(
+  stdout: string,
+  command: string,
+  mode: BoardRelationshipMode = 'labels',
+): readonly BoardIssue[] {
   let payload: unknown;
   try {
     payload = JSON.parse(stdout) as unknown;
@@ -186,9 +370,14 @@ export function parseBoardListing(stdout: string, command: string): readonly Boa
     throw new Error(`${PREFIX}: ${command} answered ${describeValue(payload)}, expected a list`);
   }
   const issues = payload.map((row: unknown, index): BoardIssue => {
+    const refusal = `${PREFIX}: ${command} answered row ${index}`;
     const problem = rowProblem(row);
-    if (problem !== null) throw new Error(`${PREFIX}: ${command} answered row ${index} with ${problem}`);
-    return issueOf(row as Readonly<Record<string, unknown>>);
+    if (problem !== null) throw new Error(`${refusal} with ${problem}`);
+    const checked = row as Readonly<Record<string, unknown>>;
+    const issue = issueOf(checked);
+    return mode === 'native'
+      ? nativeIssueOf(issue, checked, refusal)
+      : issue;
   });
   return Object.freeze(issues);
 }
@@ -210,21 +399,23 @@ export function keepListing(listing: BoardListing): BoardListing {
 /**
  * The listing over `options.gh`: one
  * `gh issue list --state all --limit <n> --json number,title,body,state,stateReason,labels`
- * per call, answered as checked issues. Throws a `TypeError`, sending
+ * per call in the `labels` mode, the default, and the same command over
+ * {@link nativeBoardListFields} in the `native` mode, answered as
+ * issues checked in that mode by {@link parseBoardListing}. Throws a `TypeError`, sending
  * nothing, for a limit that is not a positive whole number; rejects,
  * naming the command, when `gh` failed or answered anything but a list
  * of issues.
  */
 export function createGhBoardListing(options: GhBoardListingOptions): BoardListing {
-  const { gh, limit = BOARD_LISTING_LIMIT } = options;
+  const { gh, limit = BOARD_LISTING_LIMIT, mode = 'labels' } = options;
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new TypeError(`${PREFIX}: limit ${describeValue(limit)}, expected a positive whole number`);
   }
-  const args = listingArgs(limit);
-  const command = boardListingCommand(limit);
+  const args = listingArgs(limit, mode);
+  const command = boardListingCommand(limit, mode);
   return async () => {
     const result = await gh(args);
     if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-    return parseBoardListing(result.stdout, command);
+    return parseBoardListing(result.stdout, command, mode);
   };
 }

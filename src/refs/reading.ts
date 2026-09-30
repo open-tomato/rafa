@@ -22,6 +22,12 @@
  * blocked line, `rafa issue unblock <n>` with the spec's own issue
  * number, in {@link RefRow.unblock}; every other row holds null there.
  *
+ * Which references are blockers, the only ones that can read
+ * `resolved`, is `extractRefs`'s reading: the body's own `Blocked by:`
+ * line when {@link RefsTextOptions.blockers} is left out, the `labels`
+ * mode, and the relationships port's `blockersOf` reading of the spec's
+ * issue when a caller in `native` mode hands one in.
+ *
  * ## Reading stamps what it has not seen
  *
  * {@link readRefsText} reads each live fingerprint against the stamp
@@ -57,6 +63,7 @@
 import type { Ref, RefKind } from './extract.js';
 import type { Fingerprint, LiveReading, RefStamp, RefState } from './stamp.js';
 import type { RefVerifier } from './verify.js';
+import type { BlockersReading } from '../board/relations/port.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -103,6 +110,8 @@ export interface RefsTextOptions {
   readonly issue: number;
   /** Reads each target as it is now. */
   readonly verify: RefVerifier;
+  /** What the spec waits on, as the port read it; left out, its `Blocked by:` line. */
+  readonly blockers?: BlockersReading;
 }
 
 /** What a reading of a copy on disk is handed. */
@@ -113,6 +122,8 @@ export interface RefsCopyOptions {
   readonly issue: number;
   /** Reads each target as it is now. */
   readonly verify: RefVerifier;
+  /** What the spec waits on, as the port read it; left out, its `Blocked by:` line. */
+  readonly blockers?: BlockersReading;
 }
 
 /** The command that takes issue `issue` off its blocked line. */
@@ -128,9 +139,9 @@ function firstStamp(live: LiveReading): Fingerprint | null {
 }
 
 /** Every reference the body names, each with its live reading; sequential, so `gh` is asked one at a time. */
-async function liveReadings(body: string, verify: RefVerifier): Promise<readonly (readonly [Ref, LiveReading])[]> {
+async function liveReadings(body: string, options: RefsTextOptions): Promise<readonly (readonly [Ref, LiveReading])[]> {
   const read: (readonly [Ref, LiveReading])[] = [];
-  for (const ref of extractRefs(body)) read.push([ref, await verify(ref)]);
+  for (const ref of extractRefs(body, options.blockers)) read.push([ref, await options.verify(ref)]);
   return read;
 }
 
@@ -168,7 +179,7 @@ function answer(rows: readonly RefRow[], copy: string, body: string, stamps: rea
 export async function readRefsText(options: RefsTextOptions): Promise<RefsReading> {
   const { stamps, body } = readRefsBlock(options.copy);
   const added: RefStamp[] = [];
-  const rows = (await liveReadings(body, options.verify)).map(([ref, live]) => {
+  const rows = (await liveReadings(body, options)).map(([ref, live]) => {
     const stamp = findStamp(stamps, ref);
     const fresh = stamp === null
       ? firstStamp(live)
@@ -191,7 +202,7 @@ export async function readRefsText(options: RefsTextOptions): Promise<RefsReadin
 export async function restampRefsText(options: RefsTextOptions): Promise<RefsReading> {
   const { stamps: old, body } = readRefsBlock(options.copy);
   const stamps: RefStamp[] = [];
-  const rows = (await liveReadings(body, options.verify)).map(([ref, live]) => {
+  const rows = (await liveReadings(body, options)).map(([ref, live]) => {
     const stamp = live.kind === 'unreadable'
       ? findStamp(old, ref)
       : live;
@@ -204,7 +215,10 @@ export async function restampRefsText(options: RefsTextOptions): Promise<RefsRea
 /** Reads `path`, runs `reading` over it, and writes the copy back when the reading changed it. */
 async function overFile(options: RefsCopyOptions, reading: (text: RefsTextOptions) => Promise<RefsReading>): Promise<RefsReading> {
   const copy = readFileSync(options.path, 'utf8');
-  const read = await reading({ copy, issue: options.issue, verify: options.verify });
+  const { issue, verify, blockers } = options;
+  const read = await reading(blockers === undefined
+    ? { copy, issue, verify }
+    : { copy, issue, verify, blockers });
   if (read.changed) writeFileSync(options.path, read.copy);
   return read;
 }
