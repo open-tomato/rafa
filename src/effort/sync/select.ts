@@ -20,7 +20,13 @@
  * through the registry it is handed, `CORE_ADAPTER_REGISTRY` when none
  * is, and makes the adapter with the repository root and, when the
  * config carries one, its `store` backend, which the `file` strategy
- * (`src/effort/sync/file.ts`) is refused without. A caller
+ * (`src/effort/sync/file.ts`) is refused without. When the config
+ * carries a `hub.url` the adapter is also handed `hub`: the url, the
+ * token's secret name and the timeout in milliseconds, which a
+ * module's `service` strategy reads (`hubContextOf` in
+ * `src/config-schema-hub.ts`). It is handed to whichever kind is
+ * selected, since core's own strategies read nothing they do not use,
+ * and a config naming `service` with no `hub.url` never resolves. A caller
  * that loaded modules hands the registry `loadModules` answers
  * (`src/modules/load.ts`), since only that one holds a module's `sync`
  * adapter.
@@ -54,11 +60,12 @@
  * module can be imported first. `select.test.ts` imports each first in a
  * child `bun` and resolves `sync/local` there.
  */
-import type { AdapterRegistry } from '../../adapters/registry.js';
+import type { AdapterContext, AdapterRegistry } from '../../adapters/registry.js';
 import type { RafaConfig, SyncStrategy } from '../../config.js';
 import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { hubContextOf } from '../../config-schema-hub.js';
 import { describeValue } from '../../config-sections.js';
 import { SYNC_STRATEGIES } from '../../config.js';
 
@@ -134,9 +141,33 @@ function isModuleStrategy(kind: unknown): kind is SyncStrategy {
 }
 
 /**
+ * The settings {@link selectSync} reads: `effortSync`, and each of the
+ * rest when the caller has it.
+ */
+export type SyncSelection = Pick<RafaConfig, 'effortSync'>
+  & Partial<Pick<RafaConfig, 'store' | 'hubUrl' | 'hubTokenSecret' | 'hubTimeout'>>;
+
+/**
+ * The context a `sync` adapter is made with: `repoRoot`, then `store`
+ * and `hub` when the config carries them. See the module note.
+ */
+function contextOf(repoRoot: string, config: SyncSelection): AdapterContext {
+  const hub = hubContextOf(config);
+  return {
+    repoRoot,
+    ...(config.store === undefined
+      ? {}
+      : { store: config.store }),
+    ...(hub === undefined
+      ? {}
+      : { hub }),
+  };
+}
+
+/**
  * Makes the `Sync` that `config.effortSync` names, under `repoRoot`,
  * through the `sync` adapter `registry` holds under that name, handing
- * it `config.store` when that is set.
+ * it `config.store` when that is set and `hub` when `config.hubUrl` is.
  *
  * Pass the `config` field of a resolved config, and the registry
  * `loadModules` answered when modules were loaded. Selecting touches
@@ -147,18 +178,14 @@ function isModuleStrategy(kind: unknown): kind is SyncStrategy {
  */
 export function selectSync(
   repoRoot: string,
-  config: Pick<RafaConfig, 'effortSync'> & Partial<Pick<RafaConfig, 'store'>>,
+  config: SyncSelection,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Sync {
   const kind: unknown = config.effortSync;
   const adapter = typeof kind === 'string'
     ? registry.find('sync', kind)
     : undefined;
-  if (adapter !== undefined) {
-    return adapter.create(config.store === undefined
-      ? { repoRoot }
-      : { repoRoot, store: config.store });
-  }
+  if (adapter !== undefined) return adapter.create(contextOf(repoRoot, config));
 
   const registered = registry.kinds('sync');
   if (isModuleStrategy(kind)) throw new SyncModuleMissing(kind, registered);

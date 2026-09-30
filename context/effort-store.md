@@ -216,7 +216,10 @@ setting (`src/config.ts`), so the user default needs no reader of its
 own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
 when either is read. A deployment of the `service` strategy also names
-`effort.syncUrl` with the hub's address, and a module implementing
+`hub.url` with the hub's address, which the config refuses to resolve
+without, and may name `hub.tokenSecret` and `hub.timeout`
+(`src/config-schema-hub.ts`); `selectSync` hands the three to the
+adapter as `AdapterContext.hub`. A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core registers two adapters in `CORE_ADAPTER_REGISTRY`

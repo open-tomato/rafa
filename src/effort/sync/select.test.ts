@@ -29,7 +29,7 @@
  * them. `select.ts` reading `CORE_ADAPTER_REGISTRY` at its top level
  * failed all five test files under those paths at load, no case passing.
  */
-import type { AnyAdapter } from '../../adapters/registry.js';
+import type { AdapterContext, AnyAdapter } from '../../adapters/registry.js';
 import type { RafaConfig } from '../../config.js';
 import type { Sync } from '../../ports/index.js';
 
@@ -159,6 +159,52 @@ describe('selectSync', () => {
     expect(roots).toEqual([ROOT]);
     // Control: core's registry, which the same config selects through by default, holds no git.
     expect(() => selectSync(ROOT, naming('git'))).toThrow(SyncModuleMissing);
+  });
+
+  describe('the hub it hands on', () => {
+    /** A registry holding a fixture `service`, and the contexts it was made with. */
+    const capturing = (): { registry: ReturnType<typeof createAdapterRegistry>; contexts: AdapterContext[] } => {
+      const contexts: AdapterContext[] = [];
+      const registry = CORE_ADAPTER_REGISTRY.register({
+        ...fixtureAdapter('service'),
+        create: (context) => {
+          contexts.push(context);
+          return FIXTURE_GIT;
+        },
+      });
+      return { registry, contexts };
+    };
+
+    it('makes the adapter with the resolved hub.url, hub.tokenSecret and hub.timeout in milliseconds', () => {
+      const text = 'store: ndjson\neffort:\n  sync: service\nhub:\n'
+        + '  url: https://hub.example.org\n  tokenSecret: rafa-hub-token\n  timeout: 12s\n';
+      const resolved = resolveConfig({ file: parseConfigText(text, join(ROOT, '.rafa', 'config.yaml')) });
+      const { registry, contexts } = capturing();
+
+      expect(selectSync(ROOT, resolved.config, registry)).toBe(FIXTURE_GIT);
+      expect(contexts).toEqual([{
+        repoRoot: ROOT,
+        store: 'ndjson',
+        hub: { url: 'https://hub.example.org', tokenSecret: 'rafa-hub-token', timeoutMs: 12_000 },
+      }]);
+      expect(existsSync(ROOT)).toBe(false);
+    });
+
+    it('hands the default timeout and no secret name for a url alone', () => {
+      const { registry, contexts } = capturing();
+      selectSync(ROOT, { effortSync: 'service', hubUrl: 'http://localhost:7373' }, registry);
+
+      expect(contexts[0]?.hub).toEqual({ url: 'http://localhost:7373', tokenSecret: null, timeoutMs: 3000 });
+    });
+
+    it('hands no hub when the config names no url, the control', () => {
+      const { registry, contexts } = capturing();
+      selectSync(ROOT, { effortSync: 'service', hubUrl: null, hubTokenSecret: 'rafa-hub-token', hubTimeout: '12s' }, registry);
+      selectSync(ROOT, naming('service'), registry);
+
+      expect(contexts).toEqual([{ repoRoot: ROOT }, { repoRoot: ROOT }]);
+      expect(contexts.map((context) => 'hub' in context)).toEqual([false, false]);
+    });
   });
 
   it('names git, service and p2p as the strategies modules bring', () => {
