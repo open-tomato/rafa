@@ -116,7 +116,7 @@ export const DECLARATION_KEYS = [
   'budget',
   'tools',
   'skills',
-
+  'tests',
 ] as const;
 
 /** One of the keys the grammar recognises. */
