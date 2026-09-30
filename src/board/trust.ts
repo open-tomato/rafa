@@ -194,7 +194,11 @@ import { describeValue, isGitHubLogin, isMapping, messageOf } from '../config-se
 /** The repository placeholders `gh api` expands from the directory it runs in. */
 const REPO_PATH = '{owner}/{repo}';
 
-/** The permissions that mean the login may change the repository. */
+/**
+ * The permissions that mean the login may change the repository. The
+ * `./store` subpath exports it too (`src/effort/store/index.ts`), so a
+ * workspace package checking a login spells write access as core does.
+ */
 export const TRUSTED_PERMISSIONS = ['admin', 'maintain', 'write'] as const;
 
 /** One of the three permissions that are trust. */

@@ -240,6 +240,25 @@ directory structure it sits under is not part of the exchange; only the
 database file matters. Importing each other's files in a loop is safe
 and idempotent: a repeat of the same file merges nothing new.
 
+**Rows travel to a hub through the wire codec, `src/effort/sync/wire.ts`,
+and are still merged only by `mergeStore`.** `exportWirePayload` reads a
+store file (read-only, one read transaction) and answers JSON-safe rows
+of every `merged` table past a per-table cursor, the highest local `seq`
+already sent, with each row's every column, `seq` and the origin pair
+included, the ids of the store's migration log, and the next cursor.
+It refuses a store with no migration log or no origin columns, and an
+integer past `Number.MAX_SAFE_INTEGER` or a BLOB, rather than round or
+drop a value. `decodeWirePayload` checks JSON text whole
+(`WireFormatError`), and `materialiseWirePayload` builds a payload into
+`effort.sqlite` in a new directory under the temporary directory,
+brought through exactly the payload's migrations and holding its rows as
+sent, which `mergeStore` then takes as `otherPath` and brings forward as
+it does any store. The payload carries no `local` table, so the scratch
+file names no store and no project: the merge's `merges` row records no
+other store, and its other-project refusal has nothing to compare. The
+codec, `mergeStore` and `TRUSTED_PERMISSIONS` are exported from the
+`./store` subpath for the packages under `packages/`.
+
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names
 `rafa effort move --to=sqlite` as the next safe step. `rafa effort

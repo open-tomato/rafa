@@ -7,8 +7,18 @@
  * route into core unresolved.
  */
 import type { Sync, SyncPortVersion } from '@open-tomato/rafa/ports';
+import type { StoreMergeResult, WirePayload } from '@open-tomato/rafa/store';
 
-import { EFFORT_KEY_PROJECTIONS, selectEffortStore } from '@open-tomato/rafa/store';
+import {
+  decodeWirePayload,
+  EFFORT_KEY_PROJECTIONS,
+  encodeWirePayload,
+  exportWirePayload,
+  materialiseWirePayload,
+  mergeStore,
+  selectEffortStore,
+  TRUSTED_PERMISSIONS,
+} from '@open-tomato/rafa/store';
 import { describe, expect, it } from 'bun:test';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -25,6 +35,15 @@ describe('core subpaths from this package', () => {
       .toBe(new URL('src/effort/store/index.ts', ROOT).href);
     expect(typeof selectEffortStore).toBe('function');
     expect(EFFORT_KEY_PROJECTIONS).toBeDefined();
+  });
+
+  it('reaches the wire codec, mergeStore and TRUSTED_PERMISSIONS through the store subpath', () => {
+    const payload: Pick<WirePayload, 'migrations'> = { migrations: [] };
+    const status: StoreMergeResult['status'] = 'merged';
+    expect([payload.migrations, status]).toEqual([[], 'merged']);
+    expect([exportWirePayload, materialiseWirePayload, encodeWirePayload, decodeWirePayload, mergeStore]
+      .map((value) => typeof value)).toEqual(['function', 'function', 'function', 'function', 'function']);
+    expect(TRUSTED_PERMISSIONS).toEqual(['admin', 'maintain', 'write']);
   });
 
   it('resolves the ports subpath to the ports entry, which exports no runtime value', async () => {

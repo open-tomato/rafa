@@ -27,7 +27,8 @@
  *     report parser, the injection renderer, the preflight runner and the
  *     PREREQUISITES parser, with the models they answer.
  *   - The whole `./store` surface: the port, both backends and the
- *     selector.
+ *     selector, with what the workspace packages take from it: the
+ *     sync wire codec, `mergeStore` and `TRUSTED_PERMISSIONS`.
  *   - The whole config, `config.ts` and `config-load.ts`:
  *     {@link loadConfig}, which reads the project's `.rafa/config.yaml`
  *     under a root and the user scope's under a home and ranks the
@@ -94,7 +95,9 @@
  *     report writers, the effort collector's halves). The CLI reaches
  *     them only through a command, and an entry is a public surface: a
  *     name added later breaks nobody, and a name removed breaks every
- *     caller that imported it.
+ *     caller that imported it. `mergeStore`, behind `rafa effort merge`,
+ *     is the one exception, and only because `./store` exports it for
+ *     the workspace packages and every subpath's names are on the root.
  *   - The rest of `src/project/` and `src/modules/`: the root candidates,
  *     prompt and scaffold behind `rafa init`, and the module loader
  *     behind `rafa module list` and the CLI's start-up. Each is reached
@@ -149,13 +152,23 @@ export type {
   EffortRowByKind,
   EffortRowKind,
   EffortStore,
+  MaterialisedWire,
+  MaterialiseOptions,
+  MergeOptions,
   NdjsonAppendResult,
   NdjsonEffortStore,
   SelectedEffortStore,
   SessionEffortRow,
   SessionMode,
   SqliteEffortStore,
+  StoreMergeResult,
   StoreReadResult,
+  TrustedPermission,
+  WireCursor,
+  WireExportOptions,
+  WirePayload,
+  WireRow,
+  WireValue,
 } from './effort/store/index.js';
 export type {
   AdapterProvision,
@@ -255,10 +268,20 @@ export {
 export { default as effortCollectCommand } from './effort/collect.js';
 export { default as effortReportCommand } from './effort/report.js';
 export {
+  decodeWirePayload,
   EFFORT_KEY_PROJECTIONS,
+  encodeWirePayload,
+  exportWirePayload,
+  materialiseWirePayload,
+  mergeStore,
   openNdjsonStore,
   openSqliteStore,
   selectEffortStore,
+  TRUSTED_PERMISSIONS,
+  WIRE_FORMAT,
+  WIRE_VERSION,
+  WireExportRefusal,
+  WireFormatError,
 } from './effort/store/index.js';
 export {
   FEATURE_TYPES,
