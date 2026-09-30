@@ -775,7 +775,30 @@ order puts the issue last.
 
 #### GitHub's cap on sub-issues per parent
 
-CAP_PLACEHOLDER
+Measured 2026-10-01 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`. The run created parent #31 and children #32 to #132
+through `gh api repos/<A>/issues`, then added the children one at a time
+with `gh issue edit 31 -R <A> --add-sub-issue <n>` until GitHub refused:
+
+| Step | Answer | #31 `subIssues.totalCount` |
+|---|---|---|
+| add #32 to #131 | ok, 100 times | 100 |
+| add #132 | error, exit 1 | 100 |
+| control: remove #131, add #132 | ok | 100 |
+| control: add #131 back | error, exit 1 | 100 |
+
+Both refusals print
+`GraphQL: Failed to add sub-issue #132 to parent #31. Parent cannot have more than 100 sub-issues (addSubIssue)`
+(the control names #131). The control shows the refusal comes from the
+count, not from the child: #132 went in once a place was free.
+
+So the cap is 100 sub-issues per parent. At the cap, the
+`gh issue list` query above answered 100 `subIssues.nodes` with
+`totalCount: 100` and `subIssuesSummary.total: 100`, and a direct
+`subIssues(first:100)` read answered `pageInfo.hasNextPage: false`. A
+parent cannot hold a 101st member, so `subIssues(first:100)` never
+misses one. The reader's `truncated` reading stays as a guard in case
+GitHub raises the cap.
 
 #### A blocker in another repository adds and reads with its own state
 
