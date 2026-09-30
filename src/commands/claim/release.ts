@@ -55,10 +55,18 @@
  * cannot be read, each naming the branch; two branches of the issue
  * held by this store, naming both; a branch that moved on the remote
  * between the fetch and the push; and a push git refused otherwise.
+ *
+ * ## Shared with the other claim actions
+ *
+ * The reading and pushing steps are exported, each taking the refusal
+ * its caller makes and a {@link ClaimDoing} for the words, so
+ * `./hand.ts` reads the line, the store id, the issue's branches and
+ * this store's claim, and pushes its commit, exactly as a release does.
  */
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
+import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { GitRunner } from '../../pr/index.js';
@@ -113,7 +121,18 @@ export interface ClaimReleaseResult {
 }
 
 /** A found reading of a remote claim branch. */
-type FoundBranch = Extract<ClaimBranchReading, { readonly state: 'found' }>;
+export type FoundBranch = Extract<ClaimBranchReading, { readonly state: 'found' }>;
+
+/** How a claim command's refusals word what it would have done. */
+export interface ClaimDoing {
+  /** Closes a moved-branch refusal: `was being released`. */
+  readonly during: string;
+  /** Closes the not-owned, two-branch and moved-branch refusals: `nothing was released`. */
+  readonly nothing: string;
+}
+
+/** How this command's refusals word a release. */
+const RELEASING: ClaimDoing = { during: 'was being released', nothing: 'nothing was released' };
 
 /** A refusal with exit code 1, opening with the command's name. */
 function refuse(message: string): CommandExit {
@@ -132,15 +151,15 @@ export function readIssueArgument(args: readonly string[], usage: string): numbe
   return Number(word);
 }
 
-/** This device's store id, or a refusal saying why it has none. */
-function storeIdOf(seams: ClaimCommandSeams): string {
+/** This device's store id, or a refusal made by `refuseWith` saying why it has none. */
+export function readClaimStoreId(seams: ClaimCommandSeams, refuseWith: (message: string) => CommandExit): string {
   let device: DeviceStoreId;
   try {
     device = seams.readStoreId();
   } catch (error) {
-    throw refuse(`the effort store could not be read for this device's store id: ${messageOf(error)}`);
+    throw refuseWith(`the effort store could not be read for this device's store id: ${messageOf(error)}`);
   }
-  if (!device.ok) throw refuse(device.reason);
+  if (!device.ok) throw refuseWith(device.reason);
   return device.storeId;
 }
 
@@ -174,8 +193,17 @@ function notOwnedReason(reading: ClaimBranchReading, issue: number, storeId: str
   return `#${String(issue)} is claimed by store ${ownership.owner} on ${branch}, not by this device (store ${storeId})`;
 }
 
-/** The one branch of the issue this store holds, or a refusal naming what the others say. */
-function ownedBranch(readings: readonly ClaimBranchReading[], issue: number, storeId: string): FoundBranch {
+/**
+ * The one branch of the issue this store holds, or a refusal made by
+ * `refuseWith` naming what the others say and closing with `doing.nothing`.
+ */
+export function findOwnedBranch(
+  readings: readonly ClaimBranchReading[],
+  owner: { readonly issue: number; readonly storeId: string },
+  refuseWith: (message: string) => CommandExit,
+  doing: ClaimDoing,
+): FoundBranch {
+  const { issue, storeId } = owner;
   const owned = readings.filter((reading): reading is FoundBranch => reading.state === 'found'
     && reading.ownership.state === 'held'
     && reading.ownership.owner === storeId);
@@ -183,22 +211,31 @@ function ownedBranch(readings: readonly ClaimBranchReading[], issue: number, sto
   if (owned.length === 1 && only !== undefined) return only;
   if (owned.length > 1) {
     const names = owned.map((reading) => reading.branch).join(', ');
-    throw refuse(`this device (store ${storeId}) holds #${String(issue)} on more than one branch: ${names}; nothing was released`);
+    throw refuseWith(`this device (store ${storeId}) holds #${String(issue)} on more than one branch: ${names}; ${doing.nothing}`);
   }
   const reasons = readings.map((reading) => notOwnedReason(reading, issue, storeId));
-  throw refuse(`this device does not own the claim on #${String(issue)}, so nothing was released:\n${reasons.map((reason) => `   ${reason}`).join('\n')}`);
+  throw refuseWith(`this device does not own the claim on #${String(issue)}, so ${doing.nothing}:\n${reasons.map((reason) => `   ${reason}`).join('\n')}`);
 }
 
-/** Pushes the release commit on `reading`'s tip, leased on it; answers the commit's sha. */
-function pushRelease(git: GitRunner, reading: FoundBranch, issue: number, storeId: string): string {
+/**
+ * Pushes the ownership commit `record` makes on `reading`'s tip, leased
+ * on it; answers the commit's sha, or a refusal made by `refuseWith`.
+ */
+export function pushOnClaimTip(
+  git: GitRunner,
+  reading: FoundBranch,
+  record: ClaimRecord,
+  refuseWith: (message: string) => CommandExit,
+  doing: ClaimDoing,
+): string {
   const { branch, tip } = reading;
-  const made = makeOwnershipCommit(git, tip, { action: 'release', issue, store: storeId });
-  if (!made.ok) throw refuse(made.reason);
+  const made = makeOwnershipCommit(git, tip, record);
+  if (!made.ok) throw refuseWith(made.reason);
   const pushed = pushOwnershipCommit(git, made.sha, branch, tip);
   if (pushed.outcome === 'moved') {
-    throw refuse(`${branch} moved on ${REMOTE} while the claim on #${String(issue)} was being released; nothing was released. Run it again to read the branch afresh`);
+    throw refuseWith(`${branch} moved on ${REMOTE} while the claim on #${String(record.issue)} ${doing.during}; ${doing.nothing}. Run it again to read the branch afresh`);
   }
-  if (pushed.outcome === 'failed') throw refuse(pushed.reason);
+  if (pushed.outcome === 'failed') throw refuseWith(pushed.reason);
   return made.sha;
 }
 
@@ -208,9 +245,9 @@ export async function releaseClaim(context: RafaContext, makeSeams: ClaimSeamsFa
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams = makeSeams(project.root, config);
-  const storeId = storeIdOf(seams);
-  const reading = ownedBranch(readIssueBranches(seams.git, issue, refuse), issue, storeId);
-  const sha = pushRelease(seams.git, reading, issue, storeId);
+  const storeId = readClaimStoreId(seams, refuse);
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, storeId }, refuse, RELEASING);
+  const sha = pushOnClaimTip(seams.git, reading, { action: 'release', issue, store: storeId }, refuse, RELEASING);
   const label = await unlabelReleased(seams.board, issue);
   const labelWarning = label.outcome === 'warning'
     ? label.warning
