@@ -259,6 +259,13 @@ export interface RelationWrite {
   readonly status: RelationWriteStatus;
   /** What the board said when it refused; null otherwise. */
   readonly problem: string | null;
+  /**
+   * How many times a `labels` checklist edit was tried, as
+   * `editChecklist` (`../epic-checklist.ts`) counts it, so a command
+   * that printed that count before the port (`rafa epic move`'s json
+   * result) still prints it. Left out of every other write.
+   */
+  readonly attempts?: number;
 }
 
 /**

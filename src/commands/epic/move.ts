@@ -73,18 +73,25 @@
  * ## The writes, in order
  *
  * {@link applyEpicMove} makes them, and the order leaves the least undone
- * when one fails:
+ * when one fails. The move itself is the board's relationships port's
+ * `setParent` (`src/board/relations/port.ts`), made with the listing the
+ * move was read off, so no `gh` argv for it is spelled here; in `labels`
+ * mode, the default, it is `setLabelsParent`
+ * (`src/board/relations/labels-writes.ts`), which sends what this command
+ * sent before the port, in the same order:
  *
- * 1. The swap, `IssueBoard.swapLabels` (`src/board/issue-board.ts`): one
- *    `gh issue edit` taking the old `epic:` label off and putting the new
- *    one on. Membership IS the label, so this is the move; a failed swap
- *    rejects and nothing else is sent, refused with exit code 1.
+ * 1. The swap: one `gh issue edit` taking the old `epic:` label off and
+ *    putting the new one on. Membership IS the label, so this is the
+ *    move; a failed swap rejects and nothing else is sent, refused with
+ *    exit code 1.
  * 2. The new epic's body, the line appended with `appendLine`, then the
  *    old epic's body, the line taken off with `removeLine`, each carried
  *    by `editChecklist` (`src/board/epic-checklist.ts`): read, write,
  *    re-read, retried up to `TICK_ATTEMPTS`, every other byte kept. The
  *    new line goes in first, so an edit that fails leaves the line in two
- *    lists rather than in none.
+ *    lists rather than in none. Each edit comes back as the port's write
+ *    record carrying `editChecklist`'s attempts, and is answered as the
+ *    {@link ChecklistEditResult} it was.
  * 3. The comment on the issue, the trail's `renderMoveComment` with the
  *    open work, posted once the label moved whatever became of the
  *    bodies, since the label is what changed on the issue.
@@ -93,6 +100,27 @@
  * that ends `failed` or a comment that could not be posted is a `warn`
  * line, and the run then ends with exit code 1 naming what to finish by
  * hand. A body that needed no edit (`nothing-to-edit`) is not a failure.
+ *
+ * ## Native mode
+ *
+ * The mode is the one `board.relationships` names in the project's
+ * config (`./move-native.ts`, which also reads the board's repository in
+ * `native` mode), or the one the relationships
+ * {@link EpicMoveSeams.relations} answer when a caller hands them in; in
+ * `labels`, the default, everything above holds. Under
+ * `board.relationships: native` the listing is read with the native
+ * fields, and the epic the issue leaves is its sub-issue parent, read
+ * through the port's `epicOf` (`./move-native.ts`): an issue with no
+ * parent, or a parent that is not an issue typed `epic` on the listing,
+ * is refused with {@link EPIC_MOVE_REFUSAL_EXIT}, as is a move to its own
+ * parent; no `epic:` label is read, and the target is refused only for
+ * not being an open `type:epic` issue. Step 1 is then one
+ * `gh issue edit <n> --parent <epic>`, which moves the issue out of its
+ * old parent in the same call, and there is no step 2: no label, no
+ * checklist line. The comment, step 3, is the same trail comment. Each
+ * native-mode sentence names the mode, and the json result carries
+ * `relationships: native` and leaves out the labels and the checklist
+ * edits it has none of.
  *
  * ## What it writes
  *
@@ -103,16 +131,16 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ChecklistEditResult } from '../../board/epic-checklist.js';
 import type { MembershipChange, OpenWork } from '../../board/epic-trail.js';
+import type { EpicRelations } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
+import type { BoardRelations, RelationWrite } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { GitRunner } from '../../pr/git.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { appendLine, editChecklist, removeLine, tickLine } from '../../board/epic-checklist.js';
 import { branchNameOf } from '../../board/epic-horizon.js';
 import {
   blankReasonMessage,
@@ -124,7 +152,6 @@ import {
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
@@ -133,6 +160,15 @@ import { createGitRunner } from '../../pr/git.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { TO_FLAG, workPhrase } from './horizon-change.js';
+import {
+  configuredMoveRelations,
+  NATIVE_MODE,
+  NATIVE_RETRY_HINT,
+  nativeAlreadyMessage,
+  nativeEpicLeft,
+  nativeParentLine,
+  readBoardRepository,
+} from './move-native.js';
 
 /** The exit code every refusal of a move ends the command with. */
 export const EPIC_MOVE_REFUSAL_EXIT = 2;
@@ -165,6 +201,8 @@ export interface EpicMoveInput {
   readonly remote?: string;
   /** Every open pull request. */
   readonly pullRequests: OpenPullRequestLister;
+  /** The board's relationships, which read the epic a native issue leaves; `labels` mode when left out. See the module note. */
+  readonly relations?: EpicRelations;
 }
 
 /** The checklist line the target epic's body gains. */
@@ -174,8 +212,8 @@ export interface MovedLine {
   readonly ticked: boolean;
 }
 
-/** What {@link readEpicMove} answers for a move it does not refuse. */
-export interface EpicMoveReading {
+/** What {@link readEpicMove} answers for a move it does not refuse in `labels` mode. */
+export interface LabelsMoveReading {
   /** The move, as the trail renders its comment. */
   readonly change: MembershipChange;
   /** The label the swap takes off: `epic:<old slug>`. */
@@ -189,12 +227,28 @@ export interface EpicMoveReading {
   readonly problems: readonly string[];
 }
 
-/** What {@link applyEpicMove} did past the swap. */
+/** What {@link readEpicMove} answers for a move it does not refuse in `native` mode: no label, no line. */
+export interface NativeMoveReading {
+  readonly change: MembershipChange;
+  readonly relationships: 'native';
+  readonly work: OpenWork | null;
+  readonly problems: readonly string[];
+}
+
+/** What {@link readEpicMove} answers, in the mode it read. */
+export type EpicMoveReading = LabelsMoveReading | NativeMoveReading;
+
+/** True when `reading` was read in `native` mode. */
+function isNativeReading(reading: EpicMoveReading): reading is NativeMoveReading {
+  return 'relationships' in reading;
+}
+
+/** What {@link applyEpicMove} did past the move itself. */
 export interface EpicMoveOutcome {
-  /** The target epic's body gaining the line. */
-  readonly added: ChecklistEditResult;
-  /** The old epic's body losing it. */
-  readonly removed: ChecklistEditResult;
+  /** The target epic's body gaining the line; `labels` mode only, left out in `native`. */
+  readonly added?: ChecklistEditResult;
+  /** The old epic's body losing it; `labels` mode only, left out in `native`. */
+  readonly removed?: ChecklistEditResult;
   /** What the board said when the comment failed; empty when it was posted. */
   readonly commentProblem: string;
 }
@@ -216,8 +270,12 @@ export interface EpicMoveResult {
   readonly from: number;
   /** The epic it joined, or would have. */
   readonly to: number;
-  readonly removedLabel: string;
-  readonly addedLabel: string;
+  /** The label taken off; `labels` mode only, left out in `native`. */
+  readonly removedLabel?: string;
+  /** The label put on; `labels` mode only, left out in `native`. */
+  readonly addedLabel?: string;
+  /** `native` in `native` mode; left out in `labels`. */
+  readonly relationships?: 'native';
   /** The reason commented, or null when nothing changed. */
   readonly reason: string | null;
   /** The reason question a run with no terminal would have asked; null otherwise. */
@@ -236,6 +294,12 @@ export interface EpicMoveSeams {
   readonly isTerminal?: () => boolean;
   /** Opens the prompter the reason is asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
+  /**
+   * The board's relationships, which read the move and make it, made over
+   * the same `gh`; when left out, the ones the project's config names,
+   * made over {@link EpicMoveSeams.gh}. See the module note.
+   */
+  readonly relations?: BoardRelations;
 }
 
 /** `#40`. */
@@ -276,13 +340,19 @@ export function readMoveLine(context: Pick<RafaContext, 'args' | 'flags'>): Move
   return Object.freeze({ issue, to, reason });
 }
 
-/** The issue that moves and the one slug it carries; a refusal otherwise. */
-function movingIssue(issues: readonly BoardIssue[], number: number): { issue: BoardIssue; slug: string } {
+/** The issue that moves, on the listing and no epic; a refusal otherwise. */
+function memberRow(issues: readonly BoardIssue[], number: number): BoardIssue {
   const issue = issues.find((candidate) => candidate.number === number);
   if (issue === undefined) throw refusal(`${ref(number)} is not on the board listing`);
   if (issue.type === 'epic') {
     throw refusal(`${ref(number)} is an epic, and an epic belongs to no epic; move its members one by one`);
   }
+  return issue;
+}
+
+/** The issue that moves and the one slug it carries; a refusal otherwise. */
+function movingIssue(issues: readonly BoardIssue[], number: number): { issue: BoardIssue; slug: string } {
+  const issue = memberRow(issues, number);
   const slugs = epicSlugsOf(issue.labels);
   const [slug] = slugs;
   if (slug === undefined) {
@@ -300,12 +370,18 @@ function ownSlug(epic: BoardIssue): string | undefined {
   return epicSlugsOf(epic.labels)[0];
 }
 
-/** The open epic `number` and its slug; a refusal when it is not one or carries no slug. */
-function targetEpic(issues: readonly BoardIssue[], number: number): { epic: BoardIssue; slug: string } {
+/** The open epic `number`; a refusal when it is not one. */
+function openEpic(issues: readonly BoardIssue[], number: number): BoardIssue {
   const epic = issues.find((candidate) => candidate.number === number);
   if (epic === undefined) throw refusal(`${ref(number)} is not on the board listing, so it is not an open epic`);
   if (epic.type !== 'epic') throw refusal(`${ref(number)} is not an epic: it carries no type:epic label`);
   if (epic.state !== 'OPEN') throw refusal(`Epic ${ref(number)} is closed, and an issue moves only to an open epic`);
+  return epic;
+}
+
+/** The open epic `number` and its slug; a refusal when it is not one or carries no slug. */
+function targetEpic(issues: readonly BoardIssue[], number: number): { epic: BoardIssue; slug: string } {
+  const epic = openEpic(issues, number);
   const slug = ownSlug(epic);
   if (slug === undefined) {
     throw refusal(`Epic ${ref(number)} carries no ${EPIC_LABEL_PREFIX} label, so there is no label to move the issue to`);
@@ -362,13 +438,34 @@ async function openWorkOf(input: EpicMoveInput): Promise<{ work: OpenWork; probl
   };
 }
 
+/** The move `input` asks for, read in `native` mode through `relations`; see the module note. */
+async function readNativeMove(input: EpicMoveInput, relations: EpicRelations): Promise<NativeMoveReading> {
+  const issue = memberRow(input.issues, input.issue);
+  const from = nativeEpicLeft(relations.read(input.issues).epicOf(issue));
+  if (typeof from === 'string') throw refusal(from);
+  openEpic(input.issues, input.to);
+  if (from === input.to) throw refusal(nativeAlreadyMessage(input.issue, from));
+  const read = issue.state === 'OPEN'
+    ? await openWorkOf(input)
+    : null;
+
+  return Object.freeze({
+    change: Object.freeze({ kind: 'move', issue: input.issue, from, to: input.to }),
+    relationships: 'native',
+    work: read?.work ?? null,
+    problems: read?.problems ?? Object.freeze([]),
+  });
+}
+
 /**
- * The move `input` asks for, read; see the module note.
+ * The move `input` asks for, read in the mode `input.relations` answers,
+ * `labels` when left out; see the module note.
  *
  * @throws CommandExit with {@link EPIC_MOVE_REFUSAL_EXIT} for each
  *   refusal the module note lists, before any git or pull request read.
  */
 export async function readEpicMove(input: EpicMoveInput): Promise<EpicMoveReading> {
+  if (input.relations?.mode === 'native') return readNativeMove(input, input.relations);
   const moving = movingIssue(input.issues, input.issue);
   const target = targetEpic(input.issues, input.to);
   if (target.slug === moving.slug) {
@@ -391,30 +488,58 @@ export async function readEpicMove(input: EpicMoveInput): Promise<EpicMoveReadin
 
 /** Where {@link applyEpicMove} writes. */
 export interface EpicMoveWrites {
-  /** The label swap and the comment. */
+  /** The comment. */
   readonly board: IssueBoard;
-  /** The two epics' bodies. */
-  readonly bodies: RoadmapBody;
+  /** The board's relationships, in the mode the move was read in, which make the move itself. */
+  readonly relations: BoardRelations;
+  /** The listing the move was read off, which the relationships read what they edit from. */
+  readonly issues: readonly BoardIssue[];
+}
+
+/** A checklist edit's status, read back off the write record the port answered it as. */
+function checklistStatus(write: RelationWrite): ChecklistEditResult['status'] {
+  if (write.status === 'failed') return 'failed';
+  return write.status === 'written'
+    ? 'edited'
+    : 'nothing-to-edit';
 }
 
 /**
- * Makes `reading`'s move: the swap, the new epic's line, the old epic's,
- * then the comment with `reason`; see the module note. Rejects with the
- * board's message when the swap fails, and then nothing else is sent;
- * past the swap it never throws, answering what each write did.
+ * The checklist edit of `epic` among `writes`, past the move itself, as
+ * `editChecklist` answered it; a `failed` one saying so when the port
+ * answered none, so the run names it to finish by hand rather than
+ * claiming a line it cannot show was written.
+ */
+function checklistEditOf(writes: readonly RelationWrite[], epic: number): ChecklistEditResult {
+  const write = writes.slice(1).find((each) => each.issue === epic);
+  if (write === undefined) {
+    return Object.freeze({ issue: epic, status: 'failed', attempts: 0, problem: `no checklist edit of epic ${ref(epic)} was answered` });
+  }
+  return Object.freeze({ issue: epic, status: checklistStatus(write), attempts: write.attempts ?? 0, problem: write.problem ?? '' });
+}
+
+/** The mode `reading` was read in. */
+function readingMode(reading: EpicMoveReading): BoardRelations['mode'] {
+  return isNativeReading(reading)
+    ? 'native'
+    : 'labels';
+}
+
+/**
+ * Makes `reading`'s move through `writes.relations`' `setParent`, then
+ * posts the comment with `reason`; see the module note. Rejects with the
+ * port's message when the move fails, and then nothing else is sent; past
+ * it it never throws, answering what each write did. Throws a
+ * `TypeError`, having sent nothing, when `writes.relations` answers
+ * another mode than the one `reading` was read in.
  */
 export async function applyEpicMove(writes: EpicMoveWrites, reading: EpicMoveReading, reason: string): Promise<EpicMoveOutcome> {
-  const { change, line } = reading;
-  await writes.board.swapLabels(change.issue, reading.removed, reading.added);
-
-  const added = await editChecklist({
-    issue: change.to,
-    edit: (body) => (line.ticked
-      ? tickLine(appendLine(body, change.issue, line.why), change.issue)
-      : appendLine(body, change.issue, line.why)),
-    board: writes.bodies,
-  });
-  const removed = await editChecklist({ issue: change.from, edit: (body) => removeLine(body, change.issue), board: writes.bodies });
+  const { change } = reading;
+  const mode = readingMode(reading);
+  if (writes.relations.mode !== mode) {
+    throw new TypeError(`epic move: the move was read in ${mode} mode, but the relationships to write it answer ${writes.relations.mode}`);
+  }
+  const moved = await writes.relations.setParent(writes.issues, { issue: change.issue, parent: change.to });
 
   let commentProblem = '';
   try {
@@ -422,7 +547,8 @@ export async function applyEpicMove(writes: EpicMoveWrites, reading: EpicMoveRea
   } catch (error) {
     commentProblem = messageOf(error);
   }
-  return Object.freeze({ added, removed, commentProblem });
+  if (mode === 'native') return Object.freeze({ commentProblem });
+  return Object.freeze({ added: checklistEditOf(moved, change.to), removed: checklistEditOf(moved, change.from), commentProblem });
 }
 
 /** Reads what `read` answers; a refusal with {@link EPIC_MOVE_REFUSAL_EXIT} when it fails. */
@@ -434,8 +560,19 @@ async function readOrRefuse<T>(what: string, read: () => Promise<T>): Promise<T>
   }
 }
 
-/** The result of `reading` with the fields a run fills in. */
+/** The result of `reading` with the fields a run fills in; see the module note for what native mode leaves out. */
 function resultOf(reading: EpicMoveReading, fields: Pick<EpicMoveResult, 'status' | 'reason' | 'question' | 'outcome'>): EpicMoveResult {
+  if (isNativeReading(reading)) {
+    return Object.freeze({
+      issue: reading.change.issue,
+      from: reading.change.from,
+      to: reading.change.to,
+      relationships: reading.relationships,
+      work: reading.work,
+      problems: reading.problems,
+      ...fields,
+    });
+  }
   return Object.freeze({
     issue: reading.change.issue,
     from: reading.change.from,
@@ -465,13 +602,16 @@ export async function moveEpicIssue(context: RafaContext, seams: EpicMoveSeams):
   const line = readMoveLine(context);
   const project = issueProject(context);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
-  const listing = await readOrRefuse('the board', () => createGhBoardListing({ gh })());
+  const relations = seams.relations
+    ?? await configuredMoveRelations(project, gh, () => readOrRefuse('the board\'s repository', () => readBoardRepository(gh)));
+  const listing = await readOrRefuse('the board', () => createGhBoardListing({ gh, mode: relations.mode })());
   const reading = await readEpicMove({
     issues: listing,
     issue: line.issue,
     to: line.to,
     git: seams.git ?? createGitRunner(project.root),
     pullRequests: createGhOpenPullRequests({ gh }),
+    relations,
   });
 
   const reason = await askReason(reading, line.reason, seams);
@@ -483,10 +623,12 @@ export async function moveEpicIssue(context: RafaContext, seams: EpicMoveSeams):
   }
   let outcome: EpicMoveOutcome;
   try {
-    outcome = await applyEpicMove({ board: createGhIssueBoard({ gh }), bodies: createGhRoadmapBody({ gh }) }, reading, reason.reason);
+    outcome = await applyEpicMove({ board: createGhIssueBoard({ gh }), relations, issues: listing }, reading, reason.reason);
   } catch (error) {
-    throw new CommandExit(1, `❌ Could not move ${ref(line.issue)} to epic ${ref(line.to)}: ${messageOf(error)}\n`
-      + 'Read its labels before running the same line again.');
+    const hint = relations.mode === 'native'
+      ? NATIVE_RETRY_HINT
+      : 'Read its labels before running the same line again.';
+    throw new CommandExit(1, `❌ Could not move ${ref(line.issue)} to epic ${ref(line.to)}: ${messageOf(error)}\n${hint}`);
   }
   return resultOf(reading, { status: 'moved', reason: reason.reason, question: null, outcome });
 }
@@ -539,7 +681,10 @@ function movedLines(result: EpicMoveResult, outcome: EpicMoveOutcome): readonly 
   const comment = outcome.commentProblem === ''
     ? []
     : [{ text: `Could not comment on ${ref(result.issue)}: ${outcome.commentProblem}`, warn: true }];
-  return [head, addedLine(result, outcome.added), removedLine(result, outcome.removed), ...work, ...comment];
+  const lines = outcome.added === undefined || outcome.removed === undefined
+    ? [{ text: nativeParentLine(result.to), warn: false }]
+    : [addedLine(result, outcome.added), removedLine(result, outcome.removed)];
+  return [head, ...lines, ...work, ...comment];
 }
 
 /** The lines text mode writes for `result`, in order. */
@@ -557,11 +702,14 @@ export function moveFailure(result: EpicMoveResult): CommandExit | null {
   const { outcome } = result;
   if (outcome === null) return null;
   const left: string[] = [];
-  if (outcome.added.status === 'failed') left.push(`add its line to epic ${ref(result.to)}'s checklist`);
-  if (outcome.removed.status === 'failed') left.push(`take its line off epic ${ref(result.from)}'s checklist`);
+  if (outcome.added?.status === 'failed') left.push(`add its line to epic ${ref(result.to)}'s checklist`);
+  if (outcome.removed?.status === 'failed') left.push(`take its line off epic ${ref(result.from)}'s checklist`);
   if (outcome.commentProblem !== '') left.push(`comment the move on ${ref(result.issue)}`);
   if (left.length === 0) return null;
-  return new CommandExit(1, `❌ ${ref(result.issue)} moved to epic ${ref(result.to)} (its label is ${result.addedLabel}),`
+  const now = result.addedLabel === undefined
+    ? `its parent is ${ref(result.to)}; ${NATIVE_MODE}`
+    : `its label is ${result.addedLabel}`;
+  return new CommandExit(1, `❌ ${ref(result.issue)} moved to epic ${ref(result.to)} (${now}),`
     + ` but the rest did not land; by hand: ${left.join('; ')}.`);
 }
 
@@ -594,7 +742,9 @@ export function createEpicMoveCommand(seams: EpicMoveSeams = {}): RafaCommand {
       + ' never recreated or closed. The reason is --reason, or asked once where there is a terminal; with neither,'
       + ' nothing changes and the question is printed. An issue with no epic: label, a target that is not an open'
       + ' epic and a move to its own epic are refused with exit code 2 before anything is written. With'
-      + ' `--output=json` the move and what each write did are the data of the terminal result event.',
+      + ' `--output=json` the move and what each write did are the data of the terminal result event. With'
+      + ' board.relationships set to native it sets the issue\'s parent to the target epic in one edit instead,'
+      + ' and no label or checklist line is read or written; the comment is the same.',
     args: [
       {
         name: 'issue',

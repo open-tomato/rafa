@@ -71,7 +71,8 @@
  * naming what to finish by hand.
  *
  * - **Move**: `applyEpicMove` (`./move.ts`), the same swap, checklist
- *   lines and move comment `rafa epic move` makes, with the trail's
+ *   lines and move comment `rafa epic move` makes in `labels` mode, made
+ *   through the `labels` relationships adapter, with the trail's
  *   `cancelMoveReason` as the reason.
  * - **Unblock**: the trail's `renderUnblockNote` appended below the
  *   dependent's body through `editChecklist`'s read, write and re-read
@@ -100,12 +101,15 @@
  * the terminal result's `data`. It starts no session, so it declares no
  * `spends`.
  */
-import type { EpicMoveReading, EpicMoveWrites } from './move.js';
+import type { EpicMoveReading } from './move.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicDependent } from '../../board/epic-dependents.js';
 import type { DependentAnswer } from '../../board/epic-trail.js';
 import type { EpicRelations } from '../../board/epics.js';
+import type { IssueBoard } from '../../board/issue-board.js';
+import type { BoardRelations } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
+import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
@@ -124,7 +128,7 @@ import {
 } from '../../board/epic-trail.js';
 import { isNotPlanned, localDay } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
-import { LABELS_READS } from '../../board/relations/labels.js';
+import { createLabelsRelations, LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
@@ -425,7 +429,14 @@ export function appendNote(body: string, note: string): string {
 }
 
 /** Where the answers are written. */
-export type CancelWrites = EpicMoveWrites;
+export interface CancelWrites {
+  /** The comments, the label taken off and the closes. */
+  readonly board: IssueBoard;
+  /** The bodies an unblock note is appended to. */
+  readonly bodies: RoadmapBody;
+  /** What a move answer is made through: `labels`, the mode `readEpicMove` reads a move here in. */
+  readonly moves: BoardRelations;
+}
 
 /** What applying one answer is handed. */
 interface ApplyInput {
@@ -462,14 +473,15 @@ async function applyMove(input: ApplyInput, dependent: EpicDependent, reading: E
   const { change } = reading;
   const base = { issue: change.issue, waitsOn: dependent.waitsOn, answer: { kind: 'moved', to: change.to } as const };
   try {
-    const outcome = await applyEpicMove(input.writes, reading, cancelMoveReason(input.epic));
+    const writes = { board: input.writes.board, relations: input.writes.moves, issues: input.issues };
+    const outcome = await applyEpicMove(writes, reading, cancelMoveReason(input.epic));
     const lines = [info(`Moved ${ref(change.issue)} from epic ${ref(change.from)} to ${ref(change.to)}.`)];
     const left: string[] = [];
-    if (outcome.added.status === 'failed') {
+    if (outcome.added?.status === 'failed') {
       lines.push(warn(`Could not add its line to epic ${ref(change.to)}'s checklist: ${outcome.added.problem}`));
       left.push(`add ${ref(change.issue)}'s line to epic ${ref(change.to)}'s checklist`);
     }
-    if (outcome.removed.status === 'failed') {
+    if (outcome.removed?.status === 'failed') {
       lines.push(warn(`Could not take its line off epic ${ref(change.from)}'s checklist: ${outcome.removed.problem}`));
       left.push(`take ${ref(change.issue)}'s line off epic ${ref(change.from)}'s checklist`);
     }
@@ -688,7 +700,8 @@ export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): 
     chosen = answered;
   }
 
-  const writes: CancelWrites = { board: createGhIssueBoard({ gh }), bodies: createGhRoadmapBody({ gh }) };
+  const bodies = createGhRoadmapBody({ gh });
+  const writes: CancelWrites = { board: createGhIssueBoard({ gh }), bodies, moves: createLabelsRelations({ gh, bodies }) };
   const input: ApplyInput = { writes, epic, issues, day: localDay((seams.now ?? ((): Date => new Date()))()), relations };
   const applied: DependentApplied[] = [];
   for (const each of chosen) {

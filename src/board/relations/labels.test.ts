@@ -258,6 +258,19 @@ describe('labels setParent and removeParent', () => {
     expect(held().get(RELATIONS_FIXTURE.epicAlpha)).not.toContain('#10');
   });
 
+  it('carries each checklist edit\'s attempts, and leaves the key out of the label write', async () => {
+    const { relations } = writer(labelsRelationsFixture);
+
+    const writes = await relations.setParent(labelsRelationsFixture, { issue: RELATIONS_FIXTURE.alphaMemberFirst, parent: RELATIONS_FIXTURE.epicBeta });
+
+    expect(writes.map((write) => Object.keys(write))).toEqual([
+      ['issue', 'what', 'status', 'problem'],
+      ['issue', 'what', 'status', 'problem', 'attempts'],
+      ['issue', 'what', 'status', 'problem', 'attempts'],
+    ]);
+    expect(writes.map((write) => write.attempts)).toEqual([undefined, 1, 1]);
+  });
+
   it('puts the label on an issue in no epic without taking any off, and appends its title as the why', async () => {
     const { relations, calls, held } = writer(labelsRelationsFixture);
 

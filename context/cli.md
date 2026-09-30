@@ -31,7 +31,7 @@ module's note is the long form.
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the audit of the changelog's released history (`src/release/audit.ts`), writing nothing; `release settle`, below; and `release tag`, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery and the tag as the terminal result's data. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned, with `cancel-unblock.ts` reading what an unblocked dependent still waits on in each relationships mode |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic through the relationships port's `setParent` and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`, with `move-native.ts` reading the mode off the config and the epic a native issue leaves off its parent; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned, with `cancel-unblock.ts` reading what an unblocked dependent still waits on in each relationships mode |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -1644,19 +1644,36 @@ New; it replaces no earlier text. What a row or an action added to
   `reasonQuestion` asked once where `isTerminal` (a seam) says stdin is
   a terminal; no terminal and no reason prints `unaskedReasonMessage`,
   a blank one warns `blankReasonMessage`, both writing nothing and
-  exiting 0. `applyEpicMove` then writes, in order: one
-  `IssueBoard.swapLabels` swapping the `epic:` labels (a failure exits 1
-  and sends nothing else); the line appended to the new epic's body,
-  then removed from the old one's, each through `editChecklist`
-  (`src/board/epic-checklist.ts`), carrying the old line's why and tick
-  (or the title, and ticked for a closed issue, when the old body lists
-  none); then the trail's `renderMoveComment` on the issue, naming the
-  open work, posted once the label moved. No issue is created or closed
-  and no `git` write is made. A body edit ending `failed` or a comment
-  that could not be posted is a `warn` line, and the run exits 1 naming
-  what to finish by hand. Json mode's result is `EpicMoveResult`.
-  `readEpicMove` and `applyEpicMove` are exported for `epic cancel`,
-  whose move of a dependent is the same move. It declares no `spends`.
+  exiting 0. `applyEpicMove` then makes the move through the board's
+  relationships port (`BoardRelations.setParent`,
+  `src/board/relations/port.ts`) over the listing it read; in `labels`
+  mode that is `setLabelsParent` (`src/board/relations/labels-writes.ts`),
+  which writes, in order: one `gh issue edit` swapping the `epic:` labels
+  (a failure exits 1 and sends nothing else); the line appended to the
+  new epic's body, then removed from the old one's, each through
+  `editChecklist` (`src/board/epic-checklist.ts`), carrying the old
+  line's why and tick (or the title, and ticked for a closed issue, when
+  the old body lists none), each answered with its `attempts`. Then the
+  trail's `renderMoveComment` on the issue, naming the open work, posted
+  once the label moved. No issue is created or closed and no `git` write
+  is made. A body edit ending `failed` or a comment that could not be
+  posted is a `warn` line, and the run exits 1 naming what to finish by
+  hand. Json mode's result is `EpicMoveResult`. With
+  `board.relationships: native` (read off the config by
+  `src/commands/epic/move-native.ts`, which then reads the board's
+  repository with one `gh repo view --json nameWithOwner`), the listing
+  is read with the native fields, the epic left is the issue's sub-issue
+  parent read through the port's `epicOf` (no parent, a parent that is
+  no `type:epic` issue on the listing, and its own parent are refused
+  with exit 2, naming the mode), no target is refused for lacking an
+  `epic:` label, and the move is one `gh issue edit <n> --parent <epic>`
+  with no label or checklist write; the comment is the same, the text
+  line naming the mode replaces the two checklist lines, and the json
+  result carries `relationships: native` and leaves out `removedLabel`,
+  `addedLabel` and the checklist edits. `readEpicMove` and
+  `applyEpicMove` are exported for `epic cancel`, whose move of a
+  dependent is the same `labels` move, made through the `labels`
+  adapter. It declares no `spends`.
 - **`rafa epic close <n> [--accept-unchecked]` is the closing gate**
   (`src/commands/epic/close.ts`), and the one `epic` action declaring
   `spends`: `{ when: 'always', what: 'one verification planning session

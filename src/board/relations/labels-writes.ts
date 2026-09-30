@@ -33,8 +33,9 @@
  * (`../epic-checklist.ts`), which reads each body afresh, writes, reads
  * it back and retries; an edit that ends `failed` is a
  * {@link RelationWrite} with status `failed`, never a rejection, since the
- * label already moved. {@link removeLabelsParent} is steps 1 and 3 with
- * nothing put on.
+ * label already moved. Each checklist write carries `editChecklist`'s
+ * `attempts`, the one write here that does. {@link removeLabelsParent}
+ * is steps 1 and 3 with nothing put on.
  *
  * The target must be an epic on the listing carrying an `epic:` label,
  * and the issue must be on the listing and not an epic: anything else is
@@ -136,12 +137,20 @@ function written(issue: number, what: string, status: RelationWriteStatus, probl
   return Object.freeze({ issue, what, status, problem });
 }
 
-/** What a checklist edit came to, as a write. */
-function checklistWrite(result: ChecklistEditResult, what: string): RelationWrite {
-  if (result.status === 'failed') return written(result.issue, what, 'failed', result.problem);
-  return written(result.issue, what, result.status === 'edited'
+/** A checklist edit's status as a write's. */
+function checklistStatus(result: ChecklistEditResult): RelationWriteStatus {
+  if (result.status === 'failed') return 'failed';
+  return result.status === 'edited'
     ? 'written'
-    : 'unchanged');
+    : 'unchanged';
+}
+
+/** What a checklist edit came to, as a write carrying its attempts. */
+function checklistWrite(result: ChecklistEditResult, what: string): RelationWrite {
+  const problem = result.status === 'failed'
+    ? result.problem
+    : null;
+  return Object.freeze({ ...written(result.issue, what, checklistStatus(result), problem), attempts: result.attempts });
 }
 
 /** The open or closed epics owning `slug`, as `readEpics` reads an epic's slug, ascending. */
