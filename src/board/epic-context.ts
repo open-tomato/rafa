@@ -22,6 +22,13 @@
  * here. The criteria are {@link readEpicBody}'s reading of the body,
  * kept verbatim.
  *
+ * The `--json` list follows `board.relationships` as the board listing's
+ * does ({@link boardListFields}): the command above in the `labels` mode,
+ * the default, and the same command over `nativeBoardListFields` in the
+ * `native` mode, whose rows are read with their relationship fields. The
+ * epic is still found by its `epic:` label here in both modes; the mode
+ * decides only what the one command asks for and reads.
+ *
  * ## Null, and when it warns
  *
  * {@link readEpicContext} never throws and never refuses: the epic is
@@ -49,6 +56,7 @@
  * reads.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 import type { Output } from '../ports/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -56,7 +64,7 @@ import { messageOf } from '../config-sections.js';
 
 import { readEpicBody } from './epic-body.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from './epics.js';
-import { BOARD_LIST_FIELDS, parseBoardListing } from './roadmap-board.js';
+import { boardListFields, parseBoardListing } from './roadmap-board.js';
 
 /** The label every epic issue carries. */
 export const EPIC_TYPE_LABEL = 'type:epic';
@@ -89,17 +97,19 @@ export interface EpicContextOptions {
   readonly gh: GhRunner;
   /** Where a warning goes; the active output when left out. */
   readonly output?: Output;
+  /** `board.relationships`: which fields are asked for and read. `labels` when left out. */
+  readonly mode?: BoardRelationshipMode;
 }
 
-/** The arguments the lookup hands `gh` for `slug`. */
-export function epicContextArgs(slug: string): readonly string[] {
+/** The arguments the lookup hands `gh` for `slug` in `mode`, `labels` when left out. */
+export function epicContextArgs(slug: string, mode: BoardRelationshipMode = 'labels'): readonly string[] {
   return Object.freeze([
     'issue', 'list',
     '--state', 'all',
     '--label', EPIC_TYPE_LABEL,
     '--label', `${EPIC_LABEL_PREFIX}${slug}`,
     '--limit', String(EPIC_CONTEXT_LIMIT),
-    '--json', BOARD_LIST_FIELDS,
+    '--json', boardListFields(mode),
   ]);
 }
 
@@ -112,7 +122,8 @@ function numbersOf(numbers: readonly number[]): string {
 async function findEpic(slug: string, options: EpicContextOptions, output: Output): Promise<EpicContext | null> {
   const id = `issue #${String(options.issue)}`;
   const label = `${EPIC_LABEL_PREFIX}${slug}`;
-  const args = epicContextArgs(slug);
+  const mode = options.mode ?? 'labels';
+  const args = epicContextArgs(slug, mode);
   const command = `gh ${args.join(' ')}`;
   const result = await options.gh(args);
   if (!result.ok) {
@@ -122,7 +133,7 @@ async function findEpic(slug: string, options: EpicContextOptions, output: Outpu
   }
   let epics;
   try {
-    epics = parseBoardListing(result.stdout, command);
+    epics = parseBoardListing(result.stdout, command, mode);
   } catch (error) {
     output.warn(`${PREFIX}: ${messageOf(error)}; ${id} is planned without its epic`);
     return null;

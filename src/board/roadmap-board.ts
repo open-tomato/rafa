@@ -64,7 +64,11 @@
  *
  * `board.relationships: native` (`.rafa/specs/rafa-340-relationships-
  * epics-blockers-github.md`) reads epics and blockers from GitHub's own
- * links. {@link parseBoardListing} reads them only when handed that mode:
+ * links. The listing asks `gh` for them only in that mode: its `--json`
+ * list is {@link boardListFields} of the mode, {@link BOARD_LIST_FIELDS}
+ * in `labels` and {@link nativeBoardListFields} in `native`, so a
+ * labels-mode listing sends the command above unchanged.
+ * {@link parseBoardListing} reads them only when handed that mode:
  * `parent`, `blockedBy`, `blocking`, `subIssuesSummary` and `subIssues`.
  * `subIssues` is read because `context/pull-requests.md` ("Native
  * relationships") records that it answers the order GitHub holds. In the
@@ -99,8 +103,23 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 /** What every refusal this module raises opens with. */
 const PREFIX = 'board listing';
 
-/** The fields the listing asks `gh issue list` for. */
+/** The fields the listing asks `gh issue list` for in the `labels` mode, the default. */
 export const BOARD_LIST_FIELDS = 'number,title,body,state,stateReason,labels';
+
+/**
+ * The fields the listing asks `gh issue list` for in the `native` mode:
+ * {@link BOARD_LIST_FIELDS} and then the five relationship fields
+ * {@link parseBoardListing} reads in that mode, in the order the module
+ * note lists them.
+ */
+export const nativeBoardListFields = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
+
+/** The `--json` fields a listing read in `mode` asks for. */
+export function boardListFields(mode: BoardRelationshipMode): string {
+  return mode === 'native'
+    ? nativeBoardListFields
+    : BOARD_LIST_FIELDS;
+}
 
 /** How many issues one listing reads when the caller names no limit; see the module note. */
 export const BOARD_LISTING_LIMIT = 1000;
@@ -167,16 +186,18 @@ export interface GhBoardListingOptions {
   readonly gh: GhRunner;
   /** How many issues to list: a positive whole number. {@link BOARD_LISTING_LIMIT} when left out. */
   readonly limit?: number;
+  /** `board.relationships`: which fields are asked for and read. `labels` when left out. */
+  readonly mode?: BoardRelationshipMode;
 }
 
-/** The arguments the listing hands `gh` for `limit`. */
-function listingArgs(limit: number): readonly string[] {
-  return ['issue', 'list', '--state', 'all', '--limit', String(limit), '--json', BOARD_LIST_FIELDS];
+/** The arguments the listing hands `gh` for `limit` in `mode`. */
+function listingArgs(limit: number, mode: BoardRelationshipMode): readonly string[] {
+  return ['issue', 'list', '--state', 'all', '--limit', String(limit), '--json', boardListFields(mode)];
 }
 
-/** The command a refusal names for `limit`. */
-export function boardListingCommand(limit: number): string {
-  return `gh ${listingArgs(limit).join(' ')}`;
+/** The command a refusal names for `limit` in `mode`, `labels` when left out. */
+export function boardListingCommand(limit: number, mode: BoardRelationshipMode = 'labels'): string {
+  return `gh ${listingArgs(limit, mode).join(' ')}`;
 }
 
 /** What a failed command wrote, for a message. Never empty. */
@@ -378,21 +399,23 @@ export function keepListing(listing: BoardListing): BoardListing {
 /**
  * The listing over `options.gh`: one
  * `gh issue list --state all --limit <n> --json number,title,body,state,stateReason,labels`
- * per call, answered as checked issues. Throws a `TypeError`, sending
+ * per call in the `labels` mode, the default, and the same command over
+ * {@link nativeBoardListFields} in the `native` mode, answered as
+ * issues checked in that mode by {@link parseBoardListing}. Throws a `TypeError`, sending
  * nothing, for a limit that is not a positive whole number; rejects,
  * naming the command, when `gh` failed or answered anything but a list
  * of issues.
  */
 export function createGhBoardListing(options: GhBoardListingOptions): BoardListing {
-  const { gh, limit = BOARD_LISTING_LIMIT } = options;
+  const { gh, limit = BOARD_LISTING_LIMIT, mode = 'labels' } = options;
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new TypeError(`${PREFIX}: limit ${describeValue(limit)}, expected a positive whole number`);
   }
-  const args = listingArgs(limit);
-  const command = boardListingCommand(limit);
+  const args = listingArgs(limit, mode);
+  const command = boardListingCommand(limit, mode);
   return async () => {
     const result = await gh(args);
     if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
-    return parseBoardListing(result.stdout, command);
+    return parseBoardListing(result.stdout, command, mode);
   };
 }
