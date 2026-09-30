@@ -265,6 +265,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
+import { readDeviceStoreId } from './claims/device.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -286,7 +287,7 @@ import {
 } from './start/dispatch.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
-import { prLifecycleSeamsIn, verifyPullRequest } from './start/pr-lifecycle.js';
+import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
@@ -565,6 +566,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
                 configured: runConfig.config.prProvider ?? null,
                 dir: checkout,
               }),
+              // A refused push reads this device's store id from the
+              // project root, where the store lives, not the checkout.
+              readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, runConfig.config)),
             },
           );
         }

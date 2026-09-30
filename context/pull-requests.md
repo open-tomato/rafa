@@ -59,7 +59,11 @@ two automatic preflight items run before any task is paid for:
 
 `rafa doctor` prints both checks. With `provider: none` the loop pushes the
 branch, prints the compare URL, skips the CI wait, skips the release
-stage's body write — there being no body — and says so each time. No other
+stage's body write — there being no body — and says so each time. A push
+of a claim branch the remote refuses because another store now owns the
+claim halts the run instead, exit 1 with the "claim lost" report, its
+commits kept on `lost/<stub>` and no compare URL printed
+(`src/start/pr-lifecycle.ts` over `src/claims/lost.ts`). No other
 provider is built; the functions in `src/utils/pr.ts` move behind one
 `PullRequests` interface in `src/pr/` so a second provider is an adapter
 later.
