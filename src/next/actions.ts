@@ -83,6 +83,14 @@
  * other word that runs. Without the option no word is added, and every
  * line is what it was before the flag existed.
  *
+ * `rafa next --roadmap --claim-ahead` hands
+ * {@link NextActionOptions.claimAhead} as well, and `plan` alone carries
+ * {@link CLAIM_AHEAD_WORD} after `--roadmap`: `plan create --next
+ * --roadmap --claim-ahead` also claims the line after its pick
+ * (`src/claims/ahead.ts`). `start` and `resume` claim nothing ahead, so
+ * their words are unchanged, and without `roadmap` the option adds no
+ * word to any action.
+ *
  * ## The actions with no command
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
@@ -187,10 +195,23 @@ export const ROADMAP_WORD = '--roadmap';
 /** The actions whose words carry {@link ROADMAP_WORD} under `--roadmap`; see the module note. */
 export const ROADMAP_PASSED_ACTIONS: ReadonlySet<NextCommandActionId> = new Set<NextCommandActionId>(['plan', 'start', 'resume']);
 
+/** The flag `rafa next --roadmap --claim-ahead` passes on to `plan`; see the module note. */
+export const CLAIM_AHEAD_WORD = '--claim-ahead';
+
 /** How the two functions here read a state beside the state itself. */
 export interface NextActionOptions {
   /** Whether the run was typed with `--roadmap`; see the module note. False when left out. */
   readonly roadmap?: boolean;
+  /** Whether it was typed with `--claim-ahead` too; read only beside `roadmap`. False when left out. */
+  readonly claimAhead?: boolean;
+}
+
+/** The words `action` adds after its own under `options`; see the module note. */
+function passedWords(action: NextCommandActionId, options: NextActionOptions): readonly string[] {
+  if (options.roadmap !== true || !ROADMAP_PASSED_ACTIONS.has(action)) return [];
+  return options.claimAhead === true && action === 'plan'
+    ? [ROADMAP_WORD, CLAIM_AHEAD_WORD]
+    : [ROADMAP_WORD];
 }
 
 /** The value a row filled in, or the defect of a row that proposed an action over none. */
@@ -256,7 +277,9 @@ export interface NextInvocation {
 
 /**
  * The command a state's action runs and the words it runs with,
- * `--roadmap` added under {@link NextActionOptions.roadmap}, or null
+ * `--roadmap` added under {@link NextActionOptions.roadmap} and
+ * `--claim-ahead` after it under {@link NextActionOptions.claimAhead}
+ * for `plan`, or null
  * for the four ids that run none: `none`, which proposes nothing, and
  * `sync`, `hop` and `home`, which the module note places.
  *
@@ -267,13 +290,10 @@ export function actionInvocation(state: NextState, options: NextActionOptions = 
   if (!runsCommand(state.action)) return null;
 
   const spec = ACTION_COMMANDS[state.action];
-  const passes = options.roadmap === true && ROADMAP_PASSED_ACTIONS.has(state.action);
   return Object.freeze({
     action: state.action,
     command: commandSpelling(spec),
-    argv: Object.freeze(passes
-      ? [...spec.argv(state), ROADMAP_WORD]
-      : spec.argv(state)),
+    argv: Object.freeze([...spec.argv(state), ...passedWords(state.action, options)]),
   });
 }
 

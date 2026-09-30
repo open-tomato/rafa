@@ -38,6 +38,19 @@
  * claimed or unclaimed answer carries, a label that could not be
  * written among them, are printed after it.
  *
+ * ## Claim ahead
+ *
+ * A `--next` spec carries what claim ahead reads (`ResolvedSpec.ahead`,
+ * `src/board/spec-source.ts`). With `claims.ahead: allow` or the run's
+ * `--claim-ahead` ({@link ClaimRouteSeams.claimsAhead}, `aheadEnabled`),
+ * {@link aheadRequestOf} reads the line after the pick and hands the
+ * claim an `ahead` request naming it and the board it was walked on;
+ * with neither, it reads nothing and hands none, so the run is the one
+ * it was before claim ahead. Two picks claim their issue alone, each
+ * with one warning saying so: one that followed a `rafa next --roadmap`
+ * hop, which walked no board and so has no line after it, and one whose
+ * line after it could not be read.
+ *
  * ## `--next` walks on
  *
  * A refused `--next` pick is printed as passed, with the reason naming
@@ -56,15 +69,18 @@
 import type { GateIssue } from '../../board/gate.js';
 import type { PlanSpecResolution } from '../../board/plan-spec.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
+import type { AheadRequest } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
+import type { ClaimsAhead } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
 import type { Output } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
-import { aheadClaimedLine, aheadNotClaimedWarning } from '../../claims/ahead.js';
+import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
 import { CommandExit } from '../../cli/command.js';
+import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 
@@ -84,6 +100,8 @@ export interface ClaimRouteSeams {
   readonly claim: (request: PlanClaimRequest) => Promise<PlanClaim>;
   /** Where the lines go. */
   readonly output: Output;
+  /** `claims.ahead`; `off` when left out. `--claim-ahead` rides on the spec. */
+  readonly claimsAhead?: ClaimsAhead;
 }
 
 /** What {@link resolveAndClaim} answers: a spec to plan with its stub and claim, or a stop. */
@@ -123,6 +141,43 @@ export function unclaimedWarning(claim: Extract<PlanClaim, { outcome: 'unclaimed
   return `⚠️  Planning issue #${String(claim.issue)} unclaimed: ${claim.reason}`;
 }
 
+/** The warning a pick that followed a hop prints under claim ahead: it walked no board. */
+export function hopAheadWarning(issue: number): string {
+  const home = `#${String(issue)}`;
+  return `⚠️  Claim ahead: ${home} was picked as the target of a rafa next --roadmap hop, which walks no board,`
+    + ` so there is no line after it to claim; ${home} is claimed alone`;
+}
+
+/** The warning a run prints when the line after its pick could not be read. */
+export function aheadUnreadWarning(issue: number, why: string): string {
+  const home = `#${String(issue)}`;
+  return `⚠️  Claim ahead: the line after ${home} could not be read, so ${home} is claimed alone: ${why}`;
+}
+
+/**
+ * The `ahead` request a claim on `spec` is handed, or undefined when
+ * claim ahead does not run for it; see the module note's "Claim ahead".
+ */
+export async function aheadRequestOf(
+  spec: ResolvedSpec,
+  setting: ClaimsAhead,
+  output: Output,
+): Promise<AheadRequest | undefined> {
+  const { ahead, issue } = spec;
+  if (ahead === undefined || issue === null || !aheadEnabled(setting, ahead.flag)) return undefined;
+  if (ahead.walk === null) {
+    output.warn(hopAheadWarning(issue));
+    return undefined;
+  }
+  try {
+    const candidate = await ahead.walk.candidate();
+    return { flag: ahead.flag, homeBoard: ahead.walk.board, candidate };
+  } catch (error) {
+    output.warn(aheadUnreadWarning(issue, messageOf(error)));
+    return undefined;
+  }
+}
+
 /** Prints a claimed or unclaimed answer and the warnings it carries. */
 function report(claim: Exclude<PlanClaim, { outcome: 'refused' }>, output: Output): void {
   if (claim.outcome === 'claimed') {
@@ -151,11 +206,15 @@ export async function resolveAndClaim(seams: ClaimRouteSeams): Promise<ClaimedRo
 
     const { spec, gate } = resolved;
     const stub = await seams.prepare(spec);
+    const ahead = await aheadRequestOf(spec, seams.claimsAhead ?? 'off', output);
     const claim = await seams.claim({
       issue: spec.issue,
       specPath: spec.path,
       stub,
       labels: spec.read?.labels ?? null,
+      ...ahead === undefined
+        ? {}
+        : { ahead },
     });
     if (claim.outcome !== 'refused') {
       report(claim, output);

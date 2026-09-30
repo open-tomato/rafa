@@ -1070,11 +1070,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../next/epic-end.js', ['epicEndLines', 'watchDryEpic']],
     ['../next/hint.js', ['commandWords', 'nextQuestion']],
     ['../next/lines.js', [
+      'CLAIM_AHEAD_FLAG',
       'DRY_RUN_FLAG',
       'dryRunOf',
       'MAX_ACTIONS',
       'NEXT_USAGE',
       'proposalLine',
+      'readClaimAhead',
       'readDryRun',
       'readRoadmap',
       'ROADMAP_FLAG',

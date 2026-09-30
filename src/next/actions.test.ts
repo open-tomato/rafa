@@ -78,6 +78,7 @@ import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   actionInvocation,
+  CLAIM_AHEAD_WORD,
   NEXT_COMMAND_ACTIONS,
   NEXT_IN_PROCESS_ACTIONS,
   ROADMAP_PASSED_ACTIONS,
@@ -343,6 +344,32 @@ describe('what an action is called with under --roadmap', () => {
   it('prints the word in the invocation the proposal line is written from', () => {
     expect(actionInvocation(STATES.plan, { roadmap: true })?.argv).toEqual(['--next', ROADMAP_WORD]);
     expect(actionInvocation(STATES.plan)?.argv).toEqual(['--next']);
+  });
+});
+
+describe('what an action is called with under --roadmap --claim-ahead', () => {
+  it('hands --claim-ahead to plan alone, after --roadmap, and leaves start and resume as --roadmap has them', async () => {
+    const { caller, seen } = harnessFor();
+
+    for (const action of ['plan', 'start', 'resume'] as const) {
+      await runAction(caller, STATES[action], { roadmap: true, claimAhead: true });
+    }
+
+    expect(seen.map((call) => [call.spelling, call.context.argv])).toEqual([
+      ['plan create', ['--next', ROADMAP_WORD, CLAIM_AHEAD_WORD]],
+      ['loop start', [`--plan=${PLAN}`, '--create-branch', ROADMAP_WORD]],
+      ['loop start', [`--plan=${PLAN}`, ROADMAP_WORD]],
+    ]);
+    expect(CLAIM_AHEAD_WORD).toBe('--claim-ahead');
+  });
+
+  it('adds it to no action without --roadmap, and to no action but plan with it', () => {
+    const without = NEXT_COMMAND_ACTIONS.flatMap((action) => actionInvocation(STATES[action], { claimAhead: true })?.argv ?? []);
+    const withRoadmap = NEXT_COMMAND_ACTIONS
+      .filter((action) => actionInvocation(STATES[action], { roadmap: true, claimAhead: true })?.argv.includes(CLAIM_AHEAD_WORD) === true);
+
+    expect(without.filter((word) => word === CLAIM_AHEAD_WORD || word === ROADMAP_WORD)).toEqual([]);
+    expect(withRoadmap).toEqual(['plan']);
   });
 });
 

@@ -17,7 +17,8 @@
  */
 import type { ClaimRouteSeams, PassOver } from './claim-route.js';
 import type { PlanSpecResolution } from '../../board/plan-spec.js';
-import type { SpecSourceKind } from '../../board/spec-source.js';
+import type { SpecLineAhead, SpecSourceKind } from '../../board/spec-source.js';
+import type { AheadCandidate } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimRequest } from '../../claims/plan-claim.js';
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -30,10 +31,13 @@ import { CommandExit } from '../../cli/command.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import {
+  aheadRequestOf,
+  aheadUnreadWarning,
   CLAIM_REFUSAL_EXIT,
   claimedLine,
   claimRefusalMessage,
   createPlanClaimContext,
+  hopAheadWarning,
   passedOverLine,
   resolveAndClaim,
   unclaimedWarning,
@@ -334,6 +338,121 @@ describe('resolveAndClaim on a refused claim', () => {
     expect((thrown as Error).message).toContain('picked #20 again');
   });
 });
+
+/** The board the line-ahead cases walk. */
+const HOME_BOARD = 7;
+
+/** The line after the pick the line-ahead cases plant. */
+const CANDIDATE: AheadCandidate = { issue: 21, title: 'The next one', board: HOME_BOARD, labels: ['spec'] };
+
+/** A walk whose line ahead is read by `read`, counting the reads. */
+function walkAhead(flag: boolean, read: () => Promise<AheadCandidate | null> = () => Promise.resolve(CANDIDATE)): {
+  ahead: SpecLineAhead;
+  reads: () => number;
+} {
+  let reads = 0;
+  const candidate = (): Promise<AheadCandidate | null> => {
+    reads += 1;
+    return read();
+  };
+  return { ahead: { flag, walk: { board: HOME_BOARD, candidate } }, reads: () => reads };
+}
+
+/** A `--next` resolution of `issue` carrying `ahead`. */
+function nextResolution(issue: number, ahead: SpecLineAhead): PlanSpecResolution {
+  const resolution = specResolution(issue, 'next');
+  return resolution.outcome === 'spec'
+    ? { ...resolution, spec: { ...resolution.spec, ahead } }
+    : resolution;
+}
+
+describe('resolveAndClaim with claim ahead', () => {
+  it('hands the claim the line ahead and its board under --claim-ahead with claims.ahead off', async () => {
+    const walk = walkAhead(true);
+    const { seams, kept } = planted([nextResolution(20, walk.ahead)], [claimedOn(20)]);
+
+    await resolveAndClaim({ ...seams, claimsAhead: 'off' });
+
+    expect(kept.requests).toEqual([{
+      issue: 20,
+      specPath: '.rafa/specs/rafa-20-issue.md',
+      stub: 'rafa-20-issue',
+      labels: LABELS,
+      ahead: { flag: true, homeBoard: HOME_BOARD, candidate: CANDIDATE },
+    }]);
+    expect(walk.reads()).toBe(1);
+  });
+
+  it('hands it under claims.ahead: allow with no flag, the flag carried as false', async () => {
+    const walk = walkAhead(false);
+    const { seams, kept } = planted([nextResolution(20, walk.ahead)], [claimedOn(20)]);
+
+    await resolveAndClaim({ ...seams, claimsAhead: 'allow' });
+
+    expect(kept.requests[0]?.ahead).toEqual({ flag: false, homeBoard: HOME_BOARD, candidate: CANDIDATE });
+  });
+
+  it('reads no line ahead and hands none with claims.ahead off and no flag, or claims.ahead left out', async () => {
+    const off = walkAhead(false);
+    const unset = walkAhead(false);
+    const offRun = planted([nextResolution(20, off.ahead)], [claimedOn(20)]);
+    const unsetRun = planted([nextResolution(20, unset.ahead)], [claimedOn(20)]);
+
+    await resolveAndClaim({ ...offRun.seams, claimsAhead: 'off' });
+    await resolveAndClaim(unsetRun.seams);
+
+    expect([off.reads(), unset.reads()]).toEqual([0, 0]);
+    expect([...offRun.kept.requests, ...unsetRun.kept.requests].map((request) => 'ahead' in request)).toEqual([false, false]);
+    expect([...offRun.kept.warn, ...unsetRun.kept.warn]).toEqual([]);
+  });
+
+  it('hands a null candidate on when no line follows the pick', async () => {
+    const walk = walkAhead(true, () => Promise.resolve(null));
+    const { seams, kept } = planted([nextResolution(20, walk.ahead)], [claimedOn(20)]);
+
+    await resolveAndClaim(seams);
+
+    expect(kept.requests[0]?.ahead).toEqual({ flag: true, homeBoard: HOME_BOARD, candidate: null });
+  });
+
+  it('claims a pick that followed a hop alone, with one warning saying why', async () => {
+    const { seams, kept } = planted([nextResolution(90, { flag: true, walk: null })], [claimedOn(90)]);
+
+    await resolveAndClaim(seams);
+
+    expect('ahead' in (kept.requests[0] ?? {})).toBe(false);
+    expect(kept.warn).toEqual([hopAheadWarning(90)]);
+    expect(hopAheadWarning(90)).toBe('⚠️  Claim ahead: #90 was picked as the target of a rafa next --roadmap hop, which walks'
+      + ' no board, so there is no line after it to claim; #90 is claimed alone');
+  });
+
+  it('claims the pick alone, with one warning, when the line ahead cannot be read', async () => {
+    const walk = walkAhead(true, () => Promise.reject(new Error('gh issue view 21: HTTP 502')));
+    const { seams, kept } = planted([nextResolution(20, walk.ahead)], [claimedOn(20)]);
+
+    await resolveAndClaim(seams);
+
+    expect('ahead' in (kept.requests[0] ?? {})).toBe(false);
+    expect(kept.warn).toEqual([aheadUnreadWarning(20, 'gh issue view 21: HTTP 502')]);
+    expect(kept.warn[0]).toBe('⚠️  Claim ahead: the line after #20 could not be read, so #20 is claimed alone: gh issue view 21: HTTP 502');
+  });
+
+  it('hands no line ahead for a spec that carries none, whatever claims.ahead says', async () => {
+    const { seams, kept } = planted([specResolution(20)], [claimedOn(20)]);
+
+    await resolveAndClaim({ ...seams, claimsAhead: 'allow' });
+
+    expect('ahead' in (kept.requests[0] ?? {})).toBe(false);
+    expect(await aheadRequestOf({ ...fileSpec(), ahead: { flag: true, walk: null } }, 'allow', sinkOutput({}))).toBeUndefined();
+  });
+});
+
+/** The spec of a `--spec` run, whose issue is null. */
+function fileSpec(): Extract<PlanSpecResolution, { outcome: 'spec' }>['spec'] {
+  const resolution = fileResolution('specs/my-feature.md');
+  if (resolution.outcome !== 'spec') throw new Error('a file resolution answered no spec');
+  return resolution.spec;
+}
 
 describe('resolveAndClaim before the claim', () => {
   it('claims nothing for a resolution that stopped', async () => {

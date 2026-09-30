@@ -32,13 +32,16 @@ import { ALWAYS_ASKED, BARE_YES_ACTIONS, ROADMAP_ACTIONS, YES_FLAG } from './cei
 import { commandWords } from './hint.js';
 
 /** The usage line every refusal here names. */
-export const NEXT_USAGE = 'rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]';
+export const NEXT_USAGE = 'rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]';
 
 /** The flag that prints the two lines and stops. */
 export const DRY_RUN_FLAG = 'dry-run';
 
 /** The flag that reads the hop rows and follows one blocker into another epic or board. */
 export const ROADMAP_FLAG = 'roadmap';
+
+/** The flag `--roadmap` passes on to `plan create`, so a plan step also claims the line after its pick. */
+export const CLAIM_AHEAD_FLAG = 'claim-ahead';
 
 /** The mark the state line opens with. */
 const STATE_MARK = '📍';
@@ -163,6 +166,23 @@ export function readDryRun(flags: RafaContext['flags']): boolean {
  */
 export function readRoadmap(flags: RafaContext['flags']): boolean {
   return readBareFlag(flags, ROADMAP_FLAG);
+}
+
+/**
+ * True under `--claim-ahead`, false without it, a value refused as
+ * {@link readDryRun} refuses one, and the flag refused with exit code 1
+ * on a line without `--roadmap` (`roadmap` false): the words it is
+ * passed on with are `plan create --next --roadmap`'s
+ * (`./actions.ts`), and a line that passes nothing on would take the
+ * flag and do nothing with it.
+ */
+export function readClaimAhead(flags: RafaContext['flags'], roadmap: boolean): boolean {
+  const claimAhead = readBareFlag(flags, CLAIM_AHEAD_FLAG);
+  if (claimAhead && !roadmap) {
+    throw lineRefusal(`--${CLAIM_AHEAD_FLAG} is passed on to plan create with --${ROADMAP_FLAG}, and this line gives no`
+      + ` --${ROADMAP_FLAG}; write --${ROADMAP_FLAG} --${CLAIM_AHEAD_FLAG}, or drop --${CLAIM_AHEAD_FLAG}`);
+  }
+  return claimAhead;
 }
 
 /** A flag that takes no value, read off `flags`; see {@link readDryRun}. */

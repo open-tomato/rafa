@@ -67,6 +67,25 @@
  * readiness gate of {@link SpecSourceOptions.inspect} included, exactly
  * as a line the walk picked at home does.
  *
+ * ## `--claim-ahead`, and the line after the pick
+ *
+ * `--claim-ahead` is read here and refused with exit
+ * {@link ROADMAP_REFUSAL_EXIT} on a line without `--next`
+ * ({@link claimAheadWithoutNextMessage}), as `--roadmap` is: the line it
+ * claims is the one after the walk's pick, and `--issue` and `--spec`
+ * walk nothing. With `--next` the request carries `claimAhead: true`,
+ * the key LEFT OUT without the flag.
+ *
+ * Every `--next` resolution answers {@link ResolvedSpec.ahead}: the flag,
+ * and the walk the pick came off — its board and a reader of the line
+ * after it — or null for a pick that followed a hop, which walked no
+ * board. The line is read only when that reader is called, so a run
+ * with claim ahead off (`claims.ahead: off` and no flag) spends no read
+ * on it; whether it is called is `plan create`'s
+ * (`src/commands/plan/claim-route.ts`), and what a claim does with it
+ * is `src/claims/ahead.ts`'s. The reader asks through the resolution's
+ * memoised issues, so a line the walk already read costs nothing more.
+ *
  * ## Where the checks go
  *
  * The readiness gate's cheap checks — trust, the `spec:ready` label,
@@ -142,13 +161,16 @@
  */
 import type { SpecIssue, SpecIssueReader, SpecSnapshot } from './issue.js';
 import type { RefreshOffer } from './snapshot-settle.js';
-import type { RoadmapOutcome, RoadmapSeams, RoadmapStop } from './spec-source-roadmap.js';
+import type { RoadmapOutcome, RoadmapSeams, RoadmapStop, RoadmapWalk } from './spec-source-roadmap.js';
+import type { AheadCandidate } from '../claims/ahead.js';
 import type { Output } from '../ports/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { nextUndoneLine } from '../claims/ahead.js';
 import { CommandExit } from '../cli/command.js';
 
 import {
+  CLAIM_AHEAD_FLAG,
   DRY_RUN_FLAG,
   ISSUE_FLAG,
   NEXT_FLAG,
@@ -164,13 +186,13 @@ import { pickRoadmapIssue } from './spec-source-roadmap.js';
 const PREFIX = 'board spec source';
 
 /**
- * The five flags this module reads, re-exported: the readings and the
+ * The six flags this module reads, re-exported: the readings and the
  * refusals are this module's, and the words are `./flags.js`'s, which
  * records why they sit there. `--refresh` is read here too and stays
  * `./issue.ts`'s to re-export, since the rule it changes is that
  * module's.
  */
-export { DRY_RUN_FLAG, ISSUE_FLAG, NEXT_FLAG, ROADMAP_FLAG, SPEC_FLAG };
+export { CLAIM_AHEAD_FLAG, DRY_RUN_FLAG, ISSUE_FLAG, NEXT_FLAG, ROADMAP_FLAG, SPEC_FLAG };
 
 /** The three flags, in the order a refusal names them. */
 export const SOURCE_FLAGS: readonly string[] = [SPEC_FLAG, ISSUE_FLAG, NEXT_FLAG];
@@ -178,7 +200,7 @@ export const SOURCE_FLAGS: readonly string[] = [SPEC_FLAG, ISSUE_FLAG, NEXT_FLAG
 /** The exit code a command line naming no source, or several, ends with. */
 export const SOURCE_REFUSAL_EXIT = 1;
 
-/** The exit code a line giving `--roadmap` without `--next` ends with; see the module note. */
+/** The exit code a line giving `--roadmap` or `--claim-ahead` without `--next` ends with; see the module note. */
 export const ROADMAP_REFUSAL_EXIT = 2;
 
 /** Which of the three flags named the spec. */
@@ -193,6 +215,8 @@ export type SpecSourceRequest =
     readonly roadmap: number | null;
     /** Set under `--roadmap` alone, and left out otherwise: follow an away hop to its target. */
     readonly followHop?: true;
+    /** Set under `--claim-ahead` alone, and left out otherwise: claim the line after the pick as well. */
+    readonly claimAhead?: true;
   };
 
 /** What the command line said about where the spec comes from. */
@@ -222,6 +246,12 @@ export function noSourceMessage(specsDir: string): string {
 export function roadmapWithoutNextMessage(): string {
   return `${ROADMAP_FLAG} follows a hop to the spec ${NEXT_FLAG} would plan, and this line gives no ${NEXT_FLAG};`
     + ` write ${NEXT_FLAG} ${ROADMAP_FLAG}, or drop ${ROADMAP_FLAG}`;
+}
+
+/** The sentence a line giving `--claim-ahead` without `--next` is refused with. */
+export function claimAheadWithoutNextMessage(): string {
+  return `${CLAIM_AHEAD_FLAG} claims the line after the one ${NEXT_FLAG} picks, and this line gives no ${NEXT_FLAG};`
+    + ` write ${NEXT_FLAG} ${CLAIM_AHEAD_FLAG}, or drop ${CLAIM_AHEAD_FLAG}`;
 }
 
 /** The sentence a flag given without its value is refused with. */
@@ -299,14 +329,27 @@ function withRoadmap(args: readonly string[], request: SpecSourceRequest | null)
 }
 
 /**
+ * `request` with `claimAhead` set when `args` gives `--claim-ahead`,
+ * refused when it does and `request` is not `--next`'s; `request` as it
+ * was when `args` does not, the key left out. See the module note.
+ */
+function withClaimAhead(args: readonly string[], request: SpecSourceRequest | null): SpecSourceRequest | null {
+  if (!readFlagWord(args, CLAIM_AHEAD_FLAG).given) return request;
+  if (request?.kind !== 'next') {
+    throw new CommandExit(ROADMAP_REFUSAL_EXIT, claimAheadWithoutNextMessage());
+  }
+  return { ...request, claimAhead: true };
+}
+
+/**
  * The source, the refresh and the dry run `args` name.
  *
  * Throws `CommandExit({@link SOURCE_REFUSAL_EXIT}, ...)` when more than
  * one of the three is given, when one of them is given without the
  * value it needs, and when `--issue` or `--next` is given something
  * that is not an issue number; and
- * `CommandExit({@link ROADMAP_REFUSAL_EXIT}, ...)` when `--roadmap` is
- * given without `--next`.
+ * `CommandExit({@link ROADMAP_REFUSAL_EXIT}, ...)` when `--roadmap` or
+ * `--claim-ahead` is given without `--next`.
  *
  * A line naming NONE of them answers a null request rather than
  * throwing: what a command with no source says is that command's usage,
@@ -327,7 +370,7 @@ export function readSpecSourceFlags(args: readonly string[]): SpecSourceFlags {
     ? null
     : requestOf(only.flag, only.word);
   return Object.freeze({
-    request: withRoadmap(args, request),
+    request: withClaimAhead(args, withRoadmap(args, request)),
     refresh: args.includes(REFRESH_FLAG),
     dryRun: args.includes(DRY_RUN_FLAG),
   });
@@ -377,6 +420,24 @@ export interface ResolvedSpec {
   readonly read: SpecIssue | null;
   /** The snapshot written, or null under `--spec`. */
   readonly snapshot: SpecSnapshot | null;
+  /** Under `--next` alone, what claim ahead reads; the key is left out otherwise. See the module note. */
+  readonly ahead?: SpecLineAhead;
+}
+
+/** The walk a `--next` pick came off, as claim ahead reads it. */
+export interface SpecWalkAhead {
+  /** The board whose lines were walked. */
+  readonly board: number;
+  /** Reads the next undone line after the pick, or null when none follows it. */
+  readonly candidate: () => Promise<AheadCandidate | null>;
+}
+
+/** What a `--next` resolution hands claim ahead; see the module note. */
+export interface SpecLineAhead {
+  /** True under `--claim-ahead`. */
+  readonly flag: boolean;
+  /** The walk the pick came off, or null for a pick that followed a hop. */
+  readonly walk: SpecWalkAhead | null;
 }
 
 /** Why a resolution stopped without a spec. */
@@ -421,6 +482,25 @@ function memoiseIssues(issues: SpecIssueReader): SpecIssueReader {
     read.set(issue, taken);
     return taken;
   };
+}
+
+/** The walk a pick came off, or undefined for `--issue` and for a pick that followed a hop. */
+function walkOf(picked: Extract<RoadmapOutcome, { issue: number }>): RoadmapWalk | undefined {
+  return 'walk' in picked
+    ? picked.walk
+    : undefined;
+}
+
+/** What claim ahead reads off a `--next` pick of `number`; see the module note. */
+function lineAheadOf(flag: boolean, number: number, walk: RoadmapWalk | undefined, issues: SpecIssueReader): SpecLineAhead {
+  if (walk === undefined) return Object.freeze({ flag, walk: null });
+  const candidate = async (): Promise<AheadCandidate | null> => {
+    const line = await nextUndoneLine(walk.lines, number, walk.readings);
+    if (line === null) return null;
+    const read = await issues(line.issue);
+    return Object.freeze({ issue: line.issue, title: read.title, board: walk.board, labels: read.labels });
+  };
+  return Object.freeze({ flag, walk: Object.freeze({ board: walk.board, candidate }) });
 }
 
 /**
@@ -505,6 +585,9 @@ export async function resolveSpecSource(options: SpecSourceOptions): Promise<Spe
       issue: number,
       read,
       snapshot,
+      ...request.kind === 'next'
+        ? { ahead: lineAheadOf(request.claimAhead === true, number, walkOf(picked), issues) }
+        : {},
     }),
   });
 }

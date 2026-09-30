@@ -87,7 +87,9 @@
  * a claim another store holds refuses `--issue` and `--spec` with exit
  * code 1 naming the owner, and passes a `--next` pick over, the walk
  * resolved again and going on; a claim that could not be made or pushed
- * writes the plan with a warning saying why.
+ * writes the plan with a warning saying why. A `--next` run under
+ * `claims.ahead: allow` or `--claim-ahead` also claims the line after
+ * its pick in the same push, both or neither (`claims/ahead.ts`).
  *
  * ## The verdict, and what the plan records
  *
@@ -607,6 +609,7 @@ export default async function plan(
     },
     claim: (request) => claimPlanIssue(request, createPlanClaimContext(repoRoot, config)),
     output: activeOutput(),
+    claimsAhead: config.claimsAhead,
   });
   // `--dry-run`, a roadmap with nothing left and a blocked next line
   // nobody said yes past have each said their piece already; the run is

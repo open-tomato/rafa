@@ -252,9 +252,24 @@ export interface RoadmapSeams {
 /** Why a `--next` walk stopped without an issue. */
 export type RoadmapStop = 'exhausted' | 'blocked';
 
-/** What a `--next` walk came to: the issue to plan from, or why the run stops. */
+/**
+ * The walk a pick was read off, for the line after it: the board whose
+ * body was read and the lines walked, the roadmap's or the one epic's,
+ * with the readings they were read through. Claim ahead reads it
+ * (`src/claims/ahead.ts`); a pick that followed a hop walked none.
+ */
+export interface RoadmapWalk {
+  readonly board: number;
+  readonly lines: readonly RoadmapLine[];
+  readonly readings: RoadmapReadings;
+}
+
+/**
+ * What a `--next` walk came to: the issue to plan from, with the walk
+ * it was picked on when it walked one, or why the run stops.
+ */
 export type RoadmapOutcome =
-  | { readonly issue: number }
+  | { readonly issue: number; readonly walk?: RoadmapWalk }
   | { readonly stop: RoadmapStop };
 
 /** What {@link pickRoadmapIssue} is handed. */
@@ -505,7 +520,10 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
   }
 
   output.info(pickLine(pick.line));
-  return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+  const settled = await settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+  return 'stop' in settled
+    ? settled
+    : { ...settled, walk: Object.freeze({ board: roadmap, lines: descent.lines, readings }) };
 }
 
 /**

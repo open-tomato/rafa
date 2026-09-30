@@ -14,11 +14,13 @@ import { CommandExit } from '../cli/command.js';
 
 import { BARE_YES_ACTIONS, YES_FLAG } from './ceiling.js';
 import {
+  CLAIM_AHEAD_FLAG,
   DRY_RUN_FLAG,
   dryRunOf,
   MAX_ACTIONS,
   NEXT_USAGE,
   proposalLine,
+  readClaimAhead,
   readDryRun,
   readRoadmap,
   ROADMAP_FLAG,
@@ -186,7 +188,37 @@ describe('the line', () => {
     expect(refused).toBeInstanceOf(CommandExit);
     expect((refused as CommandExit).exitCode).toBe(1);
     expect((refused as CommandExit).message).toBe(`❌ --${ROADMAP_FLAG} takes no value, and read "sync" as one\nUsage: ${NEXT_USAGE}`);
-    expect(NEXT_USAGE).toBe('rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]');
+    expect(NEXT_USAGE).toBe('rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]');
+  });
+
+  it('reads --claim-ahead beside --roadmap bare, negated, written out and left out', () => {
+    const read = [{}, { [CLAIM_AHEAD_FLAG]: true }, { [CLAIM_AHEAD_FLAG]: false }, { [CLAIM_AHEAD_FLAG]: 'true' }, { [CLAIM_AHEAD_FLAG]: 'false' }]
+      .map((flags) => readClaimAhead(flags, true));
+
+    expect(read).toEqual([false, true, false, true, false]);
+    expect(CLAIM_AHEAD_FLAG).toBe('claim-ahead');
+  });
+
+  it('refuses --claim-ahead without --roadmap with exit 1, and takes it left out or negated there', () => {
+    const refusal = ((): unknown => {
+      try {
+        return readClaimAhead({ [CLAIM_AHEAD_FLAG]: true }, false);
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    expect(refusal).toBeInstanceOf(CommandExit);
+    expect((refusal as CommandExit).exitCode).toBe(1);
+    expect((refusal as CommandExit).message).toBe('❌ --claim-ahead is passed on to plan create with --roadmap, and this'
+      + ' line gives no --roadmap; write --roadmap --claim-ahead, or drop --claim-ahead'
+      + `\nUsage: ${NEXT_USAGE}`);
+    expect([readClaimAhead({}, false), readClaimAhead({ [CLAIM_AHEAD_FLAG]: false }, false)]).toEqual([false, false]);
+  });
+
+  it('refuses a value --claim-ahead swallowed with exit 1', () => {
+    expect(() => readClaimAhead({ [CLAIM_AHEAD_FLAG]: 'sync' }, true))
+      .toThrow(`--${CLAIM_AHEAD_FLAG} takes no value, and read "sync" as one`);
   });
 
   it('refuses a value --dry-run swallowed, naming the usage', () => {
