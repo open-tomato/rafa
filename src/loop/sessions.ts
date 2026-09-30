@@ -35,6 +35,33 @@
  *     absolute path of that worktree (`start/session.ts`). A run in the
  *     main checkout carries no `worktree` key at all, as it carries no
  *     `hop`, and every later write keeps the path as it is.
+ *   - `steps`: the suite steps the runner has recorded for the run, oldest
+ *     first, each a {@link SessionStep}. The field is additive: a record
+ *     written before it, and a run that has recorded no step, carry no
+ *     `steps` key at all, and {@link sessionSteps} reads such a record as
+ *     holding none. A stored `steps: []` reads the same way and is written
+ *     back without the key. Steps are only ever appended
+ *     ({@link SessionChange}'s `appendStep`); every later write keeps them.
+ *
+ * ## Steps
+ *
+ * A {@link SessionStep} is one suite run the runner made for the run:
+ *
+ *   - `kind`: one of {@link SESSION_STEP_KINDS}, `baseline` at the plan's
+ *     first dispatch, `task` after a task commits, `stage` after a stage's
+ *     last task, `pre-wrap-up` before the wrap-up.
+ *   - `scope`: `affected`, `module` or `full` (`TEST_SCOPES`,
+ *     `utils/declaration.ts`), or the list of files and folders run, which
+ *     may be empty.
+ *   - `command`: the argv spawned, `bun` first, never empty.
+ *   - `exitCode`: the command's exit code, a whole number.
+ *   - `summary`: Bun's `Ran N tests across M files.` line, or null when it
+ *     printed none.
+ *   - `failures`: the failing tests, each a file and a full test name
+ *     (`SuiteFailure`, `suite/run.ts`).
+ *   - `newFailures`: those of `failures` that are new against the
+ *     baseline; every one of them is also in `failures`, compared by file
+ *     and name.
  *
  * ## One session is one `loop start`
  *
@@ -109,7 +136,9 @@
  * {@link SessionRecordError}, naming the file: text that is no JSON
  * object, a field of the wrong type or outside its set, a `hop` key whose
  * value is not a hop record (null included), a `worktree` key whose value
- * is no absolute path (null included), a pid that is no
+ * is no absolute path (null included), a `steps` key whose value is no
+ * list of steps (null included), a step outside the shape above or whose
+ * `newFailures` names a test its `failures` does not, a pid that is no
  * positive whole number (signal 0 to pid 0 or below would reach a process
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. {@link readSessions} reads
@@ -118,6 +147,8 @@
  * and refuses a file that is not there.
  */
 import type { HopRecord } from '../next/hop-record.js';
+import type { SuiteFailure } from '../suite/run.js';
+import type { TestScope } from '../utils/declaration.js';
 
 import {
   linkSync,
@@ -133,6 +164,7 @@ import { basename, dirname, isAbsolute, join } from 'node:path';
 import { messageOf } from '../config-sections.js';
 import { asHopRecord } from '../next/hop-record.js';
 import { scopeAt } from '../project/scope.js';
+import { TEST_SCOPES } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';
 
 /** The states a session record holds, in the spec's order. */
@@ -158,6 +190,27 @@ export interface SessionTask {
   readonly text: string;
 }
 
+/** The kinds of suite step a run records, in the order a run meets them. */
+export const SESSION_STEP_KINDS = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
+
+/** One of {@link SESSION_STEP_KINDS}. */
+export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
+
+/** One suite run the runner recorded for a session. See the module note. */
+export interface SessionStep {
+  readonly kind: SessionStepKind;
+  /** A named scope, or the files and folders run. */
+  readonly scope: TestScope | readonly string[];
+  /** The argv spawned, `bun` first. */
+  readonly command: readonly string[];
+  readonly exitCode: number;
+  /** Bun's summary line, or null when it printed none. */
+  readonly summary: string | null;
+  readonly failures: readonly SuiteFailure[];
+  /** Those of {@link SessionStep.failures} new against the baseline. */
+  readonly newFailures: readonly SuiteFailure[];
+}
+
 /** One `loop start` run, as its record holds it. See the module note. */
 export interface SessionRecord {
   readonly sessionId: string;
@@ -172,15 +225,19 @@ export interface SessionRecord {
   readonly hop?: HopRecord;
   /** The linked worktree the run's checkout is; left out of a run in the main checkout. See the module note. */
   readonly worktree?: string;
+  /** The suite steps recorded, oldest first; left out while there are none. Read it with {@link sessionSteps}. */
+  readonly steps?: readonly SessionStep[];
 }
 
-/** What a new record is made from; it opens `running`, with no task. */
-export type SessionDraft = Omit<SessionRecord, 'state' | 'task'>;
+/** What a new record is made from; it opens `running`, with no task and no step. */
+export type SessionDraft = Omit<SessionRecord, 'state' | 'task' | 'steps'>;
 
 /** What {@link updateSession} changes. A field left out keeps its stored value. */
 export interface SessionChange {
   readonly state?: SessionState;
   readonly task?: SessionTask | null;
+  /** A step appended after the stored ones. */
+  readonly appendStep?: SessionStep;
   /**
    * The stored states the change acts on. Any other refuses it with
    * {@link SessionStateError}, writing nothing. Every state when left out.
@@ -325,6 +382,78 @@ function worktreeProblem(fields: object): string | null {
     : `worktree is ${describeValue(worktree)}, expected an absolute path`;
 }
 
+/** True for a list of strings each holding more than whitespace. */
+function isTextList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every(isText);
+}
+
+/** True for a failing test: a file and a name, both text. */
+function isFailure(value: unknown): value is SuiteFailure {
+  return isObject(value) && isText(field(value, 'file')) && isText(field(value, 'name'));
+}
+
+/** True for a list of failing tests. */
+function isFailureList(value: unknown): value is readonly SuiteFailure[] {
+  return Array.isArray(value) && value.every(isFailure);
+}
+
+/** The key a failing test is compared by: its file and its name. */
+function failureKey(failure: SuiteFailure): string {
+  return JSON.stringify([failure.file, failure.name]);
+}
+
+/** The problem with a step's `failures` and `newFailures`, or null. */
+function stepFailuresProblem(step: object, at: string): string | null {
+  const failures = field(step, 'failures');
+  const newFailures = field(step, 'newFailures');
+  if (!isFailureList(failures)) return `${at}.failures is ${describeValue(failures)}, expected a list of failing tests`;
+  if (!isFailureList(newFailures)) {
+    return `${at}.newFailures is ${describeValue(newFailures)}, expected a list of failing tests`;
+  }
+  const known = new Set(failures.map(failureKey));
+  const stray = newFailures.find((failure) => !known.has(failureKey(failure)));
+  return stray === undefined
+    ? null
+    : `${at}.newFailures names ${describeValue(stray)}, which ${at}.failures does not`;
+}
+
+/** Every problem with one step, the `at` naming its place in the record. */
+function stepProblems(step: unknown, at: string): string[] {
+  if (!isObject(step)) return [`${at} is ${describeValue(step)}, expected a step`];
+  const kind = field(step, 'kind');
+  const scope = field(step, 'scope');
+  const command = field(step, 'command');
+  const exitCode = field(step, 'exitCode');
+  const summary = field(step, 'summary');
+  const problems = [
+    (SESSION_STEP_KINDS as readonly unknown[]).includes(kind)
+      ? null
+      : `${at}.kind is ${describeValue(kind)}, expected one of ${SESSION_STEP_KINDS.join(', ')}`,
+    (TEST_SCOPES as readonly unknown[]).includes(scope) || isTextList(scope)
+      ? null
+      : `${at}.scope is ${describeValue(scope)}, expected one of ${TEST_SCOPES.join(', ')} or a list of paths`,
+    isTextList(command) && command.length > 0
+      ? null
+      : `${at}.command is ${describeValue(command)}, expected a non-empty list of arguments`,
+    typeof exitCode === 'number' && Number.isSafeInteger(exitCode)
+      ? null
+      : `${at}.exitCode is ${describeValue(exitCode)}, expected a whole number`,
+    summary === null || typeof summary === 'string'
+      ? null
+      : `${at}.summary is ${describeValue(summary)}, expected null or a string`,
+    stepFailuresProblem(step, at),
+  ];
+  return problems.filter((problem): problem is string => problem !== null);
+}
+
+/** Every problem with a record's `steps`, none for a record without the key. */
+function stepsProblems(fields: object): string[] {
+  if (!Object.hasOwn(fields, 'steps')) return [];
+  const steps = field(fields, 'steps');
+  if (!Array.isArray(steps)) return [`steps is ${describeValue(steps)}, expected a list of steps`];
+  return steps.flatMap((step: unknown, index) => stepProblems(step, `steps[${index}]`));
+}
+
 /** The problem with a record's `sessionId`, read from `file`, or null. */
 function sessionIdProblem(sessionId: unknown, file: string): string | null {
   if (typeof sessionId !== 'string' || !isSessionId(sessionId)) {
@@ -370,6 +499,7 @@ function recordProblems(fields: object, file: string): string[] {
     taskProblem(field(fields, 'task')),
     hopProblem(fields),
     worktreeProblem(fields),
+    ...stepsProblems(fields),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
@@ -380,9 +510,35 @@ function freezeHop(value: unknown): HopRecord {
   return Object.freeze({ ...hop, home: Object.freeze(hop.home), from: Object.freeze(hop.from) });
 }
 
+/** A frozen list of failing tests already checked, each copied to its two fields. */
+function freezeFailures(failures: readonly SuiteFailure[]): readonly SuiteFailure[] {
+  return Object.freeze(failures.map((failure) => Object.freeze({ file: failure.file, name: failure.name })));
+}
+
+/** A frozen step already checked, its fields in the order they are written. */
+function freezeStep(step: SessionStep): SessionStep {
+  return Object.freeze({
+    kind: step.kind,
+    scope: typeof step.scope === 'string'
+      ? step.scope
+      : Object.freeze([...step.scope]),
+    command: Object.freeze([...step.command]),
+    exitCode: step.exitCode,
+    summary: step.summary,
+    failures: freezeFailures(step.failures),
+    newFailures: freezeFailures(step.newFailures),
+  });
+}
+
+/** The `steps` entry of a frozen record: none while the list is missing or empty. */
+function stepsEntry(steps: unknown): { readonly steps?: readonly SessionStep[] } {
+  if (!Array.isArray(steps) || steps.length === 0) return {};
+  return { steps: Object.freeze((steps as readonly SessionStep[]).map(freezeStep)) };
+}
+
 /**
  * A frozen record of fields already checked, in the order it is written;
- * `hop` then `worktree` last, each only when there.
+ * `hop`, `worktree` then `steps` last, each only when there.
  */
 function freezeRecord(fields: object): SessionRecord {
   const task = field(fields, 'task');
@@ -405,7 +561,13 @@ function freezeRecord(fields: object): SessionRecord {
     ...worktree === undefined
       ? {}
       : { worktree: worktree as string },
+    ...stepsEntry(field(fields, 'steps')),
   });
+}
+
+/** The steps a record holds, oldest first; none for a record written before the field. */
+export function sessionSteps(record: Pick<SessionRecord, 'steps'>): readonly SessionStep[] {
+  return record.steps ?? [];
 }
 
 /**
@@ -581,7 +743,8 @@ export function beginSession(
 
 /**
  * Changes the stored record of a session, reading it again first, and
- * answers the record written. Throws {@link SessionRecordError} when the
+ * answers the record written; a change's `appendStep` goes after the
+ * stored steps. Throws {@link SessionRecordError} when the
  * record cannot be read or the change would make it one that cannot be,
  * and {@link SessionStateError} when it stores a state the change's
  * `onlyFrom` leaves out.
@@ -592,12 +755,19 @@ export function updateSession(root: string, sessionId: string, change: SessionCh
   if (change.onlyFrom !== undefined && !change.onlyFrom.includes(stored.state)) {
     throw new SessionStateError(file, stored.state, change.onlyFrom);
   }
+  const appended = change.appendStep === undefined
+    ? []
+    : stepProblems(change.appendStep, `steps[${sessionSteps(stored).length}]`);
+  if (appended.length > 0) throw new SessionRecordError(file, `not written: ${appended.join('; ')}`);
   const record = freezeRecord({
     ...stored,
     state: change.state ?? stored.state,
     task: change.task === undefined
       ? stored.task
       : change.task,
+    steps: change.appendStep === undefined
+      ? sessionSteps(stored)
+      : [...sessionSteps(stored), change.appendStep],
   });
   writeRecordFile(file, record, false);
   return record;
