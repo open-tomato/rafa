@@ -53,12 +53,13 @@ a comment body cannot trigger it, and answers one of three ways.
 | Answer | Commands | The agent is told |
 | --- | --- | --- |
 | deny, hand it over | `rafa pr merge`, `release tag`, `self-update`, `loop start`, `issue ready`; `cleanup` without `--dry-run`; `next` without `--dry-run` or a `--yes` list of only `sync`, `wait`, `unblock`, `home`, `resume`; `gh pr merge` | Hand the line to the user in a `bash` block, and do not retry |
-| deny, use rafa | `gh pr view`, `checks`, `list`; `gh issue view`, `list`, `create`, `comment`, `close` | The rafa line that replaces it |
+| deny, use rafa | `gh pr view`, `checks`, and `list` with no filter; `gh issue view`, `list`, `create`, `comment`, `close` | The rafa line that replaces it |
 | ask | `plan create` without `--dry-run`, `pr triage`, `epic close`, `skill backfill` | That it starts a Claude session (🪙) |
 
-Everything else passes, `gh pr create`, `gh pr checkout`, `gh run view`
-and `gh api` included. To turn the hook off in a project, remove its
-entry from `.claude/settings.json`.
+Everything else passes: `gh pr list` with a filter or a closed state,
+since `rafa pr list` shows open pull requests only, and `gh pr create`,
+`gh pr checkout`, `gh run view` and `gh api`. To turn the hook off in a
+project, remove its entry from `.claude/settings.json`.
 
 ## Measured
 

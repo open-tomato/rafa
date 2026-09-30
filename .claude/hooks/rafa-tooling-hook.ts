@@ -30,6 +30,10 @@ const SEPARATORS = /&&|\|\||[;|\n]/;
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const ISSUE_NUMBER = /^#?\d+$/;
 const NEXT_SAFE_IDS = new Set(['sync', 'wait', 'unblock', 'home', 'resume']);
+// `rafa pr list` shows the open pull requests and takes no filter, so a
+// `gh pr list` that filters, or reads closed and merged ones, passes.
+const PR_LIST_FILTERS = ['state', 'head', 'base', 'search', 'author', 'label', 'assignee', 'draft', 'app'];
+const PR_LIST_SHORT_FILTERS = new Set(['-s', '-H', '-B', '-S', '-A', '-l', '-a', '-d']);
 
 const handOver = (line: string, why: string): Verdict => ({
   decision: 'deny',
@@ -63,7 +67,13 @@ const flagValue = (words: string[], name: string): string | undefined => words
 
 const numberIn = (words: string[]): string => words.find((word) => ISSUE_NUMBER.test(word))?.replace('#', '') ?? '<n>';
 
-const nextIsSafe = (words: string[]): boolean => {
+const prListFilters = (words: string[]): boolean => {
+  const openOnly = words.includes('--state=open') || words.join(' ').includes('--state open') || words.join(' ').includes('-s open');
+  const filters = PR_LIST_FILTERS.some((name) => hasFlag(words, name)) || words.some((word) => PR_LIST_SHORT_FILTERS.has(word));
+  return filters && !openOnly;
+};
+
+const nextIsSafe =(words: string[]): boolean => {
   if (hasFlag(words, 'dry-run')) return true;
   const ids = flagValue(words, 'yes');
   if (ids === undefined) return false;
@@ -95,7 +105,11 @@ const judgeGhPr = (words: string[]): Verdict | null => {
     : ` ${n}`;
   const instead = `gh ${words.join(' ')}`;
   if (action === 'merge') return handOver(`rafa pr merge${target}`, 'it merges and deletes branches');
-  if (action === 'list') return useRafa(instead, 'rafa pr list');
+  if (action === 'list') {
+    return prListFilters(words)
+      ? null
+      : useRafa(instead, 'rafa pr list');
+  }
   if (action === 'view' && hasFlag(words, 'web')) return useRafa(instead, `rafa pr view${target}`);
   if (action === 'checks' && hasFlag(words, 'watch')) return useRafa(instead, `rafa pr wait${target}`);
   if (action === 'view' || action === 'checks') {

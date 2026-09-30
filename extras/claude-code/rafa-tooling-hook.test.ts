@@ -82,7 +82,21 @@ describe('judgeLine: gh commands rafa replaces', () => {
     expect(judgeLine('gh pr merge 41 --squash --delete-branch')?.reason).toContain('`rafa pr merge 41` is the user\'s to run');
   });
 
-  test.each(['gh pr create --fill', 'gh pr checkout 41', 'gh run view 9 --log', 'gh api repos/x/y', 'gh auth status'])('lets %s through', (line) => {
+  test.each(['gh pr list --state open', 'gh pr list --json number'])('denies %s, which rafa pr list answers', (line) => {
+    expect(judgeLine(line)?.reason).toContain('rafa pr list');
+  });
+
+  test.each([
+    'gh pr create --fill',
+    'gh pr checkout 41',
+    'gh run view 9 --log',
+    'gh api repos/x/y',
+    'gh auth status',
+    'gh pr list --head feat/x --state all --json number',
+    'gh pr list --state merged',
+    'gh pr list -s closed',
+    'gh pr list --author @me',
+  ])('lets %s through', (line) => {
     expect(judgeLine(line)).toBeNull();
   });
 });
