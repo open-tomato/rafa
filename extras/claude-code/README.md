@@ -61,6 +61,21 @@ since `rafa pr list` shows open pull requests only, and `gh pr create`,
 `gh pr checkout`, `gh run view` and `gh api`. To turn the hook off in a
 project, remove its entry from `.claude/settings.json`.
 
+## What the pack cannot reach
+
+The app's prompt suggestions, the next prompt it offers in the message
+box after each reply, come from a request of their own, outside the
+session's turn. The skill never loads into that request, and the hook
+sees tool calls only, so a suggestion can still offer a rafa line as a
+prompt. Measured on 2026-09-30: after a reply that named no such line,
+the box offered `rafa issue ready 457`, a spec command, for a bug.
+
+The skill's rule for a message that is only a rafa line is the fallback.
+Accepting such a suggestion makes the session run the line, or hand it
+back as a `bash` block when it needs a terminal, at the cost of one
+round trip. To stop the suggestions themselves, turn off Prompt
+suggestions in the Code tab's settings.
+
 ## Measured
 
 Each run was a fresh `claude -p` session in this repository, allowed
