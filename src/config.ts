@@ -33,8 +33,11 @@
  * from.
  *
  *   - `config-sections.ts` holds every rule about a VALUE: the readers,
- *     the closed lists of values, the prerequisite item and module
- *     source shapes, and why nothing is coerced.
+ *     the closed lists of values, and why nothing is coerced.
+ *   - `config-items.ts` holds the prerequisite item and module source
+ *     shapes, read through the helpers `config-sections.ts` exports.
+ *     This module re-exports its types and kind lists, as it did while
+ *     they sat in `config-sections.ts`.
  *   - `config-schema.ts` holds every rule about a KEY: {@link RafaConfig}
  *     and its file keys, {@link CONFIG_DEFAULTS}, {@link CONFIG_FILE},
  *     the setting specs, and the section and known-key indexes built off
@@ -181,12 +184,7 @@ export type {
   ConfigVersion,
   InjectMode,
   LessonSwitch,
-  ModuleSource,
-  ModuleSourceKind,
-  OptionalPrerequisiteItem,
   OutputMode,
-  PrerequisiteItem,
-  PrerequisiteKind,
   PrProvider,
   ReleaseEnabled,
   RouteTarget,
@@ -200,14 +198,20 @@ export {
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
   INJECT_MODES,
-  MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
   PR_PROVIDERS,
-  PREREQUISITE_KINDS,
   RELEASE_AUTO,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
 } from './config-sections.js';
+export type {
+  ModuleSource,
+  ModuleSourceKind,
+  OptionalPrerequisiteItem,
+  PrerequisiteItem,
+  PrerequisiteKind,
+} from './config-items.js';
+export { MODULE_SOURCE_KINDS, PREREQUISITE_KINDS } from './config-items.js';
 
 /**
  * The layer that answered a setting: the command line, the project's

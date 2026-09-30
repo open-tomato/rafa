@@ -7,8 +7,9 @@
  * text into a layer, layers into one resolution — and re-exports
  * {@link RafaConfig}, {@link CONFIG_DEFAULTS} and {@link CONFIG_FILE},
  * so nothing outside the pair imports this file. `config-sections.ts`
- * holds every rule about a VALUE: the readers, the closed lists, the
- * item shapes, and why nothing is coerced. `config-readers.ts` holds
+ * holds every rule about a VALUE: the readers, the closed lists, and
+ * why nothing is coerced. `config-items.ts` holds the two item shapes
+ * the `prerequisites` and `modules` lists read. `config-readers.ts` holds
  * `mapOf`, whose ruling is on a KEY — the names a map setting's file
  * spells below its own key — and the named readers the settings below
  * are read through, `directory`, `trackerKind`, `releaseFile`,
@@ -91,6 +92,11 @@
  * that comparison argue for `full`, the change is that one line.
  */
 import type {
+  ModuleSource,
+  OptionalPrerequisiteItem,
+  PrerequisiteItem,
+} from './config-items.js';
+import type {
   DangerousReleaseSettings,
   PrSettings,
   ReleaseSettings,
@@ -100,10 +106,7 @@ import type {
   ConfigVersion,
   InjectMode,
   LessonSwitch,
-  ModuleSource,
-  OptionalPrerequisiteItem,
   OutputMode,
-  PrerequisiteItem,
   Reader,
   RouteTarget,
   SkillResolverName,
@@ -115,6 +118,14 @@ import type {
 
 import { join } from 'node:path';
 
+import {
+  MODULE_SOURCE_KEYS,
+  moduleSource,
+  OPTIONAL_ITEM_KEYS,
+  optionalPrerequisite,
+  REQUIRED_ITEM_KEYS,
+  requiredPrerequisite,
+} from './config-items.js';
 import {
   directory,
   routeTable,
@@ -141,15 +152,9 @@ import {
   issueNumber,
   lessonSwitch,
   listOf,
-  MODULE_SOURCE_KEYS,
-  moduleSource,
-  OPTIONAL_ITEM_KEYS,
   oneOf,
-  optionalPrerequisite,
   OUTPUT_MODES,
   recurrenceCount,
-  REQUIRED_ITEM_KEYS,
-  requiredPrerequisite,
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,

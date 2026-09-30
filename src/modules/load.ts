@@ -86,7 +86,7 @@
  */
 import type { AdapterRegistry, AnyAdapter } from '../adapters/registry.js';
 import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
-import type { ModuleSource } from '../config-sections.js';
+import type { ModuleSource } from '../config-items.js';
 import type { ResolvedConfig } from '../config.js';
 import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
 

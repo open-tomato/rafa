@@ -6,8 +6,9 @@
  * `resolveConfig` are pure, so every precedence and refusal case here
  * runs without a disk. Reading the files, from a project root and a
  * home, is `config-load.ts`, driven in `config-load.test.ts`. The value
- * readers are driven one by one in `config-sections.test.ts`; here each
- * section is reached through a file's text. The schema itself — the
+ * readers are driven one by one in `config-sections.test.ts`, and the
+ * item-shape readers in `config-items.test.ts`; here each section is
+ * reached through a file's text. The schema itself — the
  * dotted file key per setting, the sections a file may open, and the
  * known-key index — is `config-schema.ts`, driven in
  * `config-schema.test.ts`; here it is reached through `config.js`,
