@@ -34,7 +34,8 @@
  * A change rafa makes itself — a label swapped, a body edited, a line
  * ticked — moves the issue's `updated_at`, so the next read picks it up
  * with no invalidation step of its own; so does a change made on GitHub
- * by hand.
+ * by hand. A relationship write in the `native` mode is the exception:
+ * see "Rows a relationship write touched" below.
  *
  * ## The mode the file was written in
  *
@@ -63,6 +64,22 @@
  * `updated_at` and not the blocked issue's (scratch A#14 kept its
  * creation time after its blocker B#1 closed), so a kept row's linked
  * issue holds the title and state it had when that row was last read.
+ *
+ * ## Rows a relationship write touched
+ *
+ * A sub-issue or blocked-by link added or removed moves neither end's
+ * `updated_at`, so {@link invalidateRows} is the step the writer takes:
+ * it drops the rows of the issues the write touched from a `native` file
+ * and records their numbers under `stale`, and the next read sends,
+ * after its `since` read, one more `gh api graphql` read of those issues
+ * by number (`./board-cache-native.ts`) and clears `stale`. Only a read
+ * that follows an invalidation sends it. A file with nothing stale has no
+ * `stale` key, and a `labels` file is left alone: in that mode a
+ * relationship is a label or a body line, whose edit moves `updated_at`.
+ *
+ * The invalidation rewrites the file as a read does, whole, so a read
+ * rewriting it at the same moment can win and lose the record; the next
+ * `--refresh` reads the board whole.
  *
  * The cache also belongs to the project root and not to a repository
  * name, so a checkout whose `origin` moved to another repository needs
@@ -94,7 +111,7 @@ import { dirname, join } from 'node:path';
 import { isMapping } from '../config-sections.js';
 import { SCOPE_DIR } from '../project/scope.js';
 
-import { nativeChangedArgs, nativeRowFields } from './board-cache-native.js';
+import { nativeChangedArgs, nativeIssuesArgs, nativeRowFields } from './board-cache-native.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing, parseBoardListing } from './roadmap-board.js';
 
 /** Where the cache is kept, relative to the project root. */
@@ -140,6 +157,8 @@ interface BoardCache {
   readonly watermark: string;
   /** The listing's rows, as `gh` writes them. */
   readonly rows: readonly Readonly<Record<string, unknown>>[];
+  /** Issues whose rows {@link invalidateRows} dropped, read by number on the next read; left out of the file when empty. */
+  readonly stale: readonly number[];
 }
 
 /** What {@link createCachedBoardListing} is made with. */
@@ -177,15 +196,31 @@ function readCache(path: string, mode: BoardRelationshipMode): BoardCache | null
   if (version !== BOARD_CACHE_VERSION || typeof watermark !== 'string' || watermark === '') return null;
   if (modeOfFile(payload['mode']) !== mode) return null;
   if (!Array.isArray(rows) || !rows.every(isMapping)) return null;
-  return { version, mode, watermark, rows };
+  const stale = staleOfFile(payload['stale']);
+  if (stale === null) return null;
+  return { version, mode, watermark, rows, stale };
+}
+
+/** True when `value` is a positive integer, an issue number. */
+function isIssueNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+/** The numbers a file's `stale` key names, none when it has none, or null when it is not a list of issue numbers. */
+function staleOfFile(value: unknown): readonly number[] | null {
+  if (value === undefined) return [];
+  return Array.isArray(value) && value.every(isIssueNumber)
+    ? value
+    : null;
 }
 
 /** What the file holds for `cache`: no `mode` key in the `labels` mode. See the module note. */
 function fileOf(cache: BoardCache): Readonly<Record<string, unknown>> {
-  const { version, mode, watermark, rows } = cache;
-  return mode === 'native'
+  const { version, mode, watermark, rows, stale } = cache;
+  if (mode !== 'native') return { version, watermark, rows };
+  return stale.length === 0
     ? { version, ...NATIVE_MODE_KEY, watermark, rows }
-    : { version, watermark, rows };
+    : { version, ...NATIVE_MODE_KEY, watermark, rows, stale };
 }
 
 /** Writes `cache` to `path` whole; false when it could not be written. See the module note. */
@@ -257,12 +292,28 @@ function incrementalArgs(cache: BoardCache): readonly string[] {
     : changedArgs(cache.watermark);
 }
 
+/** The rows `gh` answers to `args`, or null when it fails or answers something else. */
+async function readRows(gh: GhRunner, args: readonly string[]): Promise<readonly Readonly<Record<string, unknown>>[] | null> {
+  const answered = await gh(args);
+  return answered.ok
+    ? parseChangedRows(answered.stdout)
+    : null;
+}
+
+/** The rows of `cache`'s stale issues read again, none when it has none; see the module note. */
+function readStale(gh: GhRunner, cache: BoardCache): Promise<readonly Readonly<Record<string, unknown>>[] | null> {
+  return cache.stale.length === 0
+    ? Promise.resolve([])
+    : readRows(gh, nativeIssuesArgs(cache.stale));
+}
+
 /** The cached listing brought up to date, or null when it cannot be; see the module note. */
 async function readIncremental(gh: GhRunner, path: string, cache: BoardCache): Promise<readonly BoardIssue[] | null> {
-  const answered = await gh(incrementalArgs(cache));
-  if (!answered.ok) return null;
-  const changed = parseChangedRows(answered.stdout);
-  if (changed === null) return null;
+  const since = await readRows(gh, incrementalArgs(cache));
+  if (since === null) return null;
+  const restored = await readStale(gh, cache);
+  if (restored === null) return null;
+  const changed = [...since, ...restored];
   const rows = mergeRows(cache.rows, changed);
   let issues: readonly BoardIssue[];
   try {
@@ -270,8 +321,8 @@ async function readIncremental(gh: GhRunner, path: string, cache: BoardCache): P
   } catch {
     return null;
   }
-  if (!changesNothing(cache.rows, changed)) {
-    writeCache(path, { ...cache, watermark: newestUpdate(changed, cache.watermark), rows });
+  if (cache.stale.length > 0 || !changesNothing(cache.rows, changed)) {
+    writeCache(path, { ...cache, watermark: newestUpdate(changed, cache.watermark), rows, stale: [] });
   }
   return issues;
 }
@@ -313,7 +364,33 @@ export function createCachedBoardListing(options: CachedBoardListingOptions): Bo
     const watermark = mark.ok
       ? mark.stdout.trim()
       : '';
-    if (watermark !== '') writeCache(path, { version: BOARD_CACHE_VERSION, mode, watermark, rows: issues.map(rowOf) });
+    if (watermark !== '') {
+      writeCache(path, { version: BOARD_CACHE_VERSION, mode, watermark, rows: issues.map(rowOf), stale: [] });
+    }
     return issues;
   };
+}
+
+/**
+ * Drops the kept rows of the issues `numbers` from the `native` file
+ * under `root` and records them as stale, so the next read reads them
+ * again by number; see "Rows a relationship write touched" in the module
+ * note. Called after a relationship write, with both ends of the link.
+ * Leaves no file, a file this version cannot read and a `labels` file as
+ * they are. True when the file records every number afterwards; false
+ * when there is no `native` file to record them in or it could not be
+ * written. Throws a `RangeError` naming a number that is not a positive
+ * integer.
+ */
+export function invalidateRows(root: string, numbers: readonly number[]): boolean {
+  const bad = numbers.find((number) => !isIssueNumber(number));
+  if (bad !== undefined) throw new RangeError(`not an issue number: ${String(bad)}`);
+  const path = join(root, BOARD_CACHE_FILE);
+  const cache = readCache(path, 'native');
+  if (cache === null) return false;
+  if (numbers.length === 0) return true;
+  const touched = new Set(numbers);
+  const stale = [...new Set([...cache.stale, ...numbers])].sort((left, right) => left - right);
+  const rows = cache.rows.filter((row) => !touched.has(row['number'] as number));
+  return writeCache(path, { ...cache, rows, stale });
 }

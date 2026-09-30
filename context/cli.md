@@ -1427,8 +1427,10 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/board/board-cache.ts`): a first read takes a watermark (the
   newest `updated_at` on the repository) and then the full listing, and
   every later read sends one `gh api --paginate` for the issues changed
-  since, laying them over the kept rows; `--refresh` reads the whole
-  board again, the only way to drop a deleted or transferred issue. A
+  since, laying them over the kept rows, plus, in the `native` mode after
+  `invalidateRows` recorded the issues a relationship write touched, one
+  `gh api graphql` read of those issues by number; `--refresh` reads the
+  whole board again, the only way to drop a deleted or transferred issue. A
   case planting `gh` reads uncached unless it sets
   `IssueSeams.boardCache`. One `gh` read of the board and one of the Roadmap
   body itself: when the board is unreachable, a `warn:` line is printed

@@ -855,3 +855,22 @@ last read.
 
 Not measured: a board large enough that a page of the incremental read
 times out, and a page cost on a board whose issues hold many links.
+
+#### The read by number after a relationship write
+
+A relationship write moves no `updated_at` (above), so the kept listing
+drops the rows `invalidateRows` (`src/board/board-cache.ts`) is given and
+reads them again by number on the next read. Measured 2026-09-30 with
+`gh version 2.100.0 (2026-09-03)`, read-only, on `RAFA_340_SCRATCH_A`,
+with the argv `nativeIssuesArgs` (`src/board/board-cache-native.ts`)
+builds: one `gh api graphql` query aliasing each number as
+`i<n>: issue(number: n) { ...row }`, the fragment asking what the `since`
+read asks.
+
+| Numbers | Answer |
+|---|---|
+| #1, #2 | two rows in the `since` read's shape, exit 0 |
+| #1, #99999 (not in the repository) | #1's node, `i99999: null` and a `NOT_FOUND` error; `gh` printed the error and exited 1 |
+
+What follows: a touched issue that is gone fails the read, and the kept
+listing falls back to a full one.

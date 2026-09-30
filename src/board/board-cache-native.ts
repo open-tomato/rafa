@@ -42,27 +42,83 @@
  * host, so the issue read back is the issue written. A truncated list is
  * written with its `truncated.total` as `totalCount`, which reads back as
  * the same truncation.
+ *
+ * ## The rows a relationship write touched
+ *
+ * A sub-issue or blocked-by link added or removed moves neither end's
+ * `updated_at` (measured 2026-09-30, `context/pull-requests.md`, "A
+ * relationship write does not move `updated_at`"), so the `since` read
+ * never answers the two issues it touched. `invalidateRows`
+ * (`./board-cache.ts`) drops their rows and records their numbers, and
+ * the next read sends {@link nativeIssuesArgs} for them: one
+ * `gh api graphql` query naming each issue by number under an alias, and
+ * the same `jq` row as the `since` read. Measured 2026-09-30 with `gh`
+ * 2.100.0, read-only, on the #340 scratch repository A: numbers #1 and
+ * #2 answered their two rows and exit 0; #1 with #99999, a number the
+ * repository does not hold, answered #1's node, `i99999: null` and a
+ * `NOT_FOUND` error, and `gh` exited 1. So a number GitHub no longer
+ * holds fails the read, and the kept listing falls back to a full one,
+ * which leaves the gone issue out.
  */
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks } from './roadmap-board.js';
+
+/** What both native reads ask of each issue: the listing's fields, `updatedAt` and the relationship fields. */
+const NATIVE_ISSUE_SELECTION = [
+  'number title body state stateReason updatedAt',
+  ' labels(first: 100) { nodes { name } }',
+  ' parent { number title state url }',
+  ' blockedBy(first: 50) { nodes { number title state url } totalCount }',
+  ' blocking(first: 50) { nodes { number title state url } totalCount }',
+  ' subIssuesSummary { total completed percentCompleted }',
+  ' subIssues(first: 100) { nodes { number title state url } totalCount }',
+].join('');
 
 /** The GraphQL query the incremental read sends in the `native` mode; see the module note. */
 export const NATIVE_CHANGED_QUERY = [
   'query($owner: String!, $repo: String!, $since: DateTime!, $endCursor: String) {',
   ' repository(owner: $owner, name: $repo) {',
   ' issues(first: 100, after: $endCursor, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: ASC}) {',
-  ' nodes { number title body state stateReason updatedAt',
-  ' labels(first: 100) { nodes { name } }',
-  ' parent { number title state url }',
-  ' blockedBy(first: 50) { nodes { number title state url } totalCount }',
-  ' blocking(first: 50) { nodes { number title state url } totalCount }',
-  ' subIssuesSummary { total completed percentCompleted }',
-  ' subIssues(first: 100) { nodes { number title state url } totalCount } }',
+  ` nodes { ${NATIVE_ISSUE_SELECTION} }`,
   ' pageInfo { hasNextPage endCursor } } } }',
 ].join('');
 
-/** The `jq` filter that writes each changed issue of a page as a kept native row. */
-const NATIVE_CHANGED_ROWS = '.data.repository.issues.nodes[] | {number, title, body, state, stateReason,'
+/** The `jq` object an issue node is written as, a kept native row. */
+const NATIVE_ROW = '{number, title, body, state, stateReason,'
   + ' labels: [.labels.nodes[] | {name}], parent, blockedBy, blocking, subIssuesSummary, subIssues, updatedAt}';
+
+/** The `jq` filter that writes each changed issue of a page as a kept native row. */
+const NATIVE_CHANGED_ROWS = `.data.repository.issues.nodes[] | ${NATIVE_ROW}`;
+
+/** The `jq` filter that writes each issue {@link nativeIssuesArgs} answered as a kept native row, skipping a null one. */
+const NATIVE_ISSUE_ROWS = `.data.repository[] | select(. != null) | ${NATIVE_ROW}`;
+
+/**
+ * The GraphQL query reading `numbers` by number, each under the alias
+ * `i<number>`; see the module note. Throws a `RangeError` when a number
+ * is not a positive integer, since it is written into the query.
+ */
+export function nativeIssuesQuery(numbers: readonly number[]): string {
+  const bad = numbers.find((number) => !Number.isInteger(number) || number < 1);
+  if (bad !== undefined) throw new RangeError(`not an issue number: ${String(bad)}`);
+  const issues = numbers.map((number) => ` i${String(number)}: issue(number: ${String(number)}) { ...row }`).join('');
+  return `query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) {${issues} } } fragment row on Issue { ${NATIVE_ISSUE_SELECTION} }`;
+}
+
+/** The `gh api graphql` arguments that read the issues `numbers` in the `native` mode; see the module note. */
+export function nativeIssuesArgs(numbers: readonly number[]): readonly string[] {
+  return Object.freeze([
+    'api',
+    'graphql',
+    '-F',
+    'owner={owner}',
+    '-F',
+    'repo={repo}',
+    '-f',
+    `query=${nativeIssuesQuery(numbers)}`,
+    '--jq',
+    NATIVE_ISSUE_ROWS,
+  ]);
+}
 
 /** The `gh api graphql` arguments that read the issues changed since `watermark` in the `native` mode. */
 export function nativeChangedArgs(watermark: string): readonly string[] {
