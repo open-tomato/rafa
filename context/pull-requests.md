@@ -589,10 +589,15 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   issue titled "Roadmap". Its body is parsed by code: task-list lines
   `- [ ] #<n>` in order. A line is DONE when it is ticked or its issue is
   closed. A line is TAKEN when a branch `feat/rafa-<n>-*` exists locally or
-  on the remote, or an open PR closes it. The first line neither done nor
-  taken is the answer; then as `--issue=<n>`. It prints what it skipped and
-  why ("#20 taken: PR #33 open"), and exits 0 with a message when nothing is
-  left. `--dry-run` prints the pick and stops.
+  on the remote, or an open PR closes it. A branch the remote holds is read
+  for its claim (`src/board/roadmap-claims.ts`): a released claim does not
+  take the line, a stale `rafa:claimed` claim passes it as a takeover
+  candidate ("#20 takeover candidate: branch <b>, claimed by <store>, has
+  stood idle 4d"), and a stale `rafa:in-development` claim keeps it taken
+  with a stale note. The first line neither done nor taken is the answer;
+  then as `--issue=<n>`. It prints what it skipped and why ("#20 taken: PR
+  #33 open"), and exits 0 with a message when nothing is left. `--dry-run`
+  prints the pick and stops.
 
   A pick that is BLOCKED is the one line the walk offers its way past.
   Its issue carries `spec:blocked` and its `Blocked by:` line names a
