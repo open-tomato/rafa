@@ -15,7 +15,33 @@
  * {@link RoadmapSeams}, and the position file under the project root
  * through `readCurrentPlace` (`./roadmap-rows.ts`), so every case in
  * `./spec-source-roadmap.test.ts` drives fakes of its own and writes in
- * its own temporary directory.
+ * its own temporary directory; `./spec-source-roadmap-native.test.ts`
+ * holds the `native` cases.
+ *
+ * ## The mode
+ *
+ * Which epic a line is in, in what order an epic is walked, and what a
+ * pick waits on are relationships, read through the board's
+ * relationships port, {@link RoadmapSeams.relations}
+ * (`./relations/port.ts`), in the mode `board.relationships` names.
+ * The port goes to the epic walk (`pickDescendedLine` and `readEpics`,
+ * which read an epic's members through it) and to what a pick waits on
+ * (`blockingOf`, `./blocked-line.ts`), for the pick, the alternative
+ * under a blocked one and an away hop's target alike.
+ *
+ * - Left out, or in `labels` mode, every reading below is the one it
+ *   was before the port: the `spec:blocked` label and the `Blocked by:`
+ *   line off the issue the memoised reader holds, each blocker's state
+ *   through that same reader, and the listing never asked for it.
+ * - In `native` mode what a pick waits on is its row on the run's ONE
+ *   listing, read through the port: its `blockedBy` nodes, each with
+ *   the state GitHub holds for it, so no `spec:blocked` label or
+ *   `Blocked by:` line is read and no blocker is read one at a time.
+ *   The listing is the one {@link RoadmapSeams.listing} answers, read
+ *   at most once per run and shared with the place and the walk, so a
+ *   pick costs one listing where no epic line or place asked for it
+ *   first. A pick the listing does not hold is held back as blocked,
+ *   as `./blocked-line.ts` records.
  *
  * ## Where the walk starts
  *
@@ -61,9 +87,11 @@
  * pick is the record's target C, whether `--next` or `--next=<n>` was
  * typed: C is on the board the record names, not on the one the walk
  * would read, so no board is resolved, no roadmap body read or
- * inspected, no branch scanned and no listing made. C is read once
- * through the memoised reader for its `Blocked by:` line, a C with a
- * blocker still open stops `blocked` ({@link hopBlockedMessage}; a
+ * inspected, no branch scanned, and in `labels` mode no listing made.
+ * C is read once through the memoised reader for its `Blocked by:`
+ * line (in `native` mode its row on the one listing is read through the
+ * port instead; see "The mode"), a C with a blocker still open stops
+ * `blocked` ({@link hopBlockedMessage}; a
  * hop's chain never reaches a second one, so nothing is offered in its
  * place), and otherwise its number is answered and the funnel's
  * readiness gate runs on it as on any line picked at home.
@@ -95,10 +123,11 @@
  * what a `--dry-run` run and a run with no terminal both get
  * (`./plan-spec.ts`).
  *
- * The blocked reading costs NO command of its own: the label and the
- * `Blocked by:` line are read off the issue the walk already read to
- * ask whether it was closed, and each blocker's state goes through the
- * same memoised reader. It runs before the funnel's `inspect`, so a
+ * In `labels` mode the blocked reading costs NO command of its own: the
+ * label and the `Blocked by:` line are read off the issue the walk
+ * already read to ask whether it was closed, and each blocker's state
+ * goes through the same memoised reader. In `native` mode it costs the
+ * run's one listing at most ("The mode"). It runs before the funnel's `inspect`, so a
  * blocked pick is never offered the `spec:ready` label on its way past;
  * the line the offer names goes through `inspect` in full, exactly as a
  * typed `--issue=<n>` would.
@@ -131,8 +160,10 @@
  * told apart by labels already read and a roadmap with no epic line
  * spends nothing more and prints the same lines. The board is listed
  * through {@link RoadmapSeams.listing} only for an open `now` epic line,
- * or when a position file is there to weigh. Walking into one prints its
- * header, each open member missing from its checklist, then the walk
+ * when a position file is there to weigh, or, in `native` mode, for
+ * what a pick waits on. Walking into one prints its header, each open
+ * member missing from its checklist (its open sub-issues are walked in
+ * the epic's order in `native` mode, `./epic-walk.ts`), then the walk
  * over its lines; a blocked pick's alternative is looked for among those
  * lines only. An epic whose every line is done or taken has run dry: the
  * run stops `exhausted` on that sentence and never reads on into a
@@ -148,9 +179,16 @@
  * still has the local half, the operator is told which half is
  * missing, and a laptop with no network still plans.
  */
-import type { AlternativeOffer, BlockedLine, PassedLine, PlannableReadings } from './blocked-line.js';
+import type {
+  AlternativeOffer,
+  BlockedLine,
+  BlockerWaiting,
+  PassedLine,
+  PlannableReadings,
+} from './blocked-line.js';
 import type { BoardLister } from './boards.js';
 import type { DescendedEpic, DescendedPick, DescentPass } from './epic-walk.js';
+import type { EpicRelations } from './epics.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type {
@@ -169,12 +207,11 @@ import { readPositionFile } from '../project/position.js';
 
 import {
   blockedLineSentence,
-  blockerStatesOf,
+  blockingOf,
   declinedMessage,
   noAlternativeMessage,
   pickPlannableLine,
   plannableReadings,
-  readBlockedLine,
   unaskedMessage,
 } from './blocked-line.js';
 import { resolveDefaultBoard } from './boards.js';
@@ -214,8 +251,17 @@ export interface RoadmapSeams {
   readonly remote?: string;
   /** Lists the open pull requests the other taken reading is read from. */
   readonly pullRequests: OpenPullRequestLister;
-  /** Lists the board, once, and only for an open `now` epic line or a position file to weigh. */
+  /**
+   * Lists the board, once, and only for an open `now` epic line, a
+   * position file to weigh, or, in `native` mode, a pick's blockers.
+   */
   readonly listing: BoardListing;
+  /**
+   * The board's relationships, which read an epic's members and what a
+   * pick waits on; `labels` mode when left out. See the module note's
+   * "The mode".
+   */
+  readonly relations?: EpicRelations;
   /** The checks that run on the roadmap issue as read, before a line is parsed out of it. */
   readonly inspectRoadmap?: (issue: SpecIssue) => Promise<void>;
   /**
@@ -368,6 +414,17 @@ function listOnce(read: BoardListing): BoardListing {
   };
 }
 
+/**
+ * What a pick waits on is read through: the port and the run's one
+ * listing, or undefined for `labels` mode's reading over the issue
+ * reader alone. See the module note's "The mode".
+ */
+function waitingOf(seams: RoadmapSeams, listing: BoardListing): BlockerWaiting | undefined {
+  return seams.relations === undefined
+    ? undefined
+    : { relations: seams.relations, listing };
+}
+
 /** Where one walk starts: the board whose body is read, the epic walked alone or null, and the warnings. */
 interface StartingPlace {
   readonly board: number;
@@ -399,9 +456,14 @@ async function startingPlace(options: RoadmapPickOptions, listing: BoardListing)
  * orders them, picked with the roadmap's own readings. See the module
  * note's "Where the walk starts".
  */
-async function walkPlaceEpic(number: number, listing: BoardListing, readings: RoadmapReadings): Promise<DescendedPick> {
+async function walkPlaceEpic(
+  number: number,
+  listing: BoardListing,
+  readings: RoadmapReadings,
+  relations: EpicRelations | undefined,
+): Promise<DescendedPick> {
   const rows = await listing();
-  const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0) }).epics
+  const read = readEpics({ issues: rows, claims: new Set(), today: new Date(0), relations }).epics
     .find((candidate) => candidate.number === number);
   const row = rows.find((issue) => issue.number === number);
   if (read === undefined || row === undefined) {
@@ -434,12 +496,13 @@ async function walkPlaceEpic(number: number, listing: BoardListing, readings: Ro
  */
 export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<RoadmapOutcome> {
   const { seams, issues, output } = options;
+  const listing = listOnce(seams.listing);
+  const waiting = waitingOf(seams, listing);
   if (options.followHop === true) {
     const hop = readAwayHop(options.root);
     hop.notices.forEach((notice) => output.warn(notice));
-    if (hop.away !== null) return await pickHopTarget(hop.away, issues, output);
+    if (hop.away !== null) return await pickHopTarget(hop.away, blockingOf({ issues, waiting }), output);
   }
-  const listing = listOnce(seams.listing);
   const start = await startingPlace(options, listing);
   start.notices.forEach((notice) => output.warn(notice));
   const roadmap = start.board;
@@ -459,8 +522,8 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
     pullRequests: seams.pullRequests,
   });
   const walked = start.epic === null
-    ? await pickDescendedLine(parseRoadmapBody(read.body), { issues, readings, listing })
-    : await walkPlaceEpic(start.epic, listing, readings);
+    ? await pickDescendedLine(parseRoadmapBody(read.body), { issues, readings, listing, relations: seams.relations })
+    : await walkPlaceEpic(start.epic, listing, readings, seams.relations);
   printDescent(walked, output);
   const { descent, pick } = walked;
 
@@ -474,16 +537,27 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
   }
 
   output.info(pickLine(pick.line));
-  return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+  return settlePick(pick.line, {
+    lines: descent.lines,
+    issues,
+    readings,
+    waiting,
+    offer: seams.offerAlternative,
+    output,
+  });
 }
 
 /**
  * C, the away hop's target, as the pick, or `blocked` when C still has an
  * open blocker. See the module note's "Under `--roadmap`".
  */
-async function pickHopTarget(away: AwayHop, issues: SpecIssueReader, output: Output): Promise<RoadmapOutcome> {
+async function pickHopTarget(
+  away: AwayHop,
+  blocking: (issue: number) => Promise<BlockedLine | null>,
+  output: Output,
+): Promise<RoadmapOutcome> {
   output.info(hopHeaderLine(away));
-  const blocked = await readBlockedLine(await issues(away.target), blockerStatesOf(issues));
+  const blocked = await blocking(away.target);
   if (blocked !== null) {
     output.info(blockedPickLine(blocked));
     output.info(hopBlockedMessage(away.target));
@@ -516,28 +590,34 @@ interface PickSettlement {
   readonly lines: readonly RoadmapLine[];
   readonly issues: SpecIssueReader;
   readonly readings: RoadmapReadings;
-  readonly seams: RoadmapSeams;
+  /** The port and the listing a `native` pick's blockers are read off; undefined for `labels`. */
+  readonly waiting: BlockerWaiting | undefined;
+  /** Asks whether to plan the alternative, or undefined for a run with nobody to ask. */
+  readonly offer: AlternativeOffer | undefined;
   readonly output: Output;
 }
 
 /**
  * The picked line as it stands, or the blocked reading of it settled.
  *
- * The issue is read off the memoised reader the walk has been using, so
- * the label and the `Blocked by:` line cost no `gh issue view` of their
- * own: the walk read that issue to ask whether it was closed.
+ * In `labels` mode the issue is read off the memoised reader the walk
+ * has been using, so the label and the `Blocked by:` line cost no `gh
+ * issue view` of their own: the walk read that issue to ask whether it
+ * was closed. In `native` mode its row on the run's one listing is read
+ * through the port instead; see the module note's "The mode".
  */
 async function settlePick(line: RoadmapLine, settlement: PickSettlement): Promise<RoadmapOutcome> {
-  const { issues } = settlement;
-  const blocked = await readBlockedLine(await issues(line.issue), blockerStatesOf(issues));
+  const { issues, waiting } = settlement;
+  const readings = plannableReadings({ issues, readings: settlement.readings, waiting });
+  const blocked = await readings.blocking(line.issue);
   if (blocked === null) return { issue: line.issue };
 
   return settleBlockedPick({
     blocked,
     lines: settlement.lines,
     line,
-    readings: plannableReadings({ issues, readings: settlement.readings }),
-    offer: settlement.seams.offerAlternative,
+    readings,
+    offer: settlement.offer,
     output: settlement.output,
   });
 }
