@@ -89,8 +89,10 @@
 import type { TierPin } from '../config-sections.js';
 import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
+import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BoardIssue } from '../board/roadmap-board.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
@@ -379,6 +381,59 @@ describe('a preflight whose required item passes', () => {
     expect(readPreflightHalts(root)).toEqual([]);
     expect(run.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
     expect(run.warn).toEqual([]);
+  });
+});
+
+/** A board whose ticked line for #12 is still labelled `rafa:in-development`. */
+const DRIFTED_BOARD: readonly BoardIssue[] = [
+  { number: 1, title: 'Board', body: '- [x] #12', state: 'OPEN', stateReason: null, labels: ['type:roadmap'], type: 'roadmap', module: 'unassigned' },
+  { number: 12, title: 'Done', body: '', state: 'CLOSED', stateReason: 'COMPLETED', labels: [IN_DEVELOPMENT_LABEL], type: 'task', module: 'unassigned' },
+];
+
+/** The line that board reports. */
+const DRIFT_LINE = 'claim drift: #12 is ticked on #1 (line 1) but still labelled rafa:in-development (closed)';
+
+/** Drift seams over {@link DRIFTED_BOARD} counting `count` run records, `reads` counting each listing read. */
+function driftSeams(count: number, reads: { count: number }): StartPreflightDrift {
+  return {
+    runCount: () => count,
+    listing: () => () => {
+      reads.count += 1;
+      return Promise.resolve(DRIFTED_BOARD);
+    },
+    boards: [],
+    branches: () => ({ refs: ['refs/heads/feat/rafa-12-a'], problems: [] }),
+  };
+}
+
+describe('the drift check', () => {
+  it('warns the drift report after the preflight passed on a second run, and reads no board on a first', async () => {
+    const firstReads = { count: 0 };
+    const secondReads = { count: 0 };
+
+    const first = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(1, firstReads) });
+    const second = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(2, secondReads) });
+
+    expect(first.refusal).toBeNull();
+    expect(first.warn).toEqual([]);
+    expect(firstReads.count).toBe(0);
+    expect(second.refusal).toBeNull();
+    expect(second.warn).toEqual([DRIFT_LINE]);
+    expect(second.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
+    expect(secondReads.count).toBe(1);
+  });
+
+  it('reads no board on a due run that halts, where the same run passing reads it', async () => {
+    const haltedReads = { count: 0 };
+    const passedReads = { count: 0 };
+
+    const halted = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(127) }, { drift: driftSeams(2, haltedReads) });
+    const passed = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(2, passedReads) });
+
+    expect(halted.refusal?.exitCode).toBe(1);
+    expect(haltedReads.count).toBe(0);
+    expect(passed.refusal).toBeNull();
+    expect(passedReads.count).toBe(1);
   });
 });
 

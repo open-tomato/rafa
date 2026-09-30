@@ -112,6 +112,13 @@
  *      the issue's `rafa:claimed` is swapped for `rafa:in-development`,
  *      best-effort, and the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
+ *  13. **Reports claim drift** on every second run of the project,
+ *      through `start/preflight-drift.ts`, after the label swap so the
+ *      board it reads holds it: a ticked checklist line whose issue still
+ *      carries `rafa:in-development` or `rafa:claimed`, and a stage label
+ *      no claim branch names (`claims/drift.ts`), each one warning. It is
+ *      report-only: it edits nothing, and nothing it reads or fails to
+ *      read halts the run. A caller that hands no `drift` seams skips it.
  *
  * A run with no item to check stores nothing and prints no preflight
  * line: `writePreflightChecks` is not called with no check, so a store
@@ -286,6 +293,7 @@
  */
 import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
+import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
@@ -332,6 +340,7 @@ import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
+import { reportStartDrift } from './preflight-drift.js';
 import { refuseUnservedSync } from './preflight-sync.js';
 
 /**
@@ -389,6 +398,8 @@ export interface StartPreflightOptions {
   readonly sync: StartPreflightSync;
   /** What the claim check reads and writes through; see the module note. */
   readonly claim: StartPreflightClaim;
+  /** What the drift check reads through; no drift check when left out. See the module note. */
+  readonly drift?: StartPreflightDrift;
 }
 
 /** What a preflight that let the run through answers. */
@@ -686,6 +697,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
     activeOutput().info(`   Preflight passed${missing}.`);
   }
   await markInDevelopment(claim, options.claim.board, isFirstDispatch(options.planPath));
+  if (options.drift !== undefined) await reportStartDrift(options.drift);
 
   return Object.freeze({
     runId,

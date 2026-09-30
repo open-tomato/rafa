@@ -289,6 +289,7 @@ import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
+import { createStartPreflightDrift } from './start/preflight-drift.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
@@ -437,6 +438,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       },
       sync: { resolved: runConfig, home: homedir() },
       claim: createStartPreflightClaim(repoRoot, runConfig.config),
+      drift: createStartPreflightDrift(repoRoot, runConfig.config),
     });
 
     // What each session, task and wrap-up alike, is served against: the
