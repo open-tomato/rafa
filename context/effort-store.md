@@ -262,6 +262,25 @@ other store, and its other-project refusal has nothing to compare. The
 codec, `mergeStore` and `TRUSTED_PERMISSIONS` are exported from the
 `./store` subpath for the packages under `packages/`.
 
+**A command syncs through one contact, `createHubContact`
+(`src/effort/sync/contact.ts`), which never throws and never sets the
+exit code.** A contact is made once per invocation and runs
+`pushThenPull()` or `pull()`, each sending `{ to: null }` and
+`{ from: null, dryRun: false }`. `local` and `file` are never contacted:
+nothing is loaded, selected or written. Any other kind is selected once
+per contact by `selectSync` through the registry `loadModules` answers,
+and a selection that fails (`SyncModuleMissing` included) is written
+once through the caller's `warn`. A push or pull rejecting with an error
+whose `name` is `HubUnreachable` writes one line, `effort sync: the hub
+at <url> is unreachable (<first line of why>); this command used the
+local store, and its rows sync on the next contact`, and no second one
+for the rest of that contact; an unreachable push skips its pull, so a
+command waits out one timeout. The name is matched rather than the
+class, so a module throws a plain `Error` with that name and imports
+no value from core. Any other rejection is written as `effort sync:
+<push|pull> over <kind> failed: <message>`, and a refused push still
+pulls.
+
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names
 `rafa effort move --to=sqlite` as the next safe step. `rafa effort
