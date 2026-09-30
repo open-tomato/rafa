@@ -1,0 +1,8 @@
+gh pr list --state open --head main --limit 1 --json author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url
+gh issue list --label type:roadmap --state open --limit 1000 --json number,title,body,state,stateReason,labels
+gh issue view 1 --json number,title,body,state,labels,author
+gh issue view 100 --json number,title,body,state,labels,author
+gh issue list --state all --limit 1000 --json number,title,body,state,stateReason,labels
+gh issue view 101 --json number,title,body,state,labels,author
+gh issue view 102 --json number,title,body,state,labels,author
+gh pr list --state open --json number,headRefName,body --limit 100

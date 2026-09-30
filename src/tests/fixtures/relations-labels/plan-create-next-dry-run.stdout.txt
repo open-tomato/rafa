@@ -1,0 +1,6 @@
+🗺  Reading the roadmap, issue #1, for the next spec...
+   🧭 walking into epic #100 Relations epic (1/2 done): its checklist, then its labelled members missing from it
+   ⏭  #101 done: the issue is closed
+▶ Next on the roadmap: issue #102
+🔎 --dry-run: would plan from issue #102 "Epic member, ready". Nothing was written.
+👉 Next: create the plan for #102 — rafa plan create --next
