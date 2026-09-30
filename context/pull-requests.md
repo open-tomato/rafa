@@ -878,3 +878,47 @@ read asks.
 
 What follows: a touched issue that is gone fails the read, and the kept
 listing falls back to a full one.
+
+#### `pr merge` freed-issues per mode
+
+The sixth step of `pr merge` (lines 163–181) differs between modes:
+
+In **`labels` mode** (the default), the unblock reading (`src/commands/pr/merge-unblock.ts`)
+runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
+`Blocked by:` line names an issue this PR closes. For each such issue whose
+blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
+spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
+`afterMerge`). `--yes` does not answer that question; every failure is a warning.
+
+In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
+the open issues the merge freed, read through the port's `freedBy`, and sends no
+write (`src/board/relations/native.ts`'s `afterMerge`). An issue is freed when it
+is open, waits on blockers, and has at least one blocker among the closed issues
+and would not wait on anything once those count as closed. The output is silence
+when the merge freed nothing; otherwise a header line naming the mode, the count,
+the closed issues and that nothing was written, followed by one indented line per
+freed issue — lowest number first — naming its number and title, or number alone
+if the title is empty. `--yes` does not answer anything, since there is no
+question. A read that cannot get the board's repository or the native listing
+sends one warning and prints nothing, as the merge has already happened.
+
+#### Cache and truncation for freed-issues in native mode
+
+The freed reading in native mode sends two `gh` calls from the one board listing
+the command already holds: the board's repository (one `gh repo view --json
+nameWithOwner`, `readBoardRepository`, `src/commands/epic/move-native.ts`) to
+tell the board's issues from foreign blockers; and one native board listing (`gh
+api graphql` with `filterBy: {since}` on an incremental read, or a full listing
+on the first read). No per-blocker `gh issue view` is sent; a blocker's state
+comes from its `blockedBy` node (`src/board/relations/native.ts`, the port
+definition).
+
+An issue stays waiting when it has a blocker in the closed issues BUT its
+`blockedBy` list is truncated at 50 nodes: an unread blocker might still be open,
+so the issue is not reported as freed. The truncation key is left out (never set
+to undefined) when `gh`'s `totalCount` equals the node count. A blocker on
+another repository reads its state from the node; a blocker on this board whose
+row the listing does not hold (missing, outside any `since` window, or past a
+truncation limit) counts as unread and keeps the issue waiting, the safe
+direction the port defines. A foreign blocker is keyed by repository (`owner/name`)
+and number together; the repository comes from its `url`.
