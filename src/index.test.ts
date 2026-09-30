@@ -1088,6 +1088,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
+    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
     ['./plan/plan-files.js', ['resolveProjectConfig']],
@@ -1096,6 +1097,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../config-sections.js', ['messageOf']],
+    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
     ['../next/ceiling.js', ['ALWAYS_ASKED', 'allowedUnasked', 'BARE_YES_ACTIONS', 'readYesCeiling', 'YES_ACTIONS', 'YES_FLAG']],
     ['../next/ending.js', ['actionOutput']],

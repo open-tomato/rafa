@@ -54,14 +54,30 @@
  *     <kind> failed: <message>`, and a refused push still pulls.
  *
  * Each run answers a {@link HubContactReading} saying what was done.
+ *
+ * ## Before a read
+ *
+ * {@link pullBeforeRead} is the one call a command that reads the store
+ * makes before it reads: `rafa status`, `rafa next` and `rafa effort
+ * report`. It reads the config under the project root and the home
+ * without writing its warnings, since the command reads it again and
+ * writes them once, then makes one contact and pulls alone: a command
+ * that only reads has no rows of its own to push. A config the loop
+ * cannot run on is left for the command to refuse in its own words, so
+ * the helper contacts nothing and answers null; any other throw from
+ * reading it is a fault, and is rethrown as the command's own read
+ * would throw it.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
+import type { ConfigRoots } from '../../config-load.js';
 import type { ResolvedConfig } from '../../config.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { loadConfig } from '../../config-load.js';
 import { describeValue, messageOf } from '../../config-sections.js';
+import { ConfigError } from '../../config.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { selectSync } from './select.js';
@@ -240,4 +256,31 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
     pushThenPull: () => run('push-then-pull'),
     pull: () => run('pull'),
   });
+}
+
+/** What {@link pullBeforeRead} is made with. */
+export interface PullBeforeReadInput {
+  /** The project root and the home the config is read under. */
+  readonly roots: ConfigRoots;
+  /** Writes one warning, as a command's `output.warn` does. */
+  readonly warn: (message: string) => void;
+}
+
+/**
+ * The pull a command makes before it reads the store: the config read
+ * under `roots`, then one contact pulling the others' rows alone; see
+ * the module note's `Before a read`. Answers null, having contacted
+ * nothing, when the config is one the loop cannot run on.
+ */
+export async function pullBeforeRead(input: PullBeforeReadInput, seams: HubContactSeams = {}): Promise<HubContactReading | null> {
+  const { roots, warn } = input;
+  let resolved: ResolvedConfig;
+  try {
+    // Read silently: the command reads the config itself and writes its warnings once.
+    resolved = loadConfig(roots, {}, () => {});
+  } catch (error) {
+    if (error instanceof ConfigError) return null;
+    throw error;
+  }
+  return createHubContact({ root: roots.root, home: roots.home, resolved, warn }, seams).pull();
 }

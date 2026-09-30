@@ -18,8 +18,14 @@
  * and of the ten only `hint.ts` also prints — the one line it leaves a run that has
  * no terminal to be asked on.
  *
+ * Before the first turn it pulls the other devices' effort rows once,
+ * through `pullBeforeRead` (`../effort/sync/contact.ts`), `--dry-run`
+ * included; a hub that cannot be reached is one `warn` line, and the
+ * chain reads the local store as it would have.
+ *
  * ## One turn of the chain
  *
+
  * Every turn reads the state AFRESH — nothing is carried over but the
  * state the last action ran for — and writes two lines:
  *
@@ -241,6 +247,7 @@
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
+import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextHopStep } from '../next/hop-rows.js';
@@ -252,6 +259,7 @@ import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { messageOf } from '../config-sections.js';
+import { pullBeforeRead } from '../effort/sync/contact.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
@@ -498,6 +506,8 @@ export interface NextCommandSeams extends NextSourceSeams {
   readonly isTerminal?: () => boolean;
   /** Opens the prompter the questions are asked through. Called only to ask. */
   readonly openPrompter?: () => Prompter;
+  /** Pulls the other devices' rows before the first read. `pullBeforeRead` when left out. */
+  readonly pull?: (input: PullBeforeReadInput) => Promise<unknown>;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -568,6 +578,8 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   const sources = openNextSources(context, seams, roadmap
     ? { roadmap }
     : {});
+  // The other devices' rows, pulled once the config is usable and before the chain reads (`effort/sync/contact.ts`).
+  await (seams.pull ?? pullBeforeRead)({ roots: sources.roots, warn: (line) => context.output.warn(line) });
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
   const prompter = lazyPrompter(openPrompter);
   const dry = watchDryEpic();

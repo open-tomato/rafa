@@ -24,6 +24,7 @@
  *   the same line without the word, which reads.
  */
 import type { StatusCommandSeams } from './status.js';
+import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
@@ -109,22 +110,38 @@ const NONE_READ: StatusSections = {
   housekeeping: { read: false, problem: 'fatal: not a git repository' },
 };
 
-/** What a case's `read` seam was handed, once per call. */
+/** What a case's `read` and `pull` seams were handed, once per call, and the order they ran in. */
 interface Reads {
   readonly inputs: StatusInput[];
+  readonly pulls: PullBeforeReadInput[];
+  readonly order: string[];
 }
 
-/** Dispatches `words` over the command reading `sections` through its seam, in `project`. */
+/** The line a case's `pull` seam writes, as a hub that cannot be reached has the helper write it. */
+const PULL_LINE = 'effort sync: the hub is unreachable (seam); this command used the local store';
+
+/**
+ * Dispatches `words` over the command reading `sections` through its
+ * seam, in `project`, its pull seam writing `pullLine` when one is named.
+ */
 async function run(
   words: readonly string[],
   sections: StatusSections,
   project: PlantedProject = plant(),
+  pullLine: string | null = null,
 ): Promise<CapturedRun & { readonly reads: Reads }> {
-  const reads: Reads = { inputs: [] };
+  const reads: Reads = { inputs: [], pulls: [], order: [] };
   const seams: StatusCommandSeams = {
     read: (input) => {
       reads.inputs.push(input);
+      reads.order.push('read');
       return Promise.resolve(sections);
+    },
+    pull: (input) => {
+      reads.pulls.push(input);
+      reads.order.push('pull');
+      if (pullLine !== null) input.warn(pullLine);
+      return Promise.resolve(null);
     },
   };
   const outcome = await dispatchInProject(['status', ...words], [], [createStatusCommand(seams)], project);
@@ -198,6 +215,17 @@ describe('what rafa status reads', () => {
     expect(outcome.reads.inputs[0]?.home).toBe(project.home);
     expect(outcome.reads.inputs[0]?.config.prBase).toBe('trunk');
   });
+
+  it('pulls once under the project root and the home before it reads, its line a warn above the sections', async () => {
+    const project = plant();
+
+    const outcome = await run([], ALL_READ, project, PULL_LINE);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.reads.order).toEqual(['pull', 'read']);
+    expect(outcome.reads.pulls.map((pull) => pull.roots)).toEqual([{ root: project.root, home: project.home }]);
+    expect(lines(outcome.stdout + outcome.stderr)).toEqual([`warn: ${PULL_LINE}`, ...written(ALL_READ)]);
+  });
 });
 
 describe('the exit codes of rafa status', () => {
@@ -209,8 +237,10 @@ describe('the exit codes of rafa status', () => {
     expect(refused.stderr).toContain('rafa status: the config cannot be used:');
     expect(refused.stderr).toContain('store is "nonesuch"');
     expect(refused.reads.inputs).toEqual([]);
+    expect(refused.reads.pulls).toEqual([]);
     expect(read.exitCode).toBe(0);
     expect(read.reads.inputs).toHaveLength(1);
+    expect(read.reads.pulls).toHaveLength(1);
   });
 
   it('exits 2 for a positional word, reading nothing and naming the usage, beside the line without it', async () => {
@@ -222,6 +252,7 @@ describe('the exit codes of rafa status', () => {
     expect(refused.stderr).toContain('expected no argument, got 1: now');
     expect(refused.stderr).toContain(`Usage: ${STATUS_USAGE}`);
     expect(refused.reads.inputs).toEqual([]);
+    expect(refused.reads.pulls).toEqual([]);
     expect(read.exitCode).toBe(0);
   });
 

@@ -224,6 +224,7 @@ import type { SpecIssue, SpecIssueReader } from '../board/issue.js';
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
 import type { RafaContext } from '../cli/command.js';
+import type { ConfigRoots } from '../config-load.js';
 import type { RafaConfig } from '../config.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
@@ -723,6 +724,8 @@ export interface OpenedNextSources extends NextSources {
   readonly release: () => EpicEndRelease;
   /** The settle dry run over `origin/<base>`, read only after a merge step (`./settle-step.ts`). */
   readonly settle: SettleReader;
+  /** The project root and the home the config was read under, which `rafa next` pulls the store under. */
+  readonly roots: ConfigRoots;
 }
 
 /**
@@ -789,5 +792,6 @@ export function openNextSources(
     answer: () => Object.freeze({ ...held, board: board() }),
     release: () => readEpicEndRelease(git, project.root, config.releaseChangelog),
     settle: settleReaderFor({ root: project.root, home: project.home, base: held.base, config }, git),
+    roots: Object.freeze({ root: project.root, home: project.home }),
   });
 }

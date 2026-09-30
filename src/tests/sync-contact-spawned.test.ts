@@ -7,7 +7,13 @@
  *   - `rafa effort collect`, once its rows are stored and its summary
  *     written (`src/effort/collect.ts`);
  *   - `rafa loop start`, at the end of each task, through the one contact
- *     it makes for its run (`src/start.ts`).
+ *     it makes for its run (`src/start.ts`);
+ *
+ * and where one pulls alone before it reads the store, through
+ * `pullBeforeRead`: `rafa effort report` and `rafa status`. `rafa next`
+ * is held to the same in-process, over its seams
+ * (`src/commands/next.test.ts`), since spawned it needs a GitHub origin
+ * and would reach the real `gh`.
  *
  * The `service` strategy is the `hub-down-sync` module under
  * `src/modules/testdata/`, loaded through `modules:` and `allowList:`:
@@ -55,6 +61,9 @@ const HUB_URL = 'http://127.0.0.1:9';
  * the text output writes a warning: behind `warn: `.
  */
 const UNREACHABLE_LINE = `warn: ${hubUnreachableLine(HUB_URL, new Error('connect ECONNREFUSED on push'))}`;
+
+/** The line a pull alone writes when it found the hub unreachable, as the text output writes it. */
+const PULL_UNREACHABLE_LINE = `warn: ${hubUnreachableLine(HUB_URL, new Error('connect ECONNREFUSED on pull'))}`;
 
 /** What every line a contact writes opens with. */
 const SYNC_OPENING = 'effort sync:';
@@ -210,5 +219,28 @@ describe('rafa loop start under a service whose hub is down', () => {
     expect(tracker(scratch)).toContain('- [x] Second task');
     expect(syncCalls(scratch)).toEqual([]);
     expect(syncLines(output)).toBe(0);
+  }, RUN_TIMEOUT);
+});
+
+describe.each([
+  ['rafa effort report', ['effort', 'report']],
+  ['rafa status', ['status']],
+])('%s under a service whose hub is down', (_name, words) => {
+  it('pulls once before it reads, writes one unreachable line and exits 0, where local contacts nothing', () => {
+    const scratch = plantProject('service');
+    const run = runRafa(scratch, scratch.repo, words);
+    const output = `${run.stdout}${run.stderr}`;
+
+    expect(run.exitCode).toBe(0);
+    expect(linesEqualTo(output, PULL_UNREACHABLE_LINE)).toBe(1);
+    expect(syncLines(output)).toBe(1);
+    expect(syncCalls(scratch)).toEqual(['pull']);
+
+    // The control: the same project naming `local` runs the same command and contacts nothing.
+    const control = plantProject('local');
+    const passed = runRafa(control, control.repo, words);
+    expect(passed.exitCode).toBe(0);
+    expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
+    expect(syncCalls(control)).toEqual([]);
   }, RUN_TIMEOUT);
 });

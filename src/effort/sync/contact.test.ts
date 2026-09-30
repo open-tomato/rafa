@@ -15,14 +15,16 @@
  * strategies writing nothing beside the same config naming `service`.
  *
  * Every root is a path under a temporary directory of this file's own
- * that is never made, and the core cases hold it absent after.
+ * that is never made, and the core cases hold it absent after, but for
+ * the {@link pullBeforeRead} cases: each makes a root of its own there,
+ * holding the project config the helper reads.
  */
 import type { HubContactSeams } from './contact.js';
 import type { AdapterContext } from '../../adapters/registry.js';
 import type { ResolvedConfig } from '../../config.js';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
 
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +32,17 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
-import { parseConfigText, resolveConfig } from '../../config.js';
+import { loadConfig } from '../../config-load.js';
+import { ConfigError, parseConfigText, resolveConfig } from '../../config.js';
 
-import { createHubContact, HUB_UNREACHABLE, HubUnreachable, hubUnreachableLine, isHubUnreachable } from './contact.js';
+import {
+  createHubContact,
+  HUB_UNREACHABLE,
+  HubUnreachable,
+  hubUnreachableLine,
+  isHubUnreachable,
+  pullBeforeRead,
+} from './contact.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-sync-contact-')));
 
@@ -345,5 +355,72 @@ describe('isHubUnreachable and the line', () => {
 
     expect(line).toBe('effort sync: the hub is unreachable (refused); this command used the local store, and its rows sync on the next contact');
     expect(line).not.toContain('\n');
+  });
+});
+
+/** A project root of its own under the temporary directory, its project config holding `text`. */
+function projectHolding(text: string): string {
+  const root = mkdtempSync(join(tempBase, 'project-'));
+  mkdirSync(join(root, '.rafa'));
+  writeFileSync(join(root, '.rafa', 'config.yaml'), text, 'utf8');
+  return root;
+}
+
+/** A pull before a read under `root`, its written lines captured. */
+async function pullingUnder(root: string, seams: HubContactSeams): Promise<{
+  readonly lines: string[];
+  readonly reading: Awaited<ReturnType<typeof pullBeforeRead>>;
+}> {
+  const lines: string[] = [];
+  const reading = await pullBeforeRead({ roots: { root, home: HOME }, warn: (line) => lines.push(line) }, seams);
+  return { lines, reading };
+}
+
+/** A key no section declares, which the config warns about. */
+const UNKNOWN_KEY = 'nonsense:\n  key: 1\n';
+
+describe('pullBeforeRead', () => {
+  it('reads the project config and pulls alone, writing the one unreachable line and no config warning', async () => {
+    const service = fixture('unreachable', 'unreachable');
+    const root = projectHolding(`${SERVICE}${UNKNOWN_KEY}`);
+
+    const { lines, reading } = await pullingUnder(root, service.seams);
+
+    expect(reading).toMatchObject({ state: 'contacted', strategy: 'service', push: null, pull: { outcome: 'unreachable' } });
+    expect(service.calls).toEqual(['pull {"from":null,"dryRun":false}']);
+    expect(lines).toEqual([hubUnreachableLine(HUB_URL, new Error('connect ECONNREFUSED on pull'))]);
+    expect(service.contexts[0]?.repoRoot).toBe(root);
+  });
+
+  it('while the same file read with a sink writes the config warning it kept back, the control', () => {
+    const root = projectHolding(`${SERVICE}${UNKNOWN_KEY}`);
+    const warnings: string[] = [];
+
+    loadConfig({ root, home: HOME }, {}, (line) => warnings.push(line));
+
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('contacts nothing under a project with no sync setting, local by default', async () => {
+    const service = fixture('unreachable', 'unreachable');
+    const root = projectHolding('');
+
+    const { lines, reading } = await pullingUnder(root, service.seams);
+
+    expect(reading).toEqual({ state: 'not-contacted', strategy: 'local' });
+    expect(lines).toEqual([]);
+    expect(service.calls).toEqual([]);
+  });
+
+  it('answers null and contacts nothing for a config the command refuses itself', async () => {
+    const service = fixture('unreachable', 'unreachable');
+    const root = projectHolding('effort:\n  sync: service\n');
+
+    const { lines, reading } = await pullingUnder(root, service.seams);
+
+    expect(reading).toBeNull();
+    expect(lines).toEqual([]);
+    expect(service.calls).toEqual([]);
+    expect(() => loadConfig({ root, home: HOME }, {}, () => {})).toThrow(ConfigError);
   });
 });

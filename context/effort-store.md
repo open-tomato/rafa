@@ -282,7 +282,11 @@ no value from core. Any other rejection is written as `effort sync:
 pulls. `rafa effort collect` pushes then pulls once its rows are stored
 and its summary written, and `rafa loop start` makes one contact for its
 run and pushes then pulls at the end of each task, whatever its outcome
-(`src/effort/collect.ts`, `src/start.ts`).
+(`src/effort/collect.ts`, `src/start.ts`). `rafa status`, `rafa next`
+(`--dry-run` included) and `rafa effort report` pull alone before they
+read, through `pullBeforeRead`, which reads the config without writing
+its warnings and contacts nothing when the config is refused, leaving
+the refusal to the command.
 
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names
