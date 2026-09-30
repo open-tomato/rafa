@@ -234,6 +234,13 @@ function readLabels(listing: readonly BoardIssue[]): RelationsReading {
   });
 }
 
+/**
+ * The `labels` adapter's reads alone, with no `gh` to make: what a
+ * reader handed no port reads, so `labels` stays its default without a
+ * write seam it never uses.
+ */
+export const LABELS_READS: Pick<BoardRelations, 'mode' | 'read'> = Object.freeze({ mode: 'labels', read: readLabels });
+
 /** An epic tick's status as a write's. */
 function epicTickStatus(result: EpicTickResult): RelationWriteStatus {
   if (result.status === 'failed') return 'failed';

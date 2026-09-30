@@ -102,9 +102,9 @@ export interface HopMove {
   readonly kind: 'hop';
   readonly blocked: number;
   readonly blocker: number;
-  /** The epic holding C, and its slug. */
+  /** The epic holding C, and its slug: null in `native` mode, where an epic has none. */
   readonly epic: number;
-  readonly slug: string;
+  readonly slug: string | null;
   /** The open board listing that epic. */
   readonly board: number;
   /** Where H was read. */
