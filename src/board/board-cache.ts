@@ -21,25 +21,52 @@
  *    read BEFORE the listing, so an issue updated between the two is in
  *    the listing and read again next time, never missed: GitHub's `since`
  *    keeps an issue updated at or after the time it is given.
- *  - INCREMENTAL, otherwise: `gh api --paginate` over the repository's
- *    issues with `since=<watermark>`, filtered by `jq` to the fields the
- *    listing asks for and to issues only (the REST endpoint answers pull
- *    requests too). Each issue answered replaces the cached row with its
- *    number, a new one is added, and the watermark moves to the newest
- *    `updated_at` answered.
+ *  - INCREMENTAL, otherwise: in the `labels` mode, `gh api --paginate`
+ *    over the repository's issues with `since=<watermark>`, filtered by
+ *    `jq` to the fields the listing asks for and to issues only (the REST
+ *    endpoint answers pull requests too); in the `native` mode, one
+ *    `gh api graphql --paginate` query over
+ *    `repository.issues(filterBy: {since})` asking for the relationship
+ *    fields too (`./board-cache-native.ts`). Each issue answered replaces
+ *    the cached row with its number, a new one is added, and the
+ *    watermark moves to the newest `updated_at` answered.
  *
  * A change rafa makes itself — a label swapped, a body edited, a line
  * ticked — moves the issue's `updated_at`, so the next read picks it up
  * with no invalidation step of its own; so does a change made on GitHub
  * by hand.
  *
+ * ## The mode the file was written in
+ *
+ * `board.relationships` decides what a row holds: the listing's six
+ * fields in `labels`, the default, and the five relationship fields too
+ * in `native`. A file written in the `native` mode records it as
+ * `mode: "native"`; a file written in the `labels` mode has no `mode`
+ * key, so it is byte for byte the file this module wrote before the mode
+ * existed, and a file with none is read as `labels`. A file whose mode is
+ * not the one asked for is read as no cache and the read is a full one,
+ * which rewrites it in the mode asked for: a `labels` row read in the
+ * `native` mode would be refused for lacking the relationship fields, and
+ * a `native` row read in the `labels` mode would be answered with them
+ * silently dropped, so neither is read across.
+ *
  * ## What the incremental read cannot see
  *
  * An issue deleted or transferred out of the repository answers nothing
  * to `since`, so its row stays until a full read: `--refresh` asks for
- * one. The cache also belongs to the project root and not to a
- * repository name, so a checkout whose `origin` moved to another
- * repository needs `--refresh` once.
+ * one.
+ *
+ * In the `native` mode two more changes answer nothing to `since`, both
+ * measured 2026-09-30 and kept in `context/pull-requests.md` ("Native
+ * relationships"). A sub-issue or blocked-by link added or removed moves
+ * neither end's `updated_at`. A blocker closing moves its own
+ * `updated_at` and not the blocked issue's (scratch A#14 kept its
+ * creation time after its blocker B#1 closed), so a kept row's linked
+ * issue holds the title and state it had when that row was last read.
+ *
+ * The cache also belongs to the project root and not to a repository
+ * name, so a checkout whose `origin` moved to another repository needs
+ * `--refresh` once.
  *
  * ## The REST rows
  *
@@ -59,6 +86,7 @@
  */
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -66,6 +94,7 @@ import { dirname, join } from 'node:path';
 import { isMapping } from '../config-sections.js';
 import { SCOPE_DIR } from '../project/scope.js';
 
+import { nativeChangedArgs, nativeRowFields } from './board-cache-native.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing, parseBoardListing } from './roadmap-board.js';
 
 /** Where the cache is kept, relative to the project root. */
@@ -73,6 +102,9 @@ export const BOARD_CACHE_FILE = join(SCOPE_DIR, 'cache', 'board.json');
 
 /** The shape version the file is written with; a file of another version is read as no cache. */
 export const BOARD_CACHE_VERSION = 1;
+
+/** The `mode` key a file written in the `native` mode records; see the module note. */
+const NATIVE_MODE_KEY: Readonly<{ mode: 'native' }> = Object.freeze({ mode: 'native' });
 
 /** The `gh api` arguments that read the watermark; see the module note. */
 export const WATERMARK_ARGS: readonly string[] = Object.freeze([
@@ -88,7 +120,7 @@ const CHANGED_ROWS = '.[] | select(.pull_request == null) | {number, title, body
   + ' stateReason: (if .state_reason == null then null else (.state_reason | ascii_upcase) end),'
   + ' labels: [.labels[] | {name}], updatedAt: .updated_at}';
 
-/** The `gh api` arguments that read the issues changed since `watermark`. */
+/** The `gh api` arguments that read the issues changed since `watermark` in the `labels` mode. */
 export function changedArgs(watermark: string): readonly string[] {
   return Object.freeze([
     'api',
@@ -102,6 +134,8 @@ export function changedArgs(watermark: string): readonly string[] {
 /** What the file holds. */
 interface BoardCache {
   readonly version: number;
+  /** The mode the rows were read in; left out of the file in `labels`. See the module note. */
+  readonly mode: BoardRelationshipMode;
   /** The `updated_at` every issue changed later than is read again. */
   readonly watermark: string;
   /** The listing's rows, as `gh` writes them. */
@@ -118,10 +152,20 @@ export interface CachedBoardListingOptions {
   readonly refresh?: boolean;
   /** How many issues a full read lists; `BOARD_LISTING_LIMIT` when left out. */
   readonly limit?: number;
+  /** `board.relationships`: what a row holds and which incremental read is sent. `labels` when left out. */
+  readonly mode?: BoardRelationshipMode;
 }
 
-/** The cache at `path`, or null when there is none this version can read. */
-function readCache(path: string): BoardCache | null {
+/** The mode a file's `mode` key names, `labels` when it has none, or null when it names neither. */
+function modeOfFile(value: unknown): BoardRelationshipMode | null {
+  if (value === undefined) return 'labels';
+  return value === 'labels' || value === 'native'
+    ? value
+    : null;
+}
+
+/** The cache at `path` written in `mode`, or null when there is none this version can read in it. */
+function readCache(path: string, mode: BoardRelationshipMode): BoardCache | null {
   let payload: unknown;
   try {
     payload = JSON.parse(readFileSync(path, 'utf8')) as unknown;
@@ -131,8 +175,17 @@ function readCache(path: string): BoardCache | null {
   if (!isMapping(payload)) return null;
   const { version, watermark, rows } = payload;
   if (version !== BOARD_CACHE_VERSION || typeof watermark !== 'string' || watermark === '') return null;
+  if (modeOfFile(payload['mode']) !== mode) return null;
   if (!Array.isArray(rows) || !rows.every(isMapping)) return null;
-  return { version, watermark, rows };
+  return { version, mode, watermark, rows };
+}
+
+/** What the file holds for `cache`: no `mode` key in the `labels` mode. See the module note. */
+function fileOf(cache: BoardCache): Readonly<Record<string, unknown>> {
+  const { version, mode, watermark, rows } = cache;
+  return mode === 'native'
+    ? { version, ...NATIVE_MODE_KEY, watermark, rows }
+    : { version, watermark, rows };
 }
 
 /** Writes `cache` to `path` whole; false when it could not be written. See the module note. */
@@ -140,7 +193,7 @@ function writeCache(path: string, cache: BoardCache): boolean {
   const temporary = `${path}.${String(process.pid)}.tmp`;
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(temporary, `${JSON.stringify(cache)}\n`);
+    writeFileSync(temporary, `${JSON.stringify(fileOf(cache))}\n`);
     renameSync(temporary, path);
     return true;
   } catch {
@@ -184,7 +237,7 @@ function newestUpdate(rows: readonly Readonly<Record<string, unknown>>[], floor:
   }, floor);
 }
 
-/** `issue` as the row `gh issue list` writes for it. */
+/** `issue` as its kept row: the row `gh issue list` writes, with the relationship fields when it was read with them. */
 function rowOf(issue: BoardIssue): Readonly<Record<string, unknown>> {
   return {
     number: issue.number,
@@ -193,24 +246,32 @@ function rowOf(issue: BoardIssue): Readonly<Record<string, unknown>> {
     state: issue.state,
     stateReason: issue.stateReason,
     labels: issue.labels.map((name) => ({ name })),
+    ...nativeRowFields(issue),
   };
+}
+
+/** The incremental read's arguments for `cache`, per its mode; see the module note. */
+function incrementalArgs(cache: BoardCache): readonly string[] {
+  return cache.mode === 'native'
+    ? nativeChangedArgs(cache.watermark)
+    : changedArgs(cache.watermark);
 }
 
 /** The cached listing brought up to date, or null when it cannot be; see the module note. */
 async function readIncremental(gh: GhRunner, path: string, cache: BoardCache): Promise<readonly BoardIssue[] | null> {
-  const answered = await gh(changedArgs(cache.watermark));
+  const answered = await gh(incrementalArgs(cache));
   if (!answered.ok) return null;
   const changed = parseChangedRows(answered.stdout);
   if (changed === null) return null;
   const rows = mergeRows(cache.rows, changed);
   let issues: readonly BoardIssue[];
   try {
-    issues = parseBoardListing(JSON.stringify(rows), BOARD_CACHE_FILE);
+    issues = parseBoardListing(JSON.stringify(rows), BOARD_CACHE_FILE, cache.mode);
   } catch {
     return null;
   }
   if (!changesNothing(cache.rows, changed)) {
-    writeCache(path, { version: BOARD_CACHE_VERSION, watermark: newestUpdate(changed, cache.watermark), rows });
+    writeCache(path, { ...cache, watermark: newestUpdate(changed, cache.watermark), rows });
   }
   return issues;
 }
@@ -236,13 +297,13 @@ function changesNothing(
  * read fails.
  */
 export function createCachedBoardListing(options: CachedBoardListingOptions): BoardListing {
-  const { gh, root, refresh = false, limit = BOARD_LISTING_LIMIT } = options;
+  const { gh, root, refresh = false, limit = BOARD_LISTING_LIMIT, mode = 'labels' } = options;
   const path = join(root, BOARD_CACHE_FILE);
-  const full = createGhBoardListing({ gh, limit });
+  const full = createGhBoardListing({ gh, limit, mode });
   return async () => {
     const cache = refresh
       ? null
-      : readCache(path);
+      : readCache(path, mode);
     if (cache !== null) {
       const issues = await readIncremental(gh, path, cache);
       if (issues !== null) return issues;
@@ -252,7 +313,7 @@ export function createCachedBoardListing(options: CachedBoardListingOptions): Bo
     const watermark = mark.ok
       ? mark.stdout.trim()
       : '';
-    if (watermark !== '') writeCache(path, { version: BOARD_CACHE_VERSION, watermark, rows: issues.map(rowOf) });
+    if (watermark !== '') writeCache(path, { version: BOARD_CACHE_VERSION, mode, watermark, rows: issues.map(rowOf) });
     return issues;
   };
 }

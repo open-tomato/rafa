@@ -823,3 +823,35 @@ and `parseBoardListing` (`src/board/roadmap-board.ts`) refuses a node
 whose `url` is not issue `number`'s. A read that asks GraphQL directly
 may take `repository.nameWithOwner`, but it must answer the same row
 shape as the listing.
+
+#### The incremental read in the native mode
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`, read-only,
+with the argv `nativeChangedArgs` (`src/board/board-cache-native.ts`)
+builds: `gh api graphql --paginate` over
+`repository.issues(first: 100, filterBy: {since})`, asking for the
+listing's six fields, `updatedAt` and the five relationship fields, with
+`{owner}` and `{repo}` filled by `gh` (`-F`).
+
+| Reading | Answer |
+|---|---|
+| `open-tomato/rafa`, `since` 2026-09-29T00:00:00Z | 224 issues over three pages, in the one `gh` command; every row read by `parseBoardListing` in the native mode |
+| each page, read from `rateLimit{cost}` | 4 points, the same for a page of 100 issues, of 2 and of none |
+| `since` equal to #278's `updatedAt` | #278 answered: `since` keeps an issue updated AT the time given |
+| control: `since` 2099-01-01T00:00:00Z | no issue, at 4 points |
+| `RAFA_340_SCRATCH_A` from 2020 | 30 issues; children of #6 and #12 read their parent, A#14 reads the foreign blocker B#1 `CLOSED` in `<B>` |
+| `createCachedBoardListing` over the real runner, `native` then `native` | a full read of 422 issues (watermark and listing, 5.7 s), then ONE `gh api graphql` call, 0.65 s |
+
+`gh --jq` writes an object's keys in name order, as it does for the REST
+read of the labels mode, so a changed row's key order is `gh`'s and the
+same on every read.
+
+A blocker closing does not move the blocked issue's `updated_at`: B#1
+closed at 11:30:16Z, and A#14's `updated_at` read 11:30:07Z, its
+creation time, afterwards. So the incremental read answers the closed
+blocker's own row but not the blocked row that holds it as a node; a
+kept native row's linked issue holds the state it had when that row was
+last read.
+
+Not measured: a board large enough that a page of the incremental read
+times out, and a page cost on a board whose issues hold many links.
