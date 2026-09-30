@@ -565,7 +565,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../doctor-blocked.js', ['BLOCKED_LIST_LIMIT', 'KNOWN_LIST_LIMIT']],
     ['../plan/plan-files.js', ['plural']],
-    ['./issue-tracker.js', ['lineRefusal']],
+    ['./issue-tracker.js', ['issueProject', 'lineRefusal']],
+    ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'unblockRelationshipsMode']],
   ]],
   ['./commands/issue/check.js', [
     ['../../board/naming.js', ['boardId', 'notesFileName', 'SPEC_EXTENSION']],
