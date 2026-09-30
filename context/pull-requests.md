@@ -597,7 +597,10 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   with a stale note. The first line neither done nor taken is the answer;
   then as `--issue=<n>`. It prints what it skipped and why ("#20 taken: PR
   #33 open"), and exits 0 with a message when nothing is left. `--dry-run`
-  prints the pick and stops.
+  prints the pick and stops. The pick is claimed before the session
+  (`src/commands/plan/claim-route.ts`); a claim another store holds passes
+  the pick over, naming the owner, and the walk goes on, reading it as
+  taken by the branch that refused it, where `--issue=<n>` exits 1.
 
   A pick that is BLOCKED is the one line the walk offers its way past.
   Its issue carries `spec:blocked` and its `Blocked by:` line names a

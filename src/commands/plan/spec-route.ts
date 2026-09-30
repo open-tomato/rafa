@@ -153,6 +153,8 @@ export interface SpecRouteOptions {
   readonly roadmapIssue: number | null;
   /** `board.trustedAuthors` as config resolved it; check 0's allow-list. */
   readonly trustedAuthors: readonly string[];
+  /** Issues a `--next` walk passes over, each with the branch whose claim was refused (`./claim-route.ts`). */
+  readonly passOver?: ReadonlyMap<number, string>;
 }
 
 /** The resolution itself, as `board/plan-spec.ts` performs it. */
@@ -210,5 +212,8 @@ export async function resolveCreateSpec(
     offerReady: makeReadyOffer(),
     offerAlternative: makeAlternativeOffer(),
     offerRefresh: makeRefreshOffer(),
+    ...options.passOver === undefined
+      ? {}
+      : { passOver: options.passOver },
   });
 }

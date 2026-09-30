@@ -370,6 +370,7 @@ interface PlanSpecFields {
   readonly offerReady?: ReadyOffer | null;
   readonly offerAlternative?: AlternativeOffer | null;
   readonly offerRefresh?: RefreshOffer | null;
+  readonly passOver?: ReadonlyMap<number, string>;
   readonly output?: Output;
 }
 
@@ -414,6 +415,9 @@ function ask(
     offerReady: fields.offerReady ?? null,
     offerAlternative: fields.offerAlternative ?? null,
     offerRefresh: fields.offerRefresh ?? null,
+    ...fields.passOver === undefined
+      ? {}
+      : { passOver: fields.passOver },
     gh,
     git,
     output: fields.output ?? OUTPUT,
@@ -560,6 +564,23 @@ describe('the spec the roadmap picks', () => {
     if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
     expect(resolved.spec).toMatchObject({ kind: 'next', issue: 20, path: snapshotAt(20) });
     expect(resolved.gate?.number).toBe(20);
+  });
+
+  it('hands the walk the issues to pass over, which it reads as taken by the branch named', async () => {
+    const board = plantedGh([
+      issueOf(ROADMAP, { body: `${ROADMAP_BODY}\n- [ ] #33 the board setup`, labels: [] }),
+      issueOf(17, { state: 'CLOSED' }),
+      issueOf(20),
+      issueOf(33),
+    ]);
+
+    const resolved = await ask({ kind: 'next', roadmap: null }, board.gh, plantedGit().git, {
+      roadmapIssue: ROADMAP,
+      passOver: new Map([[20, 'feat/rafa-20-x']]),
+    });
+
+    if (resolved.outcome !== 'spec') throw new Error(`the resolution stopped: ${resolved.reason}`);
+    expect(resolved.spec.issue).toBe(33);
   });
 
   it('lists the board once through gh for a roadmap whose first line is an epic, and plans its first open spec', async () => {

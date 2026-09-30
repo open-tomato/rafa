@@ -89,7 +89,10 @@
  * reorder the roadmap with nobody saying so. The one line the walk does
  * move past, a blocked one and only on a yes, is
  * `./spec-source-roadmap.ts`'s to settle, and it settles it before
- * `inspect` runs, so the line an offer names is inspected in full.
+ * `inspect` runs, so the line an offer names is inspected in full. A
+ * line whose claim git refused is passed by a second resolution, not
+ * by this one: `plan create` resolves again with it in the roadmap's
+ * `passOver` (`src/commands/plan/claim-route.ts`).
  *
  * ## One read per issue
  *

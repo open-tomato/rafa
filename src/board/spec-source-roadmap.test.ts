@@ -1523,3 +1523,70 @@ describe('pickRoadmapIssue under --roadmap', () => {
     expect(lines.warn).toEqual([unfollowedHopNotice(`${file} does not hold a hop record`)]);
   });
 });
+
+describe('pickRoadmapIssue passing over issues whose claim was refused', () => {
+  it('reads a passed-over line as taken by the branch that refused it, and picks the line under it', async () => {
+    const { lines, output } = capture();
+
+    const resolution = await nextRun({
+      output,
+      seams: { passOver: new Map([[20, 'feat/rafa-20-pull-request-commands']]) },
+    });
+
+    expect(specOf(resolution).issue).toBe(33);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      skipLine({ line: { issue: 17, ticked: true, why: 'the pull request port, merged', lineNumber: 3 }, reason: 'ticked', detail: '' }),
+      skipLine({
+        line: { issue: 20, ticked: false, why: 'pull request commands', lineNumber: 4 },
+        reason: 'branch',
+        detail: 'feat/rafa-20-pull-request-commands',
+      }),
+      pickLine({ issue: 33, ticked: false, why: 'the board setup', lineNumber: 5 }),
+    ]);
+    expect(exists(snapshotAt(20))).toBe(false);
+  });
+
+  it('picks #20 as it always did with an empty pass-over, the control for the case above', async () => {
+    const resolution = await nextRun({ seams: { passOver: new Map() } });
+
+    expect(specOf(resolution).issue).toBe(20);
+  });
+
+  it('passes the refused line over on the way to a blocked line\'s alternative too', async () => {
+    const { lines, output } = capture();
+    const planted = plantedOffer(true);
+
+    const resolution = await nextRun({
+      issues: plantedIssues(blockedBoard()),
+      output,
+      seams: { offerAlternative: planted.offer, passOver: new Map([[33, 'feat/rafa-33-board-setup']]) },
+    });
+
+    // #33 is the alternative the blocked-line cases plan; passed over,
+    // the offer names #34, the line under it.
+    expect(planted.taken().map((taken) => taken.line.issue)).toEqual([34]);
+    expect(specOf(resolution).issue).toBe(34);
+    expect(lines.info).toContain(alternativeLine({ issue: 34, ticked: false, why: 'naming and close-out', lineNumber: 5 }));
+    expect(lines.info.join('\n')).toContain('#33 taken: branch feat/rafa-33-board-setup exists');
+  });
+
+  it('follows no hop whose target was refused, warning why, and walks as --next does', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({
+      issues: plantedIssues(board),
+      output,
+      followHop: true,
+      seams: { ...hopSeams(board).seams, passOver: new Map([[HOP_TARGET, 'feat/rafa-90-x']]) },
+    });
+
+    expect(specOf(resolution).issue).toBe(42);
+    expect(lines.warn).toEqual([
+      unfollowedHopNotice(`issue #${String(HOP_TARGET)}, the hop's target, was refused its claim on feat/rafa-90-x`),
+    ]);
+    expect(lines.info).not.toContain(hopPickLine(HOP_TARGET));
+  });
+});
