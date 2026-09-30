@@ -257,15 +257,18 @@ describe('the two directories start.ts points each call at', () => {
 
   it('dispatches each task with the HEAD the checkout is held to as its base', () => {
     // `expected.head` is the task's base: `advanceExpectation` moves it on
-    // to each task's commit, so the next task is handed the commit it sits on.
-    expect(firstArgument('dispatchTask')).toContain('base: expected.head,');
+    // to each task's commit, so the next task is handed the commit it sits
+    // on. It is read once, before the dispatch, since the task step after
+    // the commit needs the base the expectation no longer holds.
+    expect(START).toContain('const base = expected.head;');
+    expect(firstArgument('dispatchTask')).toMatch(/^\s*base,$/m);
   });
 
   it('reads a dispatch handed no base as handed none', () => {
     // The control for the case above: a literal without the field reads without it.
-    const planted = everyCall('async function run() { await dispatchTask({ taskInfo, repoRoot, home }); }');
+    const planted = everyCall('async function run() {\n  await dispatchTask({\n    taskInfo,\n    repoRoot,\n  });\n}');
 
-    expect(callTo(planted, 'dispatchTask').args[0]).not.toContain('base:');
+    expect(callTo(planted, 'dispatchTask').args[0]).not.toMatch(/^\s*base,$/m);
   });
 
   it('reads a dispatch handed no checkout as handed none', () => {
@@ -300,5 +303,65 @@ describe('the two directories start.ts points each call at', () => {
     // checkout only to record it as the run's `worktree` (`start/session.ts`).
     expect(firstArgument('openRunSession')).not.toContain('repoRoot: checkout');
     expect(firstArgument('openRunSession')).toMatch(/\bcheckout \}$/);
+  });
+});
+
+describe('where start.ts takes the suite steps', () => {
+  const EVERY = everyCall(START);
+
+  /** The index of the first call to `name`, failing when there is none. */
+  const indexOf = (calls: readonly BranchCall[], name: string): number => calls.indexOf(callTo(calls, name));
+
+  it('makes them once, over the run\'s root, checkout, tracker, session, config and plan', () => {
+    const input = callTo(EVERY, 'createRunSuiteSteps').args[0] ?? '';
+
+    expect(EVERY.filter((call) => call.name === 'createRunSuiteSteps')).toHaveLength(1);
+    for (const field of ['repoRoot,', 'checkout,', 'trackerPath,', 'sessionId: session.id,', 'settings: runConfig.config,', 'planContent,']) {
+      expect(input).toContain(field);
+    }
+  });
+
+  it('takes the steps before a session past the loop guard, ahead of progress.txt and of the wrap-up', () => {
+    // The baseline, the stage steps and the pre-wrap-up step all sit in
+    // this one call: `start/suite-steps-run.test.ts` reads which runs when.
+    expect(callTo(EVERY, 'beforeSession').args).toEqual(['taskInfo']);
+    const before = indexOf(EVERY, 'beforeSession');
+    expect(indexOf(EVERY, 'haltIfWrapUpMoved')).toBeLessThan(before);
+    expect(before).toBeLessThan(indexOf(EVERY, 'renderProgressForDispatch'));
+    expect(before).toBeLessThan(indexOf(EVERY, 'runWrapUp'));
+    expect(before).toBeLessThan(indexOf(EVERY, 'dispatchTask'));
+  });
+
+  it('stops the run when a step before a session is red, and breaks on an interrupt it ran through', () => {
+    expect(START).toContain('if (!(await suiteSteps.beforeSession(taskInfo))) return;\n      if (interrupted) break;');
+  });
+
+  it('takes the task step from the task\'s base once its commit is stored, before the usage check', () => {
+    expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
+    const after = indexOf(EVERY, 'afterTask');
+    expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
+    expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
+    expect(after).toBeLessThan(indexOf(EVERY, 'checkUsage'));
+    expect(START).toContain('if (!(await suiteSteps.afterTask(taskInfo, base))) return;');
+  });
+
+  it('reads a task step taken before the commit as taken before it', () => {
+    // The control for the ordering above: the reader answers the order
+    // written, so a planted loop taking the step first reads that way.
+    const planted = everyCall([
+      'async function run() {',
+      '  if (!(await suiteSteps.afterTask(taskInfo, base))) return;',
+      '  const finished = finishCleanExit({ trackerPath });',
+      '}',
+    ].join('\n'));
+
+    expect(indexOf(planted, 'afterTask')).toBeLessThan(indexOf(planted, 'finishCleanExit'));
+  });
+
+  it('keeps the wrap-up branch free of the pre-wrap-up step', () => {
+    // It runs in `beforeSession(null)` ahead of the branch, which still
+    // hands the whole wrap-up to `runWrapUp` alone (the first describe).
+    expect(NAMES).not.toContain('beforeSession');
+    expect(NAMES).not.toContain('runPreWrapUpStep');
   });
 });

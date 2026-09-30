@@ -145,6 +145,22 @@
  * A store the loop cannot read or write stops the run: before a dispatch,
  * nothing is dispatched; after a task, its commit and its mark stand.
  *
+ * The runner runs the slower tests itself, as recorded steps of the run
+ * (`start/suite-steps-run.ts` over `start/suite-step.ts`), each appended
+ * to the run record's `steps` before the loop acts on it. Past the loop
+ * guard and ahead of rendering `progress.txt`, the first session of the
+ * run, task or wrap-up, is preceded by the suite baseline: the one
+ * stored beside the tracker, or the full suite at HEAD. Before each task
+ * every stage step due runs, the step after a stage's last task and the
+ * catch-up for one that never ran; before the wrap-up, the full suite
+ * runs as the pre-wrap-up step. Once a task is committed `done` and its
+ * report stored, the task step runs over what it changed since the
+ * commit it was dispatched on, the base its prompt names. A step with
+ * failures the baseline does not hold is red: it writes its blocker on
+ * the next open task, when one is left, and the run stops as it does
+ * after a blocked task, so the next run retries that task handed the
+ * failing files. A red pre-wrap-up step stops the run before the wrap-up.
+ *
  * After each task's report is stored, and so after its commit and its
  * mark, the run's triage acts on it (`start/triage.ts`): the report's
  * blocker text goes onto the task's tracker line, for that task's next
@@ -214,7 +230,8 @@
  *
  * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
- * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts` and `start/wrap-up-run.ts` write goes
+ * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
+ * `start/suite-step.ts` and `start/suite-steps-run.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -243,8 +260,8 @@
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
- * A failed task, a blocked one, a checkout that moved and a report left
- * unstored still stop the run by returning, which the dispatcher ends as a success, with exit
+ * A failed task, a blocked one, a checkout that moved, a report left
+ * unstored and a red suite step still stop the run by returning, which the dispatcher ends as a success, with exit
  * code 0. A triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
@@ -306,6 +323,7 @@ import {
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
+import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { createStartTriage } from './start/triage.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
@@ -472,6 +490,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
+    // The runner's suite steps around the sessions (`start/suite-steps-run.ts`):
+    // `bun test` run here, in the checkout, and recorded on the run record.
+    const suiteSteps = createRunSuiteSteps({
+      repoRoot,
+      checkout,
+      trackerPath,
+      sessionId: session.id,
+      settings: runConfig.config,
+      planContent,
+    });
+
     // Initialize tracker only if it doesn't exist
     if (!fs.existsSync(trackerPath)) {
       activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -504,6 +533,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         : haltIfWrapUpMoved({ expected, before: 'dispatch' });
       if (moved) return;
 
+      // The baseline at the first dispatch, then the stage steps due
+      // before a task or the pre-wrap-up step before the wrap-up. A red
+      // one has blocked the next open task, when one is left, and stops
+      // the run as a blocked task does.
+      if (!(await suiteSteps.beforeSession(taskInfo))) return;
+      if (interrupted) break;
+
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
 
@@ -528,6 +564,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         break;
       }
 
+      // The HEAD the checkout is held to is the task's base commit: the
+      // session runs `bun test --changed=<base>` against it, and the task
+      // step runs over what the task changed since it.
+      const base = expected.head;
       session.taskStarted(taskInfo);
       const dispatch = await dispatchTask({
         taskInfo,
@@ -541,9 +581,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         knownMissing,
         serving,
         handout,
-        // The HEAD the checkout is held to is the task's base commit: the
-        // session runs `bun test --changed=<base>` against it.
-        base: expected.head,
+        base,
       });
       const { exitCode } = dispatch;
 
@@ -599,6 +637,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
         return;
       }
+
+      // The task step over what the task changed since its base; a red
+      // one has blocked the next open task, and stops the run.
+      if (!(await suiteSteps.afterTask(taskInfo, base))) return;
 
       const shouldPause = await checkUsage('task');
       if (shouldPause) {
