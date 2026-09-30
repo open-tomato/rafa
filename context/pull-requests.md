@@ -643,3 +643,54 @@ lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
+
+### Native relationships
+
+Measured answers for the `board.relationships: native` mode (#340). Each
+answer names the command that produced it, the `gh` it ran under and the
+date; a later task that depends on one follows it here and does not guess.
+The measurements write only to the operator's scratch repositories
+(`RAFA_340_SCRATCH_A`, `RAFA_340_SCRATCH_B`), never to `open-tomato/rafa`.
+
+#### A relationship write does not move `updated_at`
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`, on five issues: parent P #1, child C #2,
+blocked X #3, blocking Y #4 and control Z #5, which was never linked.
+Before each write the run waited 4 s, and after it 6 s, then read every
+issue's `updatedAt` twice: from GraphQL (`repository.issue(number:)`) and
+from REST (`gh api repos/<A>/issues/<n> --jq .updated_at`). The same
+GraphQL read also took `parent`, `subIssues`, `blockedBy` and `blocking`, so each row
+below shows that the write happened as well as what the timestamps did.
+
+| Write | Link read after it | `updated_at` moved on |
+|---|---|---|
+| `addSubIssue(issueId: P, subIssueId: C)` | C `parent` #1, P `subIssues` [#2] | neither P nor C |
+| `removeSubIssue(issueId: P, subIssueId: C)` | both empty again | neither P nor C |
+| `addBlockedBy(issueId: X, blockingIssueId: Y)` | X `blockedBy` [#4], Y `blocking` [#3] | neither X nor Y |
+| `removeBlockedBy(issueId: X, blockingIssueId: Y)` | both empty again | neither X nor Y |
+| control: `gh api -X PATCH repos/<A>/issues/5 -f title=…` | — | Z, 11:05:30Z → 11:06:40Z |
+
+Each write was sent as
+`gh api graphql -f query='mutation{addSubIssue(input:{issueId:"<P node id>",subIssueId:"<C node id>"}){clientMutationId}}'`
+(and likewise for the other three). GraphQL and REST agreed on every
+reading, and P, C, X and Y kept their creation timestamps throughout. The
+control shows that the same reads see a real edit. Two more reads, taken
+at 11:06:57Z after the control step, agreed as well:
+`issues(orderBy: {field: UPDATED_AT, direction: DESC})` listed #1–#4 at
+their creation times, and
+`gh api 'repos/<A>/issues?state=all&since=2026-09-30T11:05:31Z'`, one
+second after the last issue was created, returned #5 alone.
+
+What follows for the native mode: a sub-issue or blocked-by change is
+invisible to anything keyed on `updated_at`. That covers a cache row's
+freshness check, a `since=` poll and a sort by recently updated, and it
+holds on both ends of the link. A reader that must see relationship changes
+reads the relationship fields themselves.
+
+Not measured here: the writes went through the GraphQL mutations by
+`gh api`, not through `gh issue edit --add-sub-issue`, `--parent`,
+`--remove-parent`, `--add-blocked-by` or `--remove-blocked-by`. The
+session's rafa-tooling hook denies `gh issue` commands, so those flags were
+not run. Whether they send the same mutations, and so leave `updated_at`
+alone as well, is an assumption until a later task measures it.
