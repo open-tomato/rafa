@@ -77,6 +77,7 @@ import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { findNextTask } from '../utils/tracker.js';
 
+import { HOME_MARKER } from './local-paths.js';
 import {
   blockerTextOf,
   bugKeyOf,
@@ -1023,6 +1024,91 @@ describe('named secrets in what is filed', () => {
     await triage(f, reportWith({ feedback, outOfScopeBugs: [bug('Fence in feedback', null, false)] }));
 
     expect(onlyIssue(f.publicDir).draft.body).toContain(`## Feedback\n\n\`\`\`\`\n${feedback}\n\`\`\`\`\n`);
+  });
+});
+
+describe('local paths in what is filed', () => {
+  /** A report whose artifact, what and feedback name paths under `root` and `home`. */
+  function pathReport(root: string, home: string): TaskReport {
+    return reportWith({
+      feedback: `Ran ${home}/.bun/bin/bun test in ${root}.`,
+      outOfScopeBugs: [bug(
+        `${root}/.rafa/plans/PLAN-demo.md has no heading`,
+        `${root}/.rafa/plans/PLAN-demo.md:3 heading missing; cache ${home}/.cache/rafa/x.json`,
+        false,
+      )],
+    });
+  }
+
+  const RELATIVE_ARTIFACT = `.rafa/plans/PLAN-demo.md:3 heading missing; cache ${HOME_MARKER}/.cache/rafa/x.json`;
+
+  it('are absent from the filed issue and the query: the root becomes relative and the home a marker', async () => {
+    const f = fixture();
+    const home = '/Users/alice';
+
+    await triage(f, pathReport(f.root, home), { home });
+
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.contents).not.toContain(home);
+    expect(issue.contents).not.toContain(f.root);
+    expect(issue.draft.title).toBe('.rafa/plans/PLAN-demo.md has no heading');
+    expect(issue.draft.body).toContain(`## Artifact\n\n${fence(RELATIVE_ARTIFACT)}`);
+    expect(issue.draft.body).toContain(fence(`Ran ${HOME_MARKER}/.bun/bin/bun test in ..`));
+    expect(f.publicSpy.calls[0])
+      .toEqual(['find', { text: bugKeyOf(TRACKER_FILE, RELATIVE_ARTIFACT), type: 'bug' }]);
+  });
+
+  it('are absent from a recurrence comment', async () => {
+    const f = fixture();
+    const home = '/home/bob';
+    await triage(f, pathReport(f.root, home), { home });
+
+    await triage(f, pathReport(f.root, home), { home, dispatch: SECOND });
+
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.comments).toHaveLength(1);
+    expect(issue.contents).not.toContain(home);
+    expect(issue.contents).not.toContain(f.root);
+  });
+
+  it('key two reports differing only in the root and the home under one key', async () => {
+    const onMac = fixture();
+    const onLinux = fixture();
+
+    await triage(onMac, pathReport(onMac.root, '/Users/alice'), { home: '/Users/alice' });
+    await triage(onLinux, pathReport(onLinux.root, '/home/bob'), { home: '/home/bob' });
+
+    const key = bugKeyOf(TRACKER_FILE, RELATIVE_ARTIFACT);
+    expect(onMac.publicSpy.calls[0]).toEqual(onLinux.publicSpy.calls[0]!);
+    expect(refRows(onMac.root).map((row) => row.artifact)).toEqual([key]);
+    expect(refRows(onLinux.root).map((row) => row.artifact)).toEqual([key]);
+  });
+
+  it('still find a reference an earlier rafa stored under the key built from the absolute path', async () => {
+    const f = fixture();
+    const home = '/Users/alice';
+    const report = pathReport(f.root, home);
+    const legacyKey = bugKeyOf(TRACKER_FILE, report.outOfScopeBugs[0]!.artifact!);
+    const filed = await f.publicSpy.tracker.create({
+      opt: 0, title: 'filed before', body: 'no key', type: 'bug',
+      module: 'unassigned', priority: null, project: null, blockedBy: [],
+    });
+    writeTrackerRef(f.root, { dispatch: FIRST, outcome: 'blocked', artifact: legacyKey, ref: filed });
+    const callsBefore = f.publicSpy.calls.length;
+
+    const result = await triage(f, report, { home, dispatch: SECOND });
+
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', ref: filed, problem: null });
+    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['comment']);
+    expect(issueFiles(f.publicDir)).toHaveLength(1);
+  });
+
+  it('control: a path outside the root and the home is filed as reported', async () => {
+    const f = fixture();
+
+    await triage(f, reportWith({ outOfScopeBugs: [bug('bun missing', '/usr/local/bin/bun: not found', false)] }), { home: '/Users/alice' });
+
+    expect(onlyIssue(f.publicDir).draft.body).toContain(fence('/usr/local/bin/bun: not found'));
   });
 });
 

@@ -72,6 +72,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseStrategy', 'release.strategy'],
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
+  ['releasePublishCommand', 'release.publishCommand'],
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
@@ -227,6 +228,7 @@ describe('knownKeysAbove', () => {
         'strategy',
         'settle',
         'tag',
+        'publishCommand',
       ],
     ]);
     expect(knownKeysAbove('cleanup.staleDayz')).toEqual([

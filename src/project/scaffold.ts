@@ -141,6 +141,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   changelog: ${CONFIG_DEFAULTS.releaseChangelog}`,
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
   ...RELEASE_FRAGMENT_LINES,
+  `#   publishCommand: ${CONFIG_DEFAULTS.releasePublishCommand}      # the publish line release tag prints and never runs`,
   '# cleanup:',
   `#   staleDays: ${String(CONFIG_DEFAULTS.cleanupStaleDays)}                # days before rafa cleanup lists a branch as Stale`,
   `#   worktreeIdleDays: ${String(CONFIG_DEFAULTS.cleanupWorktreeIdleDays)}          # days before rafa cleanup lists a worktree as idle`,
