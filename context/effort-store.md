@@ -279,7 +279,10 @@ command waits out one timeout. The name is matched rather than the
 class, so a module throws a plain `Error` with that name and imports
 no value from core. Any other rejection is written as `effort sync:
 <push|pull> over <kind> failed: <message>`, and a refused push still
-pulls.
+pulls. `rafa effort collect` pushes then pulls once its rows are stored
+and its summary written, and `rafa loop start` makes one contact for its
+run and pushes then pulls at the end of each task, whatever its outcome
+(`src/effort/collect.ts`, `src/start.ts`).
 
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names

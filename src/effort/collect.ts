@@ -163,7 +163,18 @@
  * the window. It writes the SQLite-only `skill_invocations` table, not
  * the port, so it lands in `effort.sqlite` under any `store`. Its note
  * says which sessions it skips and why a count can be `unknown`.
+ *
+ * ## Sync
+ *
+ * Once the rows are stored and the summary written, the command entry
+ * pushes this store's rows to the project's other devices and pulls
+ * theirs, through one contact (`sync/contact.ts`). The contact writes
+ * any problem as a warning, at most one of them saying the hub is
+ * unreachable, and never changes how the command exits. `local` and
+ * `file` are not contacted. {@link collectEffort} makes no contact, so
+ * a caller handing it a store syncs nothing.
  */
+import type { ResolvedConfig } from '../config.js';
 import type { SkillCollectSummary, SkillLog, SkillScope } from './collect-skills.js';
 import type {
   CommitLogOptions,
@@ -196,6 +207,7 @@ import {
   sessionIdFromPath,
 } from './session-log.js';
 import { selectEffortStore } from './store/index.js';
+import { createHubContact } from './sync/contact.js';
 
 /**
  * Path characters the project log directory name replaces.
@@ -736,7 +748,8 @@ function refuse(problems: readonly string[]): never {
  *
  * Writes the summary through the active output
  * (`adapters/output/active.ts`), one `info` line each, as the run's
- * progress and config warnings are written ({@link collectEffort}).
+ * progress and config warnings are written ({@link collectEffort}),
+ * then pushes and pulls the store's rows (see the module note's `Sync`).
  *
  * Refuses by throwing `CommandExit` with exit code 1 and the refusal as
  * its message, one line per problem, and neither sets `process.exitCode`
@@ -755,6 +768,7 @@ export default async function collect(args: string[], repoRoot: string): Promise
   if (parsed.errors.length > 0) refuse(parsed.errors);
 
   let result: CollectResult;
+  let resolved: ResolvedConfig;
   try {
     result = await collectEffort({
       repoRoot,
@@ -767,6 +781,8 @@ export default async function collect(args: string[], repoRoot: string): Promise
         : 'appended',
       verbose: parsed.verbose,
     });
+    // Read again for the contact, silently: `collectEffort` warned about it once.
+    resolved = loadConfig({ root: repoRoot, home: homedir() }, {}, () => {});
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     refuse(error.problems);
@@ -774,4 +790,6 @@ export default async function collect(args: string[], repoRoot: string): Promise
   for (const line of formatCollectSummary(result)) {
     activeOutput().info(line);
   }
+  const warn = (message: string): void => activeOutput().warn(message);
+  await createHubContact({ root: repoRoot, home: homedir(), resolved, warn }).pushThenPull();
 }

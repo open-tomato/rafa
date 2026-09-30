@@ -155,6 +155,13 @@
  * per run, when a report first lists such a bug. A triage failure is a
  * warning and stops nothing, and no bug is ever dispatched as a task.
  *
+ * Then, whatever became of the task, the run pushes the store's rows to
+ * the project's other devices and pulls theirs, through the one contact
+ * it makes for the whole run (`effort/sync/contact.ts`). `local` and
+ * `file` are not contacted. A contact never throws, and it writes at most
+ * one line per run saying the hub is unreachable, so a hub that is down
+ * stops no task and does not repeat that line on every task.
+ *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
  * --plan        plan file to execute (default: PLAN.md in plan.dir, else at the
@@ -268,6 +275,7 @@ import { activeOutput } from './adapters/output/active.js';
 import { readDeviceStoreId } from './claims/device.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
+import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
@@ -473,6 +481,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       promoteMinConfidence: runConfig.config.learningPromoteMinConfidence,
     };
 
+    // The run's one contact with the project's other devices, run at the
+    // end of each task (`effort/sync/contact.ts`): it warns at most once
+    // that the hub is unreachable, and never throws.
+    const hubContact = createHubContact({
+      root: repoRoot,
+      home: homedir(),
+      resolved: runConfig,
+      warn: (message) => activeOutput().warn(message),
+    });
+
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
@@ -599,9 +617,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // dispatch row takes the resolver and what the prompt offered off
       // `dispatch` (`start/dispatch.ts`). Triage follows
       // the store and the mark, and stops nothing (`start/triage.ts`).
+      // Last, the task's rows are pushed and the other devices' pulled.
       const storeReport = async (outcome: FindingOutcome): Promise<boolean> => {
         const stored = await storeTaskReport({ repoRoot, planStub, dispatch, outcome, learning });
         await triageTask({ trackerPath, lineNum: taskInfo.lineNum, planStub, dispatch, outcome });
+        await hubContact.pushThenPull();
         return stored;
       };
 
