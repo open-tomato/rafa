@@ -62,6 +62,13 @@
  * `isWaiting` counts as not cleared. A local blocker's state is its row's
  * on the listing; a foreign blocker's is never asked and is null.
  *
+ * The reading is exported as {@link labelsBlockersOf} for
+ * `../blocked-line.ts`, which reads the `--next` walk's lines through it
+ * rather than through `readBlockedBy` again. It hands an empty map, since
+ * the walk holds an issue and not a listing row, and fills each local
+ * blocker's state from the walk's own memoised reader, which also reads
+ * an issue older than the listing.
+ *
  * ## freedBy
  *
  * The port's rule over this adapter's `blockersOf`, spelled once for
@@ -188,8 +195,14 @@ function foreignBlocker(token: string): Blocker {
   return Object.freeze({ number: Number(found?.[2] ?? 0), repository: found?.[1] ?? token, state: null });
 }
 
-/** What `issue` waits on; the module note holds the reading. */
-function blockersOf(issue: BoardIssue, byNumber: ReadonlyMap<number, BoardIssue>): BlockersReading {
+/**
+ * What `issue` waits on, each local blocker's state its row's on
+ * `byNumber`; the module note holds the reading.
+ */
+export function labelsBlockersOf(
+  issue: Pick<BoardIssue, 'number' | 'labels' | 'body'>,
+  byNumber: ReadonlyMap<number, Pick<BoardIssue, 'state'>>,
+): BlockersReading {
   if (!hasSpecBlockedLabel(issue.labels)) return Object.freeze({ kind: 'none', issue: issue.number });
   const read = readBlockedBy(issue.number, issue.body);
   if (read.kind !== 'blocked') {
@@ -212,7 +225,7 @@ function readLabels(listing: readonly BoardIssue[]): RelationsReading {
   const epics = epicsOf(listing);
   const owners = ownersBySlug(epics);
   const byNumber = new Map(listing.map((row) => [row.number, row]));
-  const blockers = (issue: BoardIssue): BlockersReading => blockersOf(issue, byNumber);
+  const blockers = (issue: BoardIssue): BlockersReading => labelsBlockersOf(issue, byNumber);
   return Object.freeze({
     epicOf: (issue: BoardIssue) => epicOf(issue, owners),
     membersOf: (epic: BoardIssue) => membersOf(epic, listing, epics),
