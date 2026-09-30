@@ -11,12 +11,13 @@
  * or a lease that is not a full sha, or a record `formatClaimMessage`
  * refuses.
  *
- * ## The four operations
+ * ## The operations
  *
  * | Operation | Git it runs | Answers |
  * |---|---|---|
  * | {@link makeOwnershipCommit} | `rev-parse`, `commit-tree` | the new commit's sha |
  * | {@link fetchClaimBranches} then {@link readClaimBranch} | one `fetch`, then local reads | `absent`, `found` with the ownership, or `unreadable` |
+ * | {@link readLocalClaimBranch} | local reads of `refs/heads/<branch>` | the same three |
  * | {@link pushNewClaimBranch} | `push`, no force | `pushed`, `claimed` naming the holder, or `failed` |
  * | {@link pushOwnershipCommit} | `push --force-with-lease` | `pushed`, `moved` meanwhile, or `failed` |
  *
@@ -33,6 +34,11 @@
  * refspec names, never `origin/main`. {@link readClaimBranch} then reads
  * the remote-tracking ref and nothing else, so walking several issues
  * costs one network round trip.
+ *
+ * {@link readLocalClaimBranch} reads the same way off the LOCAL branch,
+ * `refs/heads/<branch>`, with no fetch at all: it is how `loop start`'s
+ * preflight finds a claim commit `plan create` could not push, which
+ * waits on the local branch with no upstream (`src/start/preflight-claim.ts`).
  *
  * **A branch's ownership commits are the claim commits in its history
  * that name its own issue.** Its history is walked with a
@@ -95,7 +101,7 @@ import type { BranchCommit, ClaimRecord, Ownership } from './record.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { gitSaid } from '../pr/index.js';
-import { BRANCH_PREFIX, REMOTE, remoteTrackingRef } from '../start/branch-decision.js';
+import { BRANCH_PREFIX, localRef, REMOTE, remoteTrackingRef } from '../start/branch-decision.js';
 
 import { formatClaimMessage, parseClaimMessage, readOwnership } from './record.js';
 
@@ -128,15 +134,18 @@ export type OwnershipCommit =
 /** What {@link fetchClaimBranches} answered. */
 export type ClaimFetch = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
-/** What {@link readClaimBranch} read of one claim branch on the remote. */
+/**
+ * What {@link readClaimBranch} read of one claim branch on the remote, or
+ * {@link readLocalClaimBranch} of the local branch of that name.
+ */
 export type ClaimBranchReading =
-  /** The remote has no such branch, as of the last fetch. */
+  /** The remote has no such branch, as of the last fetch; or there is no such local branch. */
   | { readonly state: 'absent'; readonly branch: string }
   /** The branch, its tip, and who holds its claim. */
   | {
     readonly state: 'found';
     readonly branch: string;
-    /** The sha of the branch's tip on the remote. */
+    /** The sha of the branch's tip on the remote, or of the local branch's. */
     readonly tip: string;
     /** The tip's committer date, which staleness is read from. */
     readonly tipCommittedAt: Date;
@@ -237,8 +246,22 @@ export function fetchClaimBranches(git: GitRunner): ClaimFetch {
  * network call. Throws on a branch that is not a claim branch.
  */
 export function readClaimBranch(git: GitRunner, branch: string): ClaimBranchReading {
+  return readClaimRef(git, branch, remoteTrackingRef(branch));
+}
+
+/**
+ * Reads the LOCAL `branch`, `refs/heads/<branch>`, as {@link readClaimBranch}
+ * reads its remote-tracking ref, with no network call: `absent` when this
+ * checkout has no such branch. Throws on a branch that is not a claim branch.
+ */
+export function readLocalClaimBranch(git: GitRunner, branch: string): ClaimBranchReading {
+  return readClaimRef(git, branch, localRef(branch));
+}
+
+/** The claim reading of `branch` at `ref`, its remote-tracking ref or its local one. */
+function readClaimRef(git: GitRunner, branch: string, ref: string): ClaimBranchReading {
   const issue = issueOf(branch);
-  const resolved = git(['rev-parse', '--verify', '--quiet', `${remoteTrackingRef(branch)}^{commit}`]);
+  const resolved = git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
   const tip = resolved.stdout.trim();
   if (!resolved.ok || tip === '') {
     const said = gitSaid(resolved);

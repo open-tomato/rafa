@@ -1902,7 +1902,10 @@ New; it replaces no earlier text. What a row or an action added to
   kind no adapter serves, checked first and worded as `rafa doctor`'s
   `effort sync` row words it (`start/preflight-sync.ts`), an `agent=` of a still-to-run
   task that no scope `loop.settingSources` loads defines, checked ahead
-  of every probe, a failed required prerequisite — the two automatic
+  of every probe, a claim on the issue the plan's stub names that this
+  device does not own, named with its owner, or that it left unpushed on
+  the local `feat/<stub>` and cannot push, also checked ahead of every
+  probe (`start/preflight-claim.ts`), a failed required prerequisite — the two automatic
   items a `gh` pull request provider contributes, `gh` on `PATH` and
   `gh auth status` for `origin`'s host, checked ahead of the configured
   tiers, and the plan's `[start]` items, checked between the two on a

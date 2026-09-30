@@ -29,6 +29,7 @@ import {
   pushNewClaimBranch,
   pushOwnershipCommit,
   readClaimBranch,
+  readLocalClaimBranch,
 } from './git.js';
 import { formatClaimMessage, parseClaimMessage } from './record.js';
 
@@ -343,6 +344,44 @@ describe('fetchClaimBranches and readClaimBranch', () => {
     const calls: string[][] = [];
 
     expect(() => readClaimBranch(answering({ ok: true, stdout: '', stderr: '' }, calls), 'feat/other')).toThrow('is not a feat/rafa-* branch');
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('readLocalClaimBranch', () => {
+  it('reads an unpushed claim off the local branch, which the remote reading does not see', () => {
+    const trio = plantTrio('local-pending');
+    const claim = claimOn(trio.a, STORE_A);
+    must(trio.a, ['update-ref', `refs/heads/${BRANCH}`, claim]);
+    const calls: string[][] = [];
+    const git = recording(trio.a, calls);
+
+    const local = readLocalClaimBranch(git, BRANCH);
+    fetchClaimBranches(trio.a);
+    const remote = readClaimBranch(trio.a, BRANCH);
+
+    if (local.state !== 'found') throw new Error(`expected found, read ${local.state}`);
+    expect(local.tip).toBe(claim);
+    expect(local.commits.map((commit) => commit.sha)).toEqual([claim]);
+    expect(local.ownership).toEqual({ state: 'held', owner: STORE_A, pending: null, ignored: [] });
+    // The control: the same branch read on the remote is absent, since nothing was pushed.
+    expect(remote).toEqual({ state: 'absent', branch: BRANCH });
+    expect(calls.filter((call) => ['fetch', 'push', 'pull', 'ls-remote'].includes(call[0] ?? ''))).toEqual([]);
+  });
+
+  it('reads a checkout with no such local branch as absent, even while the remote holds it', () => {
+    const trio = plantTrio('local-absent');
+    must(trio.b, ['push', '--quiet', 'origin', `${claimOn(trio.b, STORE_B)}:refs/heads/${BRANCH}`]);
+    fetchClaimBranches(trio.a);
+
+    expect(readLocalClaimBranch(trio.a, BRANCH)).toEqual({ state: 'absent', branch: BRANCH });
+    expect(readClaimBranch(trio.a, BRANCH).state).toBe('found');
+  });
+
+  it('throws on a branch that is not a claim branch', () => {
+    const calls: string[][] = [];
+
+    expect(() => readLocalClaimBranch(answering({ ok: true, stdout: '', stderr: '' }, calls), 'feat/other')).toThrow('is not a feat/rafa-* branch');
     expect(calls).toEqual([]);
   });
 });

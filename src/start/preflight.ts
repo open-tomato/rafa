@@ -72,7 +72,13 @@
  *      `gh`. They go AHEAD of the configured required tier, because a
  *      run whose pull request could never be opened should halt at its
  *      cheapest check rather than after the tiers a repository added.
- *   7. **Prints the reminders** that file carries, through `info`: each
+ *   7. **Checks the claim** on the issue the plan's stub names, through
+ *      `start/preflight-claim.ts`, before any probe: a claim `plan create`
+ *      left unpushed on the local `feat/<stub>` is pushed, and a run of an
+ *      issue another device owns, or no device holds, is refused naming
+ *      the owner. A plan whose stub names no issue, or a branch carrying
+ *      no claim commit, runs as it always did.
+ *   8. **Prints the reminders** that file carries, through `info`: each
  *      `human` item, by its line.
  *      A reminder is never checked and never halts, so a plan's unticked
  *      operator steps for after the merge stop nothing. It then **warns
@@ -87,22 +93,24 @@
  *      this rafa refuses prints nothing here either (its first open
  *      refuses it with its own next step), and one that cannot be read
  *      is one warning naming why. None of it halts.
- *   8. **Decides the start-only tier**, through `isFirstDispatch`
+ *   9. **Decides the start-only tier**, through `isFirstDispatch`
  *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
  *      probed ahead of the configured required tier on a first
  *      dispatch, and on a resume each is skipped with one line naming
  *      it and why. See below.
- *   9. **Checks every item** through `runPreflight`
+ *  10. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
  *      optional item is warned about as it is found.
- *  10. **Stores a row per check** through `writePreflightChecks`
+ *  11. **Stores a row per check** through `writePreflightChecks`
  *      (`effort/store/preflight.ts`), under the repo root in the SQLite
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
- *  11. **Halts, or answers.** A failed required item, or rows that could
+ *  12. **Halts, or answers.** A failed required item, or rows that could
  *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
- *      code 1. Otherwise the run's id, the report, the reminders and the
+ *      code 1. Otherwise, on a first dispatch of a run holding its claim,
+ *      the issue's `rafa:claimed` is swapped for `rafa:in-development`,
+ *      best-effort, and the run's id, the report, the reminders and the
  *      `known-missing:` lines are answered.
  *
  * A run with no item to check stores nothing and prints no preflight
@@ -215,6 +223,14 @@
  *        Write each as - [ ] uv installed: `uvx --version`, ...
  *        Nothing was checked and nothing was dispatched.
  *
+ * A claim this device does not own refuses after that, still before any
+ * probe, naming the owner (`start/preflight-claim.ts` shows it):
+ *
+ *     ❌ Refusing to start: this device does not own the claim on #7.
+ *        #7 is claimed by store store-a on feat/rafa-7-x, not by this
+ *        device (store store-b)
+ *        Nothing was checked and nothing was dispatched.
+ *
  * ## The notice
  *
  * {@link knownMissingNotice} answers the `known-missing:` lines followed
@@ -269,6 +285,7 @@
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
 import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
+import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightSync } from './preflight-sync.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
@@ -314,6 +331,7 @@ import {
 import { runPreflight } from '../preflight/run.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
+import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { refuseUnservedSync } from './preflight-sync.js';
 
 /**
@@ -369,6 +387,8 @@ export interface StartPreflightOptions {
   readonly readRemote?: ResolvePrProviderOptions['readRemote'];
   /** What the sync-strategy check reads; see the module note. */
   readonly sync: StartPreflightSync;
+  /** What the claim check reads and writes through; see the module note. */
+  readonly claim: StartPreflightClaim;
 }
 
 /** What a preflight that let the run through answers. */
@@ -630,8 +650,8 @@ function refusalOf(runId: string, halt: string | null, storeProblem: string | nu
  * Runs the preflight of one `loop start` run and answers what the run's
  * sessions are handed, or throws `CommandExit` with exit code 1 for a
  * failed required item, rows the store refused, a PREREQUISITES file
- * that cannot be read, or an `effort.sync` no adapter serves. See the
- * module note.
+ * that cannot be read, an `effort.sync` no adapter serves, or a claim
+ * this device does not own. See the module note.
  */
 export async function runStartPreflight(options: StartPreflightOptions): Promise<StartPreflight> {
   const runId = (options.newRunId ?? randomUUID)();
@@ -640,6 +660,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   refuseStoreRuleBreaks(options.planPath);
   const items = await loadItems(options);
   refuseMalformedItems(options.planPath, items);
+  const claim = refuseUnownedClaim(options.planPath, options.claim);
   announceReminders(options.planPath, items.reminders);
   announceUnknownMigrations(options.repoRoot);
 
@@ -664,6 +685,7 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
       : `; ${report.knownMissing.length} optional item(s) named known-missing in every task prompt`;
     activeOutput().info(`   Preflight passed${missing}.`);
   }
+  await markInDevelopment(claim, options.claim.board, isFirstDispatch(options.planPath));
 
   return Object.freeze({
     runId,
