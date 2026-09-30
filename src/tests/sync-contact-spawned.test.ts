@@ -10,10 +10,15 @@
  *     it makes for its run (`src/start.ts`);
  *
  * and where one pulls alone before it reads the store, through
- * `pullBeforeRead`: `rafa effort report` and `rafa status`. `rafa next`
- * is held to the same in-process, over its seams
- * (`src/commands/next.test.ts`), since spawned it needs a GitHub origin
- * and would reach the real `gh`.
+ * `pullBeforeRead`: `rafa effort report`, `rafa status` and `rafa next
+ * --dry-run`. `rafa next`'s own chain logic is held in-process, over its
+ * seams (`src/commands/next.test.ts`); here it is spawned over a
+ * stand-in `gh` and a real bare origin, exactly as
+ * `next-chain-fixtures.ts` plants one, so its pull is proven over the
+ * real dispatcher and a real `openNextSources`, not just the seam.
+ * `--dry-run` halts the chain before it asks or runs anything
+ * (`playTurn`, `src/commands/next.ts`), so the fixture needs no ready
+ * action beyond a state that reads without throwing.
  *
  * The `service` strategy is the `hub-down-sync` module under
  * `src/modules/testdata/`, loaded through `modules:` and `allowList:`:
@@ -23,15 +28,17 @@
  * whole, counted, beside the log.
  *
  * Each claim sits beside a control that could have failed it: the same
- * project naming `effort.sync: local`, which loads the same module and
- * contacts nothing, and, for the loop, a plan of two tasks, which pushes
- * twice and still writes the line once.
+ * project naming `effort.sync: local` and `effort.sync: file`, which
+ * load the same module and contact nothing — `local` moves no rows, and
+ * `file` moves them only through `rafa effort copy`/`import`, which none
+ * of these commands calls — and, for the loop, a plan of two tasks,
+ * which pushes twice and still writes the line once.
  */
 import type { ScratchRepo } from './cli-capture.js';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -41,6 +48,7 @@ import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { BASE, NEXT_ISSUE, NEXT_TITLE, ROADMAP_ISSUE, writeStandInGh } from './next-chain-fixtures.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
 
@@ -69,7 +77,7 @@ const PULL_UNREACHABLE_LINE = `warn: ${hubUnreachableLine(HUB_URL, new Error('co
 const SYNC_OPENING = 'effort sync:';
 
 /** A config naming `strategy` as `effort.sync`, loading the hub-down module either way. */
-function configFor(strategy: 'service' | 'local'): string {
+function configFor(strategy: 'service' | 'local' | 'file'): string {
   return [
     'pr:',
     '  provider: none',
@@ -110,7 +118,7 @@ function git(scratch: ScratchRepo, ...args: string[]): void {
 }
 
 /** A scratch project with one commit and the config for `strategy`, both notices dismissed. */
-function plantProject(strategy: 'service' | 'local'): ScratchRepo {
+function plantProject(strategy: 'service' | 'local' | 'file'): ScratchRepo {
   const scratch = plantScratchRepo(tempBase);
   writeDismissed(scratch.home, NOTICE_IDS);
   git(scratch, 'config', 'user.name', 'Rafa Sync');
@@ -120,6 +128,60 @@ function plantProject(strategy: 'service' | 'local'): ScratchRepo {
   git(scratch, 'add', '-A');
   git(scratch, 'commit', '-q', '--no-verify', '-m', 'seed');
   plantProjectConfig(scratch.repo, configFor(strategy));
+  return scratch;
+}
+
+/** The one undone roadmap line `rafa next`'s board read proposes planning. */
+const NEXT_ROADMAP_BODY = `- [ ] #${String(NEXT_ISSUE)} — ${NEXT_TITLE}\n`;
+
+/**
+ * A config naming `strategy` as `effort.sync`, loading the hub-down
+ * module either way, with the `gh` provider and roadmap issue
+ * `rafa next`'s board read needs.
+ */
+function configForNext(strategy: 'service' | 'local' | 'file'): string {
+  return [
+    'pr:',
+    '  provider: gh',
+    `  base: ${BASE}`,
+    'roadmap:',
+    `  issue: ${String(ROADMAP_ISSUE)}`,
+    'effort:',
+    `  sync: ${strategy}`,
+    'hub:',
+    `  url: ${HUB_URL}`,
+    'modules:',
+    `  - path: ${HUB_DOWN_MODULE}`,
+    'allowList:',
+    '  - hub-down-sync',
+    '',
+  ].join('\n');
+}
+
+/**
+ * A scratch project for `rafa next`: one commit on {@link BASE}, pushed to
+ * a bare `origin` beside it so the branch scan's remote half never fails,
+ * the config for `strategy`, the stand-in `gh` {@link writeStandInGh}
+ * writes, and both notices dismissed.
+ */
+function plantNextProject(strategy: 'service' | 'local' | 'file'): ScratchRepo {
+  const scratch = plantScratchRepo(tempBase, { project: false });
+  writeDismissed(scratch.home, NOTICE_IDS);
+  git(scratch, 'checkout', '-q', '-B', BASE);
+  git(scratch, 'config', 'user.name', 'Rafa Sync');
+  git(scratch, 'config', 'user.email', 'sync@example.invalid');
+  git(scratch, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(scratch.repo, '.gitignore'), '.rafa/\n', 'utf8');
+  git(scratch, 'add', '-A');
+  git(scratch, 'commit', '-q', '--no-verify', '-m', 'seed');
+  const bare = join(dirname(scratch.repo), 'next-origin.git');
+  mkdirSync(bare, { recursive: true });
+  const bareInit = createGitRunner(bare)(['init', '-q', '--bare']);
+  if (!bareInit.ok) throw new Error(`git init --bare in a fixture step: ${bareInit.stderr}`);
+  git(scratch, 'remote', 'add', 'origin', bare);
+  git(scratch, 'push', '-q', '-u', 'origin', BASE);
+  plantProjectConfig(scratch.repo, configForNext(strategy));
+  writeStandInGh(scratch.bin, NEXT_ROADMAP_BODY);
   return scratch;
 }
 
@@ -172,7 +234,7 @@ function tracker(scratch: ScratchRepo): string {
 }
 
 describe('rafa effort collect under a service whose hub is down', () => {
-  it('stores its rows, pushes once, writes one unreachable line and exits 0, where local contacts nothing', () => {
+  it('stores its rows, pushes once, writes one unreachable line and exits 0, where local and file contact nothing', () => {
     const scratch = plantProject('service');
     const run = runRafa(scratch, scratch.repo, ['effort', 'collect', '--no-sessions']);
     const output = `${run.stdout}${run.stderr}`;
@@ -184,14 +246,16 @@ describe('rafa effort collect under a service whose hub is down', () => {
     // The unreachable push skipped its pull.
     expect(syncCalls(scratch)).toEqual(['push']);
 
-    // The control: the same project naming `local` stores the same row and contacts nothing.
-    const control = plantProject('local');
-    const passed = runRafa(control, control.repo, ['effort', 'collect', '--no-sessions']);
-    const controlOutput = `${passed.stdout}${passed.stderr}`;
-    expect(passed.exitCode).toBe(0);
-    expect(passed.stdout).toContain('+1 rows');
-    expect(syncLines(controlOutput)).toBe(0);
-    expect(syncCalls(control)).toEqual([]);
+    // The controls: the same project naming `local` or `file` stores the same row and contacts nothing.
+    for (const strategy of ['local', 'file'] as const) {
+      const control = plantProject(strategy);
+      const passed = runRafa(control, control.repo, ['effort', 'collect', '--no-sessions']);
+      const controlOutput = `${passed.stdout}${passed.stderr}`;
+      expect(passed.exitCode).toBe(0);
+      expect(passed.stdout).toContain('+1 rows');
+      expect(syncLines(controlOutput)).toBe(0);
+      expect(syncCalls(control)).toEqual([]);
+    }
   }, RUN_TIMEOUT);
 });
 
@@ -226,7 +290,7 @@ describe.each([
   ['rafa effort report', ['effort', 'report']],
   ['rafa status', ['status']],
 ])('%s under a service whose hub is down', (_name, words) => {
-  it('pulls once before it reads, writes one unreachable line and exits 0, where local contacts nothing', () => {
+  it('pulls once before it reads, writes one unreachable line and exits 0, where local and file contact nothing', () => {
     const scratch = plantProject('service');
     const run = runRafa(scratch, scratch.repo, words);
     const output = `${run.stdout}${run.stderr}`;
@@ -236,11 +300,35 @@ describe.each([
     expect(syncLines(output)).toBe(1);
     expect(syncCalls(scratch)).toEqual(['pull']);
 
-    // The control: the same project naming `local` runs the same command and contacts nothing.
-    const control = plantProject('local');
-    const passed = runRafa(control, control.repo, words);
-    expect(passed.exitCode).toBe(0);
-    expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
-    expect(syncCalls(control)).toEqual([]);
+    // The controls: the same project naming `local` or `file` runs the same command and contacts nothing.
+    for (const strategy of ['local', 'file'] as const) {
+      const control = plantProject(strategy);
+      const passed = runRafa(control, control.repo, words);
+      expect(passed.exitCode).toBe(0);
+      expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
+      expect(syncCalls(control)).toEqual([]);
+    }
+  }, RUN_TIMEOUT);
+});
+
+describe('rafa next --dry-run under a service whose hub is down', () => {
+  it('pulls once before it reads, writes one unreachable line and exits 0, where local and file contact nothing', () => {
+    const scratch = plantNextProject('service');
+    const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
+    const output = `${run.stdout}${run.stderr}`;
+
+    expect(run.exitCode).toBe(0);
+    expect(linesEqualTo(output, PULL_UNREACHABLE_LINE)).toBe(1);
+    expect(syncLines(output)).toBe(1);
+    expect(syncCalls(scratch)).toEqual(['pull']);
+
+    // The controls: the same project naming `local` or `file` runs the same command and contacts nothing.
+    for (const strategy of ['local', 'file'] as const) {
+      const control = plantNextProject(strategy);
+      const passed = runRafa(control, control.repo, ['next', '--dry-run']);
+      expect(passed.exitCode).toBe(0);
+      expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
+      expect(syncCalls(control)).toEqual([]);
+    }
   }, RUN_TIMEOUT);
 });
