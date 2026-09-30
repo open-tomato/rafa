@@ -47,26 +47,53 @@
  *
  * ## C blocked is a halt, never a second hop
  *
- * C is blocked exactly as the walk reads any line blocked,
- * `readBlockedLine` (`src/board/blocked-line.ts`): it carries
- * `spec:blocked`, and its `Blocked by:` line names a blocker the listing
- * holds open, one the listing does not hold (state not read, which is
- * not cleared), or is a fault. Each blocker's state is read off the
- * listing, never asked of `gh`. The answer is `halt`, reason
- * `blocked-blocker`, with the chain `#H ← #C ← #B`, every open and
- * unread B in line order. When H is among them the two issues block
- * each other, the mutual block, and {@link HopChain.mutual} says so. A
- * fault halts with the chain `#H ← #C` and the fault's own sentence.
+ * C is blocked exactly as the walk reads any line blocked, the port's
+ * `blockersOf` over the one listing turned into a line by
+ * `blockedLineOf` (`src/board/blocked-line.ts`). Each blocker's state is
+ * read off the listing, never asked of `gh`. The answer is `halt`,
+ * reason `blocked-blocker`, with the chain `#H ← #C ← #B`, every open and
+ * unread B on this board in the mode's order. When H is among them the
+ * two issues block each other, the mutual block, and
+ * {@link HopChain.mutual} says so.
+ *
+ * ## The mode
+ *
+ * Which epic holds C and what C waits on are relationships, read through
+ * the board's relationships port (`src/board/relations/port.ts`) in the
+ * mode `board.relationships` names, {@link HopRequest.relations}; left
+ * out, the mode is `labels` (`LABELS_READS`), what every caller before
+ * the port read. The decision reads no label and no body line itself.
+ *
+ * In `labels` mode C is blocked when it carries `spec:blocked` and its
+ * `Blocked by:` line names a blocker the listing holds open, one the
+ * listing does not hold (state not read, which is not cleared), or is a
+ * fault. A fault halts with the chain `#H ← #C` and the fault's own
+ * sentence. The faults are the line's, so they are `labels` mode's only.
+ *
+ * In `native` mode C is blocked when a `blockedBy` node is open, names
+ * this board's issue with no state, or `gh` stopped short of the list,
+ * each state the node's own: a blocker closed as `NOT_PLANNED` clears as
+ * one closed as done. No label, no `Blocked by:` line and so no fault is
+ * read, and {@link HopHalt.fault} is always null. A blocker on another
+ * repository, and the blockers past a truncated list, hold C but have no
+ * number on this board, so the chain names this board's blockers only:
+ * a C held by them alone halts with `#H ← #C`, blocked in turn. C itself
+ * may arrive as the `blockedBy` node H's own reading named
+ * ({@link HopRequest.blocker}), which the locator reads with its
+ * repository.
  */
-import type { BlockedLine, BlockerState } from '../board/blocked-line.js';
+import type { BlockedLine } from '../board/blocked-line.js';
 import type { BlockerEpic, UnhoppableBlocker } from '../board/blocker-epic.js';
 import type { BoardView } from '../board/epic-board.js';
+import type { EpicRelations } from '../board/epics.js';
+import type { RelatedIssue } from '../board/relations/port.js';
 import type { RoadmapReadings } from '../board/roadmap.js';
 import type { Place, Position } from '../project/position.js';
 
-import { readBlockedLine } from '../board/blocked-line.js';
+import { blockedLineOf } from '../board/blocked-line.js';
 import { locateBlockerEpic, noHopSentence } from '../board/blocker-epic.js';
 import { samePlace } from '../board/place.js';
+import { LABELS_READS } from '../board/relations/labels.js';
 
 /** The two taken readings the walk holds, asked about C. */
 export type TakenReadings = Pick<RoadmapReadings, 'branchFor' | 'pullRequestFor'>;
@@ -75,14 +102,20 @@ export type TakenReadings = Pick<RoadmapReadings, 'branchFor' | 'pullRequestFor'
 export interface HopRequest {
   /** H: the issue the walk reached blocked. */
   readonly blocked: number;
-  /** C: one of H's blockers, a local number or a foreign `owner/repo#<n>` token. */
-  readonly blocker: number | string;
+  /**
+   * C: one of H's blockers, a local number or a foreign `owner/repo#<n>`
+   * token as `readBlockedBy` keeps it, or a port blocker as a `native`
+   * `blockedBy` node names it.
+   */
+  readonly blocker: number | string | RelatedIssue;
   /** Where H was read (`current`) and where home is. */
   readonly position: Pick<Position, 'current' | 'home'>;
   /** The turn's one listing and its default board. */
   readonly view: BoardView;
   /** Whether a branch or an open pull request has taken C. */
   readonly taken: TakenReadings;
+  /** The board's relationships, which read C's epic and what C waits on; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /** The chain a halt reports: `#H ← #C ← #B`. */
@@ -140,7 +173,7 @@ export interface HopHalt {
   readonly from: Place;
   /** C's epic on its board. */
   readonly to: Place;
-  /** The fault C's `Blocked by:` line was reported with, else null. */
+  /** The fault C's `Blocked by:` line was reported with, else null; always null in `native` mode. */
   readonly fault: string | null;
 }
 
@@ -229,12 +262,12 @@ export async function takenBy(blocker: number, taken: TakenReadings): Promise<Ta
     : { by: 'pull-request', pullRequest };
 }
 
-/** C's own blocked reading, its blockers' states read off the listing. */
-function blockerLine(blocker: number, view: BoardView): Promise<BlockedLine | null> {
+/** C's own blocked reading through the port, its blockers' states read off the listing; see the module note. */
+function blockerLine(blocker: number, view: BoardView, relations: EpicRelations): BlockedLine | null {
   const row = view.rows.get(blocker);
-  if (row === undefined) return Promise.resolve(null);
-  const states = (issue: number): Promise<BlockerState> => Promise.resolve(view.rows.get(issue)?.state ?? null);
-  return readBlockedLine({ ...row, author: '' }, states);
+  return row === undefined
+    ? null
+    : blockedLineOf(relations.read(view.listing).blockersOf(row));
 }
 
 /** A frozen chain. */
@@ -250,8 +283,9 @@ function halt(reason: HaltReason, chain: HopChain, from: Place, to: Place, fault
 /** Hop, wait, halt or stay for H blocked by C; see the module note for the order. */
 export async function decideHop(request: HopRequest): Promise<HopDecision> {
   const { blocked, blocker, position, view } = request;
+  const relations = request.relations ?? LABELS_READS;
   const from = position.current;
-  const located: BlockerEpic = await locateBlockerEpic({ blocker, home: from, view });
+  const located: BlockerEpic = await locateBlockerEpic({ blocker, home: from, view, relations });
   if (located.kind === 'no-hop') return Object.freeze({ kind: 'stay', blocked, located });
 
   const to: Place = Object.freeze({ board: located.board, epic: located.epic });
@@ -266,7 +300,7 @@ export async function decideHop(request: HopRequest): Promise<HopDecision> {
     });
   }
 
-  const line = await blockerLine(located.blocker, view);
+  const line = blockerLine(located.blocker, view, relations);
   if (line !== null) {
     const held = line.blockers.filter((id) => line.open.includes(id) || line.unread.includes(id));
     const chain = chainOf(blocked, located.blocker, held);
