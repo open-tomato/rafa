@@ -382,6 +382,17 @@ function requiredOnly(probe: string): PrerequisiteSettings {
 /** The config default, `effort.sync: local`, read against a home under this file's scratch. */
 const DEFAULT_SYNC = { resolved: resolveConfig(), home: join(libRoot, 'home') };
 
+/** The claim seams of `PLAN-lib.md`, whose stub names no issue, so no seam is reached. */
+const NO_CLAIM = {
+  git: () => {
+    throw new Error('no git expected: the plan names no issue');
+  },
+  board: null,
+  readStoreId: () => {
+    throw new Error('no store read expected: the plan names no issue');
+  },
+};
+
 /** Enough PATH for the probe's `sleep` to resolve; nothing carried over from this process. */
 const PROBE_ENV = { PATH: ['/usr/bin', '/bin'].join(delimiter) };
 
@@ -413,6 +424,7 @@ describe('a required probe waiting on stdin', () => {
           settings: requiredOnly(WAITING_PROBE),
           checks: { timeoutMs: SHORT_TIMEOUT_MS, env: PROBE_ENV },
           sync: DEFAULT_SYNC,
+          claim: NO_CLAIM,
         });
       } catch (error) {
         if (!(error instanceof CommandExit)) throw error;
@@ -427,6 +439,7 @@ describe('a required probe waiting on stdin', () => {
         settings: requiredOnly('exit 0'),
         checks: { timeoutMs: SHORT_TIMEOUT_MS, env: PROBE_ENV },
         sync: DEFAULT_SYNC,
+        claim: NO_CLAIM,
       });
       const passElapsed = Date.now() - passStarted;
       setActiveOutput(null);

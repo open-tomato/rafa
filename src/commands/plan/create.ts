@@ -8,14 +8,14 @@
  * whose next word is no action of it, `rafa plan` alone included
  * (`src/cli/route.ts`). `src/plan.ts` reads its own flags, and the ones
  * declared here are those it reads: `--spec`, `--stub` and
- * `--no-progress` in that module, and the board's nine words in
+ * `--no-progress` in that module, and the board's ten words in
  * `src/board/flags.ts`, which records why they sit in one module.
  *
  * Three of them name the one spec a run plans from and are mutually
  * exclusive — `--spec`, `--issue` and `--next` — so none is `required`
  * and a line naming none is refused by the command with its usage.
  *
- * The eleventh flag is read by neither: `hint` is this tree's own
+ * The last flag is read by neither: `hint` is this tree's own
  * ({@link HINT_FLAG_SPEC}), and `endingWith` reads it AFTER `src/plan.ts`
  * has returned, to end a run that wrote a plan by naming the one step
  * that follows — the loop on the plan it has just written
@@ -74,6 +74,13 @@ const wrapped = wrapPhaseZeroCommand({
       description: 'With `--next`, plans the target of the `rafa next --roadmap` hop under way, the blocker it'
         + ' went to another epic or board for, through the same checks as any line; with no hop away it picks'
         + ' as `--next` does. Refused with exit 2 without `--next`.',
+      type: 'boolean',
+    },
+    {
+      name: 'claim-ahead',
+      description: 'With `--next`, also claims the line after the one it picks, on the same board, in the same'
+        + ' push as the pick\'s own claim: both claims or neither. `claims.ahead: allow` in the config does it on'
+        + ' every `--next` run. Refused with exit 2 without `--next`.',
       type: 'boolean',
     },
     {
@@ -146,6 +153,11 @@ const wrapped = wrapPhaseZeroCommand({
       cmd: 'rafa plan create --next --roadmap',
       note: 'While a rafa next --roadmap hop is away, plans the blocker it went for on that blocker\'s own'
         + ' board; with none away, plans as rafa plan create --next does.',
+    },
+    {
+      cmd: 'rafa plan create --next --claim-ahead',
+      note: 'Plans the first undone line of the roadmap and claims it and the undone line after it in one'
+        + ' push, so the issue after this one is reserved too; neither claim lands when either is refused.',
     },
     {
       cmd: 'rafa plan create --issue=20 --refresh --skip-review --no-comment',

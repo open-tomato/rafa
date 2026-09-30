@@ -11,7 +11,8 @@
  * They sat in `config-schema.ts` until that module reached the 800-line
  * cap of `context/source.md`, and moved out before any setting was added
  * so a new key is not paid for by rewrapping prose. `config-sections.ts`
- * still holds every rule about a VALUE but the release plan's, below;
+ * still holds every rule about a VALUE but the release plan's, below,
+ * and the two item shapes, which `config-items.ts` reads;
  * {@link mapOf} is here rather than there because what it rules on is a KEY: the names a map
  * setting's file spells below its own key. Outside the config modules
  * only `tiers/routing.test.ts` imports this file, reading a file's

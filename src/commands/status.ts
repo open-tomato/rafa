@@ -1,6 +1,6 @@
 /**
- * `rafa status`: where the project stands, in five sections — branch
- * and plan, loops, pull request, board, housekeeping — read by
+ * `rafa status`: where the project stands, in six sections — branch
+ * and plan, loops, pull request, board, claims, housekeeping — read by
  * `src/status/sections.ts` and worded by `src/status/render.ts`. It is
  * all code: it starts no Claude session and declares no `spends`.
  *
@@ -54,7 +54,7 @@ export const STATUS_ARGUMENT_EXIT = 2;
 
 /** How the sections are read; each left out is the system's own. */
 export interface StatusCommandSeams {
-  /** Reads the five sections for `input`. `readStatusSections` with its own seams when left out. */
+  /** Reads the six sections for `input`. `readStatusSections` with its own seams when left out. */
   readonly read?: (input: StatusInput) => Promise<StatusSections>;
 }
 
@@ -102,27 +102,30 @@ export function createStatusCommand(seams: StatusCommandSeams = DEFAULT_STATUS_S
     name: 'status',
     subject: 'status',
     action: 'status',
-    summary: 'where the project stands: branch and plan, loops, pull request, board and housekeeping',
-    description: 'Prints one line for each of five sections. Branch: the branch checked out at the project root'
+    summary: 'where the project stands: branch and plan, loops, pull request, board, claims and housekeeping',
+    description: 'Prints one line for each of six sections. Branch: the branch checked out at the project root'
       + ' and the plan its `feat/<stub>` names, with its task counts. Loops: how many sessions are running and'
       + ' how many tasks are blocked, with a line under it for each running loop and each blocked task. Pull'
       + ' request: the branch\'s open pull request, whether it can be merged and its checks. Board: the'
-      + ' Roadmap\'s next issue and whether it is ready, and how many issues carry `spec:blocked`. Housekeeping:'
+      + ' Roadmap\'s next issue and whether it is ready, and how many issues carry `spec:blocked`. Claims: each'
+      + ' `feat/rafa-<n>` claim branch on origin as last fetched, with a line under it for each naming the store'
+      + ' that owns the claim, the stage label on its issue and whether it is stale. Housekeeping:'
       + ' what `rafa cleanup` would list, counted per group, and how many worktrees are idle. Git, the session'
-      + ' records and the plans are read first; the pull request and the board are read through `gh` under a'
+      + ' records, the plans and the claim branches are read first; the pull request, the board and the stage'
+      + ' labels are read through `gh` under a'
       + ' short deadline, and nothing is fetched. A section that cannot be read is one `warn` line saying why,'
       + ' and the others are printed all the same: it exits 1 only for a config that cannot be used. With'
-      + ' `--output=json` the five sections are the data of the terminal result event. Starts no session.',
+      + ' `--output=json` the six sections are the data of the terminal result event. Starts no session.',
     args: [],
     flags: [],
     examples: [
       {
         cmd: 'rafa status',
-        note: 'Prints the five sections, one line each, with the running loops and blocked tasks under Loops.',
+        note: 'Prints the six sections, one line each, with the running loops and blocked tasks under Loops.',
       },
       {
         cmd: 'rafa status --output=json',
-        note: 'Gives the five sections as data, each with `read` and its reading or the problem.',
+        note: 'Gives the six sections as data, each with `read` and its reading or the problem.',
       },
     ],
     outputs: ['text', 'json'],

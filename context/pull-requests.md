@@ -59,7 +59,11 @@ two automatic preflight items run before any task is paid for:
 
 `rafa doctor` prints both checks. With `provider: none` the loop pushes the
 branch, prints the compare URL, skips the CI wait, skips the release
-stage's body write — there being no body — and says so each time. No other
+stage's body write — there being no body — and says so each time. A push
+of a claim branch the remote refuses because another store now owns the
+claim halts the run instead, exit 1 with the "claim lost" report, its
+commits kept on `lost/<stub>` and no compare URL printed
+(`src/start/pr-lifecycle.ts` over `src/claims/lost.ts`). No other
 provider is built; the functions in `src/utils/pr.ts` move behind one
 `PullRequests` interface in `src/pr/` so a second provider is an adapter
 later.
@@ -589,10 +593,18 @@ but `dangerous.acceptStaleRefs`, passes check 4.
   issue titled "Roadmap". Its body is parsed by code: task-list lines
   `- [ ] #<n>` in order. A line is DONE when it is ticked or its issue is
   closed. A line is TAKEN when a branch `feat/rafa-<n>-*` exists locally or
-  on the remote, or an open PR closes it. The first line neither done nor
-  taken is the answer; then as `--issue=<n>`. It prints what it skipped and
-  why ("#20 taken: PR #33 open"), and exits 0 with a message when nothing is
-  left. `--dry-run` prints the pick and stops.
+  on the remote, or an open PR closes it. A branch the remote holds is read
+  for its claim (`src/board/roadmap-claims.ts`): a released claim does not
+  take the line, a stale `rafa:claimed` claim passes it as a takeover
+  candidate ("#20 takeover candidate: branch <b>, claimed by <store>, has
+  stood idle 4d"), and a stale `rafa:in-development` claim keeps it taken
+  with a stale note. The first line neither done nor taken is the answer;
+  then as `--issue=<n>`. It prints what it skipped and why ("#20 taken: PR
+  #33 open"), and exits 0 with a message when nothing is left. `--dry-run`
+  prints the pick and stops. The pick is claimed before the session
+  (`src/commands/plan/claim-route.ts`); a claim another store holds passes
+  the pick over, naming the owner, and the walk goes on, reading it as
+  taken by the branch that refused it, where `--issue=<n>` exits 1.
 
   A pick that is BLOCKED is the one line the walk offers its way past.
   Its issue carries `spec:blocked` and its `Blocked by:` line names a
@@ -643,3 +655,72 @@ lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
+
+### Claims
+
+A claim reserves an issue for one device to work alone. The claim lives in
+git as the ownership record on the branch `feat/<stub>` (formatted
+`feat/rafa-<n>-<slug>` where the branch already runs). Its first commit is
+an empty CLAIM commit naming the claiming store's id (`store_meta.store_id`
+from the effort store) in the trailer `Rafa-Claim-Store:`. Every later
+ownership change (release, handover, acceptance, takeover) is one empty
+commit pushed with `git push --force-with-lease=refs/heads/<branch>:<sha>`,
+reading the sha last seen. The owner is the store named by the latest
+ownership commit on the branch. Work commits are never rewritten and never
+leave the branch.
+
+**Labels show the stage, never the owner:** `rafa:claimed` at `plan create`,
+swapped for `rafa:in-development` when `loop start` begins the session, and
+removed when the pull request merges through `rafa pr merge` or the claim is
+released. `rafa status` shows who holds each claim. Ownership commits name
+the actor in a trailer: `claim` for the initial claim, `hand` and `accept`
+for handovers, `release` for release, `withdraw` to cancel a hand that was
+not yet accepted, `take` for takeover.
+
+**Release:** `rafa claim release <n>` ends ownership and leaves the issue
+claimable. The push, the label removal and any force-push refusal are the
+command's only steps. A released claim has a release commit on the branch
+and does NOT take the line in a roadmap walk — the next claimant pushes a
+take commit on it.
+
+**Handover:** Ownership change is two-sided. The owner runs `rafa claim hand
+<n> --to=<store id>`, pushing a hand commit naming the receiver; the
+receiver runs `rafa claim accept <n>`, pushing an accept commit naming the
+giver. Until acceptance the owner stays the owner and may run `rafa claim
+withdraw <n>` to cancel the handover, pushing a withdraw commit.
+
+**Takeover:** `rafa claim take <n> [--stale]` takes a claim held too long.
+Without `--stale` it refuses unless the claim reads stale by `claims.staleAfter`
+(a duration such as `3d` or `disabled`, default `3d`; zero or negative is
+refused). Staleness reads from the committer date of the branch tip on the
+remote. The command fails if the claimed issue was written in this run or if
+the ownership push is refused. `claims.staleAfter` applies only to
+`rafa:claimed` claims; `rafa:in-development` is never taken over automatically,
+only by an explicit `rafa claim take <n> --stale`.
+
+**Claim lost:** When a push of the claim branch is refused and another device
+now owns the claim, the run halts with a "claim lost" report and keeps its
+commits on the local branch `lost/<stub>`, named after the original branch
+stub. Nothing force-pushes over the new owner. The refusal happens only on
+`loop start`'s preflight, not at plan time — `plan create` warns "unclaimed"
+when the claim push fails but goes on to write the plan and start the session.
+
+**Claim ahead:** Opt-in look-ahead lock to claim one issue ahead on the
+roadmap. Both the home issue and one ahead are claimed through an atomic push
+(`git push --atomic`), so either both succeed or both fail. `claims.ahead`
+is `off` (no look-ahead) or `allow` (look-ahead enabled, default `off`), and
+`--claim-ahead` on `rafa next --roadmap` and `plan create --next` opts into
+it for one run. Until #248 lands, claim ahead reaches only issues on the
+same board as the home issue; one on another board is not claimed and is
+reported.
+
+**Drift check:** Every second `loop start` and on each `rafa switch` without
+cache invalidation, a report-only drift check reads the board through
+`src/board/board-cache.ts` and verifies that the stage label on each open
+claim's issue matches its claim state. A mismatched label (a label in the
+wrong stage or both stage labels present) is reported, and the check never
+edits a label or a body. A board that is not `gh` or a label write that
+fails warns and does not undo the claim, since the claim lives in git.
+
+`claims.staleAfter` and `claims.ahead` join `LOCKED_SETTINGS` in
+`src/config-locked.ts` as settings no device can override alone.

@@ -245,6 +245,25 @@ describe('what the resolution is handed', () => {
   });
 });
 
+describe('the issues a --next walk passes over', () => {
+  it('hands them to the resolution as given', async () => {
+    const route = recording();
+    const passOver = new Map([[20, 'feat/rafa-20-x']]);
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [], passOver }, route.seams);
+
+    expect(route.asked().passOver).toBe(passOver);
+  });
+
+  it('leaves the key out for a run that passes nothing over', async () => {
+    const route = recording();
+
+    await resolveCreateSpec({ args: ['--next'], repoRoot: plant(), specsDir: SPECS_DIR, roadmapIssue: null, trustedAuthors: [] }, route.seams);
+
+    expect(Object.keys(route.asked())).not.toContain('passOver');
+  });
+});
+
 describe('the --spec route through the resolution the command uses', () => {
   it('answers the spec found under the specs directory, with no issue to publish on', async () => {
     const repoRoot = plant(join(SPECS_DIR, 'my-feature.md'));

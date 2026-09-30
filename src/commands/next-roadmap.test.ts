@@ -402,10 +402,29 @@ describe('rafa next --roadmap, dispatched', () => {
     expect(Object.keys(plain)).toEqual(['steps', 'stop']);
   });
 
+  it('proposes the plan with --roadmap --claim-ahead, the rest of stdout byte for byte the --roadmap run\'s', async () => {
+    const claimAhead = await dispatchNext(['--roadmap', '--claim-ahead', '--dry-run']);
+    const roadmap = await dispatchNext(['--roadmap', '--dry-run']);
+
+    expect(claimAhead.stdout).toContain(`👉 create the plan for #${String(LINE)} — rafa plan create --next --roadmap --claim-ahead\n`);
+    expect(claimAhead.stdout.replace(' --claim-ahead', '')).toBe(roadmap.stdout);
+    expect([claimAhead.exitCode, roadmap.exitCode]).toEqual([0, 0]);
+  });
+
+  it('refuses --claim-ahead without --roadmap with exit 1, before any source is read', async () => {
+    const run = await dispatchNext(['--claim-ahead', '--dry-run']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toBe('❌ --claim-ahead is passed on to plan create with --roadmap, and this line gives no --roadmap;'
+      + ' write --roadmap --claim-ahead, or drop --claim-ahead\nUsage: rafa next [--dry-run] [--roadmap [--claim-ahead]]'
+      + ' [--yes[=<action ids>]]\n');
+  });
+
   it('refuses a value --roadmap swallowed with exit 1, naming the usage', async () => {
     const run = await dispatchNext(['--roadmap', 'sync']);
 
     expect(run.exitCode).toBe(1);
-    expect(run.stderr).toBe('❌ --roadmap takes no value, and read "sync" as one\nUsage: rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]\n');
+    expect(run.stderr).toBe('❌ --roadmap takes no value, and read "sync" as one\nUsage: rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]\n');
   });
 });

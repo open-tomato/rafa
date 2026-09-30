@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the seventy-five registered so far wrap a
+ * of each is its command. Five of the seventy-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -63,7 +63,7 @@
  * runs each action it proposes by calling the registered command that
  * does it, nor `cleanup`, which reads the branches and worktrees through
  * `src/cleanup/` and removes the ticked ones through its steps, nor
- * `status`, which reads the five sections through `src/status/`, nor
+ * `status`, which reads the six sections through `src/status/`, nor
  * `epic show`, which reads one epic's lines into the same rows as
  * `roadmap` through `src/board/roadmap-rows.ts`, nor `epic new`, which
  * creates an epic's label, issue and board line through
@@ -77,7 +77,11 @@
  * epic through `src/board/issue-board.ts`, nor `epic cancel`, which asks
  * about the epic's dependents (`src/board/epic-dependents.ts`), applies
  * each answer through `./epic/move.ts`, `src/board/epic-checklist.ts`
- * and `src/board/issue-board.ts`, and closes the epic through the last.
+ * and `src/board/issue-board.ts`, and closes the epic through the last,
+ * nor the four `claim` actions, `release`, `hand`, `accept` and `take`,
+ * which read an issue's claim branches and push one ownership commit on
+ * them through `src/claims/git.ts` and share `claim/release.ts`'s
+ * readers.
  *
  * ## What is registered
  *
@@ -205,8 +209,8 @@
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
  *     did not confirm it, its epic count, and `current` and `home` on
  *     the boards this checkout's position holds; writing nothing.
- *   - `status`, top-level: where the project stands in five sections,
- *     branch and plan, loops, pull request, board and housekeeping, a
+ *   - `status`, top-level: where the project stands in six sections,
+ *     branch and plan, loops, pull request, board, claims and housekeeping, a
  *     section that cannot be read one warning; exit code 1 only for a
  *     config that cannot be used. It starts no session.
  *   - `next [--dry-run] [--yes[=<action ids>]]`, top-level: where the
@@ -259,6 +263,15 @@
  *     an issue to ask about, the list printed and nothing changed; an
  *     issue that is no epic and an epic closed as completed refused
  *     with exit code 2.
+ *   - `claim release <n>`, `claim hand <n> --to=<store id> [--withdraw]`,
+ *     `claim accept <n>` and `claim take <n> [--stale]`: one ownership
+ *     commit pushed to the issue's claim branch with `--force-with-lease`
+ *     on the tip read, giving this device's claim up (its stage label
+ *     taken off), offering it to another store or withdrawing the offer,
+ *     taking up a handover offered to this store, and taking over a
+ *     stale claim, `rafa:in-development` only under `--stale`; each
+ *     refused with exit code 1 when this device's standing does not allow
+ *     it, and none starts a session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -285,7 +298,7 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the twelve with an action registered: a subject with
+ * The subjects are the thirteen with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -300,6 +313,10 @@ import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import boardList from './board/list.js';
+import claimAccept from './claim/accept.js';
+import claimHand from './claim/hand.js';
+import claimRelease from './claim/release.js';
+import claimTake from './claim/take.js';
 import cleanup from './cleanup.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
@@ -385,6 +402,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
+  { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
 ]);
 
 /** The core commands, in roster order. */
@@ -454,6 +472,10 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   epicMove,
   epicClose,
   epicCancel,
+  claimRelease,
+  claimHand,
+  claimAccept,
+  claimTake,
   status,
   next,
   roadmap,

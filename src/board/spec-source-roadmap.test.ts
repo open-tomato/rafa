@@ -132,7 +132,7 @@ import type { SpecIssue } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RoadmapSeams } from './spec-source-roadmap.js';
-import type { SpecSourceResolution } from './spec-source.js';
+import type { ResolvedSpec, SpecSourceResolution } from './spec-source.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { Place, Position } from '../project/position.js';
@@ -179,6 +179,7 @@ import {
   unfollowedHopNotice,
 } from './spec-source-roadmap.js';
 import {
+  claimAheadWithoutNextMessage,
   describeIssue,
   dryRunLine,
   readSpecSourceFlags,
@@ -367,6 +368,7 @@ function nextRun(options: {
   readonly inspect?: (issue: SpecIssue) => Promise<void>;
   readonly output?: ReturnType<typeof sinkOutput>;
   readonly followHop?: boolean;
+  readonly claimAhead?: boolean;
 }): Promise<SpecSourceResolution> {
   return resolveSpecSource({
     request: {
@@ -374,6 +376,9 @@ function nextRun(options: {
       roadmap: options.roadmap ?? null,
       ...options.followHop === true
         ? { followHop: true as const }
+        : {},
+      ...options.claimAhead === true
+        ? { claimAhead: true as const }
         : {},
     },
     refresh: false,
@@ -1521,5 +1526,176 @@ describe('pickRoadmapIssue under --roadmap', () => {
 
     expect(specOf(resolution).issue).toBe(42);
     expect(lines.warn).toEqual([unfollowedHopNotice(`${file} does not hold a hop record`)]);
+  });
+});
+
+describe('pickRoadmapIssue passing over issues whose claim was refused', () => {
+  it('reads a passed-over line as taken by the branch that refused it, and picks the line under it', async () => {
+    const { lines, output } = capture();
+
+    const resolution = await nextRun({
+      output,
+      seams: { passOver: new Map([[20, 'feat/rafa-20-pull-request-commands']]) },
+    });
+
+    expect(specOf(resolution).issue).toBe(33);
+    expect(lines.info).toEqual([
+      roadmapHeaderLine(ROADMAP),
+      skipLine({ line: { issue: 17, ticked: true, why: 'the pull request port, merged', lineNumber: 3 }, reason: 'ticked', detail: '' }),
+      skipLine({
+        line: { issue: 20, ticked: false, why: 'pull request commands', lineNumber: 4 },
+        reason: 'branch',
+        detail: 'feat/rafa-20-pull-request-commands',
+      }),
+      pickLine({ issue: 33, ticked: false, why: 'the board setup', lineNumber: 5 }),
+    ]);
+    expect(exists(snapshotAt(20))).toBe(false);
+  });
+
+  it('picks #20 as it always did with an empty pass-over, the control for the case above', async () => {
+    const resolution = await nextRun({ seams: { passOver: new Map() } });
+
+    expect(specOf(resolution).issue).toBe(20);
+  });
+
+  it('passes the refused line over on the way to a blocked line\'s alternative too', async () => {
+    const { lines, output } = capture();
+    const planted = plantedOffer(true);
+
+    const resolution = await nextRun({
+      issues: plantedIssues(blockedBoard()),
+      output,
+      seams: { offerAlternative: planted.offer, passOver: new Map([[33, 'feat/rafa-33-board-setup']]) },
+    });
+
+    // #33 is the alternative the blocked-line cases plan; passed over,
+    // the offer names #34, the line under it.
+    expect(planted.taken().map((taken) => taken.line.issue)).toEqual([34]);
+    expect(specOf(resolution).issue).toBe(34);
+    expect(lines.info).toContain(alternativeLine({ issue: 34, ticked: false, why: 'naming and close-out', lineNumber: 5 }));
+    expect(lines.info.join('\n')).toContain('#33 taken: branch feat/rafa-33-board-setup exists');
+  });
+
+  it('follows no hop whose target was refused, warning why, and walks as --next does', async () => {
+    const { lines, output } = capture();
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const resolution = await nextRun({
+      issues: plantedIssues(board),
+      output,
+      followHop: true,
+      seams: { ...hopSeams(board).seams, passOver: new Map([[HOP_TARGET, 'feat/rafa-90-x']]) },
+    });
+
+    expect(specOf(resolution).issue).toBe(42);
+    expect(lines.warn).toEqual([
+      unfollowedHopNotice(`issue #${String(HOP_TARGET)}, the hop's target, was refused its claim on feat/rafa-90-x`),
+    ]);
+    expect(lines.info).not.toContain(hopPickLine(HOP_TARGET));
+  });
+});
+
+/** The line-ahead reading a `--next` resolution answered, or the failure of one that answered none. */
+function aheadOf(resolution: SpecSourceResolution): NonNullable<ResolvedSpec['ahead']> {
+  if (resolution.outcome !== 'spec' || resolution.spec.ahead === undefined) {
+    throw new Error('expected a --next spec carrying the line ahead');
+  }
+  return resolution.spec.ahead;
+}
+
+describe('readSpecSourceFlags with --claim-ahead', () => {
+  it('marks a --next request to claim ahead, beside --roadmap or not', () => {
+    expect(readSpecSourceFlags(['--next', '--claim-ahead']).request).toEqual({ kind: 'next', roadmap: null, claimAhead: true });
+    expect(readSpecSourceFlags(['--claim-ahead', '--next=31', '--roadmap']).request)
+      .toEqual({ kind: 'next', roadmap: 31, followHop: true, claimAhead: true });
+    expect(Object.keys(readSpecSourceFlags(['--next', '--roadmap']).request ?? {})).toEqual(['kind', 'roadmap', 'followHop']);
+  });
+
+  it('refuses --claim-ahead without --next with exit 2, alone or beside another source', () => {
+    for (const args of [['--claim-ahead'], ['--issue=20', '--claim-ahead'], ['--spec=a.md', '--claim-ahead']]) {
+      let thrown: unknown = null;
+      try {
+        readSpecSourceFlags(args);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(CommandExit);
+      expect((thrown as CommandExit).exitCode).toBe(ROADMAP_REFUSAL_EXIT);
+      expect((thrown as CommandExit).message).toBe(claimAheadWithoutNextMessage());
+    }
+    expect(claimAheadWithoutNextMessage())
+      .toBe('--claim-ahead claims the line after the one --next picks, and this line gives no --next; write --next --claim-ahead, or drop --claim-ahead');
+  });
+});
+
+describe('resolveSpecSource over --next, the line ahead', () => {
+  it('answers the walk\'s board and reads the next undone line after the pick only when asked', async () => {
+    const issues = plantedIssues(boardIssues());
+
+    const ahead = aheadOf(await nextRun({ issues, claimAhead: true }));
+    const askedBefore = issues.asked();
+    const candidate = await ahead.walk?.candidate();
+
+    expect(ahead.flag).toBe(true);
+    expect(ahead.walk?.board).toBe(ROADMAP);
+    expect(askedBefore).toEqual([ROADMAP, 20]);
+    expect(candidate).toEqual({ issue: 33, title: 'Issue 33', board: ROADMAP, labels: [SPEC_LABEL] });
+    expect(issues.asked()).toEqual([ROADMAP, 20, 33]);
+  });
+
+  it('answers the flag false for a --next run without --claim-ahead, the walk still carried', async () => {
+    const ahead = aheadOf(await nextRun({}));
+
+    expect(ahead.flag).toBe(false);
+    expect(ahead.walk?.board).toBe(ROADMAP);
+  });
+
+  it('passes a closed line after the pick, and a taken one is still the line ahead', async () => {
+    const board = boardIssues().map((issue) => issue.number === 33
+      ? { ...issue, state: 'CLOSED' as const }
+      : issue);
+    const taken = plantedIssues(boardIssues());
+
+    const pastClosed = await aheadOf(await nextRun({ issues: plantedIssues(board) })).walk?.candidate();
+    // #33 is taken by a branch here, and the walk passes it, yet it is
+    // still the line after #20 as the walk read the roadmap.
+    const pick = await nextRun({ issues: taken, seams: { git: plantedGit('refs/heads/feat/rafa-33-the-board-setup\n') } });
+    const pastTaken = await aheadOf(pick).walk?.candidate();
+
+    expect(pastClosed?.issue).toBe(34);
+    expect(specOf(pick).issue).toBe(20);
+    expect(pastTaken?.issue).toBe(33);
+  });
+
+  it('answers null for a pick that is the last undone line', async () => {
+    const git = plantedGit('refs/heads/feat/rafa-20-pull-request-commands\nrefs/heads/feat/rafa-33-the-board-setup\n');
+
+    const resolution = await nextRun({ seams: { git } });
+
+    expect(specOf(resolution).issue).toBe(34);
+    expect(await aheadOf(resolution).walk?.candidate()).toBeNull();
+  });
+
+  it('answers no walk for a pick that followed a hop, and no line ahead at all under --issue', async () => {
+    const board = hopBoard();
+    awayOnHop(hopRecord());
+
+    const hop = aheadOf(await nextRun({ issues: plantedIssues(board), followHop: true, claimAhead: true, seams: hopSeams(board).seams }));
+    const issue = await resolveSpecSource({
+      request: { kind: 'issue', issue: 20 },
+      refresh: false,
+      dryRun: false,
+      repoRoot: root,
+      specsDir: SPECS_DIR,
+      findSpec: () => 'never',
+      issues: plantedIssues(boardIssues()).read,
+      output: capture().output,
+    });
+
+    expect(hop).toEqual({ flag: true, walk: null });
+    expect(issue.outcome === 'spec' && 'ahead' in issue.spec).toBe(false);
+    expect(specOf(issue).issue).toBe(20);
   });
 });

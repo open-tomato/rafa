@@ -265,6 +265,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
+import { readDeviceStoreId } from './claims/device.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -286,7 +287,9 @@ import {
 } from './start/dispatch.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
-import { prLifecycleSeamsIn, verifyPullRequest } from './start/pr-lifecycle.js';
+import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './start/pr-lifecycle.js';
+import { createStartPreflightClaim } from './start/preflight-claim.js';
+import { createStartPreflightDrift } from './start/preflight-drift.js';
 import { runStartPreflight } from './start/preflight.js';
 import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
@@ -418,8 +421,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     activeOutput().info(`🧭 Task sessions are handed the plan as \`${injectMode}\` (${injectSource}); the wrap-up is handed all of it.`);
     announcePlanIssues(planContent);
 
-    // Throws on an unserved `effort.sync`, an unresolvable agent or a halt,
-    // before the tracker and before any session.
+    // Throws on an unserved `effort.sync`, an unresolvable agent, a claim
+    // this device does not own or a halt, before the tracker and before
+    // any session.
     const { knownMissing } = await runStartPreflight({
       repoRoot,
       planPath,
@@ -433,6 +437,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         home: homedir(),
       },
       sync: { resolved: runConfig, home: homedir() },
+      claim: createStartPreflightClaim(repoRoot, runConfig.config),
+      drift: createStartPreflightDrift(repoRoot, runConfig.config),
     });
 
     // What each session, task and wrap-up alike, is served against: the
@@ -562,6 +568,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
                 configured: runConfig.config.prProvider ?? null,
                 dir: checkout,
               }),
+              // A refused push reads this device's store id from the
+              // project root, where the store lives, not the checkout.
+              readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, runConfig.config)),
             },
           );
         }

@@ -876,6 +876,24 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
+  it('writes the plan of an issue it could not claim, warning why before the planner runs', () => {
+    // The scratch project has no effort store, so no store id names a
+    // claimant: the claim answers unclaimed and the plan is written.
+    const scratch = plantScratch();
+    const stub = 'rafa-20-board-routes';
+
+    const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
+
+    expect(run.exitCode).toBe(0);
+    const lines = run.stdout.split('\n');
+    const warned = lines.findIndex((line) => line.startsWith('warn: ⚠️  Planning issue #20 unclaimed: there is no effort store at '));
+    const generating = lines.findIndex((line) => line.startsWith('📝 Generating'));
+    expect(warned).toBeGreaterThanOrEqual(0);
+    expect(warned).toBeLessThan(generating);
+    expect(existsSync(join(scratch.repo, '.rafa', 'plans', `PLAN-${stub}.md`))).toBe(true);
+    expect(existsSync(scratch.spawned)).toBe(false);
+  }, 30_000);
+
   it('refuses a snapshot naming a file the repository lacks at check 4, exit 2, before the planner', () => {
     const scratch = plantScratch({ body: GONE_BODY });
     const snapshot = specPath('.rafa/specs', ISSUE.number, ISSUE.title);

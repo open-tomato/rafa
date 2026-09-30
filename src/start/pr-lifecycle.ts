@@ -46,7 +46,36 @@
  *
  * A push that fails is reported and not rethrown, for the reason a
  * provider that cannot be asked is: this is the run's last gate, and
- * the commits are made either way.
+ * the commits are made either way. The one exception is a claim lost,
+ * below.
+ *
+ * ## A refused push of a claim branch
+ *
+ * When that push fails, the gate asks who owns the claim on the branch
+ * ({@link PrLifecycleSeams.readRefusedPush}, over `claims/lost.ts`),
+ * which fetches the remote and never pushes again, with or without
+ * force. When another store now owns the claim, the reading has kept
+ * this device's commits on the local `lost/<stub>`, and the gate HALTS
+ * the run: it throws `CommandExit` with exit code 1 and the "claim
+ * lost" report as its message, printing no compare URL and no advice
+ * to push by hand and open a pull request, since either would put this
+ * device's work over the new owner's. `start()` then skips
+ * `session.finished()`, so the run is recorded as stopped, not done.
+ *
+ * Every other reading keeps the failed-push report above. A claim the
+ * reading could not settle (a failed fetch, an unreadable branch, a
+ * store id that could not be read) adds one warning naming why; a
+ * refusal that is not about the claim (this store still holds it, the
+ * branch carries no claim, it is no claim branch) adds nothing, since
+ * git's own words already say what happened. A push that worked reads
+ * nothing.
+ *
+ * {@link refusedPushReaderIn} makes that reading over a checkout and a
+ * store id reader. `start()` hands it the checkout and this device's
+ * id read from the PROJECT root under the run's `store`
+ * (`claims/device.ts`); {@link prLifecycleSeamsIn}'s own default reads
+ * the SQLite store under the directory it was made for, which is the
+ * same place only outside a worktree.
  *
  * What the gate tells the operator goes through the active output
  * (`adapters/output/active.ts`): the wait, each poll, a green verdict
@@ -60,6 +89,8 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
  */
+import type { DeviceStoreId } from '../claims/device.js';
+import type { RefusedPushReading } from '../claims/lost.js';
 import type { ClaudeSettingSource } from '../config.js';
 import type {
   CheckRow,
@@ -73,9 +104,15 @@ import type {
 import type { ClaudeSpawner } from '../utils/claude.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { readDeviceStoreId } from '../claims/device.js';
+import { claimBranchIssue } from '../claims/git.js';
+import { claimLostReport, readRefusedPush } from '../claims/lost.js';
+import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
+import { CONFIG_DEFAULTS } from '../config.js';
 import {
   compareUrl,
+  createGitRunner,
   failingRows,
   formatRows,
   ghAuthOkIn,
@@ -116,6 +153,12 @@ export interface PrLifecycleSeams {
   readonly readProvider: () => PrProviderReading;
   /** Pushes the branch to `origin` with upstream set, for a `none` provider. */
   readonly pushBranch: (branch: string) => Promise<PushOutcome>;
+  /**
+   * Who owns the claim on a branch whose push failed, keeping this
+   * device's commits on `lost/<stub>` when another store does. Read only
+   * after a failed push; see the module note.
+   */
+  readonly readRefusedPush: (branch: string) => RefusedPushReading;
   /** Whether `gh` is on PATH and authenticated. */
   readonly isGhUsable: () => Promise<boolean>;
   /** The provider every read of the pull request goes through. */
@@ -148,9 +191,40 @@ export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClau
     // caller that names no seam gets.
     readProvider: () => resolvePrProvider({ configured: null, dir }),
     pushBranch: (branch) => Promise.resolve(pushBranch(dir, branch)),
+    // `start()` replaces this with the project root's store under the
+    // run's own `store`; see the module note.
+    readRefusedPush: refusedPushReaderIn(dir, () => readDeviceStoreId(dir, CONFIG_DEFAULTS)),
     isGhUsable: () => ghAuthOkIn(dir),
     pulls: ghPullRequestsIn(dir),
     runClaude: (prompt, settingSources) => runClaude(prompt, settingSources, [], spawn, [], { cwd: dir }),
+  };
+}
+
+/**
+ * The reading {@link PrLifecycleSeams.readRefusedPush} makes: git run in
+ * `dir`, the checkout whose push was refused, and this device's store id
+ * from `readStoreId`. A store that names no id is read as no claimant
+ * (`claims/lost.ts`); a store whose read THROWS answers `unknown` rather
+ * than guess at one, so no claim of this device's is read as lost. A
+ * branch that is no claim branch reads no store and runs no git.
+ */
+export function refusedPushReaderIn(
+  dir: string,
+  readStoreId: () => DeviceStoreId,
+): (branch: string) => RefusedPushReading {
+  return (branch) => {
+    const issue = claimBranchIssue(branch);
+    if (issue === null) return readRefusedPush(createGitRunner(dir), { branch, storeId: null });
+    let device: DeviceStoreId;
+    try {
+      device = readStoreId();
+    } catch (error) {
+      return { outcome: 'unknown', issue, branch, reason: `this device's store id could not be read: ${messageOf(error)}` };
+    }
+    const storeId = device.ok
+      ? device.storeId
+      : null;
+    return readRefusedPush(createGitRunner(dir), { branch, storeId });
   };
 }
 
@@ -294,9 +368,15 @@ async function pushWithoutProvider(
 
   const push = await io.pushBranch(branch);
   if (!push.ok) {
+    const claim = io.readRefusedPush(branch);
+    haltIfClaimLost(claim);
     output.error(`\n❌ Could not push ${branch}.`);
     if (push.output !== '') output.error(push.output);
     output.error('   The work is committed locally. Push it yourself and open the PR by hand.');
+    if (claim.outcome === 'unknown') {
+      output.warn(`\n⚠️  Could not tell who holds the claim on #${String(claim.issue)}: ${claim.reason}.`);
+      output.warn(`   Check with rafa status before pushing ${branch} by hand.`);
+    }
     return;
   }
   output.info(`\n✅ Pushed ${branch} to origin.`);
@@ -310,6 +390,19 @@ async function pushWithoutProvider(
 
   output.warn('\n⚠️  CI check skipped: with no pull request provider there is nothing to poll.');
   output.warn('   The branch is pushed but nothing here confirms CI agreed with it.');
+}
+
+/**
+ * Halts the run on a claim another store now holds: throws `CommandExit`
+ * with exit code 1 and the "claim lost" report, so no compare URL is
+ * printed and no pull request is opened. Returns for any other reading.
+ */
+function haltIfClaimLost(claim: RefusedPushReading): void {
+  if (claim.outcome !== 'lost') return;
+  throw new CommandExit(1, [
+    `\n${claimLostReport(claim)}`,
+    `   The run stops here: no pull request is opened for ${claim.branch}, and the CI wait is skipped.`,
+  ].join('\n'));
 }
 
 /**

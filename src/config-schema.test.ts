@@ -62,6 +62,8 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prVersionCollision', 'pr.versionCollision'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
   ['roadmapIssue', 'roadmap.issue'],
+  ['claimsStaleAfter', 'claims.staleAfter'],
+  ['claimsAhead', 'claims.ahead'],
   ['releaseEnabled', 'release.enabled'],
   ['releaseVersionFile', 'release.versionFile'],
   ['releaseChangelog', 'release.changelog'],
@@ -117,6 +119,7 @@ const TOP = [
   'pr',
   'board',
   'roadmap',
+  'claims',
   'release',
   'cleanup',
   'dangerous',
@@ -178,6 +181,7 @@ describe('SECTIONS', () => {
   it('holds every dotted prefix a setting sits under, and no setting key', () => {
     expect([...SECTIONS].sort()).toEqual([
       'board',
+      'claims',
       'cleanup',
       'dangerous',
       'effort',

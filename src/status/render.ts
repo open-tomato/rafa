@@ -1,5 +1,5 @@
 /**
- * The words `rafa status` shows for what `./sections.ts` read: the five
+ * The words `rafa status` shows for what `./sections.ts` read: the six
  * sections as text lines, and the same reading as the JSON data of the
  * terminal result. It prints nothing; the command writes each line at
  * the level {@link StatusLine.level} names.
@@ -15,9 +15,10 @@
  * | `loops` | how many sessions are running and how many tasks are blocked |
  * | `pull` | the number, title, mergeability and checks, or `none open` |
  * | `board` | the roadmap's next issue and whether it is ready, then how many issues carry `spec:blocked` |
+ * | `claims` | how many claim branches `origin` holds as last fetched, and how many are held, stale and released |
  * | `housekeeping` | the four `rafa cleanup` group counts, and how many worktrees are idle |
  *
- * Two lines have lines under them, indented two spaces. The loops line
+ * Three lines have lines under them, indented two spaces. The loops line
  * has one per running loop (`sessionLine`, which names a paused one
  * `paused`), then one per blocked task, naming its plan, its line in the
  * checklist and the blocker its line trails, when it trails one.
@@ -30,6 +31,12 @@
  * hop left waiting on its owner's review, then each notice the place
  * fell back with, at the `warn` level. A project with neither gets the
  * board line alone, as it did before boards.
+ *
+ * The claims line has one per claim branch (`claimLine`): its issue and
+ * branch, the store that owns the claim (with a handover pending, the
+ * store it is offered to) or the one that released it, the stage labels
+ * on the issue, and whether it is stale, how long its tip has stood and
+ * which `rafa claim take` would take it.
  *
  * ## A section not read
  *
@@ -50,12 +57,13 @@
  *
  * ## The JSON data
  *
- * {@link statusData} is the five sections under their own keys, each
+ * {@link statusData} is the six sections under their own keys, each
  * `{ read: false, problem }` or its reading with `read: true` first.
  * Every reading `./sections.ts` answers is plain JSON already (dates are
  * ISO 8601 strings there), so the data is the reading, copied, and
  * `JSON.parse(JSON.stringify(data))` gives it back unchanged.
  */
+import type { ClaimRow, ClaimsReading } from './claims.js';
 import type {
   BlockedSession,
   BoardReading,
@@ -71,6 +79,7 @@ import type { Mergeability } from '../pr/index.js';
 
 import { blockedLineSentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
+import { idleText } from '../board/roadmap-claims.js';
 import { planLabel, sessionLine } from '../commands/loop/loop-sessions.js';
 import { formatCounts } from '../commands/plan/plan-files.js';
 
@@ -82,6 +91,7 @@ export const STATUS_SECTION_TITLES = Object.freeze({
   loops: 'Loops',
   pull: 'Pull request',
   board: 'Board',
+  claims: 'Claims',
   housekeeping: 'Housekeeping',
 });
 
@@ -113,7 +123,7 @@ export interface StatusLine {
   readonly text: string;
 }
 
-/** The JSON data of the terminal result: the five sections; see the module note. */
+/** The JSON data of the terminal result: the six sections; see the module note. */
 export type StatusData = StatusSections;
 
 /** `count` and `noun`, the noun plural unless the count is one. */
@@ -203,6 +213,53 @@ function nextStanding(next: NonNullable<BoardReading['next']>): string {
     : 'not ready';
 }
 
+/** The claims line. */
+function claimsText(reading: ClaimsReading): string {
+  const { claims } = reading;
+  if (claims.length === 0) return 'none on origin as last fetched';
+  const count = (states: readonly ClaimRow['state'][]): number => claims.filter((row) => states.includes(row.state)).length;
+  return `${counted(claims.length, 'claim branch', 'claim branches')} on origin as last fetched:`
+    + ` ${String(count(['held']))} held, ${String(count(['stale-claimed', 'stale-in-development']))} stale,`
+    + ` ${String(count(['released']))} released`;
+}
+
+/** Who a claim row names: its owner, with a pending handover, or who released it. */
+function claimHolder(row: ClaimRow): string {
+  if (row.owner === null) return `released by store ${row.releasedBy ?? 'unknown'}`;
+  return row.handingTo === null
+    ? `owned by store ${row.owner}`
+    : `owned by store ${row.owner}, handing over to store ${row.handingTo}`;
+}
+
+/** The stage labels a claim row names. */
+function claimStage(stage: ClaimRow['stage']): string {
+  if (stage === null) return 'stage labels not read';
+  return stage.length === 0
+    ? 'no stage label'
+    : stage.join(' and ');
+}
+
+/** Whether a claim row is stale, and what would take it. */
+function claimStanding(row: ClaimRow): string {
+  const idle = `idle ${idleText(row.idleMs)}`;
+  const take = `rafa claim take ${String(row.issue)}`;
+  if (row.state === 'released') return `free to claim (${idle})`;
+  if (row.state === 'held') return `not stale (${idle})`;
+  return row.state === 'stale-claimed'
+    ? `stale (${idle}): ${take} takes it over`
+    : `stale (${idle}) but in development: only ${take} --stale takes it over`;
+}
+
+/** One line under the claims line; see the module note. */
+export function claimLine(row: ClaimRow): string {
+  return `#${String(row.issue)} \`${row.branch}\`: ${claimHolder(row)}, ${claimStage(row.stage)}, ${claimStanding(row)}`;
+}
+
+/** The lines under the claims line: one per claim branch. */
+function claimsBody(reading: ClaimsReading): readonly StatusLine[] {
+  return reading.claims.map((row) => info(`${INDENT}${claimLine(row)}`));
+}
+
 /** The housekeeping line. */
 function housekeepingText(reading: HousekeepingReading): string {
   const { merged, stale, notPushed, worktrees } = reading.counts;
@@ -229,6 +286,7 @@ export function renderStatus(sections: StatusSections): readonly StatusLine[] {
     ...sectionLines('loops', sections.loops, loopsText, loopsBody),
     ...sectionLines('pull', sections.pull, pullText),
     ...sectionLines('board', sections.board, boardText, boardBody),
+    ...sectionLines('claims', sections.claims, claimsText, claimsBody),
     ...sectionLines('housekeeping', sections.housekeeping, housekeepingText),
   ];
 }
@@ -247,6 +305,7 @@ export function statusData(sections: StatusSections): StatusData {
     loops: sectionData(sections.loops),
     pull: sectionData(sections.pull),
     board: sectionData(sections.board),
+    claims: sectionData(sections.claims),
     housekeeping: sectionData(sections.housekeeping),
   };
 }

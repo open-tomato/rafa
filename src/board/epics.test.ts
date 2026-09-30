@@ -25,14 +25,19 @@
  *    done epic past its date.
  *  - A blocked-by epic is read beside the same blocker closed, which must
  *    name no epic.
+ *  - A released branch claim is read beside every other claim state,
+ *    each of which must claim its member.
  */
 import type { BoardIssue } from './roadmap-board.js';
+import type { BranchClaim } from './roadmap-claims.js';
+import type { BranchClaimReading } from './roadmap.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
 
 import {
+  branchClaimsMember,
   disagreementOf,
   epicSlugsOf,
   groupByEpicLabel,
@@ -124,6 +129,27 @@ describe('groupByEpicLabel', () => {
 
     expect(groups.get('board')?.map((found) => found.number)).toEqual([11]);
     expect(groups.get('views')?.map((found) => found.number)).toEqual([11]);
+  });
+});
+
+describe('branchClaimsMember', () => {
+  const on = (claim: BranchClaim): BranchClaimReading => ({ branch: 'origin/feat/rafa-11-x', claim });
+
+  it('claims a member for every branch the walk passes over', () => {
+    const claimed = [
+      on({ state: 'none' }),
+      on({ state: 'unreadable', reason: 'fatal: unable to access origin' }),
+      on({ state: 'held', owner: 'store-a', pending: null }),
+      on({ state: 'stale-in-development', owner: 'store-a', idleMs: 5 }),
+      on({ state: 'stale-claimed', owner: 'store-a', idleMs: 5 }),
+    ].map(branchClaimsMember);
+
+    expect(claimed).toEqual([true, true, true, true, true]);
+  });
+
+  it('claims nothing for a released claim or no branch, the control', () => {
+    expect([branchClaimsMember(on({ state: 'released', releasedBy: 'store-a' })), branchClaimsMember(null)])
+      .toEqual([false, false]);
   });
 });
 

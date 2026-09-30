@@ -28,6 +28,13 @@
  * added back to its argument list, so the removal becomes a swap onto
  * a label nobody asked for, left 13 pass and 1 fail against 14 pass
  * either side — the argument list case below.
+ *
+ * One mutation of `addLabel` was driven on 2026-09-30 the same way, over
+ * `bun test src/board/issue-board.test.ts`, the module restored from a
+ * scratch copy and verified with `sha256sum -c`: its `--add-label`
+ * turned into `--remove-label`, so the addition takes the label off
+ * instead, left 33 pass and 1 fail against 34 pass either side — the
+ * argument list case below.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
@@ -194,6 +201,44 @@ describe('swapLabels', () => {
     expect(stub.calls()).toEqual([]);
     // The control: ordinary labels on an ordinary issue send the command.
     await expect(board.swapLabels(7, 'spec:ready', 'spec:needs-work')).resolves.toBeUndefined();
+  });
+});
+
+describe('addLabel', () => {
+  it('puts the label on in a gh issue edit carrying no --remove-label', async () => {
+    const stub = stubGh(wrote(''));
+
+    await createGhIssueBoard({ gh: stub.run }).addLabel(7, 'rafa:claimed');
+
+    expect(stub.calls()).toEqual([['issue', 'edit', '7', '--add-label', 'rafa:claimed']]);
+  });
+
+  it('rejects a failed addition, naming the command', async () => {
+    const stub = stubGh(failed('gh: could not add label: not found'));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).addLabel(7, 'rafa:claimed'))
+      .rejects.toThrow('gh issue edit 7 --add-label rafa:claimed failed');
+  });
+
+  it('names itself, not swapLabels, in the label it refuses', async () => {
+    const stub = stubGh(wrote(''));
+
+    await expect(createGhIssueBoard({ gh: stub.run }).addLabel(7, '--repo')).rejects.toThrow(
+      'board issue: addLabel refused the label',
+    );
+  });
+
+  it('refuses a label that would reach gh as a flag, an empty one, and an issue that is no number', async () => {
+    const stub = stubGh(wrote(''));
+    const board = createGhIssueBoard({ gh: stub.run });
+
+    await expect(board.addLabel(7, '--repo')).rejects.toThrow(TypeError);
+    await expect(board.addLabel(7, '')).rejects.toThrow(TypeError);
+    await expect(board.addLabel(0, 'rafa:claimed')).rejects.toThrow(TypeError);
+    await expect(board.addLabel(1.5, 'rafa:claimed')).rejects.toThrow(TypeError);
+    expect(stub.calls()).toEqual([]);
+    // The control: an ordinary label on an ordinary issue sends the command.
+    await expect(board.addLabel(7, 'rafa:claimed')).resolves.toBeUndefined();
   });
 });
 

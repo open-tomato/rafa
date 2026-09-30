@@ -65,7 +65,8 @@
  * a `claude` planner's rejection carries, or 1 for any other, with the
  * rejection's message. An unusable config, a line naming no spec source
  * or several, a spec that does not exist and a plan already there each
- * throw exit code 1 with the whole refusal as the message; a board
+ * throw exit code 1 with the whole refusal as the message, and so does a
+ * claim another store holds on an issue the line named; a board
  * refusal — an issue or a roadmap whose author is trusted with nothing,
  * a closed or unlabelled issue, a leaking body, a snapshot that differs
  * with no `--refresh`, a reference of the saved copy check 4 reads as
@@ -75,6 +76,20 @@
  * with every gap in it. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
+ *
+ * ## The claim
+ *
+ * A run that knows its issue — `--issue`, `--next`, or a `--spec` whose
+ * name opens `rafa-<n>-` — claims it through `claims/plan-claim.ts`
+ * after the plan-already-there refusal and check 4, and before the
+ * usage check, the notices and the session, so a lost race costs no
+ * session. `commands/plan/claim-route.ts` holds what each answer does:
+ * a claim another store holds refuses `--issue` and `--spec` with exit
+ * code 1 naming the owner, and passes a `--next` pick over, the walk
+ * resolved again and going on; a claim that could not be made or pushed
+ * writes the plan with a warning saying why. A `--next` run under
+ * `claims.ahead: allow` or `--claim-ahead` also claims the line after
+ * its pick in the same push, both or neither (`claims/ahead.ts`).
  *
  * ## The verdict, and what the plan records
  *
@@ -197,7 +212,9 @@ import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
+import { claimPlanIssue } from './claims/plan-claim.js';
 import { CommandExit } from './cli/command.js';
+import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
@@ -568,30 +585,41 @@ export default async function plan(
   // before anything is spent (`commands/plan/refs-check.ts`).
   announceCreateRefs(args, dangerousAcceptStaleRefs);
 
-  const resolved = await resolveCreateSpec({
-    args,
-    repoRoot,
-    specsDir,
-    roadmapIssue,
-    trustedAuthors: boardTrustedAuthors,
+  // The spec, the cheap refusals over it, then the claim on its issue,
+  // all before any session is paid for ("The claim").
+  const resolved = await resolveAndClaim({
+    resolve: (passOver) => resolveCreateSpec({
+      args,
+      repoRoot,
+      specsDir,
+      roadmapIssue,
+      trustedAuthors: boardTrustedAuthors,
+      passOver,
+    }),
+    prepare: async (spec) => {
+      const stub = argValue(args, '--stub') ?? stubFromSpecPath(path.resolve(repoRoot, spec.path));
+      const planFile = planFilePath(planDir, `PLAN-${stub}.md`);
+      if (fs.existsSync(path.resolve(repoRoot, planFile))) {
+        throw new CommandExit(1, `❌ ${planFile} already exists — remove it or pass a different --stub.`);
+      }
+      // Check 4: the references the saved copy names, read against its
+      // stamps. `--spec` has no copy to read.
+      await checkCreateRefs({ spec, repoRoot, args, acceptStaleRefs: dangerousAcceptStaleRefs });
+      return stub;
+    },
+    claim: (request) => claimPlanIssue(request, createPlanClaimContext(repoRoot, config)),
+    output: activeOutput(),
+    claimsAhead: config.claimsAhead,
   });
   // `--dry-run`, a roadmap with nothing left and a blocked next line
   // nobody said yes past have each said their piece already; the run is
   // over and no session is paid for.
   if (resolved.outcome === 'stopped') return;
 
+  const { stub } = resolved;
   const specRequest = resolved.spec.path;
   const specPath = path.resolve(repoRoot, specRequest);
-
-  const stub = argValue(args, '--stub') ?? stubFromSpecPath(specPath);
   const planFile = planFilePath(planDir, `PLAN-${stub}.md`);
-  if (fs.existsSync(path.resolve(repoRoot, planFile))) {
-    throw new CommandExit(1, `❌ ${planFile} already exists — remove it or pass a different --stub.`);
-  }
-
-  // Check 4: the references the saved copy names, read against its
-  // stamps, before any session is paid for. `--spec` has no copy to read.
-  await checkCreateRefs({ spec: resolved.spec, repoRoot, args, acceptStaleRefs: dangerousAcceptStaleRefs });
 
   await checkUsage('issue');
 

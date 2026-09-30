@@ -54,7 +54,7 @@
  * line stays readable.
  */
 import type { PrProviderReading } from './provider.js';
-import type { PrerequisiteItem } from '../config-sections.js';
+import type { PrerequisiteItem } from '../config-items.js';
 
 /** The host asked about when a reading names none; see the module note. */
 export const DEFAULT_GH_HOST = 'github.com';

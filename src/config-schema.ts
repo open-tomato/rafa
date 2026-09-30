@@ -7,8 +7,9 @@
  * text into a layer, layers into one resolution — and re-exports
  * {@link RafaConfig}, {@link CONFIG_DEFAULTS} and {@link CONFIG_FILE},
  * so nothing outside the pair imports this file. `config-sections.ts`
- * holds every rule about a VALUE: the readers, the closed lists, the
- * item shapes, and why nothing is coerced. `config-readers.ts` holds
+ * holds every rule about a VALUE: the readers, the closed lists, and
+ * why nothing is coerced. `config-items.ts` holds the two item shapes
+ * the `prerequisites` and `modules` lists read. `config-readers.ts` holds
  * `mapOf`, whose ruling is on a KEY — the names a map setting's file
  * spells below its own key — and the named readers the settings below
  * are read through, `directory`, `trackerKind`, `releaseFile`,
@@ -91,19 +92,23 @@
  * that comparison argue for `full`, the change is that one line.
  */
 import type {
+  ModuleSource,
+  OptionalPrerequisiteItem,
+  PrerequisiteItem,
+} from './config-items.js';
+import type {
   DangerousReleaseSettings,
   PrSettings,
   ReleaseSettings,
 } from './config-schema-release.js';
 import type {
+  ClaimsAhead,
+  ClaimsStaleAfter,
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
   LessonSwitch,
-  ModuleSource,
-  OptionalPrerequisiteItem,
   OutputMode,
-  PrerequisiteItem,
   Reader,
   RouteTarget,
   SkillResolverName,
@@ -115,6 +120,14 @@ import type {
 
 import { join } from 'node:path';
 
+import {
+  MODULE_SOURCE_KEYS,
+  moduleSource,
+  OPTIONAL_ITEM_KEYS,
+  optionalPrerequisite,
+  REQUIRED_ITEM_KEYS,
+  requiredPrerequisite,
+} from './config-items.js';
 import {
   directory,
   routeTable,
@@ -131,6 +144,8 @@ import {
 } from './config-schema-release.js';
 import {
   busyTimeoutMs,
+  claimsAhead,
+  claimsStaleAfter,
   CLAUDE_SETTING_SOURCES,
   confidence,
   CONFIG_VERSIONS,
@@ -141,15 +156,9 @@ import {
   issueNumber,
   lessonSwitch,
   listOf,
-  MODULE_SOURCE_KEYS,
-  moduleSource,
-  OPTIONAL_ITEM_KEYS,
   oneOf,
-  optionalPrerequisite,
   OUTPUT_MODES,
   recurrenceCount,
-  REQUIRED_ITEM_KEYS,
-  requiredPrerequisite,
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,
@@ -238,6 +247,13 @@ export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleas
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
    */
   roadmapIssue: number | null;
+  /**
+   * How long a `rafa:claimed` claim stands before another device may
+   * take it over, or `disabled`. `claims.staleAfter`.
+   */
+  claimsStaleAfter: ClaimsStaleAfter;
+  /** Whether a claim may reach one issue ahead. `claims.ahead`. */
+  claimsAhead: ClaimsAhead;
   /**
    * The age in days past which `rafa cleanup` lists a branch as Stale.
    * `cleanup.staleDays`.
@@ -331,6 +347,8 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
+  claimsStaleAfter: '3d',
+  claimsAhead: 'off',
   ...RELEASE_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
@@ -429,6 +447,8 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
+  claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
+  claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },
   ...RELEASE_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {

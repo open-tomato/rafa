@@ -90,7 +90,7 @@
  * saying which, and all three stop at {@link RoadmapStop} `blocked`.
  *
  * So the walk reorders nothing by itself, and the only thing that moves
- * past a line is an answer. A run handed no offer
+ * past a line is an answer, or a claim git refused (below). A run handed no offer
  * ({@link RoadmapSeams.offerAlternative}) plans nothing at all, which is
  * what a `--dry-run` run and a run with no terminal both get
  * (`./plan-spec.ts`).
@@ -102,6 +102,22 @@
  * blocked pick is never offered the `spec:ready` label on its way past;
  * the line the offer names goes through `inspect` in full, exactly as a
  * typed `--issue=<n>` would.
+ *
+ * ## A line whose claim was refused
+ *
+ * `plan create --next` claims the issue it picked before its planning
+ * session (`src/commands/plan/claim-route.ts`), and a claim another
+ * store holds is refused. The run then resolves again, handing the
+ * refused issues in as {@link RoadmapSeams.passOver}, each with the
+ * branch whose claim refused it; the walk reads such a line as TAKEN by
+ * that branch, printed as any taken line is, and walks on. So the line
+ * is passed because git answered for it, never because the walk
+ * guessed, and it is passed wherever the walk meets it: in the
+ * roadmap, inside an epic, and on the way to a blocked line's
+ * alternative. An away hop whose target was refused is not followed,
+ * warned in one line ({@link unfollowedHopNotice}), and the walk picks
+ * as a bare `--next` does. With no `passOver`, the walk is the one it
+ * always was.
  *
  * ## The roadmap's own body, and why it has a seam of its own
  *
@@ -154,6 +170,7 @@ import type { DescendedEpic, DescendedPick, DescentPass } from './epic-walk.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type {
+  BranchClaimReading,
   OpenPullRequestLister,
   RoadmapLine,
   RoadmapReadings,
@@ -224,14 +241,35 @@ export interface RoadmapSeams {
    * so ({@link unaskedMessage}). See the module note.
    */
   readonly offerAlternative?: AlternativeOffer;
+  /**
+   * Issues whose claim was refused this run, each with the branch that
+   * refused it: read as taken by that branch. Left out, or empty, for a
+   * walk that passes nothing over. See the module note.
+   */
+  readonly passOver?: ReadonlyMap<number, string>;
 }
 
 /** Why a `--next` walk stopped without an issue. */
 export type RoadmapStop = 'exhausted' | 'blocked';
 
-/** What a `--next` walk came to: the issue to plan from, or why the run stops. */
+/**
+ * The walk a pick was read off, for the line after it: the board whose
+ * body was read and the lines walked, the roadmap's or the one epic's,
+ * with the readings they were read through. Claim ahead reads it
+ * (`src/claims/ahead.ts`); a pick that followed a hop walked none.
+ */
+export interface RoadmapWalk {
+  readonly board: number;
+  readonly lines: readonly RoadmapLine[];
+  readonly readings: RoadmapReadings;
+}
+
+/**
+ * What a `--next` walk came to: the issue to plan from, with the walk
+ * it was picked on when it walked one, or why the run stops.
+ */
 export type RoadmapOutcome =
-  | { readonly issue: number }
+  | { readonly issue: number; readonly walk?: RoadmapWalk }
   | { readonly stop: RoadmapStop };
 
 /** What {@link pickRoadmapIssue} is handed. */
@@ -434,10 +472,18 @@ async function walkPlaceEpic(number: number, listing: BoardListing, readings: Ro
  */
 export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<RoadmapOutcome> {
   const { seams, issues, output } = options;
+  const passOver = seams.passOver ?? new Map<number, string>();
   if (options.followHop === true) {
     const hop = readAwayHop(options.root);
     hop.notices.forEach((notice) => output.warn(notice));
-    if (hop.away !== null) return await pickHopTarget(hop.away, issues, output);
+    const refused = hop.away === null
+      ? undefined
+      : passOver.get(hop.away.target);
+    if (hop.away !== null && refused !== undefined) {
+      output.warn(unfollowedHopNotice(`issue #${String(hop.away.target)}, the hop's target, was refused its claim on ${refused}`));
+    } else if (hop.away !== null) {
+      return await pickHopTarget(hop.away, issues, output);
+    }
   }
   const listing = listOnce(seams.listing);
   const start = await startingPlace(options, listing);
@@ -453,11 +499,11 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
   const branches = scanClaimBranches(seams.git, seams.remote);
   branches.problems.forEach((problem) => output.warn(problem));
 
-  const readings = createRoadmapReadings({
+  const readings = passingOver(createRoadmapReadings({
     issues,
     branches,
     pullRequests: seams.pullRequests,
-  });
+  }), passOver);
   const walked = start.epic === null
     ? await pickDescendedLine(parseRoadmapBody(read.body), { issues, readings, listing })
     : await walkPlaceEpic(start.epic, listing, readings);
@@ -474,7 +520,28 @@ export async function pickRoadmapIssue(options: RoadmapPickOptions): Promise<Roa
   }
 
   output.info(pickLine(pick.line));
-  return settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+  const settled = await settlePick(pick.line, { lines: descent.lines, issues, readings, seams, output });
+  return 'stop' in settled
+    ? settled
+    : { ...settled, walk: Object.freeze({ board: roadmap, lines: descent.lines, readings }) };
+}
+
+/**
+ * `readings` with every issue of `passOver` read as taken by the branch
+ * that refused its claim, and every other issue read as `readings` reads
+ * it. See the module note's "A line whose claim was refused".
+ */
+export function passingOver(readings: RoadmapReadings, passOver: ReadonlyMap<number, string>): RoadmapReadings {
+  if (passOver.size === 0) return readings;
+  return Object.freeze({
+    ...readings,
+    branchClaimFor: async (issue: number): Promise<BranchClaimReading | null> => {
+      const branch = passOver.get(issue);
+      return branch === undefined
+        ? await readings.branchClaimFor(issue)
+        : { branch, claim: { state: 'none' } };
+    },
+  });
 }
 
 /**

@@ -8,12 +8,44 @@
  * case where the same section was read and printed at `info`, so a
  * renderer that always warned, or never did, would fail.
  */
+import type { ClaimRow } from './claims.js';
 import type { BlockedSession, PlaceReading, SectionUnread, StatusSections } from './sections.js';
 import type { SessionRecord } from '../loop/sessions.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { renderStatus, STATUS_SECTION_TITLES, statusData } from './render.js';
+import { claimLine, renderStatus, STATUS_SECTION_TITLES, statusData } from './render.js';
+
+/** Two hours, in milliseconds. */
+const TWO_HOURS_MS = 2 * 3_600_000;
+
+/** Four days, in milliseconds. */
+const FOUR_DAYS_MS = 4 * 24 * 3_600_000;
+
+/** A claim row held by `store-a` at `rafa:in-development`, the fields a case does not name held fixed. */
+function claimRow(fields: Partial<ClaimRow> = {}): ClaimRow {
+  return {
+    branch: 'feat/rafa-101-rafa-status',
+    issue: 101,
+    owner: 'store-a',
+    handingTo: null,
+    releasedBy: null,
+    stage: ['rafa:in-development'],
+    state: 'held',
+    tipCommittedAt: '2026-09-24T08:00:00.000Z',
+    idleMs: TWO_HOURS_MS,
+    ...fields,
+  };
+}
+
+/** A claims reading with no branch, so a case about another section's indented lines sees only its own. */
+const NO_CLAIMS: StatusSections['claims'] = { read: true, claims: [], notes: [] };
+
+/** The claims line and the line under it that {@link allRead} prints. */
+const CLAIMS_LINES = [
+  'Claims: 1 claim branch on origin as last fetched: 1 held, 0 stale, 0 released',
+  '  #101 `feat/rafa-101-rafa-status`: owned by store store-a, rafa:in-development, not stale (idle 2h)',
+];
 
 /** A session record, the fields a case does not name held fixed. */
 function record(fields: Partial<SessionRecord> = {}): SessionRecord {
@@ -82,6 +114,7 @@ function allRead(): StatusSections {
       blockedIssues: 3,
       notes: [],
     },
+    claims: { read: true, claims: [claimRow()], notes: ['a claims note the text leaves to the JSON'] },
     housekeeping: {
       read: true,
       counts: { merged: 1, stale: 0, notPushed: 2, worktrees: 3 },
@@ -116,12 +149,13 @@ describe('renderStatus', () => {
       { level: 'info', text: '  blocked: plan `rafa-101-rafa-status` line 14: Write the docs' },
       { level: 'info', text: 'Pull request: #120 rafa status, mergeable, checks green' },
       { level: 'info', text: 'Board: next is #102 on roadmap #31, ready; 3 issues labelled spec:blocked' },
+      ...CLAIMS_LINES.map((text) => ({ level: 'info', text })),
       { level: 'info', text: 'Housekeeping: 1 merged, 0 stale, 2 not pushed, 3 worktrees (1 idle)' },
     ]);
   });
 
   it('prints the loops line alone when nothing runs and nothing is blocked', () => {
-    const lines = texts({ ...allRead(), loops: { read: true, live: [], blocked: [] } });
+    const lines = texts({ ...allRead(), claims: NO_CLAIMS, loops: { read: true, live: [], blocked: [] } });
 
     expect(lines.filter((line) => line.startsWith('  '))).toEqual([]);
     expect(lines).toContain('Loops: 0 running, 0 tasks blocked');
@@ -188,19 +222,19 @@ describe('renderStatus', () => {
       { level: 'warn', text: 'Board: not read: the board was not read within the 5000ms network deadline' },
     ]);
     expect(lines.filter((line) => line.level === 'info').map((line) => line.text.split(':')[0]))
-      .toEqual(['Branch', 'Loops', '  session-0100', '  blocked', '  blocked', 'Housekeeping']);
+      .toEqual(['Branch', 'Loops', '  session-0100', '  blocked', '  blocked', 'Claims', '  #101 `feat/rafa-101-rafa-status`', 'Housekeeping']);
   });
 
   it('prints a warn line and nothing under it for a loops section not read', () => {
-    const lines = renderStatus({ ...allRead(), loops: unread('the runs directory could not be read') });
+    const lines = renderStatus({ ...allRead(), claims: NO_CLAIMS, loops: unread('the runs directory could not be read') });
 
     expect(lines.filter((line) => line.text.startsWith('  '))).toEqual([]);
     expect(lines[1]).toEqual({ level: 'warn', text: 'Loops: not read: the runs directory could not be read' });
   });
 
-  it('prints five warn lines, one per title, when no section was read', () => {
+  it('prints six warn lines, one per title, when no section was read', () => {
     const problem = unread('nothing answered');
-    const lines = renderStatus({ branch: problem, loops: problem, pull: problem, board: problem, housekeeping: problem });
+    const lines = renderStatus({ branch: problem, loops: problem, pull: problem, board: problem, claims: problem, housekeeping: problem });
 
     expect(lines).toEqual(Object.values(STATUS_SECTION_TITLES).map((title) => ({
       level: 'warn',
@@ -232,7 +266,7 @@ describe('the place lines under the board line', () => {
   function boardLines(sections: StatusSections): readonly { readonly level: string; readonly text: string }[] {
     const lines = renderStatus(sections);
     const from = lines.findIndex((line) => line.text.startsWith('Board:'));
-    const to = lines.findIndex((line) => line.text.startsWith('Housekeeping:'));
+    const to = lines.findIndex((line) => line.text.startsWith('Claims:'));
     return lines.slice(from, to);
   }
 
@@ -247,6 +281,7 @@ describe('the place lines under the board line', () => {
       '  blocked: plan `rafa-101-rafa-status` line 14: Write the docs',
       'Pull request: #120 rafa status, mergeable, checks green',
       BOARD_LINE,
+      ...CLAIMS_LINES,
       'Housekeeping: 1 merged, 0 stale, 2 not pushed, 3 worktrees (1 idle)',
     ].join('\n'));
     expect(boardLines(allRead())).toEqual([{ level: 'info', text: BOARD_LINE }]);
@@ -311,7 +346,7 @@ describe('statusData', () => {
 
     expect(data).toEqual(sections);
     expect(JSON.parse(JSON.stringify(data))).toEqual(data);
-    expect(Object.keys(data)).toEqual(['branch', 'loops', 'pull', 'board', 'housekeeping']);
+    expect(Object.keys(data)).toEqual(['branch', 'loops', 'pull', 'board', 'claims', 'housekeeping']);
     expect(Object.keys(sections.branch).at(-1)).toBe('read');
     expect(Object.keys(data.branch)).toEqual(['read', 'branch', 'plan', 'notes']);
     expect(Object.keys(data.board)).toEqual(['read', 'problem']);
@@ -323,6 +358,8 @@ describe('statusData', () => {
     expect(data.branch.read && data.branch.notes).toEqual(['a note the text leaves to the JSON']);
     expect(data.branch.read && data.branch.plan?.tracker).toBe('/project/.rafa/plans/PLAN_TRACKER-rafa-101-rafa-status.md');
     expect(data.pull.read && data.pull.pull?.summary.url).toBe('https://github.com/open-tomato/rafa/pull/120');
+    expect(data.claims.read && data.claims.notes).toEqual(['a claims note the text leaves to the JSON']);
+    expect(Object.keys(data.claims)).toEqual(['read', 'claims', 'notes']);
   });
 
   it('is a copy: changing the data leaves the reading as it was', () => {
@@ -332,5 +369,53 @@ describe('statusData', () => {
     (data.housekeeping as { counts: { merged: number } }).counts.merged = 99;
 
     expect(sections.housekeeping.read && sections.housekeeping.counts.merged).toBe(1);
+  });
+});
+
+describe('the claims lines', () => {
+  /** The claims line and the lines under it, for `rows`. */
+  function claimsLines(rows: readonly ClaimRow[]): readonly string[] {
+    const lines = texts({ ...allRead(), claims: { read: true, claims: rows, notes: [] } });
+    const from = lines.findIndex((line) => line.startsWith('Claims:'));
+    const to = lines.findIndex((line) => line.startsWith('Housekeeping:'));
+    return lines.slice(from, to);
+  }
+
+  it('says none, with no line under it, when origin holds no claim branch, where one branch prints one', () => {
+    expect(claimsLines([])).toEqual(['Claims: none on origin as last fetched']);
+    expect(claimsLines([claimRow()])).toEqual(CLAIMS_LINES);
+  });
+
+  it('names each branch\'s owner, stage label and stale state, counting held, stale and released apart', () => {
+    const rows = [
+      claimRow({ branch: 'feat/rafa-7-a', issue: 7, owner: 'store-b', stage: ['rafa:claimed'], state: 'stale-claimed', idleMs: FOUR_DAYS_MS }),
+      claimRow({ branch: 'feat/rafa-8-b', issue: 8, state: 'stale-in-development', idleMs: FOUR_DAYS_MS }),
+      claimRow({ branch: 'feat/rafa-9-c', issue: 9, owner: null, releasedBy: 'store-c', stage: [], state: 'released' }),
+      claimRow({ branch: 'feat/rafa-10-d', issue: 10, handingTo: 'store-d', stage: null }),
+    ];
+
+    expect(claimsLines(rows)).toEqual([
+      'Claims: 4 claim branches on origin as last fetched: 1 held, 2 stale, 1 released',
+      '  #7 `feat/rafa-7-a`: owned by store store-b, rafa:claimed, stale (idle 4d): rafa claim take 7 takes it over',
+      '  #8 `feat/rafa-8-b`: owned by store store-a, rafa:in-development, stale (idle 4d) but in development: only rafa claim take 8 --stale takes it over',
+      '  #9 `feat/rafa-9-c`: released by store store-c, no stage label, free to claim (idle 2h)',
+      '  #10 `feat/rafa-10-d`: owned by store store-a, handing over to store store-d, stage labels not read, not stale (idle 2h)',
+    ]);
+  });
+
+  it('names both stage labels on an issue a failed swap left carrying both', () => {
+    expect(claimLine(claimRow({ stage: ['rafa:in-development', 'rafa:claimed'] })))
+      .toContain(', rafa:in-development and rafa:claimed, ');
+  });
+
+  it('prints one warn line and nothing under it for a claims section not read, where a read one prints info', () => {
+    const lines = renderStatus({ ...allRead(), claims: unread('the origin branches could not be listed: fatal: bad ref') });
+
+    expect(lines.filter((line) => line.text.startsWith('  #'))).toEqual([]);
+    expect(lines.filter((line) => line.text.startsWith('Claims:'))).toEqual([
+      { level: 'warn', text: 'Claims: not read: the origin branches could not be listed: fatal: bad ref' },
+    ]);
+    const read = renderStatus(allRead()).filter((line) => line.text.startsWith('Claims:'));
+    expect(read.map((line) => line.level)).toEqual(['info']);
   });
 });
