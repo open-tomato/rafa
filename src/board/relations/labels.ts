@@ -69,6 +69,11 @@
  * blocker's state from the walk's own memoised reader, which also reads
  * an issue older than the listing.
  *
+ * {@link labelsLineBlockersOf} is the same reading of a bare body, as
+ * though it carried `spec:blocked`, for `src/refs/extract.ts`: a spec's
+ * references are marked by what its `Blocked by:` line names, whatever
+ * its labels, as they were before the port.
+ *
  * ## freedBy
  *
  * The port's rule over this adapter's `blockersOf`, spelled once for
@@ -110,7 +115,7 @@ import type { RoadmapBody } from '../roadmap-tick.js';
 import { epicTickProblemLine, epicTickSentence, tickEpics } from '../../commands/pr/merge-tick.js';
 import { unblockAfterMerge } from '../../commands/pr/merge-unblock.js';
 import { messageOf } from '../../config-sections.js';
-import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy } from '../blocked.js';
+import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../blocked.js';
 import { epicLines } from '../epic-walk.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf, readEpics } from '../epics.js';
 import { boardListFields } from '../roadmap-board.js';
@@ -218,6 +223,16 @@ export function labelsBlockersOf(
     issue: issue.number,
     blockers: Object.freeze([...local, ...read.foreign.map(foreignBlocker)]),
   });
+}
+
+/**
+ * What the `Blocked by:` line in `body` names, read as
+ * {@link labelsBlockersOf} reads an issue carrying `spec:blocked`: a
+ * `blocked` reading, or a `fault` whose `line` still holds every id and
+ * token the line named. No state is read; see the module note.
+ */
+export function labelsLineBlockersOf(issue: number, body: string): BlockersReading {
+  return labelsBlockersOf({ number: issue, labels: [SPEC_BLOCKED_LABEL], body }, new Map());
 }
 
 /** The four reads over `listing`; see the module note. */
