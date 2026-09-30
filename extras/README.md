@@ -43,4 +43,5 @@ Update it with `git -C ~/rafa-extras pull` for the clone, or
 | --- | --- | --- |
 | [`zsh/tomato/`](zsh/tomato/) | A two-line oh-my-zsh theme: repository, branch and diff count, rafa version, spec or roadmap with epic progress on the left; a spacer for status messages; every live loop's task counter at the top right | zsh 5.9, oh-my-zsh |
 | [`zsh/rafa-prompt/`](zsh/rafa-prompt/) | A prompt segment naming the plan of the current branch and how far its run is: ready, in progress, blocked, running, done | zsh 5.9, oh-my-zsh |
+| [`claude-code/`](claude-code/) | A tooling pack for Claude Code agents: a skill with the `gh`-to-rafa mappings and who runs which command, a PreToolUse hook that enforces them, and `/rafa-hookify` to install both in a project | Claude Code 2.1.283, Haiku and Sonnet |
 | [`warp/`](warp/) | Warp settings that matter to rafa, and a probe for Warp's use of zsh completions | Warp stable 0.2026.09.16 |

@@ -4,6 +4,9 @@ The agent task loop for ralph, packaged and ready to ship. A single-package
 implementation of the loop from `agentic-research`, with all the pieces
 running under bun and ready for publishing to npm as `@open-tomato/rafa`.
 
+The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
+before running or suggesting any `gh`, `rafa` or branch-cleanup command.
+
 ## Context pages
 
 One page per tag, each the authority for its own subject; read the page your
