@@ -2,7 +2,8 @@
  * Tests for the `--json` fields following `board.relationships` in the
  * three commands that send the board listing's fields: the board listing
  * (`./roadmap-board.ts`), the board lister (`./boards.ts`) and the epic
- * context lookup (`./epic-context.ts`).
+ * context lookup (`./epic-context.ts`), which sends its `--label` list
+ * in the labels mode and the native board listing in the native mode.
  *
  * The labels-mode argv is written out here as literal words, never
  * rebuilt from `BOARD_LIST_FIELDS` or the modules' own builders, so a
@@ -14,6 +15,7 @@
  * mode is refused, which proves the mode reached the parser and not only
  * the argv. Every `gh` answer is planted; nothing spawns.
  */
+import type { EpicRelations } from './epics.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardRelationshipMode } from '../config-sections.js';
 
@@ -23,6 +25,8 @@ import { sinkOutput } from '../tests/output-sinks.js';
 
 import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND, boardsListArgs, createGhBoardLister } from './boards.js';
 import { epicContextArgs, readEpicContext } from './epic-context.js';
+import { LABELS_READS } from './relations/labels.js';
+import { createNativeRelations } from './relations/native.js';
 import {
   BOARD_LIST_FIELDS,
   boardListFields,
@@ -165,7 +169,18 @@ describe('readEpicContext', () => {
     '--limit', '20', '--json', LABELS_FIELDS,
   ];
 
-  /** The lookup for an issue labelled `epic:auth`, read in `mode`, with the warnings it left. */
+  /** The native-mode listing argv, written out. */
+  const NATIVE_LISTING_ARGS = ['issue', 'list', '--state', 'all', '--limit', '1000', '--json', NATIVE_FIELDS];
+
+  /** The relationships each mode is read through; `undefined` leaves the option out. */
+  function relationsFor(mode: BoardRelationshipMode | undefined, gh: GhRunner): EpicRelations | undefined {
+    if (mode === undefined) return undefined;
+    return mode === 'native'
+      ? createNativeRelations({ gh, repository: 'acme/board' })
+      : LABELS_READS;
+  }
+
+  /** The lookup for issue #7 labelled `epic:auth`, read in `mode`, with the warnings it left. */
   async function lookUp(rows: readonly unknown[], mode?: BoardRelationshipMode): Promise<{
     readonly calls: readonly (readonly string[])[];
     readonly found: number | null;
@@ -179,24 +194,28 @@ describe('readEpicContext', () => {
       },
     });
     const base = { issue: 7, labels: ['epic:auth'], gh: gh.run, output };
-    const context = await readEpicContext(mode === undefined
+    const relations = relationsFor(mode, gh.run);
+    const context = await readEpicContext(relations === undefined
       ? base
-      : { ...base, mode });
+      : { ...base, relations });
     return { calls: gh.calls(), found: context?.number ?? null, warnings };
   }
 
   it('sends the labels-mode argv unchanged when no mode is named and when labels is', async () => {
     expect(epicContextArgs('auth')).toEqual(LABELS_ARGS);
-    expect(epicContextArgs('auth', 'labels')).toEqual(LABELS_ARGS);
     for (const mode of [undefined, 'labels'] as const) {
       const read = await lookUp([labelsRow()], mode);
       expect(read).toEqual({ calls: [LABELS_ARGS], found: 31, warnings: [] });
     }
   });
 
-  it('asks for and reads the native fields in the native mode, in one gh call', async () => {
-    const read = await lookUp([nativeRow()], 'native');
-    expect(read).toEqual({ calls: [[...LABELS_ARGS.slice(0, -1), NATIVE_FIELDS]], found: 31, warnings: [] });
+  it('sends the native board listing, and no --label list, in the native mode', async () => {
+    const parent = { number: 31, title: 'Roadmap', url: 'https://github.com/acme/board/issues/31', state: 'OPEN' };
+    const child = { ...nativeRow(), number: 7, labels: [{ name: 'type:spec' }], parent };
+    // #31's first `type:` label is `type:roadmap`, so it is typed epic here only by relabelling it.
+    const epic = { ...nativeRow(), labels: [{ name: 'type:epic' }] };
+    const read = await lookUp([epic, child], 'native');
+    expect(read).toEqual({ calls: [NATIVE_LISTING_ARGS], found: 31, warnings: [] });
   });
 
   it('warns and answers null for a labels-shaped answer in the native mode', async () => {

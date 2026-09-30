@@ -389,7 +389,8 @@ export const EPIC_CONTEXT_HEADING = '## Epic (the epic this spec belongs to)';
 /**
  * Renders the `{EPIC_CONTEXT}` slot: nothing at all for no epic, so the
  * prompt reads as it did before the slot; otherwise two newlines, a
- * heading, the epic's number and title, its acceptance criteria as
+ * heading, the epic's number and title (and its `epic:` label in the
+ * `labels` mode), its acceptance criteria as
  * written and the instruction to carry them into the plan's
  * `rafa:context` block. An epic whose body holds no criteria says so
  * rather than dropping the section. See "The epic context". Exported for
@@ -397,7 +398,10 @@ export const EPIC_CONTEXT_HEADING = '## Epic (the epic this spec belongs to)';
  */
 export function formatEpicContextSection(epic: EpicContext | null): string {
   if (epic === null) return '';
-  const named = `This spec belongs to epic #${String(epic.number)}, "${epic.title}" (\`epic:${epic.slug}\`).`;
+  const label = epic.slug === null
+    ? ''
+    : ` (\`epic:${epic.slug}\`)`;
+  const named = `This spec belongs to epic #${String(epic.number)}, "${epic.title}"${label}.`;
   if (epic.criteria === null) {
     return [
       '',

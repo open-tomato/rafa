@@ -33,9 +33,10 @@
  *   sub-issue the listing does not hold. The problems are the
  *   `horizon:` ones alone (`readHorizonProblems`, `./epic-problems.ts`):
  *   the two-labels, orphan-label and checklist problems are marks only
- *   the `labels` mode reads. The cancelled-epic notice is not read: its
- *   dependents are read from `Blocked by:` lines
- *   (`./epic-dependents.ts`), which `native` mode does not read.
+ *   the `labels` mode reads. The cancelled-epic notice is not read:
+ *   `./epic-cancel-notice.ts` hands `readEpicDependents`
+ *   (`./epic-dependents.ts`) no port, so it reads `Blocked by:` lines,
+ *   which `native` mode does not.
  *
  * ## Which lines are epic lines
  *

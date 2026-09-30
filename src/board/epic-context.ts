@@ -1,9 +1,10 @@
 /**
  * The epic context `plan create` hands the planner: the epic a spec issue
- * belongs to, found by the issue's `epic:<slug>` label, with the epic's
- * number, title and acceptance criteria.
+ * belongs to, with the epic's number, title and acceptance criteria. In
+ * `labels` mode, the default, it is found by the issue's `epic:<slug>`
+ * label; in `native` mode, by its sub-issue parent (see "The mode").
  *
- * An epic is an issue labelled `type:epic` and `epic:<slug>`, and its
+ * In `labels` mode an epic is an issue labelled `type:epic` and `epic:<slug>`, and its
  * members are the issues carrying that `epic:<slug>` label
  * (`./epics.ts`). The spec issue's labels are already in hand when
  * `plan create` runs under `--issue` or `--next`, so the slug costs no
@@ -22,13 +23,27 @@
  * here. The criteria are {@link readEpicBody}'s reading of the body,
  * kept verbatim.
  *
- * The `--json` list follows `board.relationships` as the board listing's
- * does ({@link boardListFields}): the command above in the `labels` mode,
- * the default, and the same command over `nativeBoardListFields` in the
- * `native` mode, whose rows are read with their relationship fields. The
- * epic is still found by its `epic:` label here in both modes; the mode
- * decides only what the one command asks for and reads.
+ * ## The mode
  *
+ * Which epic the spec issue is in is a relationship, read in the mode
+ * `board.relationships` names through the board's relationships port
+ * (`./relations/port.ts`), {@link EpicContextOptions.relations}; left
+ * out, the mode is `labels` (`LABELS_READS`), what every caller before
+ * the port read.
+ *
+ * - In `labels` mode the epic is found by the issue's `epic:<slug>`
+ *   label with the one command above, and everything below reads as it
+ *   did before the port.
+ * - In `native` mode no `epic:` label is read and no `--label` list is
+ *   sent: the epic is the issue's sub-issue `parent`, read by the port's
+ *   `epicOf` over the board listing, and its title and body are the
+ *   parent's row on that listing. The listing is
+ *   {@link EpicContextOptions.listing} when the caller holds one, and
+ *   costs no read; otherwise it is ONE board listing read in the native
+ *   mode (`createGhBoardListing`, `./roadmap-board.ts`). A native epic
+ *   is named by its number and title, so {@link EpicContext.slug} is
+ *   null.
+
  * ## Null, and when it warns
  *
  * {@link readEpicContext} never throws and never refuses: the epic is
@@ -46,17 +61,24 @@
  * - the command failed or answered anything but a list of issues: a
  *   warning carries the refusal.
  *
+ * In `native` mode it answers null SILENTLY for an issue with no parent,
+ * the ordinary case, and after one warning when the listing read failed
+ * or lacks the native fields, when the listing holds no row for the
+ * issue, or when its parent is no epic on the listing (another
+ * repository's issue, or a row not typed `epic`).
+ *
  * An epic found whose body has no criteria section is still answered,
  * with `criteria` null, and without a warning: the missing section is a
  * body problem `rafa doctor` reports, and the number and title are
  * still context.
  *
  * Nothing here spawns: the command goes through the {@link GhRunner}
- * seam, and every case in `./epic-context.test.ts` plants the answer it
- * reads.
+ * seam, and every case in `./epic-context.test.ts` and
+ * `./epic-context-native.test.ts` plants the answer it reads.
  */
+import type { EpicRelations } from './epics.js';
+import type { BoardIssue } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
 import type { Output } from '../ports/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -64,7 +86,8 @@ import { messageOf } from '../config-sections.js';
 
 import { readEpicBody } from './epic-body.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from './epics.js';
-import { boardListFields, parseBoardListing } from './roadmap-board.js';
+import { LABELS_READS } from './relations/labels.js';
+import { BOARD_LIST_FIELDS, createGhBoardListing, parseBoardListing } from './roadmap-board.js';
 
 /** The label every epic issue carries. */
 export const EPIC_TYPE_LABEL = 'type:epic';
@@ -81,8 +104,8 @@ export interface EpicContext {
   readonly number: number;
   /** The epic issue's title. */
   readonly title: string;
-  /** The slug its `epic:` label and the spec issue's share. */
-  readonly slug: string;
+  /** The slug its `epic:` label and the spec issue's share; null in `native` mode, where an epic has none. */
+  readonly slug: string | null;
   /** The acceptance criteria, verbatim, or null when the body has none. */
   readonly criteria: string | null;
 }
@@ -97,19 +120,25 @@ export interface EpicContextOptions {
   readonly gh: GhRunner;
   /** Where a warning goes; the active output when left out. */
   readonly output?: Output;
-  /** `board.relationships`: which fields are asked for and read. `labels` when left out. */
-  readonly mode?: BoardRelationshipMode;
+  /** The board's relationships, which read the issue's epic; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
+  /**
+   * The board listing the caller already holds, read in the `native`
+   * mode; read by `native` only, which lists the board once when it is
+   * left out. See the module note.
+   */
+  readonly listing?: readonly BoardIssue[];
 }
 
-/** The arguments the lookup hands `gh` for `slug` in `mode`, `labels` when left out. */
-export function epicContextArgs(slug: string, mode: BoardRelationshipMode = 'labels'): readonly string[] {
+/** The arguments the `labels`-mode lookup hands `gh` for `slug`. */
+export function epicContextArgs(slug: string): readonly string[] {
   return Object.freeze([
     'issue', 'list',
     '--state', 'all',
     '--label', EPIC_TYPE_LABEL,
     '--label', `${EPIC_LABEL_PREFIX}${slug}`,
     '--limit', String(EPIC_CONTEXT_LIMIT),
-    '--json', boardListFields(mode),
+    '--json', BOARD_LIST_FIELDS,
   ]);
 }
 
@@ -122,8 +151,7 @@ function numbersOf(numbers: readonly number[]): string {
 async function findEpic(slug: string, options: EpicContextOptions, output: Output): Promise<EpicContext | null> {
   const id = `issue #${String(options.issue)}`;
   const label = `${EPIC_LABEL_PREFIX}${slug}`;
-  const mode = options.mode ?? 'labels';
-  const args = epicContextArgs(slug, mode);
+  const args = epicContextArgs(slug);
   const command = `gh ${args.join(' ')}`;
   const result = await options.gh(args);
   if (!result.ok) {
@@ -133,7 +161,7 @@ async function findEpic(slug: string, options: EpicContextOptions, output: Outpu
   }
   let epics;
   try {
-    epics = parseBoardListing(result.stdout, command, mode);
+    epics = parseBoardListing(result.stdout, command);
   } catch (error) {
     output.warn(`${PREFIX}: ${messageOf(error)}; ${id} is planned without its epic`);
     return null;
@@ -151,12 +179,54 @@ async function findEpic(slug: string, options: EpicContextOptions, output: Outpu
   return Object.freeze({ number: epic.number, title: epic.title, slug, criteria: readEpicBody(epic.body).criteria });
 }
 
+/** The board listing the `native` mode reads: the caller's, or one listing read over `options.gh`. */
+function nativeListing(options: EpicContextOptions): Promise<readonly BoardIssue[]> {
+  return options.listing === undefined
+    ? createGhBoardListing({ gh: options.gh, mode: 'native' })()
+    : Promise.resolve(options.listing);
+}
+
+/** The epic the spec issue's `parent` names on `listing`, or null, silently or after one warning; see the module note. */
+function nativeEpicOn(listing: readonly BoardIssue[], options: EpicContextOptions, relations: EpicRelations, output: Output): EpicContext | null {
+  const id = `issue #${String(options.issue)}`;
+  const row = listing.find((each) => each.number === options.issue);
+  if (row === undefined) {
+    output.warn(`${PREFIX}: the board listing holds no ${id}; it is planned without its epic`);
+    return null;
+  }
+  const epicOf = relations.read(listing).epicOf(row);
+  if (epicOf.kind === 'none') return null;
+  if (epicOf.kind === 'unresolved') {
+    const marks = epicOf.marks.map((each) => each.mark).join(', ');
+    output.warn(`${PREFIX}: ${id}'s parent ${marks} is no epic on the board; it is planned without an epic`);
+    return null;
+  }
+  const epic = listing.find((each) => each.number === epicOf.epic);
+  if (epic === undefined) return null;
+  return Object.freeze({ number: epic.number, title: epic.title, slug: null, criteria: readEpicBody(epic.body).criteria });
+}
+
+/** The `native`-mode lookup: the issue's parent on the board listing; never throws. */
+async function readNativeEpicContext(options: EpicContextOptions, relations: EpicRelations): Promise<EpicContext | null> {
+  const output = options.output ?? activeOutput();
+  try {
+    return nativeEpicOn(await nativeListing(options), options, relations, output);
+  } catch (error) {
+    output.warn(`${PREFIX}: ${messageOf(error)}; issue #${String(options.issue)} is planned without its epic`);
+    return null;
+  }
+}
+
 /**
- * The epic the spec issue's `epic:` label names, with its criteria, or
- * null: silently for an issue with no such label, after one warning
- * otherwise. Sends at most one `gh` command; see the module note.
+ * The epic the spec issue belongs to, with its criteria, or null. In
+ * `labels` mode, the one its `epic:` label names: null silently for an
+ * issue with no such label, after one warning otherwise, sending at most
+ * one `gh` command. In `native` mode, its `parent` on the board listing.
+ * See the module note.
  */
 export async function readEpicContext(options: EpicContextOptions): Promise<EpicContext | null> {
+  const relations = options.relations ?? LABELS_READS;
+  if (relations.mode === 'native') return readNativeEpicContext(options, relations);
   const slugs = epicSlugsOf(options.labels);
   const [slug, ...others] = slugs;
   if (slug === undefined) return null;
