@@ -20,7 +20,8 @@
  *    carrying no `epic:` label, one with no member, and one with an OPEN
  *    member, naming each open member. Membership is the `epic:<slug>`
  *    label (`groupByEpicLabel`, `src/board/epics.ts`), the slug the epic's
- *    first. No session has started at this point.
+ *    first; in `native` mode it is the epic's sub-issues (see "The
+ *    mode"). No session has started at this point.
  * 3. The criteria: the body's `Acceptance criteria` section
  *    (`readEpicBody`) cut into criteria by `splitCriteria`
  *    (`src/epic/verify-plan.ts`). An epic with none is refused, since the
@@ -55,6 +56,30 @@
  *    (`src/effort/epic-cost.ts`), printed by `renderEpicCost` beside the
  *    body's `Estimate:`, with the line saying cost follows membership. A
  *    store that cannot be read is a `warn` line: the epic is closed.
+ *
+ * ## The mode
+ *
+ * Who is in the epic is a relationship, read in the mode
+ * `board.relationships` names through the board's relationships port
+ * (`src/board/relations/port.ts`), {@link EpicCloseSeams.relations};
+ * left out, the mode is `labels` (`LABELS_READS`), and step 2 reads as
+ * spelled above, sending the same one listing.
+ *
+ * In `native` mode the listing is read with the native fields
+ * (`boardListFields`), no `epic:` label is read, and a native epic is
+ * named by its number and title, so {@link EpicToClose.slug} is null and
+ * no refusal names a label. The members are the port's `membersOf`: the
+ * rows whose `parent` is the epic, in sub-issue order. Step 2 refuses an
+ * epic with no sub-issue on the listing and none in GitHub's count
+ * (`subIssuesSummary`), and one with an open member, naming each. GitHub's
+ * count also holds sub-issues the listing does not (one in another
+ * repository, or past the listing's limit), whose state the listing
+ * cannot show, so step 2 also refuses an epic with a sub-issue off the
+ * listing while the count has any sub-issue not completed. How GitHub
+ * counts a sub-issue closed as not planned is not recorded
+ * (`src/board/epic-summary.ts`), so that refusal may fire over one; it
+ * errs toward keeping the epic open. The cost in step 9 is read over
+ * the members the listing holds.
  *
  * ## Filing a failed check
  *
@@ -94,6 +119,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { EpicBody } from '../../board/epic-body.js';
 import type { UncheckedCriterion } from '../../board/epic-trail.js';
+import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
@@ -118,6 +144,7 @@ import { PLACEHOLDER_REASON } from '../../board/epic-template.js';
 import { renderCloseComment } from '../../board/epic-trail.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
+import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
@@ -157,8 +184,13 @@ export interface CloseLine {
 /** The epic the gate checks, read off the listing. */
 export interface EpicToClose {
   readonly epic: BoardIssue;
-  readonly slug: string;
-  /** Every issue carrying `epic:<slug>`, in ascending number; each one closed. */
+  /** The slug of its first `epic:` label; null in `native` mode, where an epic is named by number and title. */
+  readonly slug: string | null;
+  /**
+   * Every issue carrying `epic:<slug>`, in ascending number; in `native`
+   * mode every row whose `parent` is the epic, in sub-issue order. Each
+   * one closed.
+   */
   readonly members: readonly BoardIssue[];
   readonly body: EpicBody;
 }
@@ -196,6 +228,8 @@ export interface EpicCloseSeams {
   readonly privateTracker?: Tracker;
   /** Seams for the tracker reference `triageReport` stores. */
   readonly findings?: FindingsWriterSeams;
+  /** The board's relationships, which read the epic's members; `labels` mode when left out. See the module note. */
+  readonly relations?: EpicRelations;
 }
 
 /** `#40`. */
@@ -244,33 +278,67 @@ export function readCloseLine(context: Pick<RafaContext, 'args' | 'flags'>): Clo
   return Object.freeze({ epic: Number(word), acceptUnchecked });
 }
 
-/**
- * The epic `number` names on `issues`, with its members; see the module
- * note, step 2.
- *
- * @throws CommandExit with {@link EPIC_CLOSE_REFUSAL_EXIT} for each
- *   refusal step 2 lists.
- */
-export function readEpicToClose(issues: readonly BoardIssue[], number: number): EpicToClose {
-  const epic = issues.find((issue) => issue.number === number);
-  if (epic === undefined) throw refusal(`${ref(number)} is not on the board listing`);
-  if (epic.type !== 'epic') throw refusal(`${ref(number)} is not an epic: it carries no type:epic label`);
-  if (epic.state !== 'OPEN') throw refusal(`Epic ${ref(number)} is closed already`);
+/** Refuses epic `number` when a member of `members` is open, naming each; see the module note, step 2. */
+function refuseOpenMembers(number: number, members: readonly BoardIssue[]): void {
+  const open = members.filter((member) => member.state === 'OPEN');
+  if (open.length === 0) return;
+  const named = open.map((member) => `${ref(member.number)} ${oneLine(member.title)}`).join(', ');
+  throw refusal(`Epic ${ref(number)} has ${String(open.length)} open ${open.length === 1
+    ? 'member'
+    : 'members'}: ${named}. The gate checks an epic only once every member is closed: close them, or move them`
+    + ' out with rafa epic move <issue> --to=<epic>. No session was started');
+}
+
+/** The `labels`-mode members of `epic`: the issues carrying its first `epic:` label. */
+function labelsEpicToClose(issues: readonly BoardIssue[], epic: BoardIssue): EpicToClose {
+  const { number } = epic;
   const [slug] = epicSlugsOf(epic.labels);
   if (slug === undefined) throw refusal(`Epic ${ref(number)} carries no ${EPIC_LABEL_PREFIX} label, so it has no members`);
   const members = groupByEpicLabel(issues).get(slug) ?? [];
   if (members.length === 0) {
     throw refusal(`Epic ${ref(number)} has no members: no issue carries ${EPIC_LABEL_PREFIX}${slug}, so no work was done under it`);
   }
-  const open = members.filter((member) => member.state === 'OPEN');
-  if (open.length > 0) {
-    const named = open.map((member) => `${ref(member.number)} ${oneLine(member.title)}`).join(', ');
-    throw refusal(`Epic ${ref(number)} has ${String(open.length)} open ${open.length === 1
-      ? 'member'
-      : 'members'}: ${named}. The gate checks an epic only once every member is closed: close them, or move them`
-      + ' out with rafa epic move <issue> --to=<epic>. No session was started');
-  }
+  refuseOpenMembers(number, members);
   return Object.freeze({ epic, slug, members, body: readEpicBody(epic.body) });
+}
+
+/** The `native`-mode members of `epic`: its sub-issues, checked against GitHub's own count; see the module note. */
+function nativeEpicToClose(issues: readonly BoardIssue[], epic: BoardIssue, relations: EpicRelations): EpicToClose {
+  const { number } = epic;
+  const { members } = relations.read(issues).membersOf(epic);
+  const summary = epic.subIssuesSummary ?? { total: members.length, completed: 0 };
+  if (members.length === 0 && summary.total === 0) {
+    throw refusal(`Epic ${ref(number)} has no members: it has no sub-issue, so no work was done under it`);
+  }
+  refuseOpenMembers(number, members);
+  const unlisted = summary.total - members.length;
+  const notCompleted = summary.total - summary.completed;
+  if (unlisted > 0 && notCompleted > 0) {
+    throw refusal(`Epic ${ref(number)} has ${String(unlisted)} ${unlisted === 1
+      ? 'sub-issue'
+      : 'sub-issues'} the board listing does not hold, in another repository or past its limit, and GitHub counts`
+      + ` ${String(notCompleted)} of its ${String(summary.total)} sub-issues not completed, so the gate cannot tell every`
+      + ' member is closed: close them on GitHub, or take them out of the epic. No session was started');
+  }
+  return Object.freeze({ epic, slug: null, members, body: readEpicBody(epic.body) });
+}
+
+/**
+ * The epic `number` names on `issues`, with its members, read in the
+ * mode `relations` answers, `labels` when left out; see the module note,
+ * step 2 and "The mode".
+ *
+ * @throws CommandExit with {@link EPIC_CLOSE_REFUSAL_EXIT} for each
+ *   refusal step 2 lists.
+ */
+export function readEpicToClose(issues: readonly BoardIssue[], number: number, relations: EpicRelations = LABELS_READS): EpicToClose {
+  const epic = issues.find((issue) => issue.number === number);
+  if (epic === undefined) throw refusal(`${ref(number)} is not on the board listing`);
+  if (epic.type !== 'epic') throw refusal(`${ref(number)} is not an epic: it carries no type:epic label`);
+  if (epic.state !== 'OPEN') throw refusal(`Epic ${ref(number)} is closed already`);
+  return relations.mode === 'native'
+    ? nativeEpicToClose(issues, epic, relations)
+    : labelsEpicToClose(issues, epic);
 }
 
 /** The flags the planning session is spawned with, `--tools` last since it is variadic. */
@@ -541,11 +609,13 @@ export async function closeEpic(context: RafaContext, seams: EpicCloseSeams): Pr
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
   let listing: readonly BoardIssue[];
   try {
-    listing = await createGhBoardListing({ gh })();
+    listing = await createGhBoardListing(seams.relations === undefined
+      ? { gh }
+      : { gh, mode: seams.relations.mode })();
   } catch (error) {
     throw new CommandExit(EPIC_CLOSE_REFUSAL_EXIT, `❌ Could not read the board, so nothing was changed: ${messageOf(error)}`);
   }
-  const target = readEpicToClose(listing, line.epic);
+  const target = readEpicToClose(listing, line.epic, seams.relations);
   const epic = line.epic;
   const split = splitCriteria(target.body.criteria);
   if (split.length === 0) {

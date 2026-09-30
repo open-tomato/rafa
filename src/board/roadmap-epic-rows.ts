@@ -293,7 +293,7 @@ function isNative(relations: EpicRelations | undefined): relations is EpicRelati
 }
 
 /** What {@link readListedEpics} reads. */
-interface ListedEpicsInput {
+export interface ListedEpicsInput {
   readonly issues: readonly BoardIssue[];
   readonly claims: ReadonlySet<number>;
   readonly today: Date;
@@ -304,8 +304,10 @@ interface ListedEpicsInput {
  * Every epic on the listing, read in the mode `input.relations` answers:
  * `readEpics` alone in `labels` mode, and in `native` mode each epic with
  * its `done/total` and state taken off its row's `subIssuesSummary`.
+ * `rafa epic show` reads its epic here too, so its head counts as the
+ * roadmap's row does.
  */
-function readListedEpics(input: ListedEpicsInput): Epics {
+export function readListedEpics(input: ListedEpicsInput): Epics {
   const { issues, claims, today, relations } = input;
   if (!isNative(relations)) return readEpics({ issues, claims, today });
   const read = readEpics({ issues, claims, today, relations });
@@ -319,8 +321,12 @@ function readListedEpics(input: ListedEpicsInput): Epics {
   return Object.freeze({ epics: Object.freeze(epics), unknown: read.unknown });
 }
 
-/** The problems the mode reads on `issues`; see the module note. */
-function problemsOf(issues: readonly BoardIssue[], relations: EpicRelations | undefined): readonly EpicProblem[] {
+/**
+ * The problems the mode reads on `issues`: every `readEpicProblems` one
+ * in `labels` mode, the `horizon:` ones alone in `native`; see the
+ * module note. `rafa epic show` keeps the ones about its epic.
+ */
+export function readModeEpicProblems(issues: readonly BoardIssue[], relations: EpicRelations | undefined): readonly EpicProblem[] {
   return isNative(relations)
     ? readHorizonProblems(issues)
     : readEpicProblems(issues);
@@ -383,7 +389,7 @@ export async function readRoadmapEpicRows(options: RoadmapEpicRowsOptions): Prom
   const shown = epicRows.filter((row) => options.all === true || row.horizon === 'now');
   const problems = epicRows.length === 0 || listed.issues === null
     ? []
-    : problemsOf(listed.issues, options.relations);
+    : readModeEpicProblems(listed.issues, options.relations);
   const cancelled = listed.issues === null || isNative(options.relations)
     ? []
     : cancelledEpicNoticeLines(listed.issues);

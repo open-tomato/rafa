@@ -31,7 +31,7 @@ module's note is the long form.
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the audit of the changelog's released history (`src/release/audit.ts`), writing nothing; `release settle`, below; and `release tag`, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery and the tag as the terminal result's data. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
 | `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
-| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned |
+| `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's `epic:<slug>` label, its issue from the epic template and its line on the current board; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned, with `cancel-unblock.ts` reading what an unblocked dependent still waits on in each relationships mode |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
@@ -1549,6 +1549,11 @@ New; it replaces no earlier text. What a row or an action added to
   epic (its horizon, its checklist, its members, a member carrying a
   second `epic:` label; an orphan label is `rafa roadmap`'s) is a `warn`
   line, a `warn` log event in json mode, whose result is `EpicsResult`.
+  In `native` mode (`EpicShowSeams.relations`) the listing is read with
+  the native fields, the lines are the epic's open sub-issues in their
+  order, the head counts GitHub's `subIssuesSummary` as `rafa roadmap`
+  does (`readListedEpics`), the epic has no slug, and only its
+  `horizon:` problems are warned.
   A Roadmap naming no open `now` epic that is not done prints one line
   and exits 0; a failed listing prints the epic, or the Roadmap's epics,
   `unknown` with the reason and exits 0; a number the listing holds that
@@ -1663,8 +1668,12 @@ New; it replaces no earlier text. What a row or an action added to
   one not `type:epic`, a closed epic, one with no `epic:` label, one
   with no member, and one with an OPEN member, naming each open member
   by number and title, before any session starts. Membership is the
-  `epic:<slug>` label (`groupByEpicLabel`). An epic whose body has no
-  acceptance criteria is refused with no session. Then ONE captured
+  `epic:<slug>` label (`groupByEpicLabel`); in `native` mode
+  (`EpicCloseSeams.relations`) it is the epic's sub-issues, no label is
+  read or named, and an epic with a sub-issue off the listing is refused
+  while GitHub's `subIssuesSummary` counts any not completed. An epic
+  whose body has no acceptance criteria is refused with no session.
+  Then ONE captured
   planning session, in the project root with `--tools Read,Grep,Glob`,
   answers a check or an uncheckable reason per criterion
   (`src/epic/verify-plan.ts`); when every criterion is still the
@@ -1730,7 +1739,12 @@ New; it replaces no earlier text. What a row or an action added to
   `Blocked by:` line still names the member, and `readBlockedBy` reads
   that first line and not the note, so `readEpicDependents` keeps
   listing a moved or unblocked dependent. Json mode's result is
-  `EpicCancelResult`. It declares no `spends`.
+  `EpicCancelResult`. It declares no `spends`. In `native` mode
+  (`EpicCancelSeams.relations`) the dependents are the open issues with a
+  `blockedBy` link to one of the epic's open sub-issues, and an unblock
+  clears nothing: it writes the note and the comment, takes no label off
+  and removes no link, printing `keptLinksLine`
+  (`src/commands/epic/cancel-unblock.ts`).
 - **An epic closed as not planned is noticed by `rafa epic show`,
   `rafa roadmap` and `rafa next`** (`src/board/epic-cancel-notice.ts`),
   each over the board listing it already reads, so the notice sends no
@@ -1742,7 +1756,8 @@ New; it replaces no earlier text. What a row or an action added to
   dependent is gone from the list already. A MOVED dependent is still
   named while its line names an open member, since nothing on the
   listing says which cancel it was answered for. `epic show` warns the
-  lines last, in its result's `warnings` too, whichever epic it shows;
+  lines last, in its result's `warnings` too, whichever epic it shows,
+  in `labels` mode only;
   `rafa roadmap` (`issue list --roadmap`) carries them last in
   `readRoadmapEpicRows`' warnings, epic lines or none; `rafa next`
   carries them as board problems only when the walk or the place read

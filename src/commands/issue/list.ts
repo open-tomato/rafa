@@ -187,6 +187,7 @@ import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js
 import type { EpicHorizonGroup } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
+import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { Issue, IssueQuery, TrackerKind } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -415,12 +416,19 @@ export function renderRoadmapList(
  * The board listing a roadmap reading reads through, asked once for the
  * command: kept under `.rafa/cache/` and read incrementally when `seams`
  * keeps the board (`keepsBoard`), else one full `gh issue list`. See the
- * module note's "One board read".
+ * module note's "One board read". Read with the fields `mode` asks for,
+ * `labels` when left out (`boardListFields`, `src/board/roadmap-board.ts`).
  */
-export function roadmapBoard(seams: IssueSeams, gh: GhRunner, root: string, refresh: boolean): BoardListing {
+export function roadmapBoard(
+  seams: IssueSeams,
+  gh: GhRunner,
+  root: string,
+  refresh: boolean,
+  mode: BoardRelationshipMode = 'labels',
+): BoardListing {
   return keepListing(keepsBoard(seams)
-    ? createCachedBoardListing({ gh, root, refresh })
-    : createGhBoardListing({ gh }));
+    ? createCachedBoardListing({ gh, root, refresh, mode })
+    : createGhBoardListing({ gh, mode }));
 }
 
 /** What a roadmap listing is read with beyond its filter: `--all`, `--refresh`, and whether the refs column is printed. */
