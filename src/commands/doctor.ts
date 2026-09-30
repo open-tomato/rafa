@@ -380,6 +380,8 @@ export interface DoctorResult {
   readonly epics: DoctorBoardReadings['epics'];
   /** Every truncated relationship list (`./doctor-relations.ts`); in `native` mode only, left out otherwise. */
   readonly relations?: DoctorBoardReadings['relations'];
+  /** Every mark of the mode `board.relationships` does not name (`./doctor-marks.ts`); left out when no layer sets the key. */
+  readonly marks?: DoctorBoardReadings['marks'];
   /** Every unresolved board owner, unlabelled Roadmap and lost position slot; null for a project with no GitHub board. */
   readonly boards: DoctorBoardReadings['boards'];
   /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
@@ -691,7 +693,8 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);
     const effortSync = await readDoctorEffortSync({ root: project.root, home: project.home, resolved: preflight.resolved }, seams);
-    const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue, preflight.config.boardRelationships);
+    const modeSet = preflight.resolved.sources.boardRelationships !== 'default';
+    const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue, preflight.config.boardRelationships, modeSet);
     const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
