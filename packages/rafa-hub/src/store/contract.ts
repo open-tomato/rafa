@@ -137,11 +137,34 @@ function pairOf(row: WireRow): string {
   return `${String(row['origin_store'])}:${String(row['origin_seq'])}`;
 }
 
-/** Every column of each row but `seq`, sorted by origin pair, for comparing rows as pushed with rows as pulled. */
+/**
+ * The key of a commit's `row_json` core's merge recomputes over the
+ * commits a store holds (`MERGE_RULES`, `commits.row_json` edited as
+ * `recomputed`), so an adapter merging through `mergeStore` answers it
+ * changed. Spelled here since the store subpath does not export it.
+ */
+const RECOMPUTED_GAP = 'minutesSincePrevious';
+
+/** `row_json` with the recomputed gap left out, its other keys in their order. */
+function withoutGap(rowJson: WireRow[string]): WireRow[string] {
+  if (typeof rowJson !== 'string') return rowJson;
+  const parsed = JSON.parse(rowJson) as Record<string, unknown>;
+  return JSON.stringify(Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== RECOMPUTED_GAP)));
+}
+
+/**
+ * Every column of each commit row but `seq`, with the recomputed gap
+ * left out of `row_json`, sorted by origin pair, for comparing rows as
+ * pushed with rows as pulled.
+ */
 function withoutSeq(rows: readonly WireRow[]): Readonly<Record<string, unknown>>[] {
   return [...rows]
     .sort((left, right) => pairOf(left).localeCompare(pairOf(right)))
-    .map((row) => Object.fromEntries(Object.entries(row).filter(([column]) => column !== 'seq')));
+    .map((row) => Object.fromEntries(Object.entries(row)
+      .filter(([column]) => column !== 'seq')
+      .map(([column, value]) => [column, column === 'row_json'
+        ? withoutGap(value)
+        : value])));
 }
 
 /** Builds rows and payloads from the template. */
@@ -354,7 +377,7 @@ export function hubStoreContract(name: string, factory: HubStoreFactory): void {
         expect(pairsIn(byC, COMMITS)).toEqual(pairsOf(commit(A, 1), commit(B, 1)));
       });
 
-      it('carries every column as pushed, with seq the hub\'s own in rising order past the cursor', async () => {
+      it('carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor', async () => {
         const pushedRows = [commit(A, 5, 7), commit(A, 6, 9), commit(B, 2, 11)];
         await hub().push({ device: A, payload: payload({ [COMMITS]: pushedRows }) });
         const pulled = await pull(C);

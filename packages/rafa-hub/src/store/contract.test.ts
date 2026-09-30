@@ -10,6 +10,9 @@
  * breaks, read off the child's `(fail)` lines. The `none` run is the
  * control: the same harness with nothing broken exits 0 with no case
  * failed, so a fault's failure is the fault's and not the harness's.
+ * `recomputes-gap` is held to pass too: it rewrites only the commit gap
+ * core's merge recomputes, which the suite exempts, where `edits-rows`
+ * adds any other key to `row_json` and is held to fail.
  */
 import { join } from 'node:path';
 
@@ -69,11 +72,18 @@ const FAULT_CASES: readonly (readonly [string, readonly string[]])[] = [
   ]],
   ['forgets-last-push', ['last push per device > records each device\'s latest push at the clock\'s time, in device order']],
   ['miscounts', ['push > counts the rows it holds per table']],
+  ['edits-rows', ['pull > carries every column as pushed but the recomputed gap, with seq the hub\'s own in rising order past the cursor']],
 ];
 
 describe('the contract suite against a broken stand-in', () => {
   it('passes the stand-in with nothing broken, as the control', async () => {
     const run = await runFixture('none');
+
+    expect(run).toEqual({ exitCode: 0, failed: [] });
+  });
+
+  it('passes the stand-in whose pull rewrites only the gap the merge recomputes', async () => {
+    const run = await runFixture('recomputes-gap');
 
     expect(run).toEqual({ exitCode: 0, failed: [] });
   });

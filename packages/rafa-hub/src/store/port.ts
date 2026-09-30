@@ -21,7 +21,11 @@
  * it on the device, and a pull answers one, so the device materialises
  * it and merges it with `mergeStore` as it would any payload. The rows a
  * pull answers carry every column as pushed, the origin pair included,
- * with `seq` the hub's own; the payload's `cursor` is the hub cursor the
+ * with `seq` the hub's own and one exception: a commit's
+ * `minutesSincePrevious` in its `row_json`, which core's merge rules
+ * declare recomputed, so an adapter that merges through `mergeStore`
+ * answers the gap over every commit the hub holds rather than the one
+ * the pushing device measured. The payload's `cursor` is the hub cursor the
  * device passes to its next pull, as the push cursor it keeps for its
  * next push is its own store's.
  *

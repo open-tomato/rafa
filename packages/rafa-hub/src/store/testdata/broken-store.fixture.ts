@@ -22,20 +22,30 @@ export const FAULT_ENV = 'RAFA_HUB_STORE_FAULT';
 /** Offsets each push's `origin_seq` by, so a repeated row is a new one. */
 const PUSH_OFFSET = 1_000;
 
-/** `payload` with every row's origin pair passed through `change`. */
-function reorigin(payload: WirePayload, change: (row: WireRow) => WireRow): WirePayload {
+/** `payload` with every row passed through `change`. */
+function mapRows(payload: WirePayload, change: (row: WireRow) => WireRow): WirePayload {
   const tables = Object.fromEntries(Object.entries(payload.tables).map(([table, rows]) => [table, rows.map(change)]));
   return { ...payload, tables };
 }
 
-/** Each fault, as a change to the working stand-in. */
+/** `rowJson` with `key` set to `value`, appended after its other keys. */
+function withKey(rowJson: WireRow[string], key: string, value: unknown): WireRow[string] {
+  if (typeof rowJson !== 'string') return rowJson;
+  return JSON.stringify({ ...JSON.parse(rowJson) as Record<string, unknown>, [key]: value });
+}
+
+/**
+ * Each fault, as a change to the working stand-in. `recomputes-gap` is
+ * no fault: it rewrites only the gap core's merge recomputes, as the
+ * SQLite adapter's merge does, which the suite exempts, so it passes.
+ */
 const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
   'none': (store) => store,
   'keeps-own-origin': (store) => ({ ...store, pull: (request) => store.pull({ ...request, device: '' }) }),
   'ignores-cursor': (store) => ({ ...store, pull: (request) => store.pull({ ...request, since: {} }) }),
   'stamps-pusher': (store) => ({
     ...store,
-    push: (request) => store.push({ ...request, payload: reorigin(request.payload, (row) => ({ ...row, origin_store: request.device })) }),
+    push: (request) => store.push({ ...request, payload: mapRows(request.payload, (row) => ({ ...row, origin_store: request.device })) }),
   }),
   'repeats-rows': (store) => {
     let pushes = 0;
@@ -44,10 +54,18 @@ const FAULTS: Readonly<Record<string, (store: HubStore) => HubStore>> = {
       push: (request) => {
         pushes += 1;
         const offset = pushes * PUSH_OFFSET;
-        return store.push({ ...request, payload: reorigin(request.payload, (row) => ({ ...row, origin_seq: Number(row['origin_seq']) + offset })) });
+        return store.push({ ...request, payload: mapRows(request.payload, (row) => ({ ...row, origin_seq: Number(row['origin_seq']) + offset })) });
       },
     };
   },
+  'edits-rows': (store) => ({
+    ...store,
+    pull: async (request) => mapRows(await store.pull(request), (row) => ({ ...row, row_json: withKey(row['row_json'] ?? null, 'edited', true) })),
+  }),
+  'recomputes-gap': (store) => ({
+    ...store,
+    pull: async (request) => mapRows(await store.pull(request), (row) => ({ ...row, row_json: withKey(row['row_json'] ?? null, 'minutesSincePrevious', 42) })),
+  }),
   'forgets-last-push': (store) => ({ ...store, status: async () => ({ ...await store.status(), devices: [] }) }),
   'miscounts': (store) => ({ ...store, status: async () => ({ ...await store.status(), rows: {} }) }),
 };
