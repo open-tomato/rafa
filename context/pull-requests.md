@@ -692,5 +692,111 @@ Not measured here: the writes went through the GraphQL mutations by
 `gh api`, not through `gh issue edit --add-sub-issue`, `--parent`,
 `--remove-parent`, `--add-blocked-by` or `--remove-blocked-by`. The
 session's rafa-tooling hook denies `gh issue` commands, so those flags were
-not run. Whether they send the same mutations, and so leave `updated_at`
-alone as well, is an assumption until a later task measures it.
+not run. The `v2.100.0` source shows they send these same mutations
+(`api/queries_issue.go`, see the `--parent` answer below), with
+`replaceParent: true` added on `addSubIssue`. So they should leave
+`updated_at` alone as well. That is a reading of the source, not a run.
+
+#### `gh issue list --json subIssues` answers the order GitHub holds
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`. The session's rafa-tooling hook denies `gh issue`, so
+`gh issue list` itself was not run. The run sent the query `gh issue list`
+builds instead, through `gh api graphql`: the `IssueList` query of
+`pkg/cmd/issue/list/http.go` at `v2.100.0`, with the relationship fields
+exactly as `api/query_builder.go` spells them:
+
+```text
+parent{id,number,title,url,state,repository{nameWithOwner}}
+subIssues(first:100){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+subIssuesSummary{total,completed,percentCompleted}
+blockedBy(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+blocking(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+```
+
+Parent #6 got children #7, #8, #9 and #10, added in that order by
+`addSubIssue`. Each reading below comes from that listing, and the same
+order came back from `repository.issue(number: 6){subIssues}` and from
+`gh api repos/<A>/issues/6/sub_issues --jq '[.[].number]'`:
+
+| Step | `subIssues.nodes` |
+|---|---|
+| after the four adds | [#7, #8, #9, #10] |
+| `reprioritizeSubIssue` moving #10 `beforeId` #7, then #8 `afterId` #9 | [#10, #7, #9, #8] |
+| `gh api -X PATCH repos/<A>/issues/6/sub_issues/priority -F sub_issue_id=<#9 id> -F after_id=<#8 id>` | [#10, #7, #8, #9] |
+
+The first reading is the control: it matches creation order, and the
+reprioritised readings differ from it. So the listing carries the order.
+`subIssues` therefore belongs in the native mode's listing fields, and
+`membersOf(epic)` reads its order from `subIssues.nodes`. It must never
+sort by number. The field stops at 100 nodes, so `totalCount` above the
+node count is the truncation reading.
+
+Not measured: a drag in GitHub's web UI. The run reprioritised through the
+GraphQL mutation and the REST priority endpoint, and both moved the
+listing the same way.
+
+#### `gh issue edit --parent` on an issue that has a parent moves it
+
+Read from source, then measured 2026-09-30 with `gh version 2.100.0
+(2026-09-03)` on `RAFA_340_SCRATCH_A`. At `v2.100.0`, `--parent` builds
+`DeferredUpdateIssueOptions` with `ReplaceExistingParent: true`
+(`pkg/cmd/issue/edit/edit.go`). It sends
+`addSubIssue(input: {issueId: <new parent>, subIssueId: <issue>, replaceParent: true})`
+(`api/queries_issue.go`). `--add-sub-issue` sends the same mutation with
+`replaceParent: true`, and `--remove-parent` sends `removeSubIssue` against
+the parent it has just read. The hook denies `gh issue`, so the run sent
+those mutations through `gh api graphql`. It used child #13 under old
+parent #11, with new parent #12:
+
+| `addSubIssue(issueId: #12, subIssueId: #13, …)` | Answer | #13 `parent` | #11 `subIssues` | #12 `subIssues` |
+|---|---|---|---|---|
+| `replaceParent` left out | error, exit 1 | #11 | [#13] | [] |
+| `replaceParent: false` | error, exit 1 | #11 | [#13] | [] |
+| `replaceParent: true` (what `--parent` sends) | ok | #12 | [] | [#13] |
+
+Both refusals print
+`Failed to add sub-issue #13 to parent #12. Sub issue may only have one parent`
+(GraphQL `type: VALIDATION`). A second move with `replaceParent: true`
+took issue #10 out of the first position under #6, into #12, which
+already held #13. Then #12 read [#13, #10], and #6 read [#7, #8, #9]. A
+moved issue goes to the end of its new parent, and the old parent closes
+the gap.
+
+What follows for the native mode: a parent write is a move in one call,
+with no remove first. It needs `replaceParent: true`: `gh issue edit
+--parent`, or the mutation with that input. The old parent loses the
+issue in the same call, so an epic move is one write, and the new epic's
+order puts the issue last.
+
+#### GitHub's cap on sub-issues per parent
+
+CAP_PLACEHOLDER
+
+#### A blocker in another repository adds and reads with its own state
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`. The run used
+blocked issue #14 on `RAFA_340_SCRATCH_A` and blocker #1 on
+`RAFA_340_SCRATCH_B`. It sent
+`addBlockedBy(input: {issueId: <A#14>, blockingIssueId: <B#1>})` through
+`gh api graphql`, and the call succeeded. It then read both repositories
+with the `gh issue list` query above:
+
+| Step | A#14 `blockedBy.nodes` | B#1 `blocking.nodes` |
+|---|---|---|
+| after the add | B#1, `state: OPEN`, `repository.nameWithOwner: <B>`, `totalCount: 1` | A#14, `state: OPEN`, repository `<A>` |
+| after `gh api -X PATCH repos/<B>/issues/1 -f state=closed -f state_reason=completed` | B#1, `state: CLOSED`, repository `<B>` | A#14, `state: OPEN` |
+
+So a foreign blocker arrives in the blocked repository's one board read,
+with its number, state and repository. The native reader gets it from the
+`blockedBy` node and needs no per-blocker `gh issue view`. A blocker's
+`number` alone is ambiguous across repositories. The reader keys a blocker
+by `repository.nameWithOwner` and `number` together.
+`gh issue edit --add-blocked-by` takes a number or a URL.
+`ResolveIssueRef` (`pkg/cmd/issue/shared/lookup.go`) resolves a URL to its
+own repository. It refuses only a URL on another host, so a foreign blocker
+is written by URL. `blockedBy` stops at 50 nodes, and `totalCount` above
+the node count is its truncation reading.
+
+Not measured: a blocker in a repository the reading account cannot see.
+Both scratch repositories belong to the same account.
