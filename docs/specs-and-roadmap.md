@@ -473,6 +473,186 @@ rafa switch -                 # back to #254's previous place
 rafa switch 31                # move to home (#31)
 ```
 
+## Board relationships: choosing a mode
+
+Relationships — which issues block which — are tracked in one of two ways,
+configured under `board.relationships`:
+
+| Mode | Marker | API cost | When to use |
+|---|---|---|---|
+| `labels` (default) | `spec:blocked` label + `Blocked by:` line | ~0 points | Solo projects, GraphQL budget constrained, or trackers without native relationships |
+| `native` | GitHub's parent and blocked-by links | ~8 points per read of 5,000/hour | Relationships show in GitHub UI, nothing clears blockers by hand |
+
+No key in `.rafa/config.yaml` means `labels` — the default, today's system,
+byte-for-byte unchanged. Every command prints the same output and sends the
+same `gh` and `git` calls as before.
+
+### Solo project: nothing changes
+
+If your roadmap has no relationships and no epics, everything works as before.
+You never see the mode choice: `labels` is used invisibly, and both modes
+behave identically. An epic is purely optional.
+
+### Choosing a mode: `labels` vs `native`
+
+**`labels` mode** (the default):
+- Relationships are marked with labels (`spec:blocked`) and lines (`Blocked by: #<n>`)
+- `rafa next` and `rafa plan create --next` skip blocked issues
+- When a blocker closes, `rafa pr merge` asks whether to remove the label
+- No GitHub API overhead for relationships
+- Use when GraphQL budget matters (about 2 API points per full board read of 287 issues)
+
+**`native` mode**:
+- Relationships use GitHub's built-in parent and blocked-by links
+- Issues appear blocked in GitHub's UI under "Relationships"
+- `rafa next` and `rafa plan create --next` skip blocked issues the same way
+- Nothing removes blockers by hand — you edit the link in GitHub
+- Costs about 8 API points per full board read (part of rafa's 5,000 points per hour)
+- Use when relationships should be visible and managed in GitHub's UI
+
+### Setting up native mode
+
+From an empty config, add the mode to `.rafa/config.yaml`:
+
+```yaml
+board:
+  relationships: native
+```
+
+Then initialize the board. `rafa init --board` will offer to move your
+relationships from labels to native links:
+
+```bash
+rafa init --board
+```
+
+It will print each move it finds — every issue that carries `spec:blocked`
+with blockers to link — and ask once to proceed. When you answer yes,
+it adds the native links and optionally removes the old labels. Run
+`rafa doctor` afterward to check whether any old marks remain.
+
+### Upgrading from labels to native
+
+To upgrade an existing board from labels to native:
+
+1. Add the mode to `.rafa/config.yaml`:
+   ```yaml
+   board:
+     relationships: native
+   ```
+
+2. Run `rafa init --board`, which will:
+   - Read every issue labelled `spec:blocked` with a `Blocked by:` line
+   - Print the list of moves it found
+   - Ask once: "Move these relationships to native links? [y/N]"
+   - On yes, add the native links to GitHub
+   - Ask separately: "Remove old marks after the move? [y/N]"
+   - On yes, remove `spec:blocked` labels and `Blocked by:` lines
+
+3. Verify with `rafa doctor`:
+   ```bash
+   rafa doctor
+   ```
+
+### Using native relationships
+
+**Solo project**: Mark an issue blocked from GitHub's UI:
+
+1. Open the issue
+2. Click **Relationships** on the right
+3. Add the blocker under **Blocked by**
+4. Or, use the command line:
+   ```bash
+   gh issue edit 12 --add-blocked-by 7
+   ```
+
+**With epics**: Add issues as sub-issues to group them:
+
+```bash
+gh issue edit 40 --add-sub-issue 12,13
+# or drag them in GitHub's UI under the epic's Relationships panel
+```
+
+When you close a blocker, `rafa next` will skip the blocked issue until
+the link is removed. In `labels` mode, you would manually remove the
+`spec:blocked` label. In `native` mode, GitHub keeps the link for history;
+removing it is a manual step in GitHub.
+
+### Native mode with epics
+
+When both epics and native relationships are used:
+
+- An epic's progress is shown by GitHub's sub-issue count: `0/2 done`, `1/2 done`
+- `rafa roadmap` shows the same progress rafa calculates from the links
+- An issue's parent can be changed by dragging it to another epic in GitHub, or:
+  ```bash
+  gh issue edit 12 --parent 40
+  ```
+- The issue moves to the end of its new epic's sub-issues
+- `rafa next` walks an epic's sub-issues in the order GitHub holds them
+
+### Edge cases and examples
+
+#### A blocker in another repository
+
+A native blocker can link to an issue in any repository you can access:
+
+```bash
+# Block issue #12 with a blocker in another repo
+gh issue edit 12 --add-blocked-by <owner>/<repo>#<n>
+```
+
+`rafa next` reads the blocker's state from the link. It reads the issue's
+number, state (open/closed) and repository from the one board read.
+
+#### A blocker closed as "Not Planned"
+
+When a blocker is closed as "Not Planned" (not planned, rafa's own reason),
+the blocked issue is still freed. The relationship is preserved for history.
+
+#### Moving an issue to another epic
+
+In native mode, an issue's parent is replaced when you move it:
+
+```bash
+gh issue edit 12 --parent 40
+```
+
+This removes issue #12 from its old epic and adds it to epic #40, moving it
+to the end of #40's sub-issues. The old epic's checklist is NOT edited (rafa
+does not remove the line; you may delete it by hand if you want to).
+
+#### An epic past the sub-issue cap
+
+GitHub caps sub-issues per parent at some limit. When an epic nears it,
+`rafa doctor` warns: `epic #254 has N sub-issues (truncated at 50 shown)`.
+An epic past the cap is reported, never silently truncated. `rafa next`
+treats unread blockers as still blocking; read `context/pull-requests.md`
+under "Cache and truncation for freed-issues in native mode" for the safety rule.
+
+#### Relationship changed by hand on GitHub
+
+When you change a link in GitHub's UI (add a blocker, remove one, move an
+issue to another epic), `rafa next` sees it on the next read. The cache
+detects relationship changes by reading the affected issues' relationship
+fields. No special refresh is needed; `rafa next` always reads fresh.
+
+### The measurement behind native mode
+
+Measured answers for the native mode are recorded in
+`context/pull-requests.md` under "Native relationships". Key findings:
+
+- Relationship writes do NOT move an issue's `updated_at`, so a cache
+  keyed on timestamps can skip re-reading
+- A full board read in native mode costs about 8 API points; labels mode
+  costs about 2
+- An incremental read (since a timestamp) costs 4 points per page of 100
+  issues, the same whether the page holds relationships or not
+- Sub-issue order is read from GitHub's `subIssues` field; it preserves
+  the order you set in GitHub and reflects drags
+- Every blocker's state (open/closed/missing) is read from its node in
+  the `blockedBy` list; no per-blocker `gh issue view` is sent
+
 ## Other trackers
 
 GitHub Issues is what works today, through `gh`. The tracker sits behind
