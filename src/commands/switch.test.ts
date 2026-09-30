@@ -19,6 +19,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
+import type { GitRunner } from '../pr/git.js';
 import type { Place, Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
@@ -136,11 +137,27 @@ function at(board: number, epicNumber: number | null): Place {
   return { board, epic: epicNumber };
 }
 
-/** Dispatches `words` from `project` over the planted `gh`, answering the outcome and the `gh` calls. */
-async function run(words: readonly string[], project: PlantedProject = plantCase(), planted: Planted = {}) {
+/** A `git` whose branch reads answer `refs` on both sides, recording each call. */
+function plantedGit(calls: string[][], refs: readonly string[] = []): GitRunner {
+  return (args) => {
+    calls.push([...args]);
+    const [verb] = args;
+    if (verb === 'for-each-ref') return { ok: true, stdout: refs.join('\n'), stderr: '' };
+    if (verb === 'ls-remote') return { ok: true, stdout: '', stderr: '' };
+    return { ok: false, stdout: '', stderr: `unplanted: git ${args.join(' ')}` };
+  };
+}
+
+/**
+ * Dispatches `words` from `project` over the planted `gh` and `git`
+ * (branches `refs`), answering the outcome and the calls of each.
+ */
+async function run(words: readonly string[], project: PlantedProject = plantCase(), planted: Planted = {}, refs: readonly string[] = []) {
   const calls: string[][] = [];
-  const outcome = await dispatchInProject(['switch', ...words], [], [createSwitchCommand({ gh: plantedGh(calls, planted) })], project);
-  return { ...outcome, calls, project };
+  const gitCalls: string[][] = [];
+  const seams = { gh: plantedGh(calls, planted), git: plantedGit(gitCalls, refs) };
+  const outcome = await dispatchInProject(['switch', ...words], [], [createSwitchCommand(seams)], project);
+  return { ...outcome, calls, gitCalls, project };
 }
 
 /** The position `project` holds, or null when its file reads unset. */
@@ -389,5 +406,75 @@ describe('rafa switch -', () => {
     expect(result.exitCode).toBe(SWITCH_REFUSAL_EXIT);
     expect(result.stderr).toContain('The previous place, board #41, no longer stands: #41 is a closed board');
     expect(positionOf(project)).toEqual(planted);
+  });
+});
+
+describe('the drift report', () => {
+  /** {@link LISTING} with #31's line for #50 ticked while #51 still carries rafa:in-development, and #7 rafa:claimed. */
+  const DRIFTED = [
+    ...LISTING.filter((row) => ![7, 31].includes((row as { number: number }).number)),
+    raw(7, 'A plain issue', 'Nothing.', ['type:bug', 'rafa:claimed']),
+    raw(31, 'Platform board', '- [ ] #50\n- [x] #51\n- [ ] #60', BOARD_LABELS),
+  ];
+
+  it('warns each drift line ahead of the new place, exiting 0 with the position written', async () => {
+    const result = await run(['40'], plantCase(), { listing: DRIFTED });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe([
+      'warn: claim drift: #7 is labelled rafa:claimed (open) but no feat/rafa-7-* claim branch names it',
+      'board #40 · epic #80 Epic delta (now) · 1/2 done',
+      '',
+    ].join('\n'));
+    expect(positionOf(result.project)?.current).toEqual(at(40, 80));
+  });
+
+  it('reports a ticked line still labelled, and nothing once a branch names the labelled issue', async () => {
+    const listing = DRIFTED.map((row) => (row as { number: number }).number === 51
+      ? raw(51, 'alpha one', 'Open.', ['epic:alpha', 'rafa:in-development'])
+      : row);
+
+    const drifted = await run(['40'], plantCase(), { listing });
+    const branched = await run(['40'], plantCase(), { listing: DRIFTED }, ['refs/heads/feat/rafa-7-x']);
+
+    expect(drifted.stdout).toContain('warn: claim drift: #51 is ticked on #31 (line 2) but still labelled rafa:in-development (open)\n');
+    expect(branched.stdout).not.toContain('claim drift');
+    expect(branched.exitCode).toBe(0);
+  });
+
+  it('reads no branch when no issue carries a stage label, where a labelled board reads them', async () => {
+    const clean = await run(['40']);
+    const labelled = await run(['40'], plantCase(), { listing: DRIFTED });
+
+    expect(clean.stdout).not.toContain('claim drift');
+    expect(clean.gitCalls).toEqual([]);
+    expect(labelled.gitCalls.map((call) => call[0])).toEqual(['for-each-ref', 'ls-remote']);
+  });
+
+  it('reads the board listing once and sends gh nothing but reads, the drift report included', async () => {
+    const result = await run(['40'], plantCase(), { listing: DRIFTED });
+
+    const listings = result.calls.filter((call) => call[0] === 'issue' && call[1] === 'list' && call.includes('all'));
+
+    expect(result.stdout).toContain('claim drift');
+    expect(listings).toHaveLength(1);
+    expect(result.calls.filter((call) => !(call[0] === 'issue' && call[1] === 'list'))).toEqual([]);
+  });
+
+  it('reports no drift for a refused switch, reading no branch', async () => {
+    const result = await run(['41'], plantCase(), { listing: DRIFTED });
+
+    expect(result.exitCode).toBe(SWITCH_REFUSAL_EXIT);
+    expect(result.stdout).not.toContain('claim drift');
+    expect(result.gitCalls).toEqual([]);
+  });
+
+  it('keeps the json result terminal, the drift lines as warnings ahead of it', async () => {
+    const result = await run(['40', '--output=json'], plantCase(), { listing: DRIFTED });
+    const events = eventsOf(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(events.at(-1)?.type).toBe('result');
+    expect(JSON.stringify(events.slice(0, -1))).toContain('claim drift: #7 is labelled rafa:claimed');
   });
 });

@@ -326,7 +326,7 @@ describe('a pick\'s blockers in native mode', () => {
   it('plans a pick with no blockedBy node, though its label and line say it waits', async () => {
     const picked = await pickOver({ board: waitingBoard([]) });
 
-    expect(picked.outcome).toEqual({ issue: 57 });
+    expect(picked.outcome).toMatchObject({ issue: 57 });
     expect(picked.lines.info).toEqual([roadmapHeaderLine(ROADMAP), pickLine(lineOf(57, 1))]);
     expect(picked.listed).toBe(1);
   });
@@ -335,7 +335,7 @@ describe('a pick\'s blockers in native mode', () => {
     const cleared = await pickOver({ board: waitingBoard([node(25, 'CLOSED')]) });
     const held = await pickOver({ board: waitingBoard([node(25, 'OPEN')]) });
 
-    expect(cleared.outcome).toEqual({ issue: 57 });
+    expect(cleared.outcome).toMatchObject({ issue: 57 });
     expect(held.outcome).toEqual({ stop: 'blocked' });
     expect(held.lines.info).toContain('   🚧 #57 is blocked by #25 (open)');
   });
@@ -348,7 +348,7 @@ describe('a pick\'s blockers in native mode', () => {
     expect(held.outcome).toEqual({ stop: 'blocked' });
     expect(held.lines.info).toContain(`   🚧 #57 is blocked by ${OTHER}#7 (open)`);
     expect(held.asked).not.toContain(7);
-    expect(cleared.outcome).toEqual({ issue: 57 });
+    expect(cleared.outcome).toMatchObject({ issue: 57 });
   });
 
   it('holds back a pick the listing does not hold, naming why, rather than planning over unread links', async () => {
@@ -373,7 +373,7 @@ describe('a pick\'s blockers in native mode', () => {
       },
     });
 
-    expect(picked.outcome).toEqual({ issue: 58 });
+    expect(picked.outcome).toMatchObject({ issue: 58 });
     expect(offered).toEqual([57, 24, 58]);
     expect(picked.listed).toBe(1);
   });
@@ -417,7 +417,7 @@ describe('an epic walked in native mode', () => {
     const native = await pickOver({ board });
     const labels = await pickOver({ board, relations: LABELS });
 
-    expect(native.outcome).toEqual({ issue: 83 });
+    expect(native.outcome).toMatchObject({ issue: 83 });
     expect(native.lines.info.at(-1)).toBe(pickLine({ issue: 83, ticked: false, why: 'spec 83', lineNumber: 2 }));
     expect(native.asked).not.toContain(42);
     expect(native.listed).toBe(1);
@@ -497,7 +497,7 @@ describe('the away hop\'s target in native mode', () => {
     const picked = await pickOver({ board, options: { followHop: true } });
     const labels = await pickOver({ board, relations: LABELS, options: { followHop: true } });
 
-    expect(picked.outcome).toEqual({ issue: HOP_TARGET });
+    expect(picked.outcome).toMatchObject({ issue: HOP_TARGET });
     expect(picked.lines.info.at(-1)).toBe(hopPickLine(HOP_TARGET));
     expect(picked.asked).not.toContain(ROADMAP);
     // The control: the labels adapter reads C's line naming the open #30,

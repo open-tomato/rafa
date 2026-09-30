@@ -1,8 +1,8 @@
 /**
  * The command-line words the board routes of `rafa plan create` are read
- * with, in one module: the three spec sources, `--roadmap`, `--refresh`,
- * `--dry-run`, the two of check 3 of the readiness gate and the one of
- * check 4.
+ * with, in one module: the three spec sources, `--roadmap`,
+ * `--claim-ahead`, `--refresh`, `--dry-run`, the two of check 3 of the
+ * readiness gate and the one of check 4.
  *
  * `plan create` is a wrapped phase 0 command, so `src/plan.ts` and the
  * modules it delegates to read its flags, and the flags
@@ -22,7 +22,7 @@
  * already published, so nothing that imported one had to move, and the
  * parity case names `src/plan.ts` and this module alone.
  *
- * Nothing here reads, decides or defaults: it is nine strings. The
+ * Nothing here reads, decides or defaults: it is ten strings. The
  * module that acts on each is named beside it.
  */
 
@@ -48,6 +48,15 @@ export const REFRESH_FLAG = '--refresh';
  * the pick it changes is `./spec-source-roadmap.ts`'s.
  */
 export const ROADMAP_FLAG = '--roadmap';
+
+/**
+ * The flag that has a `--next` run also claim the line after its pick,
+ * as `claims.ahead: allow` does on every such run; read in
+ * `./spec-source.ts`, the claim it adds is `src/claims/ahead.ts`'s.
+ * `rafa next --roadmap` passes it on to `plan create`
+ * (`src/next/actions.ts`).
+ */
+export const CLAIM_AHEAD_FLAG = '--claim-ahead';
 
 /** The flag that reads and refuses everything, and writes nothing; read in `./spec-source.ts`. */
 export const DRY_RUN_FLAG = '--dry-run';

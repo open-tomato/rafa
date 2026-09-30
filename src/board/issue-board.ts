@@ -1,7 +1,7 @@
 /**
  * The writes and one read made on an issue: the comments of an issue,
  * a comment posted, a comment edited, one label swapped for another,
- * one label taken off, an issue closed with a reason and a comment, a
+ * one label put on, one label taken off, an issue closed with a reason and a comment, a
  * label created in the repository, an issue created with its labels, and
  * a pull request closed with a comment.
  *
@@ -23,6 +23,12 @@
  * send `gh issue edit <n> --remove-label spec:blocked --add-label`,
  * whose trailing flag takes the next word or none, so the removal-only
  * write is a member of its own rather than a special case of the swap.
+ *
+ * {@link IssueBoard.addLabel} is the same reasoning the other way round:
+ * a claim's issue takes `rafa:claimed` at `plan create` with nothing
+ * taken off (`.rafa/plans/rafa-324-claim-issue-so-two`), and an empty
+ * string through `swapLabels` would leave `--remove-label` taking the
+ * next word as its value, so the addition-only write is its own member.
  *
  * Nothing here spawns, so every case in `./issue-board.test.ts` drives a
  * runner of its own and none of them reaches GitHub or reads the
@@ -59,6 +65,7 @@
  * | `comment` | `gh api repos/{owner}/{repo}/issues/<n>/comments -X POST -f body=<body>` |
  * | `editComment` | `gh api repos/{owner}/{repo}/issues/comments/<id> -X PATCH -f body=<body>` |
  * | `swapLabels` | `gh issue edit <n> --remove-label <removed> --add-label <added>` |
+ * | `addLabel` | `gh issue edit <n> --add-label <label>` |
  * | `removeLabel` | `gh issue edit <n> --remove-label <label>` |
  * | `closeIssue` | `gh issue close <n> --reason=<reason> --comment=<comment>` |
  * | `createLabel` | `gh label create <name> --description=<description>` |
@@ -112,6 +119,13 @@
  * reason the gate does not: it removes only after having READ
  * `spec:blocked` off the issue, and a failed removal is reported by its
  * caller.
+ *
+ * The addition sends that edit with `--remove-label` left out, one label
+ * in it, so it half-applies nothing either. What `gh` does with a label
+ * the repository has not made, or one the issue already carries, was not
+ * measured here; the claim stage writes do not depend on it, since a
+ * label write there is best-effort and its failure is the caller's to
+ * report, never a reason to undo the claim.
  *
  * ## Arguments are checked before they reach `gh`
  *
@@ -173,6 +187,8 @@ export interface IssueBoard {
   readonly editComment: (id: string, body: string) => Promise<BoardComment>;
   /** Takes `removed` off the issue and puts `added` on it, in one command. */
   readonly swapLabels: (issue: number, removed: string, added: string) => Promise<void>;
+  /** Puts `label` on the issue and takes nothing off it. */
+  readonly addLabel: (issue: number, label: string) => Promise<void>;
   /** Takes `label` off the issue and puts nothing on it. */
   readonly removeLabel: (issue: number, label: string) => Promise<void>;
   /** Closes the issue with `reason`, posting `comment` in the same command. */
@@ -374,6 +390,15 @@ export function createGhIssueBoard(options: GhIssueBoardOptions): IssueBoard {
       await succeed(
         ['issue', 'edit', number, '--remove-label', off, '--add-label', on],
         `gh issue edit ${number} --remove-label ${off} --add-label ${on}`,
+      );
+    },
+
+    addLabel: async (issue: number, label: string): Promise<void> => {
+      const number = issueNumber(issue, 'addLabel');
+      const on = labelName(label, 'addLabel', 'the label');
+      await succeed(
+        ['issue', 'edit', number, '--add-label', on],
+        `gh issue edit ${number} --add-label ${on}`,
       );
     },
 

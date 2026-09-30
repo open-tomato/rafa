@@ -73,15 +73,29 @@
  *    search matched: 2 fail.
  *  - `branchClaims` matching anywhere in the ref rather than at a path
  *    boundary, so `feat/rafa-200-x` claims issue 20: 1 fail.
+ *
+ * The claim reading was driven the same way on 2026-09-30 over this
+ * file and `./roadmap-claims.test.ts` (57 pass unmutated): a released
+ * claim kept taken, 2 fail; the labels never read, so no held claim is
+ * `rafa:claimed`, 3 fail; the fetch repeated per branch, 2 fail; the
+ * takeover wording replaced by the taken one, 1 fail; a branch only this
+ * checkout holds read for a claim, 3 fail; a stale `rafa:claimed` branch
+ * deciding over a taken one of the same issue, 1 fail.
  */
 import type { SpecIssue } from './issue.js';
+import type { BranchClaim } from './roadmap-claims.js';
 import type { RoadmapLine, RoadmapReadings, RoadmapSkip } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { ClaimBranchReading } from '../claims/git.js';
+import type { Ownership } from '../claims/record.js';
+import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../cli/command.js';
+import { CLAIMS_STALE_DISABLED } from '../config-sections.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {
@@ -106,6 +120,9 @@ import {
   severalRoadmapsMessage,
   skipSentence,
 } from './roadmap.js';
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 
 /** The roadmap body every walk case plants, with its three lines. */
 const BODY = [
@@ -164,6 +181,7 @@ interface ReadingLog {
 function plantedReadings(planted: {
   readonly closed?: readonly number[];
   readonly refs?: readonly string[];
+  readonly claims?: Readonly<Record<string, BranchClaim>>;
   readonly pulls?: Readonly<Record<number, number>>;
 }): { readings: RoadmapReadings; log: () => ReadingLog } {
   let issues: readonly number[] = [];
@@ -175,6 +193,12 @@ function plantedReadings(planted: {
       return Promise.resolve((planted.closed ?? []).includes(issue));
     },
     branchFor: (issue) => (planted.refs ?? []).find((ref) => branchClaims(ref, issue)) ?? null,
+    branchClaimFor: (issue) => {
+      const branch = (planted.refs ?? []).find((ref) => branchClaims(ref, issue)) ?? null;
+      return Promise.resolve(branch === null
+        ? null
+        : { branch, claim: planted.claims?.[branch] ?? { state: 'none' } });
+    },
     pullRequestFor: (issue) => {
       pulls += 1;
       return Promise.resolve((planted.pulls ?? {})[issue] ?? null);
@@ -468,6 +492,25 @@ describe('scanClaimBranches', () => {
     ]);
   });
 
+  it('carries a claim reader that reads nothing until asked, then only a branch the remote answered', () => {
+    const git = stubGit({
+      'for-each-ref': gitOk(LOCAL),
+      'ls-remote': gitOk(REMOTE),
+      'fetch': { ok: false, stdout: '', stderr: 'fatal: unable to access origin' },
+    });
+
+    const scan = scanClaimBranches(git.run);
+    const callsAfterScan = git.calls().length;
+    const localOnly = scan.claimOf?.('feat/rafa-20-pr-commands');
+    const pushed = scan.claimOf?.('feat/rafa-33-board-setup');
+
+    expect(callsAfterScan).toBe(2);
+    expect(localOnly).toBeNull();
+    expect(pushed?.state).toBe('unreadable');
+    const afterScan = git.calls().slice(callsAfterScan);
+    expect(afterScan.map((call) => call[0])).toEqual(['fetch']);
+  });
+
   it('asks the remote the caller named', () => {
     const git = stubGit({ 'for-each-ref': gitOk(''), 'ls-remote': gitOk('') });
 
@@ -525,6 +568,121 @@ describe('createRoadmapReadings', () => {
   });
 });
 
+describe('createRoadmapReadings, the claim on a branch', () => {
+  const NOW = new Date('2026-09-30T12:00:00Z');
+
+  /** A found remote branch whose claim is `ownership`, its tip committed `idleMs` before {@link NOW}. */
+  const found = (branch: string, ownership: Ownership, idleMs: number): ClaimBranchReading => ({
+    state: 'found',
+    branch,
+    tip: 'a'.repeat(40),
+    tipCommittedAt: new Date(NOW.getTime() - idleMs),
+    commits: [],
+    ownership,
+  });
+
+  const heldBy = (owner: string): Ownership => ({ state: 'held', owner, pending: null, ignored: [] });
+  const releasedBy = (store: string): Ownership => ({ state: 'released', releasedBy: store, ignored: [] });
+
+  /** Readings over `refs`, whose claims `claims` answers by branch name, the issue labelled `labels` and its reads counted. */
+  const readingsOver = (options: {
+    readonly refs: readonly string[];
+    readonly claims?: Readonly<Record<string, ClaimBranchReading>>;
+    readonly labels?: readonly string[];
+    readonly staleAfter?: ClaimsStaleAfter;
+  }): { readings: RoadmapReadings; issueReads: () => number } => {
+    let issueReads = 0;
+    const { claims } = options;
+    const readings = createRoadmapReadings({
+      issues: (issue) => {
+        issueReads += 1;
+        return Promise.resolve({ ...specIssue(issue, 'OPEN'), labels: options.labels ?? [] });
+      },
+      branches: {
+        refs: options.refs,
+        problems: [],
+        ...claims === undefined
+          ? {}
+          : { claimOf: (branch: string): ClaimBranchReading | null => claims[branch] ?? null },
+      },
+      pullRequests: () => Promise.resolve([]),
+      now: () => NOW,
+      ...options.staleAfter === undefined
+        ? {}
+        : { staleAfter: options.staleAfter },
+    });
+    return { readings, issueReads: () => issueReads };
+  };
+
+  it('weighs a held claim against the stale window and the stage label, reading the labels for it', async () => {
+    const branch = 'feat/rafa-20-x';
+    const over = (idleMs: number, labels: readonly string[]): ReturnType<typeof readingsOver> => readingsOver({
+      refs: [`refs/remotes/origin/${branch}`],
+      claims: { [branch]: found(branch, heldBy('store-a'), idleMs) },
+      labels,
+    });
+    const fresh = over(2 * DAY, [CLAIMED_LABEL]);
+    const staleClaimed = over(3 * DAY, [CLAIMED_LABEL]);
+    const staleInDevelopment = over(3 * DAY, [IN_DEVELOPMENT_LABEL]);
+
+    const answers = await Promise.all([fresh, staleClaimed, staleInDevelopment].map(({ readings }) => readings.branchClaimFor(20)));
+
+    expect(answers.map((answer) => answer?.claim.state)).toEqual(['held', 'stale-claimed', 'stale-in-development']);
+    expect(answers[0]?.branch).toBe(`refs/remotes/origin/${branch}`);
+    expect(fresh.issueReads()).toBe(1);
+  });
+
+  it('never calls a claim stale under staleAfter disabled, and weighs with 3d when the caller names none', async () => {
+    const branch = 'feat/rafa-20-x';
+    const over = (staleAfter?: ClaimsStaleAfter): ReturnType<typeof readingsOver> => readingsOver({
+      refs: [branch],
+      claims: { [branch]: found(branch, heldBy('store-a'), 90 * DAY) },
+      labels: [CLAIMED_LABEL],
+      ...staleAfter === undefined
+        ? {}
+        : { staleAfter },
+    });
+
+    const answers = await Promise.all([over(CLAIMS_STALE_DISABLED), over(), over('100d')].map(({ readings }) => readings.branchClaimFor(20)));
+
+    expect(answers.map((answer) => answer?.claim.state)).toEqual(['held', 'stale-claimed', 'held']);
+  });
+
+  it('reads no labels for a released claim, a branch the remote does not hold, or a scan carrying no claim reader', async () => {
+    const released = readingsOver({ refs: ['feat/rafa-20-x'], claims: { 'feat/rafa-20-x': found('feat/rafa-20-x', releasedBy('store-a'), DAY) } });
+    const localOnly = readingsOver({ refs: ['refs/heads/feat/rafa-20-x'], claims: {} });
+    const unread = readingsOver({ refs: ['feat/rafa-20-x'] });
+
+    const answers = await Promise.all([released, localOnly, unread].map(({ readings }) => readings.branchClaimFor(20)));
+
+    expect(answers.map((answer) => answer?.claim.state)).toEqual(['released', 'none', 'none']);
+    expect([released, localOnly, unread].map(({ issueReads }) => issueReads())).toEqual([0, 0, 0]);
+    expect(await unread.readings.branchClaimFor(33)).toBeNull();
+  });
+
+  it('decides between several branches of one issue: a taken one first, then a stale claimed one, then a released one', async () => {
+    const stale = found('feat/rafa-20-b', heldBy('store-b'), 9 * DAY);
+    const over = (claims: Readonly<Record<string, ClaimBranchReading>>): ReturnType<typeof readingsOver> => readingsOver({
+      refs: Object.keys(claims),
+      claims,
+      labels: [CLAIMED_LABEL],
+    });
+    const released = found('feat/rafa-20-a', releasedBy('store-a'), DAY);
+
+    const answers = await Promise.all([
+      over({ 'feat/rafa-20-a': released, 'feat/rafa-20-b': stale }),
+      over({ 'feat/rafa-20-a': released, 'feat/rafa-20-b': stale, 'feat/rafa-20-c': found('feat/rafa-20-c', { state: 'none', ignored: [] }, DAY) }),
+      over({ 'feat/rafa-20-a': released, 'feat/rafa-20-b': found('feat/rafa-20-b', releasedBy('store-b'), DAY) }),
+    ].map(({ readings }) => readings.branchClaimFor(20)));
+
+    expect(answers.map((answer) => [answer?.branch, answer?.claim.state])).toEqual([
+      ['feat/rafa-20-b', 'stale-claimed'],
+      ['feat/rafa-20-c', 'none'],
+      ['feat/rafa-20-a', 'released'],
+    ]);
+  });
+});
+
 describe('skipSentence', () => {
   /** A skip over the line for issue `issue`. */
   const skip = (issue: number, reason: RoadmapSkip['reason'], detail: string): RoadmapSkip => ({
@@ -544,6 +702,25 @@ describe('skipSentence', () => {
       '#18 done: the issue is closed',
       '#19 taken: branch feat/rafa-19-worktrees exists',
       '#20 taken: PR #33 open',
+    ]);
+  });
+
+  it('names a stale rafa:claimed claim a takeover candidate, and notes a stale or unreadable claim on a taken branch', () => {
+    const withClaim = (issue: number, reason: RoadmapSkip['reason'], claim: BranchClaim): RoadmapSkip => ({
+      ...skip(issue, reason, `feat/rafa-${String(issue)}-x`),
+      claim,
+    });
+
+    expect([
+      skipSentence(withClaim(21, 'stale-claim', { state: 'stale-claimed', owner: 'store-a', idleMs: 4 * DAY })),
+      skipSentence(withClaim(22, 'branch', { state: 'stale-in-development', owner: 'store-b', idleMs: 36 * HOUR })),
+      skipSentence(withClaim(23, 'branch', { state: 'unreadable', reason: 'bad object' })),
+      skipSentence(withClaim(24, 'branch', { state: 'held', owner: 'store-c', pending: null })),
+    ]).toEqual([
+      '#21 takeover candidate: branch feat/rafa-21-x, claimed by store-a, has stood idle 4d',
+      '#22 taken: branch feat/rafa-22-x exists (stale: in development under store-b, idle 36h; never taken over automatically)',
+      '#23 taken: branch feat/rafa-23-x exists (its claim could not be read: bad object)',
+      '#24 taken: branch feat/rafa-24-x exists',
     ]);
   });
 });
@@ -608,6 +785,46 @@ describe('pickNextRoadmapLine', () => {
       [20, 'closed'],
       [33, 'branch'],
       [34, 'closed'],
+    ]);
+  });
+
+  it('passes a stale claimed line as a takeover candidate and a stale in-development one as taken, and picks a released one', async () => {
+    const planted = plantedReadings({
+      refs: ['feat/rafa-20-pr-commands', 'feat/rafa-33-board-setup', 'feat/rafa-34-naming'],
+      claims: {
+        'feat/rafa-20-pr-commands': { state: 'stale-claimed', owner: 'store-a', idleMs: 4 * DAY },
+        'feat/rafa-33-board-setup': { state: 'stale-in-development', owner: 'store-b', idleMs: 5 * DAY },
+        'feat/rafa-34-naming': { state: 'released', releasedBy: 'store-c' },
+      },
+    });
+
+    const pick = await pickNextRoadmapLine(lines(), planted.readings);
+
+    expect(pick.line?.issue).toBe(34);
+    expect(pick.skipped.map((skip) => [skip.line.issue, skip.reason, skip.claim?.state])).toEqual([
+      [17, 'ticked', undefined],
+      [20, 'stale-claim', 'stale-claimed'],
+      [33, 'branch', 'stale-in-development'],
+    ]);
+  });
+
+  it('asks a released line\'s pull request next, and keeps a held claim taken as its branch', async () => {
+    const planted = plantedReadings({
+      refs: ['feat/rafa-20-pr-commands', 'feat/rafa-33-board-setup'],
+      claims: {
+        'feat/rafa-20-pr-commands': { state: 'released', releasedBy: 'store-a' },
+        'feat/rafa-33-board-setup': { state: 'held', owner: 'store-b', pending: null },
+      },
+      pulls: { 20: 41 },
+    });
+
+    const pick = await pickNextRoadmapLine(lines(), planted.readings);
+
+    expect(pick.line?.issue).toBe(34);
+    expect(pick.skipped.map((skip) => [skip.line.issue, skip.reason, skip.detail])).toEqual([
+      [17, 'ticked', ''],
+      [20, 'pull-request', '#41'],
+      [33, 'branch', 'feat/rafa-33-board-setup'],
     ]);
   });
 

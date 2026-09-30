@@ -7,7 +7,7 @@
  * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
- * making it by hand is twelve labels, a template file and an issue body
+ * making it by hand is fourteen labels, a template file and an issue body
  * nobody remembers the shape of. This module makes all four, and
  * {@link setUpBoard} is the whole of it; the question, the flags and the
  * lines printed are `src/commands/init.ts`'s, and the present-or-missing
@@ -19,7 +19,7 @@
  * it or wrote to it, `present` when it was already there and nothing was written, or
  * `refused` when it was not made and the detail says why. So a second
  * run over a board already set up writes no byte and answers `present`
- * twelve-plus-three times, which is what keeps `rafa init`'s "Nothing
+ * fourteen-plus-three times, which is what keeps `rafa init`'s "Nothing
  * changed." true when the board step is part of it.
  *
  * A refusal is never a throw. `setUpBoard` reports a failed `gh`
@@ -30,7 +30,7 @@
  *
  * ## The labels, and where their names come from
  *
- * {@link BOARD_LABELS} is the spec's list, and of its twelve names only
+ * {@link BOARD_LABELS} is the spec's list, and of its fourteen names only
  * the three horizons and {@link ROADMAP_LABEL} are spelled here for the
  * first time: `type:spec`
  * is `./issue.ts`'s {@link SPEC_LABEL}, the label an issue is refused
@@ -47,6 +47,10 @@
  * `type:roadmap` marks an issue as a board, built from the same
  * `GITHUB_LABELS` type prefix, and is exported from here as
  * {@link ROADMAP_LABEL} for the readers that find boards by it.
+ * `rafa:claimed` and `rafa:in-development` are the stages of a claim
+ * (`.rafa/plans/rafa-324-claim-issue-so-two`), `src/claims/stale.ts`'s
+ * {@link CLAIMED_LABEL} and {@link IN_DEVELOPMENT_LABEL}: they show the
+ * stage an issue's claim is at, never who holds it, which lives in git.
  *
  * No colour is sent. `gh label create --help` says a colour is optional
  * and a random one is chosen when it is left out, and the spec asks for
@@ -61,7 +65,7 @@
  * every run a write.
  *
  * That listing reads {@link LABEL_LIST_LIMIT} labels. A repository
- * holding more than that can have one of the twelve fall off the end, and
+ * holding more than that can have one of the fourteen fall off the end, and
  * what it costs is a refused part: `gh label create --help` says
  * `--force` is what updates a label that already exists, so the plain
  * form this sends fails, and the failure is reported as the refusal
@@ -140,6 +144,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 import { configFilePath } from '../config.js';
 
@@ -169,7 +174,7 @@ export interface BoardLabel {
 export const ROADMAP_LABEL = `${GITHUB_LABELS.typePrefix}roadmap`;
 
 /**
- * The twelve labels the workflow files under, in the order they are made.
+ * The fourteen labels the workflow files under, in the order they are made.
  * See the module note on where each name comes from.
  */
 export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
@@ -220,6 +225,14 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
   {
     name: ROADMAP_LABEL,
     description: 'A board: its body is the ordered checklist of epics and specs to take next',
+  },
+  {
+    name: CLAIMED_LABEL,
+    description: 'A device has claimed this issue and planned it; the claim branch names which',
+  },
+  {
+    name: IN_DEVELOPMENT_LABEL,
+    description: 'A claimed issue whose loop has started; the claim branch names which device',
   },
 ]);
 
@@ -363,7 +376,7 @@ export function missingBoardLabels(held: readonly string[]): readonly BoardLabel
 
 /**
  * Makes each of {@link BOARD_LABELS} the repository does not carry, and
- * answers one part per label. A failed listing refuses all twelve, naming
+ * answers one part per label. A failed listing refuses all fourteen, naming
  * the command, because nothing is known about any of them then.
  */
 export async function setUpLabels(gh: GhRunner): Promise<readonly BoardPart[]> {
@@ -741,7 +754,7 @@ export interface BoardSetupOptions {
 
 /**
  * Makes every part of the board that is missing and answers what each
- * came to: the twelve labels, the spec issue template, the pinned Roadmap
+ * came to: the fourteen labels, the spec issue template, the pinned Roadmap
  * issue and `roadmap.issue`.
  *
  * Writes nothing a second time: a run over a board already set up

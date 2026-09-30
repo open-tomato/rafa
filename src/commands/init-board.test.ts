@@ -50,6 +50,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
 import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
@@ -422,6 +423,29 @@ describe('whether the step runs', () => {
       .map((args) => args[2]);
     expect(created).toEqual(expect.arrayContaining(['type:epic', 'horizon:now', 'horizon:next', 'horizon:later']));
     expect(result.report?.parts.filter((part) => part.kind === 'label' && part.outcome === 'created')).toHaveLength(BOARD_LABELS.length);
+  });
+
+  it('creates the two claim stage labels under --board and prints a row for each', async () => {
+    const gh = fakeGh();
+    const root = freshRoot('claim-labels');
+
+    const result = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    const created = gh.calls()
+      .filter((args) => args[0] === 'label' && args[1] === 'create')
+      .map((args) => args[2]);
+    expect(created).toEqual(expect.arrayContaining([CLAIMED_LABEL, IN_DEVELOPMENT_LABEL]));
+    expect(renderBoardStep(result)).toEqual(expect.arrayContaining([
+      `  created  label ${CLAIMED_LABEL}`,
+      `  created  label ${IN_DEVELOPMENT_LABEL}`,
+    ]));
   });
 
   it('creates the Roadmap issue with --label type:roadmap under --board, after the label is made', async () => {

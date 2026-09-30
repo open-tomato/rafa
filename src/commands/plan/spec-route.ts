@@ -156,6 +156,8 @@ export interface SpecRouteOptions {
   readonly trustedAuthors: readonly string[];
   /** `board.relationships` as config resolved it, which `--next` walks in; `labels` when left out. */
   readonly relationships?: BoardRelationshipMode;
+  /** Issues a `--next` walk passes over, each with the branch whose claim was refused (`./claim-route.ts`). */
+  readonly passOver?: ReadonlyMap<number, string>;
 }
 
 /** The resolution itself, as `board/plan-spec.ts` performs it. */
@@ -216,5 +218,8 @@ export async function resolveCreateSpec(
     offerReady: makeReadyOffer(),
     offerAlternative: makeAlternativeOffer(),
     offerRefresh: makeRefreshOffer(),
+    ...options.passOver === undefined
+      ? {}
+      : { passOver: options.passOver },
   });
 }

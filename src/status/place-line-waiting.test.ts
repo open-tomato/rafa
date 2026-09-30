@@ -34,6 +34,7 @@ function withPlace(place: PlaceReading): StatusSections {
     loops: UNREAD,
     pull: UNREAD,
     board: { read: true, roadmap: 31, next: null, passed: 0, blockedIssues: 0, notes: [], place },
+    claims: UNREAD,
     housekeeping: UNREAD,
   };
 }

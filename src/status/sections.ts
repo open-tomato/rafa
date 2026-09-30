@@ -1,14 +1,15 @@
 /**
- * The five readings `rafa status` prints — branch and plan, loops, pull
- * request, board, housekeeping — each composed from a reader that
- * already exists, and none re-implemented here.
+ * The six readings `rafa status` prints — branch and plan, loops, pull
+ * request, board, claims, housekeeping — each composed from a reader
+ * that already exists, and none re-implemented here.
  *
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
  * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/commands/loop/loop-sessions.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
- * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readHopRecord` (`src/next/hop-record.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
+ * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
  * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/commands/doctor-cleanup.ts`) | git, the disk, `gh` for merged pull requests |
  *
  * Nothing here prints, and nothing spawns except through
@@ -35,17 +36,19 @@
  *
  * ## The local sections are read first
  *
- * `branch` and `loops` read git at the project root, `.rafa/runs/`, the
- * trackers and the plans directory, and nothing that could wait on the
- * network, so they are read, in that order, before any `gh` is spawned.
- * `pr.provider` is then resolved (`resolvePrProvider`, whose one probe is
- * `git remote get-url origin`), and `pull`, `board` and `housekeeping`
- * start together, sharing one deadline.
+ * `branch`, `loops` and the claim branches read git at the project root,
+ * `.rafa/runs/`, the trackers and the plans directory, and nothing that
+ * could wait on the network, so they are read, in that order, before any
+ * `gh` is spawned. `pr.provider` is then resolved (`resolvePrProvider`,
+ * whose one probe is `git remote get-url origin`), and `pull`, `board`,
+ * the claims' stage labels and `housekeeping` start together, sharing one
+ * deadline. The labels are the board's one listing, raced against the
+ * deadline like the board, and one not read is a note: see `./claims.ts`.
  *
  * ## The network deadline
  *
- * {@link STATUS_NETWORK_TIMEOUT_MS} is measured from the moment the three
- * start, and it bounds them twice:
+ * {@link STATUS_NETWORK_TIMEOUT_MS} is measured from the moment the
+ * network readings start, and it bounds them twice:
  *
  * - **Each `gh` command** goes through a runner opened with the time
  *   still left as its `timeoutMs` (`createGhRunner`,
@@ -55,9 +58,10 @@
  *   saying so. A section's commands run one after another, so a runner
  *   opened with the whole timeout per command would let three slow ones
  *   run three times as long.
- * - **The `pull` and `board` sections** are each raced against the same
- *   deadline, so a section whose provider waits on something other than
- *   the runner is still answered `{ read: false, problem }` on time.
+ * - **The `pull` and `board` sections**, and the claims' stage labels,
+ *   are each raced against the same deadline, so a reading whose provider
+ *   waits on something other than the runner is still answered on time:
+ *   a section `{ read: false, problem }`, the labels a claims note.
  *
  * `housekeeping` is not raced: its one `gh` command is the merged
  * listing, which the runner bounds, and `readCleanup` turns a listing
@@ -155,7 +159,9 @@
  * worktree blocked for being dirty or locked is still idle by that rule.
  */
 import type { BlockedCount, BlockedCountRelations } from './blocked-count.js';
+import type { ClaimBranches, ClaimLabels, ClaimsReading } from './claims.js';
 import type { EpicView, PlaceView } from './place-line.js';
+import type { WaitingReading, WaitingSources } from './waiting.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Epic } from '../board/epics.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
@@ -188,14 +194,15 @@ import { blockedTasks } from '../commands/loop/status.js';
 import { plansDirAt } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 import { readSessions } from '../loop/sessions.js';
-import { readHopRecord, staleAgainst } from '../next/hop-record.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
-import { positionFilePath, readPositionFile } from '../project/position.js';
+import { positionFilePath } from '../project/position.js';
 
 import { readBlockedCount } from './blocked-count.js';
+import { readClaimBranches, readClaims } from './claims.js';
+import { readWaiting } from './waiting.js';
 
 /** How long the network sections may take together, in milliseconds; see the module note. */
 export const STATUS_NETWORK_TIMEOUT_MS = 5_000;
@@ -279,20 +286,7 @@ export interface PlaceReading {
   readonly waiting?: WaitingReading;
 }
 
-/** The owner gate states that let no merge through, and so leave a pull request waiting. */
-export type WaitingGate = Exclude<OwnerApproval['state'], 'approved' | 'not-gated'>;
-
-/** A hop's pull request still open and waiting on its owner's review; see the module note. */
-export interface WaitingReading {
-  /** C, the hop record's target, or the pull request's own number on a record naming none. */
-  readonly issue: number;
-  /** The pull request the hop record names. */
-  readonly pullRequest: number;
-  /** What the owner gate answered, `unknown` for a reading that failed. */
-  readonly gate: WaitingGate;
-  /** Why it is not approved, in the gate's words or the failure's. */
-  readonly reason: string;
-}
+export type { WaitingGate, WaitingReading } from './waiting.js';
 
 /** What `rafa cleanup` would list, counted. */
 export interface HousekeepingReading {
@@ -304,12 +298,13 @@ export interface HousekeepingReading {
   readonly notes: readonly string[];
 }
 
-/** The five sections, as `rafa status` prints them and as its JSON `data` holds them. */
+/** The six sections, as `rafa status` prints them and as its JSON `data` holds them. */
 export interface StatusSections {
   readonly branch: Section<BranchReading>;
   readonly loops: Section<LoopsReading>;
   readonly pull: Section<PullReading>;
   readonly board: Section<BoardReading>;
+  readonly claims: Section<ClaimsReading>;
   readonly housekeeping: Section<HousekeepingReading>;
 }
 
@@ -320,6 +315,7 @@ export type StatusConfig = Pick<
   | 'prBase'
   | 'prProvider'
   | 'roadmapIssue'
+  | 'claimsStaleAfter'
   | 'cleanupKeep'
   | 'cleanupStaleDays'
   | 'cleanupWorktreeIdleDays'
@@ -574,72 +570,12 @@ function hasBoards(root: string, listing: readonly BoardIssue[]): boolean {
 }
 
 /** What the place is read through, beside the walk and the listing. */
-interface PlaceSources {
-  readonly root: string;
-  /** The provider over the bounded runner, a waiting pull request read through it. */
-  readonly pulls: Pick<PullRequests, 'get'>;
-  /** The owner gate, opened only once a waiting pull request is read open. */
-  readonly ownerGate: () => (pullRequest: number) => Promise<OwnerApproval>;
-}
+type PlaceSources = WaitingSources;
 
 /** A place reading, and what was read around it. */
 interface PlaceAnswer {
   readonly place: PlaceReading | null;
   readonly notes: readonly string[];
-}
-
-/** No waiting line, and nothing read around. */
-const NOT_WAITING: { readonly waiting: null; readonly notes: readonly string[] } = { waiting: null, notes: [] };
-
-/** `#<n>`. */
-function ref(number: number): string {
-  return `#${String(number)}`;
-}
-
-/** The gate for `pullRequest`, a rejection read as `unknown`; never approved on a failure. */
-async function readGate(sources: PlaceSources, pullRequest: number): Promise<OwnerApproval> {
-  try {
-    return await sources.ownerGate()(pullRequest);
-  } catch (error) {
-    return { state: 'unknown', reason: `could not read the owner gate of ${ref(pullRequest)}: ${messageOf(error)}`, owners: [] };
-  }
-}
-
-/**
- * The owner gate of `pullRequest` while it is still open, or null once it
- * merged, closed or is absent. A pull request that could not be read is
- * `unknown`, the failure its reason.
- */
-async function openPullGate(sources: PlaceSources, pullRequest: number): Promise<OwnerApproval | null> {
-  let detail: Awaited<ReturnType<PullRequests['get']>>;
-  try {
-    detail = await sources.pulls.get(pullRequest);
-  } catch (error) {
-    return { state: 'unknown', reason: `could not read pull request ${ref(pullRequest)}: ${messageOf(error)}`, owners: [] };
-  }
-  return detail?.state === 'open'
-    ? readGate(sources, pullRequest)
-    : null;
-}
-
-/** The pull request a hop left waiting on its owner's review, or null; see the module note. */
-async function readWaiting(sources: PlaceSources): Promise<{ readonly waiting: WaitingReading | null; readonly notes: readonly string[] }> {
-  const hop = readHopRecord(sources.root);
-  if (!hop.set) {
-    return hop.reason === 'absent'
-      ? NOT_WAITING
-      : { waiting: null, notes: [`${hop.detail}, so no waiting pull request is read`] };
-  }
-  const { record } = hop;
-  const { pullRequest } = record;
-  if (record.state !== 'waiting' || pullRequest === null) return NOT_WAITING;
-  const placed = readPositionFile(sources.root);
-  if (!placed.set || staleAgainst(record, placed.position)) return NOT_WAITING;
-
-  const gate = await openPullGate(sources, pullRequest);
-  if (gate === null || gate.state === 'approved' || gate.state === 'not-gated') return NOT_WAITING;
-  const waiting: WaitingReading = { issue: record.target ?? pullRequest, pullRequest, gate: gate.state, reason: gate.reason };
-  return { waiting, notes: [] };
 }
 
 /** Where this checkout stands, or null for a project with no boards; see the module note. */
@@ -704,6 +640,15 @@ async function readBoard(
     : { ...reading, place };
 }
 
+/** The claims, their stage labels asked for only when a branch carries a claim; see `./claims.ts`. */
+async function claimsSection(branches: Section<ClaimBranches>, labels: () => Promise<ClaimLabels>, config: StatusConfig, now: Date): Promise<Section<ClaimsReading>> {
+  if (!branches.read) return branches;
+  const read = branches.found.length === 0
+    ? { read: true as const, issues: [] }
+    : await labels();
+  return localSection(() => readClaims({ branches, labels: read, staleAfter: config.claimsStaleAfter, now }));
+}
+
 /** What `rafa cleanup` would list, counted, read without fetching; see the module note. */
 async function readHousekeeping(
   input: StatusInput,
@@ -722,9 +667,10 @@ async function readHousekeeping(
 }
 
 /**
- * The five sections for the project at `input.root`: `branch` and
- * `loops` first, then `pull`, `board` and `housekeeping` together under
- * one network deadline. Never a rejection; see the module note.
+ * The six sections for the project at `input.root`: `branch`, `loops`
+ * and the claim branches first, then `pull`, `board`, the claims' labels
+ * and `housekeeping` together under one network deadline. Never a
+ * rejection; see the module note.
  */
 export async function readStatusSections(input: StatusInput, seams: StatusSeams = {}): Promise<StatusSections> {
   const { root, config } = input;
@@ -758,6 +704,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
 
   const branch = localSection(() => readBranchSection(sources));
   const loops = readLoopsSection(root, sources);
+  const claimBranches = localSection(() => readClaimBranches(git));
 
   const provider = resolvePrProvider({ configured: config.prProvider, dir: root, readRemote: seams.readRemote });
   const isGh = provider.provider === 'gh';
@@ -772,6 +719,9 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
   const boardSection = isGh
     ? networkSection('board', deadline, () => readBoard(place, board, listing, readBlockedCount({ gh, relations, listing, blockedIssues }), native))
     : Promise.resolve(unread(notGhProblem('board', provider)));
+  const claims = claimsSection(claimBranches, isGh
+    ? () => networkSection('stage labels', deadline, async () => ({ issues: await listing() }))
+    : () => Promise.resolve(unread(notGhProblem('stage labels', provider))), config, now);
   const housekeeping = readHousekeeping(input, cleanup, now);
 
   return {
@@ -779,6 +729,7 @@ export async function readStatusSections(input: StatusInput, seams: StatusSeams 
     loops,
     pull: await pull,
     board: await boardSection,
+    claims: await claims,
     housekeeping: await housekeeping,
   };
 }

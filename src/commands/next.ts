@@ -1,5 +1,5 @@
 /**
- * `rafa next [--dry-run] [--roadmap] [--yes[=<action ids>]]`: where the project
+ * `rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]`: where the project
  * stands in one line, the one thing to do about it in the next, the
  * question, the action, and then the same again for what follows.
  *
@@ -205,6 +205,12 @@
  *    and `home` action that ran wrote, and the stop lines name `hop` and
  *    `home` in the lists they print (`src/next/lines.ts`).
  *
+ * `--claim-ahead` rides on it and on nothing else: the `plan` action
+ * carries it after `--roadmap`, so `plan create` also claims the line
+ * after its pick (`src/claims/ahead.ts`), and no other action's words
+ * change. A line giving it without `--roadmap` is refused with exit code
+ * 1 before any source is opened (`readClaimAhead`).
+ *
  * ## The relationships mode
  *
  * Before the first turn, {@link runNext} reads the mode
@@ -245,7 +251,7 @@
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { NextInvocation } from '../next/actions.js';
+import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextHopStep } from '../next/hop-rows.js';
 import type { NextDryRun, NextStop } from '../next/lines.js';
@@ -262,11 +268,13 @@ import { actionOutput } from '../next/ending.js';
 import { epicEndLines, watchDryEpic } from '../next/epic-end.js';
 import { commandWords, nextQuestion } from '../next/hint.js';
 import {
+  CLAIM_AHEAD_FLAG,
   DRY_RUN_FLAG,
   dryRunOf,
   MAX_ACTIONS,
   NEXT_USAGE,
   proposalLine,
+  readClaimAhead,
   readDryRun,
   readRoadmap,
   ROADMAP_FLAG,
@@ -332,6 +340,13 @@ export interface NextChainRoadmap {
    * `--roadmap`".
    */
   readonly afterLoop: () => Promise<NextState | null>;
+  /** True under `--claim-ahead`: the `plan` action's words carry it. False when left out. */
+  readonly claimAhead?: boolean;
+}
+
+/** What the actions' words carry under `roadmap`, as `src/next/actions.ts` reads it. */
+function passedOptions(roadmap: NextChainRoadmap | undefined): NextActionOptions {
+  return { roadmap: roadmap !== undefined, claimAhead: roadmap?.claimAhead === true };
 }
 
 /** What {@link runNextChain} reads, runs, asks and writes through. */
@@ -408,7 +423,7 @@ function stepOf(state: NextState, invocation: NextInvocation | null, over: Parti
 async function playTurn(options: NextChainOptions, state: NextState, previous: NextState | null): Promise<TurnEnd> {
   const { run, ask, handOver, ceiling, dryRun, info, warn, roadmap } = options;
   for (const problem of state.problems) warn(problem);
-  const invocation = actionInvocation(state, { roadmap: roadmap !== undefined });
+  const invocation = actionInvocation(state, passedOptions(roadmap));
   info(stateLine(state));
   info(proposalLine(state, invocation));
 
@@ -505,9 +520,14 @@ export const DEFAULT_NEXT_SEAMS: NextCommandSeams = Object.freeze({});
  * fast-forward through the git seam, whose refusal is this command's own
  * exit 1 and whose words git wrote are printed as they are.
  */
-async function runStateAction(context: RafaContext, sources: NextSources, state: NextState): Promise<void> {
+async function runStateAction(
+  context: RafaContext,
+  sources: NextSources,
+  state: NextState,
+  passed: NextActionOptions,
+): Promise<void> {
   if (state.action !== 'sync') {
-    await runAction({ ...context, output: actionOutput(context.output) }, state, { roadmap: sources.roadmap !== undefined });
+    await runAction({ ...context, output: actionOutput(context.output) }, state, passed);
     return;
   }
 
@@ -552,6 +572,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
   expectNoArgument(context.args, NEXT_USAGE);
   const flagged = readDryRun(context.flags);
   const roadmap = readRoadmap(context.flags);
+  const claimAhead = readClaimAhead(context.flags, roadmap);
   const ceiling = readYesCeiling(context.flags, NEXT_USAGE);
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const dryRun = dryRunOf(flagged, ceiling, isTerminal());
@@ -573,7 +594,10 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
       // A new answer per turn: its board reads the issue again, so the
       // chain sees what the step it just ran changed (`next/sources.ts`).
       read: () => readNextState(dry.watch(sources.answer())),
-      run: (state: NextState) => runStateAction(context, sources, state),
+      run: (state: NextState) => runStateAction(context, sources, state, {
+        roadmap: sources.roadmap !== undefined,
+        claimAhead,
+      }),
       ask: prompter.ask,
       handOver: prompter.close,
       ceiling,
@@ -588,7 +612,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
         context.output.warn(line);
       }),
       ...roadmap
-        ? { roadmap: { afterLoop: () => homeAfterLoop(context, sources) } }
+        ? { roadmap: { afterLoop: () => homeAfterLoop(context, sources), claimAhead } }
         : {},
     });
     endOfEpic(context, sources, report, dry.last());
@@ -601,7 +625,7 @@ export async function runNext(context: RafaContext, seams: NextCommandSeams): Pr
 /** The action ids help names, as `src/next/ceiling.ts` accepts them. */
 const YES_ID_LIST = YES_ACTIONS.join(', ');
 
-/** The three flags the command declares. */
+/** The four flags the command declares. */
 const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
   {
     name: DRY_RUN_FLAG,
@@ -616,6 +640,13 @@ const NEXT_FLAGS: readonly RafaFlagSpec[] = Object.freeze([
       + ' --roadmap to plan create and loop start, and go home once the loop has run. A blocker that is'
       + ' itself blocked halts with the chain instead, and a pull request whose owner has not approved is'
       + ' not merged.',
+    type: 'boolean',
+  },
+  {
+    name: CLAIM_AHEAD_FLAG,
+    description: 'With --roadmap, pass --claim-ahead to plan create, so the plan step also claims the line'
+      + ' after the one it picks on the same board, both claims or neither, as claims.ahead: allow does.'
+      + ' Refused without --roadmap.',
     type: 'boolean',
   },
   {
@@ -648,7 +679,8 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       + ' After a merge, while fragments wait on the base and fold into a version, it proposes'
       + ' `rafa release settle`, which runs unasked only under a --yes list naming settle.'
       + ' With `--roadmap` it follows one blocker into another epic or board, works it up to its pull'
-      + ' request and comes home, halting where that blocker is blocked in turn.'
+      + ' request and comes home, halting where that blocker is blocked in turn, and with `--claim-ahead` as'
+      + ' well its plan step also claims the next line of the board.'
       + ' With `--output=json`'
       + ' the steps and why the chain stopped are the data of the terminal result event, and under'
       + ' `--roadmap` the hops that ran as well.',
@@ -670,6 +702,10 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       {
         cmd: 'rafa next --roadmap --yes=hop,plan,start,home',
         note: 'Hops to the epic holding the blocker, plans and runs it, and comes home unasked.',
+      },
+      {
+        cmd: 'rafa next --roadmap --claim-ahead',
+        note: 'Plans the next line and claims the one after it too, both claims or neither.',
       },
     ],
     outputs: ['text', 'json'],

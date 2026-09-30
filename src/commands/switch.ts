@@ -9,7 +9,7 @@
  * The command reads the board listing once (`createGhBoardListing`,
  * `src/board/roadmap-board.ts`: every issue, open and closed, through
  * `BOARD_LIST_FIELDS` and `parseBoardListing`), and everything it
- * decides is read off that one answer. The labelled boards the default
+ * decides, the drift report included, is read off that one answer. The labelled boards the default
  * board is ranked from are the listing's open `type:roadmap` rows, not a
  * second `gh issue list --label`. The default board (`resolveDefaultBoard`,
  * `src/board/boards.ts`) is asked at most once and only when an answer
@@ -79,6 +79,24 @@
  * `horizonOf` (`src/board/roadmap-epic-rows.ts`). In json mode the
  * terminal result's `data` is a {@link SwitchResult}.
  *
+ * ## The drift report
+ *
+ * Once the position is written, and before the line naming the new
+ * place, each line of the claim drift report (`checkDrift` and
+ * `driftLines`, `src/claims/drift.ts`) is warned: a ticked checklist
+ * line whose issue still carries `rafa:in-development` or
+ * `rafa:claimed`, and a stage label no claim branch names, every line
+ * opening `claim drift:`. The report is compared over the listing the
+ * move already read, so it costs no second board read rather than the
+ * incremental one `src/board/board-cache.ts` would spend; the boards
+ * compared are the listing's `type:roadmap` rows, its epics and
+ * `roadmap.issue` when set. The branches are read through
+ * `scanClaimBranches` (`src/board/roadmap.ts`), and only when some issue
+ * carries a stage label. The report is report-only: it edits no label,
+ * no checklist and no body, and neither what it finds nor a board or
+ * git it cannot read changes the exit code. A refused switch reports no
+ * drift.
+ *
  * ## Exit codes
  *
  * {@link SWITCH_REFUSAL_EXIT} (2) for a number that is no open board or
@@ -97,6 +115,7 @@ import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
+import type { GitRunner } from '../pr/git.js';
 import type { Place, Position } from '../project/position.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
@@ -106,10 +125,12 @@ import { boardOfEpic, openBoards } from '../board/epic-board.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
-import { createGhRoadmapSearch, parseRoadmapBody } from '../board/roadmap.js';
+import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
+import { checkDrift, driftLines } from '../claims/drift.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
+import { createGitRunner } from '../pr/git.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
 import { firstNowEpic } from './epic/show.js';
@@ -153,9 +174,20 @@ export interface SwitchResult {
   readonly line: string;
 }
 
-/** How the command reaches `gh`; the system's own when left out. */
+/** How the command reaches `gh` and `git`; the system's own when left out. */
 export interface SwitchSeams {
   readonly gh?: GhRunner;
+  /** `git` in the project root, read by the drift report alone. */
+  readonly git?: GitRunner;
+}
+
+/** A move made, and what the drift report reads after it. */
+interface SwitchMove {
+  readonly result: SwitchResult;
+  readonly root: string;
+  readonly listing: readonly BoardIssue[];
+  /** `roadmap.issue`, or null when no layer names one. */
+  readonly configured: number | null;
 }
 
 /** A refusal with {@link SWITCH_REFUSAL_EXIT}. */
@@ -331,8 +363,8 @@ function writePosition(root: string, position: Position): void {
   }
 }
 
-/** Reads the line, moves, and writes the position; see the module note. */
-export async function runSwitchMove(context: RafaContext, seams: SwitchSeams): Promise<SwitchResult> {
+/** Reads the line, moves, and writes the position, answering the move and the listing read. */
+async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<SwitchMove> {
   const target = readSwitchTarget(context.args);
   const rehomed = readRehome(context.flags);
   const project = issueProject(context);
@@ -368,7 +400,7 @@ export async function runSwitchMove(context: RafaContext, seams: SwitchSeams): P
     ? rehome(base, moved.place)
     : hop(base, moved.place);
   writePosition(project.root, position);
-  return Object.freeze({
+  const result: SwitchResult = Object.freeze({
     asked: moved.kind,
     current: position.current,
     previous: position.previous,
@@ -376,11 +408,34 @@ export async function runSwitchMove(context: RafaContext, seams: SwitchSeams): P
     rehomed,
     line: placeLine(position.current, board, epics),
   });
+  return { result, root: project.root, listing, configured: config.roadmapIssue };
+}
+
+/** Reads the line, moves, and writes the position; see the module note. */
+export async function runSwitchMove(context: RafaContext, seams: SwitchSeams): Promise<SwitchResult> {
+  return (await moveCheckout(context, seams)).result;
+}
+
+/** The drift report over the listing `move` read, as the lines to warn; see the module note. */
+export async function switchDriftLines(
+  move: Pick<SwitchMove, 'root' | 'listing' | 'configured'>,
+  git: GitRunner | undefined,
+): Promise<readonly string[]> {
+  const report = await checkDrift({
+    listing: () => Promise.resolve(move.listing),
+    boards: move.configured === null
+      ? []
+      : [move.configured],
+    branches: () => scanClaimBranches(git ?? createGitRunner(move.root)),
+  });
+  return driftLines(report);
 }
 
 /** Runs one `switch` line with `seams`, writing it in the line's output mode. */
 export async function runSwitch(context: RafaContext, seams: SwitchSeams): Promise<void> {
-  const result = await runSwitchMove(context, seams);
+  const move = await moveCheckout(context, seams);
+  for (const line of await switchDriftLines(move, seams.git)) context.output.warn(line);
+  const { result } = move;
   if (context.outputMode === 'json') {
     context.output.result(result);
     return;

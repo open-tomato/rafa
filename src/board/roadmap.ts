@@ -58,16 +58,50 @@
  * ## Done, and taken
  *
  * A line is DONE when it is ticked or its issue is closed, and TAKEN
- * when a branch `feat/rafa-<n>-*` exists locally or on the remote, or an
- * open pull request closes it. The four readings are asked cheapest
- * first — the tick costs nothing, the issue state one `gh issue view`,
- * the branch a scan already in hand, the pull request one `gh pr list` —
- * and each line stops at the first that answers yes, so a ticked line at
- * the top of a long roadmap spends no call at all.
+ * when a branch `feat/rafa-<n>-*` exists locally or on the remote whose
+ * claim, if it carries one, was not released (see "Claims on the
+ * branch"), or an open pull request closes it. The four readings are
+ * asked cheapest first — the tick costs nothing, the issue state one
+ * `gh issue view`, the branch a scan already in hand (and at most one
+ * fetch per walk when a branch carries a claim), the pull request one
+ * `gh pr list` — and each line stops at the first that answers yes, so a
+ * ticked line at the top of a long roadmap spends no call at all.
  *
  * The scan of branches is taken ONCE for a whole walk
  * ({@link scanClaimBranches}) and so is the list of open pull requests,
  * because both answer every line and neither changes mid-walk.
+ *
+ * ## Claims on the branch
+ *
+ * A branch the remote holds may carry a claim (`src/claims/`), and the
+ * branch reading weighs it ({@link RoadmapReadings.branchClaimFor},
+ * read and weighed by `./roadmap-claims.ts` with `claims.staleAfter`
+ * and the issue's stage labels):
+ *
+ * | The branch's claim | The line |
+ * |---|---|
+ * | none: no ownership commit, a branch only this checkout holds, or unread | taken: `branch <b> exists` |
+ * | held, and not yet stale | taken: `branch <b> exists` |
+ * | could not be read | taken, the branch sentence noting why |
+ * | stale, in development (any labels but `rafa:claimed` alone) | taken, the branch sentence noting it is stale |
+ * | stale, `rafa:claimed` | passed as a takeover candidate, in wording of its own |
+ * | released | not taken by its branch: the pull request is asked next |
+ *
+ * So data that cannot be read keeps a line taken, and only a claim
+ * whose owner released it frees the line. A stale `rafa:claimed` claim
+ * is passed like a taken line, with a sentence naming it a takeover
+ * candidate; taking it over is the claiming command's, not the walk's.
+ * A `rafa:in-development` claim is never offered, however stale: a
+ * paused loop's branch moves only at wrap-up. With several branches
+ * naming one issue, one that keeps it taken decides, then a stale
+ * `rafa:claimed` one, and only when every branch was released is the
+ * line free. The labels are read off the walk's own issue reader, and
+ * only when a held claim is weighed.
+ *
+ * `claims.staleAfter` reaches the reading through
+ * {@link RoadmapReadingsOptions.staleAfter}; a caller that passes none
+ * weighs claims with the config default. {@link RoadmapReadings.branchFor}
+ * stays the raw ref match, with no claim read.
  *
  * ## The remote half of the branch scan, and why it is data
  *
@@ -103,13 +137,23 @@
  * the work is — losing to the pull request's.
  */
 import type { SpecIssueReader } from './issue.js';
+import type { BranchClaim, RemoteClaimReader } from './roadmap-claims.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { CommandExit } from '../cli/command.js';
+import { CONFIG_DEFAULTS } from '../config-schema.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
 import { boardId, BRANCH_PREFIX } from './naming.js';
+import {
+  claimBranchOfRef,
+  createRemoteClaimReader,
+  idleText,
+  keepsTaken,
+  weighBranchClaim,
+} from './roadmap-claims.js';
 
 /** What every refusal and every failure this module raises opens with. */
 const PREFIX = 'board roadmap';
@@ -384,6 +428,12 @@ export interface BranchScan {
   readonly refs: readonly string[];
   /** A sentence per reading that failed; the module note holds the policy. */
   readonly problems: readonly string[];
+  /**
+   * Reads the claim on a branch the remote holds (`./roadmap-claims.ts`).
+   * Left out, as a scan planted by hand leaves it, no claim is read and
+   * every branch is taken as it always was.
+   */
+  readonly claimOf?: RemoteClaimReader;
 }
 
 /** The lines of a git command's output, blank ones dropped. */
@@ -401,6 +451,10 @@ function outputLines(stdout: string): readonly string[] {
  * remote holds now. Either failing is reported through
  * {@link BranchScan.problems} and leaves the other's refs in place, so a
  * scan is never silently half-read.
+ *
+ * The scan carries {@link BranchScan.claimOf}, the claim reader over the
+ * claim branches the remote answered; it reads nothing until a line
+ * asks, and then fetches once (`./roadmap-claims.ts`).
  */
 export function scanClaimBranches(git: GitRunner, remote: string = DEFAULT_REMOTE): BranchScan {
   const local = git(['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']);
@@ -412,6 +466,7 @@ export function scanClaimBranches(git: GitRunner, remote: string = DEFAULT_REMOT
   const pushedRefs = pushed.ok
     ? outputLines(pushed.stdout).map((line) => line.split('\t').at(-1) ?? '')
     : [];
+  const claimOf = createRemoteClaimReader(git, remote, pushedRefs);
 
   const problems = [
     local.ok
@@ -425,18 +480,34 @@ export function scanClaimBranches(git: GitRunner, remote: string = DEFAULT_REMOT
   return Object.freeze({
     refs: Object.freeze([...localRefs, ...pushedRefs].filter((ref) => ref !== '')),
     problems: Object.freeze(problems),
+    claimOf,
   });
 }
 
-/** The three questions a walk asks about one roadmap line. */
+/** A branch naming an issue, and what the claim on it says. */
+export interface BranchClaimReading {
+  /** The branch ref, as the scan spelled it. */
+  readonly branch: string;
+  /** Its claim, weighed; `none` when there is no claim to read. */
+  readonly claim: BranchClaim;
+}
+
+/** The questions a walk asks about one roadmap line. */
 export interface RoadmapReadings {
   /** Whether GitHub holds the issue closed, which is the other done reading. */
   readonly isClosed: (issue: number) => Promise<boolean>;
   /**
-   * The branch claiming the issue, or null. Synchronous: the scan is
-   * taken once before the walk, so this reads a list already in hand.
+   * The first branch ref naming the issue, or null, with no claim read.
+   * Synchronous: the scan is taken once before the walk, so this reads a
+   * list already in hand. The walk itself asks {@link branchClaimFor}.
    */
   readonly branchFor: (issue: number) => string | null;
+  /**
+   * The branch naming the issue that decides the taken reading, with its
+   * claim, or null when no branch names it. See the module note's
+   * "Claims on the branch".
+   */
+  readonly branchClaimFor: (issue: number) => Promise<BranchClaimReading | null>;
   /** The open pull request closing the issue, or null. */
   readonly pullRequestFor: (issue: number) => Promise<number | null>;
 }
@@ -449,6 +520,22 @@ export interface RoadmapReadingsOptions {
   readonly branches: BranchScan;
   /** The open pull requests, read once on the first line that asks. */
   readonly pullRequests: OpenPullRequestLister;
+  /** `claims.staleAfter`; its default, `CONFIG_DEFAULTS.claimsStaleAfter`, when left out. */
+  readonly staleAfter?: ClaimsStaleAfter;
+  /** The clock a claim's idle time is read against; the system's when left out. */
+  readonly now?: () => Date;
+}
+
+/**
+ * Of the branches naming one issue, the one that decides: the first
+ * whose claim keeps the issue taken, else the first stale `rafa:claimed`
+ * one, else the first (a released one).
+ */
+function decidingBranch(read: readonly BranchClaimReading[]): BranchClaimReading | null {
+  return read.find((one) => keepsTaken(one.claim))
+    ?? read.find((one) => one.claim.state === 'stale-claimed')
+    ?? read[0]
+    ?? null;
 }
 
 /**
@@ -458,6 +545,8 @@ export interface RoadmapReadingsOptions {
  */
 export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapReadings {
   const { issues, branches, pullRequests } = options;
+  const staleAfter = options.staleAfter ?? CONFIG_DEFAULTS.claimsStaleAfter;
+  const now = options.now ?? ((): Date => new Date());
   let open: Promise<readonly RoadmapPullRequest[]> | null = null;
 
   return Object.freeze({
@@ -465,6 +554,27 @@ export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapR
 
     branchFor: (issue: number): string | null => branches.refs
       .find((ref) => branchClaims(ref, issue)) ?? null,
+
+    branchClaimFor: async (issue: number): Promise<BranchClaimReading | null> => {
+      const refs = branches.refs.filter((ref) => branchClaims(ref, issue));
+      const { claimOf } = branches;
+      const found = refs.map((ref) => {
+        const name = claimBranchOfRef(ref);
+        return { ref, reading: claimOf === undefined || name === null
+          ? null
+          : claimOf(name) };
+      });
+      // The labels are read only when a held claim is to be weighed for staleness.
+      const weighed = found.some(({ reading }) => reading?.state === 'found' && reading.ownership.state === 'held');
+      const labels = weighed
+        ? (await issues(issue)).labels
+        : [];
+      const clock = now();
+      return decidingBranch(found.map(({ ref, reading }) => ({
+        branch: ref,
+        claim: weighBranchClaim(reading, { labels, staleAfter, now: clock }),
+      })));
+    },
 
     pullRequestFor: async (issue: number): Promise<number | null> => {
       open = open ?? pullRequests();
@@ -474,8 +584,11 @@ export function createRoadmapReadings(options: RoadmapReadingsOptions): RoadmapR
   });
 }
 
-/** Why a line was passed over. The two done readings, then the two taken ones. */
-export type RoadmapSkipReason = 'ticked' | 'closed' | 'branch' | 'pull-request';
+/**
+ * Why a line was passed over. The two done readings, the two taken ones,
+ * then a stale `rafa:claimed` claim offered for a takeover.
+ */
+export type RoadmapSkipReason = 'ticked' | 'closed' | 'branch' | 'pull-request' | 'stale-claim';
 
 /** One line passed over, and what was read about it. */
 export interface RoadmapSkip {
@@ -485,6 +598,21 @@ export interface RoadmapSkip {
   readonly reason: RoadmapSkipReason;
   /** What it read: a branch name or a pull request, empty for the done readings. */
   readonly detail: string;
+  /**
+   * The claim on the branch, on a `branch` or `stale-claim` skip whose
+   * branch carries one; left out when there was no claim to read.
+   */
+  readonly claim?: BranchClaim;
+}
+
+/** What a `branch` skip adds after its branch: a stale or unreadable claim's note, or nothing. */
+function claimNote(claim: BranchClaim | undefined): string {
+  if (claim?.state === 'stale-in-development') {
+    return ` (stale: in development under ${claim.owner}, idle ${idleText(claim.idleMs)}; never taken over automatically)`;
+  }
+  return claim?.state === 'unreadable'
+    ? ` (its claim could not be read: ${claim.reason})`
+    : '';
 }
 
 /** The sentence a walk prints for one skipped line; the spec's own shape. */
@@ -492,8 +620,15 @@ export function skipSentence(skip: RoadmapSkip): string {
   const id = `#${String(skip.line.issue)}`;
   if (skip.reason === 'ticked') return `${id} done: ticked on the roadmap`;
   if (skip.reason === 'closed') return `${id} done: the issue is closed`;
+  if (skip.reason === 'stale-claim') {
+    const { claim } = skip;
+    const held = claim?.state === 'stale-claimed'
+      ? `, claimed by ${claim.owner}, has stood idle ${idleText(claim.idleMs)}`
+      : '';
+    return `${id} takeover candidate: branch ${skip.detail}${held}`;
+  }
   return skip.reason === 'branch'
-    ? `${id} taken: branch ${skip.detail} exists`
+    ? `${id} taken: branch ${skip.detail} exists${claimNote(skip.claim)}`
     : `${id} taken: PR ${skip.detail} open`;
 }
 
@@ -503,6 +638,22 @@ export interface RoadmapPick {
   readonly line: RoadmapLine | null;
   /** Every line skipped before it, in order, each with its reason. */
   readonly skipped: readonly RoadmapSkip[];
+}
+
+/**
+ * The skip a branch naming `line`'s issue makes, or null when its claim
+ * was released and the line reads on to the pull request. The claim is
+ * kept on the skip only when there was one to read.
+ */
+function branchSkip(line: RoadmapLine, read: BranchClaimReading): RoadmapSkip | null {
+  const { branch, claim } = read;
+  if (claim.state === 'released') return null;
+  const reason: RoadmapSkipReason = claim.state === 'stale-claimed'
+    ? 'stale-claim'
+    : 'branch';
+  return claim.state === 'none'
+    ? { line, reason, detail: branch }
+    : { line, reason, detail: branch, claim };
 }
 
 /**
@@ -521,8 +672,11 @@ export async function readRoadmapSkip(
   if (line.ticked) return { line, reason: 'ticked', detail: '' };
   if (await readings.isClosed(line.issue)) return { line, reason: 'closed', detail: '' };
 
-  const branch = readings.branchFor(line.issue);
-  if (branch !== null) return { line, reason: 'branch', detail: branch };
+  const branch = await readings.branchClaimFor(line.issue);
+  if (branch !== null) {
+    const skip = branchSkip(line, branch);
+    if (skip !== null) return skip;
+  }
 
   const pull = await readings.pullRequestFor(line.issue);
   return pull === null

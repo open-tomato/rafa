@@ -67,6 +67,18 @@
  * 2026-09-29, the file run alone and restored sha256-identical: the check
  * dropped reddened 1 case, and the check moved after the roster 1.
  *
+ * The claim check is driven over a real bare remote and a clone of it,
+ * whose claim branch `store-owner` holds, with a board over a scripted
+ * `gh` that records every argv; every other case plans `PLAN-demo.md`,
+ * whose stub names no issue, under seams that throw when reached. Its
+ * refusal sits beside a control differing only in the store the device
+ * claims as, and its label cases beside the first dispatch that passes.
+ * Four mutations of the wiring in `start/preflight.ts` were driven on
+ * 2026-09-30, the file restored sha256-identical: the check dropped
+ * reddened 1 case, the swap dropped 1, the swap sent ahead of the halt
+ * 2, and the check moved ahead of the malformed-items refusal 1, once
+ * the ordering case read a malformed file (0 before it did).
+ *
  * `start()` handing the preflight its settings and its plan, and handing
  * the lines on to each dispatch, is reached by no case here, since
  * `start()` spawns the CLI with no seam. It was read on the same day by
@@ -76,7 +88,12 @@
  */
 import type { TierPin } from '../config-sections.js';
 import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { StartPreflightClaim } from './preflight-claim.js';
+import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BoardIssue } from '../board/roadmap-board.js';
+import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -98,11 +115,15 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { PORT_VERSIONS } from '../adapters/registry.js';
+import { createGhIssueBoard } from '../board/issue-board.js';
+import { makeOwnershipCommit } from '../claims/git.js';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../cli/command.js';
 import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
+import { createGitRunner } from '../pr/index.js';
 import {
   DEFAULT_GH_HOST,
   ghAuthItem,
@@ -128,6 +149,21 @@ afterAll(() => {
 
 /** The stub of the plan every planting runs. */
 const STUB = 'demo';
+
+/**
+ * The claim seams of a plan whose stub names no issue, which every case
+ * but the claim's runs: the check answers before any seam is reached,
+ * so a git call or a store read here throws and reddens the case.
+ */
+const NO_CLAIM: StartPreflightClaim = {
+  git: () => {
+    throw new Error('no git expected: the plan names no issue');
+  },
+  board: null,
+  readStoreId: () => {
+    throw new Error('no store read expected: the plan names no issue');
+  },
+};
 
 /** The id every driven run is generated. */
 const RUN_ID = 'run-0001';
@@ -265,6 +301,8 @@ async function drive(
       readRemote: () => null,
       // The config default, `effort.sync: local`, unless a case plants another.
       sync: { resolved: resolveConfig(), home: join(tempRoot, 'sync-home') },
+      // A plan whose stub names no issue, unless a case plants a claim.
+      claim: NO_CLAIM,
       ...options,
     });
     return { result, refusal: null, probes, info, warn };
@@ -343,6 +381,59 @@ describe('a preflight whose required item passes', () => {
     expect(readPreflightHalts(root)).toEqual([]);
     expect(run.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
     expect(run.warn).toEqual([]);
+  });
+});
+
+/** A board whose ticked line for #12 is still labelled `rafa:in-development`. */
+const DRIFTED_BOARD: readonly BoardIssue[] = [
+  { number: 1, title: 'Board', body: '- [x] #12', state: 'OPEN', stateReason: null, labels: ['type:roadmap'], type: 'roadmap', module: 'unassigned' },
+  { number: 12, title: 'Done', body: '', state: 'CLOSED', stateReason: 'COMPLETED', labels: [IN_DEVELOPMENT_LABEL], type: 'task', module: 'unassigned' },
+];
+
+/** The line that board reports. */
+const DRIFT_LINE = 'claim drift: #12 is ticked on #1 (line 1) but still labelled rafa:in-development (closed)';
+
+/** Drift seams over {@link DRIFTED_BOARD} counting `count` run records, `reads` counting each listing read. */
+function driftSeams(count: number, reads: { count: number }): StartPreflightDrift {
+  return {
+    runCount: () => count,
+    listing: () => () => {
+      reads.count += 1;
+      return Promise.resolve(DRIFTED_BOARD);
+    },
+    boards: [],
+    branches: () => ({ refs: ['refs/heads/feat/rafa-12-a'], problems: [] }),
+  };
+}
+
+describe('the drift check', () => {
+  it('warns the drift report after the preflight passed on a second run, and reads no board on a first', async () => {
+    const firstReads = { count: 0 };
+    const secondReads = { count: 0 };
+
+    const first = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(1, firstReads) });
+    const second = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(2, secondReads) });
+
+    expect(first.refusal).toBeNull();
+    expect(first.warn).toEqual([]);
+    expect(firstReads.count).toBe(0);
+    expect(second.refusal).toBeNull();
+    expect(second.warn).toEqual([DRIFT_LINE]);
+    expect(second.info).toEqual([CHECKING_ONE, '   Preflight passed.']);
+    expect(secondReads.count).toBe(1);
+  });
+
+  it('reads no board on a due run that halts, where the same run passing reads it', async () => {
+    const haltedReads = { count: 0 };
+    const passedReads = { count: 0 };
+
+    const halted = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(127) }, { drift: driftSeams(2, haltedReads) });
+    const passed = await drive(freshRoot(), settingsOf([BUN], []), { 'bun --version': answered(0) }, { drift: driftSeams(2, passedReads) });
+
+    expect(halted.refusal?.exitCode).toBe(1);
+    expect(haltedReads.count).toBe(0);
+    expect(passed.refusal).toBeNull();
+    expect(passedReads.count).toBe(1);
   });
 });
 
@@ -1006,6 +1097,143 @@ describe('the sync-strategy check', () => {
 
     expect(run.refusal).toBeNull();
     expect(run.probes).toEqual([`bun --version in ${root}`]);
+  });
+});
+
+/** The issue, stub and store ids the claim cases plan and claim under. */
+const CLAIM_STUB = 'rafa-7-claim';
+const CLAIM_BRANCH = `feat/${CLAIM_STUB}`;
+const OWNER_STORE = 'store-owner';
+const OTHER_STORE = 'store-other';
+
+/** Runs git and throws with what it said when it fails: a fixture step, not a reading. */
+function mustGit(git: GitRunner, args: readonly string[]): string {
+  const result = git(args);
+  if (!result.ok) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+  return result.stdout.trim();
+}
+
+/** A repo root that is a clone of a bare remote whose claim branch `OWNER_STORE` holds, with its runner. */
+function claimedRoot(): { readonly root: string; readonly git: GitRunner } {
+  const root = freshRoot();
+  const originPath = `${root}-origin.git`;
+  mustGit(createGitRunner(tempRoot), ['init', '--quiet', '--bare', '--initial-branch=main', originPath]);
+  const git = createGitRunner(root);
+  mustGit(git, ['init', '--quiet', '--initial-branch=main']);
+  mustGit(git, ['config', 'user.name', 'device']);
+  mustGit(git, ['config', 'user.email', 'device@example.invalid']);
+  mustGit(git, ['config', 'commit.gpgsign', 'false']);
+  mustGit(git, ['commit', '--quiet', '--allow-empty', '-m', 'root']);
+  mustGit(git, ['remote', 'add', 'origin', originPath]);
+  const made = makeOwnershipCommit(git, 'main', { action: 'claim', issue: 7, store: OWNER_STORE });
+  if (!made.ok) throw new Error(made.reason);
+  mustGit(git, ['push', '--quiet', 'origin', `${made.sha}:refs/heads/${CLAIM_BRANCH}`]);
+  return { root, git };
+}
+
+/** A `gh` board that records every argv and answers each call as written. */
+function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoard>; readonly calls: (readonly string[])[] } {
+  const calls: (readonly string[])[] = [];
+  const gh: GhRunner = async (args): Promise<GhResult> => {
+    calls.push(args);
+    return { ok: true, stdout: '', stderr: '' };
+  };
+  return { board: createGhIssueBoard({ gh }), calls };
+}
+
+/** The claim seams of a device claiming as `store` over `git`, labelling on `board`. */
+function claimSeams(git: GitRunner, store: string, board: StartPreflightClaim['board']): StartPreflightClaim {
+  return { git, board, readStoreId: () => ({ ok: true, storeId: store }) };
+}
+
+/** The swap `loop start` sends for issue 7. */
+const SWAP_7 = ['issue', 'edit', '7', '--remove-label', CLAIMED_LABEL, '--add-label', IN_DEVELOPMENT_LABEL];
+
+describe('the claim check', () => {
+  it('refuses a run whose issue another store holds before every probe, storing nothing; the owner\'s run probes and swaps the label', async () => {
+    const { root, git } = claimedRoot();
+    const planPath = join(root, '.plans', `PLAN-${CLAIM_STUB}.md`);
+    const other = recordingBoard();
+    const owner = recordingBoard();
+
+    const run = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      planPath,
+      claim: claimSeams(git, OTHER_STORE, other.board),
+    });
+    const storedByRefusal = existsSync(sqliteStorePath(root));
+    // The control differs only in the store this device claims as.
+    const control = await drive(root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      planPath,
+      claim: claimSeams(git, OWNER_STORE, owner.board),
+    });
+
+    expect(run.refusal?.exitCode).toBe(1);
+    expect(run.refusal?.message).toBe([
+      '❌ Refusing to start: this device does not own the claim on #7.',
+      `   #7 is claimed by store ${OWNER_STORE} on ${CLAIM_BRANCH}, not by this device (store ${OTHER_STORE})`,
+      '   Nothing was checked and nothing was dispatched.',
+    ].join('\n'));
+    expect([run.probes, run.info, run.warn, other.calls]).toEqual([[], [], [], []]);
+    expect(storedByRefusal).toBe(false);
+
+    expect(control.refusal).toBeNull();
+    expect(control.probes).toEqual([`bun --version in ${root}`]);
+    expect(existsSync(sqliteStorePath(root))).toBe(true);
+    expect(control.info[0]).toBe(`🔒 #7 is claimed by this device (store ${OWNER_STORE}) on ${CLAIM_BRANCH}.`);
+    expect(owner.calls).toEqual([SWAP_7]);
+  });
+
+  it('sends no label on a halt, nor on a resume, beside the first dispatch that passes', async () => {
+    const halted = claimedRoot();
+    const resumed = claimedRoot();
+    const planIn = (root: string): string => join(root, '.plans', `PLAN-${CLAIM_STUB}.md`);
+    writeFileSync(trackerPathFor(planIn(resumed.root)), '- [x] Done already\n- [ ] Next\n', 'utf8');
+    const haltBoard = recordingBoard();
+    const resumeBoard = recordingBoard();
+
+    const halt = await drive(halted.root, settingsOf([BUN], []), { 'bun --version': answered(127, 'sh: bun: not found') }, {
+      planPath: planIn(halted.root),
+      claim: claimSeams(halted.git, OWNER_STORE, haltBoard.board),
+    });
+    const resume = await drive(resumed.root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      planPath: planIn(resumed.root),
+      claim: claimSeams(resumed.git, OWNER_STORE, resumeBoard.board),
+    });
+
+    expect(halt.refusal?.message).toStartWith('❌ preflight halted: 1 required item failed');
+    expect(resume.refusal).toBeNull();
+    expect([haltBoard.calls, resumeBoard.calls]).toEqual([[], []]);
+  });
+
+  it('reads no claim for a run the roster, or a malformed PREREQUISITES item, refuses first', async () => {
+    const roster = claimedRoot();
+    const malformed = claimedRoot();
+    const planIn = (root: string): string => join(root, '.plans', `PLAN-${CLAIM_STUB}.md`);
+    writeFileSync(planIn(roster.root), TASKS_NAMING_AGENTS, 'utf8');
+    writeFileSync(
+      join(malformed.root, '.plans', `PREREQUISITES-${CLAIM_STUB}.md`),
+      PREREQUISITES.replace('Bun is installed: `bun --version`', '`bun` reachable (`bun --version`)'),
+      'utf8',
+    );
+    const calls: (readonly string[])[] = [];
+    const recording = (git: GitRunner): GitRunner => (args) => {
+      calls.push(args);
+      return git(args);
+    };
+
+    const refusedByRoster = await drive(roster.root, settingsOf([BUN], []), { 'bun --version': answered(0) }, {
+      planPath: planIn(roster.root),
+      agents: { settingSources: ['project', 'local'], home: freshHome() },
+      claim: claimSeams(recording(roster.git), OTHER_STORE, null),
+    });
+    const refusedByItem = await drive(malformed.root, settingsOf([], []), {}, {
+      planPath: planIn(malformed.root),
+      claim: claimSeams(recording(malformed.git), OTHER_STORE, null),
+    });
+
+    expect(refusedByRoster.refusal?.message).toStartWith(`❌ Refusing to start: PLAN-${CLAIM_STUB}.md names 2 agent(s)`);
+    expect(refusedByItem.refusal?.message).toStartWith(`❌ Refusing to start: PREREQUISITES-${CLAIM_STUB}.md holds 1 malformed`);
+    expect(calls).toEqual([]);
   });
 });
 

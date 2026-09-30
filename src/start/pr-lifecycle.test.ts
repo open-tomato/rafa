@@ -61,6 +61,19 @@
  * the failed-push `return` dropped so a compare URL is printed for a
  * branch that never left the machine, 1.
  *
+ * A failed push reads the claim through the stub's `readRefusedPush`,
+ * which records `read claim <branch>` among the calls, so a gate that
+ * read it after a push that worked, or not at all, reddens on the
+ * sequence. The `refusedPushReaderIn` cases run over a real bare remote
+ * and two clones, one of which took the other's claim over, and one of
+ * them drives the whole gate with the real branch reading and the real
+ * push. Four mutations of `pr-lifecycle.ts` were driven against this
+ * file on 2026-09-30, one run each, with 39 pass either side and the
+ * module restored sha256-identical: the halt dropped, 2 cases; the store
+ * id ignored so every reading names no claimant, 1; a store id read
+ * that throws read as no id rather than `unknown`, 1; and the `unknown`
+ * warning given to `not-lost` instead, 2.
+ *
  * Every repair session records the setting sources it was handed beside
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
@@ -69,25 +82,30 @@
  * state, so the one case that sets a stub is followed by a reset to null.
  */
 import type { PrLifecycleSeams } from './pr-lifecycle.js';
+import type { DeviceStoreId } from '../claims/device.js';
+import type { RefusedPushReading } from '../claims/lost.js';
 import type { ClaudeSettingSource } from '../config.js';
 import type {
   ChecksReading,
   PrProviderReading,
   PullRequestDetail,
   PullRequestSummary,
+  GitRunner,
   PushOutcome,
 } from '../pr/index.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
+import { CommandExit } from '../cli/command.js';
 import { classifyPromptContent } from '../effort/classify.js';
-import { parseChecks, verdictOf } from '../pr/index.js';
+import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { runClaude } from '../utils/claude.js';
@@ -100,6 +118,7 @@ import {
   DEFAULT_CI_TIMEOUT_MIN,
   PR_LIFECYCLE_SEAMS,
   prLifecycleSeamsIn,
+  refusedPushReaderIn,
   verifyPullRequest,
 } from './pr-lifecycle.js';
 import { setActivePlanStub } from './stamp.js';
@@ -151,6 +170,38 @@ const NONE_NO_REMOTE: PrProviderReading = {
 /** A push that worked, and one git refused. */
 const PUSHED: PushOutcome = { ok: true, output: `branch '${BRANCH}' set up to track 'origin/${BRANCH}'.` };
 const REFUSED: PushOutcome = { ok: false, output: 'error: failed to push some refs' };
+
+/** A refusal that is not about the claim: the reading every refused-push case gets by default. */
+const NOT_LOST: RefusedPushReading = {
+  outcome: 'not-lost',
+  branch: BRANCH,
+  cause: 'not-a-claim-branch',
+  reason: `${BRANCH} is not a claim branch, so it carries no claim to lose`,
+};
+
+/** The claim branch the claim-lost cases push, and where its commits are kept. */
+const CLAIM_BRANCH = 'feat/rafa-7-claim-lost';
+const LOST_BRANCH = 'lost/rafa-7-claim-lost';
+
+/** Another store took the claim over; this device's commits are kept. */
+const LOST: RefusedPushReading = {
+  outcome: 'lost',
+  issue: 7,
+  branch: CLAIM_BRANCH,
+  owner: 'store-b',
+  pending: null,
+  storeId: 'store-a',
+  remoteTip: 'b'.repeat(40),
+  kept: { state: 'created', name: LOST_BRANCH, sha: 'a'.repeat(40) },
+};
+
+/** The fetch that would say who owns the claim failed. */
+const UNKNOWN: RefusedPushReading = {
+  outcome: 'unknown',
+  issue: 7,
+  branch: CLAIM_BRANCH,
+  reason: 'fatal: unable to access origin',
+};
 
 /** `gh pr checks --json name,state,link` stdout for the given states. */
 function checks(states: Record<string, string>): string {
@@ -207,6 +258,8 @@ interface Script {
   readonly provider?: PrProviderReading;
   /** How the push a `none` provider makes ends. Absent, it succeeds. */
   readonly push?: PushOutcome;
+  /** What a failed push reads about the claim. Absent, {@link NOT_LOST}. */
+  readonly claim?: RefusedPushReading;
   readonly ghUsable?: boolean;
   readonly prNumber?: number | null;
   readonly probes?: readonly string[];
@@ -275,6 +328,10 @@ function stub(script: Script): Stubbed {
     pushBranch: (branch) => {
       calls.push(`git push ${branch}`);
       return Promise.resolve(script.push ?? PUSHED);
+    },
+    readRefusedPush: (branch) => {
+      calls.push(`read claim ${branch}`);
+      return script.claim ?? NOT_LOST;
     },
     isGhUsable: () => {
       calls.push('gh auth status');
@@ -626,7 +683,8 @@ describe('verifyPullRequest, under a none provider', () => {
 
     await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
 
-    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    // The claim is read, and says the refusal was not about it.
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`, `read claim ${BRANCH}`]);
     expect(errors).toEqual([
       `\n❌ Could not push ${BRANCH}.`,
       REFUSED.output,
@@ -650,6 +708,194 @@ describe('verifyPullRequest, under a none provider', () => {
   });
 });
 
+describe('verifyPullRequest, on a refused push of a claim branch', () => {
+  it('halts with the claim lost report, opening no pull request, when another store owns the claim', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED, claim: LOST });
+    const seams = { ...run.seams, currentBranch: () => CLAIM_BRANCH };
+
+    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(halted).toBeInstanceOf(CommandExit);
+    const exit = halted as CommandExit;
+    expect(exit.exitCode).toBe(1);
+    expect(exit.message).toContain('❌ Claim lost: #7 is claimed by store store-b on feat/rafa-7-claim-lost');
+    expect(exit.message).toContain(`kept on the local branch ${LOST_BRANCH}`);
+    expect(exit.message).toContain(`no pull request is opened for ${CLAIM_BRANCH}`);
+    // The push, the reading, and nothing after: no gh, no poll, no repair.
+    expect(run.calls).toEqual(['read provider', `git push ${CLAIM_BRANCH}`, `read claim ${CLAIM_BRANCH}`]);
+    // No compare URL, no "push it yourself", no CI-skip line: the halt is the whole report.
+    expect(logs.join('\n')).not.toContain('Open the pull request');
+    expect(logs.join('\n')).not.toContain('Pushed');
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('reports the failed push and warns when who holds the claim could not be read', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED, claim: UNKNOWN });
+    const seams = { ...run.seams, currentBranch: () => CLAIM_BRANCH };
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams);
+
+    expect(run.calls).toEqual(['read provider', `git push ${CLAIM_BRANCH}`, `read claim ${CLAIM_BRANCH}`]);
+    expect(errors).toEqual([
+      `\n❌ Could not push ${CLAIM_BRANCH}.`,
+      REFUSED.output,
+      '   The work is committed locally. Push it yourself and open the PR by hand.',
+    ]);
+    expect(warnings).toEqual([
+      '\n⚠️  Could not tell who holds the claim on #7: fatal: unable to access origin.',
+      `   Check with rafa status before pushing ${CLAIM_BRANCH} by hand.`,
+    ]);
+  });
+
+  it('reads no claim when the push worked', async () => {
+    const run = stub({ provider: NONE_BY_CONFIG, claim: LOST });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+
+    // The control on the halt: the same `lost` reading, never asked for.
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(logs.join('\n')).toContain(`Open the pull request: ${COMPARE}`);
+  });
+});
+
+describe('refusedPushReaderIn, over a bare remote and two clones', () => {
+  const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-lifecycle-lost-')));
+  const STORE_A: DeviceStoreId = { ok: true, storeId: 'store-a' };
+
+  afterAll(() => {
+    rmSync(scope, { recursive: true, force: true });
+  });
+
+  /** Runs git and throws with what it said when it fails: a fixture step, not a reading. */
+  const must = (git: GitRunner, args: readonly string[]): string => {
+    const result = git(args);
+    if (!result.ok) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+
+  const cloneInto = (originPath: string, dir: string, name: string): GitRunner => {
+    must(createGitRunner(scope), ['clone', '--quiet', originPath, dir]);
+    const git = createGitRunner(dir);
+    must(git, ['config', 'user.name', name]);
+    must(git, ['config', 'user.email', `${name}@example.invalid`]);
+    must(git, ['config', 'commit.gpgsign', 'false']);
+    return git;
+  };
+
+  /**
+   * A bare remote, clone `a` checked out on the claim branch it claimed
+   * as store-a with one work commit on top, and clone `b` having taken
+   * the claim over as store-b on the remote. Answers `a`'s directory,
+   * both runners on the remote side, `a`'s work commit and the remote tip.
+   */
+  const plantTakenClaim = (name: string) => {
+    const root = realpathSync(mkdtempSync(join(scope, `${name}-`)));
+    const originPath = join(root, 'origin.git');
+    must(createGitRunner(scope), ['init', '--quiet', '--bare', '--initial-branch=main', originPath]);
+    const seed = cloneInto(originPath, join(root, 'seed'), 'seed');
+    writeFileSync(join(root, 'seed', 'kept.txt'), 'kept\n', 'utf8');
+    must(seed, ['add', '--all']);
+    must(seed, ['commit', '--quiet', '-m', 'root']);
+    must(seed, ['push', '--quiet', 'origin', 'HEAD:refs/heads/main']);
+
+    const aDir = join(root, 'a');
+    const a = cloneInto(originPath, aDir, 'device-a');
+    const b = cloneInto(originPath, join(root, 'b'), 'device-b');
+    const claim = makeOwnershipCommit(a, 'main', { action: 'claim', issue: 7, store: 'store-a' });
+    if (!claim.ok) throw new Error(claim.reason);
+    if (pushNewClaimBranch(a, claim.sha, CLAIM_BRANCH).outcome !== 'pushed') throw new Error('claim push');
+    must(a, ['switch', '--quiet', '-C', CLAIM_BRANCH, claim.sha]);
+    writeFileSync(join(aDir, 'work.txt'), 'work of device a\n', 'utf8');
+    must(a, ['add', '--all']);
+    must(a, ['commit', '--quiet', '-m', 'feat: work of device a']);
+    const work = must(a, ['rev-parse', 'HEAD']);
+
+    if (!fetchClaimBranches(b).ok) throw new Error('b could not fetch');
+    const lease = must(b, ['rev-parse', `refs/remotes/origin/${CLAIM_BRANCH}`]);
+    const take = makeOwnershipCommit(b, lease, { action: 'take', issue: 7, store: 'store-b' });
+    if (!take.ok) throw new Error(take.reason);
+    if (pushOwnershipCommit(b, take.sha, CLAIM_BRANCH, lease).outcome !== 'pushed') throw new Error('take push');
+
+    return { aDir, a, origin: createGitRunner(originPath), work, remoteTip: take.sha };
+  };
+
+  it('halts the real gate on a refused push: lost branch at the work, the new owner\'s tip unchanged', async () => {
+    const planted = plantTakenClaim('halt');
+    const seams: PrLifecycleSeams = {
+      ...prLifecycleSeamsIn(planted.aDir),
+      readProvider: () => NONE_BY_CONFIG,
+      readRefusedPush: refusedPushReaderIn(planted.aDir, () => STORE_A),
+    };
+
+    // The real branch reading, the real push and the real claim reading.
+    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(halted).toBeInstanceOf(CommandExit);
+    expect((halted as CommandExit).message).toContain('claimed by store store-b');
+    expect(errors).toEqual([]);
+    expect(must(planted.a, ['rev-parse', `refs/heads/${LOST_BRANCH}`])).toBe(planted.work);
+    // Read from the bare remote itself: nothing moved store-b's branch.
+    expect(must(planted.origin, ['rev-parse', `refs/heads/${CLAIM_BRANCH}`])).toBe(planted.remoteTip);
+    // The checkout is left on its branch, at its work.
+    expect(must(planted.a, ['rev-parse', 'HEAD'])).toBe(planted.work);
+  });
+
+  it('reads a store that names no id as no claimant, and keeps the commits', () => {
+    const planted = plantTakenClaim('no-id');
+
+    const reading = refusedPushReaderIn(planted.aDir, () => ({ ok: false, cause: 'ndjson', reason: 'ndjson' }))(CLAIM_BRANCH);
+
+    expect(reading.outcome).toBe('lost');
+    expect(reading.outcome === 'lost' && reading.storeId).toBeNull();
+    expect(must(planted.a, ['rev-parse', `refs/heads/${LOST_BRANCH}`])).toBe(planted.work);
+  });
+
+  it('answers unknown, keeping nothing, when the store id read throws', () => {
+    const planted = plantTakenClaim('throws');
+
+    const reading = refusedPushReaderIn(planted.aDir, () => {
+      throw new Error('database is locked');
+    })(CLAIM_BRANCH);
+
+    expect(reading).toEqual({
+      outcome: 'unknown',
+      issue: 7,
+      branch: CLAIM_BRANCH,
+      reason: 'this device\'s store id could not be read: database is locked',
+    });
+    expect(planted.a(['rev-parse', '--verify', '--quiet', `refs/heads/${LOST_BRANCH}`]).ok).toBe(false);
+  });
+
+  it('reads this store\'s own claim as not lost', () => {
+    const planted = plantTakenClaim('owned');
+
+    const reading = refusedPushReaderIn(planted.aDir, () => ({ ok: true, storeId: 'store-b' }))(CLAIM_BRANCH);
+
+    // The control on the store id: the same branch, read as its owner.
+    expect(reading.outcome === 'not-lost' && reading.cause).toBe('owned');
+    expect(planted.a(['rev-parse', '--verify', '--quiet', `refs/heads/${LOST_BRANCH}`]).ok).toBe(false);
+  });
+
+  it('reads no store for a branch that is no claim branch', () => {
+    let asked = 0;
+
+    const reading = refusedPushReaderIn(scope, () => {
+      asked += 1;
+      return STORE_A;
+    })(BRANCH);
+
+    expect(reading.outcome === 'not-lost' && reading.cause).toBe('not-a-claim-branch');
+    expect(asked).toBe(0);
+  });
+});
+
 describe('PR_LIFECYCLE_SEAMS', () => {
   it('holds the real helpers and leaves the clock to waitForChecks', () => {
     expect(PR_LIFECYCLE_SEAMS.currentBranch).toBe(getCurrentBranch);
@@ -662,6 +908,7 @@ describe('PR_LIFECYCLE_SEAMS', () => {
     // would push it.
     expect(typeof PR_LIFECYCLE_SEAMS.readProvider).toBe('function');
     expect(typeof PR_LIFECYCLE_SEAMS.pushBranch).toBe('function');
+    expect(typeof PR_LIFECYCLE_SEAMS.readRefusedPush).toBe('function');
     expect(PR_LIFECYCLE_SEAMS.runClaude).toBe(runClaude);
     expect(PR_LIFECYCLE_SEAMS.now).toBeUndefined();
     expect(PR_LIFECYCLE_SEAMS.sleep).toBeUndefined();
@@ -735,6 +982,14 @@ describe('the gate as start() calls it', () => {
     expect(call).toContain('...prLifecycleSeamsIn(checkout),');
     expect(call).toContain('dir: checkout,');
     expect(call).not.toContain('dir: repoRoot');
+  });
+
+  it('reads a refused push in the checkout, and the store id at the project root under the run\'s store', () => {
+    const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
+    const opening = 'await verifyPullRequest(';
+    const call = start.slice(start.indexOf(opening), start.indexOf(');', start.indexOf(opening)));
+
+    expect(call).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, runConfig.config)),');
   });
 });
 

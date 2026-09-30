@@ -470,6 +470,37 @@ status:
   notice: false
 ```
 
+### `claims`
+
+Two settings control how claims work when two devices work on one project.
+Devices claim issues to prevent collisions: no two can plan or start the same
+issue, and stale or lost claims are recovered without losing work.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `claims.staleAfter` | `3d` | how long a `rafa:claimed` claim stands before takeover is allowed: a duration such as `3d`, `1w`, or `disabled` |
+| `claims.ahead` | `off` | whether to reserve one issue ahead on the roadmap: `off` or `allow` |
+
+`claims.staleAfter` takes a duration or the word `disabled`; `0`, a fraction,
+and a quoted value are refused. When `disabled`, nothing is ever stale and
+claims must be released by hand. `claims.ahead` enables claim-ahead as an
+opt-in per run with `--claim-ahead` on `rafa next --roadmap` and `plan create
+--next`.
+
+```yaml
+# Default: claims are made, staleAfter is 3d, no claim ahead
+# (nothing set, or claims: {})
+
+# Set staleness only
+claims:
+  staleAfter: 3d
+
+# Disable staleness and enable claim ahead
+claims:
+  staleAfter: disabled
+  ahead: allow
+```
+
 ### `loop` and the guard
 
 A loop guards itself: every turn, it watches the checkout's branch and HEAD

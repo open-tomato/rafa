@@ -18,6 +18,7 @@ Quick start:
   rafa release status
   rafa board list
   rafa epic show
+  rafa claim release 324
   rafa status
   rafa next
   rafa roadmap
@@ -54,6 +55,8 @@ Subjects:
   epic       show one epic's issues as the Roadmap table; create an epic; defer
              or promote it; move an issue to it; close it through the gate or
              cancel it 🪙
+  claim      give up this device's claim on an issue; hand it to another store
+             or withdraw the offer; accept a handover; take over a stale claim
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,

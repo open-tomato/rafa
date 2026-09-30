@@ -178,6 +178,23 @@
  *     as it does for every setting, so a user default needs no reader
  *     of its own.
  *
+ * ## The `claims` section
+ *
+ * `claims.staleAfter` is how long a `rafa:claimed` claim stands before
+ * another device may take it over, and `claims.ahead` whether a claim
+ * may reach one issue ahead. What each VALUE may be is
+ * `config-sections.ts`'s to say. Three readings are this module's:
+ *
+ *   - `claims.staleAfter` defaults to `3d` and `claims.ahead` to `off`;
+ *     neither is null. `disabled` is a value and not an absence, so a
+ *     project that turns takeover off says so in its file.
+ *   - The section sits after `roadmap`, beside the other board keys,
+ *     and its duration is kept as written; the hours it spells are
+ *     `claimDurationHours`'s answer.
+ *   - Neither is a `CommandLineSetting`, for the reason the `pr`
+ *     section gives: every device of a project must read the same two
+ *     values, which one run's flag would break.
+ *
  * ## The `tiers` section
  *
  * `.rafa/specs/rafa-26-skill-tiers.md` names three keys that decide which

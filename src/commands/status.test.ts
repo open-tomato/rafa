@@ -18,7 +18,7 @@
  *   config's, and not a command that always refused.
  * - The case with every section unread exits 0 beside the case with
  *   every section read, which also exits 0 and writes no `warn` line:
- *   so the five `warn` lines are the sections', and a section not read
+ *   so the six `warn` lines are the sections', and a section not read
  *   is proved not to be a failure.
  * - The positional word exits 2 with the reader never called, beside
  *   the same line without the word, which reads.
@@ -90,6 +90,7 @@ const ALL_READ: StatusSections = {
   },
   pull: { read: true, pull: null, notes: [] },
   board: { read: true, roadmap: 31, next: null, passed: 4, blockedIssues: 0, notes: [] },
+  claims: { read: true, claims: [], notes: [] },
   housekeeping: {
     read: true,
     counts: { merged: 1, stale: 0, notPushed: 0, worktrees: 0 },
@@ -104,6 +105,7 @@ const NONE_READ: StatusSections = {
   loops: { read: false, problem: 'a session record cannot be read' },
   pull: { read: false, problem: 'the pull request was not read within the 5000ms network deadline' },
   board: { read: false, problem: 'the board was not read within the 5000ms network deadline' },
+  claims: { read: false, problem: 'the origin branches could not be listed: fatal: not a git repository' },
   housekeeping: { read: false, problem: 'fatal: not a git repository' },
 };
 
@@ -157,7 +159,7 @@ describe('rafa status in text mode', () => {
 
     expect(outcome.exitCode).toBe(0);
     expect(lines(outcome.stdout)).toEqual(written(NONE_READ));
-    expect(lines(outcome.stdout).filter((line) => line.startsWith('warn: '))).toHaveLength(5);
+    expect(lines(outcome.stdout).filter((line) => line.startsWith('warn: '))).toHaveLength(6);
   });
 
   it('writes the sections read at info beside the one not read at warn', async () => {
@@ -230,10 +232,11 @@ describe('the exit codes of rafa status', () => {
 
     expect(outcome.exitCode).toBe(0);
     const written = lines(outcome.stdout);
-    expect(written).toHaveLength(5);
+    expect(written).toHaveLength(6);
     expect(written[0]).toStartWith('warn: Branch: not read: ');
     expect(written[1]).toBe('Loops: 0 running, 0 tasks blocked');
-    expect(written[4]).toStartWith('warn: Housekeeping: not read: ');
+    expect(written[4]).toStartWith('warn: Claims: not read: the origin branches could not be listed: ');
+    expect(written[5]).toStartWith('warn: Housekeeping: not read: ');
   });
 });
 

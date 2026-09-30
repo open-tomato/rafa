@@ -2,7 +2,7 @@ rafa next — say where the project stands, propose the one next step, and run i
   on a yes
 
 Usage:
-  rafa next [--dry-run] [--roadmap] [--yes=<string>]
+  rafa next [--dry-run] [--roadmap] [--claim-ahead] [--yes=<string>]
 
 Description:
   Reads the project once — the running loops, the branch and its base, the plans
@@ -21,26 +21,31 @@ Description:
   and fold into a version, it proposes `rafa release settle`, which runs unasked
   only under a --yes list naming settle. With `--roadmap` it follows one blocker
   into another epic or board, works it up to its pull request and comes home,
-  halting where that blocker is blocked in turn. With `--output=json` the steps
-  and why the chain stopped are the data of the terminal result event, and under
-  `--roadmap` the hops that ran as well.
+  halting where that blocker is blocked in turn, and with `--claim-ahead` as
+  well its plan step also claims the next line of the board. With
+  `--output=json` the steps and why the chain stopped are the data of the
+  terminal result event, and under `--roadmap` the hops that ran as well.
 
 Spends:
   🪙 when the step it runs is one of the above
 
 Flags:
-  --dry-run   boolean
+  --dry-run       boolean
       Print where the project stands and what to do about it, and stop without
       asking or running it. A run with no terminal to answer on and no --yes
       does this whether or not the flag is typed.
-  --roadmap   boolean
+  --roadmap       boolean
       Follow one blocker into another epic or board and come home: where the
       walk stops at an issue blocked by one in another epic, or at an epic with
       no line left, propose the hop there, pass --roadmap to plan create and
       loop start, and go home once the loop has run. A blocker that is itself
       blocked halts with the chain instead, and a pull request whose owner has
       not approved is not merged.
-  --yes       string
+  --claim-ahead   boolean
+      With --roadmap, pass --claim-ahead to plan create, so the plan step also
+      claims the line after the one it picks on the same board, both claims or
+      neither, as claims.ahead: allow does. Refused without --roadmap.
+  --yes           string
       Run the actions named without asking, as a comma list of action ids, and
       stop at the first action the list leaves out. Bare it names sync, wait,
       unblock, plan, home. The ids are sync, resume, wait, triage, merge,
@@ -59,6 +64,9 @@ Examples:
   rafa next --roadmap --yes=hop,plan,start,home
       Hops to the epic holding the blocker, plans and runs it, and comes home
       unasked.
+  rafa next --roadmap --claim-ahead
+      Plans the next line and claims the one after it too, both claims or
+      neither.
 
 Outputs:
   text, json

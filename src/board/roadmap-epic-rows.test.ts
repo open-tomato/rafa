@@ -12,6 +12,13 @@
  * The planted board holds four epics: #100 `now` with one member closed
  * and one open, #200 `now` whose one member is claimed only by a branch,
  * #300 `next`, and #400 with no `horizon:` label. #50 and #51 are specs.
+ *
+ * The claims on #201's branch are read through {@link claimGit}, a git
+ * whose remote holds `feat/rafa-201-beta-one` with the ownership commits
+ * `formatClaimMessage` writes, so `claimsOf` weighs the branch through
+ * the walk's own taken reading. A released claim, which must leave #200
+ * in the backlog, is read beside a held one, a stale one under each
+ * stage label and one that could not be fetched, which must all claim.
  */
 import type { BoardLister } from './boards.js';
 import type { SpecIssue, SpecIssueReader } from './issue.js';
@@ -22,6 +29,8 @@ import type { GitRunner } from '../pr/git.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '../claims/record.js';
+import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { renderCancelledEpicNotice } from './epic-cancel-notice.js';
@@ -322,6 +331,96 @@ describe('readRoadmapEpicRows with an epic closed as not planned', () => {
     const read = await readRoadmapEpicRows({ ...failing.options, today: TODAY });
 
     expect(read.warnings.some((warning) => warning.includes('closed as not planned'))).toBe(false);
+  });
+});
+
+/** What {@link claimGit} answers for #201's branch. */
+interface ClaimGitOptions {
+  /** The ownership actions on the branch, oldest first. */
+  readonly actions: readonly ('claim' | 'release')[];
+  /** How long before now the branch tip was committed. */
+  readonly idleMs?: number;
+  /** A fetch that fails with this stderr. */
+  readonly fetchFails?: string;
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * A git whose remote holds `feat/rafa-201-beta-one` carrying `actions`,
+ * answering the scan and the claim reads, and recording each command.
+ */
+function claimGit(options: ClaimGitOptions): { run: GitRunner; calls: () => readonly string[] } {
+  let calls: readonly string[] = [];
+  const seconds = String(Math.floor((Date.now() - (options.idleMs ?? HOUR_MS)) / 1000));
+  const walked = options.actions
+    .map((action, index) => `${String(index + 1).repeat(40)}\n${formatClaimMessage({ action, issue: 201, store: 'store-a' })}\0`)
+    .join('');
+  const ok = (stdout: string): { ok: true; stdout: string; stderr: string } => ({ ok: true, stdout, stderr: '' });
+  const answers: Readonly<Record<string, () => ReturnType<GitRunner>>> = {
+    'for-each-ref': () => ok('refs/heads/main\n'),
+    'ls-remote': () => ok(`${'f'.repeat(40)}\trefs/heads/feat/rafa-201-beta-one\n`),
+    'fetch': () => options.fetchFails === undefined
+      ? ok('')
+      : { ok: false, stdout: '', stderr: options.fetchFails },
+    'rev-parse': () => ok(`${'a'.repeat(40)}\n`),
+  };
+  return {
+    run: (args) => {
+      const command = args[0] ?? '';
+      calls = [...calls, command];
+      if (command === 'log') return ok(args[1] === '-1'
+        ? `${seconds}\n`
+        : walked);
+      return answers[command]?.() ?? { ok: false, stdout: '', stderr: 'claimGit: no answer recorded' };
+    },
+    calls: () => calls,
+  };
+}
+
+/** The board with #201 labelled `stage` besides its own labels. */
+function boardWithStage(stage: string): readonly BoardIssue[] {
+  return BOARD.map((one) => one.number === 201
+    ? member(201, 'beta', { labels: [SPEC_READY_LABEL, 'epic:beta', stage] })
+    : one);
+}
+
+/** Epic #200's computed state, #201's branch read through `git` over `board`. */
+async function betaState(git: GitRunner, board: readonly BoardIssue[] = BOARD): Promise<string | undefined> {
+  const read = await readRoadmapEpicRows({ ...planted(MIXED, { git }, board).options, today: TODAY });
+  return read.groups[0]?.rows[1]?.epic.state;
+}
+
+describe('readRoadmapEpicRows weighs a branch through the roadmap taken reading', () => {
+  it('reads an epic whose only branch claim was released as backlog', async () => {
+    expect(await betaState(claimGit({ actions: ['claim', 'release'] }).run)).toBe('backlog');
+  });
+
+  it('reads the same branch held as in-progress, the control for the release', async () => {
+    expect(await betaState(claimGit({ actions: ['claim'] }).run)).toBe('in-progress');
+  });
+
+  it('keeps a stale claim claiming the member under either stage label', async () => {
+    const stale = { actions: ['claim'] as const, idleMs: 30 * DAY_MS };
+    const claimed = await betaState(claimGit(stale).run, boardWithStage(CLAIMED_LABEL));
+    const developing = await betaState(claimGit(stale).run, boardWithStage(IN_DEVELOPMENT_LABEL));
+
+    expect([claimed, developing]).toEqual(['in-progress', 'in-progress']);
+  });
+
+  it('keeps a claim that could not be fetched claiming the member', async () => {
+    const git = claimGit({ actions: ['claim', 'release'], fetchFails: 'fatal: unable to access origin' });
+
+    expect(await betaState(git.run)).toBe('in-progress');
+    expect(git.calls().filter((command) => command === 'fetch')).toHaveLength(1);
+  });
+
+  it('spends one fetch and one read of the branch, over the kept scan', async () => {
+    const git = claimGit({ actions: ['claim', 'release'] });
+    await betaState(git.run);
+
+    expect(git.calls()).toEqual(['for-each-ref', 'ls-remote', 'fetch', 'rev-parse', 'log', 'log']);
   });
 });
 

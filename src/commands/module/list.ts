@@ -30,7 +30,7 @@
  * command declares no flag.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ModuleSource } from '../../config-sections.js';
+import type { ModuleSource } from '../../config-items.js';
 import type { ConfiguredModule, ModuleLoadSeams } from '../../modules/load.js';
 
 import { CommandExit } from '../../cli/command.js';

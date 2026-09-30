@@ -78,12 +78,24 @@
  * ## Claims
  *
  * A member is CLAIMED, for `readEpics`, when the plan dir holds its plan
- * ({@link hasPlanFor}), a scanned branch claims it ({@link branchClaims})
- * or an open pull request closes it ({@link closedIssuesIn}): the three
- * readings the roadmap's `has` column makes, asked for every issue on
- * the listing instead of each roadmap line. A reading that failed has
+ * ({@link hasPlanFor}), a branch claims it or an open pull request
+ * closes it, asked for every issue on the listing instead of each
+ * roadmap line. The branch and the pull request are the roadmap walk's
+ * own taken reading (`createRoadmapReadings`, `./roadmap.ts`), made over
+ * the same kept scan and pull request list, so a branch is weighed as
+ * `rafa next` weighs it and `branchClaimsMember` (`./epics.ts`) says
+ * which answers claim: a branch whose claim was released claims nothing,
+ * every other branch claims. The claims' stage labels are read off the
+ * listing, never with a `gh issue view` per issue.
+ *
+ * Weighing a claim reads it off the remote, so a listing member with a
+ * claim branch the remote holds costs the walk's one `git fetch` of the
+ * claim branches and one read per such branch; a listing with none costs
+ * nothing more than the scan. The `has` column is not the taken reading
+ * and still names a released claim's branch. A reading that failed has
  * already been warned by `readRoadmapRows` and adds no claim here, and
- * no second warning.
+ * no second warning; a claim that could not be read keeps its member
+ * claimed, as it keeps a line taken.
  *
  * ## Warnings
  *
@@ -117,9 +129,10 @@
  */
 import type { EpicProblem } from './epic-problems.js';
 import type { Epic, EpicRelations, Epics } from './epics.js';
+import type { SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
-import type { RoadmapLine, RoadmapPullRequest } from './roadmap.js';
+import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { messageOf } from '../config-sections.js';
@@ -127,9 +140,9 @@ import { messageOf } from '../config-sections.js';
 import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';
 import { withSubIssuesSummary } from './epic-summary.js';
-import { readEpics } from './epics.js';
+import { branchClaimsMember, readEpics } from './epics.js';
 import { hasPlanFor, readNativeBlockersColumn, readRoadmapRows } from './roadmap-rows.js';
-import { branchClaims, closedIssuesIn, scanClaimBranches } from './roadmap.js';
+import { createRoadmapReadings, scanClaimBranches } from './roadmap.js';
 
 /** The three horizons, in the order their groups are printed. */
 export const HORIZONS = Object.freeze(['now', 'next', 'later'] as const);
@@ -282,21 +295,44 @@ async function orEmpty<T>(read: () => Promise<T> | T, fallback: T): Promise<T> {
 export type ClaimSeams = Pick<LineRowsOptions, 'planNames' | 'git' | 'remote' | 'pullRequests'>;
 
 /**
+ * The listing as the issue reader the taken reading weighs a claim's
+ * stage labels through, so weighing one spends no `gh issue view`. The
+ * reader is only asked about issues on the listing; one it does not hold
+ * rejects, which the taken reading never meets.
+ */
+function listingIssues(issues: readonly BoardIssue[]): SpecIssueReader {
+  const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
+  return (number) => {
+    const issue = byNumber.get(number);
+    return issue === undefined
+      ? Promise.reject(new Error(`board roadmap: issue #${String(number)} is not on the listing`))
+      : Promise.resolve({ ...issue, author: '' });
+  };
+}
+
+/** Whether the open pull requests close `issue`; a failed list closes nothing. */
+async function pullClaims(readings: RoadmapReadings, issue: number): Promise<boolean> {
+  return await orEmpty(async () => await readings.pullRequestFor(issue) !== null, false);
+}
+
+/**
  * Every issue on `issues` a plan, a branch or an open pull request
- * claims; a reading that fails adds no claim, since the rows' reading
- * over the same seams has warned it already. See the module note.
+ * claims, the branch and the pull request read through the roadmap
+ * walk's taken reading; a reading that fails adds no claim, since the
+ * rows' reading over the same seams has warned it already. See the
+ * module note.
  */
 export async function claimsOf(issues: readonly BoardIssue[], seams: ClaimSeams): Promise<ReadonlySet<number>> {
   const names = await orEmpty(seams.planNames, []);
-  const refs = scanClaimBranches(seams.git, seams.remote).refs;
-  const pulls = await orEmpty<readonly RoadmapPullRequest[]>(seams.pullRequests, []);
-  const closing = new Set(pulls.flatMap((pull) => closedIssuesIn(pull.body)));
-  const claimed = issues
-    .map((issue) => issue.number)
-    .filter((number) => hasPlanFor(names, number)
-      || closing.has(number)
-      || refs.some((ref) => branchClaims(ref, number)));
-  return new Set(claimed);
+  const readings = createRoadmapReadings({
+    issues: listingIssues(issues),
+    branches: scanClaimBranches(seams.git, seams.remote),
+    pullRequests: seams.pullRequests,
+  });
+  const claimed = await Promise.all(issues.map(async ({ number }) => hasPlanFor(names, number)
+    || branchClaimsMember(await readings.branchClaimFor(number))
+    || await pullClaims(readings, number)));
+  return new Set(issues.map(({ number }) => number).filter((_, index) => claimed[index]));
 }
 
 /** True when `relations` read the `native` mode; left out, the mode is `labels`. */

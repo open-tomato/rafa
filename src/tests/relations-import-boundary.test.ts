@@ -85,6 +85,7 @@ const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'next/state.ts': 'next\'s labels-mode remedy wording',
   'commands/doctor-blocked.ts': 'the doctor row reporting spec:blocked issues',
   'commands/doctor-epics.ts': 'the doctor row reporting epic: labels',
+  'commands/doctor-marks.ts': 'the doctor row naming the other mode\'s marks, which in native mode looks for epic: labels, spec:blocked and Blocked by: lines',
   'commands/epic/move.ts': 'the move module',
   'commands/epic/new.ts': 'writes the new epic:<slug> label',
   'commands/epic/close.ts': 'epic close\'s labels-mode branch, finding members by the epic: label',

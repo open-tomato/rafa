@@ -13,7 +13,7 @@
  * with that one thing put back.
  */
 import type { ModuleSettings } from './load.js';
-import type { ModuleSource } from '../config-sections.js';
+import type { ModuleSource } from '../config-items.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

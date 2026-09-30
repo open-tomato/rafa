@@ -65,8 +65,24 @@
  * is how many there are, `done` how many of them are closed, whatever
  * other reason `gh` wrote. A member is CLAIMED when its number is in the
  * `claims` set — a plan file, a branch or an open pull request claims it,
- * read by the helpers the roadmap's `has` column uses (`hasPlanFor`,
- * `branchClaims`, `closedIssuesIn`) before this is called.
+ * read before this is called: the plan file by `hasPlanFor`, the branch
+ * and the pull request by the roadmap walk's own taken reading
+ * (`createRoadmapReadings` in `./roadmap.ts`, its `branchClaimFor` and
+ * `pullRequestFor`), so an epic weighs a branch exactly as `rafa next`
+ * weighs it. A branch claims its member when {@link branchClaimsMember}
+ * says so: whenever the walk passes the line over for it, taken or
+ * offered for a takeover, and never when the claim on it was released.
+ *
+ * | The branch's claim | The member |
+ * |---|---|
+ * | none, held, stale in development, or unreadable | claimed |
+ * | stale `rafa:claimed` | claimed: its owner has not let go |
+ * | released | not claimed by that branch |
+ *
+ * A stale `rafa:claimed` claim is a takeover candidate to the walk, yet
+ * it counts here, since somebody planned the member and nobody released
+ * it; staleness therefore never changes an epic's state, and only a
+ * release does.
  *
  * ```text
  * unknown      the listing failed; the reason is kept
@@ -131,6 +147,7 @@
 import type { EpicBody } from './epic-body.js';
 import type { BoardRelations, RelationsReading } from './relations/port.js';
 import type { BoardIssue } from './roadmap-board.js';
+import type { BranchClaimReading } from './roadmap.js';
 
 import { readBlockedBy } from './blocked.js';
 import { readEpicBody } from './epic-body.js';
@@ -235,6 +252,15 @@ export function epicSlugsOf(labels: readonly string[]): readonly string[] {
     .filter((label) => label.startsWith(EPIC_LABEL_PREFIX))
     .map((label) => label.slice(EPIC_LABEL_PREFIX.length));
   return Object.freeze([...new Set(slugs)]);
+}
+
+/**
+ * Whether `reading`, the taken reading's answer for a member's branch
+ * (`RoadmapReadings.branchClaimFor`), claims the member: a branch names
+ * it and the claim on that branch was not released. See the module note.
+ */
+export function branchClaimsMember(reading: BranchClaimReading | null): boolean {
+  return reading !== null && reading.claim.state !== 'released';
 }
 
 /** True when `issue` was closed as not planned. */

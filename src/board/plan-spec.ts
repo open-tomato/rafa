@@ -467,6 +467,11 @@ export interface PlanSpecOptions {
    * always did. Never called under `--dry-run`, for the same reason.
    */
   readonly offerRefresh?: RefreshOffer | null;
+  /**
+   * Issues a `--next` walk reads as taken, each with the branch whose
+   * claim was refused; `./spec-source-roadmap.ts`'s own seam, handed on.
+   */
+  readonly passOver?: ReadonlyMap<number, string>;
   /** Runs `gh`; one made for the project root when left out. */
   readonly gh?: GhRunner;
   /** Runs `git`; one made for the project root when left out. */
@@ -568,6 +573,9 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
         : { listing: createGhBoardListing({ gh, mode: relations.mode }), relations },
       inspectRoadmap: (issue) => inspectRoadmapIssue(issue, trust()),
       offerAlternative: alternative,
+      ...options.passOver === undefined
+        ? {}
+        : { passOver: options.passOver },
     },
     output,
   });
