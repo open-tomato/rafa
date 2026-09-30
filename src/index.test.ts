@@ -629,6 +629,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readMergeRefusal',
     ]],
     ['./merge-cleanup.js', ['cleanUpAfterMerge', 'INDENT', 'reportFollowUps']],
+    ['./merge-freed.js', ['freedAfterMerge']],
     ['./merge-guard.js', ['guardBeforeMerge']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],

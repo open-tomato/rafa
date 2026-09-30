@@ -100,6 +100,13 @@
  * relationships adapter (`src/board/relations/labels.ts`) runs it in its
  * `afterMerge`, since an epic's checklist is where that mode keeps its
  * order. The boards are not a relationship and stay here alone.
+ *
+ * Under `board.relationships: native` an epic keeps its order in its
+ * sub-issues, which `gh` answers in the order GitHub holds
+ * (`context/pull-requests.md`, "Native relationships"), so there is no
+ * checklist line to tick: `pr merge` hands {@link MergeTickOptions.epics}
+ * false, the epic tick sends nothing, not even its listing, and the
+ * boards are ticked exactly as above.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ChecklistEditResult } from '../../board/epic-checklist.js';
@@ -128,6 +135,8 @@ export interface MergeTickOptions {
   readonly warn: (message: string) => void;
   /** Handed each epic's tick as it lands, lowest epic first; see the module note. */
   readonly epicTicked: (result: EpicTickResult) => void;
+  /** False to leave the epic checklists alone, as the `native` mode does; see the module note. True when left out. */
+  readonly epics?: boolean;
 }
 
 /** What the tick of one epic's checklist came to. */
@@ -279,10 +288,11 @@ async function boardsToTick(
 
 /**
  * Ticks the lines of every issue the merged pull request closes on the
- * checklist of its epic, handing each epic's result to `epicTicked`, and
- * then on every board that lists one, answering one result per board in
- * the module note's order, or null when it closes none or the boards
- * could not be found. Never throws: see the module note.
+ * checklist of its epic, handing each epic's result to `epicTicked`,
+ * unless `epics` is false, and then on every board that lists one,
+ * answering one result per board in the module note's order, or null
+ * when it closes none or the boards could not be found. Never throws:
+ * see the module note.
  */
 export async function tickRoadmapAfterMerge(
   options: MergeTickOptions,
@@ -290,7 +300,7 @@ export async function tickRoadmapAfterMerge(
   const { body, configured, gh, warn } = options;
   const issues = closedIssuesIn(body);
   if (issues.length === 0) return null;
-  await tickEpics(options, issues);
+  if (options.epics !== false) await tickEpics(options, issues);
 
   let roadmaps: readonly number[];
   try {

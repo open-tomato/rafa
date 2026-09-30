@@ -57,6 +57,7 @@ module's note is the long form.
 | `src/commands/pr/triage-report.ts` | the one pure renderer of a triage: the head line, the re-run sentence, the class with its evidence or the stored triage, what was written, and the follow-up prompt whole |
 | `src/commands/pr/merge-tick.ts` | what `pr merge` decides about the roadmap tick: the issues the merged pull request closes, each one's line on the checklist of the open epic its `epic:` label names (through `src/board/epic-checklist.ts`, one sentence per epic), every open `type:roadmap` board whose checklist lists one (with a `roadmap.issue` the listing does not hold), or while none is labelled the roadmap issue `roadmap.issue` names or the search finds, and every failure on the way turned into a warning |
 | `src/commands/pr/merge-unblock.ts` | the unblock reading `pr merge` runs after its clean-up, ahead of the follow-ups: the open `spec:blocked` issues whose `Blocked by:` line names an issue the merged pull request closes, run through `runUnblock`, with every failure turned into a warning naming the reading |
+| `src/commands/pr/merge-freed.ts` | what `pr merge` reads after its clean-up in the unblock reading's place under `board.relationships: native`: the board's repository by `gh repo view`, one native board listing, and the port's `freedBy` over it for the issues the merged pull request closes, printed under a line opening `board.relationships is native` with no question and no write, every failure a warning naming the reading |
 | `src/commands/pr/merge-cleanup.ts` | what `pr merge` runs after the provider merged: the `ls-remote` and `show-ref` probes of both branches, the clean-up steps walked and each reported, the exit-1 refusal naming the rest to paste at the first that failed, the line saying what is ready, and the follow-ups read off `package.json`, the runtime directory and the settle dry run (`readSettle`) over `origin/<base>` where `release.enabled` reads on, printed under `Follow-ups:` |
 | `src/commands/pr/merge-guard.ts` | the release guard's step in `pr merge`, called from `runMerge` after `readMergeRefusal` and before the question, only where `release.enabled` reads on: `readMergeGuard` (`src/release/guard-merge.ts`) fetches the base and the head from `origin` and reads the guard over `origin/<head>`, and `guardReaction` picks what to do. `clean` prints its lines, the forecast among them; `missing` and `stale` follow `pr.versionCollision` (`allow` silent, `report` warns, `ask` asks `Merge #<n> with its release guard reading <answer>? [y/N]` before `Merge? [y/N]`, `refuse` refuses with exit 1); a `collision` refuses with exit 1 unless `dangerous.acceptVersionCollision` is true, when it warns and merges; a guard that could not read warns and never refuses. `--yes` does not answer the guard's question, and without a terminal `ask` refuses with exit 1. A refusal names the answer and the setting first, so a `stale` or `collision` one still ends with `rafa pr triage <n> --resolve`. `PrMergeResult.guard` carries the answer, the reaction and the lines, null where the release does not run |
 | `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa self-update` while the project's `package.json` names rafa's own package and the version is not installed under the home, and `rafa release settle` — always last, so it is the merge's last line ahead of the ending hint — while the settle dry run folds the fragments waiting on the base into a version (`<n> fragments wait on <base> and fold into <version>`); a base holding only `level: none` fragments names nothing. It no longer names `rafa release tag`, which settle's own tag step names where it leaves the tag to the operator; `versionTag` stays spelled here |
@@ -596,7 +597,9 @@ New; it replaces no earlier text. What a row or an action added to
   closing no issue are a warning or a silence. `--output=json` carries
   every board's as `roadmapTicks`, null when the pull request closes
   nothing, and the first of them as `roadmapTick`, null when no board was
-  ticked.
+  ticked. Under `board.relationships: native` the epic checklist tick is
+  left out, listing and all, since an epic keeps its order in its
+  sub-issues; the boards are ticked as above.
 - **`pr merge` runs the unblock reading after its clean-up**
   (`src/commands/pr/merge-unblock.ts`), over every open issue labelled
   `spec:blocked` whose `Blocked by:` line names an issue the merged pull
@@ -613,6 +616,18 @@ New; it replaces no earlier text. What a row or an action added to
   them changes the exit code, since the merge has already happened.
   `--output=json` carries the report as `unblocked`, null when the pull
   request closes nothing.
+- **`pr merge` prints the freed issues in native mode**
+  (`src/commands/pr/merge-freed.ts`). Under `board.relationships: native`
+  the unblock reading does not run: after the clean-up the command reads
+  the board's repository and one native board listing, and prints the
+  open issues the port's `freedBy` names for the issues the merged pull
+  request closes, under a line opening `board.relationships is native`
+  and one indented line per issue. It asks nothing and writes nothing,
+  since GitHub clears a blocked-by link when the blocking issue closes;
+  a merge that freed nothing prints nothing, and one closing no issue
+  sends no call. Every failure is a warning. `--output=json` carries the
+  reading as `freed`, a key left out in `labels` mode, with `unblocked`
+  null.
 - **Checks 0–2 of the readiness gate's five run in the board route's
   resolution** (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
   the `spec:ready` label, then the leak refusal and the completeness

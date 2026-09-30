@@ -89,6 +89,7 @@
  * request, and a provider call that rejected.
  */
 import type { RafaContext } from '../../cli/command.js';
+import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -211,6 +212,8 @@ export interface PrContext {
   readonly trustedAuthors: readonly string[];
   /** `roadmap.issue`, or null when nobody named one, as `pr merge` ticks it. */
   readonly roadmapIssue: number | null;
+  /** `board.relationships`, which picks what `pr merge` reads and writes on the board after the merge. */
+  readonly relationships: BoardRelationshipMode;
   /** `plan.dir`, the plans a head branch's stub is resolved against when a checks reading is stored. */
   readonly planDir: string;
   /** The branch checked out at the project root; throws when git cannot read it. */
@@ -242,6 +245,7 @@ type PrConfig = Pick<
   | 'prResolveBudget'
   | 'boardTrustedAuthors'
   | 'roadmapIssue'
+  | 'boardRelationships'
   | 'planDir'
   | keyof MergeGuardSettings
 >;
@@ -302,6 +306,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     resolveBudget: config.prResolveBudget,
     trustedAuthors: config.boardTrustedAuthors,
     roadmapIssue: config.roadmapIssue,
+    relationships: config.boardRelationships,
     planDir: config.planDir,
     readBranch: () => readBranch(project.root),
     versionGuard: mergeGuardSettings(config),
