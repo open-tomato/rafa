@@ -16,6 +16,16 @@
  * artifact WITH the tracker file it was reported against, so two plans
  * quoting one error string keep two references.
  *
+ * ## Keys stored before local paths were taken out
+ *
+ * Triage now builds its key from the artifact with its local paths taken
+ * out (`triage/local-paths.ts`). A row a rafa before that stored may hold
+ * a key with an absolute path in it. Nothing here rewrites those rows:
+ * triage reads the key it builds now and then that legacy key, so an old
+ * row still answers on the machine and checkout that wrote it, and the
+ * keys differ nowhere else. A row is never rekeyed, since a store synced
+ * from another machine would then hold two keys for one reference.
+ *
  * ## The row
  *
  * A findings row with an artifact is keyed by its session and that
