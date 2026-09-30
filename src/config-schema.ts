@@ -102,6 +102,8 @@ import type {
   ReleaseSettings,
 } from './config-schema-release.js';
 import type {
+  ClaimsAhead,
+  ClaimsStaleAfter,
   ClaudeSettingSource,
   ConfigVersion,
   InjectMode,
@@ -142,6 +144,8 @@ import {
 } from './config-schema-release.js';
 import {
   busyTimeoutMs,
+  claimsAhead,
+  claimsStaleAfter,
   CLAUDE_SETTING_SOURCES,
   confidence,
   CONFIG_VERSIONS,
@@ -244,6 +248,13 @@ export interface RafaConfig extends PrSettings, ReleaseSettings, DangerousReleas
    */
   roadmapIssue: number | null;
   /**
+   * How long a `rafa:claimed` claim stands before another device may
+   * take it over, or `disabled`. `claims.staleAfter`.
+   */
+  claimsStaleAfter: ClaimsStaleAfter;
+  /** Whether a claim may reach one issue ahead. `claims.ahead`. */
+  claimsAhead: ClaimsAhead;
+  /**
    * The age in days past which `rafa cleanup` lists a branch as Stale.
    * `cleanup.staleDays`.
    */
@@ -336,6 +347,8 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   roadmapIssue: null,
+  claimsStaleAfter: '3d',
+  claimsAhead: 'off',
   ...RELEASE_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
@@ -434,6 +447,8 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: false,
   },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
+  claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
+  claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },
   ...RELEASE_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {

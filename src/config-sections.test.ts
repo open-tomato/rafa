@@ -27,6 +27,11 @@ import { describe, expect, it } from 'bun:test';
 import { moduleSource } from './config-items.js';
 import {
   busyTimeoutMs,
+  CLAIMS_AHEAD,
+  CLAIMS_STALE_DISABLED,
+  claimDurationHours,
+  claimsAhead,
+  claimsStaleAfter,
   CLAUDE_SETTING_SOURCES,
   confidence,
   dayCount,
@@ -599,6 +604,71 @@ describe('lessonSwitch', () => {
     ['null', null, 'null'],
   ])('refuses %s', (_label, raw, found) => {
     expect(problemsOf(lessonSwitch, raw)).toEqual([`F: s is ${found}, expected one of: on, off`]);
+  });
+});
+
+/** The expectation a `claims.staleAfter` refusal names. */
+const STALE_AFTER_EXPECTED = 'expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled';
+
+describe('claimsStaleAfter', () => {
+  it('accepts whole hours, whole days and disabled, each as written', () => {
+    const parsed = Bun.YAML.parse('a: 3d\nb: disabled\n') as Record<string, unknown>;
+
+    expect(['1h', '36h', '3d', '30d', CLAIMS_STALE_DISABLED].map((raw) => valueOf(claimsStaleAfter, raw)))
+      .toEqual(['1h', '36h', '3d', '30d', 'disabled']);
+    expect([valueOf(claimsStaleAfter, parsed.a), valueOf(claimsStaleAfter, parsed.b)]).toEqual(['3d', 'disabled']);
+  });
+
+  it.each([
+    ['zero days', '0d', '"0d"'],
+    ['zero hours', '0h', '"0h"'],
+    ['zero days spelled with two digits', '00d', '"00d"'],
+    ['a negative count of days', '-1d', '"-1d"'],
+    ['a negative count of hours', '-12h', '"-12h"'],
+    ['a fraction of a day', '1.5d', '"1.5d"'],
+    ['a unit outside hours and days', '3w', '"3w"'],
+    ['minutes', '90m', '"90m"'],
+    ['an upper-case unit', '3D', '"3D"'],
+    ['a count with no unit', '3', '"3"'],
+    ['a unit with no count', 'd', '"d"'],
+    ['a leading space', ' 3d', '" 3d"'],
+    ['a count too large to hold exactly', '9007199254740993d', '"9007199254740993d"'],
+    ['a different case of disabled', 'Disabled', '"Disabled"'],
+    ['off, which is not the word for disabled here', 'off', '"off"'],
+    ['the number 0', 0, '0'],
+    ['the number 3', 3, '3'],
+    ['the boolean false', false, 'false'],
+    ['null', null, 'null'],
+    ['a list', ['3d'], 'a list'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(claimsStaleAfter, raw)).toEqual([`F: s is ${found}, ${STALE_AFTER_EXPECTED}`]);
+  });
+});
+
+describe('claimDurationHours', () => {
+  it('answers the hours a duration spells', () => {
+    expect(['1h', '36h', '1d', '3d'].map(claimDurationHours)).toEqual([1, 36, 24, 72]);
+  });
+
+  it('answers null for disabled and for every refused spelling', () => {
+    expect([CLAIMS_STALE_DISABLED, '0d', '0h', '-1d', '1.5d', '3w', 3, null].map(claimDurationHours))
+      .toEqual([null, null, null, null, null, null, null, null]);
+  });
+});
+
+describe('claimsAhead', () => {
+  it('accepts off and allow, each as itself', () => {
+    expect(CLAIMS_AHEAD.map((word) => valueOf(claimsAhead, word))).toEqual(['off', 'allow']);
+  });
+
+  it.each([
+    ['the boolean false, which nothing here coerces', false, 'false'],
+    ['the boolean true', true, 'true'],
+    ['on, which is the tiers word and not this one', 'on', '"on"'],
+    ['a different case', 'Allow', '"Allow"'],
+    ['null', null, 'null'],
+  ])('refuses %s', (_label, raw, found) => {
+    expect(problemsOf(claimsAhead, raw)).toEqual([`F: s is ${found}, expected one of: off, allow`]);
   });
 });
 

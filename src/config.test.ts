@@ -87,7 +87,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, release, cleanup, dangerous, status, tiers, routing, task)';
+  + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -121,6 +121,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prVersionCollision',
   'boardTrustedAuthors',
   'roadmapIssue',
+  'claimsStaleAfter',
+  'claimsAhead',
   'releaseEnabled',
   'releaseVersionFile',
   'releaseChangelog',
@@ -176,6 +178,8 @@ const DEFAULTS: RafaConfig = {
   prVersionCollision: 'report',
   boardTrustedAuthors: [],
   roadmapIssue: null,
+  claimsStaleAfter: '3d',
+  claimsAhead: 'off',
   releaseEnabled: 'auto',
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
@@ -264,6 +268,9 @@ const FULL = [
   '  trustedAuthors: ["dependabot[bot]"]',
   'roadmap:',
   '  issue: 31',
+  'claims:',
+  '  staleAfter: 36h',
+  '  ahead: allow',
   'release:',
   '  enabled: false',
   '  versionFile: deno.json',
@@ -343,6 +350,8 @@ const FULL_VALUES: RafaConfig = {
   prVersionCollision: 'refuse',
   boardTrustedAuthors: ['dependabot[bot]'],
   roadmapIssue: 31,
+  claimsStaleAfter: '36h',
+  claimsAhead: 'allow',
   releaseEnabled: false,
   releaseVersionFile: 'deno.json',
   releaseChangelog: 'docs/CHANGES.md',
@@ -729,6 +738,16 @@ describe('parseConfigText', () => {
         'roadmap.issue', 'roadmap:\n  issue: 0',
         'roadmap.issue is 0, expected an issue number, a whole number above zero',
         'roadmap:\n  issue: 31', 'roadmapIssue', 31,
+      ],
+      [
+        'claims.staleAfter', 'claims:\n  staleAfter: 0d',
+        'claims.staleAfter is "0d", expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled',
+        'claims:\n  staleAfter: disabled', 'claimsStaleAfter', 'disabled',
+      ],
+      [
+        'claims.ahead', 'claims:\n  ahead: false',
+        'claims.ahead is false, expected one of: off, allow',
+        'claims:\n  ahead: allow', 'claimsAhead', 'allow',
       ],
       [
         'release.enabled', 'release:\n  enabled: on',
@@ -1185,5 +1204,38 @@ describe('effort.sync', () => {
 
     expect([omitting.config.effortSync, omitting.sources.effortSync]).toEqual(['file', 'user']);
     expect([naming.config.effortSync, naming.sources.effortSync]).toEqual(['local', 'file']);
+  });
+});
+
+describe('claims', () => {
+  it('answers 3d and off when no layer names either key', () => {
+    const resolved = resolveConfig({ file: fileOf('roadmap:\n  issue: 31\n') });
+
+    expect([resolved.config.claimsStaleAfter, resolved.sources.claimsStaleAfter]).toEqual(['3d', 'default']);
+    expect([resolved.config.claimsAhead, resolved.sources.claimsAhead]).toEqual(['off', 'default']);
+  });
+
+  it('answers each key from the file that names it, the other staying at its default', () => {
+    const stale = resolveConfig({ file: fileOf('claims:\n  staleAfter: disabled\n') });
+    const ahead = resolveConfig({ file: fileOf('claims:\n  ahead: allow\n') });
+
+    expect([stale.config.claimsStaleAfter, stale.config.claimsAhead]).toEqual(['disabled', 'off']);
+    expect([ahead.config.claimsStaleAfter, ahead.config.claimsAhead]).toEqual(['3d', 'allow']);
+  });
+
+  it('refuses a stale duration of 0 or below and an ahead value outside the two, naming each key', () => {
+    const text = 'claims:\n  staleAfter: -2h\n  ahead: yes\n';
+
+    expect(refusal(() => fileOf(text)).problems).toEqual([
+      `${PATH}: claims.staleAfter is "-2h", expected a duration of whole hours or days above zero, such as 36h or 3d, or disabled`,
+      `${PATH}: claims.ahead is "yes", expected one of: off, allow`,
+    ]);
+  });
+
+  it('is not a pair of settings the command line can name', () => {
+    const cli = { claimsStaleAfter: '1h', claimsAhead: 'allow' } as unknown as ConfigOverrides;
+    const resolved = resolveConfig({ cli });
+
+    expect([resolved.config.claimsStaleAfter, resolved.config.claimsAhead]).toEqual(['3d', 'off']);
   });
 });

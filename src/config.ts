@@ -179,6 +179,8 @@ export type {
 } from './config-schema.js';
 export { CONFIG_DEFAULTS, CONFIG_FILE } from './config-schema.js';
 export type {
+  ClaimsAhead,
+  ClaimsStaleAfter,
   ClaudeSettingSource,
   ConfigExtra,
   ConfigVersion,
@@ -358,6 +360,8 @@ function readLayer(
     prVersionCollision: read('prVersionCollision'),
     boardTrustedAuthors: read('boardTrustedAuthors'),
     roadmapIssue: read('roadmapIssue'),
+    claimsStaleAfter: read('claimsStaleAfter'),
+    claimsAhead: read('claimsAhead'),
     releaseEnabled: read('releaseEnabled'),
     releaseVersionFile: read('releaseVersionFile'),
     releaseChangelog: read('releaseChangelog'),

@@ -125,6 +125,23 @@
  *     It has a list of its own rather than {@link TIER_SWITCHES},
  *     since the two settings share a spelling and not a meaning.
  *
+ * ## The `claims` section
+ *
+ * `claims.staleAfter` is how long a `rafa:claimed` claim stands before
+ * another device may take it over; `claims.ahead` whether a claim may
+ * reach one issue ahead. {@link claimsStaleAfter} reads the first and
+ * {@link claimsAhead} the second. Three readings are this module's:
+ *
+ *   - A duration is whole digits then `h` or `d`, and nothing else:
+ *     `1.5d`, `3w`, `3D` and ` 3d` are refused, and so is the bare
+ *     number `3`, which names no unit. It is kept as written, and
+ *     {@link claimDurationHours} answers the hours it spells.
+ *   - `0h`, `0d` and anything below are refused and not read as "off":
+ *     a claim stale at once is one any device takes over, and `disabled`
+ *     is already the word for off.
+ *   - `claims.ahead` takes the WORDS `off` and `allow`, so
+ *     `ahead: false` is refused and told what to write.
+ *
  * ## The lists this module does not own
  *
  * Every other closed list here is declared here. Three are not, and
@@ -342,6 +359,21 @@ export const LESSON_SWITCHES = ['on', 'off'] as const;
 
 /** One of {@link LESSON_SWITCHES}. */
 export type LessonSwitch = (typeof LESSON_SWITCHES)[number];
+
+/** The value of `claims.staleAfter` that turns stale takeover off. */
+export const CLAIMS_STALE_DISABLED = 'disabled';
+
+/**
+ * What `claims.staleAfter` takes: a whole number of hours or days above
+ * zero, spelled as written (`36h`, `3d`), or `disabled`.
+ */
+export type ClaimsStaleAfter = `${number}h` | `${number}d` | typeof CLAIMS_STALE_DISABLED;
+
+/** What `claims.ahead` takes; see "The `claims` section". */
+export const CLAIMS_AHEAD = ['off', 'allow'] as const;
+
+/** One of {@link CLAIMS_AHEAD}. */
+export type ClaimsAhead = (typeof CLAIMS_AHEAD)[number];
 
 /** A reading of `value` with nothing wrong. */
 function accepted<T>(value: T): Reading<T> {
@@ -562,6 +594,40 @@ export const skillResolverName: Reader<SkillResolverName> = oneOf(SKILL_RESOLVER
 
 /** Accepts `on` or `off`, as words; see "The `task` section". */
 export const lessonSwitch: Reader<LessonSwitch> = oneOf(LESSON_SWITCHES);
+
+/** A claim duration as written: whole digits, then `h` or `d`. */
+const CLAIM_DURATION = /^(\d+)([hd])$/;
+const HOURS_PER_DAY = 24;
+
+/**
+ * The hours a `claims.staleAfter` duration spells (`36h` → 36, `3d` →
+ * 72), or null for anything else, `disabled` and `0d` included.
+ */
+export function claimDurationHours(raw: unknown): number | null {
+  const match = typeof raw === 'string'
+    ? CLAIM_DURATION.exec(raw)
+    : null;
+  if (match === null) return null;
+
+  const hours = Number(match[1]) * (match[2] === 'd'
+    ? HOURS_PER_DAY
+    : 1);
+  return Number.isSafeInteger(hours) && hours > 0
+    ? hours
+    : null;
+}
+
+/**
+ * Accepts a duration of whole hours or days above zero, or `disabled`,
+ * each kept as written; see "The `claims` section".
+ */
+export const claimsStaleAfter: Reader<ClaimsStaleAfter> = (raw, at) => raw === CLAIMS_STALE_DISABLED
+  || claimDurationHours(raw) !== null
+  ? accepted(raw as ClaimsStaleAfter)
+  : refused(at, raw, `a duration of whole hours or days above zero, such as 36h or 3d, or ${CLAIMS_STALE_DISABLED}`);
+
+/** Accepts `off` or `allow`; see "The `claims` section". */
+export const claimsAhead: Reader<ClaimsAhead> = oneOf(CLAIMS_AHEAD);
 
 /**
  * A GitHub account login as the collaborators endpoint takes one in a
