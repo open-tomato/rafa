@@ -34,6 +34,12 @@
  * second on the first one's issue; keyed by the file as well, they stay
  * two issues, and two wordings of one defect under one file stay one.
  *
+ * The artifact a key is built from has its local paths taken out
+ * (`./local-paths.ts`), so one bug keys the same on every machine and a
+ * key never holds a user's name. Every key builder takes that artifact,
+ * #486's test-failure key too. Step 1 below also asks the store for the
+ * legacy key, built from the artifact with its paths, when the two differ.
+ *
  * A bug with no artifact has no key (roadmap Q18): it is filed every time,
  * with no lookup and no reference stored. An artifact that is blank, or
  * that holds a lone UTF-16 surrogate, which the store cannot key a
@@ -160,7 +166,11 @@
  * filed before this rafa, with no key section of its own, gains one from
  * the first recurrence commented on it.
  *
- * ## Named secrets
+ * ## Local paths and named secrets
+ *
+ * Every value a session or the plan supplied, and every problem this
+ * module answers, has its local paths taken out first, as the key does
+ * ({@link TriageOptions.home} names the home), then its secrets.
  *
  * {@link namedSecrets} answers the value of every `env` item under
  * `prerequisites`, both tiers, and of each of {@link SECRET_ENV_NAMES}
@@ -169,10 +179,9 @@
  * through it before it reaches a title, a body, a comment or a `find`
  * query: the key is searched for as it was filed, built from the redacted
  * artifact, and the title is cut after redaction, so no cut leaves part of
- * a secret behind. A problem this module answers is redacted too. The
- * stored reference stays keyed by the key built from the artifact as
- * reported, since the store is local, and two artifacts differing only in
- * a secret's value would otherwise share one key.
+ * a secret behind. The stored reference stays keyed by the key built
+ * before secrets are redacted, since the store is local, and two artifacts
+ * differing only in a secret's value would otherwise share one key.
  *
  * ## Failures
  *
@@ -197,6 +206,7 @@ import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
+import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
@@ -205,6 +215,7 @@ import { textProblem } from '../effort/store/findings.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
+import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
 
@@ -334,6 +345,8 @@ export interface TriageOptions {
    * section. `createArtifactRefsVerifier` over `repoRoot` when left out.
    */
   readonly verifyRefs?: RefVerifier;
+  /** The home directory taken out of every filed text; `os.homedir()` when left out. */
+  readonly home?: string;
   /** Seams for the reference write. */
   readonly seams?: FindingsWriterSeams;
 }
@@ -530,19 +543,25 @@ interface Filing {
   readonly comment: string;
   /** The redacted key `find` is asked for, or null for a bug with none. */
   readonly searchText: string | null;
-  /** The key a reference is stored under, from the artifact as reported. */
+  /** The key a reference is stored under, from the artifact with local paths taken out. */
   readonly key: string | null;
+  /** The key from the artifact with its local paths, when it differs from {@link key}; else null. */
+  readonly legacyKey: string | null;
 }
 
-/** The filing for one bug, its `Refs` read through `verifyRefs`. */
+/** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
 async function filingFor(
   what: string,
   bug: ReportBug,
   options: TriageOptions,
+  local: (text: string) => string,
   redact: (text: string) => string,
   verifyRefs: RefVerifier,
 ): Promise<Filing> {
-  const artifact = artifactOf(bug);
+  const reported = artifactOf(bug);
+  const artifact = reported === null
+    ? null
+    : local(reported);
   const searchText = artifact === null
     ? null
     : bugKeyOf(options.trackerPath, redact(artifact));
@@ -574,6 +593,9 @@ async function filingFor(
     key: artifact === null
       ? null
       : bugKeyOf(options.trackerPath, artifact),
+    legacyKey: reported === null || reported === artifact
+      ? null
+      : bugKeyOf(options.trackerPath, reported),
   };
 }
 
@@ -668,10 +690,13 @@ async function triageBug(run: BugRun): Promise<BugTriage> {
 
   const { readStored } = route;
   if (readStored !== null) {
-    const stored = await step(run, 'reading the stored reference', () => readStored(key));
-    if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
-    if (stored.value !== null && stored.value.kind === route.tracker.kind) {
-      return commentOn(run, stored.value, 'store');
+    for (const storedKey of [key, filing.legacyKey]) {
+      if (storedKey === null) continue;
+      const stored = await step(run, 'reading the stored reference', () => readStored(storedKey));
+      if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
+      if (stored.value !== null && stored.value.kind === route.tracker.kind) {
+        return commentOn(run, stored.value, 'store');
+      }
     }
   }
 
@@ -733,7 +758,8 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
   checkPrivateTracker(options.tracker, privateTracker);
 
   const blocker = triageBlockers(options);
-  const redact = (text: string): string => redactSecrets(text, options.secrets);
+  const local = localPathRedactor(repoRoot, options.home ?? homedir());
+  const redact = (text: string): string => redactSecrets(local(text), options.secrets);
   const verifyRefs = options.verifyRefs ?? createArtifactRefsVerifier(repoRoot);
   const routes: Readonly<Record<TrackedChannel, Route>> = {
     public: {
@@ -765,7 +791,7 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       bugs.push(skippedRow(index, route.channel, `out_of_scope_bugs[${index}] has no what to file`));
       continue;
     }
-    const filing = await filingFor(what, bug, options, redact, verifyRefs);
+    const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
     bugs.push(await triageBug({ route, index, filing, redact }));
   }
   return { blocker, bugs };
