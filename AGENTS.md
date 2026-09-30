@@ -3,6 +3,7 @@
 The agent task loop for ralph, packaged and ready to ship. A single-package
 implementation of the loop from `agentic-research`, with all the pieces
 running under bun and ready for publishing to npm as `@open-tomato/rafa`.
+The hub's two packages sit beside it as bun workspaces under `packages/`.
 
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.
@@ -23,8 +24,8 @@ back into every turn and the split would save nothing.
   file exchange, locked keys), and what a new kind or field has to touch.
 - `context/effort-merge.md` — merge rules, the `rafa effort merge` and
   `rafa effort move` commands, and the merge trail.
-- `context/source.md` — import paths under `src/` and the shapes the lint
-  config forces.
+- `context/source.md` — import paths under `src/` and `packages/`, and the
+  shapes the lint config forces.
 - `context/inventory.md` — the record, sources and precedence, disabled
   readings, `visibleToLoop`, plugin discovery, and how search and plan needs
   use the inventory.

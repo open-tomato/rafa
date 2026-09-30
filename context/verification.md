@@ -21,8 +21,8 @@ is actually the PR's head.
 
 | Gate | Runs | Files it can open |
 |---|---|---|
-| `bun run check-types` | TypeScript compiler | `src/`, `scripts/` and root `*.ts`/`*.mjs`, with every `**/*.test.ts` excluded |
-| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `dist/`, `.claude/`, `.rafa/`, `.tmp/` and `.docs/` |
+| `bun run check-types` | TypeScript compiler | `src/`, `scripts/` and root `*.ts`/`*.mjs`, with every `**/*.test.ts` excluded; then each `packages/*/src/`, tests included |
+| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `packages/`, `dist/`, `.claude/`, `.rafa/`, `.tmp/` and `.docs/` |
 | `bun run test` | Bun's native test runner | Every `*.test.ts` outside `node_modules/` and dot-directories, `scripts/` included |
 
 One more gate runs at `git commit` rather than before the PR.
