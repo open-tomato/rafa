@@ -34,12 +34,11 @@
  * twice, interleaved so the round converges (device A's own row, then
  * device B's own row and A's pulled in, then device A pulls B's in):
  * after that, every merged table — read straight off each SQLite file
- * with no row-count shortcut, `schema_migrations`, `store_meta`, `merges`
- * and `merge_conflicts` set aside as the store's own local bookkeeping
- * (`context/effort-store.md`, "Tables outside the port") — holds the
- * same rows on both devices and the hub. A third, repeated round then
- * changes nothing: every table's content, read again, is identical to
- * what it held right after convergence.
+ * with no row-count shortcut, through `testdata/compare-merged-stores.js`,
+ * which `hub-unreachable.integration.test.ts` reads the same tables
+ * through — holds the same rows on both devices and the hub. A third,
+ * repeated round then changes nothing: every table's content, read
+ * again, is identical to what it held right after convergence.
  */
 import type { StandInGitHub } from './identity/testdata/stand-in-github.js';
 import type { HubServer } from './server.js';
@@ -51,7 +50,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { openSqliteStore } from '@open-tomato/rafa/store';
-import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { DEFAULT_STORE_FILE } from './config.js';
@@ -59,6 +57,7 @@ import { openGitHubIdentity } from './identity/github.js';
 import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
+import { expectSameMergedTables, mergedTableNames, sortedContent } from './testdata/compare-merged-stores.js';
 
 const VERSION = '0.0.0-two-devices';
 const REPOSITORY = 'open-tomato/rafa';
@@ -204,75 +203,6 @@ async function runCollect(device: Device): Promise<CollectRun> {
     new Response(child.stderr).text(),
   ]);
   return { exitCode, output: `${stdout}${stderr}` };
-}
-
-/** Every table the merge unions, past the store's own local bookkeeping; see the module note. */
-const LOCAL_ONLY_TABLES: ReadonlySet<string> = new Set(['schema_migrations', 'store_meta', 'merges', 'merge_conflicts']);
-
-/** One row read off a store, by column. */
-type Row = Readonly<Record<string, unknown>>;
-
-/** Every merged table's name on the store at `path`, sorted. */
-function mergedTableNames(path: string): string[] {
-  const db = new Database(path, { readonly: true });
-  try {
-    return db.query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\'')
-      .all()
-      .map((row) => row.name)
-      .filter((name) => !LOCAL_ONLY_TABLES.has(name))
-      .sort();
-  } finally {
-    db.close();
-  }
-}
-
-/** Every row of `table` on the store at `path`, read-only. */
-function rowsOf(path: string, table: string): Row[] {
-  const db = new Database(path, { readonly: true });
-  try {
-    return db.query<Row, []>(`SELECT * FROM "${table}"`).all();
-  } finally {
-    db.close();
-  }
-}
-
-/** `rowJson`, its recomputed `minutesSincePrevious` set aside, as `store/merge-commit-gaps.ts`'s own comparison does. */
-function withoutRecomputedGap(rowJson: string): string {
-  const parsed = JSON.parse(rowJson) as Record<string, unknown>;
-  const rest = Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'minutesSincePrevious'));
-  return JSON.stringify(rest);
-}
-
-/**
- * `row`'s content as one comparable string: the local `seq` (which side
- * holds it, and in what order) is set aside, and `commits.row_json`'s
- * recomputed gap along with it, since a merge rewrites it from whichever
- * side ran last.
- */
-function contentOf(table: string, row: Row): string {
-  const entries = Object.entries(row)
-    .filter(([column]) => column !== 'seq')
-    .map(([column, value]): readonly [string, unknown] => (table === 'commits' && column === 'row_json' && typeof value === 'string'
-      ? [column, withoutRecomputedGap(value)]
-      : [column, value]));
-  return JSON.stringify(entries.sort(([a], [b]) => a.localeCompare(b)));
-}
-
-/** Every row of `table` on the store at `path`, as content strings, sorted so two stores compare order-free. */
-function sortedContent(path: string, table: string): string[] {
-  return rowsOf(path, table)
-    .map((row) => contentOf(table, row))
-    .sort();
-}
-
-/** Every merged table of every store at `paths` holds the same rows under the content comparison above. */
-function expectSameMergedTables(paths: readonly string[]): void {
-  const [first, ...rest] = paths;
-  if (first === undefined) throw new Error('expectSameMergedTables needs at least one path');
-  for (const table of mergedTableNames(first)) {
-    const base = sortedContent(first, table);
-    for (const path of rest) expect(sortedContent(path, table)).toEqual(base);
-  }
 }
 
 describe.skipIf(!SECRETS_OK)(`two devices converge through a hub the test starts (skipped when: ${SKIP_REASON})`, () => {
