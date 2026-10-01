@@ -370,7 +370,7 @@ describe('what a mount is refused for', () => {
       'a command failing the shape check',
       { ...linear, commands: [command('issue', 'next', { outputs: ['html'] as unknown as RafaCommand['outputs'] })] },
       TypeError,
-      'command registry: module "linear": command "issue next": outputs is a list, expected a list of text, json, tui',
+      'command registry: module "linear": command "issue next": outputs is a list, expected a list of text, json, events, tui',
     ],
     [
       'a command declaring exec',

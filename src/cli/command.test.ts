@@ -101,8 +101,8 @@ describe('routing words and spellings', () => {
     expect(isTopLevel({ subject: 'usage', action: 'usage' })).toBe(true);
   });
 
-  it('names the three outputs an action can declare', () => {
-    expect(COMMAND_OUTPUTS).toEqual(['text', 'json', 'tui']);
+  it('names the four outputs an action can declare', () => {
+    expect(COMMAND_OUTPUTS).toEqual(['text', 'json', 'events', 'tui']);
   });
 });
 
@@ -216,7 +216,7 @@ describe('the shape check', () => {
     [
       'an output outside the three',
       { outputs: ['text', 'html'] },
-      'command "loop start": outputs is a list, expected a list of text, json, tui',
+      'command "loop start": outputs is a list, expected a list of text, json, events, tui',
     ],
     [
       'an alias that is not a string',

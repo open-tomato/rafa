@@ -712,7 +712,7 @@ describe('parseConfigText', () => {
         'learning:\n  promote:\n    minConfidence: 0.8', 'learningPromoteMinConfidence', 0.8,
       ],
       [
-        'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json',
+        'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json, events',
         'output:\n  mode: json', 'outputMode', 'json',
       ],
       [
@@ -1160,7 +1160,7 @@ describe('resolveConfig', () => {
     ['a misspelt mode', { inject: 'stag' }, 'inject is "stag"', 'one of: full, stage, task'],
     ['a misspelt backend', { store: 'sqllite' }, 'store is "sqllite"', 'one of: sqlite, ndjson'],
     ['an empty directory', { planDir: '' }, 'planDir is ""', 'a directory path'],
-    ['an output mode', { outputMode: 'tui' }, 'outputMode is "tui"', 'one of: text, json'],
+    ['an output mode', { outputMode: 'tui' }, 'outputMode is "tui"', 'one of: text, json, events'],
     ['an empty resolver', { taskSkills: '' }, 'taskSkills is ""', 'one of: planner, tag, none'],
     [
       'empty setting sources', { settingSources: '' }, 'settingSources is ""',

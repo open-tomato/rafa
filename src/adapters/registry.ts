@@ -131,6 +131,7 @@ import { createFileSync } from '../effort/sync/file.js';
 import { createLocalSync } from '../effort/sync/select.js';
 
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
+import { createEventsOutput } from './output/events.js';
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
 import { createClaudePlanner } from './planner/claude.js';
@@ -441,6 +442,12 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'json',
     portVersion: PORT_VERSIONS.output,
     create: ({ stream = process.stdout }) => createJsonOutput({ stream }),
+  },
+  {
+    port: 'output',
+    kind: 'events',
+    portVersion: PORT_VERSIONS.output,
+    create: ({ stream = process.stdout }) => createEventsOutput({ stream }),
   },
   {
     port: 'tracker',

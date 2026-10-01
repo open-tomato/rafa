@@ -53,15 +53,21 @@
 import type { ParseArgsSpec } from './parseArgs.js';
 import type { CliContext, FlagSpec } from './types.js';
 import type { OutputStream } from '../../adapters/output/stream.js';
+import type { OutputMode } from '../../config-sections.js';
 import type { Output } from '../../ports/index.js';
 
+import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
 import { createTextOutput } from '../../adapters/output/text.js';
+import { OUTPUT_MODES } from '../../config-sections.js';
 
 import { parseArgs } from './parseArgs.js';
 
-/** The environment variable selecting json mode when it reads `json`. */
+/** The environment variable naming the output mode: `json`, or `events` for a command that declares it. */
 const OUTPUT_ENV = 'RAFA_OUTPUT';
+
+/** The output modes a flag or the environment may name; any other value reads as text. */
+const NAMED_MODES: ReadonlySet<string> = new Set(OUTPUT_MODES);
 
 /** The environment variable read as the verbosity when no flag sets one. */
 const VERBOSITY_ENV = 'RAFA_VERBOSITY';
@@ -79,7 +85,9 @@ export interface AssembleContextOptions {
   /** The environment the output mode and the verbosity fall back to, copied into the context. */
   env: Env;
   /** An output mode winning over the line and the environment. */
-  forceOutputMode?: 'text' | 'json';
+  forceOutputMode?: OutputMode;
+  /** Whether the command declares `events` among its outputs; without it, `events` reads as text. */
+  eventsAllowed?: boolean;
   /** The signal that stops the command. Defaults to one nothing aborts. */
   signal?: AbortSignal;
   /** Where the output writes. Defaults to `process.stdout`. */
@@ -114,21 +122,35 @@ const countVerboseTokens = (argv: readonly string[]): number => {
   return count;
 };
 
-const resolveOutputMode = (force: 'text' | 'json' | undefined, flags: Flags, env: Env): 'text' | 'json' => {
+/** The mode a value names, or text for one naming none. */
+const modeNamed = (value: string | undefined): OutputMode => value !== undefined && NAMED_MODES.has(value)
+  ? value as OutputMode
+  : 'text';
+
+const resolveOutputMode = (force: OutputMode | undefined, flags: Flags, env: Env, eventsAllowed: boolean): OutputMode => {
   if (force !== undefined) {
     return force;
   }
   const flagOutput = flags.output;
-  if (typeof flagOutput === 'string') {
-    return flagOutput === 'json'
-      ? 'json'
-      : 'text';
-  }
-  if (env[OUTPUT_ENV] === 'json') {
-    return 'json';
-  }
-  return 'text';
+  const mode = typeof flagOutput === 'string'
+    ? modeNamed(flagOutput)
+    : modeNamed(env[OUTPUT_ENV]);
+  return mode === 'events' && !eventsAllowed
+    ? 'text'
+    : mode;
 };
+
+/** The adapter a mode writes through. */
+function outputFor(mode: OutputMode, verbosity: 0 | 1 | 2 | 3, stream: OutputStream): Output {
+  switch (mode) {
+    case 'json':
+      return createJsonOutput({ stream });
+    case 'events':
+      return createEventsOutput({ stream });
+    case 'text':
+      return createTextOutput({ verbosity, stream });
+  }
+}
 
 const resolveVerbosity = (argv: readonly string[], flags: Flags, env: Env): 0 | 1 | 2 | 3 => {
   const flagValue = flags.verbose ?? flags.v;
@@ -164,14 +186,12 @@ function typedOnly(flags: readonly FlagSpec[] = []): FlagSpec[] {
  * `TypeError` `parseArgs` refuses a spec with.
  */
 export function assembleContext(options: AssembleContextOptions): CliContext {
-  const { argv, env, forceOutputMode, signal, stream = process.stdout, spec = {} } = options;
+  const { argv, env, forceOutputMode, eventsAllowed = false, signal, stream = process.stdout, spec = {} } = options;
   const { positional, flags } = parseArgs(argv, spec);
   const typed = parseArgs(argv, { flags: typedOnly(spec.flags) }).flags;
-  const outputMode = resolveOutputMode(forceOutputMode, typed, env);
+  const outputMode = resolveOutputMode(forceOutputMode, typed, env, eventsAllowed);
   const verbosity = resolveVerbosity(argv, typed, env);
-  const output: Output = outputMode === 'json'
-    ? createJsonOutput({ stream })
-    : createTextOutput({ verbosity, stream });
+  const output = outputFor(outputMode, verbosity, stream);
 
   return Object.freeze({
     args: Object.freeze(positional),

@@ -385,8 +385,8 @@ describe('the core adapter registry', () => {
     expect(store.read('sessions')).toEqual([SESSION]);
   });
 
-  it('registers both outputs, text before json', () => {
-    expect(CORE_ADAPTER_REGISTRY.kinds('output')).toEqual(['text', 'json']);
+  it('registers the three outputs, text, then json, then events', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('output')).toEqual(['text', 'json', 'events']);
   });
 
   it('makes the text output over the stream and verbosity its context names', () => {

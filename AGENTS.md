@@ -44,6 +44,8 @@ back into every turn and the split would save nothing.
   the receipt rule with adoption boundary, the guards, readers, and seven keys.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
   are shown, how they are dismissed, and what a test's HOME must hold.
+- `context/operators.md` — the alpha operators under `bundled/operators/`:
+  why no loop sees them, the stretch folder, and the events output.
 
 ## This file is capped
 

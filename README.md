@@ -409,6 +409,86 @@ Every command has help at three levels (`rafa --help`,
 `rafa loop --help`, `rafa loop start --help`), and
 `rafa describe --output=json` is the same roster for a tool or an agent.
 
+## Operators (alpha)
+
+> **Alpha:** tested on rafa's own development, and may become a feature.
+> Expect the files and their steps to change between versions.
+
+An *operator* is a Claude Code agent that runs rafa itself, the way a
+person does, instead of being one of the agents a loop hands its tasks
+to. rafa ships its operators under `bundled/operators/` in the package,
+and no loop is ever served one.
+
+The first is the **stretch agent**, `rafa-stretch-engineer`. One session
+of it is a *stretch*: it sweeps the board, groups duplicate bugs,
+proposes a bucket of up to 10 issues ranked bugs first, and after you
+approve the bucket runs it one loop at a time on an integration branch,
+`stretch/<n>`, checking effort, bugs, delivery and conflicts between
+items. It stops a second time for you to merge the integration branch
+into `main`, settles one version, and writes a report with the gaps it
+hit and what it would change about itself, which waits for your yes. A
+second session, `rafa-stretch-watchtower`, watches it and its loops
+without writing anything, and alerts you when one of them needs you.
+
+On the machine that runs the loops, link the operators where Claude Code
+finds them, from the project's checkout:
+
+```bash
+ln -s "$PWD/src/bundled/operators/agents/"*.md ~/.claude/agents/
+ln -s "$PWD/src/bundled/operators/skills/"* ~/.claude/skills/
+```
+
+Allow what they run without a prompt in the project's
+`.claude/settings.local.json`, and keep every push away from `main`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(rafa:*)",
+      "Bash(setsid nohup env RAFA_OUTPUT=events rafa loop start:*)",
+      "Bash(git fetch:*)",
+      "Bash(git push origin origin/main:refs/heads/stretch/:*)",
+      "Bash(gh pr create:*)",
+      "Bash(claude agents:*)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Edit(.rafa/config.yaml)",
+      "Read(~/.claude/projects/**)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:main:*)"
+    ]
+  }
+}
+```
+
+Then start the two sessions, each in a terminal of its own, with Remote
+Control on so the bucket question and the alerts reach you away from the
+machine:
+
+```bash
+claude --agent rafa-stretch-engineer
+claude --agent rafa-stretch-watchtower
+```
+
+and type `/loop` in the watchtower's session.
+
+The agents read loops in the compact output, which you can use on your
+own too: `RAFA_OUTPUT=events rafa loop start …` (or `--output=events`)
+prints one `rafa·` line per loop event and nothing else. Every other
+command prints as text under it.
+
+```text
+rafa· task 3/9 start   "Group duplicate bugs"
+rafa· task 3/9 done    12m  340k tokens
+rafa· wrap-up          session
+rafa· no pr            no open pull request for feat/rafa-485
+```
+
 ## Configuration
 
 Settings live in `.rafa/config.yaml` in the project, and in

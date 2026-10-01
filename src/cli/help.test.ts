@@ -309,9 +309,10 @@ describe('the root help', () => {
 
   it('lists the global flags', () => {
     expect(blockOf(text, 'Global flags')).toEqual([
-      '  --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)',
-      '  -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)',
-      '  --version       print "rafa <version>" and exit; typed alone, no short form',
+      '  --output=json     NDJSON events instead of text (also RAFA_OUTPUT=json)',
+      '  --output=events   one rafa· line per loop event (also RAFA_OUTPUT=events)',
+      '  -v, --verbose     up to 3 times, or --verbose=N (also RAFA_VERBOSITY=N)',
+      '  --version         print "rafa <version>" and exit; typed alone, no short form',
     ]);
   });
 
@@ -393,7 +394,7 @@ describe('the spend mark', () => {
 
     expect(SPENDS_LEGEND).toBe('🪙  starts Claude Code sessions, which spend your Claude usage');
     expect(lines.slice(-3)).toEqual(['', SPENDS_LEGEND, '']);
-    expect(lines.slice(-6, -3)).toEqual(blockOf(helpFor(SPENDING, ''), 'Global flags'));
+    expect(lines.slice(-7, -3)).toEqual(blockOf(helpFor(SPENDING, ''), 'Global flags'));
     expect(helpFor(PLANTED, '')).not.toContain('🪙');
   });
 });
@@ -445,10 +446,12 @@ describe('the global flags the root help lists', () => {
   const read = (argv: string[], env: Record<string, string> = {}) => assembleContext({ argv, env, stream: memoryStream().stream });
 
   it('are the output mode and the verbosity, each read by assembleContext as its note says', () => {
-    expect(GLOBAL_FLAGS.map((flag) => flag.spelling)).toEqual(['--output=json', '-v, --verbose', '--version']);
+    expect(GLOBAL_FLAGS.map((flag) => flag.spelling)).toEqual(['--output=json', '--output=events', '-v, --verbose', '--version']);
     expect(read([]).outputMode).toBe('text');
     expect(read(['--output=json']).outputMode).toBe('json');
     expect(read([], { RAFA_OUTPUT: 'json' }).outputMode).toBe('json');
+    expect(assembleContext({ argv: [], env: { RAFA_OUTPUT: 'events' }, stream: memoryStream().stream, eventsAllowed: true }).outputMode).toBe('events');
+    expect(read([], { RAFA_OUTPUT: 'events' }).outputMode).toBe('text');
     expect(read([]).verbosity).toBe(0);
     expect(read(['-v', '--verbose']).verbosity).toBe(2);
     expect(read(['-v', '-v', '-v', '-v']).verbosity).toBe(3);

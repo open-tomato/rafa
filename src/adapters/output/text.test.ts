@@ -98,6 +98,7 @@ const EMITTED: readonly (readonly [string, CliEvent, readonly string[]])[] = [
     ['result: error E_PLAN\n'],
   ],
   ['a failed result with no error', { type: 'result', ok: false, ts: TS }, ['result: error unknown\n']],
+  ['a named event, which the loop\'s own lines already say', { type: 'event', name: 'halt', summary: 'halt            checkout moved', data: { reason: 'checkout moved' }, ts: TS }, []],
 ];
 
 /** A text output at `verbosity`, and the chunks it wrote. */

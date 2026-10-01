@@ -251,7 +251,7 @@ describe('the release stage as runWrapUp wires it', () => {
 
     // The control: the reader answers the module asked for and not any
     // import at all, so the list above is that module's own.
-    expect(importedFrom(WRAP_UP_RUN, './wrap-up.js')).toEqual(['preserveProgress', 'WrapUpLearning']);
+    expect(importedFrom(WRAP_UP_RUN, './wrap-up.js')).toEqual(['openPullRequestNumber', 'preserveProgress', 'WrapUpLearning']);
   });
 });
 
@@ -285,7 +285,7 @@ describe('the two directories runWrapUp points each call at', () => {
 
     expect(NAMES.indexOf('finishRelease')).toBeLessThan(NAMES.indexOf('pullRequestStarted'));
     expect(NAMES.indexOf('pullRequestStarted') + 1).toBe(NAMES.indexOf('verifyPullRequest'));
-    expect(WRAP_UP_RUN).toMatch(/if \(ciWait\) \{\n\s*session\.pullRequestStarted\(\);/);
+    expect(WRAP_UP_RUN).toMatch(/if \(ciWait\) \{\n\s*emitLoopEvent\(\{ kind: 'wrap-up', phase: 'ci' \}\);\n\s*session\.pullRequestStarted\(\);/);
     expect(gate.args.at(-1)).toBe('session');
   });
 

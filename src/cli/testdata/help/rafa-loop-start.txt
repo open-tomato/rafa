@@ -103,7 +103,7 @@ Examples:
       without asking, and runs the plan there.
 
 Outputs:
-  text, json
+  text, json, events
 
 See also:
   rafa loop stop, rafa loop pause, rafa loop resume, rafa loop status, rafa loop

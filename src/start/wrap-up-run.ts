@@ -62,7 +62,7 @@ import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
 import type { PullRequestSummary } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { CommandExit } from '../cli/command.js';
@@ -71,11 +71,12 @@ import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
+import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
 import { retryWrapUp } from './wrap-up-retry.js';
-import { preserveProgress } from './wrap-up.js';
+import { openPullRequestNumber, preserveProgress } from './wrap-up.js';
 
 /** What {@link runWrapUp} runs the wrap-up over, each as `start()` settled it. */
 export interface WrapUpRunInput {
@@ -136,6 +137,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // session as the record its prompt's release bullets are built
   // from. A preparation of null is the stage having failed to run
   // at all, and the wrap-up carries on without a release.
+  emitLoopEvent({ kind: 'wrap-up', phase: 'fragment' });
   const release = prepareReleaseStage({
     repoRoot,
     checkout,
@@ -143,11 +145,21 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     planStub,
     planContent,
   });
+  emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
   const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
+  if (activeOutputMode() !== 'text') {
+    const pullRequest = await openPullRequestNumber(checkout, expected.branch);
+    emitLoopEvent(pullRequest === null
+      ? { kind: 'no-pr', reason: `no open pull request for ${expected.branch}` }
+      : { kind: 'pr', number: pullRequest });
+  }
   // The loop guard before the loop's own release commit, against the
   // HEAD the wrap-up session's commits left on the run's branch: a
   // moved branch or a gone checkout skips the commit, push and wait.
-  if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) return;
+  if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) {
+    emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
+    return;
+  }
   // Step 3, over that same record, after the session has returned
   // and BEFORE the CI gate: the verification, the restore on a
   // refusal, the `chore: release fragment` commit, its push and the
@@ -163,6 +175,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     configured: settings.prProvider ?? null,
     dir: checkout,
   });
+  emitLoopEvent({ kind: 'wrap-up', phase: 'release' });
   const finish = await finishRelease(
     { repoRoot: checkout, settings, preparation: release },
     { readProvider },
@@ -179,6 +192,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
   }
   if (ciWait) {
+    emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });
     session.pullRequestStarted();
     await verifyPullRequest(
       Math.max(1, ciTimeoutMin) * 60_000,
