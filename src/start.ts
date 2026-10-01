@@ -560,6 +560,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           ciWait,
           ciTimeoutMin,
           ciAttempts,
+          isInterrupted: () => interrupted,
         });
         break;
       }

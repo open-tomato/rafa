@@ -30,9 +30,10 @@
  *     from `start/pr-lifecycle.ts`): phase `repair`, until the next poll
  *     writes `ci` again.
  *   - **At the end** ({@link RunSession.end}): `done` once
- *     {@link RunSession.finished} was called, which `start()` does after
- *     the wrap-up and the CI wait come back; `stopped` for every other way
- *     out. Those are a failed, blocked, interrupted or unstored task, a
+ *     {@link RunSession.finished} was called, which `start/wrap-up-run.ts`
+ *     does once the pull request is open (or the provider is `none`) and
+ *     the CI wait has come back; `stopped` for every other way out, a
+ *     delivery blocked at the pull request among them. Those are a failed, blocked, interrupted or unstored task, a
  *     pause for usage, a store the progress render cannot open, and
  *     anything thrown. A stopped record keeps the task it stopped at.
  *

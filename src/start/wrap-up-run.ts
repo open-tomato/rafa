@@ -8,17 +8,45 @@
  * with that record (`start/wrap-up.ts`), the loop guard reads the
  * checkout against the HEAD the session's commits left
  * (`start/checkout-watch.ts`), step 3 of the release verifies, commits
- * and pushes the fragment, and, when the run waits on CI, the pull
- * request's checks are waited on (`start/pr-lifecycle.ts`). The session
+ * and pushes the fragment, the pull request is DELIVERED (below), and,
+ * when the run waits on CI, the pull request's checks are waited on
+ * (`start/pr-lifecycle.ts`). The session
  * record reads `wrap-up` from the start of the branch, `pull-request` as
  * that gate starts, and the gate writes `ci` and `repair` itself, handed
  * the session (`start/session.ts`). Step 3 runs
  * BEFORE that gate: a fragment pushed after the wait started would be a
  * commit those checks never read.
  *
- * A checkout the guard finds moved skips the release commit, its push
- * and the wait, and returns without marking the session finished, so
- * the run's end writes `stopped`. Every other way through marks it
+ * ## The pull request, delivered
+ *
+ * A run never ends `done` without its pull request
+ * (`.rafa/specs/rafa-579-loop-run-ends-delivered.md`, #576). After step
+ * 3, so the fragment's notes exist, and before the CI wait,
+ * {@link deliverPullRequest} reads the branch's open pull request. With
+ * none, it spends `loop.wrapUp.retries` (`config-schema-wrap-up.ts`)
+ * retry wrap-up sessions (`start/wrap-up-retry.ts`), each handed the
+ * final message of the session before it and each followed by the same
+ * reading. Still none, or `false` retries, and the runner opens the pull
+ * request itself (`start/runner-pr.ts`), titled from the plan's issue and
+ * title ({@link runnerPrInputFor}) with the fragment's notes in its body.
+ * A repository whose `pr.provider` resolves to `none` has no pull request
+ * to deliver, and none of this runs: the CI gate's own `none` path
+ * pushes the branch as before.
+ *
+ * The delivery is BLOCKED when the open pull request cannot be read
+ * (the provider could not be asked), when the plan carries no issue
+ * number the runner could title the pull request with, or when the
+ * runner's own attempt stops at the dirty-tree, push or create step.
+ * A blocked delivery throws `CommandExit` with exit code 1 and a report
+ * naming the branch and the failed step, so the run's end writes
+ * `stopped`; the record has no `blocked` state an older rafa could read.
+ * A run the operator interrupted spawns no further retry and opens
+ * nothing, and returns, also leaving the record `stopped`.
+ *
+ * A checkout the guard finds moved skips the release commit, its push,
+ * the delivery and the wait, and returns without marking the session
+ * finished, so the run's end writes `stopped`. A delivered pull request
+ * or a `none` provider goes on to the wait and marks the session
  * finished, and the run's end writes `done`. Either way the caller ends
  * its loop once this returns.
  *
@@ -27,17 +55,26 @@
  */
 import type { CheckoutExpectation } from './checkout-guard.js';
 import type { ClaudeSettingSource, RafaConfig } from '../config.js';
+import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { SessionServing } from './serving.js';
 import type { RunSession } from './session.js';
 import type { WrapUpLearning } from './wrap-up.js';
+import type { WrapUpRetries } from '../config-schema-wrap-up.js';
+import type { PullRequestSummary } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
-import { resolvePrProvider } from '../pr/index.js';
+import { resolveBaseBranch } from '../cleanup/index.js';
+import { CommandExit } from '../cli/command.js';
+import { messageOf } from '../config-sections.js';
+import { parsePlan } from '../plan/index.js';
+import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
-import { finishRelease, prepareReleaseStage } from './release-stage.js';
+import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
+import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
+import { retryWrapUp } from './wrap-up-retry.js';
 import { preserveProgress } from './wrap-up.js';
 
 /** What {@link runWrapUp} runs the wrap-up over, each as `start()` settled it. */
@@ -68,6 +105,8 @@ export interface WrapUpRunInput {
   readonly ciTimeoutMin: number;
   /** Repair sessions to spend on a red or conflicting PR, floored at zero. */
   readonly ciAttempts: number;
+  /** True once the operator has interrupted the run; no retry or runner PR follows. */
+  readonly isInterrupted: () => boolean;
 }
 
 /** Runs the wrap-up branch of the loop; see the module note. */
@@ -104,7 +143,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     planStub,
     planContent,
   });
-  await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
+  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
   // The loop guard before the loop's own release commit, against the
   // HEAD the wrap-up session's commits left on the run's branch: a
   // moved branch or a gone checkout skips the commit, push and wait.
@@ -120,15 +159,25 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // reason: the run's `pr.provider` lives in this config, and a
   // repository resolving to `none` has no pull request to carry it
   // (`start/release-stage.ts`).
-  await finishRelease(
+  const readProvider = () => resolvePrProvider({
+    configured: settings.prProvider ?? null,
+    dir: checkout,
+  });
+  const finish = await finishRelease(
     { repoRoot: checkout, settings, preparation: release },
-    {
-      readProvider: () => resolvePrProvider({
-        configured: settings.prProvider ?? null,
-        dir: checkout,
-      }),
-    },
+    { readProvider },
   );
+  // The pull request, delivered after step 3 and before the CI gate:
+  // read, retried, opened by the runner; see the module note. A `none`
+  // provider has no pull request to deliver.
+  if (readProvider().provider !== 'none') {
+    const delivery = await deliverPullRequest(
+      { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
+      deliverySeamsIn({ ...input, fragment: finish.fragment }),
+    );
+    if (delivery.kind === 'interrupted') return;
+    if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
+  }
   if (ciWait) {
     session.pullRequestStarted();
     await verifyPullRequest(
@@ -141,10 +190,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
       // because the run's `pr.provider` lives in this config.
       {
         ...prLifecycleSeamsIn(checkout),
-        readProvider: () => resolvePrProvider({
-          configured: settings.prProvider ?? null,
-          dir: checkout,
-        }),
+        readProvider,
         // A refused push reads this device's store id from the
         // project root, where the store lives, not the checkout.
         readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),
@@ -153,4 +199,229 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     );
   }
   session.finished();
+}
+
+/** Who opened the pull request a delivery found or made. */
+export type PullRequestOpener = 'wrap-up' | 'retry' | 'runner';
+
+/** How {@link deliverPullRequest} ended; see the module note. */
+export type PullRequestDelivery =
+  | {
+    readonly kind: 'delivered';
+    /** The open pull request. */
+    readonly pull: PullRequestSummary;
+    /** The first wrap-up session, a retry, or the runner. */
+    readonly by: PullRequestOpener;
+    /** The retry sessions spawned on the way. */
+    readonly retriesSpent: number;
+  }
+  | {
+    readonly kind: 'blocked';
+    /** The report naming the branch and the step, the run's exit message. */
+    readonly message: string;
+    readonly retriesSpent: number;
+  }
+  | { readonly kind: 'interrupted'; readonly retriesSpent: number };
+
+/** What the runner's own attempt answers: opened, or blocked with its report. */
+export type RunnerAttempt = RunnerPrOpened | { readonly kind: 'blocked'; readonly message: string };
+
+/**
+ * The effects {@link deliverPullRequest} reaches through;
+ * {@link deliverySeamsIn} makes the real ones.
+ */
+export interface PullRequestDeliverySeams {
+  /** The branch's open pull request, or null; throws when the provider could not be asked. */
+  readonly findOpen: (branch: string) => Promise<PullRequestSummary | null>;
+  /** Spawns one retry wrap-up session after `previousMessage` and answers its own final message. */
+  readonly retry: (previousMessage: string) => Promise<string>;
+  /** The runner's own attempt at the pull request (`start/runner-pr.ts`). */
+  readonly openRunnerPullRequest: () => Promise<RunnerAttempt>;
+  /** True once the operator has interrupted the run. */
+  readonly isInterrupted: () => boolean;
+}
+
+/** What one delivery is made over. */
+export interface PullRequestDeliveryInput {
+  /** The run's branch, the pull request's head. */
+  readonly branch: string;
+  /** `loop.wrapUp.retries`: retry sessions to spend, or `false` for none. */
+  readonly retries: WrapUpRetries;
+  /** The first wrap-up session's final message. */
+  readonly previousMessage: string;
+}
+
+/** The line every blocked report ends with: what the stopped record leaves the operator. */
+export const DELIVERY_BLOCKED_TAIL = '   The run is recorded stopped, not done. Open the pull request by hand, or fix the step above and run again to retry the wrap-up.';
+
+/** The tail after a delivery the operator interrupted. */
+const DELIVERY_INTERRUPTED = '\n⚠️  Interrupted: no further wrap-up session runs and the loop opens no pull request. Run again to retry the wrap-up.';
+
+/** A blocked delivery, its message ending with {@link DELIVERY_BLOCKED_TAIL}. */
+function blockedDelivery(report: string, retriesSpent: number): PullRequestDelivery {
+  return { kind: 'blocked', message: `${report}\n${DELIVERY_BLOCKED_TAIL}`, retriesSpent };
+}
+
+/** The open pull request, null for none, or the blocked report when the provider could not be asked. */
+async function readOpenPull(
+  seams: PullRequestDeliverySeams,
+  branch: string,
+): Promise<{ readonly pull: PullRequestSummary | null } | { readonly unread: string }> {
+  try {
+    return { pull: await seams.findOpen(branch) };
+  } catch (error) {
+    return { unread: `❌ The run is blocked: the loop could not read whether a pull request is open for ${branch}.\n   ${messageOf(error)}` };
+  }
+}
+
+/** The line saying what follows a reading that found no pull request. */
+function missingLine(branch: string, spent: number, retries: number): string {
+  const after = spent === 0
+    ? 'the wrap-up session'
+    : `retry ${String(spent)} of ${String(retries)}`;
+  return spent < retries
+    ? `\n⚠️  No open pull request for ${branch} after ${after}: running retry wrap-up session ${String(spent + 1)} of ${String(retries)} (loop.wrapUp.retries).`
+    : `\n⚠️  No open pull request for ${branch} after ${after}: the loop opens it itself.`;
+}
+
+/**
+ * Reads the branch's open pull request, spends the retries while there
+ * is none, and has the runner open it after the last; see the module
+ * note. Never throws on its own account: what stopped it is in the
+ * answer, and the caller ends the run.
+ */
+export async function deliverPullRequest(
+  input: PullRequestDeliveryInput,
+  seams: PullRequestDeliverySeams,
+): Promise<PullRequestDelivery> {
+  const { branch } = input;
+  const retries = input.retries === false
+    ? 0
+    : input.retries;
+  let message = input.previousMessage;
+  for (let spent = 0; ; spent++) {
+    const reading = await readOpenPull(seams, branch);
+    if ('unread' in reading) return blockedDelivery(reading.unread, spent);
+    if (reading.pull !== null) {
+      const by: PullRequestOpener = spent === 0
+        ? 'wrap-up'
+        : 'retry';
+      return { kind: 'delivered', pull: reading.pull, by, retriesSpent: spent };
+    }
+    if (seams.isInterrupted()) {
+      activeOutput().warn(DELIVERY_INTERRUPTED);
+      return { kind: 'interrupted', retriesSpent: spent };
+    }
+    activeOutput().warn(missingLine(branch, spent, retries));
+    if (spent === retries) return openByRunner(seams, branch, spent);
+    message = await seams.retry(message);
+  }
+}
+
+/** The runner's own attempt, after every retry; reported either way. */
+async function openByRunner(
+  seams: PullRequestDeliverySeams,
+  branch: string,
+  retriesSpent: number,
+): Promise<PullRequestDelivery> {
+  const attempt = await seams.openRunnerPullRequest();
+  if (attempt.kind === 'blocked') return blockedDelivery(attempt.message, retriesSpent);
+  activeOutput().info(`\n✅ The loop opened pull request #${String(attempt.pull.number)} for ${branch}: ${attempt.pull.url}`);
+  return { kind: 'delivered', pull: attempt.pull, by: 'runner', retriesSpent };
+}
+
+/** What {@link runnerPrInputFor} reads the runner's pull request from. */
+export interface RunnerPrSource {
+  /** The run's branch. */
+  readonly branch: string;
+  /** The branch the pull request goes into. */
+  readonly base: string;
+  /** The plan as the run read it. */
+  readonly planContent: string;
+  /** The plan's stub, or null. */
+  readonly planStub: string | null;
+  /** The release fragment's note lines. */
+  readonly notes: readonly string[];
+}
+
+/** A `rafa:plan` issue written as a GitHub number, with or without `#`. */
+const ISSUE_NUMBER = /^#?(\d+)$/;
+
+/** `rafa-<n>` opening a stub, or a branch's last path segment. */
+const RAFA_ID = /(?:^|\/)rafa-(\d+)(?:-|$)/;
+
+/**
+ * The issue the plan implements: its `rafa:plan` block's `issue:` when
+ * that is a number, else the `rafa-<n>` its stub or branch opens with,
+ * as the wrap-up prompt reads it; null when none of them names one.
+ */
+export function planIssueNumber(planContent: string, planStub: string | null, branch: string): number | null {
+  const declared = parsePlan(planContent).header.issue?.trim() ?? '';
+  const spelled = ISSUE_NUMBER.exec(declared)?.[1]
+    ?? RAFA_ID.exec(planStub ?? '')?.[1]
+    ?? RAFA_ID.exec(branch)?.[1];
+  return spelled === undefined
+    ? null
+    : Number(spelled);
+}
+
+/**
+ * The runner's pull request input: the issue {@link planIssueNumber}
+ * reads and the title `planTitleIn` reads (`start/release-stage.ts`), or
+ * null when the plan names no issue number.
+ */
+export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
+  const issue = planIssueNumber(source.planContent, source.planStub, source.branch);
+  if (issue === null) return null;
+  return {
+    branch: source.branch,
+    base: source.base,
+    issue,
+    planTitle: planTitleIn(source.planContent, source.planStub),
+    notes: source.notes,
+  };
+}
+
+/** What {@link deliverySeamsIn} closes over: the run's input and the fragment step 3 committed. */
+export interface DeliveryContext extends WrapUpRunInput {
+  /** The fragment `finishRelease` committed, relative to the checkout, or null. */
+  readonly fragment: string | null;
+}
+
+/** The report for a plan that names no issue number to title the pull request with. */
+function noIssueReport(branch: string): string {
+  return [
+    `❌ The run is blocked: the loop could not open the pull request for ${branch}: the plan names no issue number.`,
+    '   Neither its `rafa:plan` block\'s `issue:` nor its stub or branch reads `rafa-<n>`.',
+  ].join('\n');
+}
+
+/** The real seams, each made over the run's checkout. */
+export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySeams {
+  const { checkout, expected } = context;
+  const pulls = ghPullRequestsIn(checkout);
+  return {
+    findOpen: (branch) => pulls.findOpen(branch),
+    retry: (previousMessage) => retryWrapUp({
+      previousMessage,
+      branch: expected.branch,
+      planContent: context.planContent,
+      settingSources: context.settingSources,
+      serving: context.serving,
+      learning: context.wrapUpLearning,
+      checkout,
+    }),
+    openRunnerPullRequest: async () => {
+      const runnerInput = runnerPrInputFor({
+        branch: expected.branch,
+        base: resolveBaseBranch(createGitRunner(checkout), context.settings.prBase),
+        planContent: context.planContent,
+        planStub: context.planStub,
+        notes: fragmentNotesIn(checkout, context.fragment),
+      });
+      if (runnerInput === null) return { kind: 'blocked', message: noIssueReport(expected.branch) };
+      return openRunnerPullRequest(runnerInput, runnerPrSeamsIn(checkout));
+    },
+    isInterrupted: context.isInterrupted,
+  };
 }

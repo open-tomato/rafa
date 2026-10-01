@@ -6,14 +6,23 @@
  * it asserts absent from the first one, so a `toContain` cannot pass on
  * a phrase both prompts carry anyway. The classifier key is read with
  * the classifier itself, as `wrap-up.test.ts` reads it.
+ *
+ * `retryWrapUp` is driven through a stand-in spawner with no learning
+ * and no serving, so no session, git or `gh` is reached: the cases read
+ * the prompt it spawned, the directory it spawned in, and the message it
+ * answered.
  */
 import type { ReleaseSkipped } from '../release/prepare.js';
+import type { CapturedSpawnOptions } from '../utils/claude.js';
 
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { classifyPromptContent } from '../effort/classify.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
-import { buildWrapUpRetryPrompt, missingPullRequestBullet } from './wrap-up-retry.js';
+import { withStamp } from './stamp.js';
+import { buildWrapUpRetryPrompt, missingPullRequestBullet, retryWrapUp } from './wrap-up-retry.js';
 import { buildWrapUpPrompt } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
@@ -144,5 +153,71 @@ describe('the retry wrap-up prompt', () => {
     expect([retryLines[0], ...retryLines.slice(1 + bullet.length)].join('\n')).toBe(first);
     expect(retry).toEndWith(PLAN);
     expect(retry).toContain('This pull request ships NO release fragment: no release fragment: release.enabled is false in this project.');
+  });
+});
+
+/** What one stand-in spawn was handed. */
+interface Spawned {
+  readonly prompt: string;
+  readonly options: CapturedSpawnOptions | undefined;
+}
+
+describe('retryWrapUp', () => {
+  const errors: string[] = [];
+  const infos: string[] = [];
+
+  beforeEach(() => {
+    errors.length = 0;
+    infos.length = 0;
+    setActiveOutput(sinkOutput({ error: (line) => errors.push(line), info: (line) => infos.push(line) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** One retry over a stand-in spawner answering `exitCode` and `stdout`. */
+  async function retryWith(exitCode: number, stdout: string): Promise<{ readonly answer: string; readonly spawned: readonly Spawned[] }> {
+    const spawned: Spawned[] = [];
+    const answer = await retryWrapUp({
+      previousMessage: MESSAGE,
+      branch: BRANCH,
+      planContent: PLAN,
+      settingSources: ['project'],
+      serving: null,
+      learning: null,
+      checkout: '/scratch/checkout',
+      spawn: (_args, prompt, options) => {
+        spawned.push({ prompt, options });
+        return Promise.resolve({ exitCode, stdout });
+      },
+    });
+    return { answer, spawned };
+  }
+
+  test('spawns one session in the checkout with the stamped retry prompt and no release record', async () => {
+    const { spawned } = await retryWith(0, 'Opened #601.');
+
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0]?.options?.cwd).toBe('/scratch/checkout');
+    // No release bullet of any kind: the fragment is already committed
+    // when a retry runs (see the module note).
+    expect(spawned[0]?.prompt).toBe(withStamp(retryPrompt()));
+    expect(spawned[0]?.prompt).toContain('  > Merged origin/main and pushed the branch.');
+  });
+
+  test('answers its own final message, so the next retry quotes this one', async () => {
+    const { answer } = await retryWith(0, 'Retry message.\n');
+
+    expect(answer).toBe('Retry message.\n');
+    expect(infos).toEqual(['\n✅ Retry wrap-up session ended; the loop checks for the pull request again.']);
+  });
+
+  test('answers the final message of a session that failed too, reporting the failure', async () => {
+    const { answer } = await retryWith(1, 'Stopped before gh pr create.');
+
+    expect(answer).toBe('Stopped before gh pr create.');
+    expect(errors).toEqual(['\n❌ Failed to preserve progress (exit 1). Please try again.']);
+    expect(infos).toEqual([]);
   });
 });
