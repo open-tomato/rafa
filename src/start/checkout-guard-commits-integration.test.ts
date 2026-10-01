@@ -32,6 +32,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 
@@ -188,7 +189,7 @@ function plant(): Scratch {
 function run(scratch: Scratch, words: readonly string[]): { readonly exitCode: number | null; readonly stdout: string } {
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: 30_000,
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString() };
@@ -202,7 +203,7 @@ function spawnLoopStart(scratch: Scratch) {
   }
   return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });

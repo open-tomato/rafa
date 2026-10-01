@@ -37,6 +37,7 @@ import { ACCEPT_REFS_FLAG, acceptStaleRefsPassLine } from '../board/refs-gate.js
 import { readRefsBlock } from '../refs/stamp.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** `src/`, where every module the probe imports lives. */
@@ -232,7 +233,7 @@ interface Run {
 function runPlan(scratch: Scratch, ...extra: readonly string[]): Run {
   const proc = Bun.spawnSync(
     [process.execPath, scratch.probe, scratch.sessions, `--issue=${String(SPEC_ISSUE)}`, '--no-progress', ...extra],
-    { cwd: scratch.repo, env: { PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' } },
+    { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' } },
   );
   return { exitCode: proc.exitCode, output: `${proc.stdout.toString()}\n${proc.stderr.toString()}` };
 }

@@ -62,6 +62,7 @@ import { parseBoardListing } from '../board/roadmap-board.js';
 import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '../commands/epic/cancel.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This module's own directory, `src/tests/`. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -313,7 +314,7 @@ function runCancelProbe(scratch: ScratchRepo, logPath: string): { readonly stdou
   writeFileSync(probe, buildCancelProbe(), 'utf8');
   const run = Bun.spawnSync([process.execPath, probe, logPath, 'epic', 'cancel', '40'], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: SPAWN_TIMEOUT,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

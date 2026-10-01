@@ -48,6 +48,7 @@ import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { sinkOutput } from './output-sinks.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The branch this suite checks out its release from. */
 const BRANCH = 'feat/scratch-release-e2e';
@@ -308,7 +309,7 @@ function runFinishInSubprocess(
       branch,
       JSON.stringify(provider),
     ],
-    { env: { PATH: path, HOME: tempBase } },
+    { env: { PATH: path, ...scratchHomeEnv(tempBase) } },
   );
   if (!run.success) {
     throw new Error(`the subprocess exited ${String(run.exitCode)}: ${run.stderr.toString()}`);

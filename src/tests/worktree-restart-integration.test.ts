@@ -41,6 +41,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry the second start spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -215,7 +216,7 @@ function calledIn(scratch: ScratchRepo): string[] {
 function spawnSecondStart(scratch: ScratchRepo) {
   return Bun.spawn([process.execPath, RAFA_ENTRY, ...START_ARGS], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });

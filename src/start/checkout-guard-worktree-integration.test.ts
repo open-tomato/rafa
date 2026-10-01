@@ -40,6 +40,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 import { readSessions } from '../loop/sessions.js';
 import { plantScratchRepo } from '../tests/cli-capture.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 
@@ -194,7 +195,7 @@ function spawnLoopStart(scratch: ScratchRepo) {
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${PLAN_REL}`, '--as-worktree', '--no-ci-wait', '--inject=full'],
     {
       cwd: scratch.repo,
-      env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+      env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     },

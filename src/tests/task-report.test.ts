@@ -150,6 +150,7 @@ import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** What a run with no config spawns every session under, spelled out. */
 const DEFAULT_SOURCE_ARGS = ['--setting-sources', 'project,local'];
@@ -568,9 +569,9 @@ function startCommand(): string[] {
   return [process.execPath, RAFA_ENTRY, 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait'];
 }
 
-/** The environment every run gets: the scratch PATH and HOME, nothing else. */
+/** The environment every run gets: the scratch PATH and HOME, with the bun cache variables `./scratch-home-env.ts` sets beside it, nothing else. */
 function startEnv(scratch: Scratch): Record<string, string> {
-  return { PATH: scratch.path, HOME: scratch.home };
+  return { PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
 }
 
 /** Throws unless `claude` and `gh` resolve to their stand-ins on the scratch PATH. */

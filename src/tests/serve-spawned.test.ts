@@ -40,6 +40,7 @@ import { SKILL_DELIVERY } from '../tiers/delivery.js';
 import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 const BUNDLED_BIN = join(dirname(RAFA_ENTRY), 'bundled', 'bin');
@@ -160,7 +161,7 @@ describe('rafa loop start, spawned with a recording stand-in claude', () => {
 
     const proc = Bun.spawnSync(
       [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'],
-      { cwd: scratch.repo, env: { PATH: scratch.path, HOME: scratch.home }, timeout: SPAWN_KILL_MS },
+      { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: SPAWN_KILL_MS },
     );
     expect(proc.exitCode).toBe(0);
 

@@ -44,6 +44,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { serializeFragment } from '../release/fragment.js';
 
 import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry an asynchronously spawned run executes; mirrors `cli-capture.ts`'s own. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -249,7 +250,7 @@ function spawnRafaAsync(scratch: ScratchRepo, cwd: string, words: readonly strin
   }
   const proc = Bun.spawn([process.execPath, RAFA_ENTRY, ...words], {
     cwd,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'pipe',
     stderr: 'pipe',
   });

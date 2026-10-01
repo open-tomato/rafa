@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 const STUB = 'lesson-loop';
@@ -103,7 +104,7 @@ function plant(): { repo: string; env: Record<string, string> } {
   for (const name of ['claude', 'gh']) {
     if (Bun.which(name, { PATH: path }) !== join(bin, name)) throw new Error(`${name} is not the stand-in`);
   }
-  return { repo, env: { PATH: path, HOME: home } };
+  return { repo, env: { PATH: path, ...scratchHomeEnv(home) } };
 }
 
 describe('a finding with a resolution, through rafa start', () => {

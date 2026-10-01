@@ -17,9 +17,10 @@
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
  * the real home. Its environment holds a PATH of that `bin/` directory
- * then git's own, the scratch HOME, `RAFA_TEST=1` and the suite's
- * `TMPDIR` for the effort store's test guard, and nothing else but what
- * the case names. So `claude` resolves to the stand-in
+ * then git's own, the scratch HOME with the bun cache variables that
+ * keep bun from writing under it (`./scratch-home-env.ts`), `RAFA_TEST=1`
+ * and the suite's `TMPDIR` for the effort store's test guard, and nothing
+ * else but what the case names. So `claude` resolves to the stand-in
  * {@link plantStandInClaude} writes there, or to nothing: {@link runRafa}
  * refuses to spawn when it resolves anywhere else.
  *
@@ -44,6 +45,8 @@ import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry a spawned run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -228,7 +231,7 @@ function refuseForeignClaude(scratch: ScratchRepo): void {
 
 /** The environment a spawned run gets; see {@link runRafa}. */
 function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>): Record<string, string> {
-  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, HOME: scratch.home };
+  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
 }
 
 /**

@@ -203,6 +203,7 @@ import {
 import { projectConfigText } from './project/scaffold.js';
 import { ABSENT, readRefsBlock } from './refs/stamp.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
+import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
@@ -444,7 +445,7 @@ function plantScratch(options: ScratchOptions = {}): Scratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { repo, record: join(root, 'record.json'), spawned, probe, home, env: { PATH: path, HOME: home } };
+  return { repo, record: join(root, 'record.json'), spawned, probe, home, env: { PATH: path, ...scratchHomeEnv(home) } };
 }
 
 /** What one command run did. */

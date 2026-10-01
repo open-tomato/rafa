@@ -42,6 +42,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 
 import { plantScratchRepo } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -192,7 +193,7 @@ function spawnLoopStart(scratch: ScratchRepo) {
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${PLAN_REL}`, '--as-worktree', '--no-ci-wait'],
     {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, HOME: scratch.home },
+      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     },

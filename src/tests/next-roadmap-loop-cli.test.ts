@@ -59,6 +59,7 @@ import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, eventsOf, type ScratchRepo } from './cli-capture.js';
 import { SRC_DIR } from './next-chain-fixtures.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -356,7 +357,7 @@ function runProbe(loop: LoopScratch, words: readonly string[]): { readonly event
   const recordPath = join(dirname(loop.scratch.repo), 'record.json');
   const proc = Bun.spawnSync([process.execPath, loop.probe, recordPath, ...words], {
     cwd: loop.scratch.repo,
-    env: { PATH: loop.scratch.path, HOME: loop.scratch.home, GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
+    env: { PATH: loop.scratch.path, ...scratchHomeEnv(loop.scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
   });
   const stdout = proc.stdout.toString();
   const stderr = proc.stderr.toString();

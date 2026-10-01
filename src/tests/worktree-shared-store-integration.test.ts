@@ -45,6 +45,7 @@ import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
 import { resultEvent } from './loop-session-fixtures.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry every spawn in this file runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -266,7 +267,7 @@ function spawnLoopStart(scratch: ScratchRepo, run: PlantedRun) {
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${run.planRel}`, '--as-worktree', '--no-ci-wait'],
     {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, HOME: scratch.home, TMPDIR: tmpdir() },
+      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home), TMPDIR: tmpdir() },
       stdout: 'ignore',
       stderr: 'ignore',
     },
