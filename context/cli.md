@@ -2309,8 +2309,17 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   message goes to stderr, a `CommandExit` message as the command gave
   it and anything else as `rafa: <message>`. A result a command gave is
   written as the `text` adapter writes one.
-- **The context's output** passes lines and `step` and `log` events
-  through. It holds `result(payload)` for the terminal event, and refuses
+- **events mode is given only to a command declaring `events` among its
+  outputs**, which today is `loop start` alone; any other command reads
+  `--output=events` or `RAFA_OUTPUT=events` as text
+  (`assembleContext`'s `eventsAllowed`). Its adapter
+  (`src/adapters/output/events.ts`) prints one `rafa· ` line per named
+  `event` and one per error, and nothing else; a session's stdout goes
+  to `info` there, so it never reaches the screen. The loop's events are
+  `src/start/loop-events.ts`'s, and `context/operators.md` lists their
+  line shapes.
+- **The context's output** passes lines and `step`, `log` and named
+  `event` events through; text drops a named event, json writes it. It holds `result(payload)` for the terminal event, and refuses
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
@@ -2407,8 +2416,8 @@ message naming the command as typed after `rafa` and saying to declare
   `rafa loop status`, which is no subject's first action. A subject's two
   examples are taken
   across its actions, the first of each before the second of any. The
-  global flags are `--output=json` and `-v, --verbose`, the two
-  `assembleContext` reads, and `--version`, which routing reads and which
+  global flags are `--output=json`, `--output=events` and
+  `-v, --verbose`, the three `assembleContext` reads, and `--version`, which routing reads and which
   takes no subject beside it. The spec's `--runtime=<v>` is no global flag:
   `loop start` alone reads it and declares it, since a flag typed ahead of
   the subject reaches the context's `flags` and never the `argv` a wrapped
