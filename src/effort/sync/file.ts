@@ -34,7 +34,9 @@
  * Pull merges the `effort.sqlite` the request's `from` names into this
  * project's store through `mergeStore` (`src/effort/store/merge-store.ts`,
  * whose note is the long form), as `rafa effort merge` does, and answers
- * `pulled` with the merge's own `MergeResult`. `dryRun` is the merge's.
+ * `pulled` with the merge's own `MergeResult`. `dryRun` is the merge's,
+ * and so is `sessionId`, the run whose own live record the merge's
+ * live-loop guard passes.
  * `from` is read against the repository root when it is relative; a
  * caller holding a path typed at a shell resolves it against its own
  * directory first, as `rafa effort merge` does. Every refusal is the
@@ -147,10 +149,11 @@ export function createFileSync(options: FileSyncOptions): Sync {
     return Object.freeze({ status: 'pushed', path: join(copied.directory, SQLITE_STORE_FILE_NAME) });
   };
 
-  const pull = async ({ from, dryRun }: SyncPullRequest): Promise<SyncPullResult> => {
+  const pull = async ({ from, dryRun, sessionId = null }: SyncPullRequest): Promise<SyncPullResult> => {
     const otherPath = resolve(repoRoot, requirePath('from', from));
     const path = join(storeDir(), SQLITE_STORE_FILE_NAME);
-    const merge = mergeStore({ ...mergeSeams(options), path, otherPath, backend, dryRun, stamp: fileStamp(now()), now });
+    const stamp = fileStamp(now());
+    const merge = mergeStore({ ...mergeSeams(options), path, otherPath, backend, dryRun, stamp, now, sessionId });
     return Object.freeze({ status: 'pulled', merge });
   };
 

@@ -6,7 +6,9 @@
  * directory, its store minted by `freshDevice` or `copyDevice`
  * (`src/tests/merged-stores.ts`), with `dispatches` rows planted through
  * `writeDispatch` so a merge has rows to add. The merge runs as an
- * installed runtime with no live loop, as `mergeBothWays` runs it.
+ * installed runtime with no live loop, as `mergeBothWays` runs it, but
+ * for the pull that plants one to show the request's session id reaches
+ * the merge's live-loop guard.
  *
  * Each refusal sits beside the same request made to succeed: the NDJSON
  * push beside the same device pushed under `sqlite`, the NDJSON pull
@@ -28,6 +30,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { beginSession } from '../../loop/sessions.js';
 import { copyDevice, freshDevice } from '../../tests/merged-stores.js';
 import { EffortCopyRefusal } from '../store/copy.js';
 import { writeDispatch } from '../store/dispatches.js';
@@ -243,6 +246,31 @@ describe('pulling with the file strategy', () => {
     expect(error).toMatchObject({ reason: 'ndjson' });
     expect((error as Error).message).toContain(MOVE_TO_SQLITE);
     expect(hashOf(sqliteStorePath(b.root))).toBe(before);
+  });
+
+  it('passes the request\'s session id to the merge, whose guard passes that run\'s live record', async () => {
+    const { scope, a, b } = twoDevices();
+    await fileSync(a.root).push({ to: join(scope, 'carried') });
+    const from = join(scope, 'carried', SQLITE_STORE_FILE_NAME);
+    const sessionId = '11111111-2222-3333-4444-555555555555';
+    const alive = { isAlive: (): boolean => true };
+    beginSession(b.root, {
+      sessionId,
+      planStub: 'rafa-322-demo',
+      plan: '.rafa/plans/PLAN-rafa-322-demo.md',
+      branch: 'feat/rafa-322-demo',
+      pid: 424242,
+      startedAt: '2026-09-29T09:00:00.000Z',
+    }, alive);
+    const live = createFileSync({ repoRoot: b.root, backend: 'sqlite', now: () => NOW, identity: INSTALLED, ...alive, env: {} });
+    const before = hashOf(sqliteStorePath(b.root));
+
+    const refused = await rejectionOf(() => live.pull({ from, dryRun: false }));
+
+    expect(refused).toMatchObject({ reason: 'live-loop' });
+    expect(hashOf(sqliteStorePath(b.root))).toBe(before);
+    expect(await live.pull({ from, dryRun: false, sessionId })).toMatchObject({ status: 'pulled', merge: { status: 'merged' } });
+    expect(dispatched(sqliteStorePath(b.root))).toEqual(['s-1', 's-2']);
   });
 
   it('rejects a request naming no file', async () => {

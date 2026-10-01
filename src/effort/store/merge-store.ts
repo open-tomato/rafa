@@ -37,7 +37,12 @@
  *     has pending, then `merges`, the table the merge writes its row to.
  *   - While a loop record under the store's project reads `running` or
  *     `paused` with its pid alive (`liveLoop`, `migrate.ts`): renaming
- *     the store under a loop loses what the loop writes.
+ *     the store under a loop loses what the loop writes. The record
+ *     whose session id `sessionId` names is passed: it is the run
+ *     pulling at the end of its own task, between task sessions, so
+ *     nothing of its own writes into the store under the swap. It is
+ *     matched by session id, never by pid, so a second live record
+ *     sharing that pid is still refused.
  *
  * ## The other store
  *
@@ -217,6 +222,11 @@ export interface MergeOptions extends DevelopmentProbe {
   readonly newMergeId?: () => string;
   /** The project of the repository holding `dir`, for an unminted store; `readProjectIdentity` when absent. */
   readonly readProject?: (dir: string) => ProjectIdentity;
+  /**
+   * The session id of the loop run merging, whose own live record the
+   * live-loop guard passes; absent or null for a caller that is no run.
+   */
+  readonly sessionId?: string | null;
 }
 
 /** The name the attached live store is reached by. */
@@ -324,9 +334,9 @@ function refuseOtherProject(options: MergeOptions): string | null {
   return other?.storeId ?? null;
 }
 
-/** Refuses the swap while a live loop records to the store. */
-function refuseLiveLoop(path: string, options: DevelopmentProbe): void {
-  const loop = liveLoop(path, options, NOTHING_MERGED);
+/** Refuses the swap while a live loop other than the caller's own run records to the store. */
+function refuseLiveLoop(path: string, options: DevelopmentProbe, sessionId: string | null): void {
+  const loop = liveLoop(path, options, NOTHING_MERGED, sessionId);
   if (loop === undefined) return;
   throw new MergeRefusal(
     'live-loop',
@@ -439,7 +449,7 @@ function refuseUnmergeable(options: MergeOptions, migrations: readonly SqliteMig
   const otherStore = refuseOtherProject(options);
   if (!options.dryRun) {
     refuseUnownedDevelopmentWrite(path, [...writeNames(localPlan), MERGES_TABLE], options);
-    refuseLiveLoop(path, options);
+    refuseLiveLoop(path, options, options.sessionId ?? null);
   }
   return { otherPlan, otherStore };
 }

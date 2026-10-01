@@ -494,6 +494,12 @@ export interface SyncPullRequest {
    * in, as `mergeStore`'s own `dryRun` does.
    */
   readonly dryRun: boolean;
+  /**
+   * The session id of the loop run pulling, which a strategy passes on as
+   * `mergeStore`'s `sessionId` so the live-loop guard passes the run's own
+   * record; absent or null for a pull no run makes.
+   */
+  readonly sessionId?: string | null;
 }
 
 /** What a push did. */

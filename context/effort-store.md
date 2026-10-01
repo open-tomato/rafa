@@ -206,7 +206,13 @@ has two directions: push (send the rows this store wrote, identified by
 their origin pair) and pull (merge the rows another device wrote under
 its own origin). Every adapter's pull calls `mergeStore`
 (`src/effort/store/merge-store.ts`), which implements the merge rules;
-nothing here reimplements a merge rule.
+nothing here reimplements a merge rule. A pull a loop run makes names
+the run's session id (`SyncPullRequest.sessionId`), which the adapter
+passes on as `mergeStore`'s `sessionId`: the merge's live-loop guard
+passes that run's own record, matched by session id and never by pid,
+and still refuses any other live record, one sharing the run's pid
+included (`merge-store.test.ts`). `liveLoop` (`migrate.ts`) is shared
+with the migration's guard, which names no session id.
 
 **`effort.sync` in `.rafa/config.yaml` selects the sync strategy, one of
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
