@@ -12,8 +12,13 @@
  * branch is listed, and one whose plan is gone is listed with no counts.
  * A record carrying a `worktree` is listed with that path as its last
  * column, beside records carrying none, listed `in the main checkout`.
+ *
+ * Each row prints the phase its record holds beside the tasks done over
+ * total, one session per phase of `SESSION_PHASES`, and the records the
+ * other cases plant hold none, as an older rafa writes them, and read
+ * `task`.
  */
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,6 +26,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SESSION_PHASES } from '../../loop/sessions.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   LOOP_SUBJECTS,
@@ -82,9 +88,9 @@ describe('rafa loop list', () => {
 
     expect(run.stdout).toBe([
       'Running sessions:',
-      '  session-0600: plan `demo` on `feat/other`, paused, pid 7171, started 2026-09-15T11:00:00.000Z; 1/4 done, 1 blocked, 2 open; in the main checkout',
-      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done, 1 blocked, 2 open; in the main checkout',
-      '  session-0800: plan `gone` on `feat/gone`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count; in the main checkout',
+      '  session-0600: plan `demo` on `feat/other`, paused, pid 7171, started 2026-09-15T11:00:00.000Z; 1/4 done (phase task), 1 blocked, 2 open; in the main checkout',
+      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done (phase task), 1 blocked, 2 open; in the main checkout',
+      '  session-0800: plan `gone` on `feat/gone`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count (phase task); in the main checkout',
       '',
     ].join('\n'));
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
@@ -108,8 +114,8 @@ describe('rafa loop list', () => {
 
     expect(run.stdout).toBe([
       'Running sessions:',
-      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done, 1 blocked, 2 open; in worktree `.rafa/worktrees/demo`',
-      `  session-0900: plan \`gone\` on \`feat/gone\`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count; in worktree \`${outside}\``,
+      '  session-0500: plan `demo` on `feat/demo`, running, pid 7171, started 2026-09-15T12:00:00.000Z; 1/4 done (phase task), 1 blocked, 2 open; in worktree `.rafa/worktrees/demo`',
+      `  session-0900: plan \`gone\` on \`feat/gone\`, running, pid 7171, started 2026-09-15T13:00:00.000Z; no plan or tracker to count (phase task); in worktree \`${outside}\``,
       '',
     ].join('\n'));
     expect([run.exitCode, run.stderr]).toEqual([0, '']);
@@ -126,6 +132,39 @@ describe('rafa loop list', () => {
 
     expect(sessions.map(({ session }) => Object.hasOwn(session, 'worktree'))).toEqual([true, false]);
     expect(sessions[0]?.session).toMatchObject({ worktree: inside });
+  });
+
+  it('prints the phase each record holds beside done/total, and gives it in json mode', async () => {
+    const records = SESSION_PHASES.map((phase, index) => sessionRecord({
+      sessionId: `session-phase-${String(index)}`,
+      startedAt: `2026-09-15T1${String(index)}:00:00.000Z`,
+      phase,
+    }));
+    const gone = sessionRecord({ ...MIXED[4], sessionId: 'session-phase-gone', startedAt: '2026-09-15T19:00:00.000Z', phase: 'repair' });
+    const project = projectWith(...records, gone);
+
+    const run = await list(project);
+    const json = await list(project, ['--output=json']);
+
+    const counts = run.stdout
+      .split('\n')
+      .slice(1, -1)
+      .map((row) => row.split('; ')[1]);
+    expect(counts).toEqual([
+      ...SESSION_PHASES.map((phase) => `1/4 done (phase ${phase}), 1 blocked, 2 open`),
+      'no plan or tracker to count (phase repair)',
+    ]);
+    const phases = (resultEvent(json.stdout) as { data: { sessions: Array<{ phase: SessionPhase }> } }).data.sessions.map(({ phase }) => phase);
+    expect(phases).toEqual([...SESSION_PHASES, 'repair']);
+  });
+
+  it('reads a record holding no phase as task in json mode', async () => {
+    const project = projectWith(sessionRecord());
+
+    const run = await list(project, ['--output=json']);
+
+    expect(resultEvent(run.stdout)).toMatchObject({ data: { sessions: [{ phase: 'task' }] } });
+    expect(Object.hasOwn((resultEvent(run.stdout) as { data: { sessions: Array<{ session: object }> } }).data.sessions[0]?.session ?? {}, 'phase')).toBe(false);
   });
 
   it('says there is none when no record is live, and when there is no record at all', async () => {
