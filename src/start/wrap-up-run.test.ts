@@ -259,4 +259,24 @@ describe('the two directories runWrapUp points each call at', () => {
     expect(NAMES[0]).toBe('wrapUpStarted');
     expect(NAMES.at(-1)).toBe('finished');
   });
+
+  it('writes the pull-request phase just before the CI gate, inside its block, and hands the gate the session', () => {
+    const gate = callTo(CALLS, 'verifyPullRequest');
+
+    expect(NAMES.indexOf('finishRelease')).toBeLessThan(NAMES.indexOf('pullRequestStarted'));
+    expect(NAMES.indexOf('pullRequestStarted') + 1).toBe(NAMES.indexOf('verifyPullRequest'));
+    expect(WRAP_UP_RUN).toMatch(/if \(ciWait\) \{\n\s*session\.pullRequestStarted\(\);/);
+    expect(gate.args.at(-1)).toBe('session');
+  });
+
+  it('reads a phase written after the gate, and a gate handed no session, as such', () => {
+    // The control for the case above: the same reader over a body that
+    // writes the phase once the gate is over, and hands the gate no
+    // session, answers that order and that last argument.
+    const calls = planted([PREPARE, SESSION, FINISH, ...GATE, 'session.pullRequestStarted();']);
+    const names = calls.map((call) => call.name);
+
+    expect(names.indexOf('verifyPullRequest')).toBeLessThan(names.indexOf('pullRequestStarted'));
+    expect(callTo(calls, 'verifyPullRequest').args.at(-1)).toBe('settingSources');
+  });
 });

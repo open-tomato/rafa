@@ -9,7 +9,10 @@
  * checkout against the HEAD the session's commits left
  * (`start/checkout-watch.ts`), step 3 of the release verifies, commits
  * and pushes the fragment, and, when the run waits on CI, the pull
- * request's checks are waited on (`start/pr-lifecycle.ts`). Step 3 runs
+ * request's checks are waited on (`start/pr-lifecycle.ts`). The session
+ * record reads `wrap-up` from the start of the branch, `pull-request` as
+ * that gate starts, and the gate writes `ci` and `repair` itself, handed
+ * the session (`start/session.ts`). Step 3 runs
  * BEFORE that gate: a fragment pushed after the wait started would be a
  * commit those checks never read.
  *
@@ -39,8 +42,8 @@ import { preserveProgress } from './wrap-up.js';
 
 /** What {@link runWrapUp} runs the wrap-up over, each as `start()` settled it. */
 export interface WrapUpRunInput {
-  /** The run's session record: told the wrap-up started, and that the run finished. */
-  readonly session: Pick<RunSession, 'wrapUpStarted' | 'finished'>;
+  /** The run's session record: told the wrap-up started, each phase of the CI gate, and that the run finished. */
+  readonly session: Pick<RunSession, 'wrapUpStarted' | 'pullRequestStarted' | 'ciStarted' | 'repairStarted' | 'finished'>;
   /** The project root, holding `.rafa/`: the store and this device's store id are read there. */
   readonly repoRoot: string;
   /** The checkout git and the wrap-up session run in (`start/checkout.ts`). */
@@ -127,6 +130,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     },
   );
   if (ciWait) {
+    session.pullRequestStarted();
     await verifyPullRequest(
       Math.max(1, ciTimeoutMin) * 60_000,
       Math.max(0, ciAttempts),
@@ -145,6 +149,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
         // project root, where the store lives, not the checkout.
         readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),
       },
+      session,
     );
   }
   session.finished();

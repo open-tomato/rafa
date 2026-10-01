@@ -85,6 +85,17 @@
  * session's own stdout reaches the operator through `utils/claude.ts`,
  * as `log` events in json mode.
  *
+ * ## The phase on the run record
+ *
+ * `start/wrap-up-run.ts` hands {@link verifyPullRequest} the run's
+ * session as its {@link PrLifecyclePhases} (`start/session.ts`), having
+ * written `pull-request` to it just before. The gate then writes `ci`
+ * before each poll of the checks and `repair` before each repair
+ * session, so a repaired PR reads `ci` again once its next poll starts.
+ * A gate that skips itself, finds no PR or takes the `none` path writes
+ * no phase, and the record keeps `pull-request`. Left out, the gate
+ * writes nothing ({@link NO_PHASES}).
+ *
  * The repair prompt's first line is the `ci-repair` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
@@ -92,6 +103,7 @@
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
 import type { ClaudeSettingSource } from '../config.js';
+import type { RunSession } from './session.js';
 import type {
   CheckRow,
   PrProviderReading,
@@ -239,14 +251,25 @@ export const PR_LIFECYCLE_SEAMS: PrLifecycleSeams = {
   runClaude,
 };
 
+/** The phases the gate writes to the run's session record; see the module note. */
+export type PrLifecyclePhases = Pick<RunSession, 'ciStarted' | 'repairStarted'>;
+
+/** The phases a gate handed no session writes: none. */
+export const NO_PHASES: PrLifecyclePhases = Object.freeze({
+  ciStarted: () => undefined,
+  repairStarted: () => undefined,
+});
+
 /**
  * The effects one attempt reaches through: {@link PrLifecycleSeams} with
  * its repair session bound to the run's setting sources by
  * {@link verifyPullRequest}.
  */
 interface AttemptSeams extends Omit<PrLifecycleSeams, 'runClaude'> {
-  /** Spawns one repair session with the prompt on stdin; answers its exit code. */
+  /** Writes phase `repair`, then spawns one repair session with the prompt on stdin; answers its exit code. */
   readonly runRepair: (prompt: string) => Promise<number>;
+  /** Where each poll writes phase `ci`. */
+  readonly phases: PrLifecyclePhases;
 }
 
 /**
@@ -304,18 +327,24 @@ async function repairPullRequest(
  * here so no attempt can spawn one under any other.
  *
  * `seams` replaces any of the effects {@link PrLifecycleSeams} names; a
- * key left out runs the real helper.
+ * key left out runs the real helper. `phases` is where `ci` and `repair`
+ * are written; see the module note.
  */
 export async function verifyPullRequest(
   timeoutMs: number,
   maxAttempts: number,
   settingSources: readonly ClaudeSettingSource[],
   seams: Partial<PrLifecycleSeams> = {},
+  phases: PrLifecyclePhases = NO_PHASES,
 ): Promise<void> {
   const given: PrLifecycleSeams = { ...PR_LIFECYCLE_SEAMS, ...seams };
   const io: AttemptSeams = {
     ...given,
-    runRepair: (prompt) => given.runClaude(prompt, settingSources),
+    runRepair: (prompt) => {
+      phases.repairStarted();
+      return given.runClaude(prompt, settingSources);
+    },
+    phases,
   };
   const branch = io.currentBranch();
 
@@ -442,6 +471,7 @@ function pollChecks(
   prNumber: number,
   timeoutMs: number,
 ): Promise<WaitResult> {
+  io.phases.ciStarted();
   activeOutput().info(`\n⏳ Waiting for CI on PR #${prNumber} (up to ${Math.round(timeoutMs / 60000)} min)...`);
 
   return waitForChecks({

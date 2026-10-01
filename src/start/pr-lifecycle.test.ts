@@ -81,7 +81,7 @@
  * Bun runs every test file in one process and the plan stub is module
  * state, so the one case that sets a stub is followed by a reset to null.
  */
-import type { PrLifecycleSeams } from './pr-lifecycle.js';
+import type { PrLifecyclePhases, PrLifecycleSeams } from './pr-lifecycle.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
 import type { ClaudeSettingSource } from '../config.js';
@@ -116,6 +116,7 @@ import {
   CI_POLL_INTERVAL_MS,
   DEFAULT_CI_ATTEMPTS,
   DEFAULT_CI_TIMEOUT_MIN,
+  NO_PHASES,
   PR_LIFECYCLE_SEAMS,
   prLifecycleSeamsIn,
   refusedPushReaderIn,
@@ -624,6 +625,79 @@ describe('verifyPullRequest, with zero attempts', () => {
     expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain('[0s] none — 0 check(s)');
     expect(errors[0]).toBe(`\n❌ CI still not green after 0 repair attempt(s) on ${BRANCH}.`);
+  });
+});
+
+/**
+ * The phases a gate writes, recorded into `calls` as `phase <name>`
+ * beside the effects, so a case pins where in the sequence each one
+ * was written.
+ */
+function phasesInto(calls: string[]): PrLifecyclePhases {
+  return {
+    ciStarted: () => {
+      calls.push('phase ci');
+    },
+    repairStarted: () => {
+      calls.push('phase repair');
+    },
+  };
+}
+
+describe('verifyPullRequest, writing the phase to the run record', () => {
+  it('writes ci before each poll and repair before each repair session', async () => {
+    const run = stub({ probes: [RED, GREEN], merges: [CLEAN], exits: [0] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+
+    expect(run.calls).toEqual([
+      ...OPENING,
+      `pr list ${BRANCH}`,
+      'phase ci',
+      `pr checks ${PR}`,
+      `pr view ${PR}`,
+      'phase repair',
+      'repair',
+      `pr list ${BRANCH}`,
+      'phase ci',
+      `pr checks ${PR}`,
+    ]);
+  });
+
+  it('writes repair before a conflict-repair session too', async () => {
+    const run = stub({ probes: [NONE], merges: [DIRTY], exits: [4] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+
+    expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`, 'phase ci', `pr checks ${PR}`, `pr view ${PR}`, 'phase repair', 'repair']);
+  });
+
+  it('writes ci once for a poll that waits between its probes', async () => {
+    const run = stub({ probes: [PENDING, GREEN] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+
+    expect(run.calls.filter((call) => call.startsWith('phase '))).toEqual(['phase ci']);
+  });
+
+  it('writes no phase when it skips itself, finds no PR or takes the none path', async () => {
+    const skipped = stub({ ghUsable: false });
+    const missing = stub({ prNumber: null });
+    const pushed = stub({ provider: NONE_BY_CONFIG });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, skipped.seams, phasesInto(skipped.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, missing.seams, phasesInto(missing.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, pushed.seams, phasesInto(pushed.calls));
+
+    expect(skipped.calls).toEqual([...OPENING]);
+    expect(missing.calls).toEqual([...OPENING, `pr list ${BRANCH}`]);
+    expect(pushed.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+  });
+
+  it('writes nothing through the default phases, and they cannot be changed', () => {
+    expect(NO_PHASES.ciStarted()).toBeUndefined();
+    expect(NO_PHASES.repairStarted()).toBeUndefined();
+    expect(Object.isFrozen(NO_PHASES)).toBe(true);
   });
 });
 
