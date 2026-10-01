@@ -279,6 +279,8 @@ function labelOf(event: CliEvent): string {
       return `${event.level}:${event.message}`;
     case 'step':
       return `step:${event.name}`;
+    case 'event':
+      return `event:${event.name}`;
     case 'start':
     case 'result':
       return event.type;
@@ -462,7 +464,17 @@ describe('a loop start run with no open task', () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
-    expect(eventsOf(run.stdout)).toEqual([
+    // The loop's named events (`start/loop-events.ts`) ride beside the log
+    // lines; they are read on their own below.
+    const events = eventsOf(run.stdout);
+    expect(events.filter((event) => event.type === 'event').map((event) => labelOf(event))).toEqual([
+      'event:wrap-up',
+      'event:wrap-up',
+      'event:wrap-up',
+      'event:no-pr',
+      'event:wrap-up',
+    ]);
+    expect(events.filter((event) => event.type !== 'event')).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
       ...noTaskLines().map(([level, message]) => ({
         type: 'log' as const,
@@ -524,12 +536,14 @@ describe('a loop start run whose session fails', () => {
 
     const run = runLoopStart(scratch, 'json', SESSION_FLAGS);
     const events = eventsOf(run.stdout);
-    const labels = events.map(labelOf);
+    const named = events.filter((event) => event.type === 'event').map(labelOf);
+    const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const failure = 'error:\n❌ Task failed (exit 3). Marked as blocked. Run again to retry.';
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
     expect(existsSync(scratch.callLog)).toBe(true);
+    expect(named).toEqual(['event:task-start', 'event:task-blocked']);
     expect(labels[0]).toBe('start');
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
     expect(labels.filter((label) => label === 'result')).toEqual(['result']);
@@ -561,11 +575,21 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
 
     const run = runLoopStart(scratch, 'json', SESSION_FLAGS);
     const events = eventsOf(run.stdout);
-    const labels = events.map(labelOf);
+    const named = events.filter((event) => event.type === 'event').map(labelOf);
+    const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const steps = events.filter((event) => event.type === 'step');
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
+    expect(named).toEqual([
+      'event:task-start',
+      'event:task-done',
+      'event:wrap-up',
+      'event:wrap-up',
+      'event:wrap-up',
+      'event:no-pr',
+      'event:wrap-up',
+    ]);
     expect(labels[0]).toBe('start');
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
     expect(labels.filter((label) => label === 'result')).toEqual(['result']);

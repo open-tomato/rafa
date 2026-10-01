@@ -175,7 +175,7 @@ export function runLoopStart(
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  const runEnv: Record<string, string> = { ...env, PATH: scratch.path, HOME: scratch.home };
+  const runEnv: Record<string, string> = { TMPDIR: RESOLVED_TMPDIR, ...env, PATH: scratch.path, HOME: scratch.home };
   if (mode !== 'text') runEnv.RAFA_OUTPUT = mode;
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags, NO_HINT], {
     cwd: scratch.repo,
@@ -184,6 +184,15 @@ export function runLoopStart(
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
 }
+
+/**
+ * The temp directory resolved through its links, handed to every run.
+ * A development build migrates an effort store only under the temp
+ * directory, and on macOS a scratch path resolves to `/private/var` while
+ * the unresolved temp directory reads `/var`; without it every task's
+ * report is refused and the run stops after its first task.
+ */
+const RESOLVED_TMPDIR = realpathSync(tmpdir());
 
 /** A test file's own planter: its scratch directory, and the call that removes it. */
 export interface ScratchPlanter {
