@@ -24,6 +24,18 @@ on the `open-tomato/rafa` board.
   `RafaCommand` — see the dev-planner skill's "Command-development rule" for
   guidance.
 
+* Size each task's suite run with the `tests=` declaration key (the
+  dev-planner skill's `tests=` section). Leave it off where the task's
+  own diff reaches the tests that could break, which the `affected`
+  default covers. Write `tests=module` on a task whose change other
+  modules consume through their own tests: an integration or spawned
+  test task, a change to a shared type, a reader or a module many
+  callers import. Write `tests=full` on a task whose change can break a
+  test that imports none of its files: test preloads, `bunfig.toml`,
+  `tsconfig*.json`, `package.json` or the lockfile, global state or
+  environment every test inherits, and a stage's closing cross-module
+  test task.
+
 * Before planning, review the spec as written, and report that review at the
   END of your final message as a `rafa:spec-review` block carrying
   `verdict: ready` or `verdict: not-ready`, with empty `gaps:` for ready, or a

@@ -1,12 +1,12 @@
 /**
- * The release stage as `start.ts` wires it into the wrap-up branch.
+ * Where `start.ts` hands the wrap-up over, and where it points each call.
  *
- * `release/prepare.ts`, `release/verify.ts` and `start/release-stage.ts`
- * are each driven through their own seams beside their own module, and
- * every one of those suites answers what the stage DOES. None of them
- * can answer where the loop runs it, which is this file's one claim:
- * step 1 before the wrap-up session, the record handed to that session,
- * step 3 after it returns, and all three BEFORE the CI gate.
+ * The wrap-up branch of the loop, the release stage around the session
+ * and the CI gate after it, lives in `start/wrap-up-run.ts`, and the
+ * order of its calls is read beside that module. This file's first claim
+ * is the hand-over: the `if (!taskInfo)` branch calls `runWrapUp` and
+ * nothing else, with the run's own root, checkout, config, plan and
+ * serving, and then ends the loop.
  *
  * A second claim is where each call is pointed: at the project root,
  * which holds `.rafa/`, or at the checkout git and the sessions run in
@@ -22,34 +22,14 @@
  * real Claude session. So the wiring is read off the source instead,
  * and read STRUCTURALLY: `start.ts` is parsed with TypeScript, the
  * `if (!taskInfo)` branch is located, and every call inside it is
- * collected in source order with its arguments as written. A substring
- * check could not tell a finish that runs after the CI gate from one
- * that runs before it, since both spell the same call; the order this
- * reader answers can.
+ * collected in source order with its arguments as written.
  *
  * ## The controls
  *
- * A reader that found nothing, or that answered a fixed order, would
- * pass every assertion below on any source at all. So each ordering
- * claim is paired with a PLANTED branch of the same shape that breaks
- * it — the finish moved above the session, the finish moved below the
- * CI gate, the session handed no record — and the case asserts the
- * reader reports the planted order, which is what makes its reading of
- * `start.ts` a reading rather than a coincidence.
- *
- * ## The mutation grid
- *
- * Three mutations of the branch were driven against this file on
- * 2026-09-20, one run each, 8 pass before and after and `start.ts`
- * restored sha256-identical (`00417b78…`) after every one:
- *
- *   - the finish moved below the `ciWait` block: 1 case, the CI-gate
- *     ordering, and the planted control beside it stayed green.
- *   - the record dropped from the `preserveProgress` call: 1 case here,
- *     and one in `tests/plan-injection.test.ts`, which pins the same
- *     call as a literal.
- *   - the preparation moved below the session: 1 case, the first
- *     ordering.
+ * A reader that found nothing would pass a "calls nothing else" claim on
+ * no source at all, and one that stopped at the first call would pass it
+ * on any. So a PLANTED branch that still makes a release call of its own
+ * beside the hand-over is read as making both.
  */
 import { readFileSync } from 'node:fs';
 
@@ -92,9 +72,8 @@ function wrapUpBranch(file: ts.SourceFile): ts.Statement {
 /**
  * Every call the wrap-up branch of `source` makes, in source order.
  *
- * The walk goes into nested statements, so the CI gate's call inside
- * `if (ciWait)` is read in the position it really runs in, and a call
- * moved into or out of that block moves in the answer.
+ * The walk goes into nested statements, so a call made inside a block
+ * of the branch, or inside an argument, is read as well.
  */
 function wrapUpCalls(source: string): readonly BranchCall[] {
   const file = ts.createSourceFile('start.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -178,87 +157,49 @@ function plantedStart(body: readonly string[]): string {
   ].join('\n');
 }
 
-/** Step 1, as a planted branch writes it. */
-const PREPARE = 'const release = prepareReleaseStage({ repoRoot, settings: runConfig.config, planStub, planContent });';
-
-/** The wrap-up session, handed the record step 1 answered. */
-const SESSION = 'await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);';
-
-/** Step 3, over that same record. */
-const FINISH = 'await finishRelease({ repoRoot, preparation: release });';
-
-/** The CI gate, inside the `ciWait` block it really sits in. */
-const GATE: readonly string[] = [
-  'if (ciWait) {',
-  '  await verifyPullRequest(timeout, attempts, settingSources);',
-  '}',
-];
-
-/** The calls a planted branch made of `body` makes, in source order. */
-function planted(body: readonly string[]): readonly BranchCall[] {
-  return wrapUpCalls(plantedStart(body));
-}
-
 describe('the wrap-up branch of start.ts', () => {
-  it('prepares the release before the wrap-up session and finishes it after', () => {
-    expect(NAMES).toContain('prepareReleaseStage');
-    expect(NAMES.indexOf('prepareReleaseStage')).toBeLessThan(NAMES.indexOf('preserveProgress'));
-    expect(NAMES.indexOf('preserveProgress')).toBeLessThan(NAMES.indexOf('finishRelease'));
+  it('hands the whole wrap-up to runWrapUp and calls nothing else', () => {
+    expect(NAMES).toEqual(['runWrapUp']);
+    expect(importedFrom(START, './start/wrap-up-run.js')).toEqual(['runWrapUp']);
   });
 
-  it('reads a finish moved above the session as being above it', () => {
-    // The control for the case above: the same reader over a branch
-    // that finishes the release before the session answers that order,
-    // so the claim it makes about `start.ts` could have failed.
-    const names = planted([PREPARE, FINISH, SESSION, ...GATE]).map((call) => call.name);
+  it('reads a branch making a release call of its own beside the hand-over as making both', () => {
+    // The control for the case above: the same reader over a branch that
+    // still prepares the release itself names both calls, so the claim
+    // that the branch calls nothing else could have failed.
+    const branch = plantedStart(['const release = prepareReleaseStage({ repoRoot });', 'await runWrapUp({ repoRoot });', 'break;']);
 
-    expect(names.indexOf('finishRelease')).toBeLessThan(names.indexOf('preserveProgress'));
+    expect(wrapUpCalls(branch).map((call) => call.name)).toEqual(['prepareReleaseStage', 'runWrapUp']);
   });
 
-  it('finishes the release before the CI gate', () => {
-    expect(NAMES).toContain('verifyPullRequest');
-    expect(NAMES.indexOf('finishRelease')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+  it('hands it the run\'s session, root, checkout, config, plan, serving, lessons, expectation and CI flags', () => {
+    const [input] = callTo(CALLS, 'runWrapUp').args;
+    const fields = [
+      'session,',
+      'repoRoot,',
+      'checkout,',
+      'settings: runConfig.config,',
+      'planStub,',
+      'planContent,',
+      'settingSources,',
+      'serving,',
+      'wrapUpLearning,',
+      'expected,',
+      'ciWait,',
+      'ciTimeoutMin,',
+      'ciAttempts,',
+    ];
+
+    for (const field of fields) expect(input).toContain(field);
   });
 
-  it('reads a finish moved below the CI gate as being below it', () => {
-    // The control for the case above: a release pushed after the wait
-    // started is the mistake that ordering exists to prevent, and the
-    // reader reports it where it is.
-    const names = planted([PREPARE, SESSION, ...GATE, FINISH]).map((call) => call.name);
+  it('ends the loop once runWrapUp returns', () => {
+    const file = ts.createSourceFile('start.ts', START, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const branch = wrapUpBranch(file);
+    if (!ts.isBlock(branch)) throw new Error('the wrap-up branch is not a block');
+    const statements = branch.statements.map((statement) => statement.getText(file));
 
-    expect(names.indexOf('verifyPullRequest')).toBeLessThan(names.indexOf('finishRelease'));
-  });
-
-  it('hands the session and the finish the very record the preparation answered', () => {
-    expect(callTo(CALLS, 'prepareReleaseStage').bound).toBe('release');
-    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving', 'wrapUpLearning', 'checkout']);
-    expect(callTo(CALLS, 'finishRelease').args[0]).toContain('preparation: release');
-  });
-
-  it('reads a session handed no record as being handed none', () => {
-    // The control for the case above: a `preserveProgress` call whose
-    // third argument is gone reads as two arguments, so the assertion
-    // on `start.ts` is about what is written there.
-    const calls = planted([PREPARE, 'await preserveProgress(planContent, settingSources);', FINISH, ...GATE]);
-
-    expect(callTo(calls, 'preserveProgress').args).toEqual(['planContent', 'settingSources']);
-  });
-
-  it('builds step 1 from the run\'s own root, config, plan stub and plan', () => {
-    const [input] = callTo(CALLS, 'prepareReleaseStage').args;
-
-    expect(input).toContain('repoRoot');
-    expect(input).toContain('settings: runConfig.config');
-    expect(input).toContain('planStub');
-    expect(input).toContain('planContent');
-  });
-
-  it('takes both halves of the stage from start/release-stage.ts', () => {
-    expect(importedFrom(START, './start/release-stage.js')).toEqual(['finishRelease', 'prepareReleaseStage']);
-
-    // The control: the reader answers the module asked for and not any
-    // import at all, so the list above is that module's own.
-    expect(importedFrom(START, './start/wrap-up.js')).toEqual(['preserveProgress', 'WrapUpLearning']);
+    expect(statements.at(-1)).toBe('break;');
   });
 });
 
@@ -301,7 +242,9 @@ describe('the two directories start.ts points each call at', () => {
     // main checkout's `.rafa/`, and the same `serving` reaches both doors.
     expect(START).toContain('const serving: SessionServing = { root: repoRoot, run: session.id,');
     expect(firstArgument('dispatchTask')).toContain('serving,');
-    expect(callTo(CALLS, 'preserveProgress').args).toContain('serving');
+    // The wrap-up is handed that `serving` too, and hands it to its
+    // session (`start/wrap-up-run.test.ts`).
+    expect(firstArgument('runWrapUp')).toContain('serving,');
   });
 
   it('dispatches each task with the project root and the checkout both', () => {
@@ -312,6 +255,22 @@ describe('the two directories start.ts points each call at', () => {
     expect(callTo(EVERY, 'renderProgressForDispatch').args).toEqual(['repoRoot', 'planStub', 'checkout']);
   });
 
+  it('dispatches each task with the HEAD the checkout is held to as its base', () => {
+    // `expected.head` is the task's base: `advanceExpectation` moves it on
+    // to each task's commit, so the next task is handed the commit it sits
+    // on. It is read once, before the dispatch, since the task step after
+    // the commit needs the base the expectation no longer holds.
+    expect(START).toContain('const base = expected.head;');
+    expect(firstArgument('dispatchTask')).toMatch(/^\s*base,$/m);
+  });
+
+  it('reads a dispatch handed no base as handed none', () => {
+    // The control for the case above: a literal without the field reads without it.
+    const planted = everyCall('async function run() {\n  await dispatchTask({\n    taskInfo,\n    repoRoot,\n  });\n}');
+
+    expect(callTo(planted, 'dispatchTask').args[0]).not.toMatch(/^\s*base,$/m);
+  });
+
   it('reads a dispatch handed no checkout as handed none', () => {
     // The control for the case above: the reader answers what is written,
     // so a dispatch literal without the field reads without it.
@@ -320,11 +279,14 @@ describe('the two directories start.ts points each call at', () => {
     expect(callTo(planted, 'dispatchTask').args[0]).not.toContain('checkout');
   });
 
-  it('runs the release, the wrap-up and the CI gate in the checkout', () => {
-    expect(callTo(CALLS, 'prepareReleaseStage').args[0]).toContain('checkout,');
-    expect(callTo(CALLS, 'preserveProgress').args.at(-1)).toBe('checkout');
-    expect(callTo(CALLS, 'finishRelease').args[0]).toContain('repoRoot: checkout');
-    expect(callTo(CALLS, 'prLifecycleSeamsIn').args).toEqual(['checkout']);
+  it('hands the wrap-up the project root and the checkout both', () => {
+    // Which of the two each release, session and CI gate call inside it is
+    // pointed at is read beside `start/wrap-up-run.ts`.
+    const input = firstArgument('runWrapUp');
+
+    expect(input).toContain('repoRoot,');
+    expect(input).toContain('checkout,');
+    expect(input).not.toContain('repoRoot: checkout');
   });
 
   it('keeps the config, the plan, the session record, the preflight, the pause and triage at the project root', () => {
@@ -341,5 +303,65 @@ describe('the two directories start.ts points each call at', () => {
     // checkout only to record it as the run's `worktree` (`start/session.ts`).
     expect(firstArgument('openRunSession')).not.toContain('repoRoot: checkout');
     expect(firstArgument('openRunSession')).toMatch(/\bcheckout \}$/);
+  });
+});
+
+describe('where start.ts takes the suite steps', () => {
+  const EVERY = everyCall(START);
+
+  /** The index of the first call to `name`, failing when there is none. */
+  const indexOf = (calls: readonly BranchCall[], name: string): number => calls.indexOf(callTo(calls, name));
+
+  it('makes them once, over the run\'s root, checkout, tracker, session, config and plan', () => {
+    const input = callTo(EVERY, 'createRunSuiteSteps').args[0] ?? '';
+
+    expect(EVERY.filter((call) => call.name === 'createRunSuiteSteps')).toHaveLength(1);
+    for (const field of ['repoRoot,', 'checkout,', 'trackerPath,', 'sessionId: session.id,', 'settings: runConfig.config,', 'planContent,']) {
+      expect(input).toContain(field);
+    }
+  });
+
+  it('takes the steps before a session past the loop guard, ahead of progress.txt and of the wrap-up', () => {
+    // The baseline, the stage steps and the pre-wrap-up step all sit in
+    // this one call: `start/suite-steps-run.test.ts` reads which runs when.
+    expect(callTo(EVERY, 'beforeSession').args).toEqual(['taskInfo']);
+    const before = indexOf(EVERY, 'beforeSession');
+    expect(indexOf(EVERY, 'haltIfWrapUpMoved')).toBeLessThan(before);
+    expect(before).toBeLessThan(indexOf(EVERY, 'renderProgressForDispatch'));
+    expect(before).toBeLessThan(indexOf(EVERY, 'runWrapUp'));
+    expect(before).toBeLessThan(indexOf(EVERY, 'dispatchTask'));
+  });
+
+  it('stops the run when a step before a session is red, and breaks on an interrupt it ran through', () => {
+    expect(START).toContain('if (!(await suiteSteps.beforeSession(taskInfo))) return;\n      if (interrupted) break;');
+  });
+
+  it('takes the task step from the task\'s base once its commit is stored, before the usage check', () => {
+    expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
+    const after = indexOf(EVERY, 'afterTask');
+    expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
+    expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
+    expect(after).toBeLessThan(indexOf(EVERY, 'checkUsage'));
+    expect(START).toContain('if (!(await suiteSteps.afterTask(taskInfo, base))) return;');
+  });
+
+  it('reads a task step taken before the commit as taken before it', () => {
+    // The control for the ordering above: the reader answers the order
+    // written, so a planted loop taking the step first reads that way.
+    const planted = everyCall([
+      'async function run() {',
+      '  if (!(await suiteSteps.afterTask(taskInfo, base))) return;',
+      '  const finished = finishCleanExit({ trackerPath });',
+      '}',
+    ].join('\n'));
+
+    expect(indexOf(planted, 'afterTask')).toBeLessThan(indexOf(planted, 'finishCleanExit'));
+  });
+
+  it('keeps the wrap-up branch free of the pre-wrap-up step', () => {
+    // It runs in `beforeSession(null)` ahead of the branch, which still
+    // hands the whole wrap-up to `runWrapUp` alone (the first describe).
+    expect(NAMES).not.toContain('beforeSession');
+    expect(NAMES).not.toContain('runPreWrapUpStep');
   });
 });

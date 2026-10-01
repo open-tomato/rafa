@@ -108,6 +108,7 @@
  * declared one and belongs beside the rest of them in
  * `tests/findNextTask.test.ts`.
  */
+import type { TestScope } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import {
@@ -124,6 +125,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import {
   parseTaskDeclaration,
+  readTestScope,
   stripTaskDeclaration,
 } from '../utils/declaration.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
@@ -445,5 +447,59 @@ describe('a tracker whose task lines carry declarations', () => {
     expect(resumed.status).toBe('blocked');
     expect(parseTaskDeclaration(resumed.task).declaration?.effort)
       .toBe('low');
+  });
+});
+
+describe('a tracker declaring `tests=`', () => {
+  /**
+   * One line's spec: the sentence alone, the block it trails (or null
+   * for no block at all), and the scope {@link readTestScope} must
+   * answer for it — `affected` both for the unusable value, which
+   * lands in {@link TaskDeclaration.issues} rather than on the record,
+   * and for the line with no block to read at all.
+   */
+  const specs: readonly {
+    text: string;
+    block: string | null;
+    scope: TestScope;
+  }[] = [
+    { text: 'Wire the module suite', block: '{tests=module}', scope: 'module' },
+    { text: 'Wire the full suite', block: '{tests=full}', scope: 'full' },
+    { text: 'Wire the bogus suite', block: '{tests=bogus}', scope: 'affected' },
+    { text: 'Wire the default suite', block: null, scope: 'affected' },
+  ];
+
+  it('reads the declared scope off each line, or the default for none, with the block always off the dispatched text', () => {
+    const lines = specs.map((spec) => {
+      const block = spec.block === null
+        ? ''
+        : `${GAP}${spec.block}`;
+      return `- [ ] ${spec.text}${block}`;
+    });
+
+    const tracker = plant([
+      '# Plan: a throwaway plan',
+      '',
+      '## Stage: One',
+      '',
+      ...lines,
+      '',
+    ].join('\n'));
+
+    for (const spec of specs) {
+      const info = nextTask(tracker);
+      const { text, declaration } = parseTaskDeclaration(info.task);
+
+      expect(readTestScope(declaration)).toBe(spec.scope);
+      // The text `findNextTask` hands the dispatch prompt carries no
+      // declaration of its own, whether the block held a usable value,
+      // an unusable one, or was never there.
+      expect(text).toBe(spec.text);
+      expect(parseTaskDeclaration(text).declaration).toBeNull();
+
+      updateTrackerLine(tracker, info.lineNum, 'done');
+    }
+
+    expect(findNextTask(read(tracker))).toBeNull();
   });
 });

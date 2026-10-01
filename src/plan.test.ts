@@ -801,7 +801,7 @@ describe('rafa plan through the adapter registry', () => {
     const prompt = String(readRecord(scratch)['prompt']);
     expect(prompt).toContain('| `cleanup` | `refactor-cleaner` |');
     expect(prompt).toContain('| `prose` | `doc-updater` |');
-    expect(prompt).not.toContain('`tests`');
+    expect(prompt).not.toContain('| `tests` | `tdd-guide` |');
     expect(prompt).not.toContain('{ROUTING}');
   }, 30_000);
 

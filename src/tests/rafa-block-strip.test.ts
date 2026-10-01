@@ -173,6 +173,7 @@ describe('a task dispatched from a plan carrying rafa:* blocks', () => {
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run,
     });
 

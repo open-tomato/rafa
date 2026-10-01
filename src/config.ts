@@ -47,7 +47,9 @@
  *     readings each later section's spec leaves are argued in
  *     `config-schema-readings.ts`, a note that exports nothing, except
  *     the `pr` and `release` sections', which sit with their fields in
- *     `config-schema-release.ts`, spread into `config-schema.ts`.
+ *     `config-schema-release.ts`, and the `tests` section's, which sit
+ *     with theirs in `config-schema-tests.ts`, both spread into
+ *     `config-schema.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `config-schema.ts` reads its settings through. No caller reads a
  *     setting through them but the schema, so nothing here re-exports
@@ -60,7 +62,8 @@
  * commit that added the `pr` section: `config.ts` is 506 lines,
  * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
  * one field, one default and one spec in `config-schema.ts` (in
- * `config-schema-release.ts` for a `pr` or `release` key), its reader
+ * `config-schema-release.ts` for a `pr` or `release` key, in
+ * `config-schema-tests.ts` for a `tests` key), its reader
  * in `config-sections.ts`, and one line in {@link readLayer}'s layer
  * literal here; the literal is exhaustive on purpose, so a setting
  * added there and forgotten here does not compile.
@@ -387,6 +390,8 @@ function readLayer(
     routing: read('routing'),
     taskSkills: read('taskSkills'),
     taskLessons: read('taskLessons'),
+    testsFullSuiteTriggers: read('testsFullSuiteTriggers'),
+    testsIntegration: read('testsIntegration'),
   };
   return { layer, problems, extras };
 }

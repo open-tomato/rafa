@@ -433,6 +433,7 @@ async function dispatchSpec(
     settingSources: overrides.settingSources ?? ['project', 'local'],
     serving: null,
     handout: null,
+    base: null,
     run,
   });
 

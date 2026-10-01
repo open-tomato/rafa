@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="9" assertions="4" failures="7" skipped="0" time="0.053395397">
+  <testsuite name="afterall.test.ts" file="afterall.test.ts" tests="2" assertions="0" failures="1" skipped="0" time="0.000509349" hostname="fixture-host">
+    <testcase name="aa ok" classname="" time="0.000011" file="afterall.test.ts" line="3" assertions="0" />
+    <testcase name="(unnamed)" classname="" time="0.000122" file="afterall.test.ts" assertions="0">
+      <failure type="Error" message="aa">Error: aa&#10;      at afterall.test.ts:2:38&#10;</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="beforeall.test.ts" file="beforeall.test.ts" tests="1" assertions="0" failures="1" skipped="0" time="0.000138438" hostname="fixture-host">
+    <testsuite name="grp" file="beforeall.test.ts" line="2" tests="1" assertions="0" failures="1" skipped="0" time="0" hostname="fixture-host">
+      <testcase name="(unnamed)" classname="grp" time="0.000026" file="beforeall.test.ts" assertions="0">
+        <failure type="Error" message="ba">Error: ba&#10;      at beforeall.test.ts:2:63&#10;</failure>
+      </testcase>
+    </testsuite>
+  </testsuite>
+  <testsuite name="dup.test.ts" file="dup.test.ts" tests="4" assertions="4" failures="3" skipped="0" time="0.00020808" hostname="fixture-host">
+    <testcase name="same" classname="" time="0.000038" file="dup.test.ts" line="2" assertions="1">
+      <failure type="AssertionError" message="expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;">AssertionError: expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;&#10;      at dup.test.ts:2:32&#10;</failure>
+    </testcase>
+    <testcase name="same" classname="" time="0.000024" file="dup.test.ts" line="3" assertions="1">
+      <failure type="AssertionError" message="expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;">AssertionError: expect(received).toBe(expected)&#10;&#10;Expected: 2&#10;Received: 1&#10;&#10;      at dup.test.ts:3:32&#10;</failure>
+    </testcase>
+    <testcase name="each 1" classname="" time="0.000009" file="dup.test.ts" line="4" assertions="1" />
+    <testcase name="each 2" classname="" time="0.000019" file="dup.test.ts" line="4" assertions="1">
+      <failure type="AssertionError" message="expect(received).toBe(expected)&#10;&#10;Expected: 1&#10;Received: 2&#10;">AssertionError: expect(received).toBe(expected)&#10;&#10;Expected: 1&#10;Received: 2&#10;&#10;      at dup.test.ts:4:48&#10;</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="timeout.test.ts" file="timeout.test.ts" tests="2" assertions="0" failures="2" skipped="0" time="0.05048713" hostname="fixture-host">
+    <testcase name="slow" classname="" time="0.050195" file="timeout.test.ts" line="2" assertions="0">
+      <failure type="TimeoutError" message="test timed out" />
+    </testcase>
+    <testcase name="rej" classname="" time="0.000168" file="timeout.test.ts" line="3" assertions="0">
+      <failure type="Error" message="unh">Error: unh&#10;      at timeout.test.ts:3:40&#10;</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

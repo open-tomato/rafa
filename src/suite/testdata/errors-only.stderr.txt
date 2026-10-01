@@ -1,0 +1,27 @@
+
+a.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './x.js' from '/tmp/scratch/a.test.ts'
+-------------------------------
+
+
+b.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+1 | throw new Error('q');
+              ^
+error: q
+      at /tmp/scratch/b.test.ts:1:11
+-------------------------------
+
+
+c.test.ts:
+(pass) ok [0.03ms]
+
+ 1 pass
+ 2 fail
+ 2 errors
+Ran 3 tests across 3 files. [2.00ms]

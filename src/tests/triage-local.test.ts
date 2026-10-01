@@ -373,6 +373,7 @@ describe('a blocker over the local adapter', () => {
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });

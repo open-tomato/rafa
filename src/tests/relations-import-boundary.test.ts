@@ -94,6 +94,7 @@ const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'commands/pr/merge-tick.ts': 'pr merge\'s epic-tick, matching a member against its epic: label',
   'commands/issue/roadmap-epic-table.ts': 'the roadmap epic table\'s labels-mode branch',
   'commands/issue/unblock.ts': 'rafa issue unblock, a labels-mode-only command',
+  'suite/owns.ts': 'the stage step\'s Owns: lookup, finding a spec\'s epic by its epic: label the way epic-context.ts does; a failed read only widens the step to the whole suite',
 });
 
 /** Every `.ts` source file under `src/`, its own `.test.ts` files and `testdata/` fixtures left out. */

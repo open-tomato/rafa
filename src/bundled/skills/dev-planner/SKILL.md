@@ -352,6 +352,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 | `budget` | US dollars above zero, as a plain decimal of at most six digits each side of the point, such as `0.50` | `--max-budget-usd` | always passed: a definition supplies no budget |
 | `tools` | tool names, comma-separated with no spaces | `--tools` | never passed: the definition names its tool set |
 | `skills` | skill names, comma-separated with no spaces | nothing: no flag carries a skill | kept on the record beside the agent |
+| `tests` | `affected`, `module` or `full`; `affected` when absent | nothing: the loop's runner reads it | kept on the record beside the agent |
 
 * `agent=<name>` outranks `model` and `tools`, and `effort` only when its
   definition declares one, as the last column says. The outranked keys
@@ -376,7 +377,7 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
 
 There is no default agent. A task with no declaration passes no routing flag and runs at the loop's defaults, as does one whose every value failed to parse.
 
-The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES` and `EFFORT_LEVELS` hold the aliases and levels in the table, whose `parseBudgetUsd` reads a budget and whose `parseSkillList` reads a skill list; that module is the authority for this section, so change the two together.
+The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, whose `MODEL_ALIASES`, `EFFORT_LEVELS` and `TEST_SCOPES` hold the aliases, levels and test scopes in the table, whose `parseBudgetUsd` reads a budget, whose `parseSkillList` reads a skill list and whose `readTestScope` reads a test scope; that module is the authority for this section, so change the two together.
 
 ### `skills=` declaration
 
@@ -392,6 +393,23 @@ A task with no `skills=` declaration is valid — naming none is the answer when
 ```
 
 The second example above has no `skills=` and is still a valid task declaration.
+
+### `tests=` declaration
+
+`tests=` names how much of the suite the loop's runner runs after the task commits. The task's own session runs only the tests its changes reach, whatever the key says; the key sizes the runner's step that follows it.
+
+| Value | The runner's step runs |
+| --- | --- |
+| `affected` | the test files the task's diff reaches. The default: a task with no `tests=` runs this |
+| `module` | the tests of every module the task's diff touches |
+| `full` | the whole suite |
+
+`tests` is a recognised key that maps to no flag, like `skills`: it stands on its own (`{tests=full}` is a declaration), is stripped from the task text with the rest of the block, and a value outside the three is recorded as an issue and read as absent, so the task runs at `affected`.
+
+```markdown
+  - [ ] Drive a real `rafa loop start` over a one-task fixture plan  {tests=module}
+  - [ ] Move the test preload into `bunfig.toml`  {tests=full}
+```
 
 ---
 

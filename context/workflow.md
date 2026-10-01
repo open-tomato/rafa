@@ -103,6 +103,80 @@ becomes an agent-setting record and the enqueue moves to record 1, so
 every prompt-keyed reader has to key on the type/operation pair and
 never on position.
 
+### Task session scope and test configuration
+
+**A task line declares `tests=affected` (the default), `tests=module`, or
+`tests=full` to control what its session checks.** Alongside `agent=` and
+other declaration keys, a task line can end with `{tests=<scope>}` to set
+the scope of verification the session will run. The three scopes cover
+both the task session's gates and the runner's stage step that follows
+the stage's last task.
+
+**Task session gates** run in every task, reading one exit code from each:
+- `bun test --changed=<base>` scoped to the changed tests (default, or when
+  `tests=affected` is declared or the changed files do not trigger a
+  module or full-suite rerun)
+- `bunx tsc --noEmit` to type-check changed files (TypeScript only, test
+  files excluded by `tsconfig.json`)
+- `bunx eslint <changed files>` to lint changed files
+
+All three redirect output to a file and read the exit code with `$?`
+immediately after, never piping through `tail`, `grep`, or polling with
+`until`/`while` + `sleep`. Through a pipe, only the downstream tool's exit
+code is captured, and polling wastes time when the runner records the same
+gate later anyway.
+
+**Runner recorded steps** run at fixed points in the loop to establish
+baseline expectations and stage-end failures:
+- `baseline` — Full suite once at plan start (first dispatch)
+- `task` — Full suite after each task's session ends and commits
+- `stage` — Full suite after a stage's last task completes
+- `pre-wrap-up` — Full suite before wrap-up session starts
+
+Each recorded step names its scope, the command, exit code, Bun's summary
+line, every failing test (file + full test name pairs), and which failures
+are new against the baseline (not present in `baseline`'s captured failures).
+
+**The baseline is the `baseline` step's recorded failures.** A failure is
+identified by its test file path and full test name. When a step reports
+failures after the baseline, the runner compares each failure's file + name
+pair against the baseline's captured set: a match means the failure was
+already present, a mismatch means it is new. Only new failures block the
+next task.
+
+**Declaration key `tests=` on a task line** sets what the task's session
+will run and influences what scope the runner uses for the stage step after
+that task's stage completes:
+- `tests=affected` (default): task session runs `bun test --changed=<base>`
+  plus types and lint on the changed files; stage step runs full suite
+  unless the changed files do not trigger one
+- `tests=module`: task session skips to `bun test <module-files>` when the
+  task touches files whose enclosing module is listed in
+  `tests.integration`, otherwise same as `tests=affected`; stage step runs
+  the tests for every module the diff touches
+- `tests=full`: task session runs full suite when the task changes a config
+  file or a globally-used module; stage step always runs full suite
+
+**Config keys determine when a task triggers `tests=module` or `tests=full`
+automatically:**
+- `tests.fullSuiteTriggers` (glob list; defaults include `bunfig.toml`,
+  `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
+  named in `[test] preload` of `bunfig.toml`) — when a task touches any
+  file matching these globs, the task scope escalates to `tests=full`
+- `tests.integration` (glob list; defaults to `**/*-integration.test.ts`,
+  `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
+  — when a task touches files in any module matching these globs (files in
+  the same directory or a sibling at a known depth), the scope escalates
+  to `tests=module`
+
+**A stage-end step with new failures blocks the next task.** After a
+stage's last task, the stage step runs the full suite and captures
+failures. If any failure is new against the baseline, the runner adds them
+to the blocker text the retry session receives through
+`BLOCKER_PROMPT_PREFIX` in its prompt. The blocked task holds until its
+session completes or a human unblocks it with a `[BLOCKED]` mark on its
+line in the tracker.
+
 ### Skills and lessons at dispatch
 
 **Every task's prompt holds a skill index, and at dispatch the session is

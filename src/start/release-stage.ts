@@ -11,7 +11,7 @@
  * version and the changelog section are written on the base branch
  * alone, by `rafa release settle`. Only the middle third is a prompt
  * (`./wrap-up.ts`), and this module is the two outer thirds, in the
- * order `src/start.ts` runs them:
+ * order `src/start/wrap-up-run.ts` runs them:
  *
  * ```text
  * prepareReleaseStage(input)           → ReleasePreparation | null
@@ -134,7 +134,7 @@
  * for a body there is a call that can only fail, slowly, on a machine
  * that may not have `gh` installed.
  *
- * The reading is the RUN's, so `src/start.ts` hands this stage a
+ * The reading is the RUN's, so `src/start/wrap-up-run.ts` hands this stage a
  * reader carrying the run's own `pr.provider`, the way it already
  * hands one to the CI gate. The default seam here leaves `configured`
  * null, which is `origin` deciding — right for a caller that names no

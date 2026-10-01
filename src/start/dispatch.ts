@@ -26,11 +26,14 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix from. Its third line, when the task's
  * tracker line trails a blocker comment (`utils/tracker.ts`), hands the
- * session the text the task was blocked on. Its last lines, ahead of the
+ * session the text the task was blocked on. The line after that (or
+ * after the second, with no blocker), when the loop names the task's base
+ * commit, hands the session that commit as the `bun test --changed=<base>`
+ * it runs for its scoped test gate. Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
- * when there are any. Between the blocker line (or the second line, with
- * no blocker) and `PROMPT.md` go the task's `## Skills for this task` and
+ * when there are any. Between the base line (or the blocker line, or the
+ * second line, with neither) and `PROMPT.md` go the task's `## Skills for this task` and
  * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
  * followed by a blank line, in that order, and each absent when it
  * rendered empty; with both absent the prompt is the one built before
@@ -232,6 +235,17 @@ export interface TaskDispatchOptions {
    * dispatch every task without its sections and nothing would say so.
    */
   handout: TaskHandout | null;
+  /**
+   * The task's base commit: the HEAD the checkout is expected on as the
+   * task is dispatched (`start/checkout-watch.ts`), which its own commit
+   * will sit on. The prompt hands it to the session as the
+   * `bun test --changed=<base>` it runs (see {@link buildTaskPrompt}).
+   * Null names none and leaves the prompt as it was, which a test driving
+   * the `run` seam names. Required for the reason `serving` is: a default
+   * of none would let a caller that forgot it dispatch every task without
+   * its base, and the session would guess one.
+   */
+  base: string | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -284,6 +298,29 @@ function blockerLines(blocker: string | null): string[] {
   return blocker === null || blocker.trim().length === 0
     ? []
     : [`${BLOCKER_PROMPT_PREFIX}${escapeBlockerText(blocker)}`];
+}
+
+/**
+ * What opens the prompt line handing a session its task's base commit.
+ * The loop's words open it, as they open the blocker line.
+ */
+export const BASE_PROMPT_PREFIX = 'The base commit of this task is ';
+
+/** A full or abbreviated git object name, the only shape a base may take. */
+const COMMIT_NAME = /^[0-9a-f]{7,64}$/;
+
+/**
+ * The prompt line naming `base` and the `bun test --changed=<base>` the
+ * session runs, or none for no base. Throws on a base that is not a
+ * commit name: it is pasted into a shell command the session runs, and
+ * the loop only ever hands it the HEAD git answered.
+ */
+function baseLines(base: string | null): string[] {
+  if (base === null) return [];
+  if (!COMMIT_NAME.test(base)) {
+    throw new Error(`The task's base \`${base}\` is not a commit name; the prompt pastes it into \`bun test --changed=\`.`);
+  }
+  return [`${BASE_PROMPT_PREFIX}${base}: run \`bun test --changed=${base}\` for the tests your changes reach.`];
 }
 
 /**
@@ -347,9 +384,17 @@ function sectionLines(sections: TaskPromptSections): string[] {
  * session to another plan. With no blocker, or a blank one, the prompt
  * is the one built before blockers were carried.
  *
+ * `base` is the task's base commit, {@link TaskDispatchOptions.base}.
+ * With one, a line opening {@link BASE_PROMPT_PREFIX} follows the blocker
+ * line (or the second line, with no blocker), naming the commit and the
+ * `bun test --changed=<base>` the session's scoped test gate is. A base
+ * that is not a commit name throws: the line puts it in a shell command.
+ * With none, the default, the prompt is the one built before bases were
+ * carried.
+ *
  * `sections` is the task's rendered skills and lessons sections. Each
  * non-blank one goes after the blank line that closes the head (the
- * blocker line, or the second line without one) and before
+ * base line, the blocker line, or the second line without either) and before
  * `promptContent`, skills first, each followed by a blank line of its
  * own, so the head keeps its lines and the scoped-task line stays
  * first. A section is placed as it was rendered: which resolver chose
@@ -364,11 +409,13 @@ export function buildTaskPrompt(
   knownMissing: readonly string[] = [],
   blocker: string | null = null,
   sections: TaskPromptSections = NO_TASK_SECTIONS,
+  base: string | null = null,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
     ...blockerLines(blocker),
+    ...baseLines(base),
     '',
     ...sectionLines(sections),
     promptContent,
@@ -494,6 +541,7 @@ export async function dispatchTask(
     options.knownMissing,
     taskInfo.blocker ?? null,
     { skills: renderSkillsSection(handed.skills), lessons: renderLessonsSection(handed.lessons) },
+    options.base,
   ));
 
   const served = serveForSession(options.serving, resolution);
