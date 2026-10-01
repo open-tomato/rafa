@@ -13,6 +13,14 @@
  * already exists, the local ones read first and the network ones under
  * `STATUS_NETWORK_TIMEOUT_MS`.
  *
+ * Between the two, once the config is known to be usable, it pulls the
+ * other devices' effort rows through `pullBeforeRead`
+ * (`../effort/sync/contact.ts`), so the store it reads holds what the
+ * project's sync strategy can bring in first. Under `local` and `file`
+ * that contacts nothing. A hub that cannot be reached is one `warn` line
+ * before the sections, and the sections are read from the local store
+ * all the same: the pull never changes the exit code.
+ *
  * ## What it writes
  *
  * In text mode, each line `renderStatus` answers, at the level it names:
@@ -34,10 +42,12 @@
  *   when something does not.
  */
 import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 
 import { CommandExit } from '../cli/command.js';
+import { pullBeforeRead } from '../effort/sync/contact.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { readStatusSections } from '../status/sections.js';
 
@@ -56,6 +66,8 @@ export const STATUS_ARGUMENT_EXIT = 2;
 export interface StatusCommandSeams {
   /** Reads the six sections for `input`. `readStatusSections` with its own seams when left out. */
   readonly read?: (input: StatusInput) => Promise<StatusSections>;
+  /** Pulls the other devices' rows before the read. `pullBeforeRead` when left out. */
+  readonly pull?: (input: PullBeforeReadInput) => Promise<unknown>;
 }
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -83,6 +95,10 @@ export async function runStatus(context: RafaContext, seams: StatusCommandSeams)
   const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
   });
+  const warn = (message: string): void => {
+    context.output.warn(message);
+  };
+  await (seams.pull ?? pullBeforeRead)({ roots: { root: project.root, home: project.home }, warn });
   const read = seams.read ?? ((input: StatusInput): Promise<StatusSections> => readStatusSections(input));
   const sections = await read({ root: project.root, home: project.home, config });
 

@@ -92,7 +92,8 @@
  * `settingSources`, `planPrompt`, `planDir` and `claude`, and the
  * `local` learning adapter added `home` and
  * `learningBlessMinConfidence`, each with a default, and the `file` sync
- * strategy added `store`. The planner's first three are optional to the
+ * strategy added `store`, and the `service` sync strategy a module
+ * brings added `hub`. The planner's first three are optional to the
  * type and not to the adapter: none has a default it could fall back on
  * (`src/adapters/planner/claude.ts` says why), so its `create` throws
  * when any is left out. `store` is the same to `sync/file`: a default of
@@ -104,7 +105,7 @@
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { ClaudeSettingSource, StoreBackend } from '../config.js';
+import type { ClaudeSettingSource, HubContext, StoreBackend } from '../config.js';
 import type { OutputStream } from './output/stream.js';
 import type { PlanPromptBuilder } from './planner/claude.js';
 import type { GhRunner } from './tracker/github.js';
@@ -232,6 +233,13 @@ export interface AdapterContext {
    * strategy alone, which is refused without one.
    */
   readonly store?: StoreBackend;
+  /**
+   * The hub a `service` sync reaches: the run's resolved `hub.url`,
+   * `hub.tokenSecret` and `hub.timeout`, the last in milliseconds.
+   * Handed on by `selectSync` whenever `hub.url` is set, and read by a
+   * module's `service` strategy alone; core's adapters never read it.
+   */
+  readonly hub?: HubContext;
 }
 
 /**

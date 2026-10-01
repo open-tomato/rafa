@@ -98,6 +98,11 @@
  *     not a mapping is one: `tracker: linear` is refused, where a
  *     phase 0 file could carry it as an unknown key.
  *
+ * One refusal reads two settings at once: `effort.sync: service` with
+ * no `hub.url` in any layer. The two may come from different files, so
+ * {@link resolveConfig} asks it once every setting is ranked, naming the
+ * file that chose `service`; `config-schema-hub.ts` argues it.
+ *
  * A file is judged whole, whatever the command line says. A flag that
  * outranks an unusable file value does not excuse it, because the next
  * run without the flag reads it.
@@ -159,6 +164,7 @@ import type {
 
 import { join } from 'node:path';
 
+import { hubUrlProblems } from './config-schema-hub.js';
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -181,6 +187,7 @@ export type {
   RafaConfig,
 } from './config-schema.js';
 export { CONFIG_DEFAULTS, CONFIG_FILE } from './config-schema.js';
+export type { HubContext, HubTimeout } from './config-schema-hub.js';
 export type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -339,6 +346,9 @@ function readLayer(
     store: read('store'),
     effortBusyTimeoutMs: read('effortBusyTimeoutMs'),
     effortSync: read('effortSync'),
+    hubUrl: read('hubUrl'),
+    hubTokenSecret: read('hubTokenSecret'),
+    hubTimeout: read('hubTimeout'),
     inject: read('inject'),
     planDir: read('planDir'),
     specsDir: read('specsDir'),
@@ -568,7 +578,9 @@ function unknownKeyWarning(key: string, path: string): string {
  * setting accepts throws a {@link ConfigError} naming every one, and
  * is never downgraded to the file's value: an operator who mistyped a
  * flag asked for something, and running on something else is the
- * silent success the module note refuses.
+ * silent success the module note refuses. A resolution naming
+ * `effort.sync: service` with no `hub.url` in any layer throws a
+ * {@link ConfigError} too, naming the file that chose `service`.
  */
 export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
   const file = layers.file ?? null;
@@ -601,6 +613,14 @@ export function resolveConfig(layers: ConfigLayers = {}): ResolvedConfig {
     return { value: CONFIG_DEFAULTS[setting], source: 'default' };
   };
   const ranked = SETTING_NAMES.map((setting) => [setting, rank(setting)] as const);
+  const effortSync = rank('effortSync');
+  const hubProblems = hubUrlProblems({
+    effortSync: effortSync.value,
+    hubUrl: rank('hubUrl').value,
+    effortSyncSource: effortSync.source,
+    paths: { file: file?.path ?? null, user: user?.path ?? null },
+  });
+  if (hubProblems.length > 0) throw new ConfigError(hubProblems);
   const rafaLoaded = ranked.find(([setting]) => setting === 'tiersRafa')?.[1].value !== 'off';
   const warnings = [user, file].flatMap((layer) => layer === null
     ? []

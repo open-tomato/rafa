@@ -1,7 +1,7 @@
 ## Source
 
-What `src/` expects of a new or moved module that no gate spells out, and
-the shapes the lint config forces.
+What `src/` and `packages/` expect of a new or moved module that no gate
+spells out, and the shapes the lint config forces.
 
 ### Imports
 
@@ -35,6 +35,42 @@ the shapes the lint config forces.
 - **`tsconfig.json` sets `lib` to `ES2022`**, so an ES2023 method such as
   `Array.prototype.toSorted` fails `check-types` although bun runs it.
   Sort a copy with `[...array].sort()`.
+
+### Packages under `packages/`
+
+- **`packages/*` is a bun workspace** (`workspaces` in the root
+  `package.json`) holding `packages/rafa-hub/` (`@open-tomato/rafa-hub`)
+  and `packages/rafa-sync-service/` (`@open-tomato/rafa-sync-service`).
+  Both are `private`: publishing them is an operator's decision, and the
+  root `files` ships neither.
+- **A package imports core only as `@open-tomato/rafa/store` or
+  `@open-tomato/rafa/ports`**, never `../../src/...` and never another
+  subpath. What a package needs from core is exported from one of those
+  two entries first (`src/effort/store/index.ts`, `src/ports/index.ts`).
+- **The two subpaths resolve through `paths`, not `node_modules`.**
+  `tsconfig.packages.json` maps each to the source file the build
+  compiles into its `exports` target, and each package's `tsconfig.json`
+  extends it; bun reads `paths` at runtime, so `bun test` resolves them
+  from the root or from the package with no `dist/`. Nothing installs
+  `@open-tomato/rafa` into `node_modules`: a member depending on it with
+  `workspace:*` fails `bun install` with
+  `@open-tomato/rafa@workspace:* failed to resolve`, since the root is
+  not a member of its own workspace.
+- **Every other route into core stays unresolved.** A deep path or an
+  unmapped subpath fails with `Cannot find package '@open-tomato/rafa'`
+  under bun and `TS2307` under tsc. Each package's
+  `src/core-subpaths.test.ts` holds this, holds the map to the two
+  subpaths as a closed list, and holds each entry equal to the root
+  `exports`. A new subpath goes into both files and that list.
+- **Which gates reach a package.** `bun run test` runs its tests.
+  `bun run check-types` runs the root `tsc --noEmit`, whose `tsconfig.json`
+  excludes `packages`, then `bun run --filter './packages/*' check-types`,
+  each package's own `tsc --noEmit`; a package's `tsconfig.json`
+  includes its test files. `bun run lint` reaches none of it:
+  `eslint.config.mjs` ignores `packages/**`, and a package file linted
+  with `--no-ignore` reports `import/no-unresolved` on both subpaths,
+  because `eslint.base.mjs`'s resolver reads only the root
+  `tsconfig.json`.
 
 ### References
 

@@ -71,9 +71,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { TRUSTED_PERMISSIONS } from '../../board/trust.js';
 import { loadConfig } from '../../config-load.js';
 import { resolveConfig, STORE_BACKENDS } from '../../config.js';
+import * as wire from '../sync/wire.js';
 
+import { mergeStore } from './merge-store.js';
 import { openNdjsonStore } from './ndjson.js';
 import { openSqliteStore } from './sqlite.js';
 import { EFFORT_KEY_PROJECTIONS } from './types.js';
@@ -150,6 +153,16 @@ const UNOPENABLE: readonly (readonly [string, unknown, string])[] = [
 const RUNTIME_EXPORTS = [
   'EFFORT_KEY_PROJECTIONS',
   'STORE_BACKENDS',
+  'TRUSTED_PERMISSIONS',
+  'WIRE_FORMAT',
+  'WIRE_VERSION',
+  'WireExportRefusal',
+  'WireFormatError',
+  'decodeWirePayload',
+  'encodeWirePayload',
+  'exportWirePayload',
+  'materialiseWirePayload',
+  'mergeStore',
   'openNdjsonStore',
   'openSqliteStore',
   'selectEffortStore',
@@ -310,6 +323,19 @@ describe('the ./store entry', () => {
     expect(entry.openSqliteStore).toBe(openSqliteStore);
     expect(entry.EFFORT_KEY_PROJECTIONS).toBe(EFFORT_KEY_PROJECTIONS);
     expect(entry.STORE_BACKENDS).toBe(STORE_BACKENDS);
+  });
+
+  it('re-exports what the workspace packages need, the modules\' own bindings', () => {
+    expect(entry.mergeStore).toBe(mergeStore);
+    expect(entry.TRUSTED_PERMISSIONS).toBe(TRUSTED_PERMISSIONS);
+    expect(entry.exportWirePayload).toBe(wire.exportWirePayload);
+    expect(entry.materialiseWirePayload).toBe(wire.materialiseWirePayload);
+    expect(entry.encodeWirePayload).toBe(wire.encodeWirePayload);
+    expect(entry.decodeWirePayload).toBe(wire.decodeWirePayload);
+    expect(entry.WireFormatError).toBe(wire.WireFormatError);
+    expect(entry.WireExportRefusal).toBe(wire.WireExportRefusal);
+    expect(entry.WIRE_FORMAT).toBe(wire.WIRE_FORMAT);
+    expect(entry.WIRE_VERSION).toBe(wire.WIRE_VERSION);
   });
 
   it.each([...STORE_BACKENDS])('opens %s, a backend the config accepts', (backend) => {

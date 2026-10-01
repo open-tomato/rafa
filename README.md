@@ -318,10 +318,11 @@ Configuration examples:
 effort:
   sync: file
 
-# Hub-based sync (requires module and service URL)
+# Hub-based sync (requires module and hub.url)
 effort:
   sync: service
-  syncUrl: https://hub.example.com
+hub:
+  url: https://hub.example.com
 ```
 
 Only `local` and `file` ship with rafa; `git`, `service` and `p2p` need a module.
@@ -433,6 +434,29 @@ loop; `0`, a fraction and a quoted `"5000"` are refused.
 ```yaml
 effort:
   busyTimeoutMs: 10000
+```
+
+### `hub`
+
+Three settings say how a device reaches a `rafa-hub` under
+`effort.sync: service`.
+
+| Key | Default | What it sets |
+|---|---|---|
+| `hub.url` | unset | the hub's `http` or `https` address; required with `effort.sync: service` |
+| `hub.tokenSecret` | unset | the name the hub token is stored under in the secret store, never the token |
+| `hub.timeout` | `3s` | how long one request to the hub may take, whole seconds from `1s` to `30s` |
+
+A config naming `service` with no `hub.url` in either file is refused,
+and so is a URL carrying a user name or password. `0s`, a negative or
+bare number and a timeout past `30s` are refused.
+
+```yaml
+effort:
+  sync: service
+hub:
+  url: https://hub.example.org
+  tokenSecret: rafa-hub-token
 ```
 
 ### `cleanup`

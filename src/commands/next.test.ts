@@ -173,6 +173,9 @@ const ROADMAP = 31;
 /** The pull request the pull request states name. */
 const PR = 41;
 
+/** The line a case's `pull` seam writes, as the helper writes a hub that cannot be reached. */
+const PULL_LINE = 'effort sync: the hub is unreachable (seam); this command used the local store';
+
 /** The issue the roadmap states name. */
 const ISSUE = 64;
 
@@ -700,6 +703,38 @@ describe('the command, dispatched', () => {
 
     expect(git.calls().filter((line) => line.startsWith('merge'))).toEqual([]);
     expect(run.stdout).toBe([
+      `📍 \`${BASE}\` is 2 commits behind \`origin/${BASE}\`.`,
+      `👉 fast-forward \`${BASE}\` to \`origin/${BASE}\``,
+      `⏹ --${DRY_RUN_FLAG}: nothing ran.`,
+      '',
+    ].join('\n'));
+    expect(run.exitCode).toBe(0);
+  });
+
+  it('pulls once before the chain reads, under --dry-run too, its line a warn and the exit code the same', async () => {
+    const git = fakeGit(2);
+    const pulls: Array<{ readonly roots: unknown; readonly gitCallsBefore: number }> = [];
+    const command = createNextCommand({
+      isTerminal: () => true,
+      readRemote: () => 'git@github.com:open-tomato/rafa.git',
+      openGit: () => git.git,
+      openGh: () => emptyRoadmapGh(),
+      pullRequests: () => createPullRequestsDouble({ findOpen: () => Promise.resolve(null) }).pulls,
+      pull: (input) => {
+        pulls.push({ roots: input.roots, gitCallsBefore: git.calls().length });
+        input.warn(PULL_LINE);
+        return Promise.resolve(null);
+      },
+    });
+    const project = plantProject();
+
+    const run = await dispatchInProject(['next', `--${DRY_RUN_FLAG}`], [], [command], project);
+
+    expect(pulls).toEqual([{ roots: { root: project.root, home: project.home }, gitCallsBefore: 0 }]);
+    // The chain read after it, through the git seam, and printed its lines under the pull's.
+    expect(git.calls().length).toBeGreaterThan(0);
+    expect(run.stdout).toBe([
+      `warn: ${PULL_LINE}`,
       `📍 \`${BASE}\` is 2 commits behind \`origin/${BASE}\`.`,
       `👉 fast-forward \`${BASE}\` to \`origin/${BASE}\``,
       `⏹ --${DRY_RUN_FLAG}: nothing ran.`,

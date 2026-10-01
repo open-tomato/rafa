@@ -20,6 +20,11 @@
  * {@link ReportOptions.store} is the seam for a caller that already
  * holds a store, and a store passed there means the config is not read.
  *
+ * The command entry pulls the other devices' rows into that store
+ * before it reads (see {@link report}); {@link buildReport} and the
+ * readers under it make no contact, so the projection stays one of
+ * rows already on disk.
+ *
  * A config the loop cannot run on is refused as the collect command
  * refuses it: {@link buildReport} throws the `ConfigError`, and the
  * command refuses with exit code 1, one line per problem. A warning about
@@ -194,6 +199,7 @@ import { readSessionBudgets } from './store/dispatches.js';
 import { selectEffortStore } from './store/index.js';
 import { readPreflightHalts } from './store/preflight.js';
 import { readTaskReportTallies } from './store/reports.js';
+import { pullBeforeRead } from './sync/contact.js';
 
 /** Decimal places a summed minute figure is re-rounded to. */
 const SUM_MINUTE_DECIMALS = 3;
@@ -734,6 +740,13 @@ function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoR
  * this command printed there before, and carries it in the terminal
  * result in json mode.
  *
+ * Once its arguments are read, and before any of its three reports
+ * reads the store, it pulls the other devices' rows through
+ * `pullBeforeRead` (`sync/contact.ts`), which contacts nothing under
+ * `local` or `file`, writes a hub that cannot be reached as one `warn`
+ * line, and never changes how the command exits. The report then reads
+ * the local store, whatever the pull came to.
+ *
  * A config the loop cannot run on is refused, one line per problem, the
  * way a bad argument is and the way `rafa effort collect` refuses it.
  * Anything else thrown is a fault rather than a refusal, and is rethrown.
@@ -741,6 +754,7 @@ function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoR
 export default async function report(args: string[], repoRoot: string): Promise<void> {
   const parsed = parseReportArgs(args);
   if (parsed.errors.length > 0) refuse(parsed.errors);
+  await pullBeforeRead({ roots: { root: repoRoot, home: homedir() }, warn: (line) => activeOutput().warn(line) });
   if (parsed.skills) {
     writeSkillsReport(parsed.plans, parsed.json, repoRoot);
     return;
