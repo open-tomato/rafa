@@ -87,6 +87,20 @@
  *    taken exited 128 with `fatal: a branch named 'feat/x' already
  *    exists` — which is the route split above, held up by git.
  *
+ * ## A detached HEAD is no base
+ *
+ * `git rev-parse --abbrev-ref HEAD` answers the literal `HEAD` when no
+ * branch is checked out (measured on git 2.53.0 under Linux, 2026-10-01,
+ * in a repository after `git switch --detach`: stdout `HEAD`, exit 0) —
+ * the same constant `src/next/readings.ts` and
+ * `src/commands/pr/pr-context.ts` read. Taken as a branch name it would
+ * be offered nothing, guarded as a branch of its own, and recorded as
+ * the run's branch, so a run on the checkout's own HEAD is refused
+ * there instead ({@link isDetachedHead}, {@link detachedHeadRefusal}),
+ * whatever flags the line carries. The refusal names the two ways on:
+ * `git switch <base>` back onto a branch, or `--as-worktree`, which
+ * leaves this checkout where it is.
+ *
  * ## Being ahead is not being diverged
  *
  * A base carrying local commits the remote has not got is left alone and
@@ -117,6 +131,37 @@ const MAX_LISTED_CHANGES = 10;
 
 /** A count of commits, as `git rev-list --count` writes one. */
 const COUNT = /^\d+$/;
+
+/** What `git rev-parse --abbrev-ref HEAD` answers when no branch is checked out; see the module note. */
+export const DETACHED_HEAD = 'HEAD';
+
+/** The first way on from a detached HEAD, as {@link detachedHeadRefusal} prints it. */
+export const SWITCH_TO_BASE = 'git switch <base>';
+
+/** True when `branch` is the reading of a detached HEAD rather than a branch's name. */
+export function isDetachedHead(branch: string): boolean {
+  return branch === DETACHED_HEAD;
+}
+
+/**
+ * The refusal a run on a detached HEAD answers, naming both ways on:
+ * back onto a branch with `git switch <base>`, or `--as-worktree`, which
+ * runs the plan in a worktree of its own. `worktreeFlag` is the flag as
+ * the run's line spells it.
+ */
+export function detachedHeadRefusal(worktreeFlag: string): string {
+  const ways: readonly (readonly [string, string])[] = [
+    [SWITCH_TO_BASE, 'back onto the branch the plan is cut from, such as main, then run again'],
+    [worktreeFlag, 'run the plan in a worktree of its own, leaving this checkout where it is'],
+  ];
+  const width = Math.max(...ways.map(([way]) => way.length));
+  return [
+    '❌ Refusing to run on a detached HEAD: no branch is checked out, and a run',
+    `${INDENT}commits to, pushes and opens its pull request from a branch of its own.`,
+    `${INDENT}Two ways on:`,
+    ...ways.map(([way, what]) => `${INDENT}  ${way.padEnd(width)}   ${what}`),
+  ].join('\n');
+}
 
 /** The branch a plan with this stub runs on. */
 export function branchNameFor(planStub: string): string {

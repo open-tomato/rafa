@@ -19,6 +19,14 @@
  * which makes no offer under `--as-worktree`, and calls the second right
  * after on whichever branch that answered.
  *
+ * A detached HEAD is refused first, by {@link resolveRunBranch} and on
+ * every line that reaches it — `--create-branch`, `--any-branch` or
+ * neither — since each of them runs on the checkout's own HEAD and none
+ * has a branch to run on there. The refusal names `git switch <base>`
+ * and `--as-worktree`, the route that leaves the checkout alone and so
+ * never reaches it. It is thrown before `start()` opens the session
+ * record, so a refused run leaves nothing under `.rafa/runs/`.
+ *
  * The guard's two warnings go through the active output
  * (`adapters/output/active.ts`), and its refusal is thrown as a
  * `CommandExit` with exit code 1.
@@ -35,7 +43,7 @@ import type { BranchSeams } from './branch.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 
-import { branchNameFor, REMOTE } from './branch-decision.js';
+import { branchNameFor, detachedHeadRefusal, isDetachedHead, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
 import { argValue } from './run-config.js';
@@ -142,6 +150,12 @@ export interface RunBranchRequest {
  * the plan's own branch once the offer to leave the base has been made
  * and taken.
  *
+ * A detached HEAD — `base` read as the literal `HEAD` — is refused
+ * before anything else, with exit code 1 and no git run: it is no
+ * branch, so there is nothing to offer from it and nothing to run on.
+ * `--any-branch` does not let it through, since the flag waives the
+ * check on WHICH branch the run is on, not that it is on one.
+ *
  * The offer is only made on a branch {@link DEFAULT_BRANCHES} names,
  * which is exactly the set {@link guardRunBranch} refuses. Everywhere
  * else the run is already on a branch of its own and there is nothing to
@@ -164,6 +178,7 @@ export async function resolveRunBranch(
   seams: BranchSeams = DEFAULT_BRANCH_SEAMS,
 ): Promise<string> {
   const { args, base } = request;
+  if (isDetachedHead(base)) throw new CommandExit(1, `${detachedHeadRefusal(AS_WORKTREE_FLAG)}\n${NOTHING_DISPATCHED}`);
   if (!DEFAULT_BRANCHES.includes(base)) return base;
 
   const outcome = await offerRunBranch({
