@@ -179,7 +179,7 @@ const wrapped = wrapPhaseZeroCommand({
     },
   ],
   aliases: ['start'],
-  outputs: ['text', 'json'],
+  outputs: ['text', 'json', 'events'],
   spends: {
     when: 'always',
     what: 'one session per task, one for the wrap-up, and repair sessions while CI is red',

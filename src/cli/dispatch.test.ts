@@ -501,6 +501,39 @@ describe('the events of one invocation', () => {
   });
 });
 
+describe('events mode', () => {
+  /** A registry whose one command declares the events output, writing a line and a named event. */
+  const EVENTS_REGISTRY = createCommandRegistry({
+    subjects: [{ name: 'loop', summary: 'the loop' }],
+    commands: [
+      command('loop', 'start', {
+        outputs: ['text', 'json', 'events'],
+        run: async (context) => {
+          seen = { context, active: activeOutput() };
+          context.output.info('starting');
+          context.output.emit({ type: 'event', name: 'halt', summary: 'halt            checkout moved', data: {}, ts: NOW.toISOString() });
+        },
+      }),
+    ],
+  });
+
+  it('prints only the rafa· lines of a command that declares events', async () => {
+    const { stdout, outcome } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' }, registry: EVENTS_REGISTRY });
+
+    expect(stdout).toBe('rafa· halt            checkout moved\n');
+    expect(outcome.exitCode).toBe(0);
+    expect(seen?.context.outputMode).toBe('events');
+    expect(activeOutputMode()).toBe('text');
+  });
+
+  it('runs a command that does not declare events as text', async () => {
+    const { stdout } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' } });
+
+    expect(stdout).toBe('starting\nstep: load\n');
+    expect(seen?.context.outputMode).toBe('text');
+  });
+});
+
 describe('text mode', () => {
   it('writes what the command writes and no event', async () => {
     const { outcome, stdout, stderr } = await run(['loop', 'start']);

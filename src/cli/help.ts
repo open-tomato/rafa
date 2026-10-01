@@ -138,7 +138,8 @@ export interface GlobalFlag {
  */
 export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
   { spelling: '--output=json', note: 'NDJSON events instead of text (also RAFA_OUTPUT=json)' },
-  { spelling: '-v, --verbose', note: 'repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)' },
+  { spelling: '--output=events', note: 'one rafa· line per loop event (also RAFA_OUTPUT=events)' },
+  { spelling: '-v, --verbose', note: 'up to 3 times, or --verbose=N (also RAFA_VERBOSITY=N)' },
   { spelling: '--version', note: 'print "rafa <version>" and exit; typed alone, no short form' },
 ]);
 

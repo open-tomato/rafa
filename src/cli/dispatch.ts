@@ -414,7 +414,8 @@ function assemble(route: Route, settings: Settings): { base: CliContext; problem
   const options = { argv, env: settings.env, stream: settings.stdout, signal: settings.signal };
   if (route.kind !== 'command') return { base: assembleContext(options), problem: null };
   try {
-    return { base: assembleContext({ ...options, spec: route.command }), problem: null };
+    const eventsAllowed = route.command.outputs.includes('events');
+    return { base: assembleContext({ ...options, spec: route.command, eventsAllowed }), problem: null };
   } catch (error) {
     return {
       base: assembleContext(options),

@@ -63,8 +63,9 @@ Commands:
   describe
 
 Global flags:
-  --output=json   NDJSON events instead of text (also RAFA_OUTPUT=json)
-  -v, --verbose   repeat for more, up to 3; --verbose=N (also RAFA_VERBOSITY=N)
-  --version       print "rafa <version>" and exit; typed alone, no short form
+  --output=json     NDJSON events instead of text (also RAFA_OUTPUT=json)
+  --output=events   one rafa· line per loop event (also RAFA_OUTPUT=events)
+  -v, --verbose     up to 3 times, or --verbose=N (also RAFA_VERBOSITY=N)
+  --version         print "rafa <version>" and exit; typed alone, no short form
 
 🪙  starts Claude Code sessions, which spend your Claude usage

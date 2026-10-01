@@ -22,6 +22,7 @@
  * `default`, and refuses an argument that declares `aliases`, as its
  * module note says.
  */
+import type { OutputMode } from '../../config-sections.js';
 import type { Output } from '../../ports/index.js';
 
 /** Everything a command runs with, built and frozen by `assembleContext`. */
@@ -30,8 +31,8 @@ export interface CliContext {
   args: readonly string[];
   /** The flags of the line by name: a value, `true` for a bare flag, `false` for `--no-<name>`. */
   flags: Readonly<Record<string, string | boolean>>;
-  /** How the command's output is rendered: lines a person reads, or NDJSON events. */
-  outputMode: 'text' | 'json';
+  /** How the command's output is rendered: lines a person reads, NDJSON events, or one line per loop event. */
+  outputMode: OutputMode;
   /** How much the command writes, from 0, the least, to 3. */
   verbosity: 0 | 1 | 2 | 3;
   /** Where the command writes, rendered in its `outputMode`. */

@@ -111,6 +111,36 @@ describe('assembleContext outputMode resolution', () => {
 
     expect(context.outputMode).toBe('json');
   });
+
+  it('selects events from RAFA_OUTPUT=events when the command allows it', () => {
+    const context = assembleContext({ argv: ['svc'], env: { RAFA_OUTPUT: 'events' }, stream: silentStream, eventsAllowed: true });
+
+    expect(context.outputMode).toBe('events');
+  });
+
+  it('selects events from --output=events when the command allows it', () => {
+    const context = assembleContext({ argv: ['svc', '--output=events'], env: {}, stream: silentStream, eventsAllowed: true });
+
+    expect(context.outputMode).toBe('events');
+  });
+
+  it('reads events as text when the command does not allow it', () => {
+    const context = assembleContext({ argv: ['svc'], env: { RAFA_OUTPUT: 'events' }, stream: silentStream });
+
+    expect(context.outputMode).toBe('text');
+  });
+
+  it.each(['Events', 'evnts', ''])('reads an unknown RAFA_OUTPUT %p as text', (value) => {
+    const context = assembleContext({ argv: ['svc'], env: { RAFA_OUTPUT: value }, stream: silentStream, eventsAllowed: true });
+
+    expect(context.outputMode).toBe('text');
+  });
+
+  it('lets a typed --output win over RAFA_OUTPUT=events, even one it does not know', () => {
+    const context = assembleContext({ argv: ['svc', '--output=evnts'], env: { RAFA_OUTPUT: 'events' }, stream: silentStream, eventsAllowed: true });
+
+    expect(context.outputMode).toBe('text');
+  });
 });
 
 describe('assembleContext verbosity resolution', () => {
