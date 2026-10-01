@@ -288,7 +288,7 @@ function skippedReleaseBullet(skipped: ReleaseSkipped): string {
  * push, and the create bullet already carries the reading of a refusal
  * that must not turn into a second PR.
  */
-async function openPullRequestNumber(checkout: string, branch: string): Promise<number | null> {
+export async function openPullRequestNumber(checkout: string, branch: string): Promise<number | null> {
   try {
     const found = await ghPullRequestsIn(checkout).findOpen(branch);
     return found?.number ?? null;

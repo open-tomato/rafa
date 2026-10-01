@@ -16,9 +16,10 @@
  * absolute path, so no gate ever reads one.
  *
  * The clean probe holds the source's five claims. `outputMode` is exactly
- * `'text' | 'json'`, each of the two is assignable to it, and it is not
- * `string`. A `log` event narrows to the log shape, and each other kind
- * to its own field. `CliEvent['type']` is the union of the four kinds.
+ * `'text' | 'json' | 'events'`, each of the three is assignable to it, and
+ * it is not `string`. A `log` event narrows to the log shape, and each
+ * other kind to its own field. `CliEvent['type']` is the union of the five
+ * kinds, the source's four and rafa's named `event`.
  * The events are rafa's, from `src/ports/index.ts`, which the source's
  * `events.ts` was copied into. The probe also holds what the copy
  * changes: `output` is exactly the `Output` port, and a `CliCommand` is a
@@ -88,11 +89,12 @@ const CONFORMING_PROBE = probeSource(
   PORTS_IMPORT,
   `import type { ParseArgsSpec } from ${specifierOf('cli', 'core', 'parseArgs.js')};`,
   ...EQUALS,
-  'export const modeIsExact: Equals<T.CliContext["outputMode"], "text" | "json"> = true;',
+  'export const modeIsExact: Equals<T.CliContext["outputMode"], "text" | "json" | "events"> = true;',
   'export const modeIsNotString: Equals<T.CliContext["outputMode"], string> = false;',
   'export const text: T.CliContext["outputMode"] = "text";',
   'export const json: T.CliContext["outputMode"] = "json";',
-  'export const kinds: Equals<P.CliEvent["type"], "start" | "step" | "log" | "result"> = true;',
+  'export const events: T.CliContext["outputMode"] = "events";',
+  'export const kinds: Equals<P.CliEvent["type"], "start" | "step" | "log" | "result" | "event"> = true;',
   'export function narrowed(event: P.CliEvent): true {',
   '  if (event.type === "log") {',
   '    const log: true = exactly<{',
@@ -112,6 +114,10 @@ const CONFORMING_PROBE = probeSource(
   '  if (event.type === "step") {',
   '    const name: true = exactly<string>()(event.name);',
   '    return name;',
+  '  }',
+  '  if (event.type === "event") {',
+  '    const summary: true = exactly<string>()(event.summary);',
+  '    return summary;',
   '  }',
   '  const ok: true = exactly<boolean>()(event.ok);',
   '  return ok;',

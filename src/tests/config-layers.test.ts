@@ -642,7 +642,7 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'learning:\n  promote:\n    minConfidence: 0.8', 'learningPromoteMinConfidence', 0.8,
   ],
   [
-    'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json',
+    'output.mode', 'output:\n  mode: tui', 'output.mode is "tui", expected one of: text, json, events',
     'output:\n  mode: json', 'outputMode', 'json',
   ],
   [

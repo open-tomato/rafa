@@ -134,6 +134,7 @@ const TYPE_EXPORTS = [
   'BlessedBundle',
   'CliEvent',
   'CliEventLog',
+  'CliEventNamed',
   'CliEventResult',
   'CliEventStart',
   'CliEventStep',

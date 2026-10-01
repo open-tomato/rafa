@@ -120,7 +120,9 @@
  * lines no NDJSON reader parses among the events, so neither door lets
  * them through. {@link spawnClaudeCaptured} hands each line, its newline
  * off, to the active output's `info`, which the `json` adapter writes as
- * one `log` event. {@link spawnClaude} spawns through
+ * one `log` event. The `events` mode routes them the same way, and its
+ * adapter drops every `info`, so the screen keeps only its `rafa·` lines.
+ * {@link spawnClaude} spawns through
  * {@link spawnClaudeCaptured} and answers its exit code alone. A last
  * line with no newline goes once stdout closes, and a blank line is an
  * event with an empty message, so the messages joined with newlines are
@@ -383,10 +385,10 @@ function guardSpend(): void {
  * output reaches the operator as it happens, in the working directory
  * `options.cwd` names, or the loop's own when it names none.
  *
- * In json mode it spawns through {@link spawnClaudeCaptured} instead and
- * answers that session's exit code, so the session's stdout reaches the
- * operator as `log` events and never as bytes among them; see the module
- * note.
+ * In json or events mode it spawns through {@link spawnClaudeCaptured}
+ * instead and answers that session's exit code, so the session's stdout
+ * reaches the active output's `info` and never the screen as bytes; see
+ * the module note.
  *
  * An exit code of `undefined` — which is what a signalled process
  * answers — is reported as 1, because every caller here treats a
@@ -401,7 +403,7 @@ export async function spawnClaude(
   options: CapturedSpawnOptions = {},
 ): Promise<number> {
   guardSpend();
-  if (activeOutputMode() === 'json') {
+  if (activeOutputMode() !== 'text') {
     const { exitCode } = await spawnCaptured(args, prompt, options);
     return exitCode;
   }
@@ -514,31 +516,31 @@ function writeWholeLines(text: string, write: (line: string) => void): string {
  *
  * The mode is read once, before the first chunk, off the active output
  * (`adapters/output/active.ts`). In text mode each chunk is written to
- * `process.stdout` as its bytes. In json mode nothing is: each line the
- * decoded text completes goes to that output's `info`, and what follows
- * the last newline goes once the stream ends, unless it is empty. See
- * the module note.
+ * `process.stdout` as its bytes. In any other mode nothing is: each line
+ * the decoded text completes goes to that output's `info`, which json
+ * writes as an event and events drops, and what follows the last newline
+ * goes once the stream ends, unless it is empty. See the module note.
  */
 async function teeToOperator(
   stream: ReadableStream<Uint8Array>,
 ): Promise<string> {
   const decoder = new TextDecoder();
-  const jsonOutput = activeOutputMode() === 'json'
-    ? activeOutput()
-    : null;
+  const routed = activeOutputMode() === 'text'
+    ? null
+    : activeOutput();
   const writeLine = (line: string): void => {
-    jsonOutput?.info(line);
+    routed?.info(line);
   };
   let text = '';
   let pending = '';
   for await (const chunk of stream) {
-    if (jsonOutput === null) process.stdout.write(chunk);
+    if (routed === null) process.stdout.write(chunk);
     const decoded = decoder.decode(chunk, { stream: true });
     text += decoded;
-    if (jsonOutput !== null) pending = writeWholeLines(pending + decoded, writeLine);
+    if (routed !== null) pending = writeWholeLines(pending + decoded, writeLine);
   }
   const tail = decoder.decode();
-  if (jsonOutput !== null) {
+  if (routed !== null) {
     const rest = writeWholeLines(pending + tail, writeLine);
     if (rest !== '') writeLine(rest);
   }

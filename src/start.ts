@@ -308,6 +308,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
+import { emitLoopEvent, taskPosition, taskTokens, unlessText } from './start/loop-events.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
@@ -335,6 +336,7 @@ import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { createStartTriage } from './start/triage.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
+import { parseTaskDeclaration } from './utils/declaration.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
 import { findNextTask, trackerPathFor, updateTrackerLine } from './utils/tracker.js';
@@ -549,13 +551,20 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const moved = taskInfo
         ? haltIfCheckoutMoved({ expected, trackerPath, taskInfo })
         : haltIfWrapUpMoved({ expected, before: 'dispatch' });
-      if (moved) return;
+      if (moved) {
+        emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
+        return;
+      }
 
       // The baseline at the first dispatch, then the stage steps due
       // before a task or the pre-wrap-up step before the wrap-up. A red
       // one has blocked the next open task, when one is left, and stops
       // the run as a blocked task does.
-      if (!(await suiteSteps.beforeSession(taskInfo))) return;
+      if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
+      if (!(await suiteSteps.beforeSession(taskInfo))) {
+        emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
+        return;
+      }
       if (interrupted) break;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
@@ -586,6 +595,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // session runs `bun test --changed=<base>` against it, and the task
       // step runs over what the task changed since it.
       const base = expected.head;
+      const position = taskPosition(trackerContent, taskInfo.lineNum);
+      const startedAt = Date.now();
+      emitLoopEvent({ kind: 'task-start', position, text: parseTaskDeclaration(taskInfo.task).text });
       session.taskStarted(taskInfo);
       const dispatch = await dispatchTask({
         taskInfo,
@@ -619,6 +631,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (interrupted) {
         updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
         activeOutput().info('\n⚠️  Interrupted. Task marked as blocked. Run again to resume.');
+        emitLoopEvent({ kind: 'task-blocked', position, reason: 'interrupted' });
         await storeReport('blocked');
         throw new CommandExit(0);
       }
@@ -626,6 +639,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // Ahead of any other failed session: marked with its blocker text.
       if (isBudgetExit(dispatch)) {
         markBudgetExit({ trackerPath, taskInfo, dispatch });
+        emitLoopEvent({ kind: 'task-blocked', position, reason: 'budget exceeded' });
         await storeReport('blocked');
         return;
       }
@@ -633,6 +647,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (exitCode !== 0) {
         updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
+        emitLoopEvent({ kind: 'task-blocked', position, reason: `session exited ${exitCode}` });
         await storeReport('failed');
         return;
       }
@@ -640,6 +655,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // The loop guard before the task commit: a moved or missing checkout
       // commits nothing and stores the task blocked on `checkout moved`.
       if (haltIfCheckoutMoved({ expected, trackerPath, taskInfo, before: 'commit' })) {
+        emitLoopEvent({ kind: 'task-blocked', position, reason: 'checkout moved' });
+        emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
         await storeReport('blocked');
         return;
       }
@@ -652,19 +669,29 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       });
       expected = advanceExpectation(expected, finished.attempt);
       const stored = await storeReport(finished.outcome);
-      if (finished.outcome !== 'done') return;
+      if (finished.outcome !== 'done') {
+        emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
+        return;
+      }
+      const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));
+      emitLoopEvent({ kind: 'task-done', position, durationMs: Date.now() - startedAt, tokens });
       if (!stored) {
         activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
+        emitLoopEvent({ kind: 'halt', reason: 'task report not stored' });
         return;
       }
 
       // The task step over what the task changed since its base; a red
       // one has blocked the next open task, and stops the run.
-      if (!(await suiteSteps.afterTask(taskInfo, base))) return;
+      if (!(await suiteSteps.afterTask(taskInfo, base))) {
+        emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
+        return;
+      }
 
       const shouldPause = await checkUsage('task');
       if (shouldPause) {
         activeOutput().info('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
+        emitLoopEvent({ kind: 'halt', reason: 'usage high' });
         break;
       }
     }

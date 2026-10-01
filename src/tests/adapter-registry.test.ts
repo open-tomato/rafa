@@ -134,7 +134,7 @@ describe('every core port kind', () => {
       tracker: ['local', 'github'],
       store: ['sqlite', 'ndjson'],
       learning: ['local'],
-      output: ['text', 'json'],
+      output: ['text', 'json', 'events'],
       planner: ['claude'],
       sync: ['local', 'file'],
     });

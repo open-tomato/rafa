@@ -231,7 +231,7 @@ describe('the release stage as runWrapUp wires it', () => {
 
     // The control: the reader answers the module asked for and not any
     // import at all, so the list above is that module's own.
-    expect(importedFrom(WRAP_UP_RUN, './wrap-up.js')).toEqual(['preserveProgress', 'WrapUpLearning']);
+    expect(importedFrom(WRAP_UP_RUN, './wrap-up.js')).toEqual(['openPullRequestNumber', 'preserveProgress', 'WrapUpLearning']);
   });
 });
 

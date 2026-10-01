@@ -321,6 +321,17 @@ describe('forwardLine', () => {
       'info {"type":"log","level":"loud","message":"x","ts":"t"}',
     ]);
   });
+
+  it('emits a named event unchanged, and writes one missing its summary at info', () => {
+    const { output, seen } = recordingOutput();
+    const event: CliEvent = { type: 'event', name: 'halt', summary: 'halt            checkout moved', data: { reason: 'checkout moved' }, ts: '2026-10-01T12:00:00.000Z' };
+    const broken = '{"type":"event","name":"halt","ts":"t"}';
+
+    const answers = [forwardLine(JSON.stringify(event), output), forwardLine(broken, output)];
+
+    expect(answers).toEqual([null, null]);
+    expect(seen).toEqual([`emit ${JSON.stringify(event)}`, `info ${broken}`]);
+  });
 });
 
 describe('throwFailure', () => {

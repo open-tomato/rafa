@@ -501,6 +501,56 @@ describe('the events of one invocation', () => {
   });
 });
 
+describe('events mode', () => {
+  /** A registry whose one command declares the events output, writing a line and a named event. */
+  const EVENTS_REGISTRY = createCommandRegistry({
+    subjects: [{ name: 'loop', summary: 'the loop' }],
+    commands: [
+      command('loop', 'start', {
+        outputs: ['text', 'json', 'events'],
+        run: async (context) => {
+          seen = { context, active: activeOutput() };
+          context.output.info('starting');
+          context.output.emit({ type: 'event', name: 'halt', summary: 'halt            checkout moved', data: {}, ts: NOW.toISOString() });
+        },
+      }),
+    ],
+  });
+
+  it('prints only the rafa· lines of a command that declares events', async () => {
+    const { stdout, outcome } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' }, registry: EVENTS_REGISTRY });
+
+    expect(stdout).toBe('rafa· halt            checkout moved\n');
+    expect(outcome.exitCode).toBe(0);
+    expect(seen?.context.outputMode).toBe('events');
+    expect(activeOutputMode()).toBe('text');
+  });
+
+  it.each([
+    ['a refusal with a message', new CommandExit(1, '\n❌ Plan file not found: x.md\n   Nothing was dispatched.'), 'rafa· error            ❌ Plan file not found: x.md Nothing was dispatched.\n'],
+    ['a refusal with no message', new CommandExit(2), 'rafa· error            exit code 2\n'],
+    ['a thrown error', new Error('boom'), 'rafa· error            rafa: boom\n'],
+  ])('ends %s as one rafa· error line on stdout, and nothing on stderr', async (_label, thrown, line) => {
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'loop', summary: 'the loop' }],
+      commands: [command('loop', 'start', { outputs: ['text', 'json', 'events'], run: async () => { throw thrown; } })],
+    });
+
+    const { stdout, stderr, outcome } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' }, registry });
+
+    expect(stdout).toBe(line);
+    expect(stderr).toBe('');
+    expect(outcome.exitCode).not.toBe(0);
+  });
+
+  it('runs a command that does not declare events as text', async () => {
+    const { stdout } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' } });
+
+    expect(stdout).toBe('starting\nstep: load\n');
+    expect(seen?.context.outputMode).toBe('text');
+  });
+});
+
 describe('text mode', () => {
   it('writes what the command writes and no event', async () => {
     const { outcome, stdout, stderr } = await run(['loop', 'start']);

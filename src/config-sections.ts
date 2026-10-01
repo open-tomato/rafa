@@ -293,9 +293,9 @@ export const INJECT_MODES = ['full', 'stage', 'task'] as const;
 export type InjectMode = (typeof INJECT_MODES)[number];
 
 /** How a command writes what it has to say. */
-export const OUTPUT_MODES = ['text', 'json'] as const;
+export const OUTPUT_MODES = ['text', 'json', 'events'] as const;
 
-/** One of the two output modes. */
+/** One of the three output modes. */
 export type OutputMode = (typeof OUTPUT_MODES)[number];
 
 /** The sources Claude Code's `--setting-sources` takes a subset of. */

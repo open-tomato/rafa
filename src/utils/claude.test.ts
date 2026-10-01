@@ -1154,6 +1154,28 @@ describe('both doors in json mode, against a stand-in claude on PATH', () => {
     expect(session.stdout).toBe('one line\nno newline');
   });
 
+  it('hands the lines to info and writes no byte to stdout when the output is set in events mode', async () => {
+    setActiveOutput(recordingOutput(), 'events');
+    standInClaude(['printf \'one line\\nno newline\'']);
+
+    const session = await runClaudeCaptured('the events control', DEFAULT_SOURCES);
+
+    expect(infoLines).toEqual(['one line', 'no newline']);
+    expect(written).toEqual([]);
+    expect(session.stdout).toBe('one line\nno newline');
+  });
+
+  it('spawns runClaude through a pipe in events mode too, writing no byte to stdout', async () => {
+    setActiveOutput(recordingOutput(), 'events');
+    standInClaude(['printf \'from runClaude\\n\'', 'exit 2']);
+
+    const exitCode = await runClaude('a repair session', UNSORTED_SOURCES);
+
+    expect(exitCode).toBe(2);
+    expect(infoLines).toEqual(['from runClaude']);
+    expect(written).toEqual([]);
+  });
+
   it('spawns runClaude through a pipe, handing its lines to info and answering its exit code', async () => {
     process.env['CLAUDE_CODE_ENTRYPOINT'] = 'rafa-test-sentinel';
     standInClaude([

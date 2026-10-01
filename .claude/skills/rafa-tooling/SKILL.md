@@ -54,12 +54,8 @@ this". Run it when it fits case 2. When it needs a terminal, run its
 back as a `bash` block. Do not answer it with an explanation of what the
 command is.
 
-A PreToolUse hook, `.claude/hooks/rafa-tooling-hook.ts`, holds these rules
-where it can: it denies the case 1 commands and the `gh` commands in the
-mappings below, and asks before a 🪙 command. A denial is final for that
-command: follow its reason, and do not retry the step another way. A
-command the hook or the permission prompt stopped did not run, so report
-it as not run, never as done.
+A command the permission prompt stopped did not run, so report it as not
+run, never as done.
 
 A command meant for another machine (a loop host over ssh) goes in a plain
 fenced block with no `bash` tag, under a line naming the machine: the Run

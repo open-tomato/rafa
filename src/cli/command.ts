@@ -84,10 +84,10 @@ import { describeValue } from '../config-sections.js';
 
 import { spendsProblem } from './spends.js';
 
-/** What an action can render: text a person reads, NDJSON events, or the TUI. */
-export const COMMAND_OUTPUTS = ['text', 'json', 'tui'] as const;
+/** What an action can render: text a person reads, NDJSON events, one line per loop event, or the TUI. */
+export const COMMAND_OUTPUTS = ['text', 'json', 'events', 'tui'] as const;
 
-/** One of the three renderings an action declares. */
+/** One of the four renderings an action declares. */
 export type CommandOutput = (typeof COMMAND_OUTPUTS)[number];
 
 /** One example a command's help lists. */

@@ -414,7 +414,8 @@ function assemble(route: Route, settings: Settings): { base: CliContext; problem
   const options = { argv, env: settings.env, stream: settings.stdout, signal: settings.signal };
   if (route.kind !== 'command') return { base: assembleContext(options), problem: null };
   try {
-    return { base: assembleContext({ ...options, spec: route.command }), problem: null };
+    const eventsAllowed = route.command.outputs.includes('events');
+    return { base: assembleContext({ ...options, spec: route.command, eventsAllowed }), problem: null };
   } catch (error) {
     return {
       base: assembleContext(options),
@@ -564,10 +565,19 @@ function resultEvent(ending: Ending, now: () => Date): CliEventResult {
     : { type: 'result', ok: true, data: ending.payload.value, ts };
 }
 
-/** Writes an ending's terminal event, or in text mode what a person reads of it. */
+/**
+ * Writes an ending's terminal event, or in text mode what a person reads
+ * of it. In events mode a failed ending is one `rafa· error` line on
+ * stdout, its exit code when it carries no message, so a watcher reading
+ * only those lines sees how the run ended.
+ */
 function writeEnding(ending: Ending, event: CliEventResult, base: CliContext, settings: Settings): void {
   if (base.outputMode === 'json') {
     base.output.emit(event);
+    return;
+  }
+  if (base.outputMode === 'events') {
+    if (ending.exitCode !== 0) base.output.error(ending.stderrLine ?? `exit code ${ending.exitCode}`);
     return;
   }
   if (ending.stderrLine !== null) settings.stderr.write(`${ending.stderrLine}\n`);
