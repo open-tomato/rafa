@@ -28,6 +28,14 @@
  * (`sessions.ts`) reads only names ending in `.json`, and answers no
  * record when the directory does not exist. `readSession` reads the one
  * record an id names, and refuses a file that is not there.
+ *
+ * ## What is never refused
+ *
+ * `phase`. A record written by a rafa from before the field carries no
+ * `phase` key, and one written by a later rafa may carry a phase this one
+ * does not know; neither is a problem. The frozen record keeps a phase of
+ * {@link SESSION_PHASES} and leaves out any other, and
+ * {@link sessionPhase} reads a record without one as `task`.
  */
 import type { SessionRecord, SessionStep } from './sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
@@ -45,6 +53,18 @@ export const SESSION_STATES = Object.freeze(['running', 'paused', 'stopped', 'do
 
 /** One of {@link SESSION_STATES}. */
 export type SessionState = (typeof SESSION_STATES)[number];
+
+/**
+ * The phases of a run, in the order a run meets them: its tasks, the
+ * wrap-up, the pull request, the CI wait, and a repair of what CI failed.
+ */
+export const SESSION_PHASES = Object.freeze(['task', 'wrap-up', 'pull-request', 'ci', 'repair'] as const);
+
+/** One of {@link SESSION_PHASES}. */
+export type SessionPhase = (typeof SESSION_PHASES)[number];
+
+/** The phase a record without a phase of {@link SESSION_PHASES} reads as. */
+const DEFAULT_PHASE: SessionPhase = 'task';
 
 /** What a record's file name ends in. */
 export const RECORD_EXTENSION = '.json';
@@ -256,6 +276,18 @@ export function recordProblems(fields: object, file: string): string[] {
   return problems.filter((problem): problem is string => problem !== null);
 }
 
+/** True for one of {@link SESSION_PHASES}. */
+function isSessionPhase(value: unknown): value is SessionPhase {
+  return (SESSION_PHASES as readonly unknown[]).includes(value);
+}
+
+/** The `phase` entry of a frozen record: none for an absent phase or one outside {@link SESSION_PHASES}. */
+function phaseEntry(phase: unknown): { readonly phase?: SessionPhase } {
+  return isSessionPhase(phase)
+    ? { phase }
+    : {};
+}
+
 /** A checked `hop` value, frozen through to its places. */
 function freezeHop(value: unknown): HopRecord {
   const hop = asHopRecord(value) as HopRecord;
@@ -290,7 +322,8 @@ function stepsEntry(steps: unknown): { readonly steps?: readonly SessionStep[] }
 
 /**
  * A frozen record of fields already checked, in the order it is written;
- * `hop`, `worktree` then `steps` last, each only when there.
+ * `phase`, `hop`, `worktree` then `steps` last, each only when there,
+ * `phase` only when it is one of {@link SESSION_PHASES}.
  */
 export function freezeRecord(fields: object): SessionRecord {
   const task = field(fields, 'task');
@@ -307,6 +340,7 @@ export function freezeRecord(fields: object): SessionRecord {
     task: isObject(task)
       ? Object.freeze({ line: field(task, 'line') as number, text: field(task, 'text') as string })
       : null,
+    ...phaseEntry(field(fields, 'phase')),
     ...hop === undefined
       ? {}
       : { hop: freezeHop(hop) },
@@ -320,6 +354,14 @@ export function freezeRecord(fields: object): SessionRecord {
 /** The steps a record holds, oldest first; none for a record written before the field. */
 export function sessionSteps(record: Pick<SessionRecord, 'steps'>): readonly SessionStep[] {
   return record.steps ?? [];
+}
+
+/**
+ * The phase a record reads as: its own, or `task` for a record without
+ * one, as a record from a rafa older than the field is.
+ */
+export function sessionPhase(record: Pick<SessionRecord, 'phase'>): SessionPhase {
+  return record.phase ?? DEFAULT_PHASE;
 }
 
 /**

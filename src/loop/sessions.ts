@@ -23,6 +23,18 @@
  *   - `state`: one of {@link SESSION_STATES}.
  *   - `task`: the task running, its 1-based tracker line and its sentence,
  *     or null.
+ *   - `phase`: where the run is, one of {@link SESSION_PHASES}: `task`
+ *     while it works its plan's tasks, then `wrap-up`, `pull-request`,
+ *     `ci` and `repair`. The field is additive, as `steps` is: a record
+ *     written before it, and a new record, carry no `phase` key, and
+ *     {@link sessionPhase} reads such a record as `task`. A phase this
+ *     rafa does not know, as a later rafa may write, is no problem on
+ *     read and reads as `task` too; it is left out of the record read,
+ *     so the next write of the record carries no `phase` key. It is
+ *     written as its own `"phase": "<value>"` key, as `state` is, which
+ *     the zsh prompt plugin's patterns over the file's text rely on
+ *     (`extras/zsh/rafa-prompt/`). Once written, every later write keeps
+ *     it until a change names another ({@link SessionChange}'s `phase`).
  *   - `hop`: only on a run started with `loop start --roadmap` while a
  *     `rafa next --roadmap` hop is away, the hop record as
  *     `.rafa/hop.json` held it when the run began
@@ -138,7 +150,7 @@
  * read. This module re-exports what a caller reads from there, so
  * `./sessions.js` stays the one import a record's reader needs.
  */
-import type { SessionState, SessionStepKind } from './session-record-parse.js';
+import type { SessionPhase, SessionState, SessionStepKind } from './session-record-parse.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { TestScope } from '../utils/declaration.js';
@@ -169,13 +181,15 @@ import {
   stepProblems,
 } from './session-record-parse.js';
 
-export type { SessionState, SessionStepKind } from './session-record-parse.js';
+export type { SessionPhase, SessionState, SessionStepKind } from './session-record-parse.js';
 export {
   isSessionId,
   parseSessionRecord,
+  SESSION_PHASES,
   SESSION_STATES,
   SESSION_STEP_KINDS,
   SessionRecordError,
+  sessionPhase,
   sessionSteps,
 } from './session-record-parse.js';
 
@@ -215,6 +229,8 @@ export interface SessionRecord {
   readonly startedAt: string;
   readonly state: SessionState;
   readonly task: SessionTask | null;
+  /** Where the run is; left out of a record from before the field. Read it with {@link sessionPhase}. */
+  readonly phase?: SessionPhase;
   /** The away hop the run was started under; left out of every other run's record. See the module note. */
   readonly hop?: HopRecord;
   /** The linked worktree the run's checkout is; left out of a run in the main checkout. See the module note. */
@@ -223,13 +239,15 @@ export interface SessionRecord {
   readonly steps?: readonly SessionStep[];
 }
 
-/** What a new record is made from; it opens `running`, with no task and no step. */
-export type SessionDraft = Omit<SessionRecord, 'state' | 'task' | 'steps'>;
+/** What a new record is made from; it opens `running`, with no task, no phase and no step. */
+export type SessionDraft = Omit<SessionRecord, 'state' | 'task' | 'phase' | 'steps'>;
 
 /** What {@link updateSession} changes. A field left out keeps its stored value. */
 export interface SessionChange {
   readonly state?: SessionState;
   readonly task?: SessionTask | null;
+  /** The phase the run is now in. */
+  readonly phase?: SessionPhase;
   /** A step appended after the stored ones. */
   readonly appendStep?: SessionStep;
   /**
@@ -477,6 +495,7 @@ export function updateSession(root: string, sessionId: string, change: SessionCh
     task: change.task === undefined
       ? stored.task
       : change.task,
+    phase: change.phase ?? stored.phase,
     steps: change.appendStep === undefined
       ? sessionSteps(stored)
       : [...sessionSteps(stored), change.appendStep],

@@ -114,8 +114,17 @@ function initBareOrigin(scratch: ScratchRepo, path: string): void {
 }
 
 /**
+ * Where the stand-in logs that it has started, outside the worktree: the
+ * session is spawned only after the run record names its task, so removing
+ * the worktree before this log appears races the spawn itself.
+ */
+function startedLogFor(scratch: ScratchRepo): string {
+  return `${scratch.callLog}.started`;
+}
+
+/**
  * Writes the stand-in `claude` into `scratch`'s `bin/`. It drains its
- * prompt, sleeps {@link STAND_IN_DELAY_SECONDS} — a window to remove the
+ * prompt, logs its start to {@link startedLogFor}, sleeps {@link STAND_IN_DELAY_SECONDS} — a window to remove the
  * worktree while it holds the first task's session — then tries to write
  * {@link MARKER_FILE} into its `cwd` (the worktree, once removed no longer
  * there to write into), logs the call regardless, and answers a
@@ -128,6 +137,7 @@ function plantWorktreeStandIn(scratch: ScratchRepo): void {
   writeFileSync(claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
+    `echo started >> '${startedLogFor(scratch)}'`,
     `/bin/sleep ${STAND_IN_DELAY_SECONDS}`,
     `printf 'written by the worktree task\\n' > '${MARKER_FILE}' 2>/dev/null`,
     `echo called >> '${scratch.callLog}'`,
@@ -231,12 +241,16 @@ describe('the loop guard replaying a removed worktree in a real --as-worktree ru
 
     const proc = spawnLoopStart(scratch);
     try {
-      // The first task dispatches, its stand-in session still draining its
-      // prompt and about to sleep; wait for the worktree to exist, then
-      // remove it whole while the session holds it — standing in for the
-      // worktree being torn down from under a running task.
+      // The first task dispatches and its stand-in session starts, about to
+      // sleep; wait for that session's start log, then remove the worktree
+      // whole while the session holds it — standing in for the worktree
+      // being torn down from under a running task. Removing it on the run
+      // record alone races the session's spawn into the worktree.
       await waitForTask(scratch.repo, TASK1);
       await waitUntil(() => (existsSync(join(worktreePath, '.git'))
+        ? true
+        : null), RUN_TIMEOUT);
+      await waitUntil(() => (existsSync(startedLogFor(scratch))
         ? true
         : null), RUN_TIMEOUT);
       rmSync(worktreePath, { recursive: true, force: true });
