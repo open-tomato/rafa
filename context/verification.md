@@ -150,31 +150,22 @@ The following failures appear on every run because the tree or the test
 itself is in that state. Check this list before investigating a failure
 you see in a run record.
 
-**Two parity-lineage tests read the sibling's live store (baseline: 4
-pass, 2 fail).**
+**The two parity suites skip unless `RAFA_LIVE_PARITY=1`.**
 `src/tests/parity-lineage.test.ts` compares the sibling's stored effort
-rows against a fresh collection over that sibling's live session directory
-— input this repository does not own. Two of six cases fail: `matches
-every plainly-stored session row to its fresh counterpart, byte for byte`
-and `accounts for every grown session log: neither size nor mtime moved
-backward`. Both throw `parity lineage: stored session <id> has no fresh
-counterpart` because the `.jsonl` for a session the stored rows name has
-been deleted from the live directory. This does NOT clear on a re-run.
-Prove it pre-existing by running the test at `origin/main` in a worktree
-(do not stash, since the input is outside the tree): `git worktree add -q
---detach <tmp> origin/main`, `ln -s` the real `node_modules` into it, run
-the one file there (about 5s, no `bun install` needed), and remove with
-`git worktree remove --force`. Measured at both ends: `4 pass`, `2 fail`.
-
-**One case reads a frozen snapshot of logs (baseline: passes, race
-possible).**
-`src/tests/parity-differential.test.ts` runs the collector twice over a
-frozen snapshot from the sibling's session directory to eliminate the race
-where the sibling's loop appends to `.jsonl` files while collection runs.
-Both backends read identical input. The race does not survive a re-run
-against a sibling that has since gone quiet. If one run passes and the
-next fails, re-run the same suite: a real parity failure reproduces; a
-race does not.
+rows against a fresh collection over that sibling's live session
+directory, and `src/tests/parity-differential.test.ts` collects a frozen
+copy of that directory into both backends — input this repository does
+not own. Without the variable at exactly `1`, every case of both files
+skips under `live parity off: set RAFA_LIVE_PARITY=1 to run against the
+sibling's live session logs and stored rows`, before anything on disk is
+read (`resolveLiveParity` in `src/tests/parity-fixture.ts`); with it on
+and the fixture absent, they skip under the fixture's own reason. Only
+a run with the variable set can go red, and its red is about the live
+input: lineage's `parity lineage: stored session <id> has no fresh
+counterpart` means a `.jsonl` the stored rows name was deleted from the
+live directory, and it does not clear on a re-run. In the differential
+suite both backends read one frozen copy, so a difference between them
+is a real parity failure, not the sibling appending mid-run.
 
 **One case reads a gitignored plan (baseline: red).**
 `src/plan/parse.test.ts`'s `a real plan file on disk` reads
