@@ -12,39 +12,24 @@
  * shell line or writes anything — the command layer does all four,
  * which is what keeps every refusal an action carries the action's own.
  *
- * ## The two pre-conditions, ahead of the table
+ * ## The two pre-conditions, among the rows
  *
- * Before any row answers, two conditions stop the table and are
- * reported in its place, each with what the PERSON does about it
- * rather than an action rafa runs. Both answer `none`, so a caller
- * prints the two lines and has nothing to offer.
+ * Two conditions stop the table and are reported in its place, each
+ * with what the PERSON does about it rather than an action rafa runs,
+ * and each answering `none`; `./preconditions.ts` holds what each
+ * matches and says.
  *
  *  - {@link NEXT_PRECONDITIONS}`[0]`, `tree-modified`: the working tree
- *    has changes to tracked files. Every action the table can propose
- *    switches branches, pulls, merges or hands the checkout to a model
- *    session, and each of those loses or conflicts those changes. The
- *    reading NAMES the files and the proposal is prose only — "commit
- *    or set aside your changes; rafa will not touch them" — with no
- *    command in it, because the choice between committing them,
- *    stashing them and moving them elsewhere is the person's and rafa
- *    does not make it. An untracked file is not one of these: nothing
- *    rafa runs loses one (`trackedChanges` in
- *    `src/start/branch-decision.ts`).
+ *    has changes to tracked files. It is read once row 1 has found no
+ *    live run and ahead of every other row, since one `git status
+ *    --porcelain` asks nothing of the network. Row 1 comes first because
+ *    a live run's edits are the loop's and never the person's to commit
+ *    or set aside, and the tree line names the checkout it read.
  *  - {@link NEXT_PRECONDITIONS}`[1]`, `pulls-unusable`: the pull
- *    request provider could not be ASKED — no network, no
- *    authentication, a `gh` that did not run. The port answers null for
- *    a pull request that is not there and throws when it could not look
- *    (`src/pr/types.ts`), so a throw is this condition and never an
- *    empty repository. The proposal names `rafa doctor`, which is the
- *    command that reports what the provider needs.
- *
- * The tree is read ahead of EVERY row, since one `git status
- * --porcelain` asks nothing of the network. The provider is read where
- * the table would read it, ahead of rows 5, 6, 7 and 8 and not before:
- * asking it earlier would spend a `gh` call on a state rows 1 to 4
- * settle without one, and a provider nobody asked is a provider nobody
- * can report on. So a running loop is still row 1 with the provider
- * unusable beside it, and it says so without ever finding out.
+ *    request provider could not be asked. It is read where the table
+ *    would read the provider, ahead of rows 5, 6, 7 and 8 and not
+ *    before, so a running loop is still row 1 with the provider
+ *    unusable beside it, and it says so without ever finding out.
  *
  * ## The table
  *
@@ -165,10 +150,10 @@
  *
  * `./readings.ts` holds the readings and the order they are asked in:
  * each is made at most once per answer and only when it is asked for,
- * so the working tree is read once ahead of the table, the provider is
- * reached from row 5 on and the board from row 10 on. A reading that
- * failed is carried out as {@link NextState.problems} rather than
- * thrown, and the caller prints those beside the answer.
+ * so the working tree is read once, after row 1 and ahead of row 2, the
+ * provider is reached from row 5 on and the board from row 10 on. A
+ * reading that failed is carried out as {@link NextState.problems}
+ * rather than thrown, and the caller prints those beside the answer.
  */
 import type { NextHopStep } from './hop-rows.js';
 import type { NextSources, NextWorld, OpenPull } from './readings.js';
@@ -178,17 +163,14 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { planLabel } from '../commands/loop/loop-sessions.js';
 import { plural } from '../commands/plan/plan-files.js';
-import { messageOf } from '../config-sections.js';
 import { hasDiverged } from '../start/branch-decision.js';
 
 import { homeAfterLoop, readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';
+import { readPullsUnusable, readTreeModified } from './preconditions.js';
 import { branchLabel, onBase, openWorld } from './readings.js';
 
 /** What a defect this module raises opens with. */
 const PREFIX = 'rafa next';
-
-/** How many changed files the tree pre-condition names before eliding. */
-const MAX_NAMED_FILES = 5;
 
 /**
  * The action a state proposes, as `--yes` names one and
@@ -302,59 +284,6 @@ export interface RowAnswer {
   readonly planStub?: string | null;
   readonly planPath?: string;
   readonly hop?: NextHopStep;
-}
-
-/** The changed files a pre-condition names, capped and quoted. */
-function nameFiles(paths: readonly string[]): string {
-  const shown = paths.slice(0, MAX_NAMED_FILES).map((path) => `\`${path}\``);
-  const hidden = paths.length - shown.length;
-  return hidden > 0
-    ? `${shown.join(', ')} and ${hidden} more`
-    : shown.join(', ');
-}
-
-/**
- * A sentence on one line: every run of whitespace a space. What a
- * provider threw can be several lines, and a reading is one.
- */
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Pre-condition 1: the working tree has changes to tracked files. Prose
- * only, and no tool named; see the module note.
- */
-function readTreeModified(world: NextWorld): RowAnswer | null {
-  const paths = world.tracked();
-  if (paths.length === 0) return null;
-
-  return {
-    id: 'tree-modified',
-    action: 'none',
-    reading: `the working tree has changes to ${plural(paths.length, 'tracked file')}: ${nameFiles(paths)}`,
-    proposal: 'commit or set aside your changes; rafa will not touch them',
-  };
-}
-
-/**
- * Pre-condition 2: the provider could not be asked. Answered by ASKING
- * it — the one reading that tells a provider that is unusable from a
- * repository that simply has no pull request — so it is read where the
- * table would read the provider and not before; see the module note.
- */
-async function readPullsUnusable(world: NextWorld): Promise<RowAnswer | null> {
-  try {
-    await world.openPull();
-    return null;
-  } catch (error) {
-    return {
-      id: 'pulls-unusable',
-      action: 'none',
-      reading: `the \`${world.sources.pulls.kind}\` pull request provider could not be asked: ${oneLine(messageOf(error))}`,
-      proposal: 'run `rafa doctor` to see what the provider needs, then read the state again',
-    };
-  }
 }
 
 /** A pull request as a sentence names it. */
@@ -654,6 +583,30 @@ const ROADMAP_ROWS: readonly NextRow[] = Object.freeze(ROWS.flatMap((row) => [..
  */
 export const NEXT_ROADMAP_STATES: readonly NextStateId[] = Object.freeze(ROADMAP_ROWS.map((row) => row.id));
 
+/**
+ * The rows read ahead of the working-tree pre-condition: row 1 alone,
+ * whose live run owns the edits the tree would otherwise offer back to
+ * the person; see `./preconditions.ts`.
+ */
+const AHEAD_OF_TREE: ReadonlySet<NextStateId> = new Set<NextStateId>(['loop-running']);
+
+/**
+ * The first answer `rows` give, read in order, the provider pre-condition
+ * read ahead of each row that reads the provider; null when none answers.
+ */
+async function firstAnswer(world: NextWorld, rows: readonly NextRow[]): Promise<RowAnswer | null> {
+  for (const row of rows) {
+    if (row.pulls === true) {
+      const unusable = await readPullsUnusable(world);
+      if (unusable !== null) return unusable;
+    }
+
+    const found = await row.read(world);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 /** A row's answer, with the nulls filled in and the problems carried. */
 function answer(row: RowAnswer, problems: readonly string[]): NextState {
   return Object.freeze({
@@ -678,9 +631,11 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
  * beside it. With {@link NextSources.roadmap} set, the five hop rows are
  * read among them, in {@link NEXT_ROADMAP_STATES}' order.
  *
- * The two pre-conditions come first: the working tree ahead of every
- * row, the provider ahead of the rows that read it. Either one
- * answers in the table's place, carrying `none` to run.
+ * The two pre-conditions are read among the rows: the working tree once
+ * row 1 has found no live run and ahead of every other row, the
+ * provider ahead of the rows that read it. Either one answers in the
+ * table's place, carrying `none` to run, and neither offers a live
+ * run's edits back to the person, since row 1 has answered for those.
  *
  * A row asks only the readings it needs and each of them at most once,
  * so a state an early row settles costs nothing a later one would have
@@ -693,18 +648,10 @@ export async function readNextState(sources: NextSources): Promise<NextState> {
     ? ROWS
     : ROADMAP_ROWS;
 
-  const modified = readTreeModified(world);
-  if (modified !== null) return answer(modified, world.problems());
-
-  for (const row of rows) {
-    if (row.pulls === true) {
-      const unusable = await readPullsUnusable(world);
-      if (unusable !== null) return answer(unusable, world.problems());
-    }
-
-    const found = await row.read(world);
-    if (found !== null) return answer(found, world.problems());
-  }
+  const found = await firstAnswer(world, rows.filter((row) => AHEAD_OF_TREE.has(row.id)))
+    ?? readTreeModified(world)
+    ?? await firstAnswer(world, rows.filter((row) => !AHEAD_OF_TREE.has(row.id)));
+  if (found !== null) return answer(found, world.problems());
 
   // Unreachable: row 13 answers for every reading. A table edited to end
   // on a row that can answer null is the defect this catches.
