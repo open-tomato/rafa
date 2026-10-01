@@ -11,8 +11,9 @@
  *    `master` has been taken ({@link resolveRunBranch}). This is the
  *    route every run took before the flag existed, unchanged.
  *  - Under `--as-worktree` the plan's `feat/<stub>` is added as a linked
- *    worktree at `loop.worktreeDir/<stub>` ({@link addRunWorktree}), and
- *    THAT worktree is the checkout: every git command the loop runs, each
+ *    worktree at `loop.worktreeDir/<stub>` ({@link addRunWorktree}), or
+ *    the worktree an earlier start left there on that branch is reused,
+ *    and THAT worktree is the checkout: every git command the loop runs, each
  *    task's commit, the wrap-up, the release and the CI gate, and every
  *    session the run spawns, run there. The branch is the worktree's.
  *    No offer is made and nothing is asked, since the flag is the answer,

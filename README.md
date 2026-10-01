@@ -516,7 +516,8 @@ while the loop runs beside you. This is a git worktree, the second desk on
 the same repository, with its own branch and its own working directory. Both
 share one `.rafa/` and one effort store. The worktree is created under
 `.rafa/worktrees/` by default, or in the directory `loop.worktreeDir` names
-when configured. A loop without `--as-worktree` runs in the current checkout,
+when configured; a run started again with the flag reuses the worktree it
+left there. A loop without `--as-worktree` runs in the current checkout,
 which is unchanged. The guard stops a loop if you switch away from it; with
 a worktree, you are free to switch the main checkout to anything, and the
 loop stays on its branch. Two loops run in two worktrees, each with its own

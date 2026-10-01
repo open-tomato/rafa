@@ -20,6 +20,25 @@
  *    Neither fetches: a branch that already exists is never fetched over,
  *    the decision module's rule.
  *
+ * ## A worktree already there
+ *
+ * Before any step runs, the runner reads `git worktree list --porcelain`
+ * once, so a run started again after one that stopped finds what that
+ * one left ({@link readExisting}):
+ *
+ *  - a worktree at `loop.worktreeDir/<stub>` holding `feat/<stub>` is
+ *    reused as it stands: one line says so, nothing is fetched or added,
+ *    and the outcome's route is `reuse` with no steps;
+ *  - that path holding another branch, or a detached HEAD, is refused,
+ *    naming the path and what it holds;
+ *  - `feat/<stub>` held by a checkout at any other path, the main one
+ *    included, is refused, naming that path and the one the run wanted.
+ *
+ * Paths are compared after resolving symlinks on both sides, since git
+ * lists them resolved (see below); a path that is gone is compared as
+ * written. A listing git could not give reads as no worktree at all, and
+ * the add then refuses as it did before this reading existed.
+ *
  * Nothing here asks a question: the worktree is asked for by a flag, and
  * the flag is the answer. Git runs in the PROJECT ROOT (`./checkout.ts`),
  * the checkout whose `.git` the new worktree is registered with, and the
@@ -52,6 +71,14 @@
  *  - After every one of those, `git status --short` in the main checkout
  *    printed nothing and its branch was still `main`.
  *
+ * Measured on git 2.53.0 under Linux (2026-10-01), with the project
+ * reached through a symlink: `git worktree list --porcelain` printed
+ * every path with the symlink resolved, the main checkout's and each
+ * linked worktree's alike, and a detached worktree's block carried a
+ * `detached` line and no `branch` line. Adding a worktree again at the
+ * path of one that already held `feat/x` exited 128 with `fatal:
+ * '<path>' already exists`, which is why the listing is read first.
+ *
  * ## Refusals
  *
  * Every refusal is a `CommandExit` with exit code 1, the shape
@@ -61,7 +88,8 @@
 import type { BranchPlan, BranchRoute } from './branch-decision.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
 
-import { join } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
@@ -109,14 +137,21 @@ export interface WorktreeStep {
   readonly argv: readonly string[];
 }
 
+/**
+ * How the run came by its worktree: one of the branch decision's routes,
+ * or `reuse` for a worktree an earlier start left at the same path on
+ * the same branch.
+ */
+export type WorktreeRoute = BranchRoute | 'reuse';
+
 /** The worktree the run now has. */
 export interface WorktreeOutcome {
   /** The branch the worktree holds, `feat/<stub>`. */
   readonly branch: string;
   /** The worktree's directory, `loop.worktreeDir/<stub>` under the project root. */
   readonly path: string;
-  readonly route: BranchRoute;
-  /** The steps that ran, in order, all of them having succeeded. */
+  readonly route: WorktreeRoute;
+  /** The steps that ran, in order, all of them having succeeded; none on `reuse`. */
   readonly steps: readonly WorktreeStep[];
 }
 
@@ -188,6 +223,95 @@ function holderName(holder: { readonly main: boolean }): string {
 }
 
 /**
+ * The refusal for `branch` checked out in another checkout, `detail`
+ * lines beneath the first: git's own when an add failed, the path the
+ * run wanted when the listing read before any step found the holder.
+ */
+function heldRefusal(
+  branch: string,
+  holder: { readonly path: string; readonly main: boolean },
+  detail: readonly string[],
+): string {
+  return [
+    `❌ Refusing to add a worktree for ${branch}: it is checked out in ${holderName(holder)} at ${holder.path}.`,
+    ...detail,
+    `${INDENT}Switch that checkout off ${branch}, or remove it with git worktree remove, then run again.`,
+    UNTOUCHED,
+  ].join('\n');
+}
+
+/** `path` as git lists it: its symlinks resolved, or resolved as written when it is gone. */
+function canonicalPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/** What the listing already holds at the run's path and for its branch; see the module note. */
+export type ExistingWorktree =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'reuse' }
+  | {
+    readonly kind: 'path-taken';
+    /** The branch the worktree at the run's path holds, or null when it is detached. */
+    readonly holds: string | null;
+  }
+  | {
+    readonly kind: 'branch-held';
+    /** The checkout holding the run's branch, at a path that is not the run's. */
+    readonly holder: { readonly path: string; readonly main: boolean };
+  };
+
+/**
+ * Reads a `git worktree list --porcelain` listing for the run's worktree:
+ * the entry at `path` decides first, reused when it holds `branch` and
+ * refused when it holds anything else, and only with no entry there is a
+ * checkout holding `branch` elsewhere looked for.
+ */
+export function readExisting(
+  listing: readonly WorktreeEntry[],
+  branch: string,
+  path: string,
+): ExistingWorktree {
+  const wanted = canonicalPath(path);
+  const atPath = listing.find((entry) => canonicalPath(entry.path) === wanted);
+  if (atPath !== undefined) {
+    return atPath.branch === branch
+      ? Object.freeze({ kind: 'reuse' })
+      : Object.freeze({ kind: 'path-taken', holds: atPath.branch });
+  }
+  const holder = holderOf(listing, branch);
+  return holder === null
+    ? Object.freeze({ kind: 'none' })
+    : Object.freeze({ kind: 'branch-held', holder });
+}
+
+/**
+ * The refusal a worktree already there answers when it cannot be reused,
+ * naming both sides: the run's path and the branch it holds, or the
+ * run's branch, the path holding it and the path the run wanted.
+ */
+export function existingRefusal(
+  existing: Extract<ExistingWorktree, { kind: 'path-taken' | 'branch-held' }>,
+  branch: string,
+  path: string,
+): string {
+  if (existing.kind === 'branch-held') {
+    return heldRefusal(branch, existing.holder, [`${INDENT}The run's worktree for it would be at ${path}.`]);
+  }
+  const holds = existing.holds === null
+    ? 'a detached HEAD'
+    : existing.holds;
+  return [
+    `❌ Refusing to reuse the worktree at ${path} for ${branch}: it holds ${holds}.`,
+    `${INDENT}Switch that worktree to ${branch}, or remove it with git worktree remove, then run again.`,
+    UNTOUCHED,
+  ].join('\n');
+}
+
+/**
  * The refusal a failed step answers. A failed add names the checkout
  * that holds the branch when the listing shows one, since that is the
  * refusal an operator can act on; every other failure names the step.
@@ -201,14 +325,7 @@ export function stepRefusal(
   const holder = step.id === 'add'
     ? holderOf(listing, plan.branch)
     : null;
-  if (holder !== null) {
-    return [
-      `❌ Refusing to add a worktree for ${plan.branch}: it is checked out in ${holderName(holder)} at ${holder.path}.`,
-      ...quotedLines(gitSaid(result)),
-      `${INDENT}Switch that checkout off ${plan.branch}, or remove it with git worktree remove, then run again.`,
-      UNTOUCHED,
-    ].join('\n');
-  }
+  if (holder !== null) return heldRefusal(plan.branch, holder, quotedLines(gitSaid(result)));
   const fetchNote = step.id === 'fetch'
     ? [`${INDENT}Refusing to cut ${plan.branch} from a stale ${REMOTE}/${plan.base}.`]
     : [];
@@ -236,15 +353,30 @@ function openingLine(route: BranchRoute, plan: BranchPlan): string {
 }
 
 /**
+ * The worktree an earlier start left at `path` on `branch`, reused with
+ * one line saying so; null when the listing holds nothing for the run.
+ * A worktree there that cannot be reused is refused; see the module note.
+ */
+function reuseExisting(git: GitRunner, branch: string, path: string): WorktreeOutcome | null {
+  const existing = readExisting(readListing(git), branch, path);
+  if (existing.kind === 'none') return null;
+  if (existing.kind !== 'reuse') throw new CommandExit(1, `\n${existingRefusal(existing, branch, path)}`);
+  activeOutput().info(`\n🌿 Reusing the worktree at ${path}, which already holds ${branch}.`);
+  return Object.freeze({ branch, path, route: 'reuse', steps: Object.freeze([]) });
+}
+
+/**
  * Adds the worktree for the plan's branch: `feat/<stub>` created from
  * the freshly fetched `origin/<base>`, or the existing branch when git
- * already has it, checked out at `loop.worktreeDir/<stub>`. The main
+ * already has it, checked out at `loop.worktreeDir/<stub>`. A worktree
+ * an earlier start left there on that branch is reused instead. The main
  * checkout's branch and working tree are never touched.
  *
- * Answers the worktree the run now has. A plan with no stub, a failed
- * fetch, and an add git refused — a branch checked out elsewhere, named
- * by that checkout's path, above all — are each a `CommandExit` with
- * exit code 1; see the module note.
+ * Answers the worktree the run now has. A plan with no stub, a worktree
+ * already there that cannot be reused, a failed fetch, and an add git
+ * refused — a branch checked out elsewhere, named by that checkout's
+ * path, above all — are each a `CommandExit` with exit code 1; see the
+ * module note.
  */
 export function addRunWorktree(
   request: WorktreeRequest,
@@ -255,6 +387,9 @@ export function addRunWorktree(
   if (stub === '') {
     throw new CommandExit(1, '\n❌ Cannot add a worktree for a plan with no stub: its branch would be feat/ alone.');
   }
+  const path = worktreePathFor(request.projectRoot, request.worktreeDir, stub);
+  const reused = reuseExisting(git, branchNameFor(stub), path);
+  if (reused !== null) return reused;
   const offer = readBranchOffer({
     planStub: stub,
     base: request.base,
@@ -267,7 +402,6 @@ export function addRunWorktree(
   if (offer.kind !== 'take') throw new Error(`the branch decision answered ${offer.kind} under --create-branch`);
 
   const plan: BranchPlan = { branch: offer.branch, base: request.base };
-  const path = worktreePathFor(request.projectRoot, request.worktreeDir, stub);
   const steps = worktreeSteps(offer.route, plan, path);
   activeOutput().info(openingLine(offer.route, plan));
   for (const step of steps) {

@@ -362,7 +362,11 @@ New; it replaces no earlier text. What a row or an action added to
 - **`loop start --as-worktree` creates a new git worktree for the loop to run
   in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`):
   the worktree is created under `.rafa/worktrees/` by default, or in the
-  directory `loop.worktreeDir` names when configured. The project root and
+  directory `loop.worktreeDir` names when configured. Started again, the run
+  reuses the worktree at `<loop.worktreeDir>/<stub>` when it holds
+  `feat/<stub>`, with one line saying so, and refuses that path holding
+  another branch or `feat/<stub>` held at another path, naming both
+  (`start/worktree.ts`). The project root and
   checkout stay separate: the root owns `.rafa/`, the config and the store,
   while the checkout (the worktree) is where the loop creates the branch and
   runs; you stay on `main` in the original checkout and can work there while
