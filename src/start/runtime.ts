@@ -383,7 +383,7 @@ export function forwardLine(line: string, output: Output): CliEventResult | null
   return null;
 }
 
-/** The event a line holds, or null when it holds none of the four kinds. */
+/** The event a line holds, or null when it holds none of the five kinds. */
 function eventOf(line: string): CliEvent | null {
   let parsed: unknown;
   try {
@@ -408,6 +408,10 @@ function eventOf(line: string): CliEvent | null {
         : null;
     case 'result':
       return typeof event.ok === 'boolean'
+        ? event
+        : null;
+    case 'event':
+      return typeof event.name === 'string' && typeof event.summary === 'string'
         ? event
         : null;
     default:

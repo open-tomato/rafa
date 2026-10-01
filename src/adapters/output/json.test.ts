@@ -65,6 +65,15 @@ function jsonOutput(
 }
 
 describe('createJsonOutput', () => {
+  it('writes a named event unchanged as one NDJSON line', () => {
+    const { output, chunks } = jsonOutput();
+    const event: CliEvent = { type: 'event', name: 'pr', summary: 'pr #612 opened', data: { number: 612 }, ts: TS };
+
+    output.emit(event);
+
+    expect(chunks).toEqual([`${JSON.stringify(event)}\n`]);
+  });
+
   it('produces exactly one JSON object per line for each call', () => {
     const { output, chunks } = jsonOutput();
 

@@ -382,8 +382,21 @@ export interface CliEventResult {
   ts: string;
 }
 
-/** Every event an output renders, closed over its four kinds. */
-export type CliEvent = CliEventStart | CliEventStep | CliEventLog | CliEventResult;
+/**
+ * One named event of a long-running command, such as a loop's task
+ * ending. `summary` is the one line the events output prints; `data`
+ * holds the same facts as fields for a reader of json.
+ */
+export interface CliEventNamed {
+  type: 'event';
+  name: string;
+  summary: string;
+  data: Readonly<Record<string, unknown>>;
+  ts: string;
+}
+
+/** Every event an output renders, closed over its five kinds. */
+export type CliEvent = CliEventStart | CliEventStep | CliEventLog | CliEventResult | CliEventNamed;
 
 /**
  * Where a command's output goes: a terminal's text, or NDJSON events a

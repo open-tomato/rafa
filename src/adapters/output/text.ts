@@ -23,8 +23,8 @@
  * verbosity 2 and above as `debug: <message>`, `warn` and `error` at
  * every verbosity as `warn: ` and `error: `, and `result` as `result: `
  * followed by a string payload as it is or any other payload as JSON.
- * `emit` renders a `log` event through the function of its level, and
- * each other kind on a line of its own. The stream's `write` is a
+ * `emit` renders a `log` event through the function of its level, a
+ * named `event` as nothing, and each other kind on a line of its own. The stream's `write` is a
  * property, as `stream.ts` says, and the output answered is frozen.
  *
  * ## One stream
@@ -140,6 +140,11 @@ export function createTextOutput({ verbosity, stream }: CreateTextOutputOptions)
       }
       case 'result': {
         writeLine(resultLine(event));
+        return;
+      }
+      case 'event': {
+        // The command's own lines already say it in text; the events
+        // output (`adapters/output/events.ts`) is where it is printed.
         return;
       }
     }
