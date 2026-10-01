@@ -167,14 +167,6 @@ live directory, and it does not clear on a re-run. In the differential
 suite both backends read one frozen copy, so a difference between them
 is a real parity failure, not the sibling appending mid-run.
 
-**One case reads a gitignored plan (baseline: red).**
-`src/plan/parse.test.ts`'s `a real plan file on disk` reads
-`.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a
-fixture, and `.rafa/` is gitignored. Where the file is absent, the test
-fails with an unhandled `ENOENT` between tests. Prove pre-existing in a
-worktree at `origin/main`, not a stash (a stash is a no-op once a plan's
-diff commits).
-
 **Three cleanup cases are red since 2026-09-24T12:00Z (baseline: 6 pass,
 3 fail).**
 `src/cleanup/scratch-repository.test.ts` reads its worktrees at fixed
