@@ -211,7 +211,9 @@ describe('resolveScope on disk', () => {
     const root = realpathSync(project);
     expect(probes).toEqual([
       join(root, 'a', 'b', '.rafa', 'config.yaml'),
+      join(root, 'a', 'b', '.git'),
       join(root, 'a', '.rafa', 'config.yaml'),
+      join(root, 'a', '.git'),
       join(root, '.rafa', 'config.yaml'),
     ]);
   });
@@ -333,9 +335,13 @@ describe('resolveScope without a project', () => {
     });
     expect(fs.probes).toEqual([
       '/srv/app/src/.rafa/config.yaml',
+      '/srv/app/src/.git',
       '/srv/app/.rafa/config.yaml',
+      '/srv/app/.git',
       '/srv/.rafa/config.yaml',
+      '/srv/.git',
       '/.rafa/config.yaml',
+      '/.git',
     ]);
   });
 

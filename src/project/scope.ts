@@ -52,23 +52,39 @@
  *
  * `.rafa/` is gitignored, so a linked worktree of a project's
  * repository holds none of its own, and a walk from a worktree beside
- * the main checkout reaches no project. So when the walk finds nothing,
- * the resolution asks for the MAIN CHECKOUT of the repository holding
- * the start, `mainCheckoutOf` in `worktree-root.ts`, and answers it as
- * the root when it holds `.rafa/config.yaml`. A worktree under the main
- * checkout, at `.rafa/worktrees/<name>` say, needs no fallback: the
- * walk climbs into the main checkout and finds it there.
+ * the main checkout reaches no project of its own. Worse, it may reach
+ * someone else's: a worktree beside the main checkout under a parent
+ * folder that holds its own `.rafa/config.yaml` would climb straight
+ * past the repository into the parent's project.
  *
- * The fallback runs only once the walk has found nothing, so a start
- * inside a project never runs git, and a worktree whose own `.rafa/`
- * holds the file still resolves to itself. It checks the main checkout
- * alone and does not climb above it: a project above the repository is
- * one the walk already reached, had there been one. The main checkout
- * is not probed again when the walk already passed it, which it did
- * from the main checkout and from any directory under it, and it is
- * not taken when it is the home, for the reason the home is passed
- * over. When the main checkout it probed holds no file either, the hint
- * names it.
+ * So the walk STOPS at the top level of the git working tree holding
+ * the start: the first directory, climbing, whose {@link GIT_MARKER}
+ * exists, a directory in a main checkout and a file in a linked
+ * worktree, which is how git itself finds a working tree when no
+ * `GIT_DIR` names one. It probes the config before the marker, so a
+ * top level holding both answers itself. When the walk found nothing up
+ * to there, or found nothing up to the filesystem root because no
+ * directory holds the marker, the resolution asks for the MAIN CHECKOUT
+ * of the repository holding the start, `mainCheckoutOf` in
+ * `worktree-root.ts`, and answers it as the root when it holds
+ * `.rafa/config.yaml`. Only when it does not does the walk go on above
+ * the top level to the filesystem root, so a repository inside a
+ * project, such as a checkout under a project's folder with no config
+ * of its own, still runs in that project.
+ *
+ * The fallback runs only once the walk below the top level has found
+ * nothing, so a start inside a project whose root is at or below its
+ * working tree's top level never runs git, and a worktree whose own
+ * `.rafa/` holds the file still resolves to itself. A worktree under
+ * the main checkout, at `.rafa/worktrees/<name>` say, stops at its own
+ * top level and runs git once, answering the main checkout the walk
+ * would have climbed to. The fallback checks the main checkout alone and
+ * does not climb above it: what is above it is the walk's to climb.
+ * The main checkout is not probed when it is the start or a directory
+ * above it, which the walk climbs whether or not it stops at the top
+ * level, and it is not taken when it is the home, for the reason the
+ * home is passed over. When the main checkout it probed holds no file
+ * either, the hint names it.
  *
  * Git answers the main checkout as a real path, measured in
  * `worktree-root.ts`, so it compares with the real paths the walk
@@ -272,21 +288,42 @@ export function selfAndAncestors(path: string): readonly string[] {
     : [path, ...selfAndAncestors(parent)];
 }
 
-/** Where the walk stopped, and whether it passed over a home holding the user file. */
+/** The marker git finds a working tree's top level by: a directory in a main checkout, a file in a linked worktree. */
+const GIT_MARKER = '.git';
+
+/**
+ * Where one stretch of the walk stopped: the root it found, whether it
+ * passed over a home holding the user file, and the working tree's top
+ * level it stopped at, when it stopped at one.
+ */
 interface Walk {
   readonly root: string | null;
   readonly passedUserConfig: boolean;
+  readonly topLevel: string | null;
 }
 
-/** Climbs from `realStart` to the first directory other than the home holding the file. */
-function walkUp(realStart: string, realHome: string | null, fs: ScopeFileSystem): Walk {
+/**
+ * Climbs `dirs`, nearest first, to the first directory other than the
+ * home holding the file. With `stopAtTopLevel`, a directory holding no
+ * file but holding {@link GIT_MARKER} ends the climb; see the module note.
+ */
+function walkUp(
+  dirs: readonly string[],
+  realHome: string | null,
+  fs: ScopeFileSystem,
+  stopAtTopLevel: boolean,
+): Walk {
   let passedUserConfig = false;
-  for (const dir of selfAndAncestors(realStart)) {
-    if (!fs.exists(configFilePath(dir))) continue;
-    if (dir !== realHome) return { root: dir, passedUserConfig };
-    passedUserConfig = true;
+  for (const dir of dirs) {
+    if (fs.exists(configFilePath(dir))) {
+      if (dir !== realHome) return { root: dir, passedUserConfig, topLevel: null };
+      passedUserConfig = true;
+    }
+    if (stopAtTopLevel && fs.exists(join(dir, GIT_MARKER))) {
+      return { root: null, passedUserConfig, topLevel: dir };
+    }
   }
-  return { root: null, passedUserConfig };
+  return { root: null, passedUserConfig, topLevel: null };
 }
 
 /** The main checkout of the repository holding `realStart`, a refusal wrapped as a {@link ScopeError}. */
@@ -308,8 +345,9 @@ interface Fallback {
 /**
  * The main checkout as the root when the walk from `realStart` found
  * none and the checkout holds the file; see the module note. Probes
- * nothing when the checkout is null, the home, or a directory the walk
- * already passed.
+ * nothing when the checkout is null, the home, or a directory at or
+ * above the start, which the walk probes whether or not it stops at
+ * the top level.
  */
 function fallBack(
   realStart: string,
@@ -327,13 +365,26 @@ function fallBack(
 }
 
 /**
+ * The walk above the working tree's top level `lower` stopped at, or
+ * nothing to climb when it stopped at none.
+ */
+function walkAbove(lower: Walk, realHome: string | null, fs: ScopeFileSystem): Walk {
+  if (lower.topLevel === null) return lower;
+  const above = selfAndAncestors(lower.topLevel).slice(1);
+  const upper = walkUp(above, realHome, fs, false);
+  return { ...upper, passedUserConfig: lower.passedUserConfig || upper.passedUserConfig };
+}
+
+/**
  * Resolves the scopes a command run in `start` stands in: the project
  * whose root is the nearest directory at or above `start` holding
  * `.rafa/config.yaml`, the home passed over, and the user scope under
- * `seams.home`. When no directory up to the filesystem root holds the
- * file, the main checkout of the repository holding `start` is the
- * root if it holds the file. Answers {@link NoProject}, carrying the
- * `rafa init` hint, when it does not either.
+ * `seams.home`. The walk stops at the top level of the git working tree
+ * holding `start`; when it found no file up to there, the main checkout
+ * of the repository holding `start` is the root if it holds the file,
+ * and only then does the walk go on above the top level to the
+ * filesystem root. Answers {@link NoProject}, carrying the `rafa init`
+ * hint, when nothing holds the file.
  *
  * Throws a {@link ScopeError} for a relative start or home, for a
  * start that does not resolve, and for a git that cannot say which
@@ -348,15 +399,19 @@ export function resolveScope(start: string, seams: ScopeSeams): ScopeResolution 
   const user = scopeAt(home);
   const realStart = realStartOf(start, fs);
   const realHome = realHomeOf(home, fs);
-  const walk = walkUp(realStart, realHome, fs);
-  const fallback = walk.root === null
+  const lower = walkUp(selfAndAncestors(realStart), realHome, fs, true);
+  const fallback = lower.root === null
     ? fallBack(realStart, realHome, fs, mainCheckout)
-    : { root: walk.root, probed: null };
-  if (fallback.root === null) {
+    : { root: lower.root, probed: null };
+  const walk = fallback.root === null
+    ? walkAbove(lower, realHome, fs)
+    : lower;
+  const root = fallback.root ?? walk.root;
+  if (root === null) {
     const passed = walk.passedUserConfig
       ? user.configFile
       : null;
     return { found: false, start, home, user, hint: initHint(start, passed, fallback.probed) };
   }
-  return { found: true, root: fallback.root, home, project: scopeAt(fallback.root), user };
+  return { found: true, root, home, project: scopeAt(root), user };
 }
