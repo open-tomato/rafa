@@ -117,6 +117,18 @@ module's note is the long form.
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
 
+### Project scope and configuration discovery
+
+The dispatcher's `resolveProjectConfig` reads the git root, walks upward for
+`.rafa/config.yaml`, and stops at the repository's top level (`src/project/scope.ts`).
+When the start folder is inside a git working tree, the walk never leaves that
+tree to read a `.rafa/` above it. A linked worktree answers its main checkout's
+`.rafa/` through a fallback in `src/project/worktree-root.ts`, which is consulted
+when the walk finds nothing. A project always has its own `.rafa/` if it runs at
+all, so a setup relying on a parent config must keep the parent folder outside
+any repository. The project root the dispatcher found is handed to every command,
+so all reads are consistent even when run from a subdirectory.
+
 ### `rafa next --roadmap`: the hop rows
 
 The `--roadmap` flag enables five additional rows in the state table
@@ -196,6 +208,32 @@ itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
 none, and no position file stamp nothing. `parseSessionRecord`
 (`loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
 record, and every later write keeps it whole.
+
+### `rafa next` row order
+
+The state table is first-match and reads rows in order from `src/next/state.ts`,
+stopping at the first row whose reading answers something (a found state or a
+problem). The base rows are:
+
+1. Branch sync (`git fetch --all || git ls-remote`)
+2. Loop running (`rafa loop status`)
+3. Working tree uncommitted edits
+4. Plan unstarted or paused
+5. Pull request merge checks
+6. Pull request open (ready to merge)
+7. Pull request no checks (`merge-unchecked` action)
+8. Plan ready (issue picked, ready to start)
+9. Plan blocked (issue blocked by another, can `hop` to parent)
+10. Issue blocked (blocker still open, can unblock)
+11. Nothing left (no unblocked issues on the roadmap)
+12. Finally ready (nothing to do, would just exit 0)
+
+With `--roadmap`, five hop rows are inserted before their corresponding base
+rows, as the "hop rows" subsection describes above. Each row is read in a
+`try-catch` and failures warn without stopping the chain. A turn is a loop:
+one read through the table until a row answers, or reaching the end. Once a
+command-based action finishes, the chain reads again from row 1, comparing
+the new state with the last one to print a stop line or propose another action.
 
 ### Changing the `rafa next` table
 
@@ -379,6 +417,28 @@ New; it replaces no earlier text. What a row or an action added to
   loop, with or without `--as-worktree`, and never interferes with the loop's
   own commits. Without `--as-worktree` the checkout is the project root itself,
   and you run the loop where you already are.
+- **`loop.wrapUp.retries` and the wrap-up pull request retry loop**
+  (`start/wrap-up.ts`, `start/pr-lifecycle.ts`): After the wrap-up session
+  ends, the runner reads the branch's open pull request. With none, it runs
+  `loop.wrapUp.retries` more wrap-up sessions (the config key defaults to `1`,
+  from 1 to 3; `false` skips straight to opening the pull request). Each
+  retry session is told that the pull request is missing and given the
+  previous session's final message, allowing the session to correct course.
+  If no retry succeeds in opening one, the runner opens it itself, titled
+  `rafa-<n>: <plan title>`, with a body opening `Closes #<n>`, the release
+  fragment's notes, and a line saying the wrap-up did not finish. A push or
+  a create that fails ends the run `blocked`, naming the branch and the step.
+  With `pr.provider: none`, the pull request is never opened; a run ends `ok`
+  once the wrap-up finishes.
+- **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
+  (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
+  phase's start. A record with no `phase`, from an older rafa, reads as `task`.
+  The header shows `🍅 #<n> <task>/<total>` in `task` and `🍅 #<n> <phase>`
+  otherwise, never counting past the total, and `rafa loop status` and
+  `rafa loop list` print the phase beside `done/total`. On `loop resume` the
+  record's phase is read to resume at the right place; a record in `task` or
+  `wrap-up` resumes the loop, a record in `pull-request` or `ci` waits for
+  checks, and a record in `repair` retries the CI repair.
 - **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
   `plan create`, `loop start`, `effort collect`, `effort report` and
   `usage`. The command is handed a fresh copy of `argv`
