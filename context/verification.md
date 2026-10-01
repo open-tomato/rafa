@@ -19,6 +19,11 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
+The full-suite scripts treat the workspace packages apart: `check-types` runs
+`tsc` over the root, then each `packages/*/src/` with its tests
+included; `bun run lint` ignores `packages/` whole, so package code is
+never linted.
+
 **Runner recorded steps** (full suite, recorded at fixed points):
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — Full suite after each task's session ends and commits

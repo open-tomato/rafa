@@ -17,7 +17,9 @@
  * keys. `config-schema-release.ts` holds the `pr` and `release`
  * sections and `dangerous.acceptVersionCollision`, and
  * `config-schema-tests.ts` the `tests` section and its reader, both
- * spread in here.
+ * spread in here. `config-schema-hub.ts` holds the `hub` section, its
+ * readers and the refusal of `effort.sync: service` with no `hub.url`,
+ * spread in after `effort.sync`.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -99,6 +101,7 @@ import type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
 } from './config-items.js';
+import type { HubSettings } from './config-schema-hub.js';
 import type {
   DangerousReleaseSettings,
   PrSettings,
@@ -139,6 +142,7 @@ import {
   tierPins,
   trackerKind,
 } from './config-readers.js';
+import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
   DANGEROUS_RELEASE_SETTINGS,
@@ -187,13 +191,13 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
 
 /**
  * Every setting, resolved. The module note maps each to its file key;
- * the `pr` and `release` fields are {@link PrSettings}' and
- * {@link ReleaseSettings}', `dangerousAcceptVersionCollision` is
- * {@link DangerousReleaseSettings}', and the `tests` fields are
- * {@link TestsSettings}'.
+ * the `hub` fields are {@link HubSettings}', the `pr` and `release`
+ * fields are {@link PrSettings}' and {@link ReleaseSettings}',
+ * `dangerousAcceptVersionCollision` is {@link DangerousReleaseSettings}',
+ * and the `tests` fields are {@link TestsSettings}'.
  */
 export interface RafaConfig
-  extends PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings {
+  extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -341,6 +345,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
+  ...HUB_DEFAULTS,
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -408,6 +413,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   store: { key: 'store', read: oneOf(STORE_BACKENDS), cli: true },
   effortBusyTimeoutMs: { key: 'effort.busyTimeoutMs', read: busyTimeoutMs, cli: false },
   effortSync: { key: 'effort.sync', read: oneOf(SYNC_STRATEGIES), cli: false },
+  ...HUB_SETTINGS,
   inject: { key: 'plan.inject', read: oneOf(INJECT_MODES), cli: true },
   planDir: { key: 'plan.dir', read: directory, cli: true },
   specsDir: { key: 'specs.dir', read: directory, cli: true },

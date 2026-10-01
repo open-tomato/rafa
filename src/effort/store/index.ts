@@ -59,12 +59,30 @@
  *
  * The port's types and its key record, each backend's opener and
  * surface type, the selector, and the backend names, so a caller can
- * spell a selection without importing the config module. Nothing else.
- * A subpath is a public surface: a name added to it later breaks
- * nobody, and a name removed breaks every caller that imported it. So
- * the SQLite module's schema history and migration function, exported
- * there for its own suite, are not exported here, and neither is the
- * adapter registry the selector resolves through.
+ * spell a selection without importing the config module.
+ *
+ * Beside them, what the workspace packages under `packages/` need from
+ * core, since a package reaches core only through this entry and
+ * `./ports`, and `./ports` exports no runtime value
+ * (`context/source.md`):
+ *
+ *   - the sync wire codec, `src/effort/sync/wire.ts`: the export of a
+ *     store's rows past a cursor as JSON, the text's encoder and
+ *     checking decoder, the materialiser that builds a payload into the
+ *     store file a merge reads, and its two errors;
+ *   - {@link mergeStore} (`merge-store.ts`), the one route by which rows
+ *     are merged, with its options and its result, the latter as
+ *     `StoreMergeResult`, the name `./ports` gives it beside the
+ *     learning library's own `MergeResult`;
+ *   - `TRUSTED_PERMISSIONS` (`src/board/trust.ts`), the repository
+ *     permissions that are write access, so a hub checking a token's
+ *     login spells them as core does.
+ *
+ * Nothing else. A subpath is a public surface: a name added to it later
+ * breaks nobody, and a name removed breaks every caller that imported
+ * it. So the SQLite module's schema history and migration function,
+ * exported there for its own suite, are not exported here, and neither
+ * is the adapter registry the selector resolves through.
  *
  * `effort/store.ts`, the sibling's store bound to one file, is not
  * re-exported either. It is what the NDJSON backend runs, not a third
@@ -78,7 +96,18 @@ import type { RafaConfig } from '../../config.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 
+export type { TrustedPermission } from '../../board/trust.js';
 export type { StoreBackend } from '../../config.js';
+export type {
+  MaterialisedWire,
+  MaterialiseOptions,
+  WireCursor,
+  WireExportOptions,
+  WirePayload,
+  WireRow,
+  WireValue,
+} from '../sync/wire.js';
+export type { MergeOptions, MergeResult as StoreMergeResult } from './merge-store.js';
 export type {
   NdjsonAppendResult,
   NdjsonEffortStore,
@@ -97,7 +126,19 @@ export type {
   SessionMode,
 } from './types.js';
 
+export { TRUSTED_PERMISSIONS } from '../../board/trust.js';
 export { STORE_BACKENDS } from '../../config.js';
+export {
+  decodeWirePayload,
+  encodeWirePayload,
+  exportWirePayload,
+  materialiseWirePayload,
+  WIRE_FORMAT,
+  WIRE_VERSION,
+  WireExportRefusal,
+  WireFormatError,
+} from '../sync/wire.js';
+export { mergeStore } from './merge-store.js';
 export { openNdjsonStore } from './ndjson.js';
 export { openSqliteStore } from './sqlite.js';
 export { EFFORT_KEY_PROJECTIONS } from './types.js';

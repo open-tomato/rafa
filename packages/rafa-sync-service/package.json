@@ -1,0 +1,23 @@
+{
+  "name": "@open-tomato/rafa-sync-service",
+  "version": "0.0.0",
+  "description": "The rafa module providing the service sync strategy, which syncs an effort store through rafa-hub.",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "check-types": "tsc --noEmit"
+  },
+  "rafa": {
+    "manifestVersion": 1,
+    "types": ["sync"],
+    "provides": {
+      "sync": { "kind": "service", "entry": "./src/sync.ts" }
+    },
+    "requires": {
+      "rafa": ">=0.31 <1",
+      "ports": { "sync": 1 }
+    }
+  }
+}

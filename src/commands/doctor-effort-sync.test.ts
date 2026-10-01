@@ -52,9 +52,15 @@ function resolvedOf(lines: readonly string[]): ResolvedConfig {
   return resolveConfig({ cli: {}, file, user: null });
 }
 
-/** Config lines naming `kind` as `effort.sync`. */
+/**
+ * Config lines naming `kind` as `effort.sync`, with the `hub.url` the
+ * config refuses a `service` sync without, so the module check is reached.
+ */
 function syncLines(kind: string): string[] {
-  return ['effort:', `  sync: ${kind}`];
+  const hub = kind === 'service'
+    ? ['hub:', '  url: https://hub.example.org']
+    : [];
+  return ['effort:', `  sync: ${kind}`, ...hub];
 }
 
 /** Config lines loading the fixture module, with or without its `allowList:` line. */

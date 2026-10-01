@@ -112,6 +112,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
 import * as registryModule from './adapters/registry.js';
+import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
@@ -143,6 +144,17 @@ import {
   selectEffortStore,
 } from './effort/store/index.js';
 import * as storeEntry from './effort/store/index.js';
+import { mergeStore } from './effort/store/merge-store.js';
+import {
+  decodeWirePayload,
+  encodeWirePayload,
+  exportWirePayload,
+  materialiseWirePayload,
+  WIRE_FORMAT,
+  WIRE_VERSION,
+  WireExportRefusal,
+  WireFormatError,
+} from './effort/sync/wire.js';
 import {
   FEATURE_TYPES,
   MANIFEST_VERSION,
@@ -224,15 +236,25 @@ const RUNTIME_EXPORTS = [
   'STORE_BACKENDS',
   'SYNC_STRATEGIES',
   'ScopeError',
+  'TRUSTED_PERMISSIONS',
+  'WIRE_FORMAT',
+  'WIRE_VERSION',
+  'WireExportRefusal',
+  'WireFormatError',
   'configFilePath',
   'createAdapterRegistry',
+  'decodeWirePayload',
   'effortCollectCommand',
   'effortReportCommand',
+  'encodeWirePayload',
+  'exportWirePayload',
   'initHint',
   'isRafaBlockKind',
   'loadConfig',
   'loadPlanPrerequisites',
+  'materialiseWirePayload',
   'mergePlanPrerequisites',
+  'mergeStore',
   'openNdjsonStore',
   'openSqliteStore',
   'parseConfigText',
@@ -291,15 +313,25 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['STORE_BACKENDS', entry.STORE_BACKENDS, STORE_BACKENDS],
   ['SYNC_STRATEGIES', entry.SYNC_STRATEGIES, SYNC_STRATEGIES],
   ['ScopeError', entry.ScopeError, ScopeError],
+  ['TRUSTED_PERMISSIONS', entry.TRUSTED_PERMISSIONS, TRUSTED_PERMISSIONS],
+  ['WIRE_FORMAT', entry.WIRE_FORMAT, WIRE_FORMAT],
+  ['WIRE_VERSION', entry.WIRE_VERSION, WIRE_VERSION],
+  ['WireExportRefusal', entry.WireExportRefusal, WireExportRefusal],
+  ['WireFormatError', entry.WireFormatError, WireFormatError],
   ['configFilePath', entry.configFilePath, configFilePath],
   ['createAdapterRegistry', entry.createAdapterRegistry, createAdapterRegistry],
+  ['decodeWirePayload', entry.decodeWirePayload, decodeWirePayload],
   ['effortCollectCommand', entry.effortCollectCommand, effortCollect],
   ['effortReportCommand', entry.effortReportCommand, effortReport],
+  ['encodeWirePayload', entry.encodeWirePayload, encodeWirePayload],
+  ['exportWirePayload', entry.exportWirePayload, exportWirePayload],
   ['initHint', entry.initHint, initHint],
   ['isRafaBlockKind', entry.isRafaBlockKind, isRafaBlockKind],
   ['loadConfig', entry.loadConfig, loadConfig],
   ['loadPlanPrerequisites', entry.loadPlanPrerequisites, loadPlanPrerequisites],
+  ['materialiseWirePayload', entry.materialiseWirePayload, materialiseWirePayload],
   ['mergePlanPrerequisites', entry.mergePlanPrerequisites, mergePlanPrerequisites],
+  ['mergeStore', entry.mergeStore, mergeStore],
   ['openNdjsonStore', entry.openNdjsonStore, openNdjsonStore],
   ['openSqliteStore', entry.openSqliteStore, openSqliteStore],
   ['parseConfigText', entry.parseConfigText, parseConfigText],
@@ -1072,6 +1104,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
+    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
     ['./plan/plan-files.js', ['resolveProjectConfig']],
@@ -1080,6 +1113,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../config-sections.js', ['messageOf']],
+    ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
     ['../next/ceiling.js', ['ALWAYS_ASKED', 'allowedUnasked', 'BARE_YES_ACTIONS', 'readYesCeiling', 'YES_ACTIONS', 'YES_FLAG']],
     ['../next/ending.js', ['actionOutput']],

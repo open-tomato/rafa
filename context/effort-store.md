@@ -215,8 +215,12 @@ which means no sync: a device keeps its own store. The user scope's
 setting (`src/config.ts`), so the user default needs no reader of its
 own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
-when either is read. A deployment of the `service` strategy also names
-`effort.syncUrl` with the hub's address, and a module implementing
+when either is read. A deployment of the `service` strategy requires
+`hub.url` (the hub's address), and may name `hub.tokenSecret` (the
+secret store name where the token is held, never the token itself) and
+`hub.timeout` (how long a request may take, `3s` by default, from `1s`
+to `30s`, as `3s`). `selectSync` hands the three to the adapter as
+`AdapterContext.hub` (`src/config-schema-hub.ts`). A module implementing
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core registers two adapters in `CORE_ADAPTER_REGISTRY`
@@ -239,6 +243,62 @@ local store. The file exchanged is `<dir>/effort.sqlite`, and the
 directory structure it sits under is not part of the exchange; only the
 database file matters. Importing each other's files in a loop is safe
 and idempotent: a repeat of the same file merges nothing new.
+
+**The `service` strategy syncs rows through a wire format over HTTP, defined
+in `src/effort/sync/wire.ts`, and merged only by `mergeStore`.** Push
+exports rows the local store wrote (identified by its origin pair) past a
+per-table, per-device cursor, building a JSON payload of every `merged`
+table's rows that have a `seq` higher than the cursor's value for that
+table. Each row carries every column, `seq` and the origin pair
+(`origin_store`, `origin_seq`), so the receiver's merge can identify which
+device wrote it and skip rows it already holds. The payload also carries
+the migration ids the sending store has applied, in order. `exportWirePayload`
+reads the SQLite file read-only, and refuses a store with no migration log or
+no origin columns, and an integer past `Number.MAX_SAFE_INTEGER` or a BLOB,
+rather than round or drop a value. Pull receives a payload from the hub,
+decodes its JSON (`decodeWirePayload` checks it whole, throwing
+`WireFormatError` on syntax error or missing fields), and builds it with
+`materialiseWirePayload` into a scratch `effort.sqlite` in a new directory
+under the temporary directory. The scratch file is brought forward through
+exactly the migrations the payload names, so its schema matches the sender's,
+then rows inserted as sent with their `seq` values intact. `mergeStore` then
+takes the scratch file as `otherPath` and brings it forward to this rafa's
+schema as it does any store. The payload carries no `local` table (the
+migration log, `store_meta`, the merge trail), so the scratch file names no
+store and no project: the merge records no other store in `merges`, and its
+other-project refusal has nothing to compare. The cursor for the next push
+advances only after a successful push; after a successful pull, the next pull
+starts from the new rows the merge brought in. The codec, `mergeStore` and
+`TRUSTED_PERMISSIONS` are exported from the `./store` subpath for the
+packages under `packages/`.
+
+**The `service` strategy makes one contact per command through
+`createHubContact` (`src/effort/sync/contact.ts`), which never throws
+and never sets the exit code.** A contact runs `pushThenPull()` (push then
+pull) or `pull()` alone. `local` and `file` are never contacted: nothing is
+loaded, selected or written. The `service` adapter is selected once per
+contact by `selectSync` through the registry `loadModules` answers, and a
+selection that fails (e.g., `SyncModuleMissing`) is written once through
+the caller's `warn`. **When sync runs:** `rafa effort collect` makes one
+contact and pushes then pulls after storing rows and writing its summary;
+`rafa loop start` makes one contact for the run and pushes then pulls at
+the end of each task, whatever its outcome; `rafa status`, `rafa next`
+(including `--dry-run`), and `rafa effort report` pull alone before they
+read, through `pullBeforeRead` (`src/effort/collect.ts`, `src/start.ts`,
+querying in the effort module). **The offline rule:** a push or pull that
+rejects with an error whose `name` is `HubUnreachable` (network error,
+timeout, or hub unreachable) writes exactly one line per contact, `effort
+sync: the hub at <url> is unreachable (<first line of why>); this command
+used the local store, and its rows sync on the next contact`. An unreachable
+hub does not prevent the command from running: it uses the local store and
+exits with the status it would have had, and an unreachable push skips its
+pull so a command waits out one timeout. The name `HubUnreachable` is
+matched on the error's `name` property rather than its class, so a module
+can throw a plain `Error({ name: 'HubUnreachable' })` and import no value
+from core. Any other rejection is written as `effort sync: <push|pull> over
+service failed: <message>`, and a refused push still attempts its pull.
+`pullBeforeRead` reads the config without writing its warnings and contacts
+nothing when the config is refused, leaving the refusal to the command.
 
 **Merge requires the SQLite backend.** A project configured with
 `store: ndjson` is refused by `rafa effort merge <file>`, which names

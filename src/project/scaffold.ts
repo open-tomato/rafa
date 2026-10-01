@@ -36,11 +36,11 @@
  * parses to {@link CONFIG_DEFAULTS}, which the tests hold, so a setting
  * added to the schema without a line here is caught there.
  *
- * Two lines carry their key and no value, `pr.provider` and `pr.base`,
- * because each resolves to null and null is what a key with no value
- * parses to. Uncommented they are silent, so those two settings resolve
- * from the defaults layer where every other resolves from the file, and
- * the tests name both. The line is written anyway: it tells an operator
+ * Five lines carry their key and no value, `hub.url`, `hub.tokenSecret`,
+ * `pr.provider`, `pr.base` and `roadmap.issue`, because each resolves to
+ * null and null is what a key with no value parses to. Uncommented they
+ * are silent, so those five settings resolve from the defaults layer
+ * where every other resolves from the file, and the tests name them. The line is written anyway: it tells an operator
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
@@ -100,6 +100,10 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# effort:',
   `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,
   `#   sync: ${CONFIG_DEFAULTS.effortSync}                  # local | file | git | service | p2p; how the store travels between devices`,
+  '# hub:',
+  '#   url:                         # the hub effort.sync: service reaches, required with it',
+  '#   tokenSecret:                 # the secret store name the hub token is kept under, never the token',
+  `#   timeout: ${CONFIG_DEFAULTS.hubTimeout}                  # 1s..30s; how long one request to the hub may take`,
   '# plan:',
   `#   inject: ${CONFIG_DEFAULTS.inject}                # full | stage | task`,
   `#   dir: ${CONFIG_DEFAULTS.planDir}`,

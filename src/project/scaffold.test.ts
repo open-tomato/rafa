@@ -8,11 +8,11 @@
  *
  * Each file as written sets `version` and nothing else, with no unknown
  * key. Uncommented, every setting line of it resolves every setting from
- * the file to its default, but for {@link VALUELESS}: the two lines that
- * carry a key and no value, whose defaults are read off the repository
- * and cannot be spelled, stay silent uncommented and so are answered by
- * the defaults layer. The control drops one more line and finds exactly
- * that setting answered by the default beside those two, so a setting
+ * the file to its default, but for {@link VALUELESS}: the lines that
+ * carry a key and no value, whose defaults are null because nobody has
+ * said, stay silent uncommented and so are answered by the defaults
+ * layer. The control drops one more line and finds exactly that setting
+ * answered by the default beside those, so a setting
  * added to the schema without a line in the template reddens the
  * uncommented case.
  *
@@ -114,6 +114,8 @@ function created(path: string, kind: ScopeWriteKind): ScopeWrite {
  * file leaves each to the defaults layer. See the module note.
  */
 const VALUELESS: readonly (readonly [string, string])[] = [
+  ['hubUrl', 'default'],
+  ['hubTokenSecret', 'default'],
   ['prProvider', 'default'],
   ['prBase', 'default'],
   ['roadmapIssue', 'default'],
@@ -142,10 +144,8 @@ describe('the config files', () => {
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
     expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 1);
-    expect(Object.entries(resolved.sources).filter(([, source]) => source !== 'file')).toEqual([
-      ['trackingAll', 'default'],
-      ...VALUELESS.map((pair) => [...pair]),
-    ]);
+    const unanswered = Object.entries(resolved.sources).filter(([, source]) => source !== 'file');
+    expect(unanswered.sort()).toEqual([['trackingAll', 'default'], ...VALUELESS.map((pair) => [...pair])].sort());
   });
 
   it('carries the learning section at its defaults, which resolve from the file once uncommented', () => {

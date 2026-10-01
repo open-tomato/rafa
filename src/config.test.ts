@@ -85,7 +85,7 @@ const PATH = '/repo/.rafa/config.yaml';
 const USER_PATH = '/home/someone/.rafa/config.yaml';
 
 /** The known-keys tail of a warning about a top-level unknown key. */
-const KNOWN = '(known keys: version, store, effort, plan, specs, tracker, learning, '
+const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
   + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task, tests)';
 
@@ -95,6 +95,9 @@ const SETTINGS: readonly ConfigSetting[] = [
   'store',
   'effortBusyTimeoutMs',
   'effortSync',
+  'hubUrl',
+  'hubTokenSecret',
+  'hubTimeout',
   'inject',
   'planDir',
   'specsDir',
@@ -156,6 +159,9 @@ const DEFAULTS: RafaConfig = {
   store: 'sqlite',
   effortBusyTimeoutMs: 5000,
   effortSync: 'local',
+  hubUrl: null,
+  hubTokenSecret: null,
+  hubTimeout: '3s',
   inject: 'stage',
   planDir: join('.rafa', 'plans'),
   specsDir: join('.rafa', 'specs'),
@@ -232,6 +238,10 @@ const FULL = [
   'effort:',
   '  busyTimeoutMs: 250',
   '  sync: file',
+  'hub:',
+  '  url: https://hub.example.org',
+  '  tokenSecret: rafa-hub-token',
+  '  timeout: 10s',
   'plan:',
   '  inject: full',
   '  dir: .plans',
@@ -328,6 +338,9 @@ const FULL_VALUES: RafaConfig = {
   store: 'ndjson',
   effortBusyTimeoutMs: 250,
   effortSync: 'file',
+  hubUrl: 'https://hub.example.org',
+  hubTokenSecret: 'rafa-hub-token',
+  hubTimeout: '10s',
   inject: 'full',
   planDir: '.plans',
   specsDir: '.specs',
@@ -634,6 +647,21 @@ describe('parseConfigText', () => {
         'effort.sync', 'effort:\n  sync: rsync',
         'effort.sync is "rsync", expected one of: local, file, git, service, p2p',
         'effort:\n  sync: p2p', 'effortSync', 'p2p',
+      ],
+      [
+        'hub.url', 'hub:\n  url: hub.example.org',
+        'hub.url is "hub.example.org", expected an http or https URL with no user name or password, such as https://hub.example.org',
+        'hub:\n  url: http://localhost:7373', 'hubUrl', 'http://localhost:7373',
+      ],
+      [
+        'hub.tokenSecret', 'hub:\n  tokenSecret: " "',
+        'hub.tokenSecret is " ", expected a secret store name',
+        'hub:\n  tokenSecret: team-hub', 'hubTokenSecret', 'team-hub',
+      ],
+      [
+        'hub.timeout', 'hub:\n  timeout: 0s',
+        'hub.timeout is "0s", expected a duration of whole seconds from 1s to 30s, such as 3s',
+        'hub:\n  timeout: 30s', 'hubTimeout', '30s',
       ],
       [
         'plan.inject', 'plan:\n  inject: all',
