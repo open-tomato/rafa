@@ -63,6 +63,14 @@
  *    so `--yes=merge-unchecked` reads as no id at all rather than as an
  *    always-asked one: 16 pass and 1 fail, the `merge-unchecked`
  *    refusal case, which reads its message rather than its exit code.
+ *
+ * Four more were driven on 2026-09-30 for the lists in `native` mode,
+ * the same way over this file and `./actions.test.ts`, against 52 pass
+ * and 0 fail: the native lists answered as the labels ones, 48 pass and
+ * 4 fail; the native `unblock` refusal dropped, so the word falls to the
+ * unknown-id refusal, 51 pass and 1 fail, the case reading its message;
+ * and bare `--yes` answering {@link BARE_YES_ACTIONS} whatever the mode,
+ * 51 pass and 1 fail. The fourth is `./actions.test.ts`'s.
  */
 import type { NextActionId } from './state.js';
 
@@ -75,10 +83,12 @@ import {
   allowedUnasked,
   ALWAYS_ASKED,
   BARE_YES_ACTIONS,
+  bareYesActionsFor,
   CEILING_REFUSAL_EXIT,
   readYesCeiling,
   ROADMAP_ACTIONS,
   YES_ACTIONS,
+  yesActionsFor,
   YES_FLAG,
 } from './ceiling.js';
 
@@ -88,15 +98,18 @@ const USAGE = 'rafa next [--dry-run] [--yes[=<action ids>]]';
 /** The eleven, spelled out: what a person may type, held against the table below. */
 const ELEVEN: readonly NextActionId[] = ['sync', 'resume', 'wait', 'triage', 'merge', 'settle', 'start', 'plan', 'unblock', 'hop', 'home'];
 
+/** The ten a list may name in `native` mode, spelled out: the eleven without `unblock`. */
+const NATIVE_TEN: readonly NextActionId[] = ['sync', 'resume', 'wait', 'triage', 'merge', 'settle', 'start', 'plan', 'hop', 'home'];
+
 /** The ceiling `--yes=<value>` reads to. */
 function ceilingOf(value: boolean | string): readonly NextActionId[] | null {
   return readYesCeiling({ [YES_FLAG]: value }, USAGE);
 }
 
 /** The refusal `--yes=<value>` earns, or null where the list was read without one. */
-function refusalOf(value: string): CommandExit | null {
+function refusalOf(value: string, mode: 'labels' | 'native' = 'labels'): CommandExit | null {
   try {
-    readYesCeiling({ [YES_FLAG]: value }, USAGE);
+    readYesCeiling({ [YES_FLAG]: value }, USAGE, mode);
     return null;
   } catch (error) {
     if (error instanceof CommandExit) return error;
@@ -220,5 +233,46 @@ describe('whether an action may run unasked', () => {
     expect(allowedUnasked('merge-unchecked', ['merge-unchecked'])).toBe(false);
     expect(allowedUnasked('merge-unchecked', [...YES_ACTIONS, 'merge-unchecked'])).toBe(false);
     expect(allowedUnasked('merge', [...YES_ACTIONS, 'merge-unchecked'])).toBe(true);
+  });
+});
+
+describe('the lists in native mode', () => {
+  it('reads labels mode as the eleven and the five, whether the mode is handed or left out', () => {
+    expect([yesActionsFor('labels'), bareYesActionsFor('labels')]).toEqual([ELEVEN, ['sync', 'wait', 'unblock', 'plan', 'home']]);
+    expect(readYesCeiling({ [YES_FLAG]: true }, USAGE, 'labels')).toEqual(ceilingOf(true));
+    expect(refusalOf('unblock', 'labels')).toBeNull();
+  });
+
+  it('accepts ten in native mode, the eleven without unblock', () => {
+    expect(yesActionsFor('native')).toEqual(NATIVE_TEN);
+    expect(NATIVE_TEN.map((action) => readYesCeiling({ [YES_FLAG]: action }, USAGE, 'native')))
+      .toEqual(NATIVE_TEN.map((action) => [action]));
+  });
+
+  it('allows four with bare --yes in native mode, the five without unblock', () => {
+    expect(bareYesActionsFor('native')).toEqual(['sync', 'wait', 'plan', 'home']);
+    expect(readYesCeiling({ [YES_FLAG]: true }, USAGE, 'native')).toEqual(['sync', 'wait', 'plan', 'home']);
+  });
+
+  it('refuses a list naming unblock in native mode with exit 2, naming the mode and the ten', () => {
+    const alone = refusalOf('unblock', 'native');
+    const among = refusalOf('sync, unblock', 'native');
+
+    expect([alone?.exitCode, among?.exitCode]).toEqual([CEILING_REFUSAL_EXIT, CEILING_REFUSAL_EXIT]);
+    expect(alone?.message).toBe(`❌ --${YES_FLAG} names unblock, which is offered in labels mode only and`
+      + ' board.relationships is native: the tracker clears a blocker when it closes;'
+      + ` the ids are ${NATIVE_TEN.join(', ')}\nUsage: ${USAGE}`);
+    expect(among?.message).toBe(alone?.message);
+    expect(refusalOf(NATIVE_TEN.join(','), 'native')).toBeNull();
+  });
+
+  it('names the ten, not the eleven, when native mode refuses a word that is no id', () => {
+    expect(refusalOf('mrege', 'native')?.message).toBe(`❌ --${YES_FLAG} names "mrege", which is no step of rafa next;`
+      + ` the ids are ${NATIVE_TEN.join(', ')}\nUsage: ${USAGE}`);
+  });
+
+  it('still refuses the always-asked ids in native mode, with their own reasons', () => {
+    expect(refusalOf('ready', 'native')?.message).toBe(refusalOf('ready')?.message);
+    expect(refusalOf('merge-unchecked', 'native')?.message).toBe(refusalOf('merge-unchecked')?.message);
   });
 });

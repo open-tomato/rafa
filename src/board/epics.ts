@@ -10,11 +10,40 @@
  * and never stored, so nothing here spawns `gh`, reads git or opens a
  * file: {@link readEpics} is a pure function over the listing, the set of
  * claimed issue numbers and today's date, all handed in, and every case
- * in `./epics.test.ts` is a literal listing.
+ * in `./epics.test.ts` and `./epics-native.test.ts` is a literal listing.
+ *
+ * ## The mode
+ *
+ * Who is in an epic, in what order, and which epics its members wait on
+ * are relationships, and the board records them in the mode
+ * `board.relationships` names (`./relations/port.ts`). {@link readEpics}
+ * takes the board's port as {@link EpicsInput.relations}:
+ *
+ * - Left out, or in `labels` mode, the epics are read from the `epic:`
+ *   labels and `Blocked by:` lines as the next two sections spell it.
+ *   That reading IS the `labels` adapter's (`./relations/labels.ts`
+ *   wraps this function rather than reimplementing it), so the port is
+ *   not called back: its `blockersOf` reads a line only under
+ *   `spec:blocked` and without the listing's numbers, and routing the
+ *   blocked-by epics through it would change what `labels` mode prints.
+ * - In `native` mode the port's one reading over the listing answers
+ *   everything relational, and no `epic:` label, `spec:blocked` or
+ *   `Blocked by:` line is read. An epic's members are `membersOf`'s, the
+ *   rows whose `parent` is the epic, in its sub-issue order, and the
+ *   epic carries {@link Epic.order} `sub-issues` to say so. Its slug is
+ *   null: a native epic is named by its number and title. The epics it
+ *   waits on are read from its open members' `blockersOf`: each blocker
+ *   on this board whose `blockedBy` node reads `OPEN` and whose row the
+ *   listing holds is owned by the epic `epicOf` puts it in, or is one
+ *   itself when its row is typed `epic`. A foreign blocker owns no epic
+ *   on this board.
+ *
+ * The computed and stored states, the disagreement and lateness below
+ * read the members and not the mode, so both modes answer them alike.
  *
  * ## Membership is the label
  *
- * An issue is a member of the epic whose `epic:<slug>` label it carries.
+ * In `labels` mode, an issue is a member of the epic whose `epic:<slug>` label it carries.
  * {@link groupByEpicLabel} groups the listing by every `epic:` label an
  * issue carries, as the tracker reads a `type:` label: the prefix matched
  * as written and the slug taken exactly, since GitHub keeps no two labels
@@ -97,7 +126,7 @@
  *
  * ## Blocked by
  *
- * The epics an epic waits on are read from its OPEN members'
+ * In `labels` mode, the epics an epic waits on are read from its OPEN members'
  * `Blocked by:` lines with `readBlockedBy` (`./blocked.ts`), taken only
  * when a line reads `blocked` — a faulty line's ids are for printing,
  * not for acting on. Each named blocker that is open is owned by the
@@ -116,6 +145,7 @@
  * late.
  */
 import type { EpicBody } from './epic-body.js';
+import type { BoardRelations, RelationsReading } from './relations/port.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { BranchClaimReading } from './roadmap.js';
 
@@ -144,18 +174,34 @@ export interface EpicProgress {
   readonly notPlanned: number;
 }
 
+/**
+ * The part of the relationships port (`./relations/port.ts`) the epic
+ * readers ask: the mode, and the reads over one listing. A whole
+ * `BoardRelations`, as `selectBoardRelations` makes it, is one.
+ */
+export type EpicRelations = Pick<BoardRelations, 'mode' | 'read'>;
+
+/** How an epic's members are ordered: kept only in `native` mode, where the epic's sub-issue order is the order. */
+export type EpicOrder = 'sub-issues';
+
 /** One `type:epic` issue, read against the listing. */
 export interface Epic {
   /** The epic issue's number. */
   readonly number: number;
   /** The epic issue's title. */
   readonly title: string;
-  /** Its first `epic:` label's slug, or null when it carries none. */
+  /** Its first `epic:` label's slug, or null when it carries none, and always in `native` mode. */
   readonly slug: string | null;
   /** Its body, read; null when the listing failed. */
   readonly body: EpicBody | null;
-  /** Every issue carrying its `epic:<slug>` label, in ascending number. */
+  /**
+   * Its members: in `labels` mode every issue carrying its `epic:<slug>`
+   * label, in ascending number; in `native` mode every row whose `parent`
+   * is the epic, in its sub-issue order.
+   */
   readonly members: readonly BoardIssue[];
+  /** `sub-issues` in `native` mode, where {@link Epic.members} is in the epic's order; left out in `labels` mode. */
+  readonly order?: EpicOrder;
   /** The state computed from the members. */
   readonly state: EpicState;
   /** Why the state is `unknown`, or null when it is not. */
@@ -182,6 +228,8 @@ export interface EpicsInput {
   readonly claims: ReadonlySet<number>;
   /** Today, read as a local calendar day. */
   readonly today: Date;
+  /** The board's relationships; `labels` mode's reading when left out. See the module note. */
+  readonly relations?: EpicRelations;
 }
 
 /** Every epic on one listing, or the reason there is none to read. */
@@ -287,48 +335,116 @@ export function localDay(date: Date): string {
   return `${String(date.getFullYear())}-${month}-${day}`;
 }
 
-/** Everything the per-epic reading needs, taken once for a whole listing. */
+/**
+ * Where one mode reads an epic's slug, its members and the epics owning
+ * a member's blockers: taken once for a whole listing, so each epic's
+ * reading is a lookup.
+ */
+interface MembershipSource {
+  /** The epic's slug; null when it carries none, and always in `native` mode. */
+  readonly slugOf: (epic: BoardIssue) => string | null;
+  /** The epic's members, in the mode's order. */
+  readonly membersOf: (epic: BoardIssue, slug: string | null) => readonly BoardIssue[];
+  /** The epics owning an open blocker of `member`, in any order, repeats allowed. */
+  readonly blockerOwnersOf: (member: BoardIssue) => readonly number[];
+  /** Kept in `native` mode only; see {@link Epic.order}. */
+  readonly order?: EpicOrder;
+}
+
+/** Everything the per-epic reading needs besides its mode's source. */
 interface EpicsView {
-  readonly groups: ReadonlyMap<string, readonly BoardIssue[]>;
-  readonly byNumber: ReadonlyMap<number, BoardIssue>;
-  readonly epicsBySlug: ReadonlyMap<string, readonly number[]>;
-  readonly known: ReadonlySet<number>;
+  readonly source: MembershipSource;
   readonly claims: ReadonlySet<number>;
   readonly today: string;
 }
 
-/** The epics owning `blocker`: its slugs' epics, or itself when it is one. */
-function ownersOf(blocker: BoardIssue, view: EpicsView): readonly number[] {
+/** The slug an epic owns: its first `epic:` label's, or null for none. */
+function firstSlugOf(epic: BoardIssue): string | null {
+  return epicSlugsOf(epic.labels)[0] ?? null;
+}
+
+/** `labels` mode's source: the module note's `epic:` labels and `Blocked by:` lines. */
+function labelsSource(issues: readonly BoardIssue[], epicIssues: readonly BoardIssue[]): MembershipSource {
+  const groups = groupByEpicLabel(issues);
+  const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
+  const known = new Set(issues.map((issue) => issue.number));
+  const epicsBySlug = new Map<string, readonly number[]>();
+  for (const epic of epicIssues) {
+    const slug = firstSlugOf(epic);
+    if (slug !== null) epicsBySlug.set(slug, [...epicsBySlug.get(slug) ?? [], epic.number]);
+  }
+  const ownersOf = (blocker: BoardIssue): readonly number[] => blocker.type === 'epic'
+    ? [blocker.number]
+    : epicSlugsOf(blocker.labels).flatMap((slug) => epicsBySlug.get(slug) ?? []);
+
+  return {
+    slugOf: firstSlugOf,
+    membersOf: (_epic, slug) => slug === null
+      ? []
+      : groups.get(slug) ?? [],
+    blockerOwnersOf: (member) => {
+      const reading = readBlockedBy(member.number, member.body, known);
+      if (reading.kind !== 'blocked') return [];
+      return reading.blockers
+        .map((blocker) => byNumber.get(blocker))
+        .filter((blocker): blocker is BoardIssue => blocker?.state === 'OPEN')
+        .flatMap(ownersOf);
+    },
+  };
+}
+
+/** The epic owning local blocker row `blocker` in `native` mode: itself when it is one, else its parent epic. */
+function nativeOwnerOf(blocker: BoardIssue, reading: RelationsReading): readonly number[] {
   if (blocker.type === 'epic') return [blocker.number];
-  return epicSlugsOf(blocker.labels).flatMap((slug) => view.epicsBySlug.get(slug) ?? []);
+  const epic = reading.epicOf(blocker);
+  return epic.kind === 'epic'
+    ? [epic.epic]
+    : [];
+}
+
+/** `native` mode's source: the port's reading over the listing; see the module note. */
+function nativeSource(issues: readonly BoardIssue[], relations: EpicRelations): MembershipSource {
+  const reading = relations.read(issues);
+  const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
+  return {
+    slugOf: () => null,
+    membersOf: (epic) => reading.membersOf(epic).members,
+    blockerOwnersOf: (member) => {
+      const blockers = reading.blockersOf(member);
+      if (blockers.kind !== 'blocked') return [];
+      return blockers.blockers
+        .filter((blocker) => blocker.repository === null && blocker.state === 'OPEN')
+        .flatMap((blocker) => {
+          const row = byNumber.get(blocker.number);
+          return row === undefined
+            ? []
+            : nativeOwnerOf(row, reading);
+        });
+    },
+    order: 'sub-issues',
+  };
 }
 
 /** The epics owning an open blocker of one of `members` still open, `self` left out. */
-function blockedByOf(self: number, members: readonly BoardIssue[], view: EpicsView): readonly number[] {
+function blockedByOf(self: number, members: readonly BoardIssue[], source: MembershipSource): readonly number[] {
   const owners = members
     .filter((member) => member.state === 'OPEN')
-    .map((member) => readBlockedBy(member.number, member.body, view.known))
-    .filter((reading) => reading.kind === 'blocked')
-    .flatMap((reading) => reading.blockers)
-    .map((blocker) => view.byNumber.get(blocker))
-    .filter((blocker): blocker is BoardIssue => blocker?.state === 'OPEN')
-    .flatMap((blocker) => ownersOf(blocker, view))
+    .flatMap((member) => source.blockerOwnersOf(member))
     .filter((owner) => owner !== self);
   return Object.freeze([...new Set(owners)].sort((left, right) => left - right));
 }
 
 /** One `type:epic` issue read against the listing. */
 function epicOf(epic: BoardIssue, view: EpicsView): Epic {
-  const slug = epicSlugsOf(epic.labels)[0] ?? null;
-  const members = slug === null
-    ? []
-    : view.groups.get(slug) ?? [];
+  const { source } = view;
+  const slug = source.slugOf(epic);
+  const members = source.membersOf(epic, slug);
   const body = readEpicBody(epic.body);
   const progress = progressOf(members);
   const state = computedState(members, progress, view.claims);
   const stored = storedState(epic, members, view.claims);
 
-  return Object.freeze({
+  const read: Epic = {
     number: epic.number,
     title: epic.title,
     slug,
@@ -337,11 +453,14 @@ function epicOf(epic: BoardIssue, view: EpicsView): Epic {
     state,
     reason: null,
     progress,
-    blockedBy: blockedByOf(epic.number, members, view),
+    blockedBy: blockedByOf(epic.number, members, source),
     late: body.date !== null && body.date < view.today && state !== 'done',
     stored,
     disagreement: disagreementOf(epic.number, state, stored),
-  });
+  };
+  return Object.freeze(source.order === undefined
+    ? read
+    : { ...read, order: source.order });
 }
 
 /**
@@ -369,7 +488,12 @@ export function unknownEpic(number: number, reason: string): Epic {
 /**
  * Every `type:epic` issue on the listing, read. A failed listing (`issues`
  * null) answers no epics and its reason in {@link Epics.unknown}; ask
- * {@link unknownEpic} for one epic known by number. Never throws.
+ * {@link unknownEpic} for one epic known by number. Membership and the
+ * blocked-by epics are read in the mode `relations` answers, `labels`
+ * when it is left out; the module note holds both.
+ *
+ * Throws only what a `native` adapter's read throws: a `TypeError` for a
+ * listing read without the native fields. Never throws otherwise.
  */
 export function readEpics(input: EpicsInput): Epics {
   if (input.issues === null) {
@@ -379,20 +503,12 @@ export function readEpics(input: EpicsInput): Epics {
   const epicIssues = input.issues
     .filter((issue) => issue.type === 'epic')
     .sort((left, right) => left.number - right.number);
-  const epicsBySlug = new Map<string, readonly number[]>();
-  for (const epic of epicIssues) {
-    const slug = epicSlugsOf(epic.labels)[0];
-    if (slug !== undefined) epicsBySlug.set(slug, [...epicsBySlug.get(slug) ?? [], epic.number]);
-  }
+  const { relations } = input;
+  const source = relations === undefined || relations.mode === 'labels'
+    ? labelsSource(input.issues, epicIssues)
+    : nativeSource(input.issues, relations);
 
-  const view: EpicsView = {
-    groups: groupByEpicLabel(input.issues),
-    byNumber: new Map(input.issues.map((issue) => [issue.number, issue])),
-    epicsBySlug,
-    known: new Set(input.issues.map((issue) => issue.number)),
-    claims: input.claims,
-    today: localDay(input.today),
-  };
+  const view: EpicsView = { source, claims: input.claims, today: localDay(input.today) };
   return Object.freeze({
     epics: Object.freeze(epicIssues.map((epic) => epicOf(epic, view))),
     unknown: null,

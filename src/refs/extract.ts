@@ -99,13 +99,33 @@
  * ## Duplicates and blockers
  *
  * A reference is read once per kind and text, at the first line that
- * names it. A target named on the body's `Blocked by:` line is marked
- * {@link Ref.blocker}, wherever it was first read, so the `resolved`
- * state can be asked of it. Which line that is, and which of its ids
- * are local, is `src/board/blocked.ts`'s reading, taken whole so that
- * the field has one spelling across rafa.
+ * names it. A target the spec waits on is marked {@link Ref.blocker},
+ * wherever it was first read, so the `resolved` state can be asked of
+ * it (`./stamp.ts`). What the spec waits on is the board's
+ * relationships port's reading (`src/board/relations/port.ts`), in the
+ * mode `board.relationships` names, handed in as a `BlockersReading`:
+ *
+ *  - Left out, the mode is `labels`, and the reading is the body's own
+ *    `Blocked by:` line (`labelsLineBlockersOf`,
+ *    `src/board/relations/labels.ts`), whatever the issue's labels. A
+ *    line that is one of the four faults still marks every id and
+ *    `owner/repo#<n>` token it names, as the line read before the port
+ *    did; a body with no line marks nothing.
+ *  - In `native` mode the caller hands the port's `blockersOf` reading
+ *    of the spec's issue, and each `blockedBy` node marks `#<n>` (and
+ *    `rafa-<n>`) for this board's issue, `owner/name#<n>` for another
+ *    repository's. The body's `Blocked by:` line is not read then: only
+ *    the configured mode is. A truncated reading marks the nodes it
+ *    holds, and nothing past them.
+ *
+ * A local id is matched as written, so `#07` is not `#7`, as before the
+ * port; an `owner/repo#<n>` token is matched by its repository as
+ * written and its number read as a number, since a `blockedBy` node
+ * names a number and not a token.
  */
-import { readBlockedBy } from '../board/blocked.js';
+import type { BlockersReading } from '../board/relations/port.js';
+
+import { labelsLineBlockersOf } from '../board/relations/labels.js';
 import { SETTINGS } from '../config-schema.js';
 
 /** What a reference points at. */
@@ -133,7 +153,7 @@ export interface Ref {
   readonly text: string;
   /** The 1-based line of the text it was first read on. */
   readonly line: number;
-  /** True when the body's `Blocked by:` line names it. */
+  /** True when the spec waits on it, as the module note reads it. */
   readonly blocker: boolean;
 }
 
@@ -366,15 +386,32 @@ function lineRefs(line: string): readonly Found[] {
   return found;
 }
 
-/** The texts the body's `Blocked by:` line names: `#7` and `owner/repo#7` alike. */
-function blockerTexts(text: string): ReadonlySet<string> {
-  const read = readBlockedBy(0, text);
-  return new Set([...read.blockers.map((id) => `#${String(id)}`), ...read.foreign]);
+/** `owner/repo#7` with its number read as a number, the key a foreign blocker is matched by. */
+function foreignKey(repository: string, number: string | number): string {
+  return `${repository}#${String(Number(number))}`;
 }
 
-/** True when `found` is a target the `Blocked by:` line names. */
+/** An `owner/repo#<n>` token's key, split at its last `#`. */
+function foreignTokenKey(token: string): string {
+  const hash = token.lastIndexOf('#');
+  return foreignKey(token.slice(0, hash), token.slice(hash + 1));
+}
+
+/** The keys `reading` names: `#7` for this board's issue, {@link foreignKey}'s for another's. */
+function blockerKeys(reading: BlockersReading): ReadonlySet<string> {
+  if (reading.kind === 'none') return new Set();
+  if (reading.kind === 'fault') {
+    const { blockers, foreign } = reading.line;
+    return new Set([...blockers.map((id) => `#${String(id)}`), ...foreign.map(foreignTokenKey)]);
+  }
+  return new Set(reading.blockers.map((blocker) => blocker.repository === null
+    ? `#${String(blocker.number)}`
+    : foreignKey(blocker.repository, blocker.number)));
+}
+
+/** True when `found` is a target `blockers` names. */
 function isBlocker(found: Found, blockers: ReadonlySet<string>): boolean {
-  if (found.kind === 'cross-issue') return blockers.has(found.text);
+  if (found.kind === 'cross-issue') return blockers.has(foreignTokenKey(found.text));
   if (found.kind !== 'issue') return false;
   return blockers.has(`#${found.text.replace(/^(?:#|rafa-)/u, '')}`);
 }
@@ -384,12 +421,14 @@ function isBlocker(found: Found, blockers: ReadonlySet<string>): boolean {
  * line that names it, in the order the text first names them.
  *
  * `text` is a spec's or a bug's body as written; line numbers count its
- * own lines, CRLF or LF alike. Never throws: text that names nothing
- * answers an empty list. The module note holds what is read, what is
- * skipped and why.
+ * own lines, CRLF or LF alike. `blockers` is what the spec waits on, as
+ * the relationships port read it; left out, it is the `labels` reading
+ * of `text`'s own `Blocked by:` line. Never throws: text that names
+ * nothing answers an empty list. The module note holds what is read,
+ * what is skipped and why.
  */
-export function extractRefs(text: string): readonly Ref[] {
-  const blockers = blockerTexts(text);
+export function extractRefs(text: string, blockers?: BlockersReading): readonly Ref[] {
+  const waitsOn = blockerKeys(blockers ?? labelsLineBlockersOf(0, text));
   const seen = new Set<string>();
   const refs: Ref[] = [];
 
@@ -398,7 +437,7 @@ export function extractRefs(text: string): readonly Ref[] {
       const id = `${found.kind}:${found.text}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      refs.push(Object.freeze({ ...found, line: line.number, blocker: isBlocker(found, blockers) }));
+      refs.push(Object.freeze({ ...found, line: line.number, blocker: isBlocker(found, waitsOn) }));
     }
   }
 

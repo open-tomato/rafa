@@ -47,6 +47,19 @@
  *     collaborators path; `config-sections.ts` records what that
  *     narrower shape refuses and why.
  *
+ * `board.relationships` names where the board's epics and blockers
+ * live: `labels`, the `epic:` labels, `spec:blocked` and `Blocked by:`
+ * lines rafa has always read, or `native`, GitHub's sub-issue parent
+ * and blocked-by links. `.rafa/specs/rafa-340-relationships-epics-
+ * blockers-github.md` has the two as modes beside each other, only the
+ * configured one ever read. Two readings it leaves:
+ *
+ *   - It defaults to `labels`, so a project that never names the key
+ *     reads and writes its board exactly as before the key existed.
+ *   - It is no `CommandLineSetting`, for the reason the `pr` section
+ *     gives, and more: the mode says where a board's links are stored,
+ *     so a run that read one board in the other mode would find none.
+ *
  * ## The `roadmap` section
  *
  * `.rafa/specs/rafa-20-pr-commands.md` has `plan create --next` read its

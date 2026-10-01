@@ -7,7 +7,7 @@
  * `src/start.ts`, `src/start/run-config.ts`, `src/start/run-setup.ts`,
  * `src/start/session.ts`, `src/start/pause.ts`,
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
- * `src/start/wrap-up.ts`, `src/start/dispatch.ts`,
+ * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
@@ -21,7 +21,7 @@
  * ## The release lines
  *
  * A run that reaches its wrap-up now runs the release around that
- * session (`src/start.ts`), and no scratch repository here carries a
+ * session (`src/start/wrap-up-run.ts`), and no scratch repository here carries a
  * `package.json` or a `CHANGELOG.md`, so every such run writes the
  * three lines of {@link NO_RELEASE_PREPARED}, {@link
  * NO_RELEASE_REPORTED} and {@link NO_RELEASE_BODY}: step 1 saying it
@@ -172,6 +172,7 @@ const ROUTED_MODULES: string[] = [
   'preflight/run.ts',
   'start/commit.ts',
   'start/wrap-up.ts',
+  'start/wrap-up-run.ts',
   'start/promoted-check.ts',
   'start/dispatch.ts',
   'start/triage.ts',
@@ -282,6 +283,19 @@ const NO_REPORT_WARNING = /^warn: {3}No task report: .+; recorded as telemetry$/
 /** The line naming the commit a task's work made, its sha abbreviated. */
 const COMMITTED_LINE = /^info: {3}Committed [0-9a-f]{7} .+$/;
 
+/**
+ * A runner suite step's line, `label` naming the step. The scratch
+ * project holds no test file, so Bun answers exit 1 and no summary
+ * line, which the step reads as green.
+ */
+function suiteStepLine(label: string): RegExp {
+  return new RegExp(`^🧪 ${label}: bun test .+ exited 1; no summary line$`);
+}
+
+/** The baseline the first dispatch runs, and the step run before the wrap-up. */
+const BASELINE_LINE = suiteStepLine('suite baseline');
+const PRE_WRAP_UP_LINE = suiteStepLine('pre-wrap-up step');
+
 /** How long a case may run, over the kill below. */
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -383,7 +397,10 @@ function plant(planting: Planting): Scratch {
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, claude, callLog, path: [bin, dirname(gitBinary)].join(delimiter) };
+  // The runner's suite steps spawn `bun test` themselves, so bun must resolve in the child.
+  const bunBinary = Bun.which('bun');
+  if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
+  return { repo, home, claude, callLog, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
 }
 
 /**
@@ -580,6 +597,8 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
     ['warn', `\n⚠️  The plan holds ${issues.length} part(s) the loop does not read as written:`],
     ...issues.map((issue) => ['warn', `   line ${issue.line}: ${issue.text}`] as const),
     ['info', `📋 Creating new plan tracker at PLAN_TRACKER-${STUB}.md...`],
+    ['info', BASELINE_LINE],
+    ['info', PRE_WRAP_UP_LINE],
     ['info', '\n✅ All tasks completed!'],
     ['info', WRAP_UP_STARTING],
     ['info', WRAP_UP_QUIET],
@@ -728,6 +747,8 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:✅ Task done: ${TASK}`,
       expect.stringMatching(COMMITTED_LINE),
       expect.stringMatching(NO_REPORT_WARNING),
+      expect.stringMatching(/^info:🧪 task step after .+ exited 1; no summary line$/),
+      expect.stringMatching(/^info:🧪 pre-wrap-up step: .+ exited 1; no summary line$/),
       'info:\n✅ All tasks completed!',
       `info:${WRAP_UP_STARTING}`,
       `info:${WRAP_UP_QUIET}`,
@@ -751,7 +772,8 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
     expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
     expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
     expect(run.stdout.split(SESSION_STDOUT)).toHaveLength(3);
-    expect(run.stdout).not.toContain('step: ');
+    // Read per line: the runner's `🧪 pre-wrap-up step: ...` line carries the words mid-line.
+    expect(run.stdout.split('\n').filter((line) => line.startsWith('step: '))).toEqual([]);
     expect(run.stdout.split('\n').filter((line) => line.startsWith('{'))).toEqual([]);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');
   }, RUN_TIMEOUT);

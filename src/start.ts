@@ -145,6 +145,22 @@
  * A store the loop cannot read or write stops the run: before a dispatch,
  * nothing is dispatched; after a task, its commit and its mark stand.
  *
+ * The runner runs the slower tests itself, as recorded steps of the run
+ * (`start/suite-steps-run.ts` over `start/suite-step.ts`), each appended
+ * to the run record's `steps` before the loop acts on it. Past the loop
+ * guard and ahead of rendering `progress.txt`, the first session of the
+ * run, task or wrap-up, is preceded by the suite baseline: the one
+ * stored beside the tracker, or the full suite at HEAD. Before each task
+ * every stage step due runs, the step after a stage's last task and the
+ * catch-up for one that never ran; before the wrap-up, the full suite
+ * runs as the pre-wrap-up step. Once a task is committed `done` and its
+ * report stored, the task step runs over what it changed since the
+ * commit it was dispatched on, the base its prompt names. A step with
+ * failures the baseline does not hold is red: it writes its blocker on
+ * the next open task, when one is left, and the run stops as it does
+ * after a blocked task, so the next run retries that task handed the
+ * failing files. A red pre-wrap-up step stops the run before the wrap-up.
+ *
  * After each task's report is stored, and so after its commit and its
  * mark, the run's triage acts on it (`start/triage.ts`): the report's
  * blocker text goes onto the task's tracker line, for that task's next
@@ -199,7 +215,8 @@
  *               before escalating (default 2; 0 disables repair but
  *               still reports the verdict).
  *
- * After the last task the loop runs a wrap-up session (`start/wrap-up.ts`:
+ * After the last task the loop runs its wrap-up branch
+ * (`start/wrap-up-run.ts`): a wrap-up session (`start/wrap-up.ts`:
  * promote findings, sync with main, commit, push, open or update the PR)
  * and then WAITS on that PR's checks (`start/pr-lifecycle.ts`). A
  * conflicting PR gets no CI run at all, so without this last stage the
@@ -220,7 +237,8 @@
  *
  * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
- * `start/triage.ts`, `start/release-stage.ts` and `start/wrap-up.ts` write goes
+ * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
+ * `start/suite-step.ts` and `start/suite-steps-run.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -249,8 +267,8 @@
  * which the dispatcher writes to stderr in text mode as the loop printed
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
- * A failed task, a blocked one, a checkout that moved and a report left
- * unstored still stop the run by returning, which the dispatcher ends as a success, with exit
+ * A failed task, a blocked one, a checkout that moved, a report left
+ * unstored and a red suite step still stop the run by returning, which the dispatcher ends as a success, with exit
  * code 0. A triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
@@ -272,16 +290,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
-import { readDeviceStoreId } from './claims/device.js';
 import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
-import { resolvePrProvider } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
 import {
   advanceExpectation,
-  expectWrapUpCommits,
   haltIfCheckoutMoved,
   haltIfWrapUpMoved,
   openCheckoutExpectation,
@@ -295,11 +310,9 @@ import {
 } from './start/dispatch.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
-import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './start/pr-lifecycle.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
 import { createStartPreflightDrift } from './start/preflight-drift.js';
 import { runStartPreflight } from './start/preflight.js';
-import { finishRelease, prepareReleaseStage } from './start/release-stage.js';
 import { announceRiskTotal } from './start/risk-total.js';
 import { settleRunCheckout } from './start/run-checkout.js';
 import {
@@ -318,8 +331,9 @@ import {
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
+import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { createStartTriage } from './start/triage.js';
-import { preserveProgress } from './start/wrap-up.js';
+import { runWrapUp } from './start/wrap-up-run.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
@@ -494,6 +508,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // Resolves no tracker here: the chain waits for the first public bug.
     const triageTask = createStartTriage({ repoRoot, config: runConfig.config });
 
+    // The runner's suite steps around the sessions (`start/suite-steps-run.ts`):
+    // `bun test` run here, in the checkout, and recorded on the run record.
+    const suiteSteps = createRunSuiteSteps({
+      repoRoot,
+      checkout,
+      trackerPath,
+      sessionId: session.id,
+      settings: runConfig.config,
+      planContent,
+    });
+
     // Initialize tracker only if it doesn't exist
     if (!fs.existsSync(trackerPath)) {
       activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -526,76 +551,41 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         : haltIfWrapUpMoved({ expected, before: 'dispatch' });
       if (moved) return;
 
+      // The baseline at the first dispatch, then the stage steps due
+      // before a task or the pre-wrap-up step before the wrap-up. A red
+      // one has blocked the next open task, when one is left, and stops
+      // the run as a blocked task does.
+      if (!(await suiteSteps.beforeSession(taskInfo))) return;
+      if (interrupted) break;
+
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
 
       if (!taskInfo) {
-        session.wrapUpStarted();
-        activeOutput().info('\n✅ All tasks completed!');
-        activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
-        activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
-        // Step 1 of the release, written BEFORE the session that
-        // rewrites it (`start/release-stage.ts`), and handed to the
-        // session as the record its prompt's release bullets are built
-        // from. A preparation of null is the stage having failed to run
-        // at all, and the wrap-up carries on without a release.
-        const release = prepareReleaseStage({
+        // The wrap-up, the release around it and the CI gate
+        // (`start/wrap-up-run.ts`); the loop ends however it returns.
+        await runWrapUp({
+          session,
           repoRoot,
           checkout,
           settings: runConfig.config,
           planStub,
           planContent,
+          settingSources,
+          serving,
+          wrapUpLearning,
+          expected,
+          ciWait,
+          ciTimeoutMin,
+          ciAttempts,
         });
-        await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
-        // The loop guard before the loop's own release commit, against the
-        // HEAD the wrap-up session's commits left on the run's branch: a
-        // moved branch or a gone checkout skips the commit, push and wait.
-        if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) return;
-        // Step 3, over that same record, after the session has returned
-        // and BEFORE the CI gate: the verification, the restore on a
-        // refusal, the `chore: release fragment` commit, its push and the
-        // forecast. A fragment pushed after the wait started would be a
-        // commit those checks never read, and the wait would then report
-        // on a head the release moved.
-        // The reading that decides whether the sentence or the forecast
-        // reaches a pull request body at all is made here too, and for the same
-        // reason: the run's `pr.provider` lives in this config, and a
-        // repository resolving to `none` has no pull request to carry it
-        // (`start/release-stage.ts`).
-        await finishRelease(
-          { repoRoot: checkout, settings: runConfig.config, preparation: release },
-          {
-            readProvider: () => resolvePrProvider({
-              configured: runConfig.config.prProvider ?? null,
-              dir: checkout,
-            }),
-          },
-        );
-        if (ciWait) {
-          await verifyPullRequest(
-            Math.max(1, ciTimeoutMin) * 60_000,
-            Math.max(0, ciAttempts),
-            settingSources,
-            // The gate takes its own path when this reads `none`: the
-            // branch pushed, the compare URL printed and no CI wait
-            // (`start/pr-lifecycle.ts`). The reading is made here
-            // because the run's `pr.provider` lives in this config.
-            {
-              ...prLifecycleSeamsIn(checkout),
-              readProvider: () => resolvePrProvider({
-                configured: runConfig.config.prProvider ?? null,
-                dir: checkout,
-              }),
-              // A refused push reads this device's store id from the
-              // project root, where the store lives, not the checkout.
-              readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, runConfig.config)),
-            },
-          );
-        }
-        session.finished();
         break;
       }
 
+      // The HEAD the checkout is held to is the task's base commit: the
+      // session runs `bun test --changed=<base>` against it, and the task
+      // step runs over what the task changed since it.
+      const base = expected.head;
       session.taskStarted(taskInfo);
       const dispatch = await dispatchTask({
         taskInfo,
@@ -609,6 +599,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         knownMissing,
         serving,
         handout,
+        base,
       });
       const { exitCode } = dispatch;
 
@@ -666,6 +657,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');
         return;
       }
+
+      // The task step over what the task changed since its base; a red
+      // one has blocked the next open task, and stops the run.
+      if (!(await suiteSteps.afterTask(taskInfo, base))) return;
 
       const shouldPause = await checkUsage('task');
       if (shouldPause) {

@@ -373,7 +373,7 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * release bullet of any kind ({@link buildWrapUpPrompt}). It is handed
  * over rather than prepared here because the loop verifies and commits
  * the same record after this session returns: a preparation made
- * inside this function would leave `start.ts` nothing to finish.
+ * inside this function would leave `start/wrap-up-run.ts` nothing to finish.
  *
  * `serving` is what the session is served against (`start/serving.ts`),
  * as a task session is: the run's served directory is filled just

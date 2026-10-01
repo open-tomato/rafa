@@ -28,6 +28,12 @@
  * when both are empty or blank, each unchanged case paired with a
  * rendered section that changes it.
  *
+ * Also for the task's base commit reaching the prompt: `buildTaskPrompt`
+ * placing the line naming `bun test --changed=<base>` after the blocker
+ * line and ahead of the sections, no line for a null base, and a base
+ * that is not a commit name refused; and `dispatchTask` handing the
+ * runner the prompt its `base` option put that line in.
+ *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
  * in `tests/task-report.test.ts`. Every store here sits under a fresh root
@@ -58,7 +64,14 @@ import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
-import { buildTaskPrompt, dispatchTask, NO_TASK_SECTIONS, renderProgressForDispatch, storeTaskReport } from './dispatch.js';
+import {
+  BASE_PROMPT_PREFIX,
+  buildTaskPrompt,
+  dispatchTask,
+  NO_TASK_SECTIONS,
+  renderProgressForDispatch,
+  storeTaskReport,
+} from './dispatch.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -347,6 +360,7 @@ describe('dispatchTask, serving its session', () => {
       settingSources: ['project', 'local'],
       serving,
       handout: null,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });
@@ -478,6 +492,7 @@ describe('dispatchTask, handing its task out', () => {
       settingSources: ['project', 'local'],
       serving,
       handout,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });
@@ -616,6 +631,7 @@ describe('dispatchTask, one fixture task under each resolver', () => {
       settingSources: ['project', 'local'],
       serving,
       handout: given,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });
@@ -714,6 +730,7 @@ describe('dispatchTask, lessons matched by artifact path', () => {
       settingSources: ['project', 'local'],
       serving: null,
       handout: given,
+      base: null,
       run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
       newSessionId: () => 'session-under-test',
     });
@@ -988,6 +1005,90 @@ describe('buildTaskPrompt, placing the task\'s sections', () => {
   });
 });
 
+describe('buildTaskPrompt and dispatchTask, handing the task its base commit', () => {
+  const TASK = 'Make the widget round';
+  const PROMPT_MD = '# PROMPT.md\nDo the task.';
+  const PLAN = '# Plan\n- [ ] Make the widget round';
+  const BASE = 'a5a383a0c3f1e2d4b6a798011223344556677889';
+  const BASE_LINE = `${BASE_PROMPT_PREFIX}${BASE}: run \`bun test --changed=${BASE}\` for the tests your changes reach.`;
+  const BEFORE = buildTaskPrompt(TASK, PROMPT_MD, PLAN);
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('holds the prompt unchanged for a null base, against a base that changes it', () => {
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, null)).toBe(BEFORE);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE)).not.toBe(BEFORE);
+  });
+
+  it('names the base and bun test --changed=<base> on the third line, with no blocker', () => {
+    const lines = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE).split('\n');
+
+    expect(lines[0]).toBe(`Your scoped task is: ${TASK}`);
+    expect(lines[2]).toBe(BASE_LINE);
+    expect(lines[2]).toContain(`\`bun test --changed=${BASE}\``);
+    expect(lines[3]).toBe('');
+  });
+
+  it('places the base line after the blocker line and ahead of the sections', () => {
+    const skills = renderSkillsSection([{
+      name: 'git-workflow',
+      source: 'project',
+      path: '/project/skills/git-workflow/SKILL.md',
+      description: 'Use when pushing a branch',
+    }], 'add-dir');
+    const lines = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], 'hook refused', { skills, lessons: '' }, BASE).split('\n');
+
+    expect(lines[2]?.startsWith('An earlier run of this task left it blocked on: ')).toBe(true);
+    expect(lines[3]).toBe(BASE_LINE);
+    expect(lines[4]).toBe('');
+    expect(lines[5]).toBe('## Skills for this task');
+  });
+
+  it('takes an abbreviated commit name', () => {
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, 'a5a383a')).toContain('--changed=a5a383a`');
+  });
+
+  it('refuses a base that is not a commit name, which the line would paste into a shell command', () => {
+    for (const base of ['', 'HEAD', 'origin/main', 'a5a383a; rm -rf .', 'A5A383A']) {
+      expect(() => buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, base)).toThrow('is not a commit name');
+    }
+  });
+
+  it('hands the runner a prompt naming the base its dispatch was given', async () => {
+    const root = freshRoot();
+    const prompts: string[] = [];
+    const run: TaskSessionRunner = (prompt) => {
+      prompts.push(prompt);
+      return Promise.resolve({ exitCode: 0, stdout: '' });
+    };
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (base: string | null): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      base,
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+
+    const based = await dispatchWith(BASE);
+    const unbased = await dispatchWith(null);
+
+    expect(based.prompt).toBe(prompts[0] ?? '');
+    expect(based.prompt).toContain(`\`bun test --changed=${BASE}\``);
+    expect(unbased.prompt).not.toContain('--changed=');
+  });
+});
+
 describe('dispatchTask and renderProgressForDispatch, in the run\'s checkout', () => {
   /** A session output whose report holds one finding, so the render has a line to write. */
   const FOUND = REPORTED.replace(
@@ -1020,6 +1121,7 @@ describe('dispatchTask and renderProgressForDispatch, in the run\'s checkout', (
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run,
       newSessionId: () => 'session-under-test',
     });

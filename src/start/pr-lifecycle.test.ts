@@ -960,24 +960,32 @@ describe('prLifecycleSeamsIn', () => {
   });
 });
 
-describe('the gate as start() calls it', () => {
+describe('the gate as start() calls it, through runWrapUp', () => {
+  /** `start/wrap-up-run.ts`, where the loop's one call to the gate sits. */
+  const wrapUpRun = (): string => readFileSync(new URL('./wrap-up-run.ts', import.meta.url), 'utf8');
+
+  /** The gate's call as the module writes it, up to its closing `);`. */
+  const gateCall = (source: string): string => {
+    const opening = 'await verifyPullRequest(';
+    return source.slice(source.indexOf(opening), source.indexOf(');', source.indexOf(opening)));
+  };
+
   it('hands it the setting sources the run resolved', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
-    const opening = 'await verifyPullRequest(';
-    const call = start.slice(start.indexOf(opening), start.indexOf(');', start.indexOf(opening)));
+    const source = wrapUpRun();
 
     // One call, handed the value the run config resolved, which is the
     // only reading of that argument: every `rafa start` the suite runs
     // passes `--no-ci-wait`, and the cases above call the gate directly.
-    expect(start.split(opening).length - 1).toBe(1);
-    expect(call).toContain('settingSources,');
+    expect(source.split('await verifyPullRequest(').length - 1).toBe(1);
+    expect(start.split('await verifyPullRequest(').length - 1).toBe(0);
+    expect(gateCall(source)).toContain('settingSources,');
     expect(start).toContain('const { inject: injectMode, settingSources } = runConfig.config;');
+    expect(start).toContain('await runWrapUp({');
   });
 
   it('hands it the seams of the run\'s checkout, and reads the provider there', () => {
-    const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
-    const opening = 'await verifyPullRequest(';
-    const call = start.slice(start.indexOf(opening), start.indexOf(');', start.indexOf(opening)));
+    const call = gateCall(wrapUpRun());
 
     expect(call).toContain('...prLifecycleSeamsIn(checkout),');
     expect(call).toContain('dir: checkout,');
@@ -986,10 +994,10 @@ describe('the gate as start() calls it', () => {
 
   it('reads a refused push in the checkout, and the store id at the project root under the run\'s store', () => {
     const start = readFileSync(new URL('../start.ts', import.meta.url), 'utf8');
-    const opening = 'await verifyPullRequest(';
-    const call = start.slice(start.indexOf(opening), start.indexOf(');', start.indexOf(opening)));
 
-    expect(call).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, runConfig.config)),');
+    expect(gateCall(wrapUpRun())).toContain('readRefusedPush: refusedPushReaderIn(checkout, () => readDeviceStoreId(repoRoot, settings)),');
+    // The `settings` read there is the run's own config, as `start()` hands it over.
+    expect(start).toContain('settings: runConfig.config,');
   });
 });
 

@@ -149,6 +149,7 @@ async function dispatchAndRead(line: string, resolver: TaskHandout['resolver'], 
     settingSources: ['project', 'local'],
     serving,
     handout: handout(resolver),
+    base: null,
     run,
     newSessionId: () => sessionId,
   });

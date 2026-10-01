@@ -1,0 +1,11 @@
+Roadmap #1 · now
+   #  state        done/total  blocked  date  title
+#100  in-progress  1/2         -        -     Relations epic
+      #101  closed  Epic member, already done
+      #102  open    Epic member, ready
+
+Roadmap #1 · no epic
+   #  state  type  spec  blocked by                                           has  refs  title
+#150  open   code  📝    🔴 #151 ❔ external-owner/external-repo#999 🟢 #152  -    -     Blocked on two locals and a foreign token
+spec:        📝 outline only
+blocked by:  🔴 still open  ❔ state unknown  🟢 closed

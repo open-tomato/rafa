@@ -120,6 +120,7 @@ export type {
 } from './adapters/registry.js';
 export type { ConfigRoots } from './config-load.js';
 export type {
+  BoardRelationshipMode,
   ClaudeSettingSource,
   CommandLineSetting,
   ConfigExtra,
@@ -248,6 +249,7 @@ export type {
 export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
 export { loadConfig, readConfigFile } from './config-load.js';
 export {
+  BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,

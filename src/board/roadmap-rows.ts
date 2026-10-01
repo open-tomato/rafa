@@ -12,8 +12,10 @@
  *    with {@link parseRoadmapBody} (`./roadmap.ts`); see "Which board";
  *  - `spec`: {@link findReadinessGaps} and {@link hasSpecReadyLabel}
  *    (`./readiness.ts`), the two functions `issue ready` calls;
- *  - `blocked by`: {@link readBlockedBy} (`./blocked.ts`), with each
- *    blocker's state taken off the board listing rather than asked for;
+ *  - `blocked by`: in `labels` mode {@link readBlockedBy} (`./blocked.ts`),
+ *    with each blocker's state taken off the board listing rather than
+ *    asked for; in `native` mode the relationships port's `blockersOf`
+ *    (`./relations/port.ts`), each state off its `blockedBy` node;
  *  - `has`: {@link stubOfPlanFile} over the plan dir's file names, the
  *    branch scan {@link scanClaimBranches} with {@link branchClaims}, and
  *    the open pull request list with {@link closedIssuesIn};
@@ -100,14 +102,33 @@
  *
  * ## The blocked by column
  *
- * The first `Blocked by:` line, read with the board's numbers as
+ * Read in the mode {@link RoadmapRowsOptions.relations} answers,
+ * `labels` when it is left out, and only in that mode: a `native` board's
+ * `Blocked by:` lines, and a `labels` board's `blockedBy` links, are
+ * `rafa doctor`'s to name.
+ *
+ * In `labels` mode, the port is not asked. The column is the first
+ * `Blocked by:` line, read with the board's numbers as
  * `known`. Each local blocker is `#n open` or `#n closed` by the
  * listing's own state, and `#n unknown` when the listing has no such
  * issue; each `owner/repo#n` is printed as written with state
  * `unknown`, since this board cannot answer for another. The line is
  * read whatever the labels say and whatever kind the reading is: the
  * column shows what the line NAMES, and {@link RoadmapRow.blocked}
- * carries the reading itself for a caller that reports faults.
+ * carries the reading itself for a caller that reports faults. The
+ * port's `labels` reading is not this one: it reads a line only under
+ * `spec:blocked` and without the board's numbers, so asking it would
+ * change what the column prints.
+ *
+ * In `native` mode the column is the port's one reading over the
+ * listing: each `blockedBy` node, in the order `gh` answered them, `#n`
+ * on this board and `owner/name#n` on another, each `open` or `closed`
+ * as its node reads, whatever it closed as. Nothing is asked per
+ * blocker, and a foreign blocker's state is read as a local one's is.
+ * There is no line, so {@link RoadmapRow.blocked} is null. A node list
+ * `gh` cut short ({@link BlockersReading} `truncated`) is one warning
+ * per issue naming GitHub's count, since the column names only the
+ * nodes answered.
  *
  * ## The has column
  *
@@ -163,11 +184,18 @@
  *  - {@link RoadmapRefs} rejecting: one warning, and every `refs` cell
  *    empty. The saved copies are local, so the board being unreachable
  *    does not stop them being read.
+ *
+ * The one throw past the Roadmap read is the `native` adapter's
+ * `TypeError` for a listing read without the native fields: that is a
+ * listing asked for in the wrong mode, not a reading that failed, and
+ * reading it as a board with no blocker would hide it.
  */
 import type { BlockedReading } from './blocked.js';
 import type { BoardLister } from './boards.js';
+import type { EpicRelations } from './epics.js';
 import type { SpecIssueReader } from './issue.js';
 import type { ReadinessGap } from './readiness.js';
+import type { BlockersReading } from './relations/port.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapLine, RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { GitRunner } from '../pr/git.js';
@@ -235,7 +263,7 @@ export interface RoadmapRow {
   readonly issue: BoardIssue | null;
   /** The `spec` column, or null with no issue to read. */
   readonly spec: SpecReading | null;
-  /** The `Blocked by:` reading, or null with no issue to read. */
+  /** The `Blocked by:` reading, or null with no issue to read, and always in `native` mode. */
   readonly blocked: BlockedReading | null;
   /** The `blocked by` column: empty with no issue or no line. */
   readonly blockers: readonly BlockerCell[];
@@ -310,6 +338,8 @@ export interface RoadmapRowsOptions {
   readonly all?: boolean;
   /** The project root whose position file names the current place; left out, the default board is read. */
   readonly root?: string;
+  /** The board's relationships, which read the `blocked by` column; `labels` mode when left out. See the module note. */
+  readonly relations?: EpicRelations;
 }
 
 /** What {@link readLineRows} is made with: every seam of {@link RoadmapRowsOptions} but the five the Roadmap is found through. */
@@ -435,6 +465,22 @@ export function readBlockersColumn(
   return Object.freeze([...local, ...foreign]);
 }
 
+/** The `blocked by` column for one `native` reading: each node in `gh`'s order, its state off the node. */
+export function readNativeBlockersColumn(reading: BlockersReading): readonly BlockerCell[] {
+  if (reading.kind !== 'blocked') return Object.freeze([]);
+  return Object.freeze(reading.blockers.map((blocker): BlockerCell => Object.freeze({
+    reference: `${blocker.repository ?? ''}#${String(blocker.number)}`,
+    state: stateWord(blocker.state ?? undefined),
+  })));
+}
+
+/** The warning a `native` reading `gh` cut short is carried as, or null when it was read whole. */
+export function truncatedBlockersWarning(reading: BlockersReading): string | null {
+  if (reading.kind !== 'blocked' || reading.truncated === undefined) return null;
+  return `#${String(reading.issue)} is blocked by ${String(reading.truncated.total)} issues, more than the board read answered,`
+    + ` so its blocked by column names the first ${String(reading.blockers.length)}`;
+}
+
 /** The `blocked by` cell as printed: `#24 open, #26 closed`. */
 export function blockersText(cells: readonly BlockerCell[]): string {
   return cells.map((cell) => `${cell.reference} ${cell.state}`).join(', ');
@@ -524,16 +570,33 @@ interface BoardView {
   readonly byNumber: ReadonlyMap<number, BoardIssue>;
   readonly states: ReadonlyMap<number, BoardIssueState>;
   readonly known: ReadonlySet<number>;
+  /** The port's `blockersOf` over the listing in `native` mode; null in `labels` mode, which reads the line. */
+  readonly blockersOf: ((issue: BoardIssue) => BlockersReading) | null;
 }
 
-/** The listing indexed, or null when it failed. */
-function viewOf(issues: readonly BoardIssue[] | null): BoardView | null {
+/** The listing indexed, or null when it failed; read through `relations` when they are `native`. */
+function viewOf(issues: readonly BoardIssue[] | null, relations: EpicRelations | undefined): BoardView | null {
   if (issues === null) return null;
   return {
     byNumber: new Map(issues.map((issue) => [issue.number, issue])),
     states: new Map(issues.map((issue) => [issue.number, issue.state])),
     known: new Set(issues.map((issue) => issue.number)),
+    blockersOf: relations === undefined || relations.mode === 'labels'
+      ? null
+      : relations.read(issues).blockersOf,
   };
+}
+
+/** One warning per issue on `rows` whose `native` reading was cut short, each issue once. */
+function truncationWarnings(rows: readonly RoadmapRow[], board: BoardView | null): readonly string[] {
+  const blockersOf = board?.blockersOf ?? null;
+  if (blockersOf === null) return [];
+  const issues = new Map(rows.flatMap((row) => row.issue === null
+    ? []
+    : [[row.issue.number, row.issue] as const]));
+  return [...issues.values()]
+    .map((issue) => truncatedBlockersWarning(blockersOf(issue)))
+    .filter((warning): warning is string => warning !== null);
 }
 
 /** One row over the board, when there is one. */
@@ -541,6 +604,17 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
   const issue = board?.byNumber.get(line.issue);
   if (board === null || issue === undefined) {
     return Object.freeze({ line, issue: null, spec: null, blocked: null, blockers: Object.freeze([]), has, refs });
+  }
+  if (board.blockersOf !== null) {
+    return Object.freeze({
+      line,
+      issue,
+      spec: readSpecColumn(issue.labels, issue.body),
+      blocked: null,
+      blockers: readNativeBlockersColumn(board.blockersOf(issue)),
+      has,
+      refs,
+    });
   }
   const blocked = readBlockedBy(issue.number, issue.body, board.known);
   return Object.freeze({
@@ -556,8 +630,8 @@ function rowOf(line: RoadmapLine, board: BoardView | null, has: readonly HasMark
 
 /**
  * `lines` as rows, in their order: the unticked ones, or every one with
- * `all`. Never rejects: each failed reading is carried as a warning, as
- * the module note holds. {@link readRoadmapRows} hands in the Roadmap's
+ * `all`. Never rejects on a failed reading: each is carried as a warning,
+ * as the module note holds, which also holds the one `native` refusal. {@link readRoadmapRows} hands in the Roadmap's
  * lines, and `rafa epics` an epic's (`src/commands/epic/show.ts`).
  */
 export async function readLineRows(lines: readonly RoadmapLine[], options: LineRowsOptions): Promise<LineRows> {
@@ -568,7 +642,7 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
     ? { value: [], warning: null }
     : await readOrWarn(options.pullRequests, [], 'the open pull requests could not be listed, so no pr is shown');
   const plans = await readOrWarn(options.planNames, [], 'the plan dir could not be read, so no plan is shown');
-  const board = viewOf(listed.issues);
+  const board = viewOf(listed.issues, options.relations);
   const issues = [...new Set(selected.map((line) => line.issue))];
   const namesEpic = board !== null && issues.some((issue) => board.byNumber.get(issue)?.type === 'epic');
   const refs = options.refsWhen === 'plain' && namesEpic
@@ -582,8 +656,15 @@ export async function readLineRows(lines: readonly RoadmapLine[], options: LineR
   const sources: HasSources = { planNames: plans.value, refs: scan.refs, pulls: pulls.value };
   const rows = selected.map((line) => rowOf(line, board, readHasColumn(line.issue, sources), refs.value.get(line.issue) ?? null));
 
-  const warnings = [listed.warning, ...scan.problems, pulls.warning, plans.warning, refs.warning, ...refsWarnings(refs.value)]
-    .filter((warning): warning is string => warning !== null);
+  const warnings = [
+    listed.warning,
+    ...truncationWarnings(rows, board),
+    ...scan.problems,
+    pulls.warning,
+    plans.warning,
+    refs.warning,
+    ...refsWarnings(refs.value),
+  ].filter((warning): warning is string => warning !== null);
   return Object.freeze({ rows: Object.freeze(rows), warnings: Object.freeze(warnings) });
 }
 

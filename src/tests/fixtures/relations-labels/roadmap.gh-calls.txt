@@ -1,0 +1,5 @@
+gh issue list --label type:roadmap --state open --limit 1000 --json number,title,body,state,stateReason,labels
+gh issue view 1 --json number,title,body,state,labels,author
+gh api repos/{owner}/{repo}/issues?state=all&sort=updated&direction=desc&per_page=1 --jq .[0].updated_at // ""
+gh issue list --state all --limit 1000 --json number,title,body,state,stateReason,labels
+gh pr list --state open --json number,headRefName,body --limit 100

@@ -15,10 +15,11 @@
  * are read through, `directory`, `trackerKind`, `releaseFile`,
  * `tierPins` and `routeTable`, and the readers of the release plan's
  * keys. `config-schema-release.ts` holds the `pr` and `release`
- * sections and `dangerous.acceptVersionCollision`, spread in here.
- * `config-schema-hub.ts` holds the `hub` section, its readers and the
- * refusal of `effort.sync: service` with no `hub.url`, spread in after
- * `effort.sync`.
+ * sections and `dangerous.acceptVersionCollision`, and
+ * `config-schema-tests.ts` the `tests` section and its reader, both
+ * spread in here. `config-schema-hub.ts` holds the `hub` section, its
+ * readers and the refusal of `effort.sync: service` with no `hub.url`,
+ * spread in after `effort.sync`.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -72,7 +73,8 @@
  * entry naming no field does not either. {@link SETTING_NAMES},
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
- * spec — in `config-schema-release.ts` for a `pr` or `release` key —
+ * spec — in `config-schema-release.ts` for a `pr` or `release` key,
+ * `config-schema-tests.ts` for a `tests` key —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
@@ -105,7 +107,9 @@ import type {
   PrSettings,
   ReleaseSettings,
 } from './config-schema-release.js';
+import type { TestsSettings } from './config-schema-tests.js';
 import type {
+  BoardRelationshipMode,
   ClaimsAhead,
   ClaimsStaleAfter,
   ClaudeSettingSource,
@@ -147,7 +151,9 @@ import {
   RELEASE_DEFAULTS,
   RELEASE_SETTINGS,
 } from './config-schema-release.js';
+import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import {
+  BOARD_RELATIONSHIP_MODES,
   busyTimeoutMs,
   claimsAhead,
   claimsStaleAfter,
@@ -186,11 +192,12 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
 /**
  * Every setting, resolved. The module note maps each to its file key;
  * the `hub` fields are {@link HubSettings}', the `pr` and `release`
- * fields are {@link PrSettings}' and
- * {@link ReleaseSettings}', and `dangerousAcceptVersionCollision` is
- * {@link DangerousReleaseSettings}'.
+ * fields are {@link PrSettings}' and {@link ReleaseSettings}',
+ * `dangerousAcceptVersionCollision` is {@link DangerousReleaseSettings}',
+ * and the `tests` fields are {@link TestsSettings}'.
  */
-export interface RafaConfig extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings {
+export interface RafaConfig
+  extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -248,6 +255,13 @@ export interface RafaConfig extends HubSettings, PrSettings, ReleaseSettings, Da
    * write-holders. `board.trustedAuthors`.
    */
   boardTrustedAuthors: readonly string[];
+  /**
+   * Where the board's epics and blockers are read and written: `labels`
+   * (`epic:` labels, `spec:blocked` and `Blocked by:` lines) or `native`
+   * (GitHub's sub-issue parent and blocked-by links).
+   * `board.relationships`.
+   */
+  boardRelationships: BoardRelationshipMode;
   /**
    * The issue whose task list `plan create --next` reads its order off,
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
@@ -353,6 +367,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   loopWorktreeDir: join('.rafa', 'worktrees'),
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
+  boardRelationships: 'labels',
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -370,6 +385,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   routing: DEFAULT_ROUTING,
   taskSkills: 'planner',
   taskLessons: 'on',
+  ...TESTS_DEFAULTS,
 });
 
 /** What the module knows about one setting. */
@@ -454,6 +470,11 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: listOf(githubLogin, 'GitHub logins'),
     cli: false,
   },
+  boardRelationships: {
+    key: 'board.relationships',
+    read: oneOf(BOARD_RELATIONSHIP_MODES),
+    cli: false,
+  },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
   claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
   claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },
@@ -487,6 +508,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   routing: { key: 'routing', read: routeTable, cli: false },
   taskSkills: { key: 'task.skills', read: skillResolverName, cli: true },
   taskLessons: { key: 'task.lessons', read: lessonSwitch, cli: false },
+  ...TESTS_SETTINGS,
 };
 
 /** Every setting name, read off the closed record above. */

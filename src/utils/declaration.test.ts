@@ -69,6 +69,14 @@
  * block, and every fixture here puts them exactly there. Both were
  * re-driven against that file when it landed and redden 5 and 4 of its
  * 15 cases, which is how it knows its own fixtures reached the module.
+ *
+ * The `tests` key's cases (the seven-key roster, the scope constants,
+ * `tests=` alone and beside an agent, its unusable and duplicated
+ * values, and {@link readTestScope}) were given two controls, the module
+ * restored byte-identical (sha256 checked) and green after each: taking
+ * `tests` out of `DECLARATION_KEYS` reddens seven of them, and letting
+ * {@link isTestScope} accept any non-empty value reddens the scope
+ * constants case and the unusable-value case.
  */
 import type { AgentEffortLookup, TaskDeclaration } from './declaration.js';
 
@@ -79,15 +87,19 @@ import {
   DECLARATION_KEYS,
   EFFORT_LEVELS,
   GRANULAR_KEYS,
+  DEFAULT_TEST_SCOPE,
   isEffortLevel,
   isModelValue,
+  isTestScope,
   MODEL_ALIASES,
   parseBudgetUsd,
   parseSkillList,
   parseTaskDeclaration,
   parseToolList,
+  readTestScope,
   resolveDeclarationFlags,
   stripTaskDeclaration,
+  TEST_SCOPES,
 } from './declaration.js';
 
 /** The two spaces a tracker line puts between text and block. */
@@ -135,7 +147,7 @@ function declarationOf(taskText: string): TaskDeclaration {
 }
 
 describe('the recognised grammar', () => {
-  it('recognises exactly six keys, the budget ahead of the tools and skills last', () => {
+  it('recognises exactly seven keys, the budget ahead of the tools, skills and tests last', () => {
     expect([...DECLARATION_KEYS]).toEqual([
       'agent',
       'model',
@@ -143,7 +155,16 @@ describe('the recognised grammar', () => {
       'budget',
       'tools',
       'skills',
+      'tests',
     ]);
+  });
+
+  it('carries the three test scopes, narrowest first, defaulting to the narrowest', () => {
+    expect([...TEST_SCOPES]).toEqual(['affected', 'module', 'full']);
+    expect(DEFAULT_TEST_SCOPE).toBe('affected');
+    expect(isTestScope('module')).toBe(true);
+    expect(isTestScope('Full')).toBe(false);
+    expect(isTestScope('')).toBe(false);
   });
 
   it('names the three keys an agent outranks', () => {
@@ -183,6 +204,20 @@ describe('the recognised grammar', () => {
   });
 });
 
+describe('readTestScope', () => {
+  it('answers the scope a block declared', () => {
+    expect(readTestScope(declarationOf('Do it  {tests=affected}'))).toBe('affected');
+    expect(readTestScope(declarationOf('Do it  {tests=module}'))).toBe('module');
+    expect(readTestScope(declarationOf('Do it  {tests=full}'))).toBe('full');
+  });
+
+  it('answers `affected` for no block and for a block with no `tests=`', () => {
+    expect(readTestScope(parseTaskDeclaration('Do it').declaration)).toBe('affected');
+    expect(readTestScope(null)).toBe('affected');
+    expect(readTestScope(declarationOf('Do it  {effort=low}'))).toBe('affected');
+  });
+});
+
 describe('parseTaskDeclaration', () => {
   it('answers the task text with the block removed', () => {
     const parsed = parseTaskDeclaration(HYGIENE_LINE);
@@ -205,9 +240,9 @@ describe('parseTaskDeclaration', () => {
     expect(parsed.text).toBe('Do the thing');
   });
 
-  it('reads all six keys off one block', () => {
+  it('reads all seven keys off one block', () => {
     const declaration = declarationOf(
-      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash skills=bun-testing}',
+      'Do it  {agent=tdd-guide model=opus effort=max budget=1.25 tools=Read,Bash skills=bun-testing tests=module}',
     );
 
     expect(declaration.agent).toBe('tdd-guide');
@@ -216,6 +251,7 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.budget).toBe(1.25);
     expect(declaration.tools).toEqual(['Read', 'Bash']);
     expect(declaration.skills).toEqual(['bun-testing']);
+    expect(declaration.tests).toBe('module');
     expect(declaration.issues).toEqual([]);
   });
 
@@ -330,6 +366,48 @@ describe('parseTaskDeclaration', () => {
     expect(declaration.effort).toBe('low');
     expect(declaration.issues).toEqual([
       { reason: 'unusable-value', key: 'skills', text: 'skills=bun-testing,' },
+    ]);
+  });
+
+  it('declares on `tests=` alone, mapping to no flag and leaving the text clean', () => {
+    const line = 'Wire the suite step into the runner  {tests=full}';
+    const parsed = parseTaskDeclaration(line);
+    const declaration = declarationOf(line);
+
+    expect(parsed.text).toBe('Wire the suite step into the runner');
+    expect(declaration.tests).toBe('full');
+    expect(declaration.extras).toEqual([]);
+    expect(declaration.issues).toEqual([]);
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT)).toEqual({ args: [], suppressed: [] });
+  });
+
+  it('keeps `tests=` off the flags and the suppressed list beside an agent', () => {
+    const declaration = declarationOf('Do it  {agent=tdd-guide tests=module}');
+
+    expect(declaration.tests).toBe('module');
+    expect(resolveDeclarationFlags(declaration, NO_OWN_EFFORT)).toEqual({
+      args: ['--agent', 'tdd-guide'],
+      suppressed: [],
+    });
+  });
+
+  it('records an unusable `tests=` value as an issue and reads it as absent', () => {
+    const declaration = declarationOf('Do it  {effort=low tests=bogus}');
+
+    expect(declaration.tests).toBeNull();
+    expect(declaration.effort).toBe('low');
+    expect(declaration.issues).toEqual([
+      { reason: 'unusable-value', key: 'tests', text: 'tests=bogus' },
+    ]);
+    expect(readTestScope(declaration)).toBe('affected');
+  });
+
+  it('takes the first of a duplicated `tests=` and says so', () => {
+    const declaration = declarationOf('Do it  {tests=full tests=affected}');
+
+    expect(readTestScope(declaration)).toBe('full');
+    expect(declaration.issues).toEqual([
+      { reason: 'duplicate-key', key: 'tests', text: 'tests=affected' },
     ]);
   });
 

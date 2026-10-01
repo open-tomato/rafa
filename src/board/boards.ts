@@ -18,6 +18,12 @@
  * default is picked from. A narrower `--json` list is refused by
  * {@link parseBoardListing}, naming the first field a row lacks.
  *
+ * The `--json` list follows `board.relationships` as the board listing's
+ * does ({@link boardListFields}): the command above in the `labels` mode,
+ * the default and {@link BOARDS_LIST_ARGS}, and the same command over
+ * `nativeBoardListFields` in the `native` mode, whose rows are read with
+ * their relationship fields.
+ *
  * Nothing here spawns: `gh` arrives through the {@link GhRunner} seam
  * declared in `src/adapters/tracker/github.ts`, and every case in
  * `./boards.test.ts` plants the answers it reads.
@@ -60,8 +66,9 @@
 import type { BoardIssue } from './roadmap-board.js';
 import type { RoadmapSearch } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 
-import { BOARD_LIST_FIELDS, BOARD_LISTING_LIMIT, parseBoardListing } from './roadmap-board.js';
+import { BOARD_LISTING_LIMIT, boardListFields, parseBoardListing } from './roadmap-board.js';
 import { isRoadmapTitle, resolveRoadmapIssue, ROADMAP_TITLE } from './roadmap.js';
 import { ROADMAP_LABEL } from './setup.js';
 
@@ -71,38 +78,54 @@ const PREFIX = 'board listing';
 /** Every open labelled board; the seam {@link resolveDefaultBoard} reads through. */
 export type BoardLister = () => Promise<readonly BoardIssue[]>;
 
-/** The arguments the board lister hands `gh`. */
-export const BOARDS_LIST_ARGS: readonly string[] = Object.freeze([
-  'issue', 'list',
-  '--label', ROADMAP_LABEL,
-  '--state', 'open',
-  '--limit', String(BOARD_LISTING_LIMIT),
-  '--json', BOARD_LIST_FIELDS,
-]);
+/** The arguments the board lister hands `gh` in `mode`. */
+export function boardsListArgs(mode: BoardRelationshipMode): readonly string[] {
+  return Object.freeze([
+    'issue', 'list',
+    '--label', ROADMAP_LABEL,
+    '--state', 'open',
+    '--limit', String(BOARD_LISTING_LIMIT),
+    '--json', boardListFields(mode),
+  ]);
+}
 
-/** The command a refusal of the board lister names. */
+/** The arguments the board lister hands `gh` in the `labels` mode, the default. */
+export const BOARDS_LIST_ARGS: readonly string[] = boardsListArgs('labels');
+
+/** The command a refusal of the board lister names in the `labels` mode, the default. */
 export const BOARDS_LIST_COMMAND = `gh ${BOARDS_LIST_ARGS.join(' ')}`;
 
-/** What a failed command wrote, for a message. Never empty. */
-function detailOf(result: GhResult): string {
+/** What a failed `command` wrote, for a message. Never empty. */
+function detailOf(result: GhResult, command: string): string {
   const written = result.stderr.trim() || result.stdout.trim();
   return written === ''
-    ? `${BOARDS_LIST_COMMAND} failed and wrote nothing`
-    : `${BOARDS_LIST_COMMAND} failed: ${written}`;
+    ? `${command} failed and wrote nothing`
+    : `${command} failed: ${written}`;
+}
+
+/** What {@link createGhBoardLister} is made with. */
+export interface GhBoardListerOptions {
+  /** Runs the one `gh` command the lister sends. */
+  readonly gh: GhRunner;
+  /** `board.relationships`: which fields are asked for and read. `labels` when left out. */
+  readonly mode?: BoardRelationshipMode;
 }
 
 /**
  * The lister over `options.gh`: one {@link BOARDS_LIST_COMMAND} per
- * call, answered as checked issues in the order `gh` wrote them. Rejects,
- * naming the command, when `gh` failed or answered anything
- * {@link parseBoardListing} refuses.
+ * call in the `labels` mode, the default, and {@link boardsListArgs} of
+ * `native` in that mode, answered as issues checked in that mode, in the
+ * order `gh` wrote them. Rejects, naming the command, when `gh` failed
+ * or answered anything {@link parseBoardListing} refuses.
  */
-export function createGhBoardLister(options: { readonly gh: GhRunner }): BoardLister {
-  const { gh } = options;
+export function createGhBoardLister(options: GhBoardListerOptions): BoardLister {
+  const { gh, mode = 'labels' } = options;
+  const args = boardsListArgs(mode);
+  const command = `gh ${args.join(' ')}`;
   return async () => {
-    const result = await gh(BOARDS_LIST_ARGS);
-    if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result)}`);
-    return parseBoardListing(result.stdout, BOARDS_LIST_COMMAND);
+    const result = await gh(args);
+    if (!result.ok) throw new Error(`${PREFIX}: ${detailOf(result, command)}`);
+    return parseBoardListing(result.stdout, command, mode);
   };
 }
 

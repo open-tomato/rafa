@@ -64,6 +64,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['prResolveBudget', 'pr.resolveBudget'],
   ['prVersionCollision', 'pr.versionCollision'],
   ['boardTrustedAuthors', 'board.trustedAuthors'],
+  ['boardRelationships', 'board.relationships'],
   ['roadmapIssue', 'roadmap.issue'],
   ['claimsStaleAfter', 'claims.staleAfter'],
   ['claimsAhead', 'claims.ahead'],
@@ -89,6 +90,8 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['routing', 'routing'],
   ['taskSkills', 'task.skills'],
   ['taskLessons', 'task.lessons'],
+  ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
+  ['testsIntegration', 'tests.integration'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -131,6 +134,7 @@ const TOP = [
   'tiers',
   'routing',
   'task',
+  'tests',
 ];
 
 describe('SETTINGS', () => {
@@ -203,6 +207,7 @@ describe('SECTIONS', () => {
       'specs',
       'status',
       'task',
+      'tests',
       'tiers',
       'tracker',
       'tracking',

@@ -66,6 +66,18 @@
  *   by label only, and a sweep spec lists the bugs it clears. A closed
  *   member is still reported; the checklist is the epic's order, and a
  *   closed spec missing from it is as absent as an open one.
+ *
+ * ## In native mode
+ *
+ * With `board.relationships` set to `native`, membership is the
+ * sub-issue parent and order the sub-issue order
+ * (`./relations/native.ts`), and an epic is named by its number and
+ * title. Four of the five kinds are marks of the `epic:` labels and the
+ * checklist, which only the `labels` mode reads, so they are not read
+ * there: {@link readHorizonProblems} answers the one kind left, every
+ * epic without exactly one `horizon:` label, each with a null slug,
+ * since a horizon is a label in both modes. {@link readEpicProblems} is
+ * the `labels` mode's reading and is never asked in `native` mode.
  */
 import type { BoardIssue } from './roadmap-board.js';
 
@@ -180,8 +192,8 @@ function orphanLabels(
     } as const)));
 }
 
-/** Every epic carrying no `horizon:` label, or two or more. */
-function horizons(epics: readonly BoardIssue[]): readonly EpicProblem[] {
+/** Every epic carrying no `horizon:` label, or two or more, its slug read by `slugOf`. */
+function horizons(epics: readonly BoardIssue[], slugOf: (epic: BoardIssue) => string | null): readonly EpicProblem[] {
   return epics.flatMap((epic) => {
     const found = epic.labels.filter((label) => label.startsWith(HORIZON_LABEL_PREFIX));
     return found.length === 1
@@ -189,10 +201,15 @@ function horizons(epics: readonly BoardIssue[]): readonly EpicProblem[] {
       : [{
         kind: 'horizon',
         issue: epic.number,
-        slug: epicSlugsOf(epic.labels)[0] ?? null,
+        slug: slugOf(epic),
         horizons: Object.freeze(found),
       } as const];
   });
+}
+
+/** An epic's slug as the `labels` mode reads it: its first `epic:` label's, or null. */
+function firstSlugOf(epic: BoardIssue): string | null {
+  return epicSlugsOf(epic.labels)[0] ?? null;
 }
 
 /** One epic's two order checks: its checklist against its label, both ways. */
@@ -250,10 +267,20 @@ export function readEpicProblems(issues: readonly BoardIssue[]): readonly EpicPr
   const problems = [
     ...severalEpicLabels(sorted),
     ...orphanLabels(groups, owned),
-    ...horizons(epics),
+    ...horizons(epics, firstSlugOf),
     ...order,
   ].sort(compareProblems);
   return Object.freeze(problems);
+}
+
+/**
+ * The `horizon` problems on `issues` alone, in ascending epic number,
+ * each with a null slug: the one kind the `native` mode reads, as the
+ * module note's "In native mode" holds. Never throws.
+ */
+export function readHorizonProblems(issues: readonly BoardIssue[]): readonly EpicProblem[] {
+  const epics = byNumber(issues).filter((issue) => issue.type === 'epic');
+  return Object.freeze([...horizons(epics, () => null)]);
 }
 
 /** The sentence a report prints for `problem`: what is wrong and what fixes it. */

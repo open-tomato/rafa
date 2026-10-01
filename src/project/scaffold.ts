@@ -44,12 +44,14 @@
  * the key exists and what it takes, which is the whole point of a
  * template of commented settings.
  *
- * The `tiers`, `routing` and `task` sections close the template.
- * `tiers.skills` and `tiers.agents` are written as `{}`, their empty
- * default, and `routing` as one line per row of `tiers/routing.ts`'s
- * `DEFAULT_ROUTES`, so the template cannot drift from the defaults the
- * schema answers. `task.skills` and `task.lessons` are written from
- * `CONFIG_DEFAULTS`, at `planner` and `on`.
+ * The `tiers`, `routing`, `task` and `tests` sections close the
+ * template. `tiers.skills` and `tiers.agents` are written as `{}`, their
+ * empty default, and `routing` as one line per row of
+ * `tiers/routing.ts`'s `DEFAULT_ROUTES`, so the template cannot drift
+ * from the defaults the schema answers. `task.skills` and `task.lessons`
+ * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and both
+ * `tests` lists from `CONFIG_DEFAULTS` too, each pattern double-quoted:
+ * a flow-list entry opening with `*` would parse as a YAML alias.
  *
  * A file is written only when nothing is at its path, with the `wx` flag,
  * so a file that appears between the check and the write is refused by
@@ -83,6 +85,11 @@ export const PROJECT_TREE = Object.freeze(['specs', 'plans', 'runs', 'effort', '
 
 /** The directories of a user tree, under `<home>/.rafa/`. */
 export const USER_TREE = Object.freeze(['instincts'] as const);
+
+/** `patterns` as a YAML flow list, each double-quoted. See the module note. */
+function globsLine(patterns: readonly string[]): string {
+  return `[${patterns.map((pattern) => JSON.stringify(pattern)).join(', ')}]`;
+}
 
 /**
  * Every setting of the schema but `version`, commented out at its
@@ -134,6 +141,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   PR_VERSION_COLLISION_LINE,
   '# board:',
   '#   trustedAuthors: []           # logins trusted with board text besides the repo write-holders',
+  `#   relationships: ${CONFIG_DEFAULTS.boardRelationships}        # labels | native, where epics and blockers are recorded`,
   '# roadmap:',
   '#   issue:                       # the issue plan create --next reads; unset is the one titled Roadmap',
   '# claims:',
@@ -165,6 +173,9 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# task:',
   `#   skills: ${CONFIG_DEFAULTS.taskSkills}                # planner | tag | none, the resolver that picks a task's skills`,
   `#   lessons: ${CONFIG_DEFAULTS.taskLessons}                    # on | off, whether blessed lessons join a task's prompt`,
+  '# tests:',
+  `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
+  `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
 ]);
 
 /** The line every file opens its settings with. */

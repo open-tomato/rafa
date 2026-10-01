@@ -39,6 +39,42 @@
  * would plan work over a dependency nobody checked, which is the silent
  * failure the whole reading exists to avoid.
  *
+ * ## The mode
+ *
+ * What a line waits on is a relationship, read through the board's
+ * relationships port (`./relations/port.ts`) in the mode
+ * `board.relationships` names: {@link blockedLineOf} turns the port's
+ * `blockersOf` reading into a {@link BlockedLine}, in either mode, and
+ * the port's `isWaiting` is what answers "not blocked".
+ *
+ * In `labels` mode, the default and what the three readings above spell,
+ * {@link readBlockedLine} asks the `labels` adapter's own reading
+ * (`labelsBlockersOf`, `./relations/labels.ts`) for the label, the line
+ * and its fault, and fills each blocker's state from the walk's
+ * {@link BlockerStates}, as it did before the port: that reader also
+ * reads a blocker older than the board listing, which the listing's own
+ * rows would answer as not read.
+ *
+ * In `native` mode the line's issue is read off the one board listing
+ * the caller holds ({@link BlockerWaiting}), and what it waits on is its
+ * `blockedBy` nodes, each with the state GitHub holds for it: no
+ * `spec:blocked` label, `Blocked by:` line or per-blocker read is asked,
+ * and {@link blockerStatesOf} is not used. So:
+ *
+ *  - a blocker closed as `NOT_PLANNED` is closed, and clears the line as
+ *    one closed as done does;
+ *  - a blocker on another repository still open holds the line, and is
+ *    named `owner/name#7 (open)` from {@link BlockedLine.foreignOpen};
+ *  - a `blockedBy` list `gh` stopped short of holds the line whatever
+ *    the nodes read, and names the rest as not read, from
+ *    {@link BlockedLine.truncated};
+ *  - an issue the listing does not hold is a fault
+ *    ({@link notOnListingMessage}): its links were not read, and a line
+ *    whose waiting nobody read is not one that waits on nothing.
+ *
+ * Both keys are left out, never set to undefined, when there is nothing
+ * to say, so a `labels` reading never carries them.
+ *
  * ## A fault is blocked, and is reported rather than resolved
  *
  * An issue labelled `spec:blocked` whose line is missing, names itself
@@ -76,11 +112,25 @@
  * jumping from a blocked line to a number with nothing in between.
  */
 import type { SpecIssue, SpecIssueReader } from './issue.js';
+import type {
+  Blocker,
+  BlockersReading,
+  BoardRelations,
+  RelatedIssue,
+  RelationsReading,
+  Truncation,
+} from './relations/port.js';
+import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapLine, RoadmapReadings, RoadmapSkip } from './roadmap.js';
 
-import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { hasSpecReadyLabel, SPEC_READY_LABEL } from './readiness.js';
+import { labelsBlockersOf } from './relations/labels.js';
+import { isWaiting } from './relations/port.js';
 import { readRoadmapSkip, skipSentence } from './roadmap.js';
+
+/** No listing: the `labels` reading of one issue asks its blockers' states of the walk's reader instead. */
+const NO_ROWS: ReadonlyMap<number, Pick<BoardIssue, 'state'>> = new Map();
 
 /** What the board holds a blocker as, or null when this run read no state for it. */
 export type BlockerState = 'OPEN' | 'CLOSED' | null;
@@ -121,66 +171,116 @@ export interface BlockedLine {
   readonly unread: readonly number[];
   /** The fault its line was reported with, or null when the line read. */
   readonly fault: string | null;
+  /**
+   * The blockers on another repository still open, in the order `gh`
+   * answered them. `native` mode only, and only when there is one; left
+   * out otherwise.
+   */
+  readonly foreignOpen?: readonly RelatedIssue[];
+  /**
+   * GitHub's count of the blockers, kept when `gh` answered fewer, whose
+   * rest were not read. `native` mode only; left out otherwise.
+   */
+  readonly truncated?: Truncation;
 }
 
-/** One reading, spelled and frozen. */
+/** One reading, spelled and frozen; `extra` holds the native keys that are present. */
 function blocked(
   issue: number,
-  blockers: readonly number[],
-  open: readonly number[],
-  unread: readonly number[],
+  lists: Pick<BlockedLine, 'blockers' | 'open' | 'unread'>,
   fault: string | null,
+  extra: Pick<BlockedLine, 'foreignOpen' | 'truncated'> = {},
 ): BlockedLine {
   return Object.freeze({
     issue,
-    blockers: Object.freeze([...blockers]),
-    open: Object.freeze([...open]),
-    unread: Object.freeze([...unread]),
+    blockers: Object.freeze([...lists.blockers]),
+    open: Object.freeze([...lists.open]),
+    unread: Object.freeze([...lists.unread]),
     fault,
+    ...extra,
   });
 }
 
-/** Each blocker of `read`, with what the board said of it, in line order. */
-async function heldStates(
-  blockers: readonly number[],
-  states: BlockerStates,
-): Promise<readonly { readonly id: number; readonly state: BlockerState }[]> {
-  let held: readonly { id: number; state: BlockerState }[] = [];
-  for (const id of blockers) {
-    held = [...held, { id, state: await states(id) }];
-  }
-  return held;
+/** The keys a `native` reading adds, each kept only when it has something to say. */
+function nativeExtra(
+  foreign: readonly Blocker[],
+  truncated: Truncation | undefined,
+): Pick<BlockedLine, 'foreignOpen' | 'truncated'> {
+  const open = foreign
+    .filter((blocker) => blocker.state === 'OPEN')
+    .map((blocker): RelatedIssue => Object.freeze({ number: blocker.number, repository: blocker.repository }));
+  return {
+    ...open.length === 0
+      ? {}
+      : { foreignOpen: Object.freeze(open) },
+    ...truncated === undefined
+      ? {}
+      : { truncated: Object.freeze({ total: truncated.total }) },
+  };
 }
 
 /**
- * Why `issue` is blocked, or null when it is not: no `spec:blocked`
- * label, or every blocker closed. The module note holds the three
- * readings in the order they run and why a fault answers blocked.
+ * The line the port's `reading` comes to, in either mode, or null when
+ * it does not hold its issue back (`isWaiting`, `./relations/port.ts`).
+ * A fault is blocked with its sentence and the ids its line named; a
+ * blocked reading names this board's blockers still open and not read,
+ * in the reading's order, and the module note holds the two keys a
+ * `native` reading may add.
+ */
+export function blockedLineOf(reading: BlockersReading): BlockedLine | null {
+  if (reading.kind === 'none') return null;
+  if (reading.kind === 'fault') {
+    return blocked(reading.issue, { blockers: reading.line.blockers, open: [], unread: [] }, reading.message);
+  }
+  if (!isWaiting(reading)) return null;
+
+  const local = reading.blockers.filter((blocker) => blocker.repository === null);
+  const idsOf = (state: BlockerState): readonly number[] => local
+    .filter((blocker) => blocker.state === state)
+    .map((blocker) => blocker.number);
+  return blocked(
+    reading.issue,
+    { blockers: local.map((blocker) => blocker.number), open: idsOf('OPEN'), unread: idsOf(null) },
+    null,
+    nativeExtra(reading.blockers.filter((blocker) => blocker.repository !== null), reading.truncated),
+  );
+}
+
+/** `reading` with each of this board's blockers' state asked of `states`, one at a time, in its order. */
+async function withStates(reading: BlockersReading, states: BlockerStates): Promise<BlockersReading> {
+  if (reading.kind !== 'blocked') return reading;
+  let held: readonly Blocker[] = [];
+  for (const blocker of reading.blockers) {
+    const state = blocker.repository === null
+      ? await states(blocker.number)
+      : blocker.state;
+    held = [...held, Object.freeze({ ...blocker, state })];
+  }
+  return Object.freeze({ ...reading, blockers: Object.freeze(held) });
+}
+
+/**
+ * Why `issue` is blocked in `labels` mode, or null when it is not: no
+ * `spec:blocked` label, or every blocker closed. The module note holds
+ * the three readings in the order they run, why a fault answers blocked,
+ * and why each state is asked of `states` rather than of a listing.
  */
 export async function readBlockedLine(
   issue: SpecIssue,
   states: BlockerStates,
 ): Promise<BlockedLine | null> {
-  if (!hasSpecBlockedLabel(issue.labels)) return null;
-
-  const read = readBlockedBy(issue.number, issue.body);
-  if (read.kind !== 'blocked') {
-    return blocked(issue.number, read.blockers, [], [], blockedFaultMessage(read));
-  }
-
-  const held = await heldStates(read.blockers, states);
-  const open = held.filter((one) => one.state === 'OPEN').map((one) => one.id);
-  const unread = held.filter((one) => one.state === null).map((one) => one.id);
-  return open.length + unread.length === 0
-    ? null
-    : blocked(issue.number, read.blockers, open, unread, null);
+  return blockedLineOf(await withStates(labelsBlockersOf(issue, NO_ROWS), states));
 }
 
-/** `#24 (open), #26 (state not read)` — the blockers a sentence names. */
+/** `#24 (open), owner/name#7 (open), #26 (state not read)` — the blockers a sentence names. */
 function nameBlockers(line: BlockedLine): string {
   return [
     ...line.open.map((id) => `#${String(id)} (open)`),
+    ...(line.foreignOpen ?? []).map((one) => `${one.repository ?? ''}#${String(one.number)} (open)`),
     ...line.unread.map((id) => `#${String(id)} (state not read)`),
+    ...line.truncated === undefined
+      ? []
+      : [`the rest of its ${String(line.truncated.total)} blockers (state not read)`],
   ].join(', ');
 }
 
@@ -215,30 +315,81 @@ export interface PlannableReadings {
   readonly isReady: (issue: number) => Promise<boolean>;
 }
 
-/** What {@link plannableReadings} is built over. */
-export interface PlannableReadingsOptions {
+/**
+ * The part of the relationships port (`./relations/port.ts`) the
+ * waiting reading asks: the mode, and the reads over one listing. A
+ * whole `BoardRelations`, as `selectBoardRelations` makes it, is one.
+ */
+export type BlockerRelations = Pick<BoardRelations, 'mode' | 'read'>;
+
+/** The port, and the one board listing a `native` reading reads its rows off. */
+export interface BlockerWaiting {
+  /** The board's relationships, whose mode picks the reading. */
+  readonly relations: BlockerRelations;
+  /** The board listing, read in `native` mode only, and read through at most once per listing it answers. */
+  readonly listing: BoardListing;
+}
+
+/** What {@link blockingOf} is built over. */
+export interface BlockingOptions {
   /** Reads one issue by number; the walk's own memoised reader. */
   readonly issues: SpecIssueReader;
+  /** The port and the listing; `labels` mode, over `issues` alone, when left out. */
+  readonly waiting?: BlockerWaiting;
+}
+
+/** The fault an issue the `native` listing does not hold is blocked with. */
+export function notOnListingMessage(issue: number): string {
+  return `#${String(issue)} is not on the board listing, so its blocked-by links were not read;`
+    + ' it is held back rather than planned over a dependency nobody checked';
+}
+
+/** The `native` reading of one issue, off the listing `waiting` answers; the module note holds the reading. */
+function nativeBlocking(waiting: BlockerWaiting): (issue: number) => Promise<BlockedLine | null> {
+  let read: { readonly rows: readonly BoardIssue[]; readonly reading: RelationsReading } | null = null;
+  return async (issue: number): Promise<BlockedLine | null> => {
+    const rows = await waiting.listing();
+    if (read?.rows !== rows) read = { rows, reading: waiting.relations.read(rows) };
+    const row = rows.find((candidate) => candidate.number === issue);
+    return row === undefined
+      ? blocked(issue, { blockers: [], open: [], unread: [] }, notOnListingMessage(issue))
+      : blockedLineOf(read.reading.blockersOf(row));
+  };
+}
+
+/**
+ * Why the issue numbered is blocked, or null when it is not, in the mode
+ * `options.waiting` names; the module note holds both. In `labels` mode,
+ * and when `waiting` is left out, the listing is never asked and the
+ * blocker states go through the same reader ({@link blockerStatesOf}),
+ * which keeps a blocked line's own check to the reads the walk had
+ * already made wherever its blockers are on the roadmap too.
+ */
+export function blockingOf(options: BlockingOptions): (issue: number) => Promise<BlockedLine | null> {
+  const { issues, waiting } = options;
+  if (waiting?.relations.mode === 'native') return nativeBlocking(waiting);
+  const states = blockerStatesOf(issues);
+  return async (issue: number): Promise<BlockedLine | null> => readBlockedLine(await issues(issue), states);
+}
+
+/** What {@link plannableReadings} is built over. */
+export interface PlannableReadingsOptions extends BlockingOptions {
   /** The done and taken readings the walk already made. */
   readonly readings: RoadmapReadings;
 }
 
 /**
  * The three readings over one issue reader and the walk's own done and
- * taken readings, so a caller composes none of them itself.
- *
- * The blocker states go through the same reader
- * ({@link blockerStatesOf}), which is what keeps a blocked line's own
- * check to the reads the walk had already made wherever its blockers are
- * on the roadmap too.
+ * taken readings, so a caller composes none of them itself. Whether a
+ * line is blocked is {@link blockingOf}'s, in the mode `options.waiting`
+ * names.
  */
 export function plannableReadings(options: PlannableReadingsOptions): PlannableReadings {
   const { issues, readings } = options;
-  const states = blockerStatesOf(issues);
 
   return Object.freeze({
     skip: (line: RoadmapLine): Promise<RoadmapSkip | null> => readRoadmapSkip(line, readings),
-    blocking: async (issue: number): Promise<BlockedLine | null> => readBlockedLine(await issues(issue), states),
+    blocking: blockingOf(options),
     isReady: async (issue: number): Promise<boolean> => hasSpecReadyLabel((await issues(issue)).labels),
   });
 }

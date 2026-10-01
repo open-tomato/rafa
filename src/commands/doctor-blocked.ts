@@ -3,6 +3,11 @@
  * labelled `spec:blocked` whose `Blocked by:` line is MISSING or
  * UNREADABLE, named with what an author must do about it.
  *
+ * It runs in the `labels` mode of `board.relationships` alone
+ * (`./doctor-board.ts`, "The mode"): `spec:blocked` and the `Blocked
+ * by:` line are that mode's marks, and a `native` board is read by the
+ * relationships row (`./doctor-relations.ts`) instead.
+ *
  * `src/board/blocked.ts` is the reading of one body — the label, the
  * ids a line names, and the four faults it refuses to guess at — and
  * this module is the half that asks the board for the bodies and turns

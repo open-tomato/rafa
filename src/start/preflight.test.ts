@@ -1574,6 +1574,7 @@ async function promptFor(knownMissing: readonly string[] | undefined): Promise<s
       settingSources: ['project', 'local'],
       serving: null,
       handout: null,
+      base: null,
       run: (prompt) => {
         prompts.push(prompt);
         return Promise.resolve({ exitCode: 0, stdout: '' });

@@ -186,6 +186,7 @@ const PROJECT_TEXT = [
   '  versionCollision: refuse',
   'board:',
   '  trustedAuthors: [octocat]',
+  '  relationships: native',
   'roadmap:',
   '  issue: 31',
   'claims:',
@@ -224,6 +225,9 @@ const PROJECT_TEXT = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'tests:',
+  '  fullSuiteTriggers: ["project/*.toml"]',
+  '  integration: ["project/**/*.e2e.ts"]',
   '',
 ].join('\n');
 
@@ -275,6 +279,7 @@ const PROJECT_VALUES: RafaConfig = {
   prResolveBudget: 0.5,
   prVersionCollision: 'refuse',
   boardTrustedAuthors: ['octocat'],
+  boardRelationships: 'native',
   roadmapIssue: 31,
   claimsStaleAfter: '36h',
   claimsAhead: 'allow',
@@ -304,6 +309,8 @@ const PROJECT_VALUES: RafaConfig = {
   ]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  testsFullSuiteTriggers: ['project/*.toml'],
+  testsIntegration: ['project/**/*.e2e.ts'],
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -358,6 +365,7 @@ const USER_TEXT = [
   '  versionCollision: ask',
   'board:',
   '  trustedAuthors: ["dependabot[bot]", hubot]',
+  '  relationships: labels',
   'roadmap:',
   '  issue: 7',
   'claims:',
@@ -391,6 +399,9 @@ const USER_TEXT = [
   'task:',
   '  skills: none',
   '  lessons: on',
+  'tests:',
+  '  fullSuiteTriggers: []',
+  '  integration: ["user/**/*.e2e.ts"]',
   '',
 ].join('\n');
 
@@ -432,6 +443,7 @@ const USER_VALUES: RafaConfig = {
   prResolveBudget: 3,
   prVersionCollision: 'ask',
   boardTrustedAuthors: ['dependabot[bot]', 'hubot'],
+  boardRelationships: 'labels',
   roadmapIssue: 7,
   claimsStaleAfter: 'disabled',
   claimsAhead: 'off',
@@ -457,6 +469,8 @@ const USER_VALUES: RafaConfig = {
   routing: new Map([...CONFIG_DEFAULTS.routing, ['review', 'typescript-reviewer']]),
   taskSkills: 'none',
   taskLessons: 'on',
+  testsFullSuiteTriggers: [],
+  testsIntegration: ['user/**/*.e2e.ts'],
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -706,6 +720,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'board:\n  trustedAuthors: [hubot]', 'boardTrustedAuthors', ['hubot'],
   ],
   [
+    'board.relationships', 'board:\n  relationships: Native',
+    'board.relationships is "Native", expected one of: labels, native',
+    'board:\n  relationships: native', 'boardRelationships', 'native',
+  ],
+  [
     'roadmap.issue', 'roadmap:\n  issue: 2.5',
     'roadmap.issue is 2.5, expected an issue number, a whole number above zero',
     'roadmap:\n  issue: 31', 'roadmapIssue', 31,
@@ -829,6 +848,16 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'task.lessons', 'task:\n  lessons: "Off"',
     'task.lessons is "Off", expected one of: on, off',
     'task:\n  lessons: off', 'taskLessons', 'off',
+  ],
+  [
+    'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: [""]',
+    'tests.fullSuiteTriggers[0] is "", expected a glob pattern relative to the repository root',
+    'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
+  ],
+  [
+    'tests.integration', 'tests:\n  integration: { e2e: true }',
+    'tests.integration is a mapping, expected a list of glob patterns',
+    'tests:\n  integration: []', 'testsIntegration', [],
   ],
 ];
 

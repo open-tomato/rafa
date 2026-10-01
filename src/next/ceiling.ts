@@ -54,6 +54,25 @@
  * prints in a run without that flag, so a plain `rafa next` says what it
  * said before they were ids, and names them under it.
  *
+ * ## In `native` mode
+ *
+ * `unblock` is offered in `labels` mode only (`LABELS_ONLY_ACTIONS`,
+ * `./actions.ts`): with `board.relationships` set to `native` the
+ * tracker clears a blocker when it closes, and no row proposes it. So
+ * the lists are read per mode. {@link yesActionsFor} answers the ids a
+ * list may name — the eleven of {@link YES_ACTIONS} in `labels`, the ten
+ * without `unblock` in `native` — and {@link bareYesActionsFor} what
+ * bare `--yes` allows — the five of {@link BARE_YES_ACTIONS} in
+ * `labels`, the four without `unblock` in `native`. Both are taken off
+ * the constants rather than spelled again, so the two modes cannot
+ * drift apart on any other id.
+ *
+ * {@link readYesCeiling} reads a line against the mode it is handed,
+ * `labels` when left out. In `native` mode a list naming `unblock` is
+ * refused with exit 2, naming the mode, rather than quietly dropped, for
+ * the reason an unknown id is: the person who typed it would read the
+ * list as allowing a step the board does not offer.
+ *
  * ## The two refusals, both exit 2
  *
  * A list naming an id of {@link ALWAYS_ASKED} — `ready` or
@@ -95,10 +114,11 @@
  */
 import type { NextActionId } from './state.js';
 import type { RafaContext } from '../cli/command.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 
 import { CommandExit } from '../cli/command.js';
 
-import { NEXT_COMMAND_ACTIONS } from './actions.js';
+import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from './actions.js';
 
 /** The flag that names the actions which may run unasked. */
 export const YES_FLAG = 'yes';
@@ -149,6 +169,41 @@ export const BARE_YES_ACTIONS: readonly NextActionId[] = Object.freeze([
   'home',
 ] as const);
 
+/** Whether `action` is one of the ids offered in `labels` mode only; see the module note. */
+function isLabelsOnly(action: string): boolean {
+  return (LABELS_ONLY_ACTIONS as ReadonlySet<string>).has(action);
+}
+
+/** Each mode's list, the ids offered in `labels` mode only dropped in `native`. */
+function perMode(labels: readonly NextActionId[]): Readonly<Record<BoardRelationshipMode, readonly NextActionId[]>> {
+  return Object.freeze({
+    labels,
+    native: Object.freeze(labels.filter((action) => !isLabelsOnly(action))),
+  });
+}
+
+/** The ids a list may name, per mode; see the module note. */
+const YES_ACTIONS_BY_MODE = perMode(YES_ACTIONS);
+
+/** What bare `--yes` allows, per mode; see the module note. */
+const BARE_YES_ACTIONS_BY_MODE = perMode(BARE_YES_ACTIONS);
+
+/**
+ * The ids a list may name in `mode`: {@link YES_ACTIONS} in `labels`,
+ * the ten without `unblock` in `native`. See the module note.
+ */
+export function yesActionsFor(mode: BoardRelationshipMode): readonly NextActionId[] {
+  return YES_ACTIONS_BY_MODE[mode];
+}
+
+/**
+ * What bare `--yes` allows in `mode`: {@link BARE_YES_ACTIONS} in
+ * `labels`, the four without `unblock` in `native`. See the module note.
+ */
+export function bareYesActionsFor(mode: BoardRelationshipMode): readonly NextActionId[] {
+  return BARE_YES_ACTIONS_BY_MODE[mode];
+}
+
 /** The action ids that may run unasked, or null where every one is asked about. */
 export type NextCeiling = readonly NextActionId[] | null;
 
@@ -157,43 +212,57 @@ function ceilingRefusal(problem: string, usage: string): CommandExit {
   return new CommandExit(CEILING_REFUSAL_EXIT, `❌ ${problem}\nUsage: ${usage}`);
 }
 
-/** One word of a list as an action id, or the refusal it earns. */
-function readCeilingId(word: string, usage: string): NextActionId {
+/** One word of a list as an action id in `mode`, or the refusal it earns. */
+function readCeilingId(word: string, usage: string, mode: BoardRelationshipMode): NextActionId {
   if (isAlwaysAsked(word)) {
     throw ceilingRefusal(`--${YES_FLAG} names ${word}, which no list runs unasked: ${ALWAYS_ASKED_WHY[word]}`, usage);
   }
 
-  const named = YES_ACTIONS.find((action) => action === word);
+  const ids = yesActionsFor(mode);
+  if (mode === 'native' && isLabelsOnly(word)) {
+    throw ceilingRefusal(
+      `--${YES_FLAG} names ${word}, which is offered in labels mode only and board.relationships is native:`
+      + ` the tracker clears a blocker when it closes; the ids are ${ids.join(', ')}`,
+      usage,
+    );
+  }
+
+  const named = ids.find((action) => action === word);
   if (named !== undefined) return named;
   throw ceilingRefusal(
     `--${YES_FLAG} names "${word}", which is no step of rafa next;`
-    + ` the ids are ${YES_ACTIONS.join(', ')}`,
+    + ` the ids are ${ids.join(', ')}`,
     usage,
   );
 }
 
 /**
- * The action ids `--yes` named, or null where the line leaves the flag
- * out: bare it names {@link BARE_YES_ACTIONS}, and a value is read as a
+ * The action ids `--yes` named in `mode`, `labels` when left out, or
+ * null where the line leaves the flag out: bare it names
+ * {@link bareYesActionsFor} the mode, and a value is read as a
  * comma list, each word trimmed and an empty one dropped. `--no-yes`
  * names nothing, as leaving the flag out does, and `--yes=` names no
  * action — a ceiling that allows nothing, which stops the chain at its
  * first action rather than being a line refused.
  *
  * Throws `CommandExit(2, ...)` naming `usage` for a list holding an id
- * of {@link ALWAYS_ASKED} and for one holding a word that is no action
- * id; see the module note.
+ * of {@link ALWAYS_ASKED}, for one holding a word that is no action id,
+ * and, in `native` mode, for one naming `unblock`; see the module note.
  */
-export function readYesCeiling(flags: RafaContext['flags'], usage: string): NextCeiling {
+export function readYesCeiling(
+  flags: RafaContext['flags'],
+  usage: string,
+  mode: BoardRelationshipMode = 'labels',
+): NextCeiling {
   const value = flags[YES_FLAG];
   if (value === undefined || value === false) return null;
-  if (value === true) return BARE_YES_ACTIONS;
+  if (value === true) return bareYesActionsFor(mode);
 
   return Object.freeze(value
     .split(',')
     .map((word) => word.trim())
     .filter((word) => word !== '')
-    .map((word) => readCeilingId(word, usage)));
+    .map((word) => readCeilingId(word, usage, mode)));
 }
 
 /**

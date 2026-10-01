@@ -87,7 +87,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task)';
+  + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -123,6 +123,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'prResolveBudget',
   'prVersionCollision',
   'boardTrustedAuthors',
+  'boardRelationships',
   'roadmapIssue',
   'claimsStaleAfter',
   'claimsAhead',
@@ -148,6 +149,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'routing',
   'taskSkills',
   'taskLessons',
+  'testsFullSuiteTriggers',
+  'testsIntegration',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -184,6 +187,7 @@ const DEFAULTS: RafaConfig = {
   prResolveBudget: 2,
   prVersionCollision: 'report',
   boardTrustedAuthors: [],
+  boardRelationships: 'labels',
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -215,6 +219,13 @@ const DEFAULTS: RafaConfig = {
   ]),
   taskSkills: 'planner',
   taskLessons: 'on',
+  testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json', 'bun.lock', 'bun.lockb'],
+  testsIntegration: [
+    '**/*-integration.test.ts',
+    '**/*.integration.test.ts',
+    '**/*-spawned*.test.ts',
+    '**/*-cli.test.ts',
+  ],
 };
 
 /**
@@ -278,6 +289,7 @@ const FULL = [
   '  versionCollision: refuse',
   'board:',
   '  trustedAuthors: ["dependabot[bot]"]',
+  '  relationships: native',
   'roadmap:',
   '  issue: 31',
   'claims:',
@@ -311,6 +323,9 @@ const FULL = [
   'task:',
   '  skills: tag',
   '  lessons: off',
+  'tests:',
+  '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
+  '  integration: []',
   '',
 ].join('\n');
 
@@ -365,6 +380,7 @@ const FULL_VALUES: RafaConfig = {
   prResolveBudget: 0.5,
   prVersionCollision: 'refuse',
   boardTrustedAuthors: ['dependabot[bot]'],
+  boardRelationships: 'native',
   roadmapIssue: 31,
   claimsStaleAfter: '36h',
   claimsAhead: 'allow',
@@ -390,6 +406,8 @@ const FULL_VALUES: RafaConfig = {
   routing: new Map<string, RouteTarget>([['cleanup', 'refactor-cleaner'], ['review', false]]),
   taskSkills: 'tag',
   taskLessons: 'off',
+  testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
+  testsIntegration: [],
 };
 
 /**
@@ -454,7 +472,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(8);
+    expect(lists).toHaveLength(10);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -767,6 +785,11 @@ describe('parseConfigText', () => {
         'board:\n  trustedAuthors: [octocat]', 'boardTrustedAuthors', ['octocat'],
       ],
       [
+        'board.relationships', 'board:\n  relationships: sub-issues',
+        'board.relationships is "sub-issues", expected one of: labels, native',
+        'board:\n  relationships: native', 'boardRelationships', 'native',
+      ],
+      [
         'roadmap.issue', 'roadmap:\n  issue: 0',
         'roadmap.issue is 0, expected an issue number, a whole number above zero',
         'roadmap:\n  issue: 31', 'roadmapIssue', 31,
@@ -890,6 +913,16 @@ describe('parseConfigText', () => {
         'task.lessons', 'task:\n  lessons: false',
         'task.lessons is false, expected one of: on, off',
         'task:\n  lessons: off', 'taskLessons', 'off',
+      ],
+      [
+        'tests.fullSuiteTriggers', 'tests:\n  fullSuiteTriggers: package.json',
+        'tests.fullSuiteTriggers is "package.json", expected a list of glob patterns',
+        'tests:\n  fullSuiteTriggers: ["*.toml"]', 'testsFullSuiteTriggers', ['*.toml'],
+      ],
+      [
+        'tests.integration', 'tests:\n  integration: ["/abs/*.test.ts"]',
+        'tests.integration[0] is "/abs/*.test.ts", expected a glob pattern relative to the repository root',
+        'tests:\n  integration: ["e2e/**"]', 'testsIntegration', ['e2e/**'],
       ],
     ];
 

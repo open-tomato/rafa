@@ -1,156 +1,245 @@
 ## Verification
 
-### Gate order
+### Gate tiers and task declaration
 
-Run these checks in this order before any PR. Each gate opens a specific set
-of files — understand which files your change touches, and which gates can
-actually reach them.
+**A task session runs a targeted subset of checks; the runner runs the full
+suite at defined stages.** A task line declares `tests=affected` (the
+default), `tests=module`, or `tests=full` to control what its session checks.
 
-**These gates are the WHOLE of verification: there is no hosted one.** The
-repository carries no `.github/workflows/` on any branch (its
-`.github/` holds only the spec issue template), so no workflow runs
-against a PR and `gh pr checks <n>` answers `no checks reported`
-forever rather than for a moment. That is the expected reading here and
-never a symptom — in a repository that DOES have workflows it would be
-ambiguous between a run not yet scheduled and a conflicting PR that
-will never get one, which is why the reading to take is the ref check
-(`git ls-remote origin 'refs/pull/<n>/*'`, where a mergeable PR exposes
-`merge` beside `head`) and not the checks list. Nothing catches a red
-gate after the push, so capture the three exit codes at the commit that
-is actually the PR's head.
+**Task session gates** (read one exit code from each):
+- `bun test --changed=<base>` (affected), `bun test --changed=<base>
+  --reporter=junit --reporter-outfile=<file>` to read failures via JUnit
+- `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
+- `bunx eslint <changed files>` (ESLint on changed files only)
 
-| Gate | Runs | Files it can open |
-|---|---|---|
-| `bun run check-types` | TypeScript compiler | `src/`, `scripts/` and root `*.ts`/`*.mjs`, with every `**/*.test.ts` excluded; then each `packages/*/src/`, tests included |
-| `bun run lint` | ESLint | `.js`, `.mjs`, `.ts`, `.md` and `.json` across the tree, except `packages/`, `dist/`, `.claude/`, `.rafa/`, `.tmp/` and `.docs/` |
-| `bun run test` | Bun's native test runner | Every `*.test.ts` outside `node_modules/` and dot-directories, `scripts/` included |
+All three redirect to a file and read `$?` immediately after with
+`exit=$?` on the next line — never pipe through `tail` or poll with
+`until`/`while` + `sleep`. Through a pipe, `tail`'s exit code is read
+instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
+waste time when the runner will record the same gate later as a real
+step anyway.
 
-One more gate runs at `git commit` rather than before the PR.
-`.githooks/pre-commit` runs `scripts/control-byte-gate/control-byte-gate.ts`
-with `--staged`, refusing a commit whose staged blobs carry a raw control
-byte or an invisible codepoint. The hook is live only in a clone where
-`git config core.hooksPath .githooks` has been run. By hand, the script
-with no flag reads every tracked file, and `--include-untracked` adds the
-files not yet added.
+The full-suite scripts treat the workspace packages apart: `check-types` runs
+`tsc` over the root, then each `packages/*/src/` with its tests
+included; `bun run lint` ignores `packages/` whole, so package code is
+never linted.
+
+**Runner recorded steps** (full suite, recorded at fixed points):
+- `baseline` — Full suite once at plan start (first dispatch)
+- `task` — Full suite after each task's session ends and commits
+- `stage` — Full suite after a stage's last task
+- `pre-wrap-up` — Full suite before wrap-up session starts
+
+Each recorded step names its scope (affected, module, full, or a
+file/folder list it ran on), the command, exit code, Bun's summary line,
+every failing test (file + full test name pairs), and which failures are
+new against the baseline (not present in `baseline`'s captured failures).
+
+**Declaration key `tests=` on a task line** sets what the task's session
+will run:
+- `tests=affected` (default): `bun test --changed=<base>` plus types and
+  lint on the changed files
+- `tests=module`: One full-suite module (e.g., `bun test
+  src/effort/**/*.test.ts`) when the task touches files that trigger a
+  module re-run
+- `tests=full`: Entire suite when the task changes a config file or a
+  globally-used module
+
+**Config keys for when a task triggers `tests=full` or `tests=module`:**
+- `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
+  `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
+  named in `[test] preload` of `bunfig.toml`)
+- `tests.integration` (glob list, defaults to `**/*-integration.test.ts`,
+  `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
+
+**The baseline is the `baseline` step's recorded failures.** A failure
+is identified by its test file path and full test name (the pair the
+JUnit reporter captures). When a step after the baseline reports failures,
+the runner compares each failure's file + name pair against the baseline's
+captured set: a match means the failure was already present, a mismatch
+means it is new. Only new failures block the next task. A stage-end step
+with new failures names them in the blocker text the retry session
+receives through `BLOCKER_PROMPT_PREFIX`.
+
+**These recorded steps are the WHOLE of verification; there is no hosted
+workflow.** The repository carries no `.github/workflows/` on any branch,
+so `gh pr checks <n>` answers `no checks reported`. That is the expected
+reading. To verify a PR's state, capture the three task session gates
+at the commit that is actually the PR's head, and read the runner's
+recorded steps from the `.rafa/runs/<run-id>.json` file when a loop ran.
+One more gate runs at `git commit`: `.githooks/pre-commit` runs
+`scripts/control-byte-gate/control-byte-gate.ts` with `--staged`, refusing
+a commit whose staged blobs carry a raw control byte or an invisible
+codepoint. The hook is live only where `git config core.hooksPath
+.githooks` has been run.
+
+### Baseline and known failures
+
+**Every run starts by recording a baseline.** The first step of every plan
+is a full-suite run that establishes what the tree held at that moment.
+Later steps compare their failures against this baseline to separate
+inherited failures from new ones. A baseline failure (one present in the
+baseline step) does not block work; a new failure (one that first appears
+in a later step) does.
+
+**A failure is a test file plus a full test name.** The JUnit reporter
+(run with `--reporter=junit --reporter-outfile=<file>`) identifies each
+failure by its test file path and the test's full name (including any
+nested `describe` blocks). Two failures are identical when both match; a
+test name that changes counts as a different failure, so rewriting a test
+name can hide a failure without fixing it.
+
+**The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
+step's `failures` array holds the test file + name pairs it observed.
+The `newFailures` array in each step lists only the failures not present
+in the baseline. The runner writes these arrays as each step completes,
+and the loop reads them to decide what to report to the next task.
+
+**Known baseline failures are documented on this page.** Some tests fail
+on every run because the tree itself is in that state or the test reads
+machine-specific state. Read the list below before attributing a failure
+to the diff: when a test's file and name appear in the list with its
+reason, the failure is known and expected.
+
+### Exit-code and no-polling rules
+
+**Read exit codes from the tool itself, never from downstream commands.**
+When a task session or the runner spawns a gate or step, capture its exit
+code by redirecting output to a file and immediately reading `$?` (or
+`echo "exit=$?"` on the next line) rather than piping to `tail`,
+`grep`, or similar. Through a pipe, only the downstream tool's exit code
+is captured:
+
+```bash
+# WRONG: tail's exit code is read, not the test runner's
+bun test 2>&1 | tail -10
+echo "Exit code: $?"  # This reads tail's exit code, not bun test's
+
+# WRONG: PIPESTATUS array is empty on zsh (spelled $pipestatus, indexed from 1)
+bun test 2>&1 | tail -10
+echo "Exit code: ${PIPESTATUS[0]}"  # Empty on zsh
+
+# CORRECT: capture to file, then read immediately
+bun test > output.log 2>&1
+exit_code=$?
+echo "Exit code: $exit_code"
+```
+
+**Never use `until` or `while` + `sleep` to poll for completion.** Run the
+gate or step in the background (with `&` or shell job control), redirect
+its output to a file, and check completion by watching the file (with
+`tail -f` in a test watcher, or by reading `test -s` for size, or by
+checking the exit file you write yourself), then read the exit code from
+the exit file. The runner records steps as they complete and holds their
+exit codes; a background loop that waits adds no value when the runner
+already provides the records. If you are writing a test that spawns a
+gate, write the exit code to a marker file or read it from the process's
+recorded step.
+
+**The summary line is what the runner reads.** Bun writes a line like
+`Ran 390 tests, 385 pass, 5 fail (~175s)` after all tests complete. The
+runner parses Bun's summary to extract the counts. Two gates run on the
+same tree produce identical counts unless a case reads an input the tree
+does not own — which a few cases do, documented below. When debugging,
+reproduce the same test run to verify: two identical runs produce identical
+output, so once-only variation points to the input, not the gate.
+
+### Known failures by cause
+
+The following failures appear on every run because the tree or the test
+itself is in that state. Check this list before investigating a failure
+you see in a run record.
+
+**Two parity-lineage tests read the sibling's live store (baseline: 4
+pass, 2 fail).**
+`src/tests/parity-lineage.test.ts` compares the sibling's stored effort
+rows against a fresh collection over that sibling's live session directory
+— input this repository does not own. Two of six cases fail: `matches
+every plainly-stored session row to its fresh counterpart, byte for byte`
+and `accounts for every grown session log: neither size nor mtime moved
+backward`. Both throw `parity lineage: stored session <id> has no fresh
+counterpart` because the `.jsonl` for a session the stored rows name has
+been deleted from the live directory. This does NOT clear on a re-run.
+Prove it pre-existing by running the test at `origin/main` in a worktree
+(do not stash, since the input is outside the tree): `git worktree add -q
+--detach <tmp> origin/main`, `ln -s` the real `node_modules` into it, run
+the one file there (about 5s, no `bun install` needed), and remove with
+`git worktree remove --force`. Measured at both ends: `4 pass`, `2 fail`.
+
+**One case reads a frozen snapshot of logs (baseline: passes, race
+possible).**
+`src/tests/parity-differential.test.ts` runs the collector twice over a
+frozen snapshot from the sibling's session directory to eliminate the race
+where the sibling's loop appends to `.jsonl` files while collection runs.
+Both backends read identical input. The race does not survive a re-run
+against a sibling that has since gone quiet. If one run passes and the
+next fails, re-run the same suite: a real parity failure reproduces; a
+race does not.
+
+**One case reads a gitignored plan (baseline: red).**
+`src/plan/parse.test.ts`'s `a real plan file on disk` reads
+`.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a
+fixture, and `.rafa/` is gitignored. Where the file is absent, the test
+fails with an unhandled `ENOENT` between tests. Prove pre-existing in a
+worktree at `origin/main`, not a stash (a stash is a no-op once a plan's
+diff commits).
+
+**Three cleanup cases are red since 2026-09-24T12:00Z (baseline: 6 pass,
+3 fail).**
+`src/cleanup/scratch-repository.test.ts` reads its worktrees at fixed
+`SCRATCH_NOW` (2026-09-24T12:00Z), but worktrees carry their real
+modification time. Once wall-clock time passes `SCRATCH_NOW`, every
+worktree carries a `recent` blocker and the three `readCleanup over a
+scratch repository` cases fail. It stays red until the fixture dates
+worktrees relative to `SCRATCH_NOW`.
+
+**CHANGELOG.md holds old directory tokens red since 0.9.2.**
+`src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
+fails because `CHANGELOG.md`'s 0.9.2 section names old directories without
+a slash, and the sweep catches both spellings. A plan's session may not
+touch a released section, so it stays red until a change exempts
+`CHANGELOG.md` or rewords those lines.
+
+**One suite prints a model refusal on a clean run (baseline: passes).**
+`src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
+`Sorry, this request could not be completed.` and exits 3; the planted
+binary's stdout is not captured away from the suite's own, so both land in
+the run log. Read the counts and exit code, never the prose around them.
+
+**About twenty spawned tests fail due to `isUnderTempDir` on macOS.**
+`src/effort/store/location.test.ts`'s `answers true for a path under the
+real path of a symlinked temporary directory` is red because `isUnderTempDir`
+canonicalizes the temp dir but not the path, so paths through the symlink
+read as outside. This cascades to every spawned test that runs a task
+session through this checkout's `bun src/rafa.ts` and needs a migrated
+table, halting the loop with `effort store: <path> needs migration ...;
+a development build migrates only a store under the temp directory or
+RAFA_EFFORT_DIR`. Affected files: `src/tests/loop-sessions.test.ts`,
+`src/tests/task-report.test.ts` (six cases), `src/tests/loop-output.test.ts`
+(three cases), `src/tests/effort-skills-collect-integration.test.ts`,
+`src/tests/serve-spawned.test.ts`, `src/tests/command-output.test.ts`,
+`src/tests/preflight-halts.test.ts` (two cases), and
+`src/tests/lesson-push-e2e.test.ts`. Confirmed pre-existing at `origin/main`
+(commit `e5041c5`) with a worktree.
+
+**A worktree runs fewer skills-tier tests.** Three of the skills-tier
+checker suite's cases fail inside a `git worktree` of this repository and
+pass in the main checkout. The cause is not investigated. Run only the
+file you are proving in the worktree, or subtract those three before
+comparing a full run there against a run in the main checkout.
+
+**Two `migrations.test.ts` cases read machine state.**
+`describe('the installed 0.24.1 runtime')`'s `holds the rule the
+transcription copies` and `describe('the lock at the newest release tag')`'s
+`keeps every line of the lock at v0.28.0` fail when the installed binary
+and the checked-out tag are older than this tree expects.
+
+**One `copy.test.ts` case reads a filesystem-specific error string.**
+`rafa effort copy over a live store`'s `copies while another connection
+holds a read transaction...` expects `database is locked` but this machine's
+SQLite reports `disk I/O error` for the same contention instead.
 
 ### Reading the captures
-
-A gate's output is what it wrote to stdout and stderr. The first line after
-any banner carries the verdict: TypeScript exits nonzero on type errors,
-ESLint exits nonzero on lint violations, and the test runner exits nonzero
-when any test fails.
-
-**A green gate is a zero exit code.** Capture the exit code beside the
-gate name, not a word from the output. Redirect the gate to a file and
-read `$?` rather than piping it into `tail`: through a pipe the code read
-is `tail`'s, and `${PIPESTATUS[0]}` prints empty here because zsh spells
-that array `$pipestatus` and indexes it from 1. The test runner writes
-pass/fail counts after all tests complete, and its order is
-deterministic, so two runs of the same tree move only where a case reads
-an input the tree does not own — which two cases do, below.
-
-**The full suite outlasts a 120-second tool call.** `bun run test` runs
-its 390-odd files one after another in one process, about 175s at
-rafa-100's head, so a foreground call with the default timeout is cut
-off before the summary line. Run it in the background with the output
-redirected to a file, and read the exit code and the `Ran N tests`
-line once it ends. This replaces nothing on this page.
-
-**One case reads a frozen copy of session logs.**
-`src/tests/parity-differential.test.ts` runs the collector twice, once
-per backend, over a frozen snapshot of logs from the sibling's session
-directory `~/.claude/projects/-Users-marcos-projects-agentic-research`.
-The snapshot eliminates the race condition where the live directory would
-change between collection passes: the sibling's loop would append to its
-`.jsonl` files while the test collects, altering the rows the test reads.
-Both backends now read identical input and are compared for parity, with
-the test validating that `holds every session row byte-identical between
-backends, keyed by session id`.
-
-The fields the race moves are NOT confined to `sizeBytes` and
-`modifiedAt`, as this paragraph read until 2026-09-20: one run during
-rafa-21 differed in `lineCount`, `recordCount`, `recordTypeCounts`,
-`usage` and `lastTimestamp` with those two EQUAL, which a two-field rule
-would have misread as a real parity failure. Separate race from failure
-by re-running the file instead: the race does not survive a re-run
-against a sibling that has since gone quiet, while a real parity failure
-reproduces every time. Do NOT reach for a stash-and-re-run to prove it
-pre-existing: that is a second full suite against a moving input.
-
-**One case reads the sibling's LIVE store, and it is red here.**
-`src/tests/parity-lineage.test.ts` compares the sibling's stored effort
-rows against a fresh collection over that sibling's live session
-directory, neither of them an input this repository owns. Two of its six
-cases fail on this machine — `matches every plainly-stored session row to
-its fresh counterpart, byte for byte` and `accounts for every grown
-session log: neither size nor mtime moved backward` — both throwing
-`parity lineage: stored session <id> has no fresh counterpart` from
-`freshCounterpartOf`, because the `.jsonl` for a session the stored rows
-name has been deleted from the live directory. **So `bun run test` cannot
-exit 0 here**, and the gate capture to record is exit 1 with `2 fail`
-under that one file, not "green apart from". Unlike the differential race
-above, this does NOT clear on a re-run, and that is the first control:
-reproducing alone separates the two. The second is a run at the base,
-which a stash cannot give you since the input is outside the tree —
-`git worktree add -q --detach <tmp> origin/main`, `ln -s` the real
-`node_modules` into it, run the one file there (about 5s, no `bun install`
-needed), and remove it with `git worktree remove --force`. Identical
-counts at both ends prove the base is red for the same reason. Measured
-at `0aec45d` and at rafa-63's head: `4 pass`, `2 fail` either side. Do not
-re-file it as a finding; over twenty tasks of one plan already did.
-
-A worktree changes what the skills-tier checker suites find: three of their
-cases fail inside a `git worktree` of this repository and pass in the main
-checkout (one is `this repository skills tier, checked with the PATH a CI
-runner provides > exits 0 with no --fix`). The cause is not investigated.
-Run only the file you are proving in the worktree, or subtract those three
-before comparing a full run there against one here. This paragraph replaces
-nothing.
-
-**One case reads a gitignored plan, and it is red in any checkout
-without it.** `src/plan/parse.test.ts`'s `a real plan file on disk` reads
-`.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a
-fixture, and `.rafa/` is gitignored whole, so where that file is absent
-the suite reports an unhandled `ENOENT` between tests on top of the
-parity-lineage failures above. Measured at rafa-80's head and at
-`origin/main` alike. Prove it pre-existing with the worktree at
-`origin/main`, not a stash: once a plan's diff is committed a stash is a
-no-op, and it would only pull uncommitted work out from under a session
-still editing.
-
-**One case reads the tracked CHANGELOG, and it is red since 0.9.2.**
-`src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
-reports `CHANGELOG.md` holding both old directory tokens: two entries
-of the 0.9.2 section name the old directories without a slash, and the
-sweep catches the slashless spelling too. Do not quote the reported line
-here: until 2026-09-23 this paragraph did, verbatim, and so the same case
-reported `context/verification.md` as a second offender. It fails alone
-as well, so it is not state leaking from an earlier file, and with the
-two parity-lineage cases the full run reads `3 fail`, not 2. A plan's
-session may not touch a released section to fix it, so it stays red
-until a change exempts `CHANGELOG.md` or rewords those lines. This paragraph replaces nothing;
-it is the third known failure the pages above did not list.
-
-**Three cleanup cases are red since 2026-09-24T12:00Z.**
-`src/cleanup/scratch-repository.test.ts` reads its worktrees at the fixed
-`SCRATCH_NOW` (2026-09-24T12:00Z), but the worktrees carry their real
-modification time. Once the wall clock passes `SCRATCH_NOW` that time is
-later than the reading's clock, so every worktree carries a `recent`
-blocker (`modified today, within cleanup.worktreeIdleDays (0)`) and three
-`readCleanup over a scratch repository` cases fail: `6 pass`, `3 fail`,
-identically on `origin/main`. It stays red until the fixture dates its
-worktrees relative to `SCRATCH_NOW`. A test that needs an idle worktree
-from that fixture scripts `modifiedAt` rather than reading the disk, as
-`src/status/seen.test.ts` does. This paragraph replaces nothing.
-
-**One suite prints a model refusal on a clean run.**
-`src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
-`Sorry, this request could not be completed.` and exits 3, and a second
-that answers a `proposals:` YAML block; the planted binary's stdout is
-not captured away from the suite's own, so both land in the log of a run
-that exited 0. Scanning such a log for trouble finds prose that reads
-like a failed session. Read the counts and the exit code, never the
-prose around them.
 
 **Inside a Claude Code session, `bun test` names failures only.** The
 session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`
@@ -172,16 +261,16 @@ on it. Test files already carry errors no gate ever reported, so compare
 against the base before attributing one to the diff: TS2769 where a
 `readonly` array reaches `toEqual` (`src/config-schema.test.ts`,
 `src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
-`it(name, { timeout }, fn)` form in the spawned suites. A type-level claim that must stay
-checked belongs in the suite instead, as in `src/ports/index.test.ts`,
-which runs `ts.createProgram` over probe files.
+`it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
+that must stay checked belongs in the suite instead, as in
+`src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
 
-Widening an exported interface therefore reaches every `*.test.ts`
-literal of it with no gate saying so: grep the type name across the test
-files and fix each literal by hand. Adding `blocking` to `SpecReviewGap`
-reddened a `toEqual` in `src/adapters/planner/claude.test.ts`, which
-builds a gap as an object literal rather than through `parseSpecReview`,
-and only `bun test` reported it.
+Widening an exported interface reaches every `*.test.ts` literal with no
+gate saying so: grep the type name across the test files and fix each
+literal by hand. Adding `blocking` to `SpecReviewGap` reddened a `toEqual`
+in `src/adapters/planner/claude.test.ts`, which builds a gap as an object
+literal rather than through `parseSpecReview`, and only `bun test` reported
+it.
 
 **A passing test file proves nothing about its imports.** Bun answers a
 bare `'vitest'` import with its own runner, so a file never ported off
@@ -227,56 +316,6 @@ from the worktree but still staged in the index passes `git ls-files`
 while failing `existsSync`. Every gate that opens the file by path will
 fail, so stage the deletion and re-run — a gate's refusal to open a staged
 delete is not a fault.
-
-**On this machine, `isUnderTempDir` misses `tmpdir()`'s own symlink, and
-about twenty spawned tests fail from that one row.** `TMPDIR` here resolves
-under `/var/folders/...`, itself reached through `/tmp` on macOS, and
-`src/effort/store/location.test.ts`'s `answers true for a path under the
-real path of a symlinked temporary directory` is red for it: `isUnderTempDir`
-canonicalizes the temp dir it is handed but not the path it is asked about,
-so a path built through the link side (rather than the real side) reads
-as outside. `refuseUnownedDevelopmentWrite`
-(`src/effort/store/development-build.ts`) calls `isUnderTempDir` to decide
-whether a development build may migrate a scratch store, and every spawned
-test that runs a task session through this checkout's `bun src/rafa.ts`
-therefore hits the refusal once the session's report needs a migrated
-table — `effort store: <path> needs migration ...; a development build
-migrates only a store under the temp directory or RAFA_EFFORT_DIR`. The
-loop then halts the run rather than proceeding, so every assertion past
-that point fails too: a timed-out `loop start`/`loop pause` pair
-(`src/tests/loop-sessions.test.ts`, 90s each), six `rafa start` cases
-reading tables the halted report never wrote (`src/tests/task-report.test.ts`),
-and one each in `src/tests/loop-output.test.ts` (three cases),
-`src/tests/effort-skills-collect-integration.test.ts`,
-`src/tests/serve-spawned.test.ts`, `src/tests/command-output.test.ts`,
-`src/tests/preflight-halts.test.ts` (two cases) and
-`src/tests/lesson-push-e2e.test.ts`. Confirmed pre-existing at `origin/main`
-(`e5041c5`) with a worktree, `loop-output.test.ts` failing the same way
-there; the root cause predates every commit on this plan's branch —
-`isUnderTempDir` and `refuseUnownedDevelopmentWrite` were both last
-touched by rafa-234 (`dea6b76`), already on `main`. Do not re-file it as a
-finding; this paragraph is the record. It clears once `isUnderTempDir`
-canonicalizes the path argument the same way it canonicalizes the temp
-dir argument.
-
-**Two `migrations.test.ts` cases read the globally installed `rafa`, and
-one reads a release tag, both machine state.**
-`describe('the installed 0.24.1 runtime')`'s `holds the rule the
-transcription copies` compares a locally installed CLI's bytes against a
-transcribed rule, and `describe('the lock at the newest release tag')`'s
-`keeps every line of the lock at v0.28.0` reads a git tag; both fail here
-because the installed binary and the checked-out tag are older than this
-tree expects. Unrelated to the temp-dir cascade above and to this plan:
-`migrations.test.ts` was last touched by rafa-234 (`dea6b76`), already on
-`main`. This paragraph replaces nothing.
-
-**One `copy.test.ts` case reads a filesystem-specific SQLite error
-string.** `rafa effort copy over a live store`'s `copies while another
-connection holds a read transaction...` expects `database is locked` but
-this machine's SQLite reports `disk I/O error` for the same contention
-instead. Unrelated to the temp-dir cascade above; `src/commands/effort/copy.test.ts`
-was last touched by rafa-234 (`dea6b76`), already on `main`. This
-paragraph replaces nothing.
 
 ### Spawned CLI tests
 
