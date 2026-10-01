@@ -46,6 +46,7 @@ import { createCommandRegistry } from '../cli/registry.js';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
+import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry a spawned run executes. */
@@ -198,7 +199,7 @@ export function plantScratchRepo(base: string, options: ScratchOptions = {}): Sc
   execFileSync('git', ['init', '-q', '.'], {
     cwd: repo,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
   if (options.project !== false) plantProjectConfig(repo);
 

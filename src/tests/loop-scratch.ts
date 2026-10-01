@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The `src/` directory. */
@@ -97,7 +98,7 @@ function git(cwd: string, home: string, ...args: string[]): void {
   execFileSync('git', args, {
     cwd,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 

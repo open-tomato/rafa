@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 
+import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -72,10 +73,7 @@ export function git(cwd: string, home: string, ...args: readonly string[]): { re
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
       LC_ALL: 'C',
     },
   });
