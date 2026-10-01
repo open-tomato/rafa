@@ -189,22 +189,6 @@ touch a released section, so it stays red until a change exempts
 binary's stdout is not captured away from the suite's own, so both land in
 the run log. Read the counts and exit code, never the prose around them.
 
-**About twenty spawned tests fail due to `isUnderTempDir` on macOS.**
-`src/effort/store/location.test.ts`'s `answers true for a path under the
-real path of a symlinked temporary directory` is red because `isUnderTempDir`
-canonicalizes the temp dir but not the path, so paths through the symlink
-read as outside. This cascades to every spawned test that runs a task
-session through this checkout's `bun src/rafa.ts` and needs a migrated
-table, halting the loop with `effort store: <path> needs migration ...;
-a development build migrates only a store under the temp directory or
-RAFA_EFFORT_DIR`. Affected files: `src/tests/loop-sessions.test.ts`,
-`src/tests/task-report.test.ts` (six cases), `src/tests/loop-output.test.ts`
-(three cases), `src/tests/effort-skills-collect-integration.test.ts`,
-`src/tests/serve-spawned.test.ts`, `src/tests/command-output.test.ts`,
-`src/tests/preflight-halts.test.ts` (two cases), and
-`src/tests/lesson-push-e2e.test.ts`. Confirmed pre-existing at `origin/main`
-(commit `e5041c5`) with a worktree.
-
 **A worktree runs fewer skills-tier tests.** Three of the skills-tier
 checker suite's cases fail inside a `git worktree` of this repository and
 pass in the main checkout. The cause is not investigated. Run only the

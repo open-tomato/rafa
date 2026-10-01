@@ -1088,8 +1088,9 @@ path; both patterns keep the real `.rafa/effort/` untouched.
 otherwise.** `guardTestProcess` (`store/location.ts`) runs before any file
 or directory is made, at every open of either backend and at
 `fix-schema`'s. In a process whose `Bun.main` ends in `.test.ts`, or whose
-environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (or its
-real path) throws `effort store: a test opened <path>, outside the temp
+environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (as
+spelled, or with the path and `tmpdir()` both read through their real
+paths, a path not made yet through its nearest existing ancestor) throws `effort store: a test opened <path>, outside the temp
 directory <tmp>; a test opens stores under tmpdir() only`. `runRafa` sets
 `RAFA_TEST=1` and the suite's `TMPDIR` on its child. A SQLite read of a
 file that does not exist opens nothing and so is not guarded; an NDJSON

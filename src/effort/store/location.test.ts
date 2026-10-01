@@ -219,6 +219,32 @@ describe('isUnderTempDir', () => {
     expect(isUnderTempDir(join(real, 'a', 'effort.sqlite'), link)).toBe(true);
     expect(isUnderTempDir(join(link, 'a', 'effort.sqlite'), link)).toBe(true);
   });
+
+  it('answers true for a path not made yet, spelled through a symlinked temporary root', () => {
+    // macOS's shape: `/var` links to `/private/var`, the temporary directory is read as its real path,
+    // and a store path is spelled from `/var`.
+    const root = freshDir('symlinked-root');
+    const realRoot = join(root, 'private-var');
+    const linkRoot = join(root, 'var');
+    mkdirSync(join(realRoot, 'T'), { recursive: true });
+    symlinkSync(realRoot, linkRoot);
+    const path = join(linkRoot, 'T', 'a', '.rafa', 'effort', 'effort.sqlite');
+
+    expect(existsSync(join(linkRoot, 'T', 'a'))).toBe(false);
+    expect(isUnderTempDir(path, join(realRoot, 'T'))).toBe(true);
+    expect(isUnderTempDir(path, join(linkRoot, 'T'))).toBe(true);
+  });
+
+  it('control: answers false for a path not made yet, spelled through the symlinked root but outside the temporary directory', () => {
+    const root = freshDir('symlinked-root-control');
+    const realRoot = join(root, 'private-var');
+    const linkRoot = join(root, 'var');
+    mkdirSync(join(realRoot, 'T'), { recursive: true });
+    symlinkSync(realRoot, linkRoot);
+
+    expect(isUnderTempDir(join(linkRoot, 'other', 'effort.sqlite'), join(realRoot, 'T'))).toBe(false);
+    expect(isUnderTempDir(join(linkRoot, 'T', '..', 'other', 'effort.sqlite'), join(realRoot, 'T'))).toBe(false);
+  });
 });
 
 describe('guardTestProcess', () => {
