@@ -9,6 +9,31 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.33.0 — 2026-10-01, rafa-hub, the service a team's devices sync the effort store through; Loop task sessions run only the tests their change reaches; Stretch agent, alpha, and the events output for loops; A loop run ends delivered — eight loop bugs fixed
+<!-- rafa:fragments rafa-325-rafa-hub rafa-479-loop-task-sessions-run rafa-598 rafa-579-loop-run-ends-delivered -->
+
+- rafa-hub: New `@open-tomato/rafa-hub` server that a team's devices sync their effort stores through, with health, status, push and pull routes, a SQLite store, access for anyone with write permission on the configured GitHub repository, YAML config from `RAFA_HUB_CONFIG`, and a Docker recipe.
+- Sync: New `@open-tomato/rafa-sync-service` module that provides the `service` sync strategy. It pushes new effort rows to the hub, merges the rows other devices pushed, and asks for `rafa self-update` when the hub's store is newer than your rafa.
+- Configuration: New `hub.url`, `hub.tokenSecret` and `hub.timeout` settings. `effort.sync: service` is refused without `hub.url`, and the token is read from the system secret store, never from config.
+- Configuration: new `tests.fullSuiteTriggers` and `tests.integration` glob lists name the files whose change widens a task step to the full suite and the integration tests every stage step runs.
+- Effort store: `rafa effort collect` and each loop task now push and then pull through the project's sync strategy. `rafa status`, `rafa next` and `rafa effort report` pull before they read. With the hub unreachable, a command prints one line and carries on with the local store. The `./store` entry now exports the JSON sync wire codec, `mergeStore` and `TRUSTED_PERMISSIONS`.
+- Effort store: merging a pulled store, including a loop run's end-of-task sync pull, no longer refuses the run that asked for it, while any other live run on the store, even one sharing its pid, is still refused
+- Documentation: READMEs for both packages, and the Sync section of `context/effort-store.md` rewritten for the `service` strategy and the `hub.*` keys.
+- Documentation: `context/verification.md` and `context/workflow.md` describe the test tiers, the runner's recorded steps, the baseline and known failures, and the `tests=` key.
+- Loop: task sessions run only `bun test --changed=<base>` against the base commit they are handed, plus `bunx tsc --noEmit` and `bunx eslint` on their changed files, and `rafa loop start` runs the rest itself: a full-suite baseline at the plan's first dispatch, a scoped step after each task and each finished stage, and the full suite before the wrap-up; a step with failures new against the baseline blocks the next task with the failing files named, while failures the baseline already held block nothing.
+- Loop: `RAFA_OUTPUT=events` (or `--output=events`) prints one `rafa·` line per loop event, and a session's stdout stays off the screen; every other command prints as text under it.
+- Declarations: a new `tests=affected|module|full` task key sets how widely the runner tests after a task; `affected` is the default.
+- Agents: the gate sections of `loop-implementer`, `build-error-resolver`, `code-reviewer` and `tdd-guide` now give the scoped gates, read each tool's own exit code and never poll a running suite.
+- Operators: an alpha stretch agent, its watchtower and three phase skills ship under `bundled/operators/`, never served to a loop.
+- Output: named events are a fifth event kind; json writes them, text leaves them out, and a runtime child's json lines carry them through.
+- Tooling: the rafa-tooling hook is no longer registered in this repository.
+- loop: a run's record now carries its phase (task, wrap-up, pull-request, ci or repair), and a record from an older rafa reads as task; a wrap-up that ends without a pull request runs `loop.wrapUp.retries` more wrap-up sessions, then has the loop open the pull request itself, and the run is recorded done only once it is open (or under `pr.provider: none`), otherwise it ends blocked with exit 1, naming the branch and the step; `loop start --as-worktree` run again reuses the plan's existing worktree and refuses a mismatched one, naming both; `loop start` on a detached HEAD refuses before writing any run record, naming `git switch <base>` and `--as-worktree`; Ctrl-C or `rafa loop stop` during the suite step stops the run, recording the step interrupted and marking no task blocked
+- CLI: `rafa loop status` and `rafa loop list` show the phase each run is in beside its tasks done
+- extras: the tomato prompt header shows a loop's phase once its tasks are done, and never a task count past the total
+- Config: new `loop.wrapUp.retries` setting (default 1; a whole number from 1 to 3, or false for no retry), with its commented line in the config `rafa init` writes
+- rafa next: reports a running loop instead of telling you to commit or set aside the loop's own edits, and the working-tree line names the checkout it read
+- Fixed: a linked worktree beside its main checkout now resolves to that checkout's rafa project even when a parent folder holds its own `.rafa/config.yaml`
+
 ## 0.32.0 — 2026-09-30, The publish line `rafa release tag` prints comes from config; Triage takes local paths out of filed bugs and their keys; Planned under assumptions; Epics and blockers as a board mode — `labels` or GitHub's native relationships
 <!-- rafa:fragments rafa-449 fix-release-publish-command rafa-449-2 fix-triage-local-paths rafa-324-claim-issue-so-two rafa-340-relationships-epics-blockers-github -->
 
