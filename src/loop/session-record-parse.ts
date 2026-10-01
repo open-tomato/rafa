@@ -21,7 +21,8 @@
  * value is not a hop record (null included), a `worktree` key whose value
  * is no absolute path (null included), a `steps` key whose value is no
  * list of steps (null included), a step outside the shape `sessions.ts` describes or whose
- * `newFailures` names a test its `failures` does not, a pid that is no
+ * `newFailures` names a test its `failures` does not, a step whose
+ * `interrupted` key holds anything but `true`, a pid that is no
  * positive whole number (signal 0 to pid 0 or below would reach a process
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. `readSessions`
@@ -189,6 +190,15 @@ function stepFailuresProblem(step: object, at: string): string | null {
     : `${at}.newFailures names ${describeValue(stray)}, which ${at}.failures does not`;
 }
 
+/** The problem with a step's `interrupted`, or null: when there, it is `true`. */
+function stepInterruptedProblem(step: object, at: string): string | null {
+  if (!Object.hasOwn(step, 'interrupted')) return null;
+  const interrupted = field(step, 'interrupted');
+  return interrupted === true
+    ? null
+    : `${at}.interrupted is ${describeValue(interrupted)}, expected true or no key`;
+}
+
 /** Every problem with one step, the `at` naming its place in the record. */
 export function stepProblems(step: unknown, at: string): string[] {
   if (!isObject(step)) return [`${at} is ${describeValue(step)}, expected a step`];
@@ -214,6 +224,7 @@ export function stepProblems(step: unknown, at: string): string[] {
       ? null
       : `${at}.summary is ${describeValue(summary)}, expected null or a string`,
     stepFailuresProblem(step, at),
+    stepInterruptedProblem(step, at),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
@@ -311,6 +322,9 @@ function freezeStep(step: SessionStep): SessionStep {
     summary: step.summary,
     failures: freezeFailures(step.failures),
     newFailures: freezeFailures(step.newFailures),
+    ...(step.interrupted === true
+      ? { interrupted: true as const }
+      : {}),
   });
 }
 

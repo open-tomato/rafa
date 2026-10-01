@@ -30,6 +30,7 @@ import {
   blockerText,
   dueStages,
   ensureBaseline,
+  isStepInterrupted,
   junitFileFor,
   planOwnsReader,
   readStageLedger,
@@ -37,6 +38,7 @@ import {
   runPreWrapUpStep,
   runStageStep,
   runTaskStep,
+  SIGINT_EXIT_CODE,
   stageLedgerPathFor,
 } from './suite-step.js';
 
@@ -184,6 +186,16 @@ function linesAt(level: string): readonly string[] {
   return lines.filter((line) => line.level === level).map((line) => line.message);
 }
 
+/** What a `bun test` ended by SIGINT midway answers: exit 130, no summary, no JUnit file. */
+function killed(overrides: Partial<SuiteResult> = {}): SuiteResult {
+  return result({ exitCode: SIGINT_EXIT_CODE, summary: null, errors: null, junit: 'missing', ...overrides });
+}
+
+/** `context` with the runner's SIGINT flag reading `flag`. */
+function interruptedBy(context: SuiteStepContext, flag: boolean): SuiteStepContext {
+  return { ...context, isInterrupted: () => flag };
+}
+
 describe('ensureBaseline', () => {
   it('runs the full suite once, writes the file and records a baseline step with no new failure', async () => {
     const { context, seen } = contextWith([red([KNOWN])]);
@@ -211,7 +223,7 @@ describe('ensureBaseline', () => {
     writeBaseline(baselinePathFor(trackerPath), baselineWith());
     const { context, seen } = contextWith([]);
     const outcome = await ensureBaseline(context);
-    expect(outcome).toEqual({ baseline: baselineWith(), step: null });
+    expect(outcome).toEqual({ baseline: baselineWith(), step: null, interrupted: false });
     expect(seen.runs).toHaveLength(0);
     expect(seen.steps).toHaveLength(0);
   });
@@ -411,7 +423,7 @@ describe('runStageStep', () => {
       seams: { listTestFiles: () => ['src/b/b.test.ts'] },
     });
     const outcome = await runStageStep(context, stage, baselineWith());
-    expect(outcome).toEqual({ kind: 'stage', step: null, red: false, blocker: null, blockedLine: null });
+    expect(outcome).toEqual({ kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null });
     expect(seen.runs).toHaveLength(0);
     expect(seen.steps).toHaveLength(0);
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
@@ -502,5 +514,99 @@ describe('planOwnsReader', () => {
     expect(await withIssue()).toBeNull();
     expect(calls).toBe(1);
     expect(linesAt('info').filter((line) => line.startsWith('🗂'))).toHaveLength(2);
+  });
+});
+
+describe('a step stopped by SIGINT', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+
+  it('reads exit 130 as SIGINT, and neither SIGTERM\'s 143 nor a red exit 1 as it', () => {
+    expect(SIGINT_EXIT_CODE).toBe(130);
+    expect(isStepInterrupted({}, { exitCode: 130 })).toBe(true);
+    expect(isStepInterrupted({}, { exitCode: 143 })).toBe(false);
+    expect(isStepInterrupted({}, { exitCode: 1 })).toBe(false);
+    expect(isStepInterrupted({ isInterrupted: () => true }, { exitCode: 0 })).toBe(true);
+    expect(isStepInterrupted({ isInterrupted: () => false }, { exitCode: 0 })).toBe(false);
+  });
+
+  it('records a task step whose bun test ended on SIGINT as interrupted, writing no blocker', async () => {
+    const { context, seen } = contextWith([killed()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome).toMatchObject({ kind: 'task', red: false, interrupted: true, blocker: null, blockedLine: null });
+    expect(seen.steps).toHaveLength(1);
+    expect(seen.steps[0]).toMatchObject({ kind: 'task', exitCode: 130, summary: null, newFailures: [], interrupted: true });
+    expect(outcome.step).toEqual(seen.steps[0] ?? null);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    expect(linesAt('error')).toEqual([]);
+    expect(linesAt('info').some((line) => line.includes('interrupted by SIGINT'))).toBe(true);
+  });
+
+  it('blocks the next task on the same run ended by exit 1, the control that the step could have blocked', async () => {
+    const { context, seen } = contextWith([killed({ exitCode: 1 })]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome).toMatchObject({ red: true, interrupted: false, blockedLine: 9 });
+    expect(Object.keys(seen.steps[0] ?? {})).not.toContain('interrupted');
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.status).toBe('blocked');
+  });
+
+  it('reads a step as interrupted when the runner received SIGINT, whatever bun test answered', async () => {
+    const { context, seen } = contextWith([red([FRESH])]);
+    const outcome = await runTaskStep(interruptedBy(context, true), input);
+
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null, blockedLine: null });
+    expect(seen.steps[0]).toMatchObject({ failures: [FRESH], newFailures: [], interrupted: true });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+
+    // Control: the same new failure with the flag down blocks the next task.
+    const control = contextWith([red([FRESH])]);
+    expect((await runTaskStep(interruptedBy(control.context, false), input)).red).toBe(true);
+  });
+
+  it('writes no baseline and enters no stage in the ledger for an interrupted baseline', async () => {
+    const { context, seen } = contextWith([killed()]);
+    const outcome = await ensureBaseline(context);
+
+    expect(outcome.interrupted).toBe(true);
+    expect(outcome.step).toMatchObject({ kind: 'baseline', interrupted: true });
+    expect(seen.steps).toHaveLength(1);
+    expect(existsSync(baselinePathFor(trackerPath))).toBe(false);
+    expect(existsSync(stageLedgerPathFor(trackerPath))).toBe(false);
+
+    // Control: the same baseline, not interrupted, is written and covers stage One.
+    const control = contextWith([result()]);
+    expect((await ensureBaseline(control.context)).interrupted).toBe(false);
+    expect(existsSync(baselinePathFor(trackerPath))).toBe(true);
+    expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
+  });
+
+  it('leaves an interrupted stage step out of the ledger, so the stage stays due, and blocks nothing', async () => {
+    const { context } = contextWith([killed()]);
+    const outcome = await runStageStep(context, { stage: 0, name: 'One' }, baselineWith());
+
+    expect(outcome).toMatchObject({ kind: 'stage', red: false, interrupted: true, blockedLine: null });
+    expect(readStageLedger(stageLedgerPathFor(trackerPath))).toEqual([]);
+    expect(dueStages(readFileSync(trackerPath, 'utf8'), [])).toEqual([{ stage: 0, name: 'One' }]);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('stops the due stage steps after an interrupted one', async () => {
+    const twoDone = TRACKER.replace('- [ ] third task\n- [ ] fourth task', '- [x] third task\n- [x] fourth task\n\n# Stage: Three\n\n- [ ] fifth task');
+    writeFileSync(trackerPath, twoDone, 'utf8');
+    expect(dueStages(twoDone, [])).toHaveLength(2);
+    const { context, seen } = contextWith([killed(), result()]);
+    const outcomes = await runDueStageSteps(context, baselineWith());
+
+    expect(outcomes.map((outcome) => outcome.interrupted)).toEqual([true]);
+    expect(seen.runs).toHaveLength(1);
+  });
+
+  it('answers an interrupted pre-wrap-up step as interrupted and not red', async () => {
+    const { context, seen } = contextWith([killed()]);
+    const outcome = await runPreWrapUpStep(context, baselineWith());
+
+    expect(outcome).toMatchObject({ kind: 'pre-wrap-up', red: false, interrupted: true, blocker: null });
+    expect(seen.steps[0]?.interrupted).toBe(true);
   });
 });

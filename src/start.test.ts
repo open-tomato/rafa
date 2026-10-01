@@ -312,11 +312,11 @@ describe('where start.ts takes the suite steps', () => {
   /** The index of the first call to `name`, failing when there is none. */
   const indexOf = (calls: readonly BranchCall[], name: string): number => calls.indexOf(callTo(calls, name));
 
-  it('makes them once, over the run\'s root, checkout, tracker, session, config and plan', () => {
+  it('makes them once, over the run\'s root, checkout, tracker, session, config, plan and SIGINT flag', () => {
     const input = callTo(EVERY, 'createRunSuiteSteps').args[0] ?? '';
 
     expect(EVERY.filter((call) => call.name === 'createRunSuiteSteps')).toHaveLength(1);
-    for (const field of ['repoRoot,', 'checkout,', 'trackerPath,', 'sessionId: session.id,', 'settings: runConfig.config,', 'planContent,']) {
+    for (const field of ['repoRoot,', 'checkout,', 'trackerPath,', 'sessionId: session.id,', 'settings: runConfig.config,', 'planContent,', 'isInterrupted: () => interrupted,']) {
       expect(input).toContain(field);
     }
   });

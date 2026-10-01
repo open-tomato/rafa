@@ -270,14 +270,19 @@
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
  * A failed task, a blocked one, a checkout that moved, a report left
- * unstored and a red suite step still stop the run by returning, which the dispatcher ends as a success, with exit
- * code 0. A triage failure stops nothing.
+ * unstored and a red or interrupted suite step still stop the run by
+ * returning, which the dispatcher ends as a success, with exit code 0. A
+ * triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
  * moment (`utils/claude.ts`), so the task ends then rather than when its
- * session would have, and the task is marked `[BLOCKED]`.
+ * session would have, and the task is marked `[BLOCKED]`. A SIGINT during
+ * a suite step, whether it ended `bun test` or reached the loop alone, is
+ * a stop and not a red step (`start/suite-step.ts`): the step is recorded
+ * `interrupted`, no task is marked, and the run returns, its record
+ * `stopped`, as it does when a pause's hold ends on the signal.
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -522,6 +527,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       sessionId: session.id,
       settings: runConfig.config,
       planContent,
+      isInterrupted: () => interrupted,
     });
 
     // Initialize tracker only if it doesn't exist

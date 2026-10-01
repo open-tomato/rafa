@@ -74,6 +74,12 @@
  *   - `newFailures`: those of `failures` that are new against the
  *     baseline; every one of them is also in `failures`, compared by file
  *     and name.
+ *   - `interrupted`: only on a step the runner read as a stop rather than
+ *     a suite's answer, `true`: its `bun test` ended on SIGINT, or the
+ *     runner received SIGINT while it ran (`start/suite-step.ts`). Its
+ *     failures are what Bun had reported by then, and none of them is new.
+ *     Every other step carries no `interrupted` key at all, never one set
+ *     to false, so it is written byte for byte as it was before the field.
  *
  * ## One session is one `loop start`
  *
@@ -217,6 +223,8 @@ export interface SessionStep {
   readonly failures: readonly SuiteFailure[];
   /** Those of {@link SessionStep.failures} new against the baseline. */
   readonly newFailures: readonly SuiteFailure[];
+  /** `true` on a step read as a stop on SIGINT; left out of every other. See the module note. */
+  readonly interrupted?: true;
 }
 
 /** One `loop start` run, as its record holds it. See the module note. */
