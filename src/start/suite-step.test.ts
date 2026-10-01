@@ -332,6 +332,12 @@ describe('runTaskStep', () => {
     expect(outcome.blocker).toContain('exited 1 and printed no summary line');
   });
 
+  it('is green on a project holding no test file, which Bun answers with exit 1 and no summary line', async () => {
+    const { context } = contextWith([result({ exitCode: 1, summary: null, errors: null, junit: 'missing', noTestFiles: true })]);
+    const outcome = await runTaskStep(context, input);
+    expect(outcome.red).toBe(false);
+  });
+
   it('treats every failure as new without a baseline', async () => {
     const { context, seen } = contextWith([red([KNOWN])]);
     const outcome = await runTaskStep(context, { ...input, baseline: null });

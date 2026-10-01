@@ -37,6 +37,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   CLAUDE_CODE_ENV,
   parseJunitFailures,
+  readNoTestFiles,
   readSummary,
   runSuite,
   suiteCommand,
@@ -169,6 +170,15 @@ describe('readSummary', () => {
   it('reads only the count lines directly above the summary', () => {
     const stderr = ' 9 errors\n(pass) x\n\n 1 pass\n 0 fail\nRan 1 test across 1 file. [1.00ms]\n';
     expect(readSummary(stderr).errors).toBe(0);
+  });
+});
+
+describe('readNoTestFiles', () => {
+  it('reads Bun\'s no-test-files error, and nothing else, as no test files', () => {
+    expect(readNoTestFiles('bun test v1.4.2\nerror: 0 test files matching **{.test,.spec,_test_,_spec_}.{js,ts,jsx,tsx} in --cwd="/x"\n')).toBe(true);
+    expect(readNoTestFiles('No tests found!\n\nTests need ".test" in the filename\n')).toBe(true);
+    expect(readNoTestFiles(fixture('no-match.stderr.txt'))).toBe(false);
+    expect(readNoTestFiles(fixture('clean.stderr.txt'))).toBe(false);
   });
 });
 

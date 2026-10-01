@@ -31,6 +31,10 @@
  *     where NO path matches exits 1, with `Test filter "./nope" had no
  *     matches`, no summary line and no JUnit file. Choosing paths that
  *     exist is the caller's concern.
+ *   - **A project holding no test file exits 1 with no summary line**,
+ *     printing `No tests found!` or `error: 0 test files matching ...`;
+ *     the result marks it `noTestFiles`, so a step reads it as green
+ *     rather than unreported.
  *   - **Bun does not create the JUnit file's directory, and a failed
  *     write keeps exit code 0.** It printed `JUnitReportFailed: Failed to
  *     write JUnit report` and exited 0. So the directory is created
@@ -115,6 +119,11 @@ export interface SuiteResult {
    */
   readonly errors: number | null;
   readonly junit: JunitReading;
+  /**
+   * True when Bun found no test file to run at all (a project with none,
+   * which it reports as an error and exit code 1); absent otherwise.
+   */
+  readonly noTestFiles?: boolean;
 }
 
 /** What one spawn of `bun test` answered. */
@@ -165,6 +174,14 @@ const COUNT_LINE = /^\s*(\d+) (\S.*)$/;
 
 /** The count line naming errors outside any test. */
 const ERROR_COUNT_LABEL = /^errors?$/;
+
+/** The lines Bun prints, in one of two wordings, instead of a summary when the project holds no test file. */
+const NO_TEST_FILES_LINE = /^(?:error: 0 test files matching |No tests found!)/m;
+
+/** True when `stderr` is Bun saying the project holds no test file at all. */
+export function readNoTestFiles(stderr: string): boolean {
+  return NO_TEST_FILES_LINE.test(stderr);
+}
 
 /** `path` as `bun test` reads it as a path rather than a filter; see the module note. */
 export function suitePathArgument(path: string): string {
@@ -354,5 +371,8 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
   const { summary, errors } = readSummary(stderr);
   const { junit, failures } = readJunit(options.junitFile);
-  return { command, exitCode, summary, failures, errors, junit };
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit };
+  return readNoTestFiles(stderr)
+    ? { ...result, noTestFiles: true }
+    : result;
 }

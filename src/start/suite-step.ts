@@ -375,7 +375,7 @@ function readDiff(git: GitRunner, from: string): readonly string[] | null {
 function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): StepVerdict {
   const { fresh, known } = splitFailures(result.failures, baseline);
   const newErrors = Math.max(0, (result.errors ?? 0) - (baseline?.errors ?? 0));
-  const unreported = result.exitCode !== 0 && result.summary === null;
+  const unreported = result.exitCode !== 0 && result.summary === null && result.noTestFiles !== true;
   return { fresh, known, newErrors, unreported };
 }
 
