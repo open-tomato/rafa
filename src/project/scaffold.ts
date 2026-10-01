@@ -129,6 +129,8 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
   `#   worktreeDir: ${CONFIG_DEFAULTS.loopWorktreeDir}   # where a loop adds its worktrees, read from the project root`,
+  '#   wrapUp:',
+  `#     retries: ${String(CONFIG_DEFAULTS.loopWrapUpRetries)}                 # 1..3 | false, wrap-up sessions rerun before rafa opens a missing PR itself`,
   '# pr:',
   '#   provider:                    # gh | none; unset reads it off the origin remote',
   `#   mergeMethod: ${CONFIG_DEFAULTS.prMergeMethod}          # squash | merge | rebase`,

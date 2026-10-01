@@ -16,8 +16,9 @@
  * `tierPins` and `routeTable`, and the readers of the release plan's
  * keys. `config-schema-release.ts` holds the `pr` and `release`
  * sections and `dangerous.acceptVersionCollision`, and
- * `config-schema-tests.ts` the `tests` section and its reader, both
- * spread in here.
+ * `config-schema-tests.ts` the `tests` section and its reader, and
+ * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
+ * all three spread in here.
  *
  * The modules sit under the 800-line cap of `context/source.md`, which
  * no gate reads. Measured with `wc -l` at the commit that added the `pr`
@@ -72,7 +73,8 @@
  * {@link SETTING_BY_KEY}, {@link SECTIONS} and the known-key index are
  * all read off it, so adding a setting is one field, one default, one
  * spec — in `config-schema-release.ts` for a `pr` or `release` key,
- * `config-schema-tests.ts` for a `tests` key —
+ * `config-schema-tests.ts` for a `tests` key,
+ * `config-schema-wrap-up.ts` for a `loop.wrapUp` key —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
@@ -105,6 +107,7 @@ import type {
   ReleaseSettings,
 } from './config-schema-release.js';
 import type { TestsSettings } from './config-schema-tests.js';
+import type { WrapUpSettings } from './config-schema-wrap-up.js';
 import type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -148,6 +151,7 @@ import {
   RELEASE_SETTINGS,
 } from './config-schema-release.js';
 import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
+import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 import {
   BOARD_RELATIONSHIP_MODES,
   busyTimeoutMs,
@@ -189,11 +193,13 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * Every setting, resolved. The module note maps each to its file key;
  * the `pr` and `release` fields are {@link PrSettings}' and
  * {@link ReleaseSettings}', `dangerousAcceptVersionCollision` is
- * {@link DangerousReleaseSettings}', and the `tests` fields are
- * {@link TestsSettings}'.
+ * {@link DangerousReleaseSettings}', the `tests` fields are
+ * {@link TestsSettings}', and `loopWrapUpRetries` is
+ * {@link WrapUpSettings}'.
  */
 export interface RafaConfig
-  extends PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings {
+  extends PrSettings, ReleaseSettings, DangerousReleaseSettings, TestsSettings,
+  WrapUpSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -360,6 +366,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   allowList: Object.freeze([]),
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
   loopWorktreeDir: join('.rafa', 'worktrees'),
+  ...WRAP_UP_DEFAULTS,
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   boardRelationships: 'labels',
@@ -458,6 +465,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     cli: true,
   },
   loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
+  ...WRAP_UP_SETTINGS,
   ...PR_SETTINGS,
   boardTrustedAuthors: {
     key: 'board.trustedAuthors',
