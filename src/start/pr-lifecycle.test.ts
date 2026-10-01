@@ -1059,10 +1059,16 @@ describe('the gate as start() calls it, through runWrapUp', () => {
   });
 
   it('hands it the seams of the run\'s checkout, and reads the provider there', () => {
-    const call = gateCall(wrapUpRun());
+    const source = wrapUpRun();
+    const call = gateCall(source);
+    // The provider reading is made once, over the checkout, and handed to
+    // both the pull request's delivery and the gate.
+    const reading = source.slice(source.indexOf('const readProvider = () =>'), source.indexOf('const finish = await finishRelease('));
 
     expect(call).toContain('...prLifecycleSeamsIn(checkout),');
-    expect(call).toContain('dir: checkout,');
+    expect(call).toContain('readProvider,');
+    expect(reading).toContain('dir: checkout,');
+    expect(reading).not.toContain('dir: repoRoot');
     expect(call).not.toContain('dir: repoRoot');
   });
 
