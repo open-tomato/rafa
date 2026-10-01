@@ -208,11 +208,19 @@ its own origin). Every adapter's pull calls `mergeStore`
 (`src/effort/store/merge-store.ts`), which implements the merge rules;
 nothing here reimplements a merge rule. A pull a loop run makes names
 the run's session id (`SyncPullRequest.sessionId`), which the adapter
-passes on as `mergeStore`'s `sessionId`: the merge's live-loop guard
-passes that run's own record, matched by session id and never by pid,
-and still refuses any other live record, one sharing the run's pid
-included (`merge-store.test.ts`). `liveLoop` (`migrate.ts`) is shared
-with the migration's guard, which names no session id.
+passes on as `mergeStore`'s `sessionId` parameter. The merge's live-loop
+guard receives this session id in the `liveLoop` function
+(`src/effort/store/migrate.ts`) as its `ownSessionId` parameter, and
+uses it to filter: when looking for concurrent live loops, `liveLoop`
+returns only the first record with state `running` or `paused` whose
+session id does NOT match `ownSessionId`, so the calling run's own record
+is passed by identification and excluded from the refusal check. This way
+the run calling `mergeStore` can sync at the end of its task without
+being refused by its own active record, while any other live loop — even
+one with the same pid but a different session id — is still refused
+(`merge-store.test.ts`). `liveLoop` is shared with the migration's guard
+(`migrateStore`, `migrate.ts`), which names no session id so it refuses
+any live loop, including its own if one somehow persists.
 
 **`effort.sync` in `.rafa/config.yaml` selects the sync strategy, one of
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
