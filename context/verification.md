@@ -195,12 +195,6 @@ pass in the main checkout. The cause is not investigated. Run only the
 file you are proving in the worktree, or subtract those three before
 comparing a full run there against a run in the main checkout.
 
-**Two `migrations.test.ts` cases read machine state.**
-`describe('the installed 0.24.1 runtime')`'s `holds the rule the
-transcription copies` and `describe('the lock at the newest release tag')`'s
-`keeps every line of the lock at v0.28.0` fail when the installed binary
-and the checked-out tag are older than this tree expects.
-
 **One `copy.test.ts` case reads a filesystem-specific error string.**
 `rafa effort copy over a live store`'s `copies while another connection
 holds a read transaction...` expects `database is locked` but this machine's

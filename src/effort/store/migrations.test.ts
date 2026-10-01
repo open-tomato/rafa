@@ -3,29 +3,31 @@
  * legacy ids, the legacy gate as a pre-log release reads it, the lock
  * that freezes each entry's SQL, and the guards every entry has to pass
  * (ids, contracts, the shapes `migration-shapes.ts` reads, the objects
- * each entry creates, and the lock at the newest release tag).
+ * each entry creates, and the lock at the last release pinned here).
  *
  * The pre-log rule is 0.24.1's own `checkedVersion`, transcribed below.
  * It refuses any `user_version` above 13, the length of that release's
- * history. A control reads the installed 0.24.1 bundle, when there is
- * one, and holds the transcription and the thirteen SQL bodies to it
- * byte for byte. Every store is planted under this file's own temporary
- * directory. A synthetic tail is passed as an argument and never
- * appended to `SQLITE_MIGRATIONS`.
+ * history. A control reads an excerpt of the 0.24.1 bundle committed
+ * under `src/effort/testdata/migrations/`, and holds the transcription
+ * and the thirteen SQL bodies to it byte for byte. Every store is
+ * planted under this file's own temporary directory. A synthetic tail is
+ * passed as an argument and never appended to `SQLITE_MIGRATIONS`.
  *
  * Each guard is a function here run once over the catalogue and once
  * over a near miss that has to fail it, so a green reading cannot come
- * from a guard that never looks. The release lock is read with
- * `git show` from this checkout; the case is skipped, and its title
- * says why, when git, a `v*` tag or the lock at that tag is absent. A
- * repository planted under the temporary directory drives the same
- * reader through each of those answers.
+ * from a guard that never looks. The released lock is a copy of
+ * `migrations.lock.json` at `v0.33.0`, committed beside the excerpt, so
+ * neither case reads the machine it runs on. A provenance case holds the
+ * copy to `git show` at that tag when this checkout has it, and is
+ * skipped, its title saying why, when git, the tag or the lock at the
+ * tag is absent. A repository planted under the temporary directory
+ * drives the same reader through each of those answers.
  */
 import type { CreatedObject, ShapeProblem } from './migration-shapes.js';
 import type { MigrationBreak, MigrationLock, MigrationSpec, SqliteMigration } from './migrations.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
@@ -220,8 +222,15 @@ describe('the legacy gate under 0.24.1\'s rule', () => {
   });
 });
 
-/** The installed 0.24.1 runtime, read when present and never run. */
-const INSTALLED_CLI = join(homedir(), '.rafa', 'runtime', '0.24.1', 'cli.js');
+/** Where this file's committed inputs sit. */
+const TESTDATA = join(import.meta.dir, '..', 'testdata', 'migrations');
+
+/**
+ * The 0.24.1 bundle's `cli.js` from its `migrations.ts` module through
+ * `sqlite.ts`'s `migrateSchema`, cut byte for byte from an installed
+ * runtime (lines 5811 to 6061), so no case reads `~/.rafa`.
+ */
+const RUNTIME_EXCERPT = readFileSync(join(TESTDATA, 'runtime-0.24.1-cli-excerpt.txt'), 'utf8');
 
 /** The two functions of 0.24.1's `sqlite.ts` the rule is, as its bundle prints them. */
 const INSTALLED_RULE = [
@@ -239,16 +248,23 @@ const INSTALLED_RULE = [
   '    return;',
 ].join('\n');
 
-describe('the installed 0.24.1 runtime', () => {
-  it.skipIf(!existsSync(INSTALLED_CLI))('holds the rule the transcription copies', () => {
-    expect(readFileSync(INSTALLED_CLI, 'utf8')).toContain(INSTALLED_RULE);
+/** 0.24.1's history as its bundle prints it, from the bodies given. */
+function printedHistory(bodies: readonly string[]): string {
+  const printed = bodies.map((sql) => `    \`${sql}\``).join(',\n');
+  return `  SQLITE_MIGRATIONS = [\n${printed}\n  ];\n  SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;`;
+}
+
+describe('the 0.24.1 runtime, as its committed bundle excerpt', () => {
+  it('holds the rule the transcription copies, and not a near miss of it', () => {
+    expect(RUNTIME_EXCERPT).toContain(INSTALLED_RULE);
+    expect(RUNTIME_EXCERPT).not.toContain(INSTALLED_RULE.replace('version > latest', 'version >= latest'));
   });
 
-  it.skipIf(!existsSync(INSTALLED_CLI))('holds exactly these thirteen SQL bodies as its history', () => {
-    const bodies = LEGACY.map(({ sql }) => `    \`${sql}\``).join(',\n');
-    const history = `  SQLITE_MIGRATIONS = [\n${bodies}\n  ];\n  SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;`;
+  it('holds exactly these thirteen SQL bodies as its history, and not twelve of them', () => {
+    const bodies = LEGACY.map(({ sql }) => sql);
 
-    expect(readFileSync(INSTALLED_CLI, 'utf8')).toContain(history);
+    expect(RUNTIME_EXCERPT).toContain(printedHistory(bodies));
+    expect(RUNTIME_EXCERPT).not.toContain(printedHistory(bodies.slice(0, -1)));
   });
 });
 
@@ -688,9 +704,15 @@ const LOCK_PATH = 'src/effort/store/migrations.lock.json';
 /** This checkout's root. */
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..');
 
-/** What `readReleasedLock` found: the newest tag's lock, or why there is none. */
-type ReleasedLock =
-  | { readonly found: true; readonly tag: string; readonly lock: MigrationLock }
+/** The release whose lock is committed under `TESTDATA`. */
+const RELEASED_TAG = 'v0.33.0';
+
+/** `migrations.lock.json` at `RELEASED_TAG`, as committed under `TESTDATA`. */
+const RELEASED_LOCK_TEXT = readFileSync(join(TESTDATA, `lock-${RELEASED_TAG}.json`), 'utf8');
+
+/** What `readLockAtTag` found: the lock's text at the tag, or why there is none. */
+type TaggedLock =
+  | { readonly found: true; readonly text: string }
   | { readonly found: false; readonly why: string };
 
 /** This process's environment without a `GIT_*` variable that could point git elsewhere. */
@@ -712,16 +734,15 @@ function runGit(git: string, cwd: string, args: readonly string[]): { ok: boolea
   }
 }
 
-/** The lock at the newest `v*` tag of the repository at `repo`, by version order. */
-function readReleasedLock(repo: string, git = 'git'): ReleasedLock {
-  const tags = runGit(git, repo, ['tag', '--list', 'v*', '--sort=-v:refname']);
+/** The lock's text at `tag` in the repository at `repo`, through `git show`. */
+function readLockAtTag(repo: string, tag: string, git = 'git'): TaggedLock {
+  const tags = runGit(git, repo, ['tag', '--list', tag]);
   if (tags === null) return { found: false, why: 'git is absent' };
   if (!tags.ok) return { found: false, why: 'not a git checkout' };
-  const [tag] = tags.stdout.split('\n').filter((line) => line !== '');
-  if (tag === undefined) return { found: false, why: 'no v* tag' };
+  if (tags.stdout.trim() !== tag) return { found: false, why: `no tag ${tag}` };
   const shown = runGit(git, repo, ['show', `${tag}:${LOCK_PATH}`]);
   if (shown?.ok !== true) return { found: false, why: `${tag} holds no ${LOCK_PATH}` };
-  return { found: true, tag, lock: JSON.parse(shown.stdout) as MigrationLock };
+  return { found: true, text: shown.stdout };
 }
 
 /** Each line of the released lock the current lock changed or dropped. */
@@ -734,7 +755,7 @@ function lockDrift(released: MigrationLock, current: MigrationLock): string[] {
   });
 }
 
-const RELEASED = readReleasedLock(REPO_ROOT);
+const TAGGED = readLockAtTag(REPO_ROOT, RELEASED_TAG);
 
 /** A git repository under the temporary directory, its lock committed and tagged at each version. */
 function plantRepository(name: string, releases: readonly (readonly [string, MigrationLock | null])[]): string {
@@ -760,15 +781,19 @@ function plantRepository(name: string, releases: readonly (readonly [string, Mig
 
 const GIT_PRESENT = runGit('git', tempBase, ['--version'])?.ok === true;
 
-describe('the lock at the newest release tag', () => {
-  it.skipIf(!RELEASED.found)(
-    RELEASED.found
-      ? `keeps every line of the lock at ${RELEASED.tag}`
-      : `is skipped: ${RELEASED.why}`,
-    () => {
-      if (!RELEASED.found) throw new Error('ran with no released lock');
+describe('the lock at the last release pinned here', () => {
+  it(`keeps every line of the lock at ${RELEASED_TAG}`, () => {
+    expect(lockDrift(JSON.parse(RELEASED_LOCK_TEXT) as MigrationLock, LOCK)).toEqual([]);
+  });
 
-      expect(lockDrift(RELEASED.lock, LOCK)).toEqual([]);
+  it.skipIf(!TAGGED.found)(
+    TAGGED.found
+      ? `holds the committed copy to the lock at ${RELEASED_TAG}, byte for byte`
+      : `is skipped: ${TAGGED.why}`,
+    () => {
+      if (!TAGGED.found) throw new Error(`ran with no lock at ${RELEASED_TAG}`);
+
+      expect(RELEASED_LOCK_TEXT).toBe(TAGGED.text);
     },
   );
 
@@ -783,12 +808,13 @@ describe('the lock at the newest release tag', () => {
     expect(lockDrift(released, { ...released, 'plan-ci': 'added' })).toEqual([]);
   });
 
-  it.skipIf(!GIT_PRESENT)('reads the newest tag by version, not by name, through git show', () => {
+  it.skipIf(!GIT_PRESENT)('reads the lock at the named tag, not the newest one, through git show', () => {
     const older = { 'kind-tables': 'a' };
     const newer = { 'kind-tables': 'b', findings: 'c' };
     const repo = plantRepository('released', [['v0.9.0', older], ['v0.10.0', newer]]);
 
-    expect(readReleasedLock(repo)).toEqual({ found: true, tag: 'v0.10.0', lock: newer });
+    expect(readLockAtTag(repo, 'v0.9.0')).toEqual({ found: true, text: JSON.stringify(older) });
+    expect(readLockAtTag(repo, 'v0.10.0')).toEqual({ found: true, text: JSON.stringify(newer) });
     expect(lockDrift(newer, older)).toEqual(['changed since the release: kind-tables', 'missing since the release: findings']);
   });
 
@@ -798,9 +824,9 @@ describe('the lock at the newest release tag', () => {
     const bare = join(tempBase, 'not-a-checkout');
     mkdirSync(bare);
 
-    expect(readReleasedLock(untagged, 'rafa-no-such-git')).toEqual({ found: false, why: 'git is absent' });
-    expect(readReleasedLock(bare)).toEqual({ found: false, why: 'not a git checkout' });
-    expect(readReleasedLock(untagged)).toEqual({ found: false, why: 'no v* tag' });
-    expect(readReleasedLock(lockless)).toEqual({ found: false, why: `v0.1.0 holds no ${LOCK_PATH}` });
+    expect(readLockAtTag(untagged, 'v0.1.0', 'rafa-no-such-git')).toEqual({ found: false, why: 'git is absent' });
+    expect(readLockAtTag(bare, 'v0.1.0')).toEqual({ found: false, why: 'not a git checkout' });
+    expect(readLockAtTag(untagged, 'v0.1.0')).toEqual({ found: false, why: 'no tag v0.1.0' });
+    expect(readLockAtTag(lockless, 'v0.1.0')).toEqual({ found: false, why: `v0.1.0 holds no ${LOCK_PATH}` });
   });
 });
