@@ -55,6 +55,19 @@
  *
  * Each run answers a {@link HubContactReading} saying what was done.
  *
+ * ## The run's own record
+ *
+ * A contact the loop makes names its run's session id
+ * ({@link HubContactInput}'s `sessionId`), and every pull it runs carries
+ * that id as `SyncPullRequest.sessionId`, which the strategy passes on
+ * as `mergeStore`'s `sessionId`. The merge's live-loop guard then passes
+ * that run's own record, since the loop pulls at the end of a task,
+ * after the task session has exited, and refuses any other live record,
+ * one sharing the run's pid included: the guard matches the session id,
+ * never the pid. A contact naming no session id, as
+ * {@link pullBeforeRead}'s does, puts no `sessionId` in its requests, so
+ * every live record is refused.
+ *
  * ## Before a read
  *
  * {@link pullBeforeRead} is the one call a command that reads the store
@@ -72,7 +85,7 @@ import type { AdapterRegistry } from '../../adapters/registry.js';
 import type { ConfigRoots } from '../../config-load.js';
 import type { ResolvedConfig } from '../../config.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
-import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
+import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { loadConfig } from '../../config-load.js';
@@ -158,6 +171,12 @@ export interface HubContactInput {
   readonly resolved: ResolvedConfig;
   /** Writes one warning, as a command's `output.warn` does. */
   readonly warn: (message: string) => void;
+  /**
+   * The session id of the loop run making the contact, carried on every
+   * pull; absent or null for a command that is no run. See the module
+   * note's `The run's own record`.
+   */
+  readonly sessionId?: string | null;
 }
 
 /** How a contact loads modules. Each left out is the loader's own. */
@@ -211,6 +230,13 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
   const strategy = strategyOf(config.effortSync);
   let selection: Promise<Selection> | null = null;
   let toldUnreachable = false;
+  const pullRequest: SyncPullRequest = Object.freeze({
+    from: null,
+    dryRun: false,
+    ...input.sessionId == null
+      ? {}
+      : { sessionId: input.sessionId },
+  });
 
   /** Selects once per contact, writing a problem the one time it is found. */
   const selected = (): Promise<Selection> => {
@@ -248,7 +274,7 @@ export function createHubContact(input: HubContactInput, seams: HubContactSeams 
       : null;
     const pull: HubContactStep<SyncPullResult> = push?.outcome === 'unreachable'
       ? { outcome: 'skipped' }
-      : await attempt('pull', () => sync.pull({ from: null, dryRun: false }));
+      : await attempt('pull', () => sync.pull(pullRequest));
     return { state: 'contacted', strategy, push, pull };
   };
 

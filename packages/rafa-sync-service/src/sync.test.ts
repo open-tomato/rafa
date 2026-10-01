@@ -13,7 +13,7 @@ import type { StandInHub } from './testdata/stand-in-hub.js';
 import type { SyncPortVersion } from '@open-tomato/rafa/ports';
 import type { CommitEffortRow, SqliteEffortStore } from '@open-tomato/rafa/store';
 
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -155,6 +155,28 @@ function serviceOf(at: Device | string, over: StandInHub, options: Partial<Servi
       : null),
     ...options,
   });
+}
+
+/**
+ * Plants a `running` run record of this live process under `at`'s
+ * project, in the shape core's `beginSession` writes to
+ * `.rafa/runs/<sessionId>.json`, so the merge's live-loop guard reads a
+ * live loop on the store.
+ */
+function plantLiveRun(at: Device, sessionId: string): void {
+  const dir = join(at.root, '.rafa', 'runs');
+  mkdirSync(dir, { recursive: true });
+  const record = {
+    sessionId,
+    planStub: 'rafa-322-demo',
+    plan: '.rafa/plans/PLAN-rafa-322-demo.md',
+    branch: 'feat/rafa-322-demo',
+    pid: process.pid,
+    startedAt: '2026-10-01T08:00:00.000Z',
+    state: 'running',
+    task: null,
+  };
+  writeFileSync(join(dir, `${sessionId}.json`), `${JSON.stringify(record, null, 2)}\n`);
 }
 
 /** What `call` rejected with. */
@@ -361,6 +383,26 @@ describe('pull', () => {
 
     over.setExtraMigrations([]);
     expect((await serviceOf(b, over).pull({ from: null, dryRun: false })).status).toBe('pulled');
+  });
+
+  it('passes the request\'s session id to the merge, whose guard passes that run\'s live record and no other', async () => {
+    const own = '11111111-2222-3333-4444-555555555555';
+    const over = hub();
+    const a = device(1);
+    const b = device(1);
+    await serviceOf(a, over).push({ to: null });
+    plantLiveRun(b, own);
+    const before = commitPairs(b);
+
+    const unnamed = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false }));
+    const other = await rejectionOf(serviceOf(b, over).pull({ from: null, dryRun: false, sessionId: '66666666-7777-8888-9999-000000000000' }));
+    expect([unnamed, other]).toMatchObject([{ reason: 'live-loop' }, { reason: 'live-loop' }]);
+    expect(commitPairs(b)).toEqual(before);
+    expect(existsSync(statePathOf(b))).toBe(false);
+
+    const answer = await serviceOf(b, over).pull({ from: null, dryRun: false, sessionId: own });
+    expect(answer).toMatchObject({ status: 'pulled', merge: { status: 'merged', rowsAdded: 1 } });
+    expect(commitPairs(b)).toEqual([...commitPairs(a), ...before].sort());
   });
 
   it('refuses a hub naming a migration this rafa lacks when it answers no row', async () => {

@@ -177,6 +177,8 @@
  * `file` are not contacted. A contact never throws, and it writes at most
  * one line per run saying the hub is unreachable, so a hub that is down
  * stops no task and does not repeat that line on every task.
+ * Its pulls name the run's session id, so the merge's live-loop guard
+ * passes the run's own record, matched by session id and never by pid.
  *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
@@ -497,12 +499,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
     // The run's one contact with the project's other devices, run at the
     // end of each task (`effort/sync/contact.ts`): it warns at most once
-    // that the hub is unreachable, and never throws.
+    // that the hub is unreachable, and never throws. Its pulls name the
+    // run's session id, so the merge's live-loop guard passes this run's
+    // own record and still refuses any other live one.
     const hubContact = createHubContact({
       root: repoRoot,
       home: homedir(),
       resolved: runConfig,
       warn: (message) => activeOutput().warn(message),
+      sessionId: session.id,
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.
