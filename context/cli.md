@@ -193,9 +193,9 @@ still the position's.
 The session record's `hop` field: When `loop start --roadmap` runs while a hop
 is `away`, its run record (`.rafa/runs/<session-id>.json`) carries the hop record
 itself as `hop` (`start/session.ts`). A record that came back home, a stale one,
-none, and no position file stamp nothing. `parseSessionRecord` (`loop/sessions.ts`)
-refuses a `hop` key holding anything but a hop record, and every later write keeps
-it whole.
+none, and no position file stamp nothing. `parseSessionRecord`
+(`loop/session-record-parse.ts`) refuses a `hop` key holding anything but a hop
+record, and every later write keeps it whole.
 
 ### Changing the `rafa next` table
 
@@ -356,8 +356,9 @@ New; it replaces no earlier text. What a row or an action added to
   home, a stale one, none, and no position file stamp nothing; a file
   that is no hop record is warned about in one line and stamps nothing.
   Without the flag neither file is read and the record carries no `hop`
-  key; `parseSessionRecord` (`loop/sessions.ts`) refuses a `hop` key
-  holding anything but a hop record, and every later write keeps it.
+  key; `parseSessionRecord` (`loop/session-record-parse.ts`) refuses a
+  `hop` key holding anything but a hop record, and every later write keeps
+  it.
 - **`loop start --as-worktree` creates a new git worktree for the loop to run
   in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`):
   the worktree is created under `.rafa/worktrees/` by default, or in the

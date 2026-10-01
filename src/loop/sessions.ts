@@ -131,21 +131,14 @@
  * keeps that end. The window left is the one between this module's own
  * read and its rename, which holds no lock either.
  *
- * ## What is refused on read
+ * ## Reading a record
  *
- * {@link SessionRecordError}, naming the file: text that is no JSON
- * object, a field of the wrong type or outside its set, a `hop` key whose
- * value is not a hop record (null included), a `worktree` key whose value
- * is no absolute path (null included), a `steps` key whose value is no
- * list of steps (null included), a step outside the shape above or whose
- * `newFailures` names a test its `failures` does not, a pid that is no
- * positive whole number (signal 0 to pid 0 or below would reach a process
- * group), an unparsable `startedAt`, and a `sessionId` that is no plain
- * file name or differs from the file's name. {@link readSessions} reads
- * only names ending in `.json`, and answers no record when the directory
- * does not exist. {@link readSession} reads the one record an id names,
- * and refuses a file that is not there.
+ * The record's field readers and {@link parseSessionRecord} live in
+ * `loop/session-record-parse.ts`, whose note lists what is refused on
+ * read. This module re-exports what a caller reads from there, so
+ * `./sessions.js` stays the one import a record's reader needs.
  */
+import type { SessionState, SessionStepKind } from './session-record-parse.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { TestScope } from '../utils/declaration.js';
@@ -159,28 +152,35 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
-import { asHopRecord } from '../next/hop-record.js';
 import { scopeAt } from '../project/scope.js';
-import { TEST_SCOPES } from '../utils/declaration.js';
-import { isStampableStub } from '../utils/plan-stamp.js';
 
-/** The states a session record holds, in the spec's order. */
-export const SESSION_STATES = Object.freeze(['running', 'paused', 'stopped', 'done'] as const);
+import {
+  freezeRecord,
+  isPositiveWhole,
+  isSessionId,
+  parseSessionRecord,
+  RECORD_EXTENSION,
+  recordProblems,
+  SessionRecordError,
+  sessionSteps,
+  stepProblems,
+} from './session-record-parse.js';
 
-/** One of {@link SESSION_STATES}. */
-export type SessionState = (typeof SESSION_STATES)[number];
+export type { SessionState, SessionStepKind } from './session-record-parse.js';
+export {
+  isSessionId,
+  parseSessionRecord,
+  SESSION_STATES,
+  SESSION_STEP_KINDS,
+  SessionRecordError,
+  sessionSteps,
+} from './session-record-parse.js';
 
 /** The directory the records are kept in, under a project's `.rafa/`. */
 export const RUNS_DIR = 'runs';
-
-/** What a record's file name ends in. */
-const RECORD_EXTENSION = '.json';
-
-/** A session id usable as a file name: no separator, no leading dot. */
-const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /** The task a session is running. */
 export interface SessionTask {
@@ -189,12 +189,6 @@ export interface SessionTask {
   /** The task's sentence, its routing declaration left out. */
   readonly text: string;
 }
-
-/** The kinds of suite step a run records, in the order a run meets them. */
-export const SESSION_STEP_KINDS = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
-
-/** One of {@link SESSION_STEP_KINDS}. */
-export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
 
 /** One suite run the runner recorded for a session. See the module note. */
 export interface SessionStep {
@@ -263,18 +257,6 @@ export interface SessionConflict {
   readonly record: SessionRecord;
 }
 
-/** A record file that cannot be read, or holds no record this module accepts. */
-export class SessionRecordError extends Error {
-  /** The record's path. */
-  readonly file: string;
-
-  constructor(file: string, problem: string) {
-    super(`session record ${file}: ${problem}`);
-    this.name = 'SessionRecordError';
-    this.file = file;
-  }
-}
-
 /** A run {@link beginSession} refused, over the records that refuse it. */
 export class SessionConflictError extends Error {
   readonly conflicts: readonly SessionConflict[];
@@ -305,11 +287,6 @@ export class SessionStateError extends Error {
   }
 }
 
-/** True when the text can name a record file. */
-export function isSessionId(value: string): boolean {
-  return SESSION_ID_PATTERN.test(value);
-}
-
 /** `<root>/.rafa/runs`. */
 export function runsDir(root: string): string {
   return join(scopeAt(root).dir, RUNS_DIR);
@@ -321,271 +298,6 @@ export function sessionFilePath(root: string, sessionId: string): string {
     throw new Error(`session record: unusable session id ${JSON.stringify(sessionId)}`);
   }
   return join(runsDir(root), `${sessionId}${RECORD_EXTENSION}`);
-}
-
-/** A value as a problem names it. */
-function describeValue(value: unknown): string {
-  return value === undefined
-    ? 'missing'
-    : JSON.stringify(value) ?? String(value);
-}
-
-/** An own field of a parsed object, never one its prototype answers. */
-function field(fields: object, key: string): unknown {
-  return Object.hasOwn(fields, key)
-    ? (fields as Record<string, unknown>)[key]
-    : undefined;
-}
-
-/** True for a plain object, as `JSON.parse` makes one. */
-function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** True for a whole number from 1. */
-function isPositiveWhole(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-}
-
-/** True for a string holding more than whitespace. */
-function isText(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '';
-}
-
-/** The problem with a record's `task`, or null. */
-function taskProblem(task: unknown): string | null {
-  if (task === null) return null;
-  if (!isObject(task)) return `task is ${describeValue(task)}, expected null or an object`;
-  if (!isPositiveWhole(field(task, 'line'))) {
-    return `task.line is ${describeValue(field(task, 'line'))}, expected a whole number from 1`;
-  }
-  return isText(field(task, 'text'))
-    ? null
-    : `task.text is ${describeValue(field(task, 'text'))}, expected a non-empty string`;
-}
-
-/** The problem with a record's `hop`, or null, a record without the key included. */
-function hopProblem(fields: object): string | null {
-  if (!Object.hasOwn(fields, 'hop')) return null;
-  const hop = field(fields, 'hop');
-  return asHopRecord(hop) === null
-    ? `hop is ${describeValue(hop)}, expected a hop record`
-    : null;
-}
-
-/** The problem with a record's `worktree`, or null, a record without the key included. */
-function worktreeProblem(fields: object): string | null {
-  if (!Object.hasOwn(fields, 'worktree')) return null;
-  const worktree = field(fields, 'worktree');
-  return isText(worktree) && isAbsolute(worktree)
-    ? null
-    : `worktree is ${describeValue(worktree)}, expected an absolute path`;
-}
-
-/** True for a list of strings each holding more than whitespace. */
-function isTextList(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every(isText);
-}
-
-/** True for a failing test: a file and a name, both text. */
-function isFailure(value: unknown): value is SuiteFailure {
-  return isObject(value) && isText(field(value, 'file')) && isText(field(value, 'name'));
-}
-
-/** True for a list of failing tests. */
-function isFailureList(value: unknown): value is readonly SuiteFailure[] {
-  return Array.isArray(value) && value.every(isFailure);
-}
-
-/** The key a failing test is compared by: its file and its name. */
-function failureKey(failure: SuiteFailure): string {
-  return JSON.stringify([failure.file, failure.name]);
-}
-
-/** The problem with a step's `failures` and `newFailures`, or null. */
-function stepFailuresProblem(step: object, at: string): string | null {
-  const failures = field(step, 'failures');
-  const newFailures = field(step, 'newFailures');
-  if (!isFailureList(failures)) return `${at}.failures is ${describeValue(failures)}, expected a list of failing tests`;
-  if (!isFailureList(newFailures)) {
-    return `${at}.newFailures is ${describeValue(newFailures)}, expected a list of failing tests`;
-  }
-  const known = new Set(failures.map(failureKey));
-  const stray = newFailures.find((failure) => !known.has(failureKey(failure)));
-  return stray === undefined
-    ? null
-    : `${at}.newFailures names ${describeValue(stray)}, which ${at}.failures does not`;
-}
-
-/** Every problem with one step, the `at` naming its place in the record. */
-function stepProblems(step: unknown, at: string): string[] {
-  if (!isObject(step)) return [`${at} is ${describeValue(step)}, expected a step`];
-  const kind = field(step, 'kind');
-  const scope = field(step, 'scope');
-  const command = field(step, 'command');
-  const exitCode = field(step, 'exitCode');
-  const summary = field(step, 'summary');
-  const problems = [
-    (SESSION_STEP_KINDS as readonly unknown[]).includes(kind)
-      ? null
-      : `${at}.kind is ${describeValue(kind)}, expected one of ${SESSION_STEP_KINDS.join(', ')}`,
-    (TEST_SCOPES as readonly unknown[]).includes(scope) || isTextList(scope)
-      ? null
-      : `${at}.scope is ${describeValue(scope)}, expected one of ${TEST_SCOPES.join(', ')} or a list of paths`,
-    isTextList(command) && command.length > 0
-      ? null
-      : `${at}.command is ${describeValue(command)}, expected a non-empty list of arguments`,
-    typeof exitCode === 'number' && Number.isSafeInteger(exitCode)
-      ? null
-      : `${at}.exitCode is ${describeValue(exitCode)}, expected a whole number`,
-    summary === null || typeof summary === 'string'
-      ? null
-      : `${at}.summary is ${describeValue(summary)}, expected null or a string`,
-    stepFailuresProblem(step, at),
-  ];
-  return problems.filter((problem): problem is string => problem !== null);
-}
-
-/** Every problem with a record's `steps`, none for a record without the key. */
-function stepsProblems(fields: object): string[] {
-  if (!Object.hasOwn(fields, 'steps')) return [];
-  const steps = field(fields, 'steps');
-  if (!Array.isArray(steps)) return [`steps is ${describeValue(steps)}, expected a list of steps`];
-  return steps.flatMap((step: unknown, index) => stepProblems(step, `steps[${index}]`));
-}
-
-/** The problem with a record's `sessionId`, read from `file`, or null. */
-function sessionIdProblem(sessionId: unknown, file: string): string | null {
-  if (typeof sessionId !== 'string' || !isSessionId(sessionId)) {
-    return `sessionId is ${describeValue(sessionId)}, expected a plain file name`;
-  }
-  return basename(file) === `${sessionId}${RECORD_EXTENSION}`
-    ? null
-    : `sessionId ${JSON.stringify(sessionId)} is not the file's name`;
-}
-
-/** The problem with a record's `planStub`, or null. */
-function planStubProblem(planStub: unknown): string | null {
-  return planStub === null || (typeof planStub === 'string' && isStampableStub(planStub))
-    ? null
-    : `planStub is ${describeValue(planStub)}, expected null or a plan stub`;
-}
-
-/** The problem with each text field that holds no text. */
-function textProblems(fields: object): string[] {
-  return ['plan', 'branch']
-    .filter((key) => !isText(field(fields, key)))
-    .map((key) => `${key} is ${describeValue(field(fields, key))}, expected a non-empty string`);
-}
-
-/** Every problem with a parsed record read from `file`. */
-function recordProblems(fields: object, file: string): string[] {
-  const pid = field(fields, 'pid');
-  const startedAt = field(fields, 'startedAt');
-  const state = field(fields, 'state');
-  const problems = [
-    sessionIdProblem(field(fields, 'sessionId'), file),
-    planStubProblem(field(fields, 'planStub')),
-    ...textProblems(fields),
-    isPositiveWhole(pid)
-      ? null
-      : `pid is ${describeValue(pid)}, expected a whole number from 1`,
-    typeof startedAt === 'string' && !Number.isNaN(Date.parse(startedAt))
-      ? null
-      : `startedAt is ${describeValue(startedAt)}, expected a timestamp`,
-    (SESSION_STATES as readonly unknown[]).includes(state)
-      ? null
-      : `state is ${describeValue(state)}, expected one of ${SESSION_STATES.join(', ')}`,
-    taskProblem(field(fields, 'task')),
-    hopProblem(fields),
-    worktreeProblem(fields),
-    ...stepsProblems(fields),
-  ];
-  return problems.filter((problem): problem is string => problem !== null);
-}
-
-/** A checked `hop` value, frozen through to its places. */
-function freezeHop(value: unknown): HopRecord {
-  const hop = asHopRecord(value) as HopRecord;
-  return Object.freeze({ ...hop, home: Object.freeze(hop.home), from: Object.freeze(hop.from) });
-}
-
-/** A frozen list of failing tests already checked, each copied to its two fields. */
-function freezeFailures(failures: readonly SuiteFailure[]): readonly SuiteFailure[] {
-  return Object.freeze(failures.map((failure) => Object.freeze({ file: failure.file, name: failure.name })));
-}
-
-/** A frozen step already checked, its fields in the order they are written. */
-function freezeStep(step: SessionStep): SessionStep {
-  return Object.freeze({
-    kind: step.kind,
-    scope: typeof step.scope === 'string'
-      ? step.scope
-      : Object.freeze([...step.scope]),
-    command: Object.freeze([...step.command]),
-    exitCode: step.exitCode,
-    summary: step.summary,
-    failures: freezeFailures(step.failures),
-    newFailures: freezeFailures(step.newFailures),
-  });
-}
-
-/** The `steps` entry of a frozen record: none while the list is missing or empty. */
-function stepsEntry(steps: unknown): { readonly steps?: readonly SessionStep[] } {
-  if (!Array.isArray(steps) || steps.length === 0) return {};
-  return { steps: Object.freeze((steps as readonly SessionStep[]).map(freezeStep)) };
-}
-
-/**
- * A frozen record of fields already checked, in the order it is written;
- * `hop`, `worktree` then `steps` last, each only when there.
- */
-function freezeRecord(fields: object): SessionRecord {
-  const task = field(fields, 'task');
-  const hop = field(fields, 'hop');
-  const worktree = field(fields, 'worktree');
-  return Object.freeze({
-    sessionId: field(fields, 'sessionId') as string,
-    planStub: field(fields, 'planStub') as string | null,
-    plan: field(fields, 'plan') as string,
-    branch: field(fields, 'branch') as string,
-    pid: field(fields, 'pid') as number,
-    startedAt: field(fields, 'startedAt') as string,
-    state: field(fields, 'state') as SessionState,
-    task: isObject(task)
-      ? Object.freeze({ line: field(task, 'line') as number, text: field(task, 'text') as string })
-      : null,
-    ...hop === undefined
-      ? {}
-      : { hop: freezeHop(hop) },
-    ...worktree === undefined
-      ? {}
-      : { worktree: worktree as string },
-    ...stepsEntry(field(fields, 'steps')),
-  });
-}
-
-/** The steps a record holds, oldest first; none for a record written before the field. */
-export function sessionSteps(record: Pick<SessionRecord, 'steps'>): readonly SessionStep[] {
-  return record.steps ?? [];
-}
-
-/**
- * Reads a record out of the text of `file`, or throws
- * {@link SessionRecordError} naming every problem. See the module note.
- */
-export function parseSessionRecord(text: string, file: string): SessionRecord {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new SessionRecordError(file, `holds no JSON: ${messageOf(error)}`);
-  }
-  if (!isObject(parsed)) throw new SessionRecordError(file, 'holds no JSON object');
-
-  const problems = recordProblems(parsed, file);
-  if (problems.length > 0) throw new SessionRecordError(file, problems.join('; '));
-  return freezeRecord(parsed);
 }
 
 /** The system's code on a thrown error, such as `ENOENT`, or null when it carries none. */
