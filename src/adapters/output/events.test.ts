@@ -54,8 +54,8 @@ describe('createEventsOutput', () => {
     output.emit({ type: 'log', level: 'error', message: 'refused: no plan', ts: TS });
 
     expect(chunks).toEqual([
-      `${EVENT_PREFIX}error           ❌ Task failed (exit 3). Marked as blocked.\n`,
-      `${EVENT_PREFIX}error           refused: no plan\n`,
+      `${EVENT_PREFIX}error            ❌ Task failed (exit 3). Marked as blocked.\n`,
+      `${EVENT_PREFIX}error            refused: no plan\n`,
     ]);
   });
 

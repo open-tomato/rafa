@@ -1,0 +1,110 @@
+/**
+ * Cases for the loop's events (`start/loop-events.ts`): each kind's one
+ * line, a task text folded onto it, the event written through the active
+ * output, where a task sits in its tracker, and a task's tokens read from
+ * its session log, or null when the log cannot be read.
+ */
+import type { LoopEvent } from './loop-events.js';
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it } from 'bun:test';
+
+import { setActiveOutput } from '../adapters/output/active.js';
+import { createEventsOutput } from '../adapters/output/events.js';
+import { createJsonOutput } from '../adapters/output/json.js';
+import { sessionLogDir } from '../effort/collect.js';
+
+import { emitLoopEvent, summaryOf, taskPosition, taskTokens } from './loop-events.js';
+
+/** The third task of nine. */
+const AT = { index: 3, total: 9 };
+
+/** Each kind of event beside the one line it is printed as. */
+const SUMMARIES: readonly (readonly [LoopEvent, string])[] = [
+  [{ kind: 'task-start', position: AT, text: 'Group duplicate bugs' }, 'task 3/9 start   "Group duplicate bugs"'],
+  [{ kind: 'task-done', position: AT, durationMs: (12 * 60_000) + 4_000, tokens: 340_000 }, 'task 3/9 done    12m  340k tokens'],
+  [{ kind: 'task-done', position: AT, durationMs: 40_000, tokens: null }, 'task 3/9 done    1m'],
+  [{ kind: 'task-blocked', position: AT, reason: 'session exited 3' }, 'task 3/9 blocked session exited 3'],
+  [{ kind: 'wrap-up', phase: 'fragment' }, 'wrap-up          fragment'],
+  [{ kind: 'pr', number: 612 }, 'pr #612 opened'],
+  [{ kind: 'no-pr', reason: 'no open pull request for feat/x' }, 'no pr            no open pull request for feat/x'],
+  [{ kind: 'halt', reason: 'checkout moved' }, 'halt             checkout moved'],
+];
+
+describe('summaryOf', () => {
+  it.each(SUMMARIES)('prints %o as its line', (event, line) => {
+    expect(summaryOf(event)).toBe(line);
+  });
+
+  it('keeps a task text holding quotes, backticks and a newline on one line', () => {
+    const line = summaryOf({ kind: 'task-start', position: AT, text: 'Fix `a` "b"\n  <!-- blocker -->' });
+
+    expect(line).toBe('task 3/9 start   "Fix `a` \\"b\\" <!-- blocker -->"');
+  });
+
+  it('pads a two-digit position the same way, one space at least before the rest', () => {
+    expect(summaryOf({ kind: 'task-blocked', position: { index: 12, total: 40 }, reason: 'x' })).toBe('task 12/40 blocked x');
+  });
+});
+
+describe('emitLoopEvent', () => {
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('writes one rafa· line through the active events output', () => {
+    const chunks: string[] = [];
+    setActiveOutput(createEventsOutput({ stream: { write: (chunk) => chunks.push(chunk) } }), 'events');
+
+    emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
+
+    expect(chunks).toEqual(['rafa· halt             checkout moved\n']);
+  });
+
+  it('writes the event with its kind as name and its fields as data under json', () => {
+    const chunks: string[] = [];
+    const now = () => new Date('2026-10-01T12:00:00.000Z');
+    setActiveOutput(createJsonOutput({ stream: { write: (chunk) => chunks.push(chunk) } }), 'json');
+
+    emitLoopEvent({ kind: 'pr', number: 612 }, now);
+
+    expect(chunks.map((chunk) => JSON.parse(chunk) as unknown)).toEqual([
+      { type: 'event', name: 'pr', summary: 'pr #612 opened', data: { number: 612 }, ts: '2026-10-01T12:00:00.000Z' },
+    ]);
+  });
+});
+
+describe('taskPosition', () => {
+  it('counts the task line, from zero as the tracker does, among every task of the tracker', () => {
+    const tracker = '# Stage: one\n\n- [x] first\n- [ ] second\n- [ ] third\n';
+
+    expect(taskPosition(tracker, 3)).toEqual({ index: 2, total: 3 });
+  });
+});
+
+describe('taskTokens', () => {
+  const made: string[] = [];
+
+  afterEach(() => {
+    for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('answers null when the session log cannot be read', async () => {
+    expect(await taskTokens('/nonexistent-checkout', 'no-such-session', '/nonexistent-home')).toBeNull();
+  });
+
+  it('sums the input, cache creation and output tokens the session log records', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'rafa-loop-events-'));
+    made.push(home);
+    const checkout = '/scratch/checkout';
+    const dir = sessionLogDir(checkout, home);
+    mkdirSync(dir, { recursive: true });
+    const usage = { input_tokens: 100, output_tokens: 20, cache_creation_input_tokens: 3, cache_read_input_tokens: 5000 };
+    writeFileSync(join(dir, 'abc.jsonl'), `${JSON.stringify({ type: 'assistant', message: { model: 'm', usage } })}\n`);
+
+    expect(await taskTokens(checkout, 'abc', home)).toBe(123);
+  });
+});

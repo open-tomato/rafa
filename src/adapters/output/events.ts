@@ -18,8 +18,13 @@ import type { CliEvent, Output } from '../../ports/index.js';
 /** The prefix every line this output writes starts with. */
 export const EVENT_PREFIX = 'rafa· ';
 
-/** The width the error kind is padded to, the width a loop event's kind is padded to. */
-const KIND_WIDTH = 16;
+/** The column a line's text starts at after its kind, so the lines read as a table. */
+const KIND_COLUMN = 17;
+
+/** A kind padded to {@link KIND_COLUMN}, with one space at least after it. */
+export function padKind(kind: string): string {
+  return `${kind} `.padEnd(KIND_COLUMN);
+}
 
 /** A message's lines, trimmed and joined with single spaces, blank ones dropped. */
 function oneLine(message: string): string {
@@ -43,7 +48,7 @@ export function createEventsOutput({ stream }: CreateEventsOutputOptions): Outpu
   };
 
   const error = (message: string): void => {
-    writeLine(`${'error'.padEnd(KIND_WIDTH)}${oneLine(message)}`);
+    writeLine(`${padKind('error')}${oneLine(message)}`);
   };
 
   const silent = (): void => {};
