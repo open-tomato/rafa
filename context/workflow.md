@@ -436,3 +436,74 @@ restores its own text on any failure, commits `chore: release fragment
 — or the failure sentence — into the PR body, with a level report when the
 plan's declared level is below its notes. Details at `context/release.md`; config in
 `src/release/setting.ts`.
+
+### The wrap-up and pull request
+
+**A run never ends `done` without its pull request.** The wrap-up session is
+responsible for opening a pull request with the release notes, but the runner
+verifies that a pull request exists before marking the run complete. After the
+wrap-up session ends, the runner reads the branch's open pull request. With
+one found, the run advances to the pull-request phase and waits for CI. With
+none, the runner runs `loop.wrapUp.retries` more wrap-up sessions, each told
+that the pull request is missing and given the previous session's final message
+so it can fix any issue that stopped the PR creation. If retries are exhausted
+and still no pull request exists, the runner opens one itself with the title
+`rafa-<n>: <plan title>` and a body opening with `Closes #<n>`, the release
+fragment's notes, and a line saying the wrap-up did not finish. If opening
+fails (for instance, if the branch has not been merged into the base yet or
+was pushed while the working tree had conflicts), the run ends `blocked` with
+the step and branch named. With `pr.provider: none`, the pull-request check
+and creation are both skipped and the run advances directly to CI or closes.
+
+**The retry configuration is `loop.wrapUp.retries`.** This config key (in
+`.rafa/config.yaml`) controls how many times the runner will retry the
+wrap-up session when no pull request is found. Valid values are:
+- `1` (default) — retry once if no pull request exists
+- `2` or `3` — retry that many times
+- `false` — do not retry; proceed directly to the runner opening a pull
+  request when wrap-up sessions fail to open one
+- `0` or negative numbers are rejected at plan validation time
+
+All values are stored in the run record and named in the `loop status` output.
+
+**`--as-worktree` reuses its worktree.** Before adding a new worktree, the
+runner reads `git worktree list --porcelain` to check whether a worktree at
+the expected path (under `loop.worktreeDir`, defaulting to `.rafa/worktrees/`)
+with the feature branch name already exists. If a worktree at
+`<loop.worktreeDir>/<stub>` holds `feat/<stub>`, the runner treats it as the
+checkout and resumes the tracker from where it stopped, with blocked tasks
+first. The run prints one line saying which worktree is reused. If a worktree
+at that path holds a different branch, or the path holds no worktree but the
+branch exists in another worktree elsewhere, the run refuses with both paths
+named. A resumed `loop start` takes its tasks from the tracker file
+`PLAN_TRACKER-<stub>.md`, not the plan; new tasks appended only to the plan
+file are never dispatched.
+
+**A run records its phase for display and status.** The run record holds a
+`phase` field recording which stage the run is currently in. The phases are:
+- `task` — running a task session from the plan
+- `wrap-up` — running the wrap-up session to write release notes and open PR
+- `pull-request` — pull request exists and waiting for CI/review
+- `ci` — CI checks are running on the branch (not implemented yet)
+- `repair` — a task session is blocked and waiting to be unblocked or aborted
+
+The phase changes as the runner progresses through the run. The header updates
+to show `🍅 #<n> <task>/<total>` when in the `task` phase (before any task
+starts), and `🍅 #<n> <phase>` when in any other phase, preventing display of
+counts past the total. Commands like `rafa loop status` and `rafa loop list`
+print the phase name beside the done/total count. A run record from an older
+rafa without a `phase` field reads as `task` for backwards compatibility.
+
+**A detached HEAD is refused at `loop start`.** The branch check that runs
+before the first task rejects any `loop start` attempt when the working tree
+is on a detached HEAD, whether or not `--create-branch` is passed. The refusal
+message names two alternatives: switch to a branch with `git switch <base>`
+or use `--as-worktree` to create a separate working tree. No route accepts
+`HEAD` as a valid branch name, preventing silent errors from later operations.
+
+**SIGINT during a suite step is a stop, not a suite failure.** When the runner
+is recording a suite step (baseline, task, stage, or pre-wrap-up) and receives
+SIGINT (from Ctrl-C or from `bun test` exiting on signal 2), the step is
+recorded as `interrupted` with no test summary or failure list. The run then
+ends as if `rafa loop stop` was called: tasks remain untouched, the work is
+unstaged, and the run state is preserved so `loop start` can resume it.

@@ -49,11 +49,29 @@
  *     green, as they read other positions of that call.
  *   - the preparation moved below the session: 1 case, the first
  *     ordering.
+ *
+ * ## The delivered pull request
+ *
+ * The delivery (`deliverPullRequest`) is the one part of the branch
+ * that IS driven: it reaches the provider, the retry session and the
+ * runner's attempt only through `PullRequestDeliverySeams`, so its cases
+ * run stand-ins that record each call and answer each reading in turn,
+ * with no `gh`, no session and no git. Where it sits in `runWrapUp`, and
+ * that a blocked delivery ends the run before `finished()`, is read off
+ * the source as the release's order is, beside a planted control.
  */
+import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
+import type { PullRequestSummary } from '../pr/index.js';
+
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
+
+import { setActiveOutput } from '../adapters/output/active.js';
+import { sinkOutput } from '../tests/output-sinks.js';
+
+import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
 interface BodyCall {
@@ -227,7 +245,9 @@ describe('the release stage as runWrapUp wires it', () => {
   });
 
   it('takes both halves of the stage from start/release-stage.ts', () => {
-    expect(importedFrom(WRAP_UP_RUN, './release-stage.js')).toEqual(['finishRelease', 'prepareReleaseStage']);
+    // `planTitleIn` is the title the runner-opened pull request is given,
+    // read as the fragment's is; it is no third half of the stage.
+    expect(importedFrom(WRAP_UP_RUN, './release-stage.js')).toEqual(['finishRelease', 'planTitleIn', 'prepareReleaseStage']);
 
     // The control: the reader answers the module asked for and not any
     // import at all, so the list above is that module's own.
@@ -258,5 +278,268 @@ describe('the two directories runWrapUp points each call at', () => {
   it('marks the session record at the wrap-up\'s start and, last of all, its finish', () => {
     expect(NAMES[0]).toBe('wrapUpStarted');
     expect(NAMES.at(-1)).toBe('finished');
+  });
+
+  it('writes the pull-request phase just before the CI gate, inside its block, and hands the gate the session', () => {
+    const gate = callTo(CALLS, 'verifyPullRequest');
+
+    expect(NAMES.indexOf('finishRelease')).toBeLessThan(NAMES.indexOf('pullRequestStarted'));
+    expect(NAMES.indexOf('pullRequestStarted') + 1).toBe(NAMES.indexOf('verifyPullRequest'));
+    expect(WRAP_UP_RUN).toMatch(/if \(ciWait\) \{\n\s*emitLoopEvent\(\{ kind: 'wrap-up', phase: 'ci' \}\);\n\s*session\.pullRequestStarted\(\);/);
+    expect(gate.args.at(-1)).toBe('session');
+  });
+
+  it('reads a phase written after the gate, and a gate handed no session, as such', () => {
+    // The control for the case above: the same reader over a body that
+    // writes the phase once the gate is over, and hands the gate no
+    // session, answers that order and that last argument.
+    const calls = planted([PREPARE, SESSION, FINISH, ...GATE, 'session.pullRequestStarted();']);
+    const names = calls.map((call) => call.name);
+
+    expect(names.indexOf('verifyPullRequest')).toBeLessThan(names.indexOf('pullRequestStarted'));
+    expect(callTo(calls, 'verifyPullRequest').args.at(-1)).toBe('settingSources');
+  });
+});
+
+describe('where runWrapUp delivers the pull request', () => {
+  it('delivers it after the release is finished and before the CI gate', () => {
+    expect(NAMES).toContain('deliverPullRequest');
+    expect(NAMES.indexOf('finishRelease')).toBeLessThan(NAMES.indexOf('deliverPullRequest'));
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('pullRequestStarted'));
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+  });
+
+  it('reads a delivery planted after the CI gate as being after it', () => {
+    // The control for the case above.
+    const names = planted([PREPARE, SESSION, FINISH, ...GATE, 'await deliverPullRequest(delivery, seams);']).map((call) => call.name);
+
+    expect(names.indexOf('verifyPullRequest')).toBeLessThan(names.indexOf('deliverPullRequest'));
+  });
+
+  it('hands the delivery the first session\'s final message, the run\'s branch and loop.wrapUp.retries', () => {
+    const [delivery] = callTo(CALLS, 'deliverPullRequest').args;
+
+    expect(callTo(CALLS, 'preserveProgress').bound).toBe('finalMessage');
+    expect(delivery).toContain('previousMessage: finalMessage');
+    expect(delivery).toContain('branch: expected.branch');
+    expect(delivery).toContain('retries: settings.loopWrapUpRetries');
+  });
+
+  it('delivers only under a provider other than none', () => {
+    expect(WRAP_UP_RUN).toMatch(/if \(readProvider\(\)\.provider !== 'none'\) \{\n\s*const delivery = await deliverPullRequest\(/);
+  });
+
+  it('ends a blocked delivery with exit 1 before the session is marked finished', () => {
+    const blocked = WRAP_UP_RUN.indexOf('if (delivery.kind === \'blocked\') throw new CommandExit(1, delivery.message);');
+    const interrupted = WRAP_UP_RUN.indexOf('if (delivery.kind === \'interrupted\') return;');
+
+    expect(blocked).toBeGreaterThan(-1);
+    expect(interrupted).toBeGreaterThan(-1);
+    expect(blocked).toBeLessThan(WRAP_UP_RUN.indexOf('session.finished();'));
+    expect(interrupted).toBeLessThan(WRAP_UP_RUN.indexOf('session.finished();'));
+  });
+});
+
+/** The run's branch in every delivery case. */
+const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
+
+/** An open pull request as the provider answers it. */
+function pull(number: number): PullRequestSummary {
+  return {
+    number,
+    title: 'rafa-579: A loop run ends delivered',
+    url: `https://github.com/o/r/pull/${String(number)}`,
+    state: 'open',
+    headRefName: BRANCH,
+    baseRefName: 'main',
+    author: { login: 'rafa', isBot: false },
+    isCrossRepository: false,
+    updatedAt: '2026-10-01T00:00:00Z',
+  };
+}
+
+/** What a stand-in's readings answer, one per lookup, the last repeated. */
+type Reading = PullRequestSummary | null | Error;
+
+/** Stand-in seams recording every call, in order. */
+function standIn(answers: {
+  readonly readings: readonly Reading[];
+  readonly runner?: RunnerAttempt;
+  readonly interruptedAfter?: number;
+}): { readonly seams: PullRequestDeliverySeams; readonly calls: string[]; readonly handed: string[] } {
+  const calls: string[] = [];
+  const handed: string[] = [];
+  let lookups = 0;
+  let retries = 0;
+  const seams: PullRequestDeliverySeams = {
+    findOpen: (branch) => {
+      calls.push(`findOpen ${branch}`);
+      const answer = answers.readings[Math.min(lookups, answers.readings.length - 1)] ?? null;
+      lookups += 1;
+      return answer instanceof Error
+        ? Promise.reject(answer)
+        : Promise.resolve(answer);
+    },
+    retry: (previousMessage) => {
+      retries += 1;
+      calls.push(`retry ${String(retries)}`);
+      handed.push(previousMessage);
+      return Promise.resolve(`retry ${String(retries)} final message`);
+    },
+    openRunnerPullRequest: () => {
+      calls.push('runner');
+      return Promise.resolve(answers.runner ?? { kind: 'opened', pull: pull(601) });
+    },
+    isInterrupted: () => answers.interruptedAfter !== undefined && retries >= answers.interruptedAfter,
+  };
+  return { seams, calls, handed };
+}
+
+describe('deliverPullRequest', () => {
+  const warned: string[] = [];
+  const informed: string[] = [];
+
+  beforeEach(() => {
+    warned.length = 0;
+    informed.length = 0;
+    setActiveOutput(sinkOutput({ warn: (line) => warned.push(line), info: (line) => informed.push(line) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** One delivery over `retries` from the message `first`. */
+  function deliver(seams: PullRequestDeliverySeams, retries: number | false = 1): Promise<PullRequestDelivery> {
+    return deliverPullRequest({ branch: BRANCH, retries, previousMessage: 'first final message' }, seams);
+  }
+
+  it('answers the pull request the wrap-up opened, spending no retry and no runner attempt', async () => {
+    const { seams, calls } = standIn({ readings: [pull(600)] });
+
+    const delivery = await deliver(seams);
+
+    expect(delivery).toEqual({ kind: 'delivered', pull: pull(600), by: 'wrap-up', retriesSpent: 0 });
+    expect(calls).toEqual([`findOpen ${BRANCH}`]);
+    expect(warned).toEqual([]);
+  });
+
+  it('spends one retry handed the first session\'s message, and answers the pull request it opened', async () => {
+    const { seams, calls, handed } = standIn({ readings: [null, pull(600)] });
+
+    const delivery = await deliver(seams);
+
+    expect(delivery).toEqual({ kind: 'delivered', pull: pull(600), by: 'retry', retriesSpent: 1 });
+    expect(calls).toEqual([`findOpen ${BRANCH}`, 'retry 1', `findOpen ${BRANCH}`]);
+    expect(handed).toEqual(['first final message']);
+    expect(warned[0]).toContain(`No open pull request for ${BRANCH} after the wrap-up session: running retry wrap-up session 1 of 1`);
+  });
+
+  it('opens the pull request itself after the last retry left none, reading again after each', async () => {
+    const { seams, calls, handed } = standIn({ readings: [null] });
+
+    const delivery = await deliver(seams, 2);
+
+    expect(delivery).toEqual({ kind: 'delivered', pull: pull(601), by: 'runner', retriesSpent: 2 });
+    expect(calls).toEqual([
+      `findOpen ${BRANCH}`,
+      'retry 1',
+      `findOpen ${BRANCH}`,
+      'retry 2',
+      `findOpen ${BRANCH}`,
+      'runner',
+    ]);
+    // Each retry quotes the session just before it, not the first one.
+    expect(handed).toEqual(['first final message', 'retry 1 final message']);
+    expect(warned.at(-1)).toContain('after retry 2 of 2: the loop opens it itself.');
+    expect(informed).toEqual([`\n✅ The loop opened pull request #601 for ${BRANCH}: https://github.com/o/r/pull/601`]);
+  });
+
+  it('spends no retry under loop.wrapUp.retries false and goes straight to the runner', async () => {
+    const { seams, calls } = standIn({ readings: [null] });
+
+    const delivery = await deliver(seams, false);
+
+    expect(delivery.kind).toBe('delivered');
+    expect(delivery.retriesSpent).toBe(0);
+    expect(calls).toEqual([`findOpen ${BRANCH}`, 'runner']);
+  });
+
+  it('answers a blocked runner attempt with its report and the stopped-record tail', async () => {
+    const report = `❌ The run is blocked: the loop could not open the pull request for ${BRANCH} at the push step.\n   ! [rejected]`;
+    const { seams } = standIn({ readings: [null], runner: { kind: 'blocked', message: report } });
+
+    const delivery = await deliver(seams);
+
+    expect(delivery).toEqual({ kind: 'blocked', message: `${report}\n${DELIVERY_BLOCKED_TAIL}`, retriesSpent: 1 });
+  });
+
+  it('blocks on a provider that could not be asked, with no retry and no runner attempt', async () => {
+    const { seams, calls } = standIn({ readings: [new Error('gh: not logged in')] });
+
+    const delivery = await deliver(seams);
+
+    expect(delivery.kind).toBe('blocked');
+    expect(calls).toEqual([`findOpen ${BRANCH}`]);
+    if (delivery.kind !== 'blocked') return;
+    expect(delivery.message).toContain(`could not read whether a pull request is open for ${BRANCH}`);
+    expect(delivery.message).toContain('gh: not logged in');
+    expect(delivery.message.endsWith(DELIVERY_BLOCKED_TAIL)).toBe(true);
+  });
+
+  it('spawns nothing more and opens nothing once the run is interrupted', async () => {
+    const { seams, calls } = standIn({ readings: [null], interruptedAfter: 1 });
+
+    const delivery = await deliver(seams, 3);
+
+    expect(delivery).toEqual({ kind: 'interrupted', retriesSpent: 1 });
+    expect(calls).toEqual([`findOpen ${BRANCH}`, 'retry 1', `findOpen ${BRANCH}`]);
+    expect(warned.at(-1)).toContain('Interrupted');
+  });
+
+  it('is interrupted before the runner when no retry is left', async () => {
+    // The control for the case above: the same interruption with the
+    // retries spent stops the runner too, so the check is not only on
+    // the retry path.
+    const { seams, calls } = standIn({ readings: [null], interruptedAfter: 1 });
+
+    const delivery = await deliver(seams, 1);
+
+    expect(delivery.kind).toBe('interrupted');
+    expect(calls).not.toContain('runner');
+  });
+});
+
+/** A plan whose header names `issue`, or carries no header with null. */
+function plan(issue: string | null): string {
+  const header = issue === null
+    ? []
+    : ['```rafa:plan', 'stub: some-plan', `issue: "${issue}"`, '```', ''];
+  return ['# Plan: A loop run ends delivered', '', ...header, '# Stage: One', '', '- [x] A task', ''].join('\n');
+}
+
+describe('the runner\'s pull request input', () => {
+  it('reads the issue from the plan\'s rafa:plan block first', () => {
+    expect(planIssueNumber(plan('579'), 'rafa-12-other', 'feat/rafa-13-other')).toBe(579);
+  });
+
+  it('falls back to the stub, then the branch, when the block names none', () => {
+    expect(planIssueNumber(plan(null), 'rafa-12-other', 'feat/rafa-13-other')).toBe(12);
+    expect(planIssueNumber(plan(null), 'some-plan', 'feat/rafa-13-other')).toBe(13);
+  });
+
+  it('answers null when nothing names a number, and reads a non-number issue as none', () => {
+    expect(planIssueNumber(plan(null), 'some-plan', 'feat/some-plan')).toBeNull();
+    expect(planIssueNumber(plan('OPT-123'), 'some-plan', 'feat/some-plan')).toBeNull();
+  });
+
+  it('titles the pull request from the plan heading with its Plan: label off', () => {
+    const input = runnerPrInputFor({ branch: BRANCH, base: 'main', planContent: plan('579'), planStub: 'some-plan', notes: ['- one'] });
+
+    expect(input).toEqual({ branch: BRANCH, base: 'main', issue: 579, planTitle: 'A loop run ends delivered', notes: ['- one'] });
+  });
+
+  it('answers no input for a plan that names no issue number', () => {
+    expect(runnerPrInputFor({ branch: 'feat/some-plan', base: 'main', planContent: plan(null), planStub: 'some-plan', notes: [] })).toBeNull();
   });
 });

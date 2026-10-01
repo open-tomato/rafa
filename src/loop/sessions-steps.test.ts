@@ -233,6 +233,7 @@ describe('parseSessionRecord and the steps field', () => {
     ['an empty list of paths', { scope: [] }],
     ['a negative exit code', { exitCode: -1 }],
     ['a new failure the failures hold', { failures: [KNOWN, FRESH], newFailures: [FRESH] }],
+    ['the interrupted mark', { exitCode: 130, summary: null, interrupted: true }],
   ])('reads a step holding %s', (_label, overrides) => {
     const [step] = sessionSteps(parseSessionRecord(stepText(overrides), FILE));
 
@@ -254,11 +255,28 @@ describe('parseSessionRecord and the steps field', () => {
     ['a failure without a name', stepText({ failures: [{ file: 'src/a.test.ts' }] }), 'steps[0].failures is'],
     ['new failures set to null', stepText({ newFailures: null }), 'steps[0].newFailures is null, expected a list of failing tests'],
     ['a new failure the failures lack', stepText({ newFailures: [FRESH] }), 'steps[0].newFailures names'],
+    ['interrupted set to false', stepText({ interrupted: false }), 'steps[0].interrupted is false, expected true or no key'],
+    ['interrupted set to null', stepText({ interrupted: null }), 'steps[0].interrupted is null, expected true or no key'],
   ])('refuses %s, naming the step and its field', (_label, text, problem) => {
     const read = (): SessionRecord => parseSessionRecord(text, FILE);
 
     expect(read).toThrow(SessionRecordError);
     expect(read).toThrow(problem);
+  });
+
+  it('writes the interrupted mark last on the step holding it, and no key on any other', () => {
+    const root = freshRoot();
+    beginSession(root, draft(), { isAlive: ALIVE });
+    const stopped: SessionStep = { ...TASK_STEP, exitCode: 130, newFailures: [], interrupted: true };
+
+    updateSession(root, ID, { appendStep: BASELINE });
+    const record = updateSession(root, ID, { appendStep: stopped });
+    const stored = JSON.parse(readFileSync(sessionFilePath(root, ID), 'utf8')) as { steps: object[] };
+
+    expect(sessionSteps(record)).toEqual([BASELINE, stopped]);
+    expect(Object.keys(stored.steps[0] ?? {})).not.toContain('interrupted');
+    expect(Object.keys(stored.steps[1] ?? {}).at(-1)).toBe('interrupted');
+    expect(sessionSteps(readSession(root, ID, { isAlive: ALIVE }))[1]?.interrupted).toBe(true);
   });
 
   it('names the place of a bad step after good ones', () => {

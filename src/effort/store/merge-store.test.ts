@@ -375,6 +375,46 @@ describe('mergeStore refusals, each leaving both files byte-identical', () => {
     expect(mergeStore(mergeOptions(testCase)).status).toBe('merged');
   });
 
+  it('passes the live record whose session id the caller names, and refuses another sharing its pid', () => {
+    const own = '11111111-2222-3333-4444-555555555555';
+    const other = '66666666-7777-8888-9999-000000000000';
+    const draft = { branch: 'feat/rafa-322-demo', pid: 424242 };
+    const alive = { isAlive: (): boolean => true };
+    const testCase = freshCase();
+    plantPair(testCase);
+    const control = freshCase();
+    plantPair(control);
+    for (const root of [testCase.root, control.root]) {
+      beginSession(root, {
+        ...draft,
+        sessionId: own,
+        planStub: 'rafa-322-demo',
+        plan: '.rafa/plans/PLAN-rafa-322-demo.md',
+        startedAt: '2026-09-29T09:00:00.000Z',
+      }, alive);
+    }
+    beginSession(testCase.root, {
+      ...draft,
+      sessionId: other,
+      planStub: 'rafa-323-other',
+      plan: '.rafa/plans/PLAN-rafa-323-other.md',
+      startedAt: '2026-09-29T09:30:00.000Z',
+    }, alive);
+
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { ...alive, sessionId: own })),
+      refusal('live-loop', `loop ${other} (pid 424242`),
+    );
+    expectRefusedUnchanged(
+      testCase,
+      () => mergeStore(mergeOptions(testCase, { ...alive, sessionId: other })),
+      refusal('live-loop', `loop ${own} (pid 424242`),
+    );
+    expectRefusedUnchanged(control, () => mergeStore(mergeOptions(control, alive)), refusal('live-loop', `loop ${own}`));
+    expect(mergeStore(mergeOptions(control, { ...alive, sessionId: own })).status).toBe('merged');
+  });
+
   it('refuses a development build\'s swap over a store it does not own, and runs it over one it owns (control)', () => {
     const testCase = freshCase();
     plantPair(testCase);

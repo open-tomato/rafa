@@ -218,6 +218,19 @@ export function plantStandInClaude(scratch: ScratchRepo): string {
   return claude;
 }
 
+/** Refuses a scratch whose PATH resolves `claude` anywhere but to its stand-in or to nothing. */
+function refuseForeignClaude(scratch: ScratchRepo): void {
+  const resolved = Bun.which('claude', { PATH: scratch.path });
+  if (resolved !== null && resolved !== join(scratch.bin, 'claude')) {
+    throw new Error(`claude resolves to ${resolved}, not to the stand-in or to nothing`);
+  }
+}
+
+/** The environment a spawned run gets; see {@link runRafa}. */
+function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>): Record<string, string> {
+  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, HOME: scratch.home };
+}
+
 /**
  * Spawns `bun src/rafa.ts` with `words` in `cwd`, under the scratch PATH
  * and HOME and the variables `env` names; see the module note.
@@ -234,14 +247,47 @@ export function runRafa(
   words: readonly string[],
   env: Readonly<Record<string, string>> = {},
 ): CapturedRun {
-  const resolved = Bun.which('claude', { PATH: scratch.path });
-  if (resolved !== null && resolved !== join(scratch.bin, 'claude')) {
-    throw new Error(`claude resolves to ${resolved}, not to the stand-in or to nothing`);
-  }
+  refuseForeignClaude(scratch);
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, HOME: scratch.home },
+    env: spawnedEnv(scratch, env),
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
+}
+
+/** A spawned run still going: its pid to signal, and what it answers once it ends. */
+export interface RunningRafa {
+  /** The child's pid, for a case that signals it. */
+  readonly pid: number;
+  /** Resolves once the child has ended; exit code null when a signal ended it. */
+  readonly result: Promise<CapturedRun>;
+}
+
+/**
+ * Spawns what {@link runRafa} spawns, under the same PATH, HOME and
+ * environment, without waiting: a case that signals the child while it
+ * runs reads {@link RunningRafa.result} afterwards. No timeout is
+ * applied here; a case bounds its own waits and kills the child it gave
+ * up on.
+ */
+export function startRafa(
+  scratch: ScratchRepo,
+  cwd: string,
+  words: readonly string[],
+  env: Readonly<Record<string, string>> = {},
+): RunningRafa {
+  refuseForeignClaude(scratch);
+  const child = Bun.spawn([process.execPath, RAFA_ENTRY, ...words], {
+    cwd,
+    env: spawnedEnv(scratch, env),
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const result = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    .then(([stdout, stderr, exitCode]) => ({ exitCode: child.signalCode === null
+      ? exitCode
+      : null, stdout, stderr }));
+  return { pid: child.pid, result };
 }

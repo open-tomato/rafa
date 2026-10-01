@@ -29,6 +29,18 @@
  * task's own is. A red pre-wrap-up step has no task to block: the run
  * stops before the wrap-up, and the next run takes that step again.
  *
+ * ## A step stopped by SIGINT
+ *
+ * A step `suite-step.ts` reads as interrupted (its `bun test` ended on
+ * SIGINT, or the runner received SIGINT while it ran, which
+ * {@link RunSuiteStepsOptions.isInterrupted} hands on from `start.ts`'s
+ * flag) answers false too, and is told apart from a red one: it has
+ * written no blocker, so the run ends as `rafa loop stop` ends a run
+ * between tasks, its record `stopped` (`start/session.ts`) and no task
+ * marked. An interrupted baseline, which was not written, stops the run
+ * the same way at the call that took it, and every later call of the
+ * run answers false without running a step.
+ *
  * ## A step that throws
  *
  * `suite-step.ts` answers a red suite as an outcome and warns about the
@@ -101,6 +113,8 @@ export interface RunSuiteStepsOptions {
   readonly calls?: Partial<SuiteStepCalls>;
   /** Handed on to every step (`SuiteStepContext.seams`). */
   readonly seams?: SuiteStepSeams;
+  /** True once the runner has received SIGINT, handed on to every step; never, when left out. */
+  readonly isInterrupted?: () => boolean;
 }
 
 /** The loop's two calls; see the module note. */
@@ -111,8 +125,13 @@ export interface RunSuiteSteps {
   readonly afterTask: (taskInfo: TaskInfo, base: string) => Promise<boolean>;
 }
 
-/** The baseline, or `off` when ensuring it threw. */
-type BaselineHeld = SuiteBaseline | 'off';
+/** The baseline, `off` when ensuring it threw, or `interrupted` when SIGINT stopped it. */
+type BaselineHeld = SuiteBaseline | 'off' | 'interrupted';
+
+/** Says the run stops on SIGINT as `rafa loop stop` stops it, with nothing marked. */
+function announceInterrupted(): void {
+  activeOutput().info('   Stopping here, as rafa loop stop does: no task is marked blocked. Run again to go on.');
+}
 
 /** Says why the run stops after the red step `outcome`. */
 function announceStop(outcome: StepOutcome): void {
@@ -134,6 +153,10 @@ async function guarded<T>(label: string, step: () => Promise<T>): Promise<T | nu
 
 /** True when `outcome` lets the run go on, saying why it stops when not. */
 function goesOn(outcome: StepOutcome | null): boolean {
+  if (outcome?.interrupted === true) {
+    announceInterrupted();
+    return false;
+  }
   if (outcome === null || !outcome.red) return true;
   announceStop(outcome);
   return false;
@@ -157,11 +180,18 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     ...(options.seams === undefined
       ? {}
       : { seams: options.seams }),
+    ...(options.isInterrupted === undefined
+      ? {}
+      : { isInterrupted: options.isInterrupted }),
   };
 
   let held: Promise<BaselineHeld> | null = null;
   const baseline = (): Promise<BaselineHeld> => {
     held ??= guarded('suite baseline', () => calls.ensureBaseline(context)).then((outcome) => {
+      if (outcome?.interrupted === true) {
+        announceInterrupted();
+        return 'interrupted';
+      }
       if (outcome !== null) return outcome.baseline;
       activeOutput().warn('⚠️  With no suite baseline, no suite step runs this run.');
       return 'off';
@@ -171,6 +201,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
 
   const beforeSession = async (taskInfo: TaskInfo | null): Promise<boolean> => {
     const known = await baseline();
+    if (known === 'interrupted') return false;
     if (known === 'off') return true;
     if (taskInfo === null) return goesOn(await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known)));
     const stages = await guarded('stage steps', () => calls.runDueStageSteps(context, known));
@@ -179,6 +210,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
 
   const afterTask = async (taskInfo: TaskInfo, base: string): Promise<boolean> => {
     const known = await baseline();
+    if (known === 'interrupted') return false;
     if (known === 'off') return true;
     const { text, declaration } = parseTaskDeclaration(taskInfo.task);
     const input: TaskStepInput = { baseline: known, base, declared: readTestScope(declaration), task: text };

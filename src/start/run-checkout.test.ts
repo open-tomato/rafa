@@ -38,6 +38,7 @@ import { sinkOutput } from '../tests/output-sinks.js';
 
 import { resolveRunDirs } from './checkout.js';
 import { settleRunCheckout } from './run-checkout.js';
+import { resolveRunBranch } from './run-setup.js';
 
 /** The plan every stubbed case runs. */
 const STUB = 'rafa-370';
@@ -111,6 +112,32 @@ describe('settleRunCheckout without --as-worktree', () => {
     expect(settled.projectRoot).toBe(ROOT);
     expect(calls.branchReads).toEqual([started]);
     expect(calls.offers[0]?.checkout).toBe(started);
+  });
+});
+
+describe('settleRunCheckout on a detached HEAD', () => {
+  /** {@link stubbed} on `HEAD`, the offer seam the real `resolveRunBranch` so its refusal is the one read. */
+  function detached(): { readonly seams: RunCheckoutSeams; readonly calls: Calls } {
+    const { seams, calls } = stubbed(ROOT, 'HEAD');
+    return { seams: { ...seams, offer: (offered) => resolveRunBranch(offered) }, calls };
+  }
+
+  it('refuses every line on the checkout\'s own HEAD, adding no worktree', async () => {
+    for (const args of [[], ['--create-branch'], ['--any-branch']]) {
+      const { seams, calls } = detached();
+      const settling = settleRunCheckout(request(args), seams);
+
+      await expect(settling).rejects.toBeInstanceOf(CommandExit);
+      expect(calls.worktrees).toEqual([]);
+    }
+  });
+
+  it('lets --as-worktree through to the worktree, the way on the refusal names', async () => {
+    const { seams, calls } = detached();
+    const settled = await settleRunCheckout(request(['--as-worktree']), seams);
+
+    expect(settled.checkout).toBe(WORKTREE);
+    expect(calls.worktrees).toHaveLength(1);
   });
 });
 
@@ -228,6 +255,33 @@ describe('settleRunCheckout against a real repository', () => {
     expect(git(settled.checkout, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('feat/real');
     expect(git(project, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('main');
     expect(git(project, ['status', '--porcelain', '--untracked-files=no'])).toBe('');
+  });
+
+  it('refuses a detached HEAD without the flag, creating no branch and leaving HEAD where it was', async () => {
+    git(project, ['switch', '-q', '--detach']);
+    const head = git(project, ['rev-parse', 'HEAD']);
+    try {
+      let thrown: unknown;
+      try {
+        await settleRunCheckout({
+          projectRoot: project,
+          worktreeDir: CONFIG_DEFAULTS.loopWorktreeDir,
+          planStub: 'detached',
+          args: ['--create-branch'],
+        }, startedInProject());
+      } catch (error) {
+        thrown = error;
+      }
+
+      // The reading the refusal keys on, taken off this repository rather than assumed.
+      expect(git(project, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('HEAD');
+      expect(thrown).toBeInstanceOf(CommandExit);
+      expect((thrown as CommandExit).message).toContain('git switch <base>');
+      expect(git(project, ['branch', '--list', 'feat/detached'])).toBe('');
+      expect(git(project, ['rev-parse', 'HEAD'])).toBe(head);
+    } finally {
+      git(project, ['switch', '-q', 'main']);
+    }
   });
 
   it('puts the worktree beside the repository when the directory says so', async () => {

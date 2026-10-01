@@ -434,4 +434,54 @@ describe('resolveRunBranch', () => {
   it('leaves the run on the base for a plan whose file names no stub', async () => {
     expect(await resolved(null, 'main', ['--create-branch'], NO_GIT)).toBe('main');
   });
+
+  /** The `CommandExit` resolving threw, or null when it answered a branch. */
+  async function resolveRefusalOf(base: string, args: readonly string[], over: BranchSeams): Promise<CommandExit | null> {
+    try {
+      await resolved(STUB, base, args, over);
+      return null;
+    } catch (error) {
+      if (error instanceof CommandExit) return error;
+      throw error;
+    }
+  }
+
+  // Every line that runs on the checkout's own HEAD: plain, `--create-branch`,
+  // `--any-branch`, and both.
+  const OWN_HEAD_LINES: readonly (readonly string[])[] = [
+    [],
+    ['--create-branch'],
+    ['--any-branch'],
+    ['--any-branch', '--create-branch'],
+  ];
+
+  for (const args of OWN_HEAD_LINES) {
+    it(`refuses a detached HEAD under [${args.join(' ')}] with exit 1, reading no git`, async () => {
+      const refusal = await resolveRefusalOf('HEAD', args, NO_GIT);
+
+      expect(refusal?.exitCode).toBe(1);
+      expect(refusal?.message).toStartWith('❌ Refusing to run on a detached HEAD');
+      expect(refusal?.message).toContain('git switch <base>');
+      expect(refusal?.message).toContain('--as-worktree');
+      expect(refusal?.message).toEndWith(NOTHING_DISPATCHED);
+    });
+  }
+
+  it('refuses a detached HEAD for a plan whose file names no stub', async () => {
+    let thrown: unknown;
+    try {
+      await resolveRunBranch({ checkout: REPO, planStub: null, base: 'HEAD', args: ['--create-branch'] }, NO_GIT);
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as CommandExit).exitCode).toBe(1);
+  });
+
+  it('refuses nothing on a branch, the control for the detached-HEAD cases', async () => {
+    // Same lines, a named branch instead of HEAD: none of them is refused here.
+    for (const args of OWN_HEAD_LINES) {
+      expect(await resolveRefusalOf('feat/other', args, NO_GIT)).toBeNull();
+    }
+    expect(await resolveRefusalOf('main', ['--create-branch'], seams())).toBeNull();
+  });
 });

@@ -34,7 +34,9 @@ _rafa_prompt_plan_dir() {
 }
 
 # Sets the global array `rafa_live_runs` to one entry per live loop:
-# "branch<TAB>stub<TAB>state<TAB>plan". A loop is live while a record
+# "branch<TAB>stub<TAB>state<TAB>plan<TAB>phase". The phase is the
+# record's `phase`, and `task` for a record from an older rafa that has
+# none or names one this plugin does not know. A loop is live while a record
 # under `.rafa/runs/` in one of the given roots is `running` or `paused`
 # and its process is alive; records whose process is gone are left out,
 # and a branch counts once however many records name it.
@@ -42,7 +44,7 @@ _rafa_prompt_live_runs() {
   typeset -ga rafa_live_runs
   rafa_live_runs=()
   local -A seen
-  local root record content state pid branch stub plan
+  local root record content state pid branch stub plan phase
   for root in ${(u)@}; do
     for record in $root/.rafa/runs/*.json(N); do
       content=$(<$record)
@@ -60,7 +62,9 @@ _rafa_prompt_live_runs() {
       plan=''
       [[ $content =~ '"plan": "([^"]+)"' ]] && plan=${match[1]}
       [[ -n $plan && $plan != /* ]] && plan=$root/$plan
-      rafa_live_runs+=("$branch"$'\t'"$stub"$'\t'"$state"$'\t'"$plan")
+      phase=task
+      [[ $content =~ '"phase": "(wrap-up|pull-request|ci|repair)"' ]] && phase=${match[1]}
+      rafa_live_runs+=("$branch"$'\t'"$stub"$'\t'"$state"$'\t'"$plan"$'\t'"$phase")
     done
   done
 }
@@ -86,18 +90,28 @@ _rafa_prompt_label() {
   fi
 }
 
-# Sets REPLY to "#<n> <task>/<total>" for one entry of `rafa_live_runs`:
-# the task in progress for a running loop, the tasks done for a paused one.
+# Sets REPLY to the loop part of the header for one entry of
+# `rafa_live_runs`, which the caller puts after its 🍅. In phase `task` it
+# is "#<n> <task>/<total>": the task in progress for a running loop, the
+# tasks done for a paused one, never past the total. In any other phase
+# (`wrap-up`, `pull-request`, `ci`, `repair`) it is "#<n> <phase>", since
+# every task is done by then and a count would read one past the total.
 _rafa_prompt_live_entry() {
   local -a f
   f=("${(@ps:\t:)1}")
-  local stub=${f[2]} state=${f[3]} plan=${f[4]} file=${f[4]}
+  local stub=${f[2]} state=${f[3]} plan=${f[4]} file=${f[4]} phase=${f[5]:-task}
+  _rafa_prompt_label $stub
+  local label=$REPLY
+  if [[ $phase != task ]]; then
+    REPLY="$label $phase"
+    return 0
+  fi
   [[ -f ${plan:h}/PLAN_TRACKER-$stub.md ]] && file=${plan:h}/PLAN_TRACKER-$stub.md
   _rafa_prompt_count $file
   local total=$(( reply[1] + reply[2] + reply[3] )) at=${reply[1]}
   [[ $state == running ]] && at=$(( reply[1] + 1 ))
-  _rafa_prompt_label $stub
-  REPLY="$REPLY $at/$total"
+  (( at > total )) && at=$total
+  REPLY="$label $at/$total"
 }
 
 # Reads the checkout into the global association `rafa_git` with one git

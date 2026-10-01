@@ -10,6 +10,11 @@
  * writes them, and store rows through the loop's own writer with the
  * clock handed in.
  *
+ * The phase is read off a record holding each of `SESSION_PHASES`, beside
+ * a record holding none, as a rafa older than the field writes it, which
+ * reads `task`; the planted file of that record is checked to carry no
+ * `phase` key, so the reading could not come from one.
+ *
  * The blockers sit beside their controls: a tracker line carrying a
  * comment the loop wrote is shown with the comment's text and without the
  * comment's own spelling, and the demo tracker's blocked line, which
@@ -22,9 +27,9 @@
  * branch reader throwing to show it is never read then.
  */
 import type { LoopSessionSeams } from './loop-sessions.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -33,6 +38,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeTaskReport } from '../../effort/store/reports.js';
 import { SQLITE_SCHEMA_VERSION, sqliteStorePath } from '../../effort/store/sqlite.js';
+import { SESSION_PHASES } from '../../loop/sessions.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER,
@@ -101,7 +107,7 @@ describe('rafa loop status, the session a line picks', () => {
 
     expect(run.stdout).toBe([
       RUNNING_LINE,
-      '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Tasks: 1/4 done (phase task), 1 blocked, 2 open',
       '  Blocked: line 6, Second task',
       '    the line trails no blocker comment',
       '  Task: line 6, Second task',
@@ -122,7 +128,7 @@ describe('rafa loop status, the session a line picks', () => {
 
     expect(run.stdout).toBe([
       'Session session-0450: plan `demo` on `feat/demo`, stopped, pid 7171, started 2026-09-15T11:30:00.000Z',
-      '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Tasks: 1/4 done (phase task), 1 blocked, 2 open',
       '  Blocked: line 6, Second task',
       '    the line trails no blocker comment',
       '  Task: line 6, Second task',
@@ -184,8 +190,8 @@ describe('rafa loop status, what it shows', () => {
     const fromPlan = await status(project, ['-s', 'session-0500']);
     const neither = await status(project, ['-s', 'session-0600']);
 
-    expect(fromPlan.stdout.split('\n')[1]).toBe('  Tasks: 0/4 done, 0 blocked, 4 open');
-    expect(neither.stdout.split('\n').slice(1)).toEqual(['  Tasks: neither `.plans/PLAN-gone.md` nor its tracker is there to count', '']);
+    expect(fromPlan.stdout.split('\n')[1]).toBe('  Tasks: 0/4 done (phase task), 0 blocked, 4 open');
+    expect(neither.stdout.split('\n').slice(1)).toEqual(['  Tasks: neither `.plans/PLAN-gone.md` nor its tracker is there to count (phase task)', '']);
   });
 
   it('warns and gives no ETA when the store cannot be read, still exiting 0', async () => {
@@ -221,6 +227,39 @@ describe('rafa loop status, what it shows', () => {
   });
 });
 
+describe('rafa loop status, the phase beside the tasks done', () => {
+  it.each(SESSION_PHASES.map((phase) => [phase]))('prints phase %s beside done/total, and gives it in json mode', async (phase: SessionPhase) => {
+    const project = projectWith(sessionRecord({ phase }));
+
+    const text = await status(project, []);
+    const json = await status(project, ['--output=json']);
+
+    expect(text.stdout.split('\n')[1]).toBe(`  Tasks: 1/4 done (phase ${phase}), 1 blocked, 2 open`);
+    expect(resultEvent(json.stdout)).toMatchObject({ ok: true, data: { phase, session: { phase } } });
+  });
+
+  it('reads a record holding no phase, as an older rafa writes it, as task, with or without counts', async () => {
+    const project = projectWith(sessionRecord(), sessionRecord({ sessionId: 'session-0600', planStub: 'gone', plan: '.plans/PLAN-gone.md', task: null }));
+    expect(readFileSync(join(project.root, '.rafa/runs/session-0500.json'), 'utf8')).not.toContain('"phase"');
+
+    const counted = await status(project, ['-s', 'session-0500']);
+    const uncounted = await status(project, ['-s', 'session-0600']);
+    const json = await status(project, ['-s', 'session-0500', '--output=json']);
+
+    expect(counted.stdout.split('\n')[1]).toBe('  Tasks: 1/4 done (phase task), 1 blocked, 2 open');
+    expect(uncounted.stdout.split('\n')[1]).toBe('  Tasks: neither `.plans/PLAN-gone.md` nor its tracker is there to count (phase task)');
+    expect(resultEvent(json.stdout)).toMatchObject({ data: { phase: 'task' } });
+  });
+
+  it('still prints the phase a record holds when neither its plan nor its tracker is there', async () => {
+    const project = projectWith(sessionRecord({ planStub: 'gone', plan: '.plans/PLAN-gone.md', task: null, phase: 'ci' }));
+
+    const run = await status(project, []);
+
+    expect(run.stdout.split('\n')[1]).toBe('  Tasks: neither `.plans/PLAN-gone.md` nor its tracker is there to count (phase ci)');
+  });
+});
+
 /** The demo tracker with `comment` written onto the line of `task`, as `writeTrackerBlocker` writes one. */
 function trackerBlocking(task: string, comment: string): string {
   return DEMO_TRACKER.replace(`- [ ] ${task}`, `- [BLOCKED] ${task}  ${comment}`);
@@ -236,7 +275,7 @@ describe('rafa loop status, the blockers it prints', () => {
     const run = await status(project, []);
 
     expect(run.stdout.split('\n').slice(1, 4)).toEqual([
-      '  Tasks: 1/4 done, 1 blocked, 2 open',
+      '  Tasks: 1/4 done (phase task), 1 blocked, 2 open',
       '  Blocked: line 6, Second task',
       '    the check-types gate exited 2',
     ]);
@@ -252,7 +291,7 @@ describe('rafa loop status, the blockers it prints', () => {
     const run = await status(project, []);
 
     expect(run.stdout.split('\n').slice(1, 5)).toEqual([
-      '  Tasks: 1/4 done, 2 blocked, 1 open',
+      '  Tasks: 1/4 done (phase task), 2 blocked, 1 open',
       '  Blocked: line 6, Second task',
       '    the line trails no blocker comment',
       '  Blocked: line 8, Fourth task',
@@ -268,7 +307,7 @@ describe('rafa loop status, the blockers it prints', () => {
     const neither = await status(project, ['-s', 'session-0600']);
 
     expect(open.stdout).not.toContain('Blocked:');
-    expect(open.stdout.split('\n')[1]).toBe('  Tasks: 2/4 done, 0 blocked, 2 open');
+    expect(open.stdout.split('\n')[1]).toBe('  Tasks: 2/4 done (phase task), 0 blocked, 2 open');
     expect(neither.stdout).not.toContain('Blocked:');
   });
 

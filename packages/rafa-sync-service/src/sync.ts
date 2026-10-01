@@ -52,6 +52,10 @@
  *     the end of every task, and the rows the merge added are still
  *     the hub's to answer again.
  *
+ * The request's `sessionId` is the merge's own: a loop run's end-of-task
+ * pull names its session id, and the merge's live-loop guard passes that
+ * run's record and refuses any other live one, sharing its pid or not.
+ *
  * The pull cursor becomes the payload's once a merge was swapped in or
  * no row needed one. A dry run builds, checks and deletes the merge and
  * moves no cursor, and a refusal moves none either.
@@ -249,10 +253,11 @@ function refuseUnknownMigrations(payload: WirePayload, known: readonly string[])
 }
 
 /** Merges `payload` into the store at `path` through a scratch store; see the module note. */
-function mergePayload(path: string, payload: WirePayload, dryRun: boolean, now: () => Date): StoreMergeResult {
+function mergePayload(path: string, payload: WirePayload, request: SyncPullRequest, now: () => Date): StoreMergeResult {
+  const { dryRun, sessionId = null } = request;
   const wire = materialiseWirePayload(payload, { now });
   try {
-    const merge = mergeStore({ path, otherPath: wire.path, backend: 'sqlite', dryRun, stamp: randomUUID(), now });
+    const merge = mergeStore({ path, otherPath: wire.path, backend: 'sqlite', dryRun, stamp: randomUUID(), now, sessionId });
     if (merge.backupPath === null) return merge;
     rmSync(merge.backupPath, { force: true });
     return { ...merge, backupPath: null };
@@ -298,7 +303,8 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     return PUSHED;
   };
 
-  const pull = async ({ from, dryRun }: SyncPullRequest): Promise<SyncPullResult> => {
+  const pull = async (request: SyncPullRequest): Promise<SyncPullResult> => {
+    const { from, dryRun } = request;
     refusePath('from', from);
     const origin = originOf();
     if (origin === undefined) return NOTHING_TO_SYNC;
@@ -307,7 +313,7 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
     refuseUnknownMigrations(payload, known);
     const merge = rowsIn(payload) === 0
       ? undefined
-      : mergePayload(storePath, payload, dryRun, now);
+      : mergePayload(storePath, payload, request, now);
     if (!dryRun) writeSyncCursor(statePath, origin, hub.url, 'pull', payload.cursor);
     return merge === undefined
       ? NOTHING_TO_SYNC

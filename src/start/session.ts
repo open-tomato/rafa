@@ -17,18 +17,33 @@
  *     (below), and in a worktree, the worktree's path (below).
  *   - **Before each dispatch** ({@link RunSession.taskStarted}): the task's
  *     tracker line counted from 1, and its sentence with the routing
- *     declaration left out, as the dispatch quotes it.
+ *     declaration left out, as the dispatch quotes it, and phase `task`.
  *   - **When no task is left** ({@link RunSession.wrapUpStarted}): no task,
- *     while the wrap-up and the CI wait run.
+ *     while the wrap-up and the CI wait run, and phase `wrap-up`.
+ *   - **As the CI gate starts** ({@link RunSession.pullRequestStarted},
+ *     from `start/wrap-up-run.ts`): phase `pull-request`, while the gate
+ *     finds the pull request, or pushes the branch under a `none`
+ *     provider.
+ *   - **Before each poll of the checks** ({@link RunSession.ciStarted},
+ *     from `start/pr-lifecycle.ts`): phase `ci`.
+ *   - **Before each repair session** ({@link RunSession.repairStarted},
+ *     from `start/pr-lifecycle.ts`): phase `repair`, until the next poll
+ *     writes `ci` again.
  *   - **At the end** ({@link RunSession.end}): `done` once
- *     {@link RunSession.finished} was called, which `start()` does after
- *     the wrap-up and the CI wait come back; `stopped` for every other way
- *     out. Those are a failed, blocked, interrupted or unstored task, a
+ *     {@link RunSession.finished} was called, which `start/wrap-up-run.ts`
+ *     does once the pull request is open (or the provider is `none`) and
+ *     the CI wait has come back; `stopped` for every other way out, a
+ *     delivery blocked at the pull request among them. Those are a failed, blocked, interrupted or unstored task, a
  *     pause for usage, a store the progress render cannot open, and
  *     anything thrown. A stopped record keeps the task it stopped at.
  *
+ * The open writes no phase, so a record no change has reached yet reads
+ * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
+ * `--no-ci-wait` runs no gate, and its record ends in `wrap-up`. The end
+ * leaves the phase as the last change wrote it.
+ *
  * Each change after the open reads the stored record again and changes
- * only its own field, so a `paused` another process wrote is kept by the
+ * only its own fields, so a `paused` another process wrote is kept by the
  * loop writing its next task (`loop/sessions.ts`).
  *
  * ## Under `--roadmap`: the away hop
@@ -80,7 +95,7 @@
  *
  * ## A change after the open never stops the run
  *
- * A task, wrap-up or end that cannot be written is warned about in one
+ * A task, phase or end that cannot be written is warned about in one
  * line, and the run goes on as it would have. The record is what other
  * commands read about the run, while its work is the tracker's and the
  * store's, both written by then.
@@ -155,8 +170,14 @@ export interface RunSession {
   readonly id: string;
   /** Writes the task about to be dispatched. */
   taskStarted(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>): void;
-  /** Writes that no task is running, as the wrap-up starts. */
+  /** Writes that no task is running, as the wrap-up starts, and phase `wrap-up`. */
   wrapUpStarted(): void;
+  /** Writes phase `pull-request`, as the CI gate starts on the pushed branch. */
+  pullRequestStarted(): void;
+  /** Writes phase `ci`, as a poll of the pull request's checks starts. */
+  ciStarted(): void;
+  /** Writes phase `repair`, as a repair session for the pull request is spawned. */
+  repairStarted(): void;
   /** Notes that the run reached its end, so {@link RunSession.end} writes `done`. */
   finished(): void;
   /** Writes `done` after {@link RunSession.finished}, and `stopped` otherwise. */
@@ -240,8 +261,12 @@ function sessionHandle(repoRoot: string, sessionId: string): RunSession {
     id: sessionId,
     taskStarted: (taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>) => change('the running task', {
       task: { line: taskInfo.lineNum + 1, text: stripTaskDeclaration(taskInfo.task) },
+      phase: 'task',
     }),
-    wrapUpStarted: () => change('the end of the tasks', { task: null }),
+    wrapUpStarted: () => change('the end of the tasks', { task: null, phase: 'wrap-up' }),
+    pullRequestStarted: () => change('the pull-request phase', { phase: 'pull-request' }),
+    ciStarted: () => change('the ci phase', { phase: 'ci' }),
+    repairStarted: () => change('the repair phase', { phase: 'repair' }),
     finished: () => {
       reachedEnd = true;
     },

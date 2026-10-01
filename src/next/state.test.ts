@@ -42,7 +42,9 @@
  * holding untracked files alone beside the same two paths written as
  * tracked ones; and the unusable provider beside a provider that
  * answers no pull request, which is row 13. Both are held to asking
- * NOTHING they did not need, by the call log of the double.
+ * NOTHING they did not need, by the call log of the double. A live run
+ * beside a modified tree, which row 1 takes ahead of the tree, and the
+ * checkout the tree line names, are driven in `./state-live-run.test.ts`.
  *
  * ## What passes while wrong
  *
@@ -137,6 +139,9 @@ const PR = 41;
 
 /** The issue the roadmap points at. */
 const ISSUE = 64;
+
+/** The checkout `git rev-parse --show-toplevel` names, which the tree line names. */
+const CHECKOUT = '/work/rafa';
 
 /** A checklist with one task open. */
 const OPEN_PLAN = ['# Plan: one', '', '# Stage: one', '', '- [ ] first', '- [ ] second', ''].join('\n');
@@ -274,6 +279,7 @@ function sourcesFor(over: Partial<Situation> = {}): NextSources {
   const answers: Readonly<Record<string, GitResult>> = {
     'rev-parse --abbrev-ref HEAD': said(`${situation.branch}\n`),
     'status --porcelain': said(situation.tree.map((entry) => `${entry}\n`).join('')),
+    'rev-parse --show-toplevel': said(`${CHECKOUT}\n`),
     [`rev-list --left-right --count ${BASE}...origin/${BASE}`]: said(situation.standing),
     'for-each-ref --format=%(refname) refs/heads refs/remotes': said(situation.refs.join('\n')),
   };
@@ -644,7 +650,7 @@ function stateOver(over: Partial<Situation>, pulls: PullRequests): ReturnType<ty
 /** What a provider that could not be reached says. */
 const UNREACHABLE = 'gh: could not connect to api.github.com';
 
-describe('the two pre-conditions, ahead of the table', () => {
+describe('the two pre-conditions, among the rows', () => {
   it('holds the two in the spec order, and tells one from a row of the table', () => {
     expect(NEXT_PRECONDITIONS).toEqual(['tree-modified', 'pulls-unusable']);
     expect(NEXT_PRECONDITIONS.every((id) => isPrecondition(id))).toBe(true);
@@ -663,7 +669,7 @@ describe('the two pre-conditions, ahead of the table', () => {
 
     expect(state.action).toBe('none');
     expect(state.reading).toBe(
-      'the working tree has changes to 2 tracked files: `src/next/state.ts`, `src/next/readings.ts`',
+      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`src/next/state.ts\`, \`src/next/readings.ts\``,
     );
     expect(state.proposal).toBe('commit or set aside your changes; rafa will not touch them');
   });
@@ -681,9 +687,9 @@ describe('the two pre-conditions, ahead of the table', () => {
     const one = await stateOf({ tree: [' M a.ts'] });
     const many = await stateOf({ tree: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((name) => ` M ${name}.ts`) });
 
-    expect(one.reading).toBe('the working tree has changes to 1 tracked file: `a.ts`');
+    expect(one.reading).toBe(`the working tree at \`${CHECKOUT}\` has changes to 1 tracked file: \`a.ts\``);
     expect(many.reading).toBe(
-      'the working tree has changes to 7 tracked files: `a.ts`, `b.ts`, `c.ts`, `d.ts`, `e.ts` and 2 more',
+      `the working tree at \`${CHECKOUT}\` has changes to 7 tracked files: \`a.ts\`, \`b.ts\`, \`c.ts\`, \`d.ts\`, \`e.ts\` and 2 more`,
     );
   });
 

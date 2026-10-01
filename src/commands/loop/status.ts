@@ -10,7 +10,10 @@
  * that branch. Its record gives the state it reads as, the pid, the start
  * and the task it names. The plan's tracker gives the tasks done, blocked
  * and open over the whole plan, read from the plan itself before the run
- * made its tracker, and nothing when neither file is there.
+ * made its tracker, and nothing when neither file is there. The phase the
+ * run is in sits beside the tasks done over total (`loop-sessions.ts`,
+ * "A session's tasks"): `task`, `wrap-up`, `pull-request`, `ci` or
+ * `repair`, and `task` for a record from a rafa older than the field.
  *
  * A session reading `running` or `paused` also gets its rough ETA from the
  * effort store (`loop-sessions.ts`, "The rough ETA"). A store that cannot
@@ -36,10 +39,11 @@
  * ## What it writes
  *
  * In json mode the terminal result's `data` holds `session`, the record;
+ * `phase`, the phase it reads as, `task` for a record that carries none;
  * `checklist`, the file the tasks were counted from, absolute, or null;
  * `tasks`, the counts, or null; `blocked`, one entry per blocked task,
  * empty without one; and `eta`, or null. Text mode writes the session's
- * line, then its tasks, then two lines per blocked task, then one line
+ * line, then its tasks with its phase, then two lines per blocked task, then one line
  * each for its task and its ETA.
  *
  * ## Refusals
@@ -48,17 +52,20 @@
  */
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../plan/plan-files.js';
 
 import { messageOf } from '../../config-sections.js';
+import { sessionPhase } from '../../loop/sessions.js';
 import { splitBlockerComment } from '../../utils/tracker.js';
-import { countTasks, expectNoArgument, formatCounts } from '../plan/plan-files.js';
+import { countTasks, expectNoArgument } from '../plan/plan-files.js';
 
 import {
   estimateEta,
   etaLine,
   isLive,
+  phasedCounts,
+  phaseNote,
   pickSession,
   readSessionChecklist,
   readSessionFinishes,
@@ -89,6 +96,8 @@ export interface BlockedTask {
 /** One session's status. See the module note. */
 export interface SessionStatus {
   readonly session: SessionRecord;
+  /** The phase the session reads as: its record's, or `task` when the record carries none. */
+  readonly phase: SessionPhase;
   readonly checklist: string | null;
   readonly tasks: TaskCounts | null;
   readonly blocked: readonly BlockedTask[];
@@ -133,8 +142,8 @@ export function renderStatus(status: SessionStatus): string[] {
   return [
     `Session ${sessionLine(session)}`,
     tasks === null
-      ? `  Tasks: neither \`${session.plan}\` nor its tracker is there to count`
-      : `  Tasks: ${formatCounts(tasks)}`,
+      ? `  Tasks: neither \`${session.plan}\` nor its tracker is there to count ${phaseNote(session)}`
+      : `  Tasks: ${phasedCounts(tasks, session)}`,
     ...blocked.flatMap(blockedLines),
     ...task === null
       ? []
@@ -165,6 +174,7 @@ async function runStatus(context: RafaContext, seams: ResolvedLoopSeams): Promis
 
   const status: SessionStatus = {
     session: record,
+    phase: sessionPhase(record),
     checklist: checklist?.file ?? null,
     tasks,
     blocked: blockedTasks(checklist),
@@ -186,7 +196,8 @@ export function createLoopStatusCommand(seams: LoopSessionSeams = {}): RafaComma
     action: 'status',
     summary: 'show a session: its state, tasks done over total and a rough ETA',
     description: 'Reads a session record and its plan\'s tracker: the state, the pid, the start, the task'
-      + ' it names, and the tasks done, blocked and open over the whole plan. A running or paused session'
+      + ' it names, the tasks done, blocked and open over the whole plan, and beside them the phase the'
+      + ' run is in: task, wrap-up, pull-request, ci or repair. A running or paused session'
       + ' also gets a rough ETA from the effort store: the time from its start to the last task it'
       + ' finished, per task finished, times the open and blocked tasks left, and none before its first'
       + ' task finishes. Every blocked task of the checklist is shown with the blocker comment its line'
@@ -198,7 +209,7 @@ export function createLoopStatusCommand(seams: LoopSessionSeams = {}): RafaComma
     examples: [
       {
         cmd: 'rafa loop status',
-        note: 'Shows the session on the branch checked out here: its state, tasks done over total and ETA.',
+        note: 'Shows the session on the branch checked out here: its state, tasks done over total, phase and ETA.',
       },
       {
         cmd: 'rafa loop status --session-id=9185b41c-65f7-4dd6-a0c1-6494c4028f0f --output=json',

@@ -43,7 +43,10 @@ After a dim divider, one 🍅 and every live loop of the project as
 `#<issue> <task>/<total>`, the current branch's first and the others by
 issue number, divided by `·`: `│ 🍅 #367 13/47 · #370 8/33`. A running
 loop is red and shows the task in progress; a paused one is yellow and
-shows the tasks done.
+shows the tasks done; neither count goes past the total. Once its tasks
+are done, a loop shows the phase its record names instead of a count:
+`wrap-up`, `pull-request`, `ci` or `repair`, as in `│ 🍅 #367 wrap-up`.
+A record with no phase, from an older rafa, shows the count.
 
 A loop is live while its record under `.rafa/runs/` says `running` or
 `paused` and its process is still alive, so a record left behind by a

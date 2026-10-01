@@ -25,6 +25,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -337,5 +338,86 @@ describe('a change after the open', () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toStartWith(`warn:\n⚠️  Session ${ID}: the running task was not written to ${label}: session record `);
     expect(lines[1]).toStartWith(`warn:\n⚠️  Session ${ID}: the end of the run was not written to ${label}: session record `);
+  });
+});
+
+describe('the phase each change writes', () => {
+  it('writes task on each dispatch, wrap-up, pull-request, ci and repair at their changes, and keeps it at the end', () => {
+    const root = freshRoot();
+    const session = openRunSession(options(root));
+    const opened = storedRecord(root);
+    const phases: (string | undefined)[] = [];
+    const record = (): void => {
+      phases.push(storedRecord(root)?.phase);
+    };
+
+    session.taskStarted({ task: 'First', lineNum: 0 });
+    record();
+    session.wrapUpStarted();
+    record();
+    session.pullRequestStarted();
+    record();
+    session.ciStarted();
+    record();
+    session.repairStarted();
+    record();
+    session.ciStarted();
+    record();
+    session.finished();
+    session.end();
+
+    // The control: the open writes no `phase` key, so each phase read
+    // above is one a change wrote, not one the record started with.
+    expect(opened).not.toHaveProperty('phase');
+    expect(phases).toEqual(['task', 'wrap-up', 'pull-request', 'ci', 'repair', 'ci']);
+    expect(storedRecord(root)).toMatchObject({ state: 'done', task: null, phase: 'ci' });
+  });
+
+  it('writes the phase as its own key in the stored JSON', () => {
+    const root = freshRoot();
+    const session = openRunSession(options(root));
+
+    session.wrapUpStarted();
+
+    expect(readFileSync(sessionFilePath(root, ID), 'utf8')).toContain('"phase": "wrap-up"');
+  });
+
+  it('writes task again when a dispatch follows another phase, keeping the paused state another process wrote', () => {
+    const root = freshRoot();
+    const session = openRunSession(options(root));
+    session.wrapUpStarted();
+    plantRecord(root, { ...otherRecord(), ...storedRecord(root), state: 'paused' });
+
+    session.taskStarted({ task: 'Again', lineNum: 5 });
+
+    expect(storedRecord(root)).toMatchObject({ state: 'paused', phase: 'task', task: { line: 6, text: 'Again' } });
+  });
+
+  it('leaves the task and the state alone when it writes a phase of the CI gate', () => {
+    const root = freshRoot();
+    const session = openRunSession(options(root));
+    session.taskStarted({ task: 'Kept', lineNum: 1 });
+
+    session.ciStarted();
+
+    expect(storedRecord(root)).toMatchObject({ state: 'running', phase: 'ci', task: { line: 2, text: 'Kept' } });
+  });
+
+  it('warns in one line per phase that cannot be written, and throws nothing', () => {
+    const root = freshRoot();
+    const session = openRunSession(options(root));
+    rmSync(sessionFilePath(root, ID));
+
+    const lines = linesOf(() => {
+      session.pullRequestStarted();
+      session.ciStarted();
+      session.repairStarted();
+    });
+
+    const label = join('.rafa', 'runs', `${ID}.json`);
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toStartWith(`warn:\n⚠️  Session ${ID}: the pull-request phase was not written to ${label}: `);
+    expect(lines[1]).toStartWith(`warn:\n⚠️  Session ${ID}: the ci phase was not written to ${label}: `);
+    expect(lines[2]).toStartWith(`warn:\n⚠️  Session ${ID}: the repair phase was not written to ${label}: `);
   });
 });

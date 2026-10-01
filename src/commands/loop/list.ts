@@ -5,7 +5,9 @@
  *
  * Every record under `.rafa/runs/` reading `running` or `paused`, oldest
  * first (`loop/sessions.ts`), with the tasks of its plan counted as
- * `rafa loop status` counts them (`loop-sessions.ts`). A record whose pid
+ * `rafa loop status` counts them (`loop-sessions.ts`), the phase its run is
+ * in beside the tasks done over total, `task` for a record from a rafa
+ * older than the field. A record whose pid
  * is gone reads `stopped` and is not listed, nor is one that reads `done`.
  * No branch is read: the list is the project's, whatever is checked out.
  *
@@ -15,7 +17,7 @@
  * ## What it writes
  *
  * In json mode the terminal result's `data` holds `sessions`, each its
- * `session` record and its `tasks` counts, or null when neither its plan
+ * `session` record, its `phase` as it reads, and its `tasks` counts, or null when neither its plan
  * nor its tracker is there. Text mode writes `Running sessions:` and one
  * row per session, or `No running sessions.` alone.
  *
@@ -33,15 +35,18 @@
  */
 import type { LoopSessionSeams, ResolvedLoopSeams } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../plan/plan-files.js';
 
 import { isAbsolute, relative } from 'node:path';
 
-import { countTasks, expectNoArgument, formatCounts } from '../plan/plan-files.js';
+import { sessionPhase } from '../../loop/sessions.js';
+import { countTasks, expectNoArgument } from '../plan/plan-files.js';
 
 import {
   isLive,
+  phasedCounts,
+  phaseNote,
   projectRoot,
   readRecords,
   readSessionChecklist,
@@ -55,6 +60,8 @@ const USAGE = 'rafa loop list';
 /** One running session, as the list holds it. */
 export interface SessionListing {
   readonly session: SessionRecord;
+  /** The phase the session reads as: its record's, or `task` when the record carries none. */
+  readonly phase: SessionPhase;
   readonly tasks: TaskCounts | null;
 }
 
@@ -85,8 +92,8 @@ export function renderSessionList(root: string, list: SessionList): string[] {
     'Running sessions:',
     ...list.sessions.map(({ session, tasks }) => {
       const counts = tasks === null
-        ? 'no plan or tracker to count'
-        : formatCounts(tasks);
+        ? `no plan or tracker to count ${phaseNote(session)}`
+        : phasedCounts(tasks, session);
       return `  ${sessionLine(session)}; ${counts}; ${checkoutColumn(root, session)}`;
     }),
   ];
@@ -102,6 +109,7 @@ async function runList(context: RafaContext, seams: ResolvedLoopSeams): Promise<
       const checklist = readSessionChecklist(root, session);
       return {
         session,
+        phase: sessionPhase(session),
         tasks: checklist === null
           ? null
           : countTasks(checklist.tasks),
@@ -126,7 +134,7 @@ export function createLoopListCommand(seams: LoopSessionSeams = {}): RafaCommand
     summary: 'list the running sessions, with the tasks done in each plan',
     description: 'Lists every session record under `.rafa/runs/` that reads `running` or `paused`, oldest'
       + ' first: its id, plan, branch, state, pid and start, the tasks of its plan done, blocked and'
-      + ' open, and the worktree it runs in, or the main checkout. A record whose pid is gone reads `stopped` and is not listed. Until phase 6 a plan runs in'
+      + ' open with the phase its run is in beside them, and the worktree it runs in, or the main checkout. A record whose pid is gone reads `stopped` and is not listed. Until phase 6 a plan runs in'
       + ' one session at a time, so each row is a plan running. With `--output=json` the sessions are the'
       + ' data of the terminal result event.',
     args: [],

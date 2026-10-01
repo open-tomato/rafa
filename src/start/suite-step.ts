@@ -70,6 +70,29 @@
  * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`). A red step with no open
  * task left writes nothing and answers the text all the same.
  *
+ * ## SIGINT: a stop, not a red step
+ *
+ * A step is interrupted when its `bun test` ended on SIGINT, or when the
+ * runner received SIGINT while it ran ({@link SuiteStepContext.isInterrupted},
+ * read once the run returns). A terminal's Ctrl-C reaches the loop's
+ * whole process group, `bun test` included, which ends at once; `rafa
+ * loop stop` signals the loop's pid alone, so `bun test` runs to its end
+ * and the step is read as interrupted once it returns. A child that
+ * `Bun.spawn` sees end on a signal answers 128 plus the signal's number
+ * as its exit code (measured on bun 1.4.2: 130 with `signalCode`
+ * `SIGINT` for SIGINT, 143 for SIGTERM), so exit code
+ * {@link SIGINT_EXIT_CODE} reads as SIGINT; a process exiting 130 on its
+ * own says the same by the shell's convention.
+ *
+ * Such a run answers nothing about the tree: a `bun test` killed midway
+ * prints no summary, which would otherwise read as red and block the
+ * next task. So an interrupted step is recorded with `interrupted: true`
+ * (`loop/sessions.ts`) and no new failure, is never red, writes no
+ * blocker, and answers {@link StepOutcome.interrupted}, on which the
+ * caller ends the run as `rafa loop stop` does. An interrupted baseline
+ * is not written and enters no stage in the ledger, and an interrupted
+ * stage step is not entered in it, so the next run takes each again.
+ *
  * ## The stage ledger
  *
  * The run record is new for every run, so whether a stage's step ran is
@@ -114,6 +137,7 @@ import type { PreloadReading, TaskStepScope } from '../suite/scope.js';
 import type { TestScope } from '../utils/declaration.js';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -144,6 +168,9 @@ export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
 
 /** The version the ledger is written at, and the only one read. */
 export const STAGE_LEDGER_VERSION = 1;
+
+/** The exit code `Bun.spawn` answers for a child ended by SIGINT: 128 plus its number. See the module note. */
+export const SIGINT_EXIT_CODE = 128 + constants.signals.SIGINT;
 
 /** How many known failures a step lists by name before it counts the rest. */
 const KNOWN_LISTED = 10;
@@ -177,6 +204,8 @@ export interface SuiteStepContext {
   readonly settings: Pick<TestsSettings, 'testsFullSuiteTriggers' | 'testsIntegration'>;
   /** The plan's `Owns:` folders, or null without any; see {@link planOwnsReader}. */
   readonly owns: () => Promise<readonly string[] | null>;
+  /** True once the runner has received SIGINT; never, when left out. See the module note. */
+  readonly isInterrupted?: () => boolean;
   readonly seams?: SuiteStepSeams;
 }
 
@@ -187,6 +216,8 @@ export interface StepOutcome {
   readonly step: SessionStep | null;
   /** True when the step found something new; see the module note. */
   readonly red: boolean;
+  /** True when the step was read as a stop on SIGINT, never red; see the module note. */
+  readonly interrupted: boolean;
   /** The blocker text of a red step, written or not; null when green. */
   readonly blocker: string | null;
   /** The tracker line (from zero) the blocker was written on, or null. */
@@ -199,6 +230,8 @@ export interface BaselineOutcome {
   readonly baseline: SuiteBaseline;
   /** The step recorded, or null when a stored baseline was reused. */
   readonly step: SessionStep | null;
+  /** True when the run was read as a stop on SIGINT: the baseline was not written. */
+  readonly interrupted: boolean;
 }
 
 /** One stage whose step was taken, or that the baseline covered. */
@@ -379,6 +412,11 @@ function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): StepVer
   return { fresh, known, newErrors, unreported };
 }
 
+/** True when `result` ended on SIGINT or the runner received it; see the module note. */
+export function isStepInterrupted(context: Pick<SuiteStepContext, 'isInterrupted'>, result: Pick<SuiteResult, 'exitCode'>): boolean {
+  return result.exitCode === SIGINT_EXIT_CODE || context.isInterrupted?.() === true;
+}
+
 /** True when a verdict blocks. */
 function isRed(verdict: StepVerdict): boolean {
   return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
@@ -463,14 +501,25 @@ interface Settling {
   readonly blocks: boolean;
 }
 
+/** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
+function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
+  const { kind, label, result } = settling;
+  const step: SessionStep = { ...stepOf(kind, settling.scope, result, []), interrupted: true };
+  recordStep(seams, step);
+  activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
+  activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
+  return { kind, step, red: false, interrupted: true, blocker: null, blockedLine: null };
+}
+
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
 function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result, baseline } = settling;
+  if (isStepInterrupted(context, result)) return settleInterrupted(seams, settling);
   const verdict = verdictOf(result, baseline);
   const step = stepOf(kind, settling.scope, result, verdict.fresh);
   recordStep(seams, step);
   announce(label, result, verdict.known);
-  if (!isRed(verdict)) return { kind, step, red: false, blocker: null, blockedLine: null };
+  if (!isRed(verdict)) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null };
 
   const blocker = blockerText(label, result, verdict);
   activeOutput().error(`❌ ${blocker}`);
@@ -478,7 +527,7 @@ function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, 
     ? blockNextOpenTask(context.trackerPath, blocker)
     : null;
   if (blockedLine !== null) activeOutput().error(`   The next task (line ${blockedLine + 1}) is marked blocked on it.`);
-  return { kind, step, red: true, blocker, blockedLine };
+  return { kind, step, red: true, interrupted: false, blocker, blockedLine };
 }
 
 /** Runs one suite: over `paths`, since `changedSince`, or the whole project. */
@@ -502,22 +551,24 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   if (reading.state === 'read') {
     const known = reading.baseline.failures.length;
     activeOutput().info(`📏 Suite baseline reused from ${basename(path)} (${reading.baseline.recordedAt}): ${known} known failure(s).`);
-    return { baseline: reading.baseline, step: null };
+    return { baseline: reading.baseline, step: null, interrupted: false };
   }
   if (reading.state === 'unreadable') activeOutput().warn(`⚠️  ${basename(path)} does not read (${reading.reason}); recording the baseline again.`);
 
   const commit = readHead(seams.git);
   const result = await runOne(context, seams, 'baseline', {});
   const baseline = baselineOf(result, seams.now(), commit);
+  const settling: Settling = { kind: 'baseline', scope: 'full', label: 'suite baseline', result, baseline, blocks: false };
+  if (isStepInterrupted(context, result)) return { baseline, step: settleInterrupted(seams, settling).step, interrupted: true };
   try {
     writeBaseline(path, baseline);
   } catch (error) {
     activeOutput().warn(`⚠️  Could not write ${basename(path)} (${messageOf(error)}); the next run records the baseline again.`);
   }
-  const outcome = settleStep(context, seams, { kind: 'baseline', scope: 'full', label: 'suite baseline', result, baseline, blocks: false });
+  const outcome = settleStep(context, seams, settling);
   const covered = completeStages(readFileSync(context.trackerPath, 'utf8'));
   addToLedger(context.trackerPath, covered.map((stage) => ({ ...stage, commit, via: 'baseline' as const })));
-  return { baseline, step: outcome.step };
+  return { baseline, step: outcome.step, interrupted: false };
 }
 
 /** The run a task scope asks for. */
@@ -598,19 +649,19 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   if (paths !== null && paths.length === 0) {
     activeOutput().info(`🧪 ${label}: no test file under the Owns: folders it changed and no integration file; nothing to run.`);
     addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
-    return { kind: 'stage', step: null, red: false, blocker: null, blockedLine: null };
+    return { kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null };
   }
   const result = await runOne(context, seams, 'stage', paths === null
     ? {}
     : { paths });
   const outcome = settleStep(context, seams, { kind: 'stage', scope: paths ?? 'full', label, result, baseline, blocks: true });
-  addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
+  if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;
 }
 
 /**
  * Runs every stage step due before the next dispatch, in order,
- * stopping after the first red one. See the module note.
+ * stopping after the first red or interrupted one. See the module note.
  */
 export async function runDueStageSteps(context: SuiteStepContext, baseline: SuiteBaseline | null): Promise<readonly StepOutcome[]> {
   const ledger = readStageLedger(stageLedgerPathFor(context.trackerPath));
@@ -619,7 +670,7 @@ export async function runDueStageSteps(context: SuiteStepContext, baseline: Suit
   for (const stage of due) {
     const outcome = await runStageStep(context, stage, baseline);
     outcomes.push(outcome);
-    if (outcome.red) break;
+    if (outcome.red || outcome.interrupted) break;
   }
   return outcomes;
 }

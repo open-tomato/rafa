@@ -34,7 +34,10 @@ import {
   branchNameFor,
   branchSteps,
   BRANCH_PREFIX,
+  DETACHED_HEAD,
+  detachedHeadRefusal,
   hasDiverged,
+  isDetachedHead,
   localRef,
   parseBaseStanding,
   questionFor,
@@ -42,6 +45,7 @@ import {
   readStepOutcome,
   REMOTE,
   remoteTrackingRef,
+  SWITCH_TO_BASE,
   trackedChanges,
   treeRefusal,
   YES_ANSWERS,
@@ -118,6 +122,37 @@ describe('the branch a plan runs on', () => {
     expect(localRef('feat/rafa-49')).toBe('refs/heads/feat/rafa-49');
     expect(remoteTrackingRef('feat/rafa-49')).toBe('refs/remotes/origin/feat/rafa-49');
     expect(REMOTE).toBe('origin');
+  });
+});
+
+describe('a detached HEAD', () => {
+  it('is the literal HEAD git answers, and no branch name is read as one', () => {
+    expect(DETACHED_HEAD).toBe('HEAD');
+    expect(isDetachedHead('HEAD')).toBe(true);
+    // Controls: a default branch, a plan branch, and names that only contain or resemble it.
+    expect(isDetachedHead('main')).toBe(false);
+    expect(isDetachedHead('feat/rafa-49')).toBe(false);
+    expect(isDetachedHead('feat/HEAD')).toBe(false);
+    expect(isDetachedHead('head')).toBe(false);
+    expect(isDetachedHead('')).toBe(false);
+  });
+
+  it('is refused naming git switch <base> and the worktree flag as the two ways on', () => {
+    const lines = detachedHeadRefusal('--as-worktree').split('\n');
+
+    expect(lines[0]).toStartWith('❌ Refusing to run on a detached HEAD');
+    expect(SWITCH_TO_BASE).toBe('git switch <base>');
+    const switchLine = lines.find((line) => line.includes(SWITCH_TO_BASE));
+    const worktreeLine = lines.find((line) => line.includes('--as-worktree'));
+    expect(switchLine).toBeDefined();
+    expect(worktreeLine).toBeDefined();
+    // The two ways are a column: each explanation starts at the same offset.
+    expect(switchLine?.indexOf('back onto')).toBe(worktreeLine?.indexOf('run the plan'));
+  });
+
+  it('names the worktree flag it is handed, not one of its own', () => {
+    expect(detachedHeadRefusal('--elsewhere')).toContain('--elsewhere');
+    expect(detachedHeadRefusal('--elsewhere')).not.toContain('--as-worktree');
   });
 });
 

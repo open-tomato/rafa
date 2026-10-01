@@ -177,6 +177,8 @@
  * `file` are not contacted. A contact never throws, and it writes at most
  * one line per run saying the hub is unreachable, so a hub that is down
  * stops no task and does not repeat that line on every task.
+ * Its pulls name the run's session id, so the merge's live-loop guard
+ * passes the run's own record, matched by session id and never by pid.
  *
  *   bun src/rafa.ts start [--plan=PLAN-foo.md] [--start-at=HH:MM] [--inject=stage]
  *
@@ -268,14 +270,19 @@
  * it before and carries in the result in json mode. An interrupted task
  * throws exit code 0 once it is marked and its report stored and triaged.
  * A failed task, a blocked one, a checkout that moved, a report left
- * unstored and a red suite step still stop the run by returning, which the dispatcher ends as a success, with exit
- * code 0. A triage failure stops nothing.
+ * unstored and a red or interrupted suite step still stop the run by
+ * returning, which the dispatcher ends as a success, with exit code 0. A
+ * triage failure stops nothing.
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
  * moment (`utils/claude.ts`), so the task ends then rather than when its
- * session would have, and the task is marked `[BLOCKED]`.
+ * session would have, and the task is marked `[BLOCKED]`. A SIGINT during
+ * a suite step, whether it ended `bun test` or reached the loop alone, is
+ * a stop and not a red step (`start/suite-step.ts`): the step is recorded
+ * `interrupted`, no task is marked, and the run returns, its record
+ * `stopped`, as it does when a pause's hold ends on the signal.
  */
 import type { ResolvedConfig } from './config.js';
 import type { FindingOutcome } from './effort/store/findings.js';
@@ -499,12 +506,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
     // The run's one contact with the project's other devices, run at the
     // end of each task (`effort/sync/contact.ts`): it warns at most once
-    // that the hub is unreachable, and never throws.
+    // that the hub is unreachable, and never throws. Its pulls name the
+    // run's session id, so the merge's live-loop guard passes this run's
+    // own record and still refuses any other live one.
     const hubContact = createHubContact({
       root: repoRoot,
       home: homedir(),
       resolved: runConfig,
       warn: (message) => activeOutput().warn(message),
+      sessionId: session.id,
     });
 
     // Resolves no tracker here: the chain waits for the first public bug.
@@ -519,6 +529,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       sessionId: session.id,
       settings: runConfig.config,
       planContent,
+      isInterrupted: () => interrupted,
     });
 
     // Initialize tracker only if it doesn't exist
@@ -587,6 +598,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           ciWait,
           ciTimeoutMin,
           ciAttempts,
+          isInterrupted: () => interrupted,
         });
         break;
       }

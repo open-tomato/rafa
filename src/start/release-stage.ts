@@ -332,12 +332,23 @@ const PLAN_LABEL = /^plan\s*[:—–-]\s*/i;
  * the release.
  */
 function releaseTitle(input: ReleaseStageInput): string {
-  for (const line of input.planContent.split('\n')) {
+  return planTitleIn(input.planContent, input.planStub);
+}
+
+/**
+ * The plan's title as {@link releaseTitle} reads it: its first heading,
+ * its `Plan:` label off, or `planStub` (empty when null) with no heading.
+ * The runner-opened pull request takes its title from here too
+ * (`start/wrap-up-run.ts`), so the fragment and that title cannot name
+ * the plan two ways.
+ */
+export function planTitleIn(planContent: string, planStub: string | null): string {
+  for (const line of planContent.split('\n')) {
     const heading = PLAN_HEADING.exec(line);
     if (heading === null) continue;
     return (heading[1] ?? '').replace(PLAN_LABEL, '').trim();
   }
-  return input.planStub ?? '';
+  return planStub ?? '';
 }
 
 /** Says what step 1 wrote, or why it wrote nothing, and the level report. */

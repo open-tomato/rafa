@@ -143,7 +143,7 @@ chain's question and the step's are two prompts for one consent.
 
 | Check | Class | Lives in | Also re-implemented or assumed in |
 | --- | --- | --- | --- |
-| tracked files modified | 🔒 | `branch-decision.ts` `treeRefusal` | `pr/merge.ts` (own reading), `next/state.ts` row `tree-modified` |
+| tracked files modified | 🔒 | `branch-decision.ts` `treeRefusal` | `pr/merge.ts` (own reading), `next/preconditions.ts` pre-condition `tree-modified`, read after row `loop-running` |
 | on `main`/`master` | ⚠️ `--any-branch` | guard in `start.ts` | offer in `branch-decision.ts` stands aside for it |
 | base diverged from remote | 🔒 | `branch-decision.ts` | `next/state.ts` row `base-behind` (sync), `pr/merge.ts` pull ff-only |
 | branch of a different issue than the one planned | — **not checked anywhere today** | — | the recipe-for-conflict case from the request |

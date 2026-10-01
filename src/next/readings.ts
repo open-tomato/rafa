@@ -18,16 +18,18 @@
  * {@link openWorld} answers a {@link NextWorld} of functions, every one
  * of them memoised ({@link once}). The table is ordered, so a state an
  * early row settles never spends what a later one would have: a loop
- * that is running is answered out of `.rafa/runs/` and
- * {@link NextWorld.tracked} alone, with no provider and no board asked
- * at all. The provider is reached from row 5 on, and the board from row
- * 10 on.
+ * that is running is answered out of `.rafa/runs/` alone, with no git,
+ * no provider and no board asked at all. The provider is reached from
+ * row 5 on, and the board from row 10 on.
  *
- * {@link NextWorld.tracked} is the one reading the table does not own:
- * `./state.ts` makes it ahead of every row, for the pre-condition that
- * stops the table on a working tree with changes to tracked files. It
- * is one `git status --porcelain` at the project root, which asks
- * nothing of the network.
+ * {@link NextWorld.tracked} and {@link NextWorld.checkout} are the two
+ * readings the table does not own: `./preconditions.ts` makes them once
+ * row 1 has found no live run and ahead of every other row, for the
+ * pre-condition that stops the table on a working tree with changes to
+ * tracked files. The first is one `git status --porcelain` at the
+ * project root, and the second, `git rev-parse --show-toplevel` there,
+ * is asked only once the first has found a change, to name the checkout
+ * the changes were read in. Neither asks anything of the network.
  *
  * The board is asked from the BASE BRANCH alone, because every row that
  * reads it names the base. So `rafa next` on a plan branch spends no
@@ -258,6 +260,8 @@ export interface NextWorld {
   readonly standing: () => BaseStanding | null;
   /** The tracked paths the working tree has changes to, in git's order. */
   readonly tracked: () => readonly string[];
+  /** The checkout {@link NextWorld.tracked} was read in, absolute, or null when it could not be named. */
+  readonly checkout: () => string | null;
   /** The plan the branch is named after, or null when the branch names none. */
   readonly branchPlan: () => PlanListing | null;
   /** The first plan with no run and no branch, or null when every plan has one. */
@@ -354,6 +358,27 @@ export function readTracked(sources: NextSources, note: Note): readonly string[]
   return changedPaths(trackedChanges(parseWorkingTree(result.stdout)));
 }
 
+/**
+ * The top level of the working tree git reads at the project root, as
+ * `git rev-parse --show-toplevel` prints it, or null with a problem
+ * noted. It is the checkout {@link readTracked}'s `git status` read,
+ * which is the main checkout when the project root is one even though
+ * the command ran in a linked worktree beside it.
+ */
+export function readCheckout(sources: NextSources, note: Note): string | null {
+  const result = sources.git(['rev-parse', '--show-toplevel']);
+  const checkout = result.ok
+    ? result.stdout.trim()
+    : '';
+  if (checkout !== '') return checkout;
+
+  const why = result.ok
+    ? 'git printed no top level'
+    : gitSaid(result);
+  note(`the checkout the working tree was read in could not be named: ${why}`);
+  return null;
+}
+
 /** Every branch ref this clone and the remote hold, each half that failed noted. */
 export function readRefs(sources: NextSources, remote: string, note: Note): readonly string[] {
   const scan = scanClaimBranches(sources.git, remote);
@@ -438,6 +463,7 @@ export function openWorld(sources: NextSources): NextWorld {
     liveRun: once(() => runs().find((record) => isLive(record)) ?? null),
     standing: once(() => readStanding(sources, remote, note)),
     tracked: once(() => readTracked(sources, note)),
+    checkout: once(() => readCheckout(sources, note)),
     branchPlan: once(() => readBranchPlan(branch(), plans())),
     unstartedPlan: once(() => plans()
       .find((plan) => !hasRun(runs(), plan.stub) && !hasBranch(refs(), plan.stub)) ?? null),

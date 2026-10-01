@@ -74,6 +74,7 @@ import {
   readSessions,
   runsDir,
   SessionRecordError,
+  sessionPhase,
   SessionStateError,
   updateSession,
 } from '../../loop/sessions.js';
@@ -307,6 +308,16 @@ export function readSessionChecklist(root: string, record: Pick<SessionRecord, '
   if (file === undefined) return null;
   const content = readFileSync(file, 'utf8');
   return { file, tasks: parsePlan(content).tasks, lines: content.split('\n') };
+}
+
+/** The phase a session's run is in, as `status` and `list` write it beside a count: `(phase wrap-up)`. */
+export function phaseNote(record: Pick<SessionRecord, 'phase'>): string {
+  return `(phase ${sessionPhase(record)})`;
+}
+
+/** A session's counts with its phase beside the tasks done over total. See the module note. */
+export function phasedCounts(counts: TaskCounts, record: Pick<SessionRecord, 'phase'>): string {
+  return `${counts.done}/${counts.total} done ${phaseNote(record)}, ${counts.blocked} blocked, ${counts.open} open`;
 }
 
 /** The checkbox a checklist holds at a 1-based line, or null when no task is there. */

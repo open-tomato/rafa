@@ -493,12 +493,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/loop/status.js', [
     ['../../config-sections.js', ['messageOf']],
+    ['../../loop/sessions.js', ['sessionPhase']],
     ['../../utils/tracker.js', ['splitBlockerComment']],
-    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument']],
     ['./loop-sessions.js', [
       'estimateEta',
       'etaLine',
       'isLive',
+      'phasedCounts',
+      'phaseNote',
       'pickSession',
       'readSessionChecklist',
       'readSessionFinishes',
@@ -508,8 +511,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/loop/list.js', [
-    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument', 'formatCounts']],
-    ['./loop-sessions.js', ['isLive', 'projectRoot', 'readRecords', 'readSessionChecklist', 'resolveLoopSeams', 'sessionLine']],
+    ['../../loop/sessions.js', ['sessionPhase']],
+    ['../plan/plan-files.js', ['countTasks', 'expectNoArgument']],
+    ['./loop-sessions.js', [
+      'isLive',
+      'phasedCounts',
+      'phaseNote',
+      'projectRoot',
+      'readRecords',
+      'readSessionChecklist',
+      'resolveLoopSeams',
+      'sessionLine',
+    ]],
   ]],
   ['./commands/issue/list.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],

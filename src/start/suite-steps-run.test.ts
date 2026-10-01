@@ -96,6 +96,7 @@ function outcome(kind: StepOutcome['kind'], red = false, blockedLine: number | n
     kind,
     step: null,
     red,
+    interrupted: false,
     blocker: red
       ? 'New failing test files: src/x.test.ts (1 test).'
       : null,
@@ -118,7 +119,7 @@ function scripted(answers: Partial<SuiteStepCalls> = {}): { readonly calls: Suit
     ensureBaseline: (context) => {
       seen.names.push('ensureBaseline');
       seen.contexts.push(context);
-      return answers.ensureBaseline?.(context) ?? Promise.resolve<BaselineOutcome>({ baseline: BASELINE, step: null });
+      return answers.ensureBaseline?.(context) ?? Promise.resolve<BaselineOutcome>({ baseline: BASELINE, step: null, interrupted: false });
     },
     runDueStageSteps: (context, baseline) => {
       seen.names.push('runDueStageSteps');
@@ -139,8 +140,16 @@ function scripted(answers: Partial<SuiteStepCalls> = {}): { readonly calls: Suit
   return { calls, seen };
 }
 
+/** An outcome read as a stop on SIGINT: never red, blocking nothing. */
+function stopped(kind: StepOutcome['kind']): StepOutcome {
+  return { ...outcome(kind), interrupted: true };
+}
+
 /** The loop's steps over the temporary tracker, with `calls` as its steps. */
-function stepsWith(calls: Partial<SuiteStepCalls>, extra: { readonly seams?: SuiteStepContext['seams'] } = {}): ReturnType<typeof createRunSuiteSteps> {
+function stepsWith(
+  calls: Partial<SuiteStepCalls>,
+  extra: { readonly seams?: SuiteStepContext['seams']; readonly isInterrupted?: () => boolean } = {},
+): ReturnType<typeof createRunSuiteSteps> {
   return createRunSuiteSteps({
     repoRoot: dir,
     checkout: dir,
@@ -250,6 +259,57 @@ describe('afterTask', () => {
   });
 });
 
+describe('a step stopped by SIGINT', () => {
+  const STOP_LINE = '   Stopping here, as rafa loop stop does: no task is marked blocked. Run again to go on.';
+
+  it('hands the runner\'s SIGINT flag on to every step, and none when left out', async () => {
+    let flag = false;
+    const { calls, seen } = scripted();
+    const steps = stepsWith(calls, { isInterrupted: () => flag });
+    await steps.beforeSession(taskAt('second task', 8));
+    flag = true;
+
+    expect(seen.contexts[0]?.isInterrupted?.()).toBe(true);
+    const bare = scripted();
+    await stepsWith(bare.calls).beforeSession(taskAt('second task', 8));
+    expect(bare.seen.contexts[0]?.isInterrupted).toBeUndefined();
+  });
+
+  it('stops the run after an interrupted stage step, as loop stop does, with no blocked-task line', async () => {
+    const { calls } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage'), stopped('stage')]) });
+
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(false);
+    expect(linesAt('error')).toEqual([]);
+    expect(linesAt('info')).toContain(STOP_LINE);
+  });
+
+  it('stops the run after an interrupted task step and an interrupted pre-wrap-up step', async () => {
+    const { calls } = scripted({
+      runTaskStep: () => Promise.resolve(stopped('task')),
+      runPreWrapUpStep: () => Promise.resolve(stopped('pre-wrap-up')),
+    });
+    const steps = stepsWith(calls);
+
+    expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe(false);
+    expect(linesAt('error')).toEqual([]);
+    expect(linesAt('info').filter((line) => line === STOP_LINE)).toHaveLength(2);
+  });
+
+  it('stops the run on an interrupted baseline, and runs no step at any later call', async () => {
+    const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true }) });
+    const steps = stepsWith(calls);
+
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe(false);
+    expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe(false);
+
+    expect(seen.names).toEqual(['ensureBaseline']);
+    expect(linesAt('info').filter((line) => line === STOP_LINE)).toHaveLength(1);
+    expect(linesAt('warn')).toEqual([]);
+  });
+});
+
 describe('a step that throws', () => {
   it('turns every step of the run off when the baseline throws, warning once', async () => {
     const { calls, seen } = scripted({ ensureBaseline: () => Promise.reject(new RangeError('not a PLAN or PLAN_TRACKER file')) });
@@ -343,6 +403,20 @@ describe('with suite-step.ts\'s own steps', () => {
     expect(recorded.map((step) => step.kind)).toEqual(['baseline', 'task']);
     expect(runs[1]?.changedSince).toBe(BASE);
     expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.status).toBe('unchecked');
+  });
+
+  it('stops the run on a task step whose bun test ended on SIGINT, writing no blocker line', async () => {
+    const sigint: SuiteResult = { ...suiteResult(), exitCode: 130, summary: null, errors: null, junit: 'missing' };
+    const { steps, recorded } = realSteps([suiteResult(), sigint]);
+
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe(true);
+    tickSecondTask();
+    const ticked = readFileSync(trackerPath, 'utf8');
+    expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+
+    expect(recorded.map((step) => [step.kind, step.interrupted])).toEqual([['baseline', undefined], ['task', true]]);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(ticked);
+    expect(findNextTask(ticked)?.status).toBe('unchecked');
   });
 
   it('writes a red task step\'s blocker on the next open task and stops the run', async () => {

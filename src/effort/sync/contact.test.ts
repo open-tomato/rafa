@@ -119,13 +119,16 @@ function fixture(push: Behaviour, pull: Behaviour): Fixture {
   return { calls, contexts, seams: { modules: { adapters, manifest: MANIFEST_SEAMS } } };
 }
 
-/** A contact over `resolved` whose written lines are captured. */
-function contacting(resolved: ResolvedConfig, seams: HubContactSeams): {
+/** A contact over `resolved` whose written lines are captured, naming `sessionId` when given. */
+function contacting(resolved: ResolvedConfig, seams: HubContactSeams, sessionId?: string | null): {
   readonly lines: string[];
   readonly contact: ReturnType<typeof createHubContact>;
 } {
   const lines: string[] = [];
-  return { lines, contact: createHubContact({ root: ROOT, home: HOME, resolved, warn: (line) => lines.push(line) }, seams) };
+  const warn = (line: string): void => {
+    lines.push(line);
+  };
+  return { lines, contact: createHubContact({ root: ROOT, home: HOME, resolved, warn, sessionId }, seams) };
 }
 
 /** The lines that say the hub is unreachable. */
@@ -203,6 +206,33 @@ describe('a contact that reaches the hub', () => {
       pull: { outcome: 'done', result: { status: 'nothing-to-sync' } },
     });
     expect(lines).toEqual([]);
+  });
+});
+
+describe('a contact naming its run\'s session id', () => {
+  const sessionId = '11111111-2222-3333-4444-555555555555';
+
+  it('carries the session id on every pull and on no push', async () => {
+    const service = fixture('answer', 'answer');
+    const { contact } = contacting(resolving(SERVICE), service.seams, sessionId);
+
+    await contact.pushThenPull();
+    await contact.pull();
+
+    const pull = `pull {"from":null,"dryRun":false,"sessionId":"${sessionId}"}`;
+    expect(service.calls).toEqual(['push {"to":null}', pull, pull]);
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['null', null],
+  ])('while one whose session id is %s carries none, the control', async (_label, absent) => {
+    const service = fixture('answer', 'answer');
+    const { contact } = contacting(resolving(SERVICE), service.seams, absent);
+
+    await contact.pushThenPull();
+
+    expect(service.calls).toEqual(['push {"to":null}', 'pull {"from":null,"dryRun":false}']);
   });
 });
 

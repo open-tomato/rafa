@@ -86,6 +86,7 @@ import {
   openWorld,
   readBranch,
   readBranchPlan,
+  readCheckout,
   readOpenPull,
   readPlans,
   readRefs,
@@ -465,6 +466,41 @@ describe('the tracked paths the working tree has changes to', () => {
   it('keeps git\'s own quoting and writes a rename as the pair git wrote', () => {
     expect(changedPaths(['A  "src/a b.ts"', 'R  src/old.ts -> src/new.ts']))
       .toEqual(['"src/a b.ts"', 'src/old.ts -> src/new.ts']);
+  });
+});
+
+describe('the checkout the working tree was read in', () => {
+  it('names the top level git printed, its newline trimmed', () => {
+    const kept = notes();
+    const git = gitOf({ 'rev-parse --show-toplevel': said('/work/rafa\n') });
+
+    expect(readCheckout(sourcesOf({ git: git.git }), kept.note)).toBe('/work/rafa');
+    expect(git.ran()).toEqual(['rev-parse --show-toplevel']);
+    expect(kept.held()).toEqual([]);
+  });
+
+  it('names none and says what git said when git refused', () => {
+    const kept = notes();
+    const git = gitOf({ 'rev-parse --show-toplevel': refused('fatal: not a git repository') });
+
+    expect(readCheckout(sourcesOf({ git: git.git }), kept.note)).toBeNull();
+    expect(kept.held()).toHaveLength(1);
+    expect(kept.held()[0]).toContain('fatal: not a git repository');
+  });
+
+  it('names none and says so when git printed no top level', () => {
+    const kept = notes();
+
+    expect(readCheckout(sourcesOf({ git: gitOf({ 'rev-parse --show-toplevel': said('\n') }).git }), kept.note)).toBeNull();
+    expect(kept.held()).toEqual(['the checkout the working tree was read in could not be named: git printed no top level']);
+  });
+
+  it('is read once, however often the world is asked for it', () => {
+    const git = gitOf({ 'rev-parse --show-toplevel': said('/work/rafa\n') });
+    const world = openWorld(sourcesOf({ git: git.git }));
+
+    expect([world.checkout(), world.checkout()]).toEqual(['/work/rafa', '/work/rafa']);
+    expect(git.ran()).toEqual(['rev-parse --show-toplevel']);
   });
 });
 

@@ -8,7 +8,11 @@
  * promotes the lessons the learning library names promotable, syncs
  * the branch with main, commits,
  * pushes and opens or updates the PR. `start()` finishes that release
- * and then waits on the PR's checks after it returns. The line naming
+ * and then waits on the PR's checks after it returns, once it has read
+ * that a PR is open: a session that ended with none is followed by the
+ * retry sessions `start/wrap-up-retry.ts` spawns through
+ * {@link runWrapUpSession}, handed this one's final message, and then by
+ * the PR the runner opens itself (`start/wrap-up-run.ts`). The line naming
  * whether the session succeeded goes
  * through the active output (`adapters/output/active.ts`): `info` on
  * success, and `error` on a failure, which does not stop `start()`.
@@ -37,6 +41,7 @@ import type { SessionServing } from './serving.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
+import type { CapturingSpawner } from '../utils/claude.js';
 
 import { posix } from 'node:path';
 
@@ -402,6 +407,11 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * every git and `gh` reading above is made; see the module note. It is
  * required, as `release` is: a default would spawn the session wherever
  * the loop's process stands.
+ *
+ * It answers the session's final message, its captured stdout, whether
+ * it succeeded or not: when no pull request is open once it has ended,
+ * `start/wrap-up-run.ts` quotes that message to the retry session it
+ * spawns (`start/wrap-up-retry.ts`).
  */
 export async function preserveProgress(
   planContent: string,
@@ -410,14 +420,55 @@ export async function preserveProgress(
   serving: SessionServing | null,
   learning: WrapUpLearning | null,
   checkout: string,
-): Promise<void> {
+): Promise<string> {
   const branch = getCurrentBranch(checkout);
   const openPullRequest = await openPullRequestNumber(checkout, branch);
+  return runWrapUpSession({
+    buildPrompt: (lessons) => buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons),
+    settingSources,
+    serving,
+    learning,
+    checkout,
+    branch,
+    succeeded: '\n✅ Progress preserved; PR opened or updated on this branch.',
+  });
+}
+
+/** What {@link runWrapUpSession} spawns one wrap-up session from. */
+export interface WrapUpSessionRun {
+  /** The prompt, built once the lessons to promote are read. */
+  readonly buildPrompt: (lessons: readonly InstinctRecord[]) => string;
+  /** The setting sources the session loads. */
+  readonly settingSources: readonly ClaudeSettingSource[];
+  /** What the session is served against, or null to serve nothing. */
+  readonly serving: SessionServing | null;
+  /** Where the lessons to promote are read, or null to list none. */
+  readonly learning: WrapUpLearning | null;
+  /** The run's checkout, where the session is spawned. */
+  readonly checkout: string;
+  /** The run's branch, whose PR body the promotion check writes to. */
+  readonly branch: string;
+  /** The line printed when the session exits 0. */
+  readonly succeeded: string;
+  /** The spawner; `spawnClaudeCaptured` when left out. */
+  readonly spawn?: CapturingSpawner;
+}
+
+/**
+ * Spawns one wrap-up session as {@link preserveProgress} describes, the
+ * first one or a retry (`start/wrap-up-retry.ts`), and answers its final
+ * message: the lessons read, the prompt built and stamped, the session
+ * served and spawned in the checkout, the outcome line printed, and the
+ * `rafa:promoted` answer checked once it succeeded. Never throws for a
+ * session that failed; the caller reads whether a pull request is open.
+ */
+export async function runWrapUpSession(run: WrapUpSessionRun): Promise<string> {
+  const { learning, checkout } = run;
   const lessons = await lessonsToPromote(learning);
-  const prompt = buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons);
-  const served = serving === null
+  const prompt = run.buildPrompt(lessons);
+  const served = run.serving === null
     ? null
-    : serveSession(serving);
+    : serveSession(run.serving);
   for (const skipped of served?.skipped ?? []) activeOutput().warn(`   ${skipped.message}`);
   const git = learning === null || lessons.length === 0
     ? null
@@ -427,26 +478,27 @@ export async function preserveProgress(
     : readHead(git);
   const session = await runClaudeCaptured(
     withStamp(prompt),
-    settingSources,
+    run.settingSources,
     [],
-    undefined,
+    run.spawn,
     served?.flags ?? [],
     { cwd: checkout },
   );
   if (session.exitCode !== 0) {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${session.exitCode}). Please try again.`);
-    return;
+    return session.stdout;
   }
-  activeOutput().info('\n✅ Progress preserved; PR opened or updated on this branch.');
-  if (learning === null || git === null) return;
+  activeOutput().info(run.succeeded);
+  if (learning === null || git === null) return session.stdout;
   await checkWrapUpAnswer({
     lessons,
     output: session.stdout,
     head,
     repoRoot: checkout,
-    branch,
+    branch: run.branch,
     git,
     pulls: ghPullRequestsIn(checkout),
     learning: () => wrapUpAdapter(learning),
   });
+  return session.stdout;
 }

@@ -159,14 +159,19 @@ function asidePaths(path: string, first: string, stamp: string): { parallelPath:
 
 /**
  * The first loop record under the store's project root that reads
- * `running` or `paused`, if any. Records that cannot be read refuse, the
- * text ending with `nothingDone`, the caller's sentence for what it left
- * undone; the merge (`merge-store.ts`) asks this too.
+ * `running` or `paused`, if any, passing the record whose session id is
+ * `ownSessionId`: the run asking, which a pull at the end of its own task
+ * names (`merge-store.ts`). A record is passed by its session id alone,
+ * never by its pid, so another live record sharing the caller's pid is
+ * still answered. Records that cannot be read refuse, the text ending
+ * with `nothingDone`, the caller's sentence for what it left undone; the
+ * merge asks this too, and only the merge names a session id.
  */
 export function liveLoop(
   path: string,
   options: DevelopmentProbe,
   nothingDone = 'Nothing was migrated.',
+  ownSessionId: string | null = null,
 ): SessionRecord | undefined {
   const root = storeProjectRoot(path);
   if (root === null) return undefined;
@@ -177,7 +182,8 @@ export function liveLoop(
     throw new RebuildRefusal(`the loop's run records cannot be read, so a live loop on ${path} cannot be ruled out`
       + ` (${messageOf(error)}). ${nothingDone}`);
   }
-  return records.find((record) => record.state === 'running' || record.state === 'paused');
+  return records.find((record) => (record.state === 'running' || record.state === 'paused')
+    && record.sessionId !== ownSessionId);
 }
 
 /** Refuses the swap while a live loop records to the store; see the module note. */
