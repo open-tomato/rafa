@@ -107,7 +107,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'plan validate': ['text', 'json'],
   'plan risk': ['text', 'json'],
   'plan needs': ['text', 'json'],
-  'loop start': ['text', 'json'],
+  'loop start': ['text', 'json', 'events'],
   'loop stop': ['text', 'json'],
   'loop pause': ['text', 'json'],
   'loop resume': ['text', 'json'],
