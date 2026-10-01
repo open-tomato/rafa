@@ -15,6 +15,17 @@
  * `src/board/boards.ts`) is asked at most once and only when an answer
  * needs it, so its title search is spent only then.
  *
+ * ## The relationships mode
+ *
+ * Which issues are in an epic is read in the mode `board.relationships`
+ * names (`readConfiguredRelations`, `src/board/configured-relations.ts`).
+ * In `labels`, the default, nothing more is sent and the listing is the
+ * one above. In `native` the board's repository is read first, with one
+ * `gh repo view`, and the listing is asked for the native fields, so an
+ * epic's members are its sub-issues and its progress GitHub's own count
+ * of them (`readListedEpics`, `src/board/roadmap-epic-rows.ts`, the
+ * count `rafa roadmap` prints).
+ *
  * ## Board or epic
  *
  * Issue numbers are unique in a repository, so the number alone says
@@ -63,7 +74,8 @@
  * by `writePositionFile`, then one line naming the new place:
  * `board #<b> · epic #<e> <title> (<horizon>) · <done>/<total> done`,
  * or `board #<b> · no epic` when the board names no `now` epic that is
- * not done. Progress is `readEpics` over the listing; the horizon is
+ * not done. Progress is `readListedEpics` over the listing, in the mode
+ * above; the horizon is
  * `horizonOf` (`src/board/roadmap-epic-rows.ts`). In json mode the
  * terminal result's `data` is a {@link SwitchResult}.
  *
@@ -89,7 +101,8 @@
  *
  * {@link SWITCH_REFUSAL_EXIT} (2) for a number that is no open board or
  * epic, for `-` with no previous place or one that no longer stands,
- * and for a board listing or a default board that cannot be read; 1 for
+ * and for a board listing, a `native` board's repository or a default
+ * board that cannot be read; 1 for
  * a line that names no target, a config that cannot be used and a
  * position file that cannot be written.
  *
@@ -97,7 +110,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardView } from '../board/epic-board.js';
-import type { Epics } from '../board/epics.js';
+import type { EpicRelations, Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
@@ -107,11 +120,11 @@ import type { Place, Position } from '../project/position.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveDefaultBoard } from '../board/boards.js';
+import { readConfiguredRelations } from '../board/configured-relations.js';
 import { boardOfEpic, openBoards } from '../board/epic-board.js';
-import { readEpics } from '../board/epics.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
-import { horizonOf } from '../board/roadmap-epic-rows.js';
+import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
 import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
@@ -321,10 +334,21 @@ export function defaultBoardOnce(config: RafaConfig, gh: GhRunner, listing: read
   };
 }
 
-/** The listing, read once; a refusal with {@link SWITCH_REFUSAL_EXIT} when it fails. */
-async function readListing(gh: GhRunner): Promise<readonly BoardIssue[]> {
+/**
+ * The relations `board.relationships` names, and the listing read once
+ * in that mode; a refusal with {@link SWITCH_REFUSAL_EXIT} when either
+ * read fails. See the module note's "The relationships mode".
+ */
+async function readBoard(config: RafaConfig, gh: GhRunner): Promise<{
+  readonly relations: EpicRelations | undefined;
+  readonly listing: readonly BoardIssue[];
+}> {
   try {
-    return await createGhBoardListing({ gh })();
+    const relations = await readConfiguredRelations(config, gh);
+    const listing = await createGhBoardListing(relations === undefined
+      ? { gh }
+      : { gh, mode: relations.mode })();
+    return { relations, listing };
   } catch (error) {
     throw refusal(`Could not read the board, so no target can be checked: ${messageOf(error)}`);
   }
@@ -349,7 +373,7 @@ async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<S
   };
   const config = issueSubjectConfig(project, warn);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
-  const listing = await readListing(gh);
+  const { relations, listing } = await readBoard(config, gh);
   const defaultBoard = defaultBoardOnce(config, gh, listing);
   const board: SwitchBoard = {
     listing,
@@ -362,7 +386,7 @@ async function moveCheckout(context: RafaContext, seams: SwitchSeams): Promise<S
   for (const notice of resolved.notices) {
     if (notice.kind === 'lost' || notice.reason !== 'absent') warn(notice.message);
   }
-  const epics = readEpics({ issues: listing, claims: new Set(), today: new Date() });
+  const epics = readListedEpics({ issues: listing, claims: new Set(), today: new Date(), relations });
   const moved = target.kind === 'back'
     ? { kind: 'back' as const, place: await previousPlace(resolved, board, project.root) }
     : await numberPlace(target.number, resolved, board, epics);

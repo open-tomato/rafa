@@ -609,6 +609,18 @@ from GitHub Issues:
   `waiting on #C (owner review)` until the team reviews and approves. The
   hop record (`.rafa/hop.json`) tracks where home is and what rafa works.
   When `rafa next` finishes, it deletes the record and returns home.
+- **Board relationships: a choice of modes.** A board tracks relationships
+  — which issues block which — in one of two ways. `labels` (the default)
+  uses `spec:blocked` labels and `Blocked by:` lines, carrying no cost
+  when a board is read. `native` uses GitHub's built-in parent and
+  blocked-by links, showing them in GitHub's UI and costing about 8 API
+  points per read of 5,000 per hour. Solo projects and those new to rafa
+  start with `labels`. Chose `native` when the relationships should show
+  in GitHub, or when nothing should clear a blocker by hand. Config it as
+  `board: relationships: native`, then run `rafa init --board` to move
+  from one mode to the other and remove the old marks. Read
+  [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md) under "Board
+  relationships" for the full choice and upgrade path.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request

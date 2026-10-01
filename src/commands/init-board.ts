@@ -65,6 +65,14 @@
  *
  *   - The board step did not run: nothing is asked or written, and a
  *     line that said `--epic-guard` is told so through the warnings.
+ *   - `board.relationships: native`: nothing is read, asked or written,
+ *     and a line that said `--epic-guard` is refused with
+ *     {@link EPIC_GUARD_NATIVE_REFUSAL}, which names the mode. The guard
+ *     removes a second `epic:` label, and in native mode an epic is the
+ *     issue's sub-issue parent, which the tracker keeps to one. The
+ *     refusal is a warning and not an exit code for the reason
+ *     `--board` on a non-GitHub repository is one: the project has been
+ *     set up by then, and a failing exit would read as if it had not.
  *   - `--no-epic-guard`: declined, nothing read.
  *   - Something is already at `.github/workflows/epic-guard.yml`: it is
  *     reported, `present` for a file and `refused` for anything else,
@@ -78,6 +86,42 @@
  * asked about the guard under it; a script says `--epic-guard` or
  * `--no-epic-guard`.
  *
+ * ## The relationships move, asked last
+ *
+ * When a config layer sets `board.relationships`,
+ * {@link runRelationsMoveStep} moves the relationships the board holds in
+ * the OTHER mode into the one the key names
+ * (`src/board/relations/move.ts` plans and sends; this is where the
+ * printing and the questions live). The first answer wins:
+ *
+ *   - The key is left at its default: the step answers null, reads,
+ *     asks and prints nothing, and `init` leaves `relationsMove` out of
+ *     its result, so a project that never set the key sees no change.
+ *   - The board step did not run: nothing is read or asked.
+ *   - The board is read ONCE, in the `native` listing fields, which carry
+ *     the `labels` ones too, with one `gh repo view --json nameWithOwner`
+ *     after it for the `native` side; a read that failed is a warning
+ *     naming `rafa init --board`, and nothing is planned.
+ *   - Nothing to write and no old mark left: one line says so, nothing
+ *     is asked. This is what a second run of a finished move reads.
+ *   - No terminal: nothing is written, and the line naming
+ *     `rafa init --board` is printed. There is no flag that answers for
+ *     a script: a move writes to every epic on the board, so it is typed.
+ *   - Otherwise every planned write is printed on the prompter, with
+ *     every relationship the plan skips, and ONE `[y/N]` question asks
+ *     whether to send them. Anything but yes writes nothing. On a yes
+ *     the writes go out in order, stopping at the first the board
+ *     refuses, which is a warning naming what went through and what was
+ *     left. Once every write went through, and only then, the old marks
+ *     are printed and a second `[y/N]` question asks whether to remove
+ *     them; on anything but yes they are kept and `rafa doctor` names
+ *     them. A plan with no write left but old marks still on the board
+ *     skips the first question and asks the second.
+ *
+ * A relationship write moves no `updated_at`, so the rows the move
+ * touched are dropped from a kept `native` listing (`invalidateRows`,
+ * `src/board/board-cache.ts`); a `labels` cache is left as it is.
+ *
  * ## Nothing here spawns
  *
  * GitHub arrives through the {@link GhRunner} `src/commands/init.ts`
@@ -90,15 +134,23 @@
  * prompter.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { PrProvider } from '../config-sections.js';
+import type { BoardRelationshipMode, PrProvider } from '../config-sections.js';
 
 import { join } from 'node:path';
 
+import { invalidateRows } from '../board/board-cache.js';
 import { EPIC_GUARD_PATH, writeEpicGuard } from '../board/epic-guard.js';
+import { LABELS_READS } from '../board/relations/labels.js';
+import { planRelationsMove, writeRelationsMove } from '../board/relations/move.js';
+import { createNativeRelations } from '../board/relations/native.js';
+import { createGhBoardListing } from '../board/roadmap-board.js';
 import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
+
+import { readBoardRepository } from './epic/move-native.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];
@@ -345,7 +397,9 @@ export type EpicGuardStatus =
   /** Nobody said and there was no terminal to ask on. */
   | 'unasked'
   /** The board step did not run, so neither did this one. */
-  | 'not-run';
+  | 'not-run'
+  /** `board.relationships` is `native`, where the tracker keeps one parent per issue. */
+  | 'native';
 
 /** What one run of {@link runEpicGuardStep} came to. */
 export interface EpicGuardStepResult {
@@ -364,6 +418,8 @@ export interface EpicGuardStepOptions {
   readonly wanted: boolean | null;
   /** What the board step came to; the guard runs only after a board that ran. */
   readonly board: BoardStepResult;
+  /** The project's `board.relationships`; the guard runs in `labels` mode only. */
+  readonly relationships: BoardRelationshipMode;
   /** The project root: where the workflow is written. */
   readonly root: string;
   /** True when a question can be answered. */
@@ -377,6 +433,11 @@ export interface EpicGuardStepOptions {
 /** What a line asking for `--epic-guard` is told when the board step did not run. */
 export const EPIC_GUARD_NO_BOARD_WARNING = '--epic-guard installs the epic guard workflow with the GitHub board,'
   + ` and the board step did not run, so it was not installed; run ${EPIC_GUARD_FIX}.`;
+
+/** What a line asking for `--epic-guard` is told under `board.relationships: native`. */
+export const EPIC_GUARD_NATIVE_REFUSAL = 'board.relationships is native: --epic-guard was refused, since the'
+  + ' tracker keeps one parent per issue and there is no second epic: label for the workflow to remove,'
+  + ' so it was not installed.';
 
 /** A guard step that wrote nothing and found nothing. */
 function noGuard(status: EpicGuardStatus, asked: boolean, warnings: readonly string[] = []): EpicGuardStepResult {
@@ -400,10 +461,15 @@ async function askEpicGuard(openPrompter: () => Prompter): Promise<boolean> {
  * a path that would not take a write: that is a refused part.
  */
 export async function runEpicGuardStep(options: EpicGuardStepOptions): Promise<EpicGuardStepResult> {
-  const { wanted, board, root, isTerminal, openPrompter, moduleDir } = options;
+  const { wanted, board, relationships, root, isTerminal, openPrompter, moduleDir } = options;
   if (board.status !== 'ran') {
     return noGuard('not-run', false, wanted === true
       ? [EPIC_GUARD_NO_BOARD_WARNING]
+      : []);
+  }
+  if (relationships === 'native') {
+    return noGuard('native', false, wanted === true
+      ? [EPIC_GUARD_NATIVE_REFUSAL]
       : []);
   }
   if (wanted === false) return noGuard('declined', false);
@@ -433,6 +499,194 @@ export function renderEpicGuardStep(result: EpicGuardStepResult): readonly strin
   if (result.status === 'declined') return [`The epic guard workflow was left out; run ${EPIC_GUARD_FIX} to install it.`];
   if (result.status === 'unasked') {
     return [`The epic guard question needs a terminal; run ${EPIC_GUARD_FIX} to install it.`];
+  }
+  return [];
+}
+
+/** What a run that did not move the board's relationships names as the way to move them. */
+export const MOVE_FIX = 'rafa init --board';
+
+/** What the relationships move came to. */
+export type RelationsMoveStatus =
+  /** The plan was sent: `move` says what the board took, what was left and what came of the old marks. */
+  | 'moved'
+  /** The board holds every relationship in the configured mode already, and no old mark is left. */
+  | 'nothing'
+  /** The first question was answered with anything but yes: nothing was written. */
+  | 'declined'
+  /** There was something to move and no terminal to ask on. */
+  | 'unasked'
+  /** The listing or the repository could not be read, so nothing was planned. */
+  | 'unread'
+  /** The board step did not run, so neither did this one. */
+  | 'not-run';
+
+/** What one run of {@link runRelationsMoveStep} came to. */
+export interface RelationsMoveStepResult {
+  readonly status: RelationsMoveStatus;
+  /** The mode moved from: the one `board.relationships` does not name. */
+  readonly from: BoardRelationshipMode;
+  /** The mode moved to: the one `board.relationships` names. */
+  readonly to: BoardRelationshipMode;
+  /** True when the first question, whether to send the writes, was put to an operator. */
+  readonly asked: boolean;
+  /** The planned move, or null when nothing was read. */
+  readonly plan: RelationsMovePlan | null;
+  /** What sending it came to, or null when nothing was sent. */
+  readonly move: RelationsMoveResult | null;
+  /** A sentence per reading or write that failed without stopping `init`. */
+  readonly warnings: readonly string[];
+}
+
+/** What {@link runRelationsMoveStep} is asked. */
+export interface RelationsMoveStepOptions {
+  /** What the board step came to; the move runs only after a board that ran. */
+  readonly board: BoardStepResult;
+  /** `board.relationships` when a config layer sets it, null when it is left at its default. */
+  readonly relationships: BoardRelationshipMode | null;
+  /** The project root: where a kept `native` listing drops the rows the move touched. */
+  readonly root: string;
+  /** Opens the runner every `gh` command goes through. Called only once the board ran. */
+  readonly openGh: () => GhRunner;
+  /** True when a question can be answered. */
+  readonly isTerminal: () => boolean;
+  /** Opens the prompter the writes are printed on and the questions asked through. Called only to ask. */
+  readonly openPrompter: () => Prompter;
+}
+
+/** The mode a board is moved out of when `to` is configured. */
+function otherMode(to: BoardRelationshipMode): BoardRelationshipMode {
+  return to === 'native'
+    ? 'labels'
+    : 'native';
+}
+
+/** The first question: whether to send `plan`'s writes. */
+export function moveQuestion(plan: RelationsMovePlan): string {
+  const count = plan.writes.length;
+  return `Send the ${String(count)} write${count === 1
+    ? ''
+    : 's'} above, moving the board from ${plan.from} to ${plan.to}? [y/N] `;
+}
+
+/** What a listing or repository read that failed is reported as. */
+export function moveUnreadWarning(to: BoardRelationshipMode, problem: string): string {
+  return `board.relationships is ${to}: the board could not be read for relationships to move, so nothing`
+    + ` was moved: ${problem}; run ${MOVE_FIX} again.`;
+}
+
+/** What a move the board refused part way is reported as. */
+export function moveFailureWarning(result: RelationsMoveResult, failure: RelationsMoveFailure): string {
+  const left = result.left.length;
+  return `the board refused "${failure.what}": ${failure.problem}. ${String(result.done.length)} write(s) went`
+    + ` through and ${String(left)} did not, and the old marks were kept; every write is idempotent, so run`
+    + ` ${MOVE_FIX} again to finish the move.`;
+}
+
+/** The lines printed above the first question: every write, then every relationship left where it is. */
+function planLines(plan: RelationsMovePlan): readonly string[] {
+  return [
+    `Moving the board's relationships from ${plan.from} to ${plan.to}:`,
+    ...plan.writes.map((write) => `  write    ${write.what}`),
+    ...plan.skipped.map((skipped) => `  skipped  ${skipped.reason}`),
+  ];
+}
+
+/** True for `y` or `yes`, however it is cased; an input that ended is a no. */
+async function askYes(prompter: Prompter, question: string): Promise<boolean> {
+  const answer = await prompter.ask(question);
+  return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+}
+
+/** The listing in the `native` fields, and both sides of the move over it. */
+async function readMove(gh: GhRunner, to: BoardRelationshipMode): Promise<RelationsMovePlan> {
+  const listing = await createGhBoardListing({ gh, mode: 'native' })();
+  const native = createNativeRelations({ gh, repository: await readBoardRepository(gh) });
+  return to === 'native'
+    ? planRelationsMove(listing, LABELS_READS, native)
+    : planRelationsMove(listing, native, LABELS_READS);
+}
+
+/** Prints the plan, asks once, and sends it on a yes; the second question is asked through the same prompter. */
+async function askAndSend(gh: GhRunner, plan: RelationsMovePlan, prompter: Prompter): Promise<Omit<RelationsMoveStepResult, 'from' | 'to' | 'warnings'>> {
+  for (const line of planLines(plan)) prompter.say(line);
+  const asked = plan.writes.length > 0;
+  if (asked && !await askYes(prompter, moveQuestion(plan))) return { status: 'declined', asked, plan, move: null };
+  const ask = async (question: string): Promise<boolean> => {
+    for (const mark of plan.marks) prompter.say(`  mark     ${mark.what}`);
+    return askYes(prompter, `${question} [y/N] `);
+  };
+  return { status: 'moved', asked, plan, move: await writeRelationsMove({ gh, ask }, plan) };
+}
+
+/**
+ * Moves the board's relationships into the mode `board.relationships`
+ * names, having printed every write and asked; see the module note for
+ * the order that is decided in. Answers null, sending nothing, when the
+ * key is left at its default. Never throws for the board: a read that
+ * failed and a write it refused are warnings.
+ */
+export async function runRelationsMoveStep(options: RelationsMoveStepOptions): Promise<RelationsMoveStepResult | null> {
+  const { board, relationships: to, root, openGh, isTerminal, openPrompter } = options;
+  if (to === null) return null;
+  const from = otherMode(to);
+  const outcome = (rest: Omit<RelationsMoveStepResult, 'from' | 'to' | 'warnings'>, warnings: readonly string[] = []): RelationsMoveStepResult => Object.freeze({ ...rest, from, to, warnings: Object.freeze([...warnings]) });
+  if (board.status !== 'ran') return outcome({ status: 'not-run', asked: false, plan: null, move: null });
+
+  const gh = openGh();
+  let plan: RelationsMovePlan;
+  try {
+    plan = await readMove(gh, to);
+  } catch (error) {
+    return outcome({ status: 'unread', asked: false, plan: null, move: null }, [moveUnreadWarning(to, messageOf(error))]);
+  }
+  if (plan.writes.length === 0 && plan.marks.length === 0) return outcome({ status: 'nothing', asked: false, plan, move: null });
+  if (!isTerminal()) return outcome({ status: 'unasked', asked: false, plan, move: null });
+
+  const prompter = openPrompter();
+  let sent: Omit<RelationsMoveStepResult, 'from' | 'to' | 'warnings'>;
+  try {
+    sent = await askAndSend(gh, plan, prompter);
+  } finally {
+    prompter.close();
+  }
+  if (sent.move === null) return outcome(sent);
+  invalidateRows(root, sent.move.touched);
+  return outcome(sent, sent.move.failure === null
+    ? []
+    : [moveFailureWarning(sent.move, sent.move.failure)]);
+}
+
+/** True when the move wrote anything: a write the board took, or an old mark it removed. */
+export function relationsMoveChanged(result: RelationsMoveStepResult | null): boolean {
+  return result?.move != null && (result.move.done.length > 0 || result.move.removed.length > 0);
+}
+
+/** The rows of a sent move: what went through, what was left, and what came of each old mark. */
+function movedLines(move: RelationsMoveResult): readonly string[] {
+  return [
+    ...move.done.map((write) => `  sent     ${write.what}`),
+    ...move.left.map((write) => `  left     ${write.what}`),
+    ...move.removed.map((mark) => `  removed  ${mark.what}`),
+    ...move.kept.map((mark) => `  kept     ${mark.what}`),
+  ];
+}
+
+/** The lines text mode writes for the move, and none when it has nothing to say. */
+export function renderRelationsMoveStep(result: RelationsMoveStepResult | null): readonly string[] {
+  if (result === null) return [];
+  const { status, from, to, move, plan } = result;
+  if (status === 'moved' && move !== null) {
+    const kept = move.kept.length > 0 && move.failure === null
+      ? [`The old ${from} marks were kept; rafa doctor names them, and ${MOVE_FIX} asks again.`]
+      : [];
+    return [`Board relationships, ${from} to ${to}:`, ...movedLines(move), ...kept];
+  }
+  if (status === 'nothing') return [`Board relationships: nothing to move from ${from} to ${to}.`];
+  if (status === 'declined') return [`The board's ${from} relationships were left alone; run ${MOVE_FIX} to move them to ${to}.`];
+  if (status === 'unasked') {
+    const count = plan?.writes.length ?? 0;
+    return [`Moving the board from ${from} to ${to} (${String(count)} write(s)) needs a terminal; run ${MOVE_FIX} to move it.`];
   }
   return [];
 }

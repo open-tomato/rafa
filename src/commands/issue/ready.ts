@@ -80,7 +80,11 @@
  *     the one issue already read and its `several-epic-labels` answer
  *     alone kept, so no board listing is spent and the sentence is the
  *     one `doctor` and the views print. An issue belongs to one epic, and
- *     one marked ready while carrying two would be counted by both;
+ *     one marked ready while carrying two would be counted by both. It
+ *     runs under `board.relationships: labels` only, the default: in
+ *     `native` mode an epic is the issue's one sub-issue parent, which
+ *     the tracker never lets be two, and no `epic:` label is read to
+ *     learn a relationship, so the reading is skipped and costs nothing;
  *  4. the `spec:ready` label already on the issue, which is not a
  *     refusal but an `already`: there is nothing to add, so nothing is
  *     asked and nothing is written.
@@ -123,6 +127,7 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
 
@@ -202,6 +207,11 @@ export interface ReadyOptions {
   readonly board?: IssueBoard;
   /** Reads the issue by number. Made over `gh` when left out. */
   readonly readIssue?: SpecIssueReader;
+  /**
+   * The project's `board.relationships`; the two-`epic:`-labels reading
+   * runs in `labels` mode only. `labels`, the default, when left out.
+   */
+  readonly relationships?: BoardRelationshipMode;
 }
 
 /** The one question, as the spec spells it. */
@@ -310,7 +320,7 @@ export async function runIssueReady(options: ReadyOptions): Promise<ReadyReport>
   const found = await readIssue(issue);
   const reading = await requireTrustedBoardAuthor({ kind: 'issue', number: issue }, trust, found.author);
   requireCompleteSpec(issueSource(issue), found.body);
-  requireOneEpic(found);
+  if ((options.relationships ?? 'labels') === 'labels') requireOneEpic(found);
 
   const lines = { trust: trustPassLine(issue, trust.repo, reading), checked: completeLine(issue) };
   if (hasSpecReadyLabel(found.labels)) {
@@ -436,6 +446,7 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
       gh,
       issue,
       trust,
+      relationships: config.boardRelationships,
       ask: isTerminal()
         ? prompter.ask
         : null,
@@ -461,7 +472,7 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
     summary: `mark an issue ${SPEC_READY_LABEL} once its author and its body check out`,
     description: 'Reads the issue on the GitHub board, refuses one opened by an account without write access to'
       + ' the repository, refuses a body that does not fill the spec template, refuses an issue carrying two'
-      + ' `epic:` labels, and then asks whether to mark it'
+      + ' `epic:` labels (with board.relationships set to labels, the default), and then asks whether to mark it'
       + ` ${SPEC_READY_LABEL}. On a yes it swaps the labels in one write, adding ${SPEC_READY_LABEL} and`
       + ` removing ${SPEC_NEEDS_WORK_LABEL}. It always asks and declares no flag that skips the question;`
       + ' without a terminal it prints both readings and adds no label. A run that marks the issue, or finds'

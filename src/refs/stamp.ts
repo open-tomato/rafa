@@ -65,8 +65,8 @@
  *  3. `dangling` — the target is `absent` and the stamp is not.
  *  4. `ok` — both are `absent`: the missing target was accepted.
  *  5. `suspect` — the stamp is `absent` and the target now exists.
- *  6. `resolved` — the reference is a `Blocked by:` target, stamped
- *     `open` and now `closed`.
+ *  6. `resolved` — the reference is an issue the spec waits on
+ *     (`Ref.blocker`, `./extract.ts`), stamped `open` and now `closed`.
  *  7. `ok` when the fingerprints are the same, `suspect` when not.
  *
  * `resolved` is read before sameness on purpose: a blocker that closed
@@ -210,7 +210,7 @@ export interface StampComparisonInput {
   readonly live: LiveReading;
   /** The stamp the saved copy keeps, or null when it keeps none. */
   readonly stamp: Fingerprint | null;
-  /** True when the body's `Blocked by:` line names the target. */
+  /** True when the spec waits on the target (`Ref.blocker`, `./extract.ts`). */
   readonly blocker: boolean;
 }
 

@@ -23,6 +23,29 @@
  * its open members, in ascending number. An unreadable line naming a
  * member is a `warn` line and is not asked about.
  *
+ * ## The mode
+ *
+ * Who is in the epic and who waits on it are relationships, read in the
+ * mode `board.relationships` names through the board's relationships
+ * port (`src/board/relations/port.ts`), {@link EpicCancelSeams.relations};
+ * left out, the mode is `labels` (`LABELS_READS`), and everything here
+ * reads and writes as it did before the port, over the same one listing.
+ *
+ * In `native` mode the listing is read with the native fields
+ * (`boardListFields`), and `readEpicDependents` reads the members as the
+ * epic's sub-issues and the dependents as the open issues outside it
+ * with a `blockedBy` link to an open member; no `epic:` label and no
+ * `Blocked by:` line is read, and no line is ever unreadable. A native
+ * epic is named by its number and title, as every line here already
+ * names an epic. The cancel CLEARS NOTHING in `native` mode: an unblock
+ * answer writes its note and its comment, takes no label off and removes
+ * no blocked-by link, and says so ({@link keptLinksLine},
+ * `./cancel-unblock.ts`), since GitHub stops holding an issue back once
+ * its blocker closes. What the note names as still blocking the issue is
+ * `./cancel-unblock.ts`'s reading in each mode. A move answer is read by
+ * `readEpicMove`, which reads `epic:` labels, so in `native` mode it
+ * refuses the target and the question is asked again.
+ *
  * ## The questions
  *
  * The list is printed first, one issue a line with the members it waits
@@ -48,7 +71,8 @@
  * naming what to finish by hand.
  *
  * - **Move**: `applyEpicMove` (`./move.ts`), the same swap, checklist
- *   lines and move comment `rafa epic move` makes, with the trail's
+ *   lines and move comment `rafa epic move` makes in `labels` mode, made
+ *   through the `labels` relationships adapter, with the trail's
  *   `cancelMoveReason` as the reason.
  * - **Unblock**: the trail's `renderUnblockNote` appended below the
  *   dependent's body through `editChecklist`'s read, write and re-read
@@ -77,18 +101,22 @@
  * the terminal result's `data`. It starts no session, so it declares no
  * `spends`.
  */
-import type { EpicMoveReading, EpicMoveWrites } from './move.js';
+import type { EpicMoveReading } from './move.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicDependent } from '../../board/epic-dependents.js';
 import type { DependentAnswer } from '../../board/epic-trail.js';
+import type { EpicRelations } from '../../board/epics.js';
+import type { IssueBoard } from '../../board/issue-board.js';
+import type { BoardRelations } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
+import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { GitRunner } from '../../pr/git.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { readBlockedBy, SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { editChecklist } from '../../board/epic-checklist.js';
 import { readEpicDependents } from '../../board/epic-dependents.js';
 import {
@@ -100,6 +128,7 @@ import {
 } from '../../board/epic-trail.js';
 import { isNotPlanned, localDay } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
+import { createLabelsRelations, LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
@@ -109,6 +138,7 @@ import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
+import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';
 import { applyEpicMove, readEpicMove } from './move.js';
 
 /** The exit code every refusal of a cancel ends the command with. */
@@ -217,6 +247,8 @@ export interface EpicCancelSeams {
   readonly openPrompter?: () => Prompter;
   /** Now, for the day the unblock note names. `new Date()` when left out. */
   readonly now?: () => Date;
+  /** The board's relationships, which read the members and their dependents; `labels` mode when left out. See the module note. */
+  readonly relations?: EpicRelations;
 }
 
 /** `#40`. */
@@ -250,17 +282,17 @@ export function readCancelLine(context: Pick<RafaContext, 'args' | 'flags'>): Ca
 }
 
 /**
- * The epic `number` names on `issues`, with its dependents; see the
- * module note.
+ * The epic `number` names on `issues`, with its dependents read in the
+ * mode `relations` answers, `labels` when left out; see the module note.
  *
  * @throws CommandExit with {@link EPIC_CANCEL_REFUSAL_EXIT} for an issue
  *   not on the listing, one that is not `type:epic`, and an epic closed as
  *   completed.
  */
-export function readEpicToCancel(issues: readonly BoardIssue[], number: number): EpicToCancel {
+export function readEpicToCancel(issues: readonly BoardIssue[], number: number, relations: EpicRelations = LABELS_READS): EpicToCancel {
   const epic = issues.find((issue) => issue.number === number);
   if (epic === undefined) throw refusal(`${ref(number)} is not on the board listing`);
-  const read = readEpicDependents(issues, number);
+  const read = readEpicDependents(issues, number, { relations });
   if (read === null) throw refusal(`${ref(number)} is not an epic: it carries no type:epic label`);
   if (epic.state === 'CLOSED' && !isNotPlanned(epic)) {
     throw refusal(`Epic ${ref(number)} is closed as completed, and a finished epic is not cancelled`);
@@ -397,7 +429,14 @@ export function appendNote(body: string, note: string): string {
 }
 
 /** Where the answers are written. */
-export type CancelWrites = EpicMoveWrites;
+export interface CancelWrites {
+  /** The comments, the label taken off and the closes. */
+  readonly board: IssueBoard;
+  /** The bodies an unblock note is appended to. */
+  readonly bodies: RoadmapBody;
+  /** What a move answer is made through: `labels`, the mode `readEpicMove` reads a move here in. */
+  readonly moves: BoardRelations;
+}
 
 /** What applying one answer is handed. */
 interface ApplyInput {
@@ -405,6 +444,8 @@ interface ApplyInput {
   readonly epic: number;
   readonly issues: readonly BoardIssue[];
   readonly day: string;
+  /** The board's relationships, which read what an unblocked dependent still waits on. */
+  readonly relations: EpicRelations;
 }
 
 /** A line at `info`. */
@@ -432,14 +473,15 @@ async function applyMove(input: ApplyInput, dependent: EpicDependent, reading: E
   const { change } = reading;
   const base = { issue: change.issue, waitsOn: dependent.waitsOn, answer: { kind: 'moved', to: change.to } as const };
   try {
-    const outcome = await applyEpicMove(input.writes, reading, cancelMoveReason(input.epic));
+    const writes = { board: input.writes.board, relations: input.writes.moves, issues: input.issues };
+    const outcome = await applyEpicMove(writes, reading, cancelMoveReason(input.epic));
     const lines = [info(`Moved ${ref(change.issue)} from epic ${ref(change.from)} to ${ref(change.to)}.`)];
     const left: string[] = [];
-    if (outcome.added.status === 'failed') {
+    if (outcome.added?.status === 'failed') {
       lines.push(warn(`Could not add its line to epic ${ref(change.to)}'s checklist: ${outcome.added.problem}`));
       left.push(`add ${ref(change.issue)}'s line to epic ${ref(change.to)}'s checklist`);
     }
-    if (outcome.removed.status === 'failed') {
+    if (outcome.removed?.status === 'failed') {
       lines.push(warn(`Could not take its line off epic ${ref(change.from)}'s checklist: ${outcome.removed.problem}`));
       left.push(`take ${ref(change.issue)}'s line off epic ${ref(change.from)}'s checklist`);
     }
@@ -478,14 +520,15 @@ async function unblockLabel(input: ApplyInput, issue: BoardIssue, maybeOpen: rea
   }
 }
 
-/** Appends the note, takes `spec:blocked` off when nothing else may block, and comments. */
+/**
+ * Appends the note, takes `spec:blocked` off when nothing else may block
+ * (in `labels` mode; `native` clears nothing, see the module note), and
+ * comments.
+ */
 async function applyUnblock(input: ApplyInput, dependent: EpicDependent): Promise<DependentApplied> {
   const { issue, waitsOn } = dependent;
-  const known = new Set(input.issues.map((each) => each.number));
-  const open = new Set(input.issues.filter((each) => each.state === 'OPEN').map((each) => each.number));
-  const reading = readBlockedBy(issue.number, issue.body, known);
-  const stillIds = reading.blockers.filter((id) => !waitsOn.includes(id));
-  const note = renderUnblockNote(input.day, input.epic, waitsOn, [...stillIds.map(ref), ...reading.foreign]);
+  const still = readUnblockStill(input.relations, input.issues, issue, waitsOn);
+  const note = renderUnblockNote(input.day, input.epic, waitsOn, still.named);
   const edit = await editChecklist({ issue: issue.number, edit: (body) => appendNote(body, note), board: input.writes.bodies });
 
   const lines: CancelLineOut[] = [];
@@ -501,8 +544,9 @@ async function applyUnblock(input: ApplyInput, dependent: EpicDependent): Promis
       ? `Unblocked ${ref(issue.number)}: noted below its body that ${refs(waitsOn)} no longer ${verb} it.`
       : `Unblocked ${ref(issue.number)}: its body carries the note already.`));
   }
-  const maybeOpen = [...stillIds.filter((id) => open.has(id)).map(ref), ...reading.foreign];
-  const label = await unblockLabel(input, issue, maybeOpen);
+  const label = input.relations.mode === 'native'
+    ? { line: info(keptLinksLine(issue.number, waitsOn)), left: null }
+    : await unblockLabel(input, issue, still.maybeOpen);
   if (label.line !== null) lines.push(label.line);
   if (label.left !== null) left.push(label.left);
   const problem = await commentOn(input.writes, issue.number, renderDependentComment('unblocked', input.epic, waitsOn));
@@ -603,10 +647,10 @@ function resultOf(target: EpicToCancel, fields: Pick<EpicCancelResult, 'status' 
   });
 }
 
-/** Reads the listing; a refusal with {@link EPIC_CANCEL_REFUSAL_EXIT} when it fails. */
-async function readListing(gh: GhRunner): Promise<readonly BoardIssue[]> {
+/** Reads the listing with `relations`' fields; a refusal with {@link EPIC_CANCEL_REFUSAL_EXIT} when it fails. */
+async function readListing(gh: GhRunner, relations: EpicRelations): Promise<readonly BoardIssue[]> {
   try {
-    return await createGhBoardListing({ gh })();
+    return await createGhBoardListing({ gh, mode: relations.mode })();
   } catch (error) {
     throw new CommandExit(EPIC_CANCEL_REFUSAL_EXIT, `❌ Could not read the board, so nothing was changed: ${messageOf(error)}`);
   }
@@ -633,8 +677,9 @@ export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): 
   const line = readCancelLine(context);
   const project = issueProject(context);
   const gh = seams.gh ?? createGhRunner({ cwd: project.root });
-  const issues = await readListing(gh);
-  const target = readEpicToCancel(issues, line.epic);
+  const relations = seams.relations ?? LABELS_READS;
+  const issues = await readListing(gh, relations);
+  const target = readEpicToCancel(issues, line.epic, relations);
   const epic = target.epic.number;
 
   for (const text of dependentLines(epic, target.dependents)) print(context, info(text));
@@ -655,8 +700,9 @@ export async function cancelEpic(context: RafaContext, seams: EpicCancelSeams): 
     chosen = answered;
   }
 
-  const writes: CancelWrites = { board: createGhIssueBoard({ gh }), bodies: createGhRoadmapBody({ gh }) };
-  const input: ApplyInput = { writes, epic, issues, day: localDay((seams.now ?? ((): Date => new Date()))()) };
+  const bodies = createGhRoadmapBody({ gh });
+  const writes: CancelWrites = { board: createGhIssueBoard({ gh }), bodies, moves: createLabelsRelations({ gh, bodies }) };
+  const input: ApplyInput = { writes, epic, issues, day: localDay((seams.now ?? ((): Date => new Date()))()), relations };
   const applied: DependentApplied[] = [];
   for (const each of chosen) {
     const done = await applyChoice(input, each);

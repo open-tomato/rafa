@@ -274,7 +274,7 @@ import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../start/plan-path.js';
 import { announceRiskTotal } from '../start/risk-total.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
-import { boardRunner, readDoctorBoard, renderDoctorBoard } from './doctor-board.js';
+import { boardRunner, readDoctorBoard, relationsResultOf, renderDoctorBoard } from './doctor-board.js';
 import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
 import { DOCTOR_DESCRIPTION } from './doctor-description.js';
@@ -374,10 +374,14 @@ export interface DoctorResult {
   readonly previousCopies: PreviousCopiesReading | null;
   /** Every part of the GitHub board as it was read; null for a project with no GitHub board. */
   readonly board: DoctorBoardReadings['board'];
-  /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board. */
+  /** Every open issue labelled `spec:blocked`, read; null for a project with no GitHub board or in `native` mode. */
   readonly blocked: DoctorBoardReadings['blocked'];
-  /** Every issue carrying two `epic:` labels and every orphan `epic:` label; null for a project with no GitHub board. */
+  /** Every issue carrying two `epic:` labels and every orphan `epic:` label; null for a project with no GitHub board or in `native` mode. */
   readonly epics: DoctorBoardReadings['epics'];
+  /** Every truncated relationship list (`./doctor-relations.ts`); in `native` mode only, left out otherwise. */
+  readonly relations?: DoctorBoardReadings['relations'];
+  /** Every mark of the mode `board.relationships` does not name (`./doctor-marks.ts`); left out when no layer sets the key. */
+  readonly marks?: DoctorBoardReadings['marks'];
   /** Every unresolved board owner, unlabelled Roadmap and lost position slot; null for a project with no GitHub board. */
   readonly boards: DoctorBoardReadings['boards'];
   /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
@@ -639,6 +643,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     blocked: readings.blocked,
     epics: readings.epics,
     boards: readings.boards,
+    ...relationsResultOf(readings),
     cleanup: readings.cleanup,
     refs: readings.refs,
     release: readings.release,
@@ -688,7 +693,8 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);
     const effortSync = await readDoctorEffortSync({ root: project.root, home: project.home, resolved: preflight.resolved }, seams);
-    const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue);
+    const modeSet = preflight.resolved.sources.boardRelationships !== 'default';
+    const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue, preflight.config.boardRelationships, modeSet);
     const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);

@@ -1,18 +1,21 @@
 /**
- * The dependents of an epic: every open issue OUTSIDE the epic whose
- * `Blocked by:` line names one of the epic's open members, with the
- * members it waits on. `rafa epic cancel <n>` asks about each of them
+ * The dependents of an epic: every open issue OUTSIDE the epic that
+ * waits on one of the epic's open members, with the members it waits
+ * on; in `labels` mode its `Blocked by:` line names them, in `native`
+ * mode its `blockedBy` links do. `rafa epic cancel <n>` asks about each of them
  * before it closes the epic, and the cancelled-epic notice names them
  * for an epic already closed as not planned; both read them here.
  *
  * Nothing here spawns `gh`, opens a file or asks anything:
  * {@link readEpicDependents} is a pure function over ONE board listing
  * (`./roadmap-board.ts`) and the epic's number, so every case in
- * `./epic-dependents.test.ts` is a literal listing.
+ * `./epic-dependents.test.ts` and `./epic-dependents-native.test.ts` is
+ * a literal listing.
  *
  * ## Members and outsiders
  *
- * Membership is the `epic:<slug>` label, read as `./epics.ts` reads it:
+ * In `labels` mode membership is the `epic:<slug>` label, read as
+ * `./epics.ts` reads it:
  * the epic's slug is its first `epic:` label, and its members are the
  * issues carrying that label that are not `type:epic` themselves
  * ({@link groupByEpicLabel}). An epic carrying no `epic:` label has no
@@ -43,6 +46,30 @@
  * member is not this epic's business and is not reported here;
  * `rafa doctor` reports it.
  *
+ * ## The mode
+ *
+ * Who is in the epic and what an outsider waits on are relationships,
+ * read in the mode `board.relationships` names through the board's
+ * relationships port (`./relations/port.ts`),
+ * {@link EpicDependentsOptions.relations}; left out, the mode is
+ * `labels` (`LABELS_READS`), what every caller before the port read.
+ *
+ * - In `labels` mode everything reads as the two sections above spell
+ *   it. That reading stays here rather than going through the port's
+ *   `blockersOf`, which reads a line only under `spec:blocked` and
+ *   without the listing's numbers, so routing it through the port would
+ *   change who `rafa epic cancel` asks about.
+ * - In `native` mode the port's one reading over the listing answers
+ *   both, and no `epic:` label and no `Blocked by:` line is read. The
+ *   members are `membersOf`'s, the rows whose `parent` is the epic, and
+ *   {@link EpicDependents.slug} is null: a native epic is named by its
+ *   number and title. An outsider waits on the epic when a `blockedBy`
+ *   node of its reading names an open member on this board;
+ *   {@link EpicDependent.waitsOn} lists them in the order `gh` answered
+ *   the nodes. A node on another repository is never a member. A native
+ *   issue has one parent and a blocker per link, so there is no fault to
+ *   read and {@link EpicDependents.problems} is always empty.
+ *
  * ## The epic itself
  *
  * An epic number the listing has no `type:epic` issue for answers null,
@@ -51,17 +78,26 @@
  * is what the notice reports.
  */
 import type { BlockedReading } from './blocked.js';
+import type { EpicRelations } from './epics.js';
+import type { RelationsReading } from './relations/port.js';
 import type { BoardIssue } from './roadmap-board.js';
 
 import { blockedFaultMessage, readBlockedBy } from './blocked.js';
 import { epicSlugsOf, groupByEpicLabel } from './epics.js';
+import { LABELS_READS } from './relations/labels.js';
 
 /** One open issue outside the epic that waits on its open members. */
 export interface EpicDependent {
   /** The waiting issue, as the listing read it. */
   readonly issue: BoardIssue;
-  /** The epic's open members its line names, in line order. */
+  /** The epic's open members its line names, in line order; in `native` mode, in the order of its `blockedBy` nodes. */
   readonly waitsOn: readonly number[];
+}
+
+/** What {@link readEpicDependents} reads besides the listing and the epic. */
+export interface EpicDependentsOptions {
+  /** The board's relationships, which read the members and what each outsider waits on; `labels` mode when left out. */
+  readonly relations?: EpicRelations;
 }
 
 /** An outsider whose unreadable `Blocked by:` line names an open member. */
@@ -80,13 +116,13 @@ export interface EpicDependentProblem {
 export interface EpicDependents {
   /** The epic's number. */
   readonly epic: number;
-  /** Its slug, or null when it carries no `epic:` label. */
+  /** Its slug, or null when it carries no `epic:` label, and always in `native` mode. */
   readonly slug: string | null;
   /** Its open members, in ascending number. */
   readonly openMembers: readonly number[];
   /** Every dependent, in ascending issue number. */
   readonly dependents: readonly EpicDependent[];
-  /** Every unreadable line naming an open member, in ascending issue number. */
+  /** Every unreadable line naming an open member, in ascending issue number; always empty in `native` mode. */
   readonly problems: readonly EpicDependentProblem[];
 }
 
@@ -104,27 +140,41 @@ function membersOf(slug: string | null, issues: readonly BoardIssue[]): {
   };
 }
 
-/**
- * The dependents of epic `epic` over one board listing, and every
- * unreadable line naming one of its open members; the module note holds
- * the rules. Null when the listing has no `type:epic` issue numbered
- * `epic`. Never throws.
- */
-export function readEpicDependents(issues: readonly BoardIssue[], epic: number): EpicDependents | null {
-  const epicIssue = issues.find((issue) => issue.number === epic && issue.type === 'epic');
-  if (epicIssue === undefined) return null;
+/** The open issues outside the epic, in ascending number: not the epic, and not one of `members`. */
+function outsidersOf(issues: readonly BoardIssue[], epic: number, members: ReadonlySet<number>): readonly BoardIssue[] {
+  return issues
+    .filter((issue) => issue.state === 'OPEN' && issue.number !== epic && !members.has(issue.number))
+    .sort((left, right) => left.number - right.number);
+}
 
+/** The frozen answer. */
+function answer(
+  epic: number,
+  slug: string | null,
+  openMembers: readonly number[],
+  dependents: readonly EpicDependent[],
+  problems: readonly EpicDependentProblem[],
+): EpicDependents {
+  return Object.freeze({
+    epic,
+    slug,
+    openMembers: Object.freeze([...openMembers]),
+    dependents: Object.freeze([...dependents]),
+    problems: Object.freeze([...problems]),
+  });
+}
+
+/** The `labels`-mode reading: the `epic:` label and each outsider's `Blocked by:` line; see the module note. */
+function readLabelsDependents(issues: readonly BoardIssue[], epicIssue: BoardIssue): EpicDependents {
+  const epic = epicIssue.number;
   const slug = epicSlugsOf(epicIssue.labels)[0] ?? null;
   const members = membersOf(slug, issues);
   const open = new Set(members.open);
   const known = new Set(issues.map((issue) => issue.number));
-  const outsiders = issues
-    .filter((issue) => issue.state === 'OPEN' && issue.number !== epic && !members.all.has(issue.number))
-    .sort((left, right) => left.number - right.number);
 
   const dependents: EpicDependent[] = [];
   const problems: EpicDependentProblem[] = [];
-  for (const issue of outsiders) {
+  for (const issue of outsidersOf(issues, epic, members.all)) {
     const reading = readBlockedBy(issue.number, issue.body, known);
     const names = reading.blockers.filter((id) => open.has(id));
     if (names.length === 0) continue;
@@ -139,12 +189,54 @@ export function readEpicDependents(issues: readonly BoardIssue[], epic: number):
       message: blockedFaultMessage(reading),
     }));
   }
+  return answer(epic, slug, members.open, dependents, problems);
+}
 
-  return Object.freeze({
-    epic,
-    slug,
-    openMembers: Object.freeze([...members.open]),
-    dependents: Object.freeze(dependents),
-    problems: Object.freeze(problems),
-  });
+/** The open members on this board `issue`'s `blockedBy` nodes name, in node order. */
+function nativeWaitsOn(reading: RelationsReading, issue: BoardIssue, open: ReadonlySet<number>): readonly number[] {
+  const blockers = reading.blockersOf(issue);
+  if (blockers.kind !== 'blocked') return [];
+  return blockers.blockers
+    .filter((blocker) => blocker.repository === null && open.has(blocker.number))
+    .map((blocker) => blocker.number);
+}
+
+/** The `native`-mode reading: the epic's sub-issues and each outsider's `blockedBy` nodes; see the module note. */
+function readNativeDependents(issues: readonly BoardIssue[], epicIssue: BoardIssue, relations: EpicRelations): EpicDependents {
+  const reading = relations.read(issues);
+  const members = reading.membersOf(epicIssue).members;
+  const openMembers = members
+    .filter((member) => member.state === 'OPEN')
+    .map((member) => member.number)
+    .sort((left, right) => left - right);
+  const open = new Set(openMembers);
+  const all = new Set(members.map((member) => member.number));
+
+  const dependents: EpicDependent[] = [];
+  for (const issue of outsidersOf(issues, epicIssue.number, all)) {
+    const waitsOn = nativeWaitsOn(reading, issue, open);
+    if (waitsOn.length > 0) dependents.push(Object.freeze({ issue, waitsOn: Object.freeze([...waitsOn]) }));
+  }
+  return answer(epicIssue.number, null, openMembers, dependents, []);
+}
+
+/**
+ * The dependents of epic `epic` over one board listing, and every
+ * unreadable line naming one of its open members, in the mode
+ * `options.relations` answers; the module note holds the rules. Null
+ * when the listing has no `type:epic` issue numbered `epic`. In `native`
+ * mode, throws the port's `TypeError` for a listing read without the
+ * native fields; never throws otherwise.
+ */
+export function readEpicDependents(
+  issues: readonly BoardIssue[],
+  epic: number,
+  options: EpicDependentsOptions = {},
+): EpicDependents | null {
+  const epicIssue = issues.find((issue) => issue.number === epic && issue.type === 'epic');
+  if (epicIssue === undefined) return null;
+  const relations = options.relations ?? LABELS_READS;
+  return relations.mode === 'native'
+    ? readNativeDependents(issues, epicIssue, relations)
+    : readLabelsDependents(issues, epicIssue);
 }

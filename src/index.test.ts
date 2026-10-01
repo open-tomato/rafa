@@ -115,6 +115,7 @@ import * as registryModule from './adapters/registry.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
+  BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -191,6 +192,7 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'BOARD_RELATIONSHIP_MODES',
   'CLAUDE_SETTING_SOURCES',
   'CONFIG_DEFAULTS',
   'CONFIG_FILE',
@@ -257,6 +259,7 @@ const RUNTIME_EXPORTS = [
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['BOARD_RELATIONSHIP_MODES', entry.BOARD_RELATIONSHIP_MODES, BOARD_RELATIONSHIP_MODES],
   ['CLAUDE_SETTING_SOURCES', entry.CLAUDE_SETTING_SOURCES, CLAUDE_SETTING_SOURCES],
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
   ['CONFIG_FILE', entry.CONFIG_FILE, CONFIG_FILE],
@@ -481,6 +484,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
     ['../../board/board-cache.js', ['createCachedBoardListing']],
     ['../../board/boards.js', ['createGhBoardLister']],
+    ['../../board/configured-relations.js', ['readConfiguredRelations']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
     ['../../board/roadmap-board.js', ['createGhBoardListing', 'keepListing']],
     ['../../board/roadmap-epic-rows.js', ['hasEpicLines', 'readRoadmapEpicRows']],
@@ -562,7 +566,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../doctor-blocked.js', ['BLOCKED_LIST_LIMIT', 'KNOWN_LIST_LIMIT']],
     ['../plan/plan-files.js', ['plural']],
-    ['./issue-tracker.js', ['lineRefusal']],
+    ['./issue-tracker.js', ['issueProject', 'lineRefusal']],
+    ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'unblockRelationshipsMode']],
   ]],
   ['./commands/issue/check.js', [
     ['../../board/naming.js', ['boardId', 'notesFileName', 'SPEC_EXTENSION']],
@@ -625,6 +630,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readMergeRefusal',
     ]],
     ['./merge-cleanup.js', ['cleanUpAfterMerge', 'INDENT', 'reportFollowUps']],
+    ['./merge-freed.js', ['freedAfterMerge']],
     ['./merge-guard.js', ['guardBeforeMerge']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
@@ -916,11 +922,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
     ['../../board/epic-cancel-notice.js', ['cancelledEpicNoticeLines']],
-    ['../../board/epic-problems.js', ['epicProblemMessage', 'readEpicProblems']],
+    ['../../board/epic-problems.js', ['epicProblemMessage']],
     ['../../board/epic-walk.js', ['epicLines', 'isNowEpic']],
-    ['../../board/epics.js', ['readEpics']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
-    ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams']],
+    ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams', 'readListedEpics', 'readModeEpicProblems']],
     ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
     ['../../cli/command.js', ['CommandExit']],
@@ -950,6 +955,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./move-native.js', ['NATIVE_MODE']],
   ]],
   ['./commands/epic/defer.js', [
     ['../../board/epic-trail.js', ['REASON_FLAG']],
@@ -961,13 +967,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/epic/move.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/epic-checklist.js', ['appendLine', 'editChecklist', 'removeLine', 'tickLine']],
     ['../../board/epic-horizon.js', ['branchNameOf']],
     ['../../board/epic-trail.js', ['blankReasonMessage', 'REASON_FLAG', 'readReason', 'renderMoveComment', 'unaskedReasonMessage']],
     ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
     ['../../board/roadmap.js', ['branchClaims', 'closedIssuesIn', 'createGhOpenPullRequests', 'parseRoadmapBody', 'scanClaimBranches']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
@@ -975,6 +979,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
+    ['./move-native.js', [
+      'configuredMoveRelations',
+      'NATIVE_MODE',
+      'NATIVE_RETRY_HINT',
+      'nativeAlreadyMessage',
+      'nativeEpicLeft',
+      'nativeParentLine',
+      'readBoardRepository',
+    ]],
   ]],
   ['./commands/epic/close.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -984,6 +997,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/epic-trail.js', ['renderCloseComment']],
     ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf', 'groupByEpicLabel']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/relations/labels.js', ['LABELS_READS']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
@@ -1001,12 +1015,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/epic/cancel.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../board/blocked.js', ['readBlockedBy', 'SPEC_BLOCKED_LABEL']],
+    ['../../board/blocked.js', ['SPEC_BLOCKED_LABEL']],
     ['../../board/epic-checklist.js', ['editChecklist']],
     ['../../board/epic-dependents.js', ['readEpicDependents']],
     ['../../board/epic-trail.js', ['cancelMoveReason', 'REASON_FLAG', 'renderCancelComment', 'renderDependentComment', 'renderUnblockNote']],
     ['../../board/epics.js', ['isNotPlanned', 'localDay']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/relations/labels.js', ['createLabelsRelations', 'LABELS_READS']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests']],
@@ -1015,6 +1030,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
+    ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
     ['./move.js', ['applyEpicMove', 'readEpicMove']],
   ]],
   ['./commands/claim/release.js', [
@@ -1083,6 +1099,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'stateLine',
       'stopLine',
     ]],
+    ['../next/relations-mode.js', ['openNextRelations']],
     ['../next/settle-step.js', ['followsMerge', 'readSettleAfterMerge']],
     ['../next/sources.js', ['openNextSources']],
     ['../next/state.js', ['readHomeAfterLoop', 'readNextState']],
@@ -1098,11 +1115,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/switch.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../board/boards.js', ['resolveDefaultBoard']],
+    ['../board/configured-relations.js', ['readConfiguredRelations']],
     ['../board/epic-board.js', ['boardOfEpic', 'openBoards']],
-    ['../board/epics.js', ['readEpics']],
     ['../board/place.js', ['resolvePlace']],
     ['../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../board/roadmap-epic-rows.js', ['horizonOf']],
+    ['../board/roadmap-epic-rows.js', ['horizonOf', 'readListedEpics']],
     ['../board/roadmap.js', ['createGhRoadmapSearch', 'parseRoadmapBody', 'scanClaimBranches']],
     ['../board/setup.js', ['ROADMAP_LABEL']],
     ['../claims/drift.js', ['checkDrift', 'driftLines']],
@@ -1131,10 +1148,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-board.js', [
       'boardStepChanged',
       'epicGuardChanged',
+      'relationsMoveChanged',
       'renderBoardStep',
       'renderEpicGuardStep',
+      'renderRelationsMoveStep',
       'runBoardStep',
       'runEpicGuardStep',
+      'runRelationsMoveStep',
     ]],
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
@@ -1152,7 +1172,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../start/risk-total.js', ['announceRiskTotal']],
     ['../utils/tracker.js', ['trackerPathFor']],
-    ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'renderDoctorBoard']],
+    ['./doctor-board.js', ['boardRunner', 'readDoctorBoard', 'relationsResultOf', 'renderDoctorBoard']],
     ['./doctor-cleanup.js', ['readDoctorCleanup', 'renderDoctorCleanup']],
     ['./doctor-deep.js', ['readDeep', 'renderDeep']],
     ['./doctor-description.js', ['DOCTOR_DESCRIPTION']],

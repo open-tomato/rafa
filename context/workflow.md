@@ -310,6 +310,24 @@ next issue when the roadmap advances. After every action, `next` names
 the step that follows — the merge to run, the loop to resume, or the
 loop already running — unless `--no-hint` turns off the hint.
 
+### Board relationships: labels and native modes
+
+**Epics and blockers are recorded through the board relationships port**
+(`src/board/relations/port.ts`), which offers two modes selected by the
+`board.relationships` config key. The **default is `labels`**, today's
+system unchanged; setting it to **`native`** uses GitHub's sub-issue and
+blocked-by links. Both modes are read through the same interface, so every
+command (roadmap, next, status, etc.) works the same way whichever mode
+is set. A project picks by budget and preference: `labels` keeps the
+cheaper board read (about 2 GraphQL points for a 287-issue board) and works
+on any tracker with labels; `native` shows the relationships in GitHub's
+own UI and needs no write when a blocker closes (about 8 points per full
+read, but fewer writes). The cache's incremental read stays on the REST
+endpoint in `labels` mode; `native` uses one `gh api graphql` query with
+`filterBy: {since}` because REST answers counts only.
+
+In **`labels` mode**, membership is the `epic:<slug>` label; order is
+the epic's checklist; waiting is `spec:blocked` and the `Blocked by:` line.
 Blocked specs are those marked `spec:blocked` with a `Blocked by:` line
 naming one or more open blockers. `plan create --next` skips them,
 offers the first unblocked spec instead, and asks whether to plan that
@@ -323,12 +341,34 @@ line is kept as written in `BlockedReading.foreign`
 only such tokens reads as the `no-ids` fault, so `issue unblock` never
 takes a foreign-only line for "every blocker closed" and drops the label.
 
+In **`native` mode**, membership is the issue's `parent` field; waiting
+is any open `blockedBy` node. An issue frees any issues that blocked on
+it when it closes, regardless of the reason. `rafa issue unblock` prints
+that the tracker clears a blocker when it closes, writes nothing and
+exits 0. `rafa next` offers no `unblock` action in this mode because
+nothing has to be cleared by hand. `pr merge` prints the freed issues
+read from the port's `freedBy` over the board listing it already holds,
+never writes, and the step that would unblock in `labels` mode is dropped.
+
+**Moving between modes** happens through `rafa init --board` when the
+config key is set. It finds the other mode's marks on the board listing
+and offers to move them: from `labels` to `native`, each epic's labelled
+members become its sub-issues (in checklist order) and each `Blocked by:`
+line becomes blocked-by links; the reverse moves sub-issues back to labels
+and blocked-by links back to lines. It prints every write before asking,
+writes nothing on a no, and a second run finds nothing to move. Removing
+the old mode's marks is asked separately, only after every write succeeded;
+any marks kept are named by `rafa doctor` alongside the marks of the
+other mode that are still on the board.
+
 ### Marking a spec ready
 
 **`rafa issue ready <n>` marks an issue as ready for planning** after
 checking three things: the author must have write access (or be listed as
 trusted in config), the body must fill the spec template completely, and
-the issue must carry at most one `epic:` label.
+in `labels` mode only, the issue must carry at most one `epic:` label
+(in `native` mode an epic is the one sub-issue parent, so the check is
+skipped).
 The command is offered automatically by `plan create --issue` and
 `plan create --next` in a terminal, where a yes labels the issue with
 `spec:ready` and proceeds to plan it, or a no exits with the check result.

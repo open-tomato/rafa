@@ -170,7 +170,11 @@ sentence replaces nothing.
    about each one whose blockers have all closed and removing the label on a
    yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
-   it is a warning rather than an exit code.
+   it is a warning rather than an exit code. Under
+   `board.relationships: native` step 5 ticks no epic checklist and this
+   step prints the open issues the merge freed instead, read through the
+   relationships port's `freedBy` over one native board listing, asking
+   nothing and writing nothing (`src/commands/pr/merge-freed.ts`).
 7. Print the two follow-ups when they apply, under `Follow-ups:`:
    `rafa self-update`, then `rafa release settle` while the fragments
    waiting on `origin/<base>` fold into a version, so settle is the
@@ -655,6 +659,304 @@ lacks it (`gh issue edit <n> --add-label type:roadmap`, `src/board/setup.ts`).
 Each part is written only when missing, so a rerun changes no byte. `rafa
 doctor` reports each as present or missing, with `rafa init --board` as the
 fix.
+
+### Native relationships
+
+Measured answers for the `board.relationships: native` mode (#340). Each
+answer names the command that produced it, the `gh` it ran under and the
+date; a later task that depends on one follows it here and does not guess.
+The measurements write only to the operator's scratch repositories
+(`RAFA_340_SCRATCH_A`, `RAFA_340_SCRATCH_B`), never to `open-tomato/rafa`.
+
+#### A relationship write does not move `updated_at`
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`, on five issues: parent P #1, child C #2,
+blocked X #3, blocking Y #4 and control Z #5, which was never linked.
+Before each write the run waited 4 s, and after it 6 s, then read every
+issue's `updatedAt` twice: from GraphQL (`repository.issue(number:)`) and
+from REST (`gh api repos/<A>/issues/<n> --jq .updated_at`). The same
+GraphQL read also took `parent`, `subIssues`, `blockedBy` and `blocking`, so each row
+below shows that the write happened as well as what the timestamps did.
+
+| Write | Link read after it | `updated_at` moved on |
+|---|---|---|
+| `addSubIssue(issueId: P, subIssueId: C)` | C `parent` #1, P `subIssues` [#2] | neither P nor C |
+| `removeSubIssue(issueId: P, subIssueId: C)` | both empty again | neither P nor C |
+| `addBlockedBy(issueId: X, blockingIssueId: Y)` | X `blockedBy` [#4], Y `blocking` [#3] | neither X nor Y |
+| `removeBlockedBy(issueId: X, blockingIssueId: Y)` | both empty again | neither X nor Y |
+| control: `gh api -X PATCH repos/<A>/issues/5 -f title=…` | — | Z, 11:05:30Z → 11:06:40Z |
+
+Each write was sent as
+`gh api graphql -f query='mutation{addSubIssue(input:{issueId:"<P node id>",subIssueId:"<C node id>"}){clientMutationId}}'`
+(and likewise for the other three). GraphQL and REST agreed on every
+reading, and P, C, X and Y kept their creation timestamps throughout. The
+control shows that the same reads see a real edit. Two more reads, taken
+at 11:06:57Z after the control step, agreed as well:
+`issues(orderBy: {field: UPDATED_AT, direction: DESC})` listed #1–#4 at
+their creation times, and
+`gh api 'repos/<A>/issues?state=all&since=2026-09-30T11:05:31Z'`, one
+second after the last issue was created, returned #5 alone.
+
+What follows for the native mode: a sub-issue or blocked-by change is
+invisible to anything keyed on `updated_at`. That covers a cache row's
+freshness check, a `since=` poll and a sort by recently updated, and it
+holds on both ends of the link. A reader that must see relationship changes
+reads the relationship fields themselves.
+
+Not measured here: the writes went through the GraphQL mutations by
+`gh api`, not through `gh issue edit --add-sub-issue`, `--parent`,
+`--remove-parent`, `--add-blocked-by` or `--remove-blocked-by`. The
+session's rafa-tooling hook denies `gh issue` commands, so those flags were
+not run. The `v2.100.0` source shows they send these same mutations
+(`api/queries_issue.go`, see the `--parent` answer below), with
+`replaceParent: true` added on `addSubIssue`. So they should leave
+`updated_at` alone as well. That is a reading of the source, not a run.
+
+#### `gh issue list --json subIssues` answers the order GitHub holds
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`. The session's rafa-tooling hook denies `gh issue`, so
+`gh issue list` itself was not run. The run sent the query `gh issue list`
+builds instead, through `gh api graphql`: the `IssueList` query of
+`pkg/cmd/issue/list/http.go` at `v2.100.0`, with the relationship fields
+exactly as `api/query_builder.go` spells them:
+
+```text
+parent{id,number,title,url,state,repository{nameWithOwner}}
+subIssues(first:100){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+subIssuesSummary{total,completed,percentCompleted}
+blockedBy(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+blocking(first:50){nodes{id,number,title,url,state,repository{nameWithOwner}},totalCount}
+```
+
+Parent #6 got children #7, #8, #9 and #10, added in that order by
+`addSubIssue`. Each reading below comes from that listing, and the same
+order came back from `repository.issue(number: 6){subIssues}` and from
+`gh api repos/<A>/issues/6/sub_issues --jq '[.[].number]'`:
+
+| Step | `subIssues.nodes` |
+|---|---|
+| after the four adds | [#7, #8, #9, #10] |
+| `reprioritizeSubIssue` moving #10 `beforeId` #7, then #8 `afterId` #9 | [#10, #7, #9, #8] |
+| `gh api -X PATCH repos/<A>/issues/6/sub_issues/priority -F sub_issue_id=<#9 id> -F after_id=<#8 id>` | [#10, #7, #8, #9] |
+
+The first reading is the control: it matches creation order, and the
+reprioritised readings differ from it. So the listing carries the order.
+`subIssues` therefore belongs in the native mode's listing fields, and
+`membersOf(epic)` reads its order from `subIssues.nodes`. It must never
+sort by number. The field stops at 100 nodes, so `totalCount` above the
+node count is the truncation reading.
+
+Not measured: a drag in GitHub's web UI. The run reprioritised through the
+GraphQL mutation and the REST priority endpoint, and both moved the
+listing the same way.
+
+#### `gh issue edit --parent` on an issue that has a parent moves it
+
+Read from source, then measured 2026-09-30 with `gh version 2.100.0
+(2026-09-03)` on `RAFA_340_SCRATCH_A`. At `v2.100.0`, `--parent` builds
+`DeferredUpdateIssueOptions` with `ReplaceExistingParent: true`
+(`pkg/cmd/issue/edit/edit.go`). It sends
+`addSubIssue(input: {issueId: <new parent>, subIssueId: <issue>, replaceParent: true})`
+(`api/queries_issue.go`). `--add-sub-issue` sends the same mutation with
+`replaceParent: true`, and `--remove-parent` sends `removeSubIssue` against
+the parent it has just read. The hook denies `gh issue`, so the run sent
+those mutations through `gh api graphql`. It used child #13 under old
+parent #11, with new parent #12:
+
+| `addSubIssue(issueId: #12, subIssueId: #13, …)` | Answer | #13 `parent` | #11 `subIssues` | #12 `subIssues` |
+|---|---|---|---|---|
+| `replaceParent` left out | error, exit 1 | #11 | [#13] | [] |
+| `replaceParent: false` | error, exit 1 | #11 | [#13] | [] |
+| `replaceParent: true` (what `--parent` sends) | ok | #12 | [] | [#13] |
+
+Both refusals print
+`Failed to add sub-issue #13 to parent #12. Sub issue may only have one parent`
+(GraphQL `type: VALIDATION`). A second move with `replaceParent: true`
+took issue #10 out of the first position under #6, into #12, which
+already held #13. Then #12 read [#13, #10], and #6 read [#7, #8, #9]. A
+moved issue goes to the end of its new parent, and the old parent closes
+the gap.
+
+What follows for the native mode: a parent write is a move in one call,
+with no remove first. It needs `replaceParent: true`: `gh issue edit
+--parent`, or the mutation with that input. The old parent loses the
+issue in the same call, so an epic move is one write, and the new epic's
+order puts the issue last.
+
+#### GitHub's cap on sub-issues per parent
+
+Measured 2026-10-01 with `gh version 2.100.0 (2026-09-03)` on
+`RAFA_340_SCRATCH_A`. The run created parent #31 and children #32 to #132
+through `gh api repos/<A>/issues`, then added the children one at a time
+with `gh issue edit 31 -R <A> --add-sub-issue <n>` until GitHub refused:
+
+| Step | Answer | #31 `subIssues.totalCount` |
+|---|---|---|
+| add #32 to #131 | ok, 100 times | 100 |
+| add #132 | error, exit 1 | 100 |
+| control: remove #131, add #132 | ok | 100 |
+| control: add #131 back | error, exit 1 | 100 |
+
+Both refusals print
+`GraphQL: Failed to add sub-issue #132 to parent #31. Parent cannot have more than 100 sub-issues (addSubIssue)`
+(the control names #131). The control shows the refusal comes from the
+count, not from the child: #132 went in once a place was free.
+
+So the cap is 100 sub-issues per parent. At the cap, the
+`gh issue list` query above answered 100 `subIssues.nodes` with
+`totalCount: 100` and `subIssuesSummary.total: 100`, and a direct
+`subIssues(first:100)` read answered `pageInfo.hasNextPage: false`. A
+parent cannot hold a 101st member, so `subIssues(first:100)` never
+misses one. The reader's `truncated` reading stays as a guard in case
+GitHub raises the cap.
+
+#### A blocker in another repository adds and reads with its own state
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`. The run used
+blocked issue #14 on `RAFA_340_SCRATCH_A` and blocker #1 on
+`RAFA_340_SCRATCH_B`. It sent
+`addBlockedBy(input: {issueId: <A#14>, blockingIssueId: <B#1>})` through
+`gh api graphql`, and the call succeeded. It then read both repositories
+with the `gh issue list` query above:
+
+| Step | A#14 `blockedBy.nodes` | B#1 `blocking.nodes` |
+|---|---|---|
+| after the add | B#1, `state: OPEN`, `repository.nameWithOwner: <B>`, `totalCount: 1` | A#14, `state: OPEN`, repository `<A>` |
+| after `gh api -X PATCH repos/<B>/issues/1 -f state=closed -f state_reason=completed` | B#1, `state: CLOSED`, repository `<B>` | A#14, `state: OPEN` |
+
+So a foreign blocker arrives in the blocked repository's one board read,
+with its number, state and repository. The native reader gets it from the
+`blockedBy` node and needs no per-blocker `gh issue view`. A blocker's
+`number` alone is ambiguous across repositories. The reader keys a blocker
+by its repository (`owner/name`) and `number` together; see the next
+answer for where the listing's repository comes from.
+`gh issue edit --add-blocked-by` takes a number or a URL.
+`ResolveIssueRef` (`pkg/cmd/issue/shared/lookup.go`) resolves a URL to its
+own repository. It refuses only a URL on another host, so a foreign blocker
+is written by URL. `blockedBy` stops at 50 nodes, and `totalCount` above
+the node count is its truncation reading.
+
+Not measured: a blocker in a repository the reading account cannot see.
+Both scratch repositories belong to the same account.
+
+#### `gh issue list --json` answers a linked issue without its repository
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`, running
+`gh issue list -R <A> --state all --limit 50 --json number,parent,blockedBy,blocking,subIssues,subIssuesSummary`
+itself, and the same fields on `open-tomato/rafa` with `--limit 2`. Every
+linked issue — `parent`, and each node of `blockedBy`, `blocking` and
+`subIssues` — came back with the keys `id`, `number`, `state`, `title`
+and `url`, and no `repository`, although the query `gh` sends asks for
+`repository{nameWithOwner}` (see the `subIssues` answer above). The
+foreign blocker of A#14 read as
+`{"number":1,"state":"CLOSED","url":"https://github.com/<B>/issues/1",…}`.
+`parent` is null or one such node. The three lists are
+`{"nodes":[…],"totalCount":n}`, and `subIssuesSummary` is
+`{"completed","percentCompleted","total"}`.
+
+What follows for the native mode: the listing reads a linked issue's
+repository off its `url` (`https://<host>/<owner>/<name>/issues/<n>`),
+and `parseBoardListing` (`src/board/roadmap-board.ts`) refuses a node
+whose `url` is not issue `number`'s. A read that asks GraphQL directly
+may take `repository.nameWithOwner`, but it must answer the same row
+shape as the listing.
+
+#### The incremental read in the native mode
+
+Measured 2026-09-30 with `gh version 2.100.0 (2026-09-03)`, read-only,
+with the argv `nativeChangedArgs` (`src/board/board-cache-native.ts`)
+builds: `gh api graphql --paginate` over
+`repository.issues(first: 100, filterBy: {since})`, asking for the
+listing's six fields, `updatedAt` and the five relationship fields, with
+`{owner}` and `{repo}` filled by `gh` (`-F`).
+
+| Reading | Answer |
+|---|---|
+| `open-tomato/rafa`, `since` 2026-09-29T00:00:00Z | 224 issues over three pages, in the one `gh` command; every row read by `parseBoardListing` in the native mode |
+| each page, read from `rateLimit{cost}` | 4 points, the same for a page of 100 issues, of 2 and of none |
+| `since` equal to #278's `updatedAt` | #278 answered: `since` keeps an issue updated AT the time given |
+| control: `since` 2099-01-01T00:00:00Z | no issue, at 4 points |
+| `RAFA_340_SCRATCH_A` from 2020 | 30 issues; children of #6 and #12 read their parent, A#14 reads the foreign blocker B#1 `CLOSED` in `<B>` |
+| `createCachedBoardListing` over the real runner, `native` then `native` | a full read of 422 issues (watermark and listing, 5.7 s), then ONE `gh api graphql` call, 0.65 s |
+
+`gh --jq` writes an object's keys in name order, as it does for the REST
+read of the labels mode, so a changed row's key order is `gh`'s and the
+same on every read.
+
+A blocker closing does not move the blocked issue's `updated_at`: B#1
+closed at 11:30:16Z, and A#14's `updated_at` read 11:30:07Z, its
+creation time, afterwards. So the incremental read answers the closed
+blocker's own row but not the blocked row that holds it as a node; a
+kept native row's linked issue holds the state it had when that row was
+last read.
+
+Not measured: a board large enough that a page of the incremental read
+times out, and a page cost on a board whose issues hold many links.
+
+#### The read by number after a relationship write
+
+A relationship write moves no `updated_at` (above), so the kept listing
+drops the rows `invalidateRows` (`src/board/board-cache.ts`) is given and
+reads them again by number on the next read. Measured 2026-09-30 with
+`gh version 2.100.0 (2026-09-03)`, read-only, on `RAFA_340_SCRATCH_A`,
+with the argv `nativeIssuesArgs` (`src/board/board-cache-native.ts`)
+builds: one `gh api graphql` query aliasing each number as
+`i<n>: issue(number: n) { ...row }`, the fragment asking what the `since`
+read asks.
+
+| Numbers | Answer |
+|---|---|
+| #1, #2 | two rows in the `since` read's shape, exit 0 |
+| #1, #99999 (not in the repository) | #1's node, `i99999: null` and a `NOT_FOUND` error; `gh` printed the error and exited 1 |
+
+What follows: a touched issue that is gone fails the read, and the kept
+listing falls back to a full one.
+
+#### `pr merge` freed-issues per mode
+
+The sixth step of `pr merge` (lines 163–181) differs between modes:
+
+In **`labels` mode** (the default), the unblock reading (`src/commands/pr/merge-unblock.ts`)
+runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
+`Blocked by:` line names an issue this PR closes. For each such issue whose
+blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
+spec:blocked? [y/N]` and removes the label on a yes (`src/board/relations/labels.ts`'s
+`afterMerge`). `--yes` does not answer that question; every failure is a warning.
+
+In **`native` mode**, the freed reading (`src/commands/pr/merge-freed.ts`) prints
+the open issues the merge freed, read through the port's `freedBy`, and sends no
+write (`src/board/relations/native.ts`'s `afterMerge`). An issue is freed when it
+is open, waits on blockers, and has at least one blocker among the closed issues
+and would not wait on anything once those count as closed. The output is silence
+when the merge freed nothing; otherwise a header line naming the mode, the count,
+the closed issues and that nothing was written, followed by one indented line per
+freed issue — lowest number first — naming its number and title, or number alone
+if the title is empty. `--yes` does not answer anything, since there is no
+question. A read that cannot get the board's repository or the native listing
+sends one warning and prints nothing, as the merge has already happened.
+
+#### Cache and truncation for freed-issues in native mode
+
+The freed reading in native mode sends two `gh` calls from the one board listing
+the command already holds: the board's repository (one `gh repo view --json
+nameWithOwner`, `readBoardRepository`, `src/commands/epic/move-native.ts`) to
+tell the board's issues from foreign blockers; and one native board listing (`gh
+api graphql` with `filterBy: {since}` on an incremental read, or a full listing
+on the first read). No per-blocker `gh issue view` is sent; a blocker's state
+comes from its `blockedBy` node (`src/board/relations/native.ts`, the port
+definition).
+
+An issue stays waiting when it has a blocker in the closed issues BUT its
+`blockedBy` list is truncated at 50 nodes: an unread blocker might still be open,
+so the issue is not reported as freed. The truncation key is left out (never set
+to undefined) when `gh`'s `totalCount` equals the node count. A blocker on
+another repository reads its state from the node; a blocker on this board whose
+row the listing does not hold (missing, outside any `since` window, or past a
+truncation limit) counts as unread and keeps the issue waiting, the safe
+direction the port defines. A foreign blocker is keyed by repository (`owner/name`)
+and number together; the repository comes from its `url`.
 
 ### Claims
 

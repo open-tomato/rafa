@@ -91,6 +91,23 @@
  * their words are unchanged, and without `roadmap` the option adds no
  * word to any action.
  *
+ * ## In `native` mode
+ *
+ * `unblock` is offered in `labels` mode only, the one id of
+ * {@link LABELS_ONLY_ACTIONS}: `issue unblock` re-reads a line's
+ * blockers and takes `spec:blocked` off, a label only `labels` mode
+ * holds, and with `board.relationships` set to `native` the tracker
+ * clears a blocker when it closes, so there is nothing to unblock.
+ * Row 11 of `./state.ts` already answers nothing there; this module
+ * holds the same rule at the table. {@link offeredCommandActions}
+ * answers the ids a mode offers — the whole table in `labels`, the
+ * table without `unblock` in `native` — and, handed
+ * {@link NextActionOptions.mode} `native`, {@link actionInvocation} and
+ * so {@link runAction} throw over a state proposing `unblock`, naming
+ * the state and the mode, rather than run `issue unblock` for a
+ * relationship the board does not record in labels. Left out, the mode
+ * is `labels` and every line is what it was before the mode existed.
+ *
  * ## The actions with no command
  *
  * `sync`, row 2, is not here. Fast-forwarding the base is not a
@@ -148,6 +165,7 @@
 import type { HopActionWorld } from './hop-action.js';
 import type { NextActionId, NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { BoardRelationshipMode } from '../config-sections.js';
 
 import { CommandExit, commandSpelling } from '../cli/command.js';
 import { parseArgs } from '../cli/core/parseArgs.js';
@@ -202,6 +220,11 @@ export const CLAIM_AHEAD_WORD = '--claim-ahead';
 export interface NextActionOptions {
   /** Whether the run was typed with `--roadmap`; see the module note. False when left out. */
   readonly roadmap?: boolean;
+  /**
+   * The board's `board.relationships` mode, which decides whether
+   * `unblock` is offered; see the module note. `labels` when left out.
+   */
+  readonly mode?: BoardRelationshipMode;
   /** Whether it was typed with `--claim-ahead` too; read only beside `roadmap`. False when left out. */
   readonly claimAhead?: boolean;
 }
@@ -260,6 +283,30 @@ export const NEXT_COMMAND_ACTIONS: readonly NextCommandActionId[] = Object.freez
   Object.keys(ACTION_COMMANDS) as NextCommandActionId[],
 );
 
+/** The actions offered in `labels` mode only: `unblock`; see the module note. */
+export const LABELS_ONLY_ACTIONS: ReadonlySet<NextCommandActionId> = new Set<NextCommandActionId>(['unblock']);
+
+/** The command actions each mode offers, in the table's order; see the module note. */
+const OFFERED_COMMAND_ACTIONS: Readonly<Record<BoardRelationshipMode, readonly NextCommandActionId[]>> = Object.freeze({
+  labels: NEXT_COMMAND_ACTIONS,
+  native: Object.freeze(NEXT_COMMAND_ACTIONS.filter((action) => !LABELS_ONLY_ACTIONS.has(action))),
+});
+
+/**
+ * The action ids that run a registered command which `mode` offers, in
+ * the table's order: all ten in `labels`, the nine without `unblock` in
+ * `native`. See the module note.
+ */
+export function offeredCommandActions(mode: BoardRelationshipMode): readonly NextCommandActionId[] {
+  return OFFERED_COMMAND_ACTIONS[mode];
+}
+
+/** The defect of a row that proposed an action the board's mode does not offer. */
+function notOffered(state: NextState, mode: BoardRelationshipMode): Error {
+  return new Error(`${PREFIX}: state "${state.id}" proposes "${state.action}", which is offered in labels mode only`
+    + ` and board.relationships is ${mode}: the tracker clears a blocker when it closes`);
+}
+
 /** Whether an action id runs a registered command, which `none`, `sync`, `hop` and `home` do not. */
 export function runsCommand(action: NextActionId): action is NextCommandActionId {
   return (NEXT_COMMAND_ACTIONS as readonly string[]).includes(action);
@@ -284,10 +331,14 @@ export interface NextInvocation {
  * `sync`, `hop` and `home`, which the module note places.
  *
  * Throws, naming the state and the action, on a state proposing an
- * action over a field its row left null.
+ * action over a field its row left null, and, naming the mode as well,
+ * on one proposing an action {@link NextActionOptions.mode} does not
+ * offer: `unblock` in `native` mode.
  */
 export function actionInvocation(state: NextState, options: NextActionOptions = {}): NextInvocation | null {
   if (!runsCommand(state.action)) return null;
+  const mode = options.mode ?? 'labels';
+  if (!offeredCommandActions(mode).includes(state.action)) throw notOffered(state, mode);
 
   const spec = ACTION_COMMANDS[state.action];
   return Object.freeze({
@@ -364,8 +415,10 @@ async function runHopStep(caller: RafaContext, state: NextState): Promise<void> 
  *
  * Whatever the command throws is thrown on, a `CommandExit` with its own
  * exit code and message included. Refuses with exit code 1 when the
- * caller's registry holds no such command, and throws on a state whose
- * action runs none, `sync` among them.
+ * caller's registry holds no such command, throws on a state whose
+ * action runs none, `sync` among them, and throws on one whose action
+ * {@link NextActionOptions.mode} does not offer, before any command is
+ * looked up.
  */
 export async function runAction(caller: RafaContext, state: NextState, options: NextActionOptions = {}): Promise<void> {
   if (state.action === 'hop' || state.action === 'home') {

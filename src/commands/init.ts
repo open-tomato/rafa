@@ -95,6 +95,14 @@
  * script; the order it decides in is `./init-board.ts`'s. Its flag is
  * read at the top of the run with `--board`'s, for the same reason.
  *
+ * Last of all, and only when a config layer sets `board.relationships`,
+ * the relationships move reads the board for the other mode's marks and
+ * offers to move them into the configured mode, printing every write
+ * before its one question and asking a second about the old marks; the
+ * order it decides in is `./init-board.ts`'s. With the key unset it
+ * sends nothing, prints nothing and leaves `relationsMove` out of the
+ * json result, so such a run is the run it was before the move existed.
+ *
  * ## A rerun
  *
  * Each writer writes only what is missing or stale, so a rerun over a
@@ -164,13 +172,13 @@
  * stderr, and spawns git and `gh` in the root. The writes go to the
  * disk, under the root and the home the seams name.
  */
-import type { BoardStepResult, EpicGuardStepResult } from './init-board.js';
+import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } from './init-board.js';
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig, ResolvedConfig } from '../config.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
@@ -205,10 +213,13 @@ import { gitRemoteUrl } from '../schema/project-id.js';
 import {
   boardStepChanged,
   epicGuardChanged,
+  relationsMoveChanged,
   renderBoardStep,
   renderEpicGuardStep,
+  renderRelationsMoveStep,
   runBoardStep,
   runEpicGuardStep,
+  runRelationsMoveStep,
 } from './init-board.js';
 import { renderReleaseStep, runReleaseStep } from './init-release.js';
 
@@ -273,6 +284,8 @@ export interface InitResult {
   readonly board: BoardStepResult;
   /** What the epic guard step after it came to: the workflow file, or why it was not written. */
   readonly epicGuard: EpicGuardStepResult;
+  /** What the relationships move came to; left out when `board.relationships` is not set (`./init-board.ts`). */
+  readonly relationsMove?: RelationsMoveStepResult;
 }
 
 /** The line every refusal ends with. */
@@ -399,9 +412,9 @@ async function chooseRoot(
 }
 
 /** The config as it resolves for the root, refusing one `loadConfig` refuses. */
-function resolvedConfig(root: string, home: string, warn: (message: string) => void): RafaConfig {
+function resolvedConfig(root: string, home: string, warn: (message: string) => void): ResolvedConfig {
   try {
-    return loadConfig({ root, home }, {}, warn).config;
+    return loadConfig({ root, home }, {}, warn);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     throw refusal(['rafa init: the config cannot be used:', ...error.problems.map((problem) => `  ${problem}`)]);
@@ -450,9 +463,11 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
 /** What the scopes came to, with the config they were written from. */
 interface ScopesWritten {
   /** The result, but for the two steps that run once these are on disk. */
-  readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'release'>;
+  readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'relationsMove' | 'release'>;
   /** The config as it resolved for the root, which the provider is read from. */
   readonly config: RafaConfig;
+  /** `board.relationships` when a config layer sets it, null when it is left at its default. */
+  readonly relationships: RafaConfig['boardRelationships'] | null;
 }
 
 /** Checks, then writes, the scopes for `root`; see the module note for the order. */
@@ -461,7 +476,8 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
     context.output.warn(message);
   };
   checkConflicts(root.path, home);
-  const config = resolvedConfig(root.path, home, warn);
+  const resolved = resolvedConfig(root.path, home, warn);
+  const config = resolved.config;
   checkGitignore(root.path, config);
 
   const configExisted = existsSync(configFilePath(root.path));
@@ -489,6 +505,9 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
       }),
     },
     config,
+    relationships: resolved.sources.boardRelationships === 'default'
+      ? null
+      : config.boardRelationships,
   };
 }
 
@@ -569,6 +588,7 @@ export function renderInit(result: InitResult): readonly string[] {
     ...renderReleaseStep(result.release),
     ...renderBoardStep(result.board),
     ...renderEpicGuardStep(result.epicGuard),
+    ...renderRelationsMoveStep(result.relationsMove ?? null),
   ];
   return result.changed
     ? [head, ...changed, ...steps]
@@ -591,16 +611,29 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const epicGuard = await runEpicGuardStep({
     wanted: wantsGuard,
     board,
+    relationships: scopes.config.boardRelationships,
     root: scopes.written.root,
+    isTerminal: seams.isTerminal,
+    openPrompter: seams.openPrompter,
+  });
+  const relationsMove = await runRelationsMoveStep({
+    board,
+    relationships: scopes.relationships,
+    root: scopes.written.root,
+    openGh: () => seams.gh(scopes.written.root),
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,
   });
   const result: InitResult = {
     ...scopes.written,
-    changed: scopes.written.changed || release.changed || boardStepChanged(board) || epicGuardChanged(epicGuard),
+    changed: scopes.written.changed || release.changed || boardStepChanged(board) || epicGuardChanged(epicGuard)
+      || relationsMoveChanged(relationsMove),
     release,
     board,
     epicGuard,
+    ...(relationsMove === null
+      ? {}
+      : { relationsMove }),
   };
 
   if (context.outputMode === 'json') context.output.result(result);
@@ -609,6 +642,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   for (const line of release.warnings) context.output.warn(line);
   for (const line of board.warnings) context.output.warn(line);
   for (const line of epicGuard.warnings) context.output.warn(line);
+  for (const line of relationsMove?.warnings ?? []) context.output.warn(line);
   for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
 
@@ -634,7 +668,10 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' question about setting up the GitHub board, which `--board` and `--no-board` answer for a'
       + ' script, and then, once the board has run, one question about installing the epic guard'
       + ' workflow `.github/workflows/epic-guard.yml`, which removes a second `epic:` label from an issue'
-      + ' and comments why; `--epic-guard` and `--no-epic-guard` answer that one. On a terminal it also asks once whether every pull request bumps the version and gains'
+      + ' and comments why; `--epic-guard` and `--no-epic-guard` answer that one. When `board.relationships`'
+      + ' is set, the board is then read for relationships held in the other mode: every write that moves'
+      + ' them into the configured one is printed and a terminal is asked once, nothing is written on a no,'
+      + ' and once every write went through a second question asks whether to remove the old marks. On a terminal it also asks once whether every pull request bumps the version and gains'
       + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'
       + ' answer that one, and `--yes` leaves it unset. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',

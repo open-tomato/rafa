@@ -96,11 +96,34 @@
  * the Roadmap's epics, `unknown` with the listing's reason, no rows, and
  * exits 0, as `rafa roadmap` exits 0 on the same failure.
  *
+ * ## The mode
+ *
+ * Who is in the epic is a relationship, read in the mode
+ * `board.relationships` names through the board's relationships port
+ * (`src/board/relations/port.ts`), {@link EpicShowSeams.relations}; left
+ * out, the mode is `labels`, and everything above reads as it did before
+ * the port. The epic is read as `rafa roadmap` reads its epic rows
+ * (`readListedEpics` and `readModeEpicProblems`,
+ * `src/board/roadmap-epic-rows.ts`), so the head counts alike in both.
+ *
+ * - In `labels` mode the members are the issues carrying the epic's
+ *   `epic:<slug>` label, the head counts them on the listing, and the
+ *   label problems and the cancelled-epic notice are written.
+ * - In `native` mode the listing is read with the native fields
+ *   (`boardListFields`), the members are the epic's sub-issues in their
+ *   order, and the head's state and `done/total` are GitHub's own count
+ *   of them, `subIssuesSummary`. A native epic has no slug: it is named
+ *   by its number and title, as the head already names every epic. The
+ *   only problems written are the `horizon:` ones, and the cancelled-epic
+ *   notice is not read, since it reads `Blocked by:` lines
+ *   (`src/board/epic-cancel-notice.ts`), as `rafa roadmap` does not read
+ *   it in that mode either.
+ *
  * It starts no session, so it declares no `spends`.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
-import type { Epic, Epics } from '../../board/epics.js';
+import type { Epic, EpicRelations, Epics } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
@@ -112,11 +135,10 @@ import type { TableStyle } from '../issue/roadmap-table.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
 import { cancelledEpicNoticeLines } from '../../board/epic-cancel-notice.js';
-import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
+import { epicProblemMessage } from '../../board/epic-problems.js';
 import { epicLines, isNowEpic } from '../../board/epic-walk.js';
-import { readEpics } from '../../board/epics.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
-import { claimsOf, onceSeams } from '../../board/roadmap-epic-rows.js';
+import { claimsOf, onceSeams, readListedEpics, readModeEpicProblems } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames, readCurrentPlace, readLineRows } from '../../board/roadmap-rows.js';
 import {
   createGhOpenPullRequests,
@@ -142,6 +164,12 @@ const SWITCH_HINT = `Type it bare: ${USAGE}`;
 
 /** An issue number as written: a whole number from 1, no leading zero. */
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
+
+/** What the command reads the board through: the issue commands' seams, and the board's relationships. */
+export interface EpicShowSeams extends IssueSeams {
+  /** The board's relationships, which read the epic's members; `labels` mode when left out. See the module note. */
+  readonly relations?: EpicRelations;
+}
 
 /** What json mode gives as the terminal result's `data`. */
 export interface EpicsResult {
@@ -301,10 +329,16 @@ function placeEpic(board: ChosenBoard | null, listing: readonly BoardIssue[], ep
   return epics.epics.find((epic) => epic.number === chosen) ?? null;
 }
 
+/** True when `seams` read the `native` mode; left out, the mode is `labels`. */
+function isNative(seams: EpicShowSeams): boolean {
+  return seams.relations?.mode === 'native';
+}
+
 /** The seams the rows and the claims read through, each asked once; see the module note. */
-function rowSeams(context: RafaContext, seams: IssueSeams, config: RafaConfig, gh: GhRunner): LineRowsOptions {
+function rowSeams(context: RafaContext, seams: EpicShowSeams, config: RafaConfig, gh: GhRunner): LineRowsOptions {
   const { root } = issueProject(context);
-  const board = roadmapBoard(seams, gh, root, readSwitch('refresh', context.flags['refresh'], SWITCH_HINT));
+  const refresh = readSwitch('refresh', context.flags['refresh'], SWITCH_HINT);
+  const board = roadmapBoard(seams, gh, root, refresh, seams.relations?.mode ?? 'labels');
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
     { root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
@@ -315,6 +349,9 @@ function rowSeams(context: RafaContext, seams: IssueSeams, config: RafaConfig, g
     pullRequests: createGhOpenPullRequests({ gh }),
     planNames: (seams.planNames ?? createPlanDirNames)(plansDirAt(root, config.planDir).path),
     refs,
+    ...seams.relations === undefined
+      ? {}
+      : { relations: seams.relations },
   });
 }
 
@@ -324,7 +361,7 @@ function rowSeams(context: RafaContext, seams: IssueSeams, config: RafaConfig, g
  * config, a Roadmap or an epic number that cannot be used. See the
  * module note.
  */
-export async function readEpicsView(context: RafaContext, seams: IssueSeams): Promise<EpicsResult> {
+export async function readEpicsView(context: RafaContext, seams: EpicShowSeams): Promise<EpicsResult> {
   const asked = readEpicArgument(context.args);
   const project = issueProject(context);
   const warn = (message: string): void => {
@@ -346,11 +383,13 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   } catch (error) {
     return Object.freeze({ ...empty, epic: null, unknown: messageOf(error) });
   }
-  const epics = readEpics({ issues: listing, claims: await claimsOf(listing, read), today: new Date() });
+  const epics = readListedEpics({ issues: listing, claims: await claimsOf(listing, read), today: new Date(), relations: seams.relations });
   const epic = asked === null
     ? placeEpic(roadmap, listing, epics)
     : askedEpic(asked, listing, epics);
-  const cancelled = cancelledEpicNoticeLines(listing);
+  const cancelled = isNative(seams)
+    ? []
+    : cancelledEpicNoticeLines(listing);
   const row = listing.find((issue) => issue.number === epic?.number);
   if (epic === null || row === undefined) {
     for (const line of cancelled) warn(line);
@@ -358,7 +397,7 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
   }
 
   const rows = await readLineRows(epicLines(epic, row).lines, read);
-  const problems = readEpicProblems(listing).filter((problem) => isProblemOf(problem, epic));
+  const problems = readModeEpicProblems(listing, seams.relations).filter((problem) => isProblemOf(problem, epic));
   const warnings = [...rows.warnings, ...problems.map(epicProblemMessage), ...cancelled];
   for (const warning of warnings) warn(warning);
   return Object.freeze({
@@ -372,7 +411,7 @@ export async function readEpicsView(context: RafaContext, seams: IssueSeams): Pr
 }
 
 /** Runs one `epic show` line with `seams`, writing it in the line's output mode. */
-export async function runEpics(context: RafaContext, seams: IssueSeams): Promise<void> {
+export async function runEpics(context: RafaContext, seams: EpicShowSeams): Promise<void> {
   const result = await readEpicsView(context, seams);
   if (context.outputMode === 'json') {
     context.output.result(result);
@@ -387,7 +426,7 @@ export async function runEpics(context: RafaContext, seams: IssueSeams): Promise
 }
 
 /** The command, reading the board with `seams`; see the module note. */
-export function createEpicShowCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
+export function createEpicShowCommand(seams: EpicShowSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
     name: 'epic show',
     subject: 'epic',

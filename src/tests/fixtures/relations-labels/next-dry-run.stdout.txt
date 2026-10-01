@@ -1,0 +1,3 @@
+📍 #102 is next on the roadmap and carries `spec:ready`.
+👉 create the plan for #102 — rafa plan create --next
+⏹ --dry-run: nothing ran.

@@ -280,6 +280,12 @@ export const SYNC_STRATEGIES = ['local', 'file', 'git', 'service', 'p2p'] as con
 /** One of the five effort-store sync strategies. */
 export type SyncStrategy = (typeof SYNC_STRATEGIES)[number];
 
+/** How the board records epics and blockers: labels, or GitHub's own links. */
+export const BOARD_RELATIONSHIP_MODES = ['labels', 'native'] as const;
+
+/** One of the two board relationship modes, as `board.relationships` names it. */
+export type BoardRelationshipMode = (typeof BOARD_RELATIONSHIP_MODES)[number];
+
 /** How much of the plan a task session is handed, widest first. */
 export const INJECT_MODES = ['full', 'stage', 'task'] as const;
 

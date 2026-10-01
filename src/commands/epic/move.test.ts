@@ -28,10 +28,17 @@
  *   branch fails.
  * - The failed body write is paired with the move that lands, over the
  *   same board, so a run reporting every body `edited` fails one of them.
+ *
+ * The move is written through the board's relationships port; the
+ * `labels` cases here hold that it sends what it sent before the port,
+ * and that the json result keeps its keys in their order with no key the
+ * `native` mode adds. The `native` cases are `./move-native.test.ts`'s.
  */
 import type { EpicMoveResult, EpicMoveSeams } from './move.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { MembershipChange, OpenWork } from '../../board/epic-trail.js';
+import type { IssueBoard } from '../../board/issue-board.js';
+import type { BoardRelations, ParentChange } from '../../board/relations/port.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { GitResult, GitRunner } from '../../pr/git.js';
@@ -44,10 +51,12 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { blankReasonMessage, reasonQuestion, renderMoveComment, unaskedReasonMessage } from '../../board/epic-trail.js';
+import { createLabelsRelations } from '../../board/relations/labels.js';
 import { parseBoardListing } from '../../board/roadmap-board.js';
+import { TICK_ATTEMPTS } from '../../board/roadmap-tick.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import moveCommand, { createEpicMoveCommand, moveFailure, readEpicMove, readMoveLine, renderEpicMove } from './move.js';
+import moveCommand, { applyEpicMove, createEpicMoveCommand, moveFailure, readEpicMove, readMoveLine, renderEpicMove } from './move.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-move-')));
@@ -211,6 +220,8 @@ interface CaseSetup {
   readonly planted?: Planted;
   /** The answers typed, or null for no terminal. */
   readonly answers?: readonly (string | null)[] | null;
+  /** Wraps the relationships made over the planted `gh`, handed in as a seam; the config's when left out. */
+  readonly relations?: (made: BoardRelations) => BoardRelations;
 }
 
 /** A fresh project. */
@@ -229,6 +240,9 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     git: git.git,
     isTerminal: () => answers !== null,
     openPrompter: prompter.open,
+    ...setup.relations === undefined
+      ? {}
+      : { relations: setup.relations(createLabelsRelations({ gh: planted.gh })) },
   };
   const commands: RafaCommand[] = [createEpicMoveCommand(seams)];
   const outcome = await dispatchInProject(['epic', 'move', ...words], [EPIC_SUBJECT], commands, plantCase());
@@ -316,7 +330,7 @@ describe('readEpicMove', () => {
   it('carries a ticked line ticked, and reads no work for a closed issue', async () => {
     const reading = await readEpicMove({ issues: ISSUES, issue: 13, to: 50, ...UNREAD });
 
-    expect(reading.line).toEqual({ why: 'old flow', ticked: true });
+    expect(reading).toMatchObject({ line: { why: 'old flow', ticked: true } });
     expect(reading.work).toBeNull();
   });
 
@@ -332,7 +346,7 @@ describe('readEpicMove', () => {
       pullRequests: () => Promise.reject(new Error('HTTP 502')),
     });
 
-    expect(reading.line).toEqual({ why: 'issue 12', ticked: false });
+    expect(reading).toMatchObject({ line: { why: 'issue 12', ticked: false } });
     expect(reading.work).toEqual({ branches: [], pullRequests: [] });
     expect(reading.problems.length).toBeGreaterThan(1);
     expect(reading.problems.at(-1)).toContain('the open pull requests could not be read, so none is named: HTTP 502');
@@ -566,6 +580,60 @@ describe('rafa epic move', () => {
       },
       problems: [],
     });
+  });
+});
+
+describe('rafa epic move through the port in labels mode', () => {
+  it('makes the move with the relationships\' setParent over the listing it read, sending the same calls', async () => {
+    const asked: ParentChange[] = [];
+    let listed = 0;
+    const recording = (made: BoardRelations): BoardRelations => ({
+      ...made,
+      setParent: (listing, change) => {
+        asked.push(change);
+        listed = listing.length;
+        return made.setParent(listing, change);
+      },
+    });
+    const handed = await run(['12', '--to=50', '--reason=belongs with billing'], { relations: recording });
+    const configured = await run(['12', '--to=50', '--reason=belongs with billing']);
+
+    expect(asked).toEqual([{ issue: 12, parent: 50 }]);
+    expect(listed).toBe(LISTING.length);
+    expect(handed.exitCode).toBe(0);
+    expect(handed.calls).toEqual(configured.calls);
+    expect(handed.stdout).toBe(configured.stdout);
+  });
+
+  it('keeps the json result\'s keys in their order, with no relationships key and each edit\'s attempts', async () => {
+    const result = await run(['12', '--to=50', '--reason=x', '--output=json']);
+    const data = (eventsOf(result.stdout).find((event) => event.type === 'result') as { data?: Record<string, unknown> } | undefined)?.data;
+    const outcome = data?.['outcome'] as Record<string, unknown> | undefined;
+
+    expect(Object.keys(data ?? {})).toEqual([
+      'issue', 'from', 'to', 'removedLabel', 'addedLabel', 'work', 'problems', 'status', 'reason', 'question', 'outcome',
+    ]);
+    expect(Object.keys(outcome ?? {})).toEqual(['added', 'removed', 'commentProblem']);
+    expect(Object.keys(outcome?.['added'] ?? {})).toEqual(['issue', 'status', 'attempts', 'problem']);
+  });
+
+  it('answers each checklist edit as editChecklist did, attempts included, for a body write that failed every one', async () => {
+    const planted = plantedGh({ failWrite: [40] });
+    const comments: number[] = [];
+    const board = { comment: (issue: number) => {
+      comments.push(issue);
+      return Promise.resolve({ id: '1', body: '', login: null });
+    } } as unknown as IssueBoard;
+    const reading = await readEpicMove({ issues: ISSUES, issue: 13, to: 50, ...UNREAD });
+
+    const outcome = await applyEpicMove({ board, relations: createLabelsRelations({ gh: planted.gh }), issues: ISSUES }, reading, 'x');
+
+    expect(outcome).toEqual({
+      added: { issue: 50, status: 'edited', attempts: 1, problem: '' },
+      removed: { issue: 40, status: 'failed', attempts: TICK_ATTEMPTS, problem: expect.stringContaining('HTTP 409: Conflict') as unknown as string },
+      commentProblem: '',
+    });
+    expect(comments).toEqual([13]);
   });
 });
 
