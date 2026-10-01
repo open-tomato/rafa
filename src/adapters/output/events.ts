@@ -27,7 +27,7 @@ export function padKind(kind: string): string {
 }
 
 /** A message's lines, trimmed and joined with single spaces, blank ones dropped. */
-function oneLine(message: string): string {
+export function oneLine(message: string): string {
   return message
     .split('\n')
     .map((part) => part.trim())
@@ -54,7 +54,7 @@ export function createEventsOutput({ stream }: CreateEventsOutputOptions): Outpu
   const silent = (): void => {};
 
   const emit = (event: CliEvent): void => {
-    if (event.type === 'event') writeLine(event.summary);
+    if (event.type === 'event') writeLine(oneLine(event.summary));
     if (event.type === 'log' && event.level === 'error') error(event.message);
   };
 

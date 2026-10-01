@@ -526,6 +526,23 @@ describe('events mode', () => {
     expect(activeOutputMode()).toBe('text');
   });
 
+  it.each([
+    ['a refusal with a message', new CommandExit(1, '\n❌ Plan file not found: x.md\n   Nothing was dispatched.'), 'rafa· error            ❌ Plan file not found: x.md Nothing was dispatched.\n'],
+    ['a refusal with no message', new CommandExit(2), 'rafa· error            exit code 2\n'],
+    ['a thrown error', new Error('boom'), 'rafa· error            rafa: boom\n'],
+  ])('ends %s as one rafa· error line on stdout, and nothing on stderr', async (_label, thrown, line) => {
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'loop', summary: 'the loop' }],
+      commands: [command('loop', 'start', { outputs: ['text', 'json', 'events'], run: async () => { throw thrown; } })],
+    });
+
+    const { stdout, stderr, outcome } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' }, registry });
+
+    expect(stdout).toBe(line);
+    expect(stderr).toBe('');
+    expect(outcome.exitCode).not.toBe(0);
+  });
+
   it('runs a command that does not declare events as text', async () => {
     const { stdout } = await run(['loop', 'start'], { env: { RAFA_OUTPUT: 'events' } });
 

@@ -28,7 +28,7 @@ import type { SessionServing } from './serving.js';
 import type { RunSession } from './session.js';
 import type { WrapUpLearning } from './wrap-up.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolvePrProvider } from '../pr/index.js';
 
@@ -105,10 +105,12 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   });
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
   await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
-  const pullRequest = await openPullRequestNumber(checkout, expected.branch);
-  emitLoopEvent(pullRequest === null
-    ? { kind: 'no-pr', reason: `no open pull request for ${expected.branch}` }
-    : { kind: 'pr', number: pullRequest });
+  if (activeOutputMode() !== 'text') {
+    const pullRequest = await openPullRequestNumber(checkout, expected.branch);
+    emitLoopEvent(pullRequest === null
+      ? { kind: 'no-pr', reason: `no open pull request for ${expected.branch}` }
+      : { kind: 'pr', number: pullRequest });
+  }
   // The loop guard before the loop's own release commit, against the
   // HEAD the wrap-up session's commits left on the run's branch: a
   // moved branch or a gone checkout skips the commit, push and wait.

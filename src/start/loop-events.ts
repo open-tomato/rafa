@@ -13,8 +13,8 @@
  */
 import { join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { padKind } from '../adapters/output/events.js';
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { oneLine, padKind } from '../adapters/output/events.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { readSessionLog } from '../effort/session-log.js';
 import { parsePlan } from '../plan/index.js';
@@ -46,12 +46,7 @@ const TOKENS_PER_K = 1_000;
 
 /** A text folded onto one line and quoted, its own double quotes escaped. */
 function quoted(text: string): string {
-  const folded = text
-    .split('\n')
-    .map((part) => part.trim())
-    .filter((part) => part !== '')
-    .join(' ');
-  return `"${folded.replaceAll('"', '\\"')}"`;
+  return `"${oneLine(text).replaceAll('"', '\\"')}"`;
 }
 
 /** A task's kind, `task <i>/<n> <verb>`, padded as every kind is. */
@@ -74,15 +69,15 @@ export function summaryOf(event: LoopEvent): string {
         ? `${taskKind(event.position, 'done')}${minutes(event.durationMs)}`
         : `${taskKind(event.position, 'done')}${minutes(event.durationMs)}  ${Math.round(event.tokens / TOKENS_PER_K)}k tokens`;
     case 'task-blocked':
-      return `${taskKind(event.position, 'blocked')}${event.reason}`;
+      return `${taskKind(event.position, 'blocked')}${oneLine(event.reason)}`;
     case 'wrap-up':
       return `${padKind('wrap-up')}${event.phase}`;
     case 'pr':
       return `pr #${event.number} opened`;
     case 'no-pr':
-      return `${padKind('no pr')}${event.reason}`;
+      return `${padKind('no pr')}${oneLine(event.reason)}`;
     case 'halt':
-      return `${padKind('halt')}${event.reason}`;
+      return `${padKind('halt')}${oneLine(event.reason)}`;
   }
 }
 
@@ -90,6 +85,18 @@ export function summaryOf(event: LoopEvent): string {
 export function emitLoopEvent(event: LoopEvent, now: () => Date = () => new Date()): void {
   const { kind, ...data } = event;
   activeOutput().emit({ type: 'event', name: kind, summary: summaryOf(event), data, ts: now().toISOString() });
+}
+
+/**
+ * Makes `read` unless the active output is text, and answers null there.
+ * Text prints no event, so a reading only an event carries, such as a
+ * pull request lookup over `gh` or a session log's tokens, is skipped
+ * rather than paid for on every run.
+ */
+export async function unlessText<T>(read: () => Promise<T>): Promise<T | null> {
+  return activeOutputMode() === 'text'
+    ? null
+    : read();
 }
 
 /** Where the task on `lineNum`, counted from zero, sits among the tracker's tasks. */

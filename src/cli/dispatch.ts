@@ -565,10 +565,19 @@ function resultEvent(ending: Ending, now: () => Date): CliEventResult {
     : { type: 'result', ok: true, data: ending.payload.value, ts };
 }
 
-/** Writes an ending's terminal event, or in text mode what a person reads of it. */
+/**
+ * Writes an ending's terminal event, or in text mode what a person reads
+ * of it. In events mode a failed ending is one `rafa· error` line on
+ * stdout, its exit code when it carries no message, so a watcher reading
+ * only those lines sees how the run ended.
+ */
 function writeEnding(ending: Ending, event: CliEventResult, base: CliContext, settings: Settings): void {
   if (base.outputMode === 'json') {
     base.output.emit(event);
+    return;
+  }
+  if (base.outputMode === 'events') {
+    if (ending.exitCode !== 0) base.output.error(ending.stderrLine ?? `exit code ${ending.exitCode}`);
     return;
   }
   if (ending.stderrLine !== null) settings.stderr.write(`${ending.stderrLine}\n`);

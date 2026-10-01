@@ -34,6 +34,14 @@ describe('createEventsOutput', () => {
     expect(chunks).toEqual([`${EVENT_PREFIX}task 3/9 start   "Group duplicate bugs"\n`]);
   });
 
+  it('folds a summary holding newlines onto its one line', () => {
+    const { output, chunks } = eventsOutput();
+
+    output.emit({ type: 'event', name: 'halt', summary: 'halt             a\n  b\n', data: {}, ts: TS });
+
+    expect(chunks).toEqual([`${EVENT_PREFIX}halt             a b\n`]);
+  });
+
   it('writes nothing for info, warn, debug, result, a step or a log below error', () => {
     const { output, chunks } = eventsOutput();
 

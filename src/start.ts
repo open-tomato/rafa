@@ -308,7 +308,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
-import { emitLoopEvent, taskPosition, taskTokens } from './start/loop-events.js';
+import { emitLoopEvent, taskPosition, taskTokens, unlessText } from './start/loop-events.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
@@ -673,7 +673,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
         return;
       }
-      const tokens = await taskTokens(checkout, dispatch.sessionId);
+      const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));
       emitLoopEvent({ kind: 'task-done', position, durationMs: Date.now() - startedAt, tokens });
       if (!stored) {
         activeOutput().error('   Stopping here. The task stays ticked, so the next run starts after it.');

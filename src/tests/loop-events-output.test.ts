@@ -55,6 +55,17 @@ describe('a loop start run under RAFA_OUTPUT=events', () => {
     ]);
   }, RUN_TIMEOUT);
 
+  it('prints a refusal before any task as one rafa· error line, and nothing on stderr', () => {
+    const scratch = planter.plant({ branch: BRANCH, plan: null });
+    const run = runLoopStart(scratch, 'events', SESSION_FLAGS);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toBe('');
+    expect(run.stdout.split('\n').filter((line) => line !== '')).toEqual([
+      expect.stringMatching(/^rafa· error {12}❌ Plan file not found: /),
+    ]);
+  }, RUN_TIMEOUT);
+
   it('prints only the wrap-up for a plan with no open task', () => {
     const { exitCode, lines } = eventLines(planter.plant({ branch: BRANCH, plan: PLAN_DONE }));
 

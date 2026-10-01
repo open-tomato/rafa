@@ -15,9 +15,10 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createEventsOutput } from '../adapters/output/events.js';
 import { createJsonOutput } from '../adapters/output/json.js';
+import { createTextOutput } from '../adapters/output/text.js';
 import { sessionLogDir } from '../effort/collect.js';
 
-import { emitLoopEvent, summaryOf, taskPosition, taskTokens } from './loop-events.js';
+import { emitLoopEvent, summaryOf, taskPosition, taskTokens, unlessText } from './loop-events.js';
 
 /** The third task of nine. */
 const AT = { index: 3, total: 9 };
@@ -43,6 +44,14 @@ describe('summaryOf', () => {
     const line = summaryOf({ kind: 'task-start', position: AT, text: 'Fix `a` "b"\n  <!-- blocker -->' });
 
     expect(line).toBe('task 3/9 start   "Fix `a` \\"b\\" <!-- blocker -->"');
+  });
+
+  it.each([
+    [{ kind: 'task-blocked', position: AT, reason: 'blocker: suite red\nsecond line of detail\n' }, 'task 3/9 blocked blocker: suite red second line of detail'],
+    [{ kind: 'no-pr', reason: 'gh said:\n  not found' }, 'no pr            gh said: not found'],
+    [{ kind: 'halt', reason: '\ncheckout moved\n' }, 'halt             checkout moved'],
+  ] as const)('folds a multi-line reason onto one line: %o', (event, line) => {
+    expect(summaryOf(event)).toBe(line);
   });
 
   it('pads a two-digit position the same way, one space at least before the rest', () => {
@@ -106,5 +115,34 @@ describe('taskTokens', () => {
     writeFileSync(join(dir, 'abc.jsonl'), `${JSON.stringify({ type: 'assistant', message: { model: 'm', usage } })}\n`);
 
     expect(await taskTokens(checkout, 'abc', home)).toBe(123);
+  });
+});
+
+describe('unlessText', () => {
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('skips a reading only an event needs in text mode, which prints no event', async () => {
+    let calls = 0;
+    setActiveOutput(createTextOutput({ verbosity: 0, stream: { write: () => true } }), 'text');
+
+    const answer = await unlessText(async () => {
+      calls += 1;
+      return 612;
+    });
+
+    expect(answer).toBeNull();
+    expect(calls).toBe(0);
+  });
+
+  it.each(['events', 'json'] as const)('makes the reading in %s mode', async (mode) => {
+    const stream = { write: () => true };
+    const output = mode === 'json'
+      ? createJsonOutput({ stream })
+      : createEventsOutput({ stream });
+    setActiveOutput(output, mode);
+
+    expect(await unlessText(async () => 612)).toBe(612);
   });
 });
