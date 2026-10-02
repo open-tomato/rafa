@@ -497,6 +497,10 @@ project's file outranks the same one in yours. `rafa init` writes both
 with every setting commented out at its default, so uncomment a line,
 with its section line, to change it.
 
+Tab indentation in `.rafa/config.yaml` is refused with rafa's own error
+on every Bun version, before the parser sees the file. The error names
+the line that carries a tab; use spaces only.
+
 ### `effort`
 
 One setting says how long a command waits for another rafa process that
