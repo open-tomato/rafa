@@ -1,15 +1,31 @@
 /**
  * The build-aside steps over files in a temp directory. The store here is
- * any SQLite file: the steps read no schema of their own, so a one-table
- * file is enough to tell a swap, a dry run and a removal apart by bytes.
+ * mostly any SQLite file: the steps read no schema of their own, so a
+ * one-table file is enough to tell a swap, a dry run and a removal apart.
+ * A dry run and a refusal leave the store's bytes as they were; a swap's
+ * backup is a `VACUUM INTO` snapshot, so it is compared by rows, and its
+ * inode is compared to the original's.
+ *
+ * The identity cases mint a real store through `withSqliteStore`, with
+ * the host and the project injected, since a store under the temp
+ * directory outside a repository with commits is never minted, and write
+ * to it once after the swap: a read never mints, so only a write can
+ * show whether the swapped-in file keeps the origin. Each failure point
+ * of the swap is failed through `swapIn`'s steps, and the backup and the
+ * carry are failed for real as well.
  */
+import type { SwapSteps } from './rebuild-aside.js';
+import type { StoreIdentitySeams, StoreMeta } from './store-meta.js';
+
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +34,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { vacuumInto } from './copy.js';
 import {
   checkedCounts,
   quoted,
@@ -25,9 +42,13 @@ import {
   RebuildRefusal,
   refuseCorrupt,
   refuseInFlight,
+  swapIn,
 } from './rebuild-aside.js';
+import { withSqliteStore } from './sqlite.js';
+import { readStoreMeta } from './store-meta.js';
+import { storeRows } from './testdata/store-rows.js';
 
-const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-rebuild-aside-'));
+const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-rebuild-aside-')));
 afterAll(() => {
   rmSync(tempRoot, { recursive: true, force: true });
 });
@@ -60,18 +81,121 @@ function casePaths(): { dir: string; path: string; parallelPath: string; backupP
   return { dir, path, parallelPath: `${path}.aside-1`, backupPath: `${path}.before-1.bak` };
 }
 
+/** The inode of the file at `path`. */
+function inodeOf(path: string): bigint {
+  return statSync(path, { bigint: true }).ino;
+}
+
+/** Identity seams naming one host and a project with a root commit, numbering each store id. */
+function mintingSeams(): StoreIdentitySeams {
+  let minted = 0;
+  return {
+    readHostId: () => 'host-a',
+    readProject: () => ({ rootCommit: 'root-commit-1', remote: null }),
+    newStoreId: () => {
+      minted += 1;
+      return `store-${String(minted)}`;
+    },
+  };
+}
+
+/** Opens the store at `path` once to write, answering its `store_meta` row as the open left it. */
+function writeOnce(path: string, seams: StoreIdentitySeams, create = false): StoreMeta | null {
+  return withSqliteStore(path, 'write', create, (db) => readStoreMeta(db), seams);
+}
+
+/** The `store_meta` row of the file at `path`, read on a connection of its own. */
+function metaOf(path: string): StoreMeta | null {
+  const db = new Database(path, { readonly: true });
+  try {
+    return readStoreMeta(db);
+  } finally {
+    db.close();
+  }
+}
+
 describe('rebuildAside', () => {
-  it('swaps the built file in and keeps the original whole as the backup', () => {
+  it('swaps the built file in over the store, and keeps every row of the original in a backup of its own', () => {
     const { dir, path, parallelPath, backupPath } = casePaths();
     plantFile(path, 2);
-    const original = readFileSync(path);
+    const original = storeRows(path);
+    const originalInode = inodeOf(path);
+    let builtInode = 0n;
 
-    const result = rebuildAside({ path, parallelPath, backupPath, dryRun: false, build: (aside) => plantFile(aside, 5) });
+    const result = rebuildAside({
+      path,
+      parallelPath,
+      backupPath,
+      dryRun: false,
+      build: (aside) => {
+        plantFile(aside, 5);
+        builtInode = inodeOf(aside);
+      },
+    });
 
     expect(result.backupPath).toBe(backupPath);
-    expect(readFileSync(backupPath).equals(original)).toBe(true);
-    expect(readFileSync(path).equals(original)).toBe(false);
+    expect(storeRows(backupPath)).toEqual(original);
+    expect(original.tables.notes).toHaveLength(2);
+    expect(storeRows(path).tables.notes).toHaveLength(5);
+    expect(inodeOf(backupPath)).not.toBe(originalInode);
+    expect(inodeOf(path)).toBe(builtInode);
     expect(readdirSync(dir).sort()).toEqual(['effort.sqlite', 'effort.sqlite.before-1.bak']);
+  });
+
+  it('keeps the store\'s origin on the first write after a swap, its backup keeping the row that names the original\'s inode', () => {
+    const { path, parallelPath, backupPath } = casePaths();
+    const seams = mintingSeams();
+    const minted = writeOnce(path, seams, true);
+    if (minted === null) throw new Error('the first write minted nothing');
+    expect(minted.storeId).toBe('store-1');
+    expect(minted.fileIno).toBe(inodeOf(path));
+
+    rebuildAside({ path, parallelPath, backupPath, dryRun: false, build: (aside) => vacuumInto(path, aside) });
+
+    const written = writeOnce(path, seams);
+    expect(written).toEqual({ ...minted, fileDev: statSync(path, { bigint: true }).dev, fileIno: inodeOf(path) });
+    expect(written?.fileIno).not.toBe(minted.fileIno);
+    expect(metaOf(backupPath)).toEqual(minted);
+    expect(inodeOf(backupPath)).not.toBe(minted.fileIno);
+  });
+
+  it('mints on the first write after the same swap with the carry left out, the control', () => {
+    const { path, parallelPath, backupPath } = casePaths();
+    const seams = mintingSeams();
+    expect(writeOnce(path, seams, true)?.storeId).toBe('store-1');
+    vacuumInto(path, parallelPath);
+
+    swapIn(path, parallelPath, backupPath, { carry: () => 'skipped' });
+
+    expect(writeOnce(path, seams)?.storeId).toBe('store-2');
+  });
+
+  it('removes the built file and the backup when writing the backup fails for real, leaving the store untouched', () => {
+    const { dir, path, parallelPath } = casePaths();
+    plantFile(path, 2);
+    const before = readFileSync(path);
+    const backupPath = join(dir, 'missing', 'effort.sqlite.bak');
+
+    expect(() => rebuildAside({ path, parallelPath, backupPath, dryRun: false, build: (aside) => plantFile(aside, 5) }))
+      .toThrow('unable to open database');
+    expect(readFileSync(path).equals(before)).toBe(true);
+    expect(readdirSync(dir)).toEqual(['effort.sqlite']);
+  });
+
+  it('removes the built file and the backup it wrote when the carry fails for real, leaving the store untouched', () => {
+    const { dir, path, parallelPath, backupPath } = casePaths();
+    plantFile(path, 2);
+    const before = readFileSync(path);
+
+    expect(() => rebuildAside({
+      path,
+      parallelPath,
+      backupPath,
+      dryRun: false,
+      build: (aside) => writeFileSync(aside, 'not a store at all, only text\n'.repeat(80)),
+    })).toThrow('file is not a database');
+    expect(readFileSync(path).equals(before)).toBe(true);
+    expect(readdirSync(dir)).toEqual(['effort.sqlite']);
   });
 
   it('answers what the build answered', () => {
@@ -166,6 +290,60 @@ describe('rebuildAside', () => {
     expect(() => rebuildAside({ path, parallelPath, backupPath, dryRun: false, build: () => plantFile(parallelPath, 1) }))
       .toThrow(/-journal is there/);
     expect(existsSync(parallelPath)).toBe(false);
+  });
+});
+
+describe('swapIn failure points', () => {
+  /** A case with the store and a built parallel file planted, and the store's bytes. */
+  function planted(): ReturnType<typeof casePaths> & { before: Buffer } {
+    const paths = casePaths();
+    plantFile(paths.path, 2);
+    plantFile(paths.parallelPath, 5);
+    return { ...paths, before: readFileSync(paths.path) };
+  }
+
+  it('swaps with no step failing, the control: the store replaced and the backup kept', () => {
+    const { dir, path, parallelPath, backupPath, before } = planted();
+
+    swapIn(path, parallelPath, backupPath);
+
+    expect(readFileSync(path).equals(before)).toBe(false);
+    expect(readdirSync(dir).sort()).toEqual(['effort.sqlite', 'effort.sqlite.before-1.bak']);
+  });
+
+  /** A step that throws, recording whether the backup was there when it ran. */
+  function failingStep(seen: boolean[], backupPath: string): () => never {
+    return () => {
+      seen.push(existsSync(backupPath));
+      throw new Error('planted failure');
+    };
+  }
+
+  const failures: readonly [string, boolean, (seen: boolean[], backupPath: string) => Partial<SwapSteps>][] = [
+    ['the backup, written in part,', false, (seen, backupPath) => ({
+      backup: () => {
+        seen.push(existsSync(backupPath));
+        writeFileSync(backupPath, 'partial');
+        throw new Error('planted failure');
+      },
+    })],
+    ['the carry', true, (seen, backupPath) => ({ carry: failingStep(seen, backupPath) })],
+    ['the rename', true, (seen, backupPath) => ({ replace: failingStep(seen, backupPath) })],
+  ];
+
+  it.each(failures)('removes the backup and the built file when %s fails, rethrowing and leaving the store untouched', (
+    _step,
+    backupWritten,
+    steps,
+  ) => {
+    const { dir, path, parallelPath, backupPath, before } = planted();
+    const seen: boolean[] = [];
+
+    expect(() => swapIn(path, parallelPath, backupPath, steps(seen, backupPath))).toThrow('planted failure');
+
+    expect(seen).toEqual([backupWritten]);
+    expect(readFileSync(path).equals(before)).toBe(true);
+    expect(readdirSync(dir)).toEqual(['effort.sqlite']);
   });
 });
 

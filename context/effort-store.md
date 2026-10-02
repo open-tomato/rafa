@@ -80,9 +80,9 @@ development build). It copies every table and column this rafa knows
 except the log, checks the row counts, `integrity_check` and that
 `planSchema` finds the rebuild current, and lists the unknown
 migrations, tables and columns only the newer schema holds, which stay
-in the backup alone. The original is then renamed to
-`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
-takes its place. `--dry-run` deletes the rebuild instead, so it can be
+in the backup alone. The original is then written out with `VACUUM INTO`
+to `effort.sqlite.v<user_version>-<stamp>.bak`, every row of it, and
+the rebuild is renamed over it. `--dry-run` deletes the rebuild instead, so it can be
 repeated and runs beside a live loop and from a development build; the
 swap refuses while a loop session is running or paused, and from a
 development build before anything is built. A newer schema that dropped
@@ -101,7 +101,11 @@ the swap is refused, the dry run runs. The steps around the build, from
 the in-flight journal refusal through the row-count check,
 `integrity_check` and the swap to removal on failure, are `rebuildAside`
 (`src/effort/store/rebuild-aside.ts`), which takes the two file names
-and the build from its caller and opens no store itself;
+and the build from its caller. Its swap writes the backup with
+`VACUUM INTO`, carries the store's identity onto the rebuild
+(`carryStoreIdentity`, `store-meta.ts`) and renames the rebuild over
+the store, so the store keeps its origin, and a failed step removes
+both files and leaves the store untouched;
 `SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
 `MigrateRefusal`.
 
@@ -149,7 +153,7 @@ store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
 `bringForward` with `builtAside`, checks the row count of every table
 both files hold against the live store (`checkedCounts`: a table rebuild
 that lost a row is refused), `integrity_check` and that `planSchema`
-finds it current, then renames the original to
+finds it current, then writes the original out to
 `effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
 applied or `schema_migrations` for an adoption alone, and swaps the new
 file in through `rebuildAside`. `--dry-run` deletes it instead and is

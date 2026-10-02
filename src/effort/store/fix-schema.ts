@@ -55,10 +55,13 @@
  * `integrity_check` must answer `ok`, and `planSchema` must find it a
  * store this rafa uses as it is. Under `dryRun` it is then deleted, so a
  * dry run can be repeated and leaves the directory as it found it.
- * Otherwise the live file is renamed to `<store>.v<user_version>-<stamp>.bak`
- * and the parallel file renamed into its place. The backup is the whole
- * original, left-behind data included, and restoring it is renaming it
- * back.
+ * Otherwise the live file is written out to
+ * `<store>.v<user_version>-<stamp>.bak` with `VACUUM INTO`, its identity
+ * is carried onto the parallel file, and the parallel file is renamed
+ * over it. The backup holds every row of the original, left-behind data
+ * included. The rebuild keeps the store's origin, since its `store_meta`
+ * row, copied with the known tables, is given its inode; the backup,
+ * renamed back, mints a new one.
  *
  * The live file is only ever read. A rollback journal or write-ahead log
  * beside it means a write in flight or interrupted, so the repair is
