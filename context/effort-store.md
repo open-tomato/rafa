@@ -422,10 +422,14 @@ mint. The device and inode are bigints: when a `.bak` file is renamed
 over the store, it has a new inode and triggers a copy-detection mint,
 but one restored with `cp` over the existing file keeps the old inode
 and does not (measured on tmpfs). The merge's collision check is what
-catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
-a bigint past 2^63 by wrapping without warning, so the device and inode
-are written as their two's complement and read back through `CAST(… AS TEXT)`
-as unsigned.
+catches a missed `.bak` restore. **When rafa rebuilds a store** (`merge`,
+`migrate`, or `fix-schema`), it carries the live file's device and inode
+into the rebuild's row before the rename, but only when the live row
+matches the live file; the backup is written with `VACUUM INTO`, so a
+restore has a new inode and mints a new identity. SQLite's INTEGER is
+signed and bun binds a bigint past 2^63 by wrapping without warning, so
+the device and inode are written as their two's complement and read back
+through `CAST(… AS TEXT)` as unsigned.
 
 **A test passes its fifth argument to `withSqliteStore` to inject the
 host and project, so test stores can be minted independently.** The store
@@ -680,6 +684,10 @@ spelling does not mint; the device and inode are bigints. A `.bak`
 renamed over the store has a new inode and mints, but one restored
 with `cp` over the existing file keeps the old inode and does not
 (measured on tmpfs); the merge's collision check is what catches it.
+When rafa rebuilds a store (`merge`, `migrate`, or `fix-schema`), it
+carries the live file's device and inode into the rebuild's row before
+the rename, but only when the live row matches the live file; the backup
+is written with `VACUUM INTO`, so a restore has a new inode and mints.
 Every production insert into the twelve tables a merge unions stamps
 `origin_store` from that row and `origin_seq` as the row's own `seq`,
 which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the
