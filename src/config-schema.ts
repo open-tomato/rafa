@@ -16,9 +16,10 @@
  * `tierPins` and `routeTable`, and the readers of the release plan's
  * keys. `config-schema-release.ts` holds the `pr` and `release`
  * sections and `dangerous.acceptVersionCollision`, and
- * `config-schema-tests.ts` the `tests` section and its reader, and
+ * `config-schema-tests.ts` the `tests` section and its reader,
+ * `config-schema-triage.ts` the `triage` section and its readers, and
  * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
- * all three spread in here. `config-schema-hub.ts` holds the `hub`
+ * all four spread in here. `config-schema-hub.ts` holds the `hub`
  * section, its readers and the refusal of `effort.sync: service` with
  * no `hub.url`, spread in after `effort.sync`.
  *
@@ -76,6 +77,7 @@
  * all read off it, so adding a setting is one field, one default, one
  * spec — in `config-schema-release.ts` for a `pr` or `release` key,
  * `config-schema-tests.ts` for a `tests` key,
+ * `config-schema-triage.ts` for a `triage` key,
  * `config-schema-wrap-up.ts` for a `loop.wrapUp` key —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
@@ -110,6 +112,7 @@ import type {
   ReleaseSettings,
 } from './config-schema-release.js';
 import type { TestsSettings } from './config-schema-tests.js';
+import type { TriageSettings } from './config-schema-triage.js';
 import type { WrapUpSettings } from './config-schema-wrap-up.js';
 import type {
   BoardRelationshipMode,
@@ -155,6 +158,7 @@ import {
   RELEASE_SETTINGS,
 } from './config-schema-release.js';
 import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
+import { TRIAGE_DEFAULTS, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 import {
   BOARD_RELATIONSHIP_MODES,
@@ -198,12 +202,13 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * the `hub` fields are {@link HubSettings}', the `pr` and `release`
  * fields are {@link PrSettings}' and {@link ReleaseSettings}',
  * `dangerousAcceptVersionCollision` is {@link DangerousReleaseSettings}',
- * the `tests` fields are {@link TestsSettings}', and `loopWrapUpRetries`
- * is {@link WrapUpSettings}'.
+ * the `tests` fields are {@link TestsSettings}', the `triage` fields are
+ * {@link TriageSettings}', and `loopWrapUpRetries` is
+ * {@link WrapUpSettings}'.
  */
 export interface RafaConfig
   extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
-  TestsSettings, WrapUpSettings {
+  TestsSettings, TriageSettings, WrapUpSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -378,6 +383,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
+  ...TRIAGE_DEFAULTS,
   ...RELEASE_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
@@ -486,6 +492,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
   claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
   claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },
+  ...TRIAGE_SETTINGS,
   ...RELEASE_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {

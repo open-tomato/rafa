@@ -160,6 +160,8 @@
  * the next open task, when one is left, and the run stops as it does
  * after a blocked task, so the next run retries that task handed the
  * failing files. A red pre-wrap-up step stops the run before the wrap-up.
+ * Each task prompt lists the baseline's failures as inherited
+ * (`start/inherited-notice.ts`), read again before each dispatch.
  *
  * After each task's report is stored, and so after its commit and its
  * mark, the run's triage acts on it (`start/triage.ts`): the report's
@@ -340,7 +342,7 @@ import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
-import { createStartTriage } from './start/triage.js';
+import { createStartTriage, runStartFailures } from './start/triage.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
 import { parseTaskDeclaration } from './utils/declaration.js';
@@ -621,6 +623,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         home: homedir(),
         settingSources,
         knownMissing,
+        inherited: runStartFailures(trackerPath),
         serving,
         handout,
         base,

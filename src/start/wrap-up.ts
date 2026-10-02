@@ -82,6 +82,16 @@ import { withStamp } from './stamp.js';
  * what an agent does with a conflicted lockfile. It sits mid-list, and
  * the first line above it stays the classifier key.
  *
+ * `base` is the run's base branch, as `runWrapUp` resolved it once
+ * (`start/wrap-up-run.ts`): `pr.base`, else `origin/HEAD`'s target,
+ * else `main`. The create bullet names it as `gh pr create --base
+ * <base>`, since a bare `gh pr create` opens against the repository's
+ * default branch whatever the run's base is. It is required, with no
+ * default: a default of `main` would be the same mistake for every
+ * caller that left it out. The already-open bullet names no base: it
+ * asks for a push and a `gh pr edit` of the body, and this session is
+ * not asked to move a pull request it did not open.
+ *
  * `openPullRequest` is the branch's open PR as the loop read it before
  * the session, or null when it found none. The session is told which
  * rather than asked to look, so whether to create or to edit is decided
@@ -108,6 +118,7 @@ import { withStamp } from './stamp.js';
  */
 export function buildWrapUpPrompt(
   branch: string,
+  base: string,
   planContent: string,
   openPullRequest: number | null = null,
   release: ReleasePreparation | null = null,
@@ -125,7 +136,7 @@ export function buildWrapUpPrompt(
     '* If the merge touched `bun.lock` or any `package.json`, run `bun install --frozen-lockfile` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base\'s copy (`git checkout origin/main -- bun.lock`), run a plain `bun install` so this branch\'s own dependencies are re-added, and confirm the frozen run then passes.',
     ...releaseBullets(release),
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
-    pullRequestStep(branch, openPullRequest),
+    pullRequestStep(branch, base, openPullRequest),
     '* Do not include Claude attribution in the commit or PR message.',
     ...lessonsSection(lessons),
     '',
@@ -196,11 +207,12 @@ function lessonsSection(lessons: readonly InstinctRecord[]): readonly string[] {
  * A plan's own close-out may already have opened the PR. A lookup that
  * found none can still be wrong, `gh` being absent or offline, so the
  * create branch keeps the one reading of a refusal that must not turn
- * into a second PR.
+ * into a second PR. The create names the run's `base`; the already-open
+ * PR's bullet does not.
  */
-function pullRequestStep(branch: string, openPullRequest: number | null): string {
+function pullRequestStep(branch: string, base: string, openPullRequest: number | null): string {
   return openPullRequest === null
-    ? `* No open PR was found for ${branch}: open one with \`gh pr create\`. If it answers that a PR already exists, push to that PR and update its body with \`gh pr edit\`; never open a second PR from a new branch.`
+    ? `* No open PR was found for ${branch}: open one with \`gh pr create --base ${base}\`. If it answers that a PR already exists, push to that PR and update its body with \`gh pr edit\`; never open a second PR from a new branch.`
     : `* PR #${openPullRequest} is already open for ${branch}, likely opened by the plan's close-out: push to it and update its body with \`gh pr edit ${openPullRequest}\` so the description covers the promotions this session committed.`;
 }
 
@@ -403,6 +415,10 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * have happened, and the rerun this module then asks for lists the same
  * lessons again, which a `promoted_to` set now would take off that list.
  *
+ * `base` is the run's base branch, resolved once by `runWrapUp`
+ * (`start/wrap-up-run.ts`) and handed to the prompt's create bullet. It
+ * is required for the reason {@link buildWrapUpPrompt} gives.
+ *
  * `checkout` is the run's checkout, where the session is spawned and
  * every git and `gh` reading above is made; see the module note. It is
  * required, as `release` is: a default would spawn the session wherever
@@ -419,12 +435,13 @@ export async function preserveProgress(
   release: ReleasePreparation | null,
   serving: SessionServing | null,
   learning: WrapUpLearning | null,
+  base: string,
   checkout: string,
 ): Promise<string> {
   const branch = getCurrentBranch(checkout);
   const openPullRequest = await openPullRequestNumber(checkout, branch);
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpPrompt(branch, planContent, openPullRequest, release, lessons),
+    buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons),
     settingSources,
     serving,
     learning,

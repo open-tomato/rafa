@@ -19,31 +19,22 @@
  *     machine-fault reading answers, and otherwise by its `security`
  *     flag. A bug with no usable `what` is skipped: it says nothing to
  *     file, and the store's triage writer refuses it for the same
- *     reason.
+ *     reason. A public bug the run inherited files nothing; see below.
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
  * declares a task for it.
  *
  * ## The key a bug is looked up by
  *
- * A bug's recurrence key is its artifact WITH the file it was reported
- * against: the base name of the task's tracker file, then the artifact on
- * one line, joined by {@link KEY_SEPARATOR} ({@link bugKeyOf}). The
- * artifact alone is not the defect. Two plans quoting one error string
- * report two different bugs, and keying on that string alone commented the
- * second on the first one's issue; keyed by the file as well, they stay
- * two issues, and two wordings of one defect under one file stay one.
- *
- * The artifact a key is built from has its local paths taken out
- * (`./local-paths.ts`), so one bug keys the same on every machine and a
- * key never holds a user's name. Every key builder takes that artifact,
- * #486's test-failure key too. Step 1 below also asks the store for the
- * legacy key, built from the artifact with its paths, when the two differ.
- *
- * A bug with no artifact has no key (roadmap Q18): it is filed every time,
- * with no lookup and no reference stored. An artifact that is blank, or
- * that holds a lone UTF-16 surrogate, which the store cannot key a
- * reference by, counts as none.
+ * A bug's recurrence key is built from its artifact and `what`, with
+ * their local paths taken out and the artifact stripped of numbers,
+ * commit hashes and folder prefixes ({@link bugKeyOf}): the test file,
+ * case and evidence line of a bug naming a test case, else the tracker
+ * file it was reported against WITH its artifact. `./bug-key.ts` builds
+ * it, and its note holds why a test failure keys on the test and every
+ * other bug on its file too, what stripping takes out, the legacy keys
+ * step 1 below also asks for, and why a bug with no artifact has no key
+ * and is filed every time.
  *
  * ## A public bug
  *
@@ -51,29 +42,104 @@
  * `false`, goes to the tracker the degradation chain landed on, looked
  * up by its key:
  *
- *   1. The reference stored under the key (`readTrackerRef`, which keeps a
- *      reference under the text its caller keys by, this module's key
- *      rather than the bare artifact). One of the tracker's own kind is
- *      the issue: the bug is commented on there, and nothing is stored.
- *      One of another kind is passed over, since the tracker cannot read
- *      it: a run that fell back from `github` to `local` asks `local`
- *      instead.
- *   2. The stored reference is missing: `tracker.find` for a `bug` whose
- *      text holds the key's normalized text, the same key built from the
- *      redacted artifact. Every issue this module files carries that text
- *      in its `Recurrence key` section, so an issue filed for this bug
- *      from a checkout whose store this run does not have is found, while
- *      an issue that only quotes the artifact under another file is not.
- *      The first ref it answers is commented on, and stored under the key
- *      (`writeTrackerRef`), so a later recurrence is answered by step 1.
- *   3. Neither: the bug is filed with `tracker.create`, and the reference
- *      it answers is stored under the key.
+ *   1. The reference stored under the key, then under each legacy key
+ *      (`readTrackerRef`, which keeps a reference under the text its
+ *      caller keys by, this module's key rather than the bare artifact,
+ *      and answers the newest under it). The first one of the tracker's
+ *      own kind is the issue, answered as the next section says, and is
+ *      not stored again when commented on. One of another kind is passed
+ *      over, since the tracker cannot read it: a run that fell back from
+ *      `github` to `local` asks `local` instead.
+ *   2. No stored reference is found: `tracker.find` for a `bug` whose
+ *      text holds the key's text, the same key built from the redacted
+ *      artifact and `what`. Every issue this module files carries that
+ *      text in its `Recurrence key` section, so an issue filed for this
+ *      bug from a checkout whose store this run does not have is found,
+ *      while an issue that only quotes the artifact, under another key, is
+ *      not. An issue filed before #486 carries a legacy key there, and is
+ *      found by step 1 only. The first ref `find` answers is the issue,
+ *      answered as the next section says, and once commented on is stored
+ *      under the key (`writeTrackerRef`), so a later recurrence is
+ *      answered by step 1.
+ *   3. `find` misses: the nearest open bug by the words they share, when
+ *      {@link TriageOptions.similarity} names a threshold and the tracker
+ *      has an `openIssues` reading. The open `bug` issues are listed in one
+ *      call and scored against the bug's `what` and artifact with local
+ *      paths taken out (`./similarity.ts`, whose note holds the word sets,
+ *      the score and the test-file guard). The nearest at or above the
+ *      threshold is the issue: it is commented on under an opening naming
+ *      its score (`./issue-text.ts`), with no state read, since the listing
+ *      holds open issues only, and its reference is stored under the key,
+ *      so a later recurrence is answered by step 1. Its `foundBy` is
+ *      `similarity` and its `score` the score. A listing that fails answers
+ *      `failed`, as a failed `find` does.
+ *   4. None of those: the bug is filed with `tracker.create`, and the
+ *      reference it answers is stored under the key. When step 3 ran and
+ *      found nothing at its threshold, the body ends with a `Possible
+ *      duplicates` section listing the nearest open bugs it scored, up to
+ *      the configured count.
+ *
+ * Step 3 is off when the option is left out or its threshold is `false`,
+ * and is skipped for a tracker with no `openIssues`; the bug is then filed
+ * as before it existed, with no `Possible duplicates` section. It runs only
+ * after a `find` miss, so a bug with no key, which is filed every time, never
+ * reaches it, and on the public route alone: a security bug is never
+ * compared with anything, and a machine-scoped one reaches no tracker. An
+ * inherited bug, below, is looked up by steps 1 and 2 only.
+ *
+ * ## The state of the issue a recurrence finds
+ *
+ * Before anything is written for an issue steps 1 and 2 found, its state
+ * is read with `tracker.get`:
+ *
+ *   - Open, any state but the closed three: the bug is commented on there.
+ *   - Closed as completed, `done` or `released` ({@link COMPLETED_ISSUE_STATES}):
+ *     the fix did not hold, so the bug is filed as a new issue whose body
+ *     opens with a `Supersedes` section naming the closed one
+ *     (`./issue-text.ts`), and the new reference is stored under the key
+ *     with `supersedes` naming the closed one. The closed issue's row is
+ *     kept, and `readTrackerRef` answers the new one as the newest, so the
+ *     next recurrence comments on it. Its action is `filed`. A store that
+ *     refuses the superseding write, `SupersedeInSessionRefusal` among the
+ *     refusals (`store/tracker-refs.ts`), leaves the issue filed and names
+ *     the refusal, as any store failure here does.
+ *   - Closed as `cancelled`, which the GitHub adapter answers for an issue
+ *     closed as not planned or as a duplicate: somebody decided the bug is
+ *     not to be fixed there, or is tracked elsewhere, so it is commented on
+ *     and nothing is filed, as for an open one.
+ *   - A read that fails: the bug answers `failed`, naming the issue it was
+ *     for, and nothing is filed or commented on, since a second issue for a
+ *     bug whose first may still be open is the refiling this read exists
+ *     to stop.
+ *
+ * Only the public route reads the state. The private tracker stores no
+ * reference, so its `find`, which answers the oldest issue first, would
+ * find the closed one again on every recurrence, and filing in its place
+ * would file once per recurrence; a security bug is commented on as found.
  *
  * A reference therefore goes into a findings row of its own, keyed by the
  * bug's key and not by the artifact the report's findings are keyed by, so
  * a finding this session reported under that artifact keeps its row
  * whichever was written first, and `progress.txt` renders the reference's
  * row as one more `- artifact: <key>` bullet (`store/tracker-refs.ts`).
+ *
+ * ## An inherited bug
+ *
+ * Given {@link TriageOptions.inherited}, a public bug that `./inherited.ts`
+ * reads as one of the run-start baseline's failures is a red test the run
+ * started with, not one its task made: its action is `inherited`, and
+ * nothing is filed for it. Its key is looked up as steps 1 and 2 above
+ * look one up, and the issue they find has its state read (`get`); an
+ * open one is commented on and, when `find` found it, stored under the
+ * key, as a recurrence is. A closed issue, or none, is left alone, and
+ * `create` is never called. The key goes into the option's `commented`
+ * set once the comment is made, and a bug whose key the set already
+ * holds is answered `inherited` with no call at all, so one red test
+ * reported by every task of a run comments once. A lookup, state read or
+ * comment that fails answers `failed`, as for any public bug, and leaves
+ * the set as it was. Security and machine-scoped bugs are never read
+ * against the failures: their channels never look anything up on the
+ * public tracker.
  *
  * ## A security bug
  *
@@ -144,27 +210,10 @@
  * the module the GitHub adapter's `get` answers for an issue with no
  * module label, since a report names no module.
  *
- * The title is the bug's `what` on one line, cut to
- * {@link TITLE_MAX_LENGTH} code points. The body opens with a sentence
- * saying where the issue came from, then six sections, each value in a
- * fence one backtick longer than any backtick run it holds, so the text a
- * session wrote is shown verbatim and never rendered: `What`, `Artifact`,
- * `Recurrence key` (the key step 2 searches for), `Plan` (the plan stub),
- * `Task` (the task text, as the dispatch quoted it) and `Feedback` (the
- * report's feedback). A missing artifact, key, stub or feedback is a
- * sentence saying so.
- *
- * Between `Artifact` and `Recurrence key` goes a seventh, `Refs`, when the
- * redacted artifact names a path or a symbol: each one listed with its
- * target's fingerprint as {@link TriageOptions.verifyRefs} read it at
- * filing time. An artifact that names neither, and a missing one, have no
- * `Refs` section at all. `./refs-section.ts` holds what is read and how a
- * reading that fails is shown.
- *
- * A recurrence's comment carries the same sections under its own opening
- * sentence, its `Refs` stamped when the comment is written, so an issue
- * filed before this rafa, with no key section of its own, gains one from
- * the first recurrence commented on it.
+ * The title and the body, its sections and the comment a recurrence
+ * gets are `./issue-text.ts`'s, whose note holds what each shows. The
+ * `Refs` section among them is built here, from the redacted artifact,
+ * by {@link TriageOptions.verifyRefs}.
  *
  * ## Local paths and named secrets
  *
@@ -190,10 +239,15 @@
  * tracker file that fails: each failure is answered in the result, for
  * the loop to warn about. A bug whose stored reference cannot be read
  * fails there, with no tracker call, rather than filing what may be a
- * second issue. A bug filed or commented on whose reference then cannot
- * be stored keeps its action and names the store's problem.
+ * second issue, and one whose found issue's state cannot be read fails
+ * there, as the section above says. A bug filed or commented on whose
+ * reference then cannot be stored keeps its action and names the store's
+ * problem.
  */
+import type { InheritedTriage } from './inherited.js';
+import type { BugValues } from './issue-text.js';
 import type { MachineFault } from './machine-fault.js';
+import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { RafaConfig } from '../config.js';
 import type {
@@ -202,22 +256,31 @@ import type {
   FindingsWriterSeams,
 } from '../effort/store/findings.js';
 import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
-import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
 import { messageOf } from '../config-sections.js';
-import { textProblem } from '../effort/store/findings.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
+import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
+import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
+import {
+  COMMENT_OPENING,
+  ISSUE_OPENING,
+  issueText,
+  issueTitle,
+  similarCommentOpening,
+} from './issue-text.js';
 import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
+import { nearestOpenBugs } from './similarity.js';
 
 /** Where security bugs are filed, under a repository root. */
 export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
@@ -231,24 +294,9 @@ export const TRIAGE_MODULE = 'unassigned';
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
 
-/** What stands between a bug's file and its artifact in its key. */
-export const KEY_SEPARATOR = ': ';
-
-/** The most code points a filed title holds, its cut marker included. */
-export const TITLE_MAX_LENGTH = 120;
-
-/** What ends a title that was cut. */
-const TITLE_CUT = '...';
-
-/** The shortest fence a value is shown in. */
-const MIN_FENCE_LENGTH = 3;
-
-/** What opens a filed issue's body. */
-const ISSUE_OPENING = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
-  + ' dispatches no task for it: a plan that wants it fixed declares a task.';
-
-/** What opens a recurrence's comment. */
-const COMMENT_OPENING = 'Reported again by a rafa task session.';
+/** Names `./bug-key.ts` and `./issue-text.ts` now hold, still answered from here. */
+export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
+export { TITLE_MAX_LENGTH, issueTitle } from './issue-text.js';
 
 /** One named secret: the variable's name and the value it held. */
 export interface NamedSecret {
@@ -269,6 +317,12 @@ export type BugTriageAction =
   /** An issue it recurs in was found and commented on. */
   | 'commented'
   /**
+   * It is a test failure the run started with: nothing was filed, and the
+   * open issue its key found, if any, was commented on unless it already
+   * was this run.
+   */
+  | 'inherited'
+  /**
    * Nothing was called for it: it is machine-scoped, or it had no `what`
    * to file. Its problem says which.
    */
@@ -276,8 +330,11 @@ export type BugTriageAction =
   /** A step failed before an issue was filed or commented on. */
   | 'failed';
 
-/** How the issue a recurrence was commented on was found. */
-export type RecurrenceSource = 'store' | 'find';
+/**
+ * How the issue a recurrence was commented on was found: by a stored
+ * reference, by `find`, or as the nearest open bug by its words.
+ */
+export type RecurrenceSource = 'store' | 'find' | 'similarity';
 
 /** What became of one report's blockers. */
 export interface BlockerTriage {
@@ -295,7 +352,11 @@ export interface BugTriage {
   readonly index: number;
   readonly channel: BugChannel;
   readonly action: BugTriageAction;
-  /** The issue filed or commented on, or the one a failed comment was for; else null. */
+  /**
+   * The issue filed or commented on, or the one a failed comment or state
+   * read was for; else null, as for an inherited bug that commented on
+   * nothing.
+   */
   readonly ref: IssueRef | null;
   /** How the issue was found, for a comment or a failed one; else null. */
   readonly foundBy: RecurrenceSource | null;
@@ -303,6 +364,11 @@ export interface BugTriage {
   readonly stored: TrackerRefWriteAction | null;
   /** Why it was skipped or failed, or why its reference was not stored; else null. */
   readonly problem: string | null;
+  /**
+   * The score of the open bug the similarity step matched, for a comment or
+   * a failed one found by it; absent otherwise.
+   */
+  readonly score?: number;
 }
 
 /** What {@link triageReport} did. */
@@ -316,7 +382,7 @@ export interface TriageResult {
 export interface TriageOptions {
   /** The repo root the store lives under. */
   readonly repoRoot: string;
-  /** The tracker file holding the task's line, and half of each bug's key. */
+  /** The tracker file holding the task's line, and half of the key of each bug naming no test case. */
   readonly trackerPath: string;
   /** The task's line, counting from zero, as `findNextTask` answered it. */
   readonly lineNum: number;
@@ -349,6 +415,18 @@ export interface TriageOptions {
   readonly home?: string;
   /** Seams for the reference write. */
   readonly seams?: FindingsWriterSeams;
+  /**
+   * The run-start failures and the keys commented on this run, for
+   * answering a public bug the run inherited; see the module note. Left
+   * out, no bug is inherited.
+   */
+  readonly inherited?: InheritedTriage;
+  /**
+   * The resolved `triage.similarity` settings for the nearest-open-bug
+   * step; see the module note. Left out, or with a threshold of `false`,
+   * that step is off.
+   */
+  readonly similarity?: Pick<RafaConfig, 'triageSimilarityThreshold' | 'triageSimilarityCandidates'>;
 }
 
 /** The environment a secret's value is read from. */
@@ -423,11 +501,6 @@ export function redactSecrets(text: string, secrets: readonly NamedSecret[]): st
   return text.replace(pattern, (value) => `[redacted: ${nameByValue.get(value)}]`);
 }
 
-/** True for text with something in it. */
-function hasText(value: string | null): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
 /** The text written for a report's blockers, or null when none has a `what`. */
 export function blockerTextOf(blockers: readonly ReportBlocker[]): string | null {
   const texts = blockers.map((blocker) => blocker.what).filter(hasText);
@@ -454,99 +527,24 @@ function triageBlockers(options: TriageOptions): BlockerTriage {
   }
 }
 
-/** A bug's artifact when it can key a reference, or null; see the module note. */
-function artifactOf(bug: ReportBug): string | null {
-  return hasText(bug.artifact) && textProblem(bug.artifact) === null
-    ? bug.artifact
-    : null;
-}
-
-/** `text` on one line, every run of whitespace one space, trimmed. */
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * The key a bug's issue is looked up and kept under: the base name of the
- * tracker file it was reported against, then its artifact on one line,
- * joined by {@link KEY_SEPARATOR}. The base name, rather than the path, so
- * one plan keys the same from two checkouts; see the module note.
- */
-export function bugKeyOf(trackerPath: string, artifact: string): string {
-  return `${basename(trackerPath)}${KEY_SEPARATOR}${oneLine(artifact)}`;
-}
-
-/** A value in a fence one backtick longer than any run of backticks it holds. */
-function fenced(value: string): string {
-  const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
-  const fence = '`'.repeat(Math.max(MIN_FENCE_LENGTH, ...runs.map((length) => length + 1)));
-  const body = value.endsWith('\n')
-    ? value
-    : `${value}\n`;
-  return `${fence}\n${body}${fence}`;
-}
-
-/** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
-export function issueTitle(redactedWhat: string): string {
-  const line = oneLine(redactedWhat);
-  const points = Array.from(line);
-  if (points.length <= TITLE_MAX_LENGTH) return line;
-  const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
-  return `${kept.trimEnd()}${TITLE_CUT}`;
-}
-
-/** The values one bug's issue and comment show, before redaction. */
-interface BugValues {
-  readonly what: string;
-  readonly artifact: string | null;
-  /** The key `find` is asked for, redacted, or null for a bug with none. */
-  readonly key: string | null;
-  /** The `Refs` section, heading included and already redacted, or null for none. */
-  readonly refs: string | null;
-  readonly planStub: string | null;
-  readonly taskText: string;
-  readonly feedback: string | null;
-}
-
-/** One section: its heading, then its value redacted in a fence, or the sentence for none. */
-function section(
-  heading: string,
-  value: string | null,
-  absent: string,
-  redact: (text: string) => string,
-): string {
-  const shown = value === null
-    ? absent
-    : fenced(redact(value));
-  return `## ${heading}\n\n${shown}`;
-}
-
-/** An issue body or a comment: `opening`, then the sections; see the module note. */
-function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
-  return [
-    opening,
-    section('What', values.what, '', redact),
-    section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
-    ...values.refs === null
-      ? []
-      : [values.refs],
-    section('Recurrence key', values.key, 'The report gave no artifact, so this bug has no key.', redact),
-    section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
-    section('Task', values.taskText, '', redact),
-    section('Feedback', values.feedback, 'The report gave no feedback.', redact),
-  ].join('\n\n') + '\n';
-}
-
 /** Everything one bug is filed, commented and searched with, redacted. */
 interface Filing {
   readonly draft: IssueDraft;
   readonly comment: string;
   /** The redacted key `find` is asked for, or null for a bug with none. */
   readonly searchText: string | null;
-  /** The key a reference is stored under, from the artifact with local paths taken out. */
+  /** The key a reference is stored under, from the artifact and `what` with local paths taken out. */
   readonly key: string | null;
-  /** The key from the artifact with its local paths, when it differs from {@link key}; else null. */
-  readonly legacyKey: string | null;
+  /**
+   * The legacy keys step 1 asks the store for after {@link key}: from the
+   * artifact without, then with, its local paths, each once and never
+   * {@link key} itself.
+   */
+  readonly legacyKeys: readonly string[];
+  /** The values {@link draft}'s body was built from, for the body of an issue filed in place of a closed one. */
+  readonly values: BugValues;
+  /** The `what` and artifact with local paths taken out, as the similarity step compares them. */
+  readonly compared: ComparedText;
 }
 
 /** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
@@ -564,7 +562,10 @@ async function filingFor(
     : local(reported);
   const searchText = artifact === null
     ? null
-    : bugKeyOf(options.trackerPath, redact(artifact));
+    : bugKeyOf(options.trackerPath, redact(artifact), redact(what));
+  const key = artifact === null
+    ? null
+    : bugKeyOf(options.trackerPath, artifact, local(what));
   const refs = await buildRefsSection(artifact === null
     ? null
     : redact(artifact), verifyRefs);
@@ -590,13 +591,23 @@ async function filingFor(
     },
     comment: issueText(COMMENT_OPENING, values, redact),
     searchText,
-    key: artifact === null
-      ? null
-      : bugKeyOf(options.trackerPath, artifact),
-    legacyKey: reported === null || reported === artifact
-      ? null
-      : bugKeyOf(options.trackerPath, reported),
+    key,
+    legacyKeys: legacyKeysOf(options.trackerPath, key, reported, artifact),
+    values,
+    compared: { what: local(what), artifact },
   };
+}
+
+/** The legacy keys of a bug whose artifact is `reported`, `artifact` once local paths are out; see {@link Filing}. */
+function legacyKeysOf(
+  trackerPath: string,
+  key: string | null,
+  reported: string | null,
+  artifact: string | null,
+): readonly string[] {
+  if (key === null || reported === null || artifact === null) return [];
+  const keys = [legacyBugKeyOf(trackerPath, artifact), legacyBugKeyOf(trackerPath, reported)];
+  return [...new Set(keys)].filter((legacy) => legacy !== key);
 }
 
 /** The channels that have a tracker to route a bug to: every one but `machine`. */
@@ -608,8 +619,30 @@ interface Route {
   readonly tracker: Tracker;
   /** The reference stored under a key; null for a channel that never reads the store. */
   readonly readStored: ((key: string) => IssueRef | null) | null;
-  /** Stores a reference under a key; null for a channel that never writes the store. */
-  readonly store: ((key: string, ref: IssueRef) => TrackerRefWriteAction) | null;
+  /**
+   * Stores a reference under a key, superseding `supersedes` when given;
+   * null for a channel that never writes the store.
+   */
+  readonly store: ((key: string, ref: IssueRef, supersedes?: IssueRef) => TrackerRefWriteAction) | null;
+  /** True when the issue a recurrence finds has its state read before anything is written. */
+  readonly readsState: boolean;
+  /** The similarity step's settings, or null where it does not run; see the module note. */
+  readonly similarity: SimilarityStep | null;
+}
+
+/** The similarity step's settings, its threshold a number. */
+interface SimilarityStep {
+  readonly threshold: number;
+  readonly candidates: number;
+}
+
+/** The similarity step `options` turn on, or null when they leave it off. */
+function similarityStepOf(options: TriageOptions): SimilarityStep | null {
+  const threshold = options.similarity?.triageSimilarityThreshold;
+  const candidates = options.similarity?.triageSimilarityCandidates;
+  return typeof threshold === 'number' && typeof candidates === 'number'
+    ? { threshold, candidates }
+    : null;
 }
 
 /** One bug on its way through a route. */
@@ -648,64 +681,186 @@ function resultOf(run: BugRun, action: BugTriageAction, fields: Partial<BugTriag
   };
 }
 
-/** Stores the reference of an issue reached, when the route stores and the bug has a key. */
+/**
+ * Stores the reference of an issue reached, when the route stores and the
+ * bug has a key, as superseding `supersedes` when given.
+ */
 async function settle(
   run: BugRun,
-  action: 'filed' | 'commented',
+  action: 'filed' | 'commented' | 'inherited',
   ref: IssueRef,
   foundBy: RecurrenceSource | null,
+  supersedes?: IssueRef,
 ): Promise<BugTriage> {
   const { store } = run.route;
   const { key } = run.filing;
   if (store === null || key === null) return resultOf(run, action, { ref, foundBy });
 
-  const stored = await step(run, 'storing the reference', () => store(key, ref));
+  const stored = await step(run, 'storing the reference', () => store(key, ref, supersedes));
   return stored.ok
     ? resultOf(run, action, { ref, foundBy, stored: stored.value })
     : resultOf(run, action, { ref, foundBy, problem: stored.problem });
 }
 
-/** Files the bug as a new issue. */
-async function fileNew(run: BugRun): Promise<BugTriage> {
-  const created = await step(run, `the ${run.route.channel} tracker create`, () => run.route.tracker.create(run.filing.draft));
+/** What a new issue's body adds to the filing's: the issue it supersedes, or the nearest open bugs. */
+type FilingExtras = Pick<BugValues, 'supersedes' | 'duplicates'>;
+
+/**
+ * Files the bug as a new issue. With `extras.supersedes`, an issue closed
+ * as completed, its body names that issue and its reference is stored as
+ * superseding it; with `extras.duplicates` its body lists them.
+ */
+async function fileNew(run: BugRun, extras: FilingExtras = {}): Promise<BugTriage> {
+  const { filing } = run;
+  const draft = extras.supersedes === undefined && extras.duplicates === undefined
+    ? filing.draft
+    : { ...filing.draft, body: issueText(ISSUE_OPENING, { ...filing.values, ...extras }, run.redact) };
+  const created = await step(run, `the ${run.route.channel} tracker create`, () => run.route.tracker.create(draft));
   return created.ok
-    ? settle(run, 'filed', created.value, null)
+    ? settle(run, 'filed', created.value, null, extras.supersedes)
     : resultOf(run, 'failed', { problem: created.problem });
 }
 
-/** Comments on the issue the bug recurs in. */
-async function commentOn(run: BugRun, ref: IssueRef, foundBy: RecurrenceSource): Promise<BugTriage> {
-  const commented = await step(run, `the ${run.route.channel} tracker comment`, () => run.route.tracker.comment(ref, run.filing.comment));
+/** Comments `comment` on the issue the bug recurs in, answering `action` once the comment is made. */
+async function commentOn(
+  run: BugRun,
+  ref: IssueRef,
+  foundBy: RecurrenceSource,
+  action: 'commented' | 'inherited' = 'commented',
+  comment: string = run.filing.comment,
+): Promise<BugTriage> {
+  const commented = await step(run, `the ${run.route.channel} tracker comment`, () => run.route.tracker.comment(ref, comment));
   if (!commented.ok) return resultOf(run, 'failed', { ref, foundBy, problem: commented.problem });
   return foundBy === 'store'
-    ? resultOf(run, 'commented', { ref, foundBy })
-    : settle(run, 'commented', ref, foundBy);
+    ? resultOf(run, action, { ref, foundBy })
+    : settle(run, action, ref, foundBy);
 }
 
-/** Looks the bug up by its key, then comments on what is found or files it. */
-async function triageBug(run: BugRun): Promise<BugTriage> {
-  const { route, filing } = run;
-  const { key, searchText } = filing;
-  if (key === null || searchText === null) return fileNew(run);
+/** The issue a bug's key found, and how. */
+interface Recurrence {
+  readonly ref: IssueRef;
+  readonly foundBy: RecurrenceSource;
+}
 
+/**
+ * The issue a bug's key finds: the stored reference under the key, then
+ * each legacy key, then `find` for the redacted key; null when none is
+ * found, or the failed result of the step that failed.
+ */
+async function lookUp(run: BugRun, key: string, searchText: string): Promise<StepOutcome<Recurrence | null>> {
+  const { route, filing } = run;
   const { readStored } = route;
   if (readStored !== null) {
-    for (const storedKey of [key, filing.legacyKey]) {
-      if (storedKey === null) continue;
+    for (const storedKey of [key, ...filing.legacyKeys]) {
       const stored = await step(run, 'reading the stored reference', () => readStored(storedKey));
-      if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
+      if (!stored.ok) return stored;
       if (stored.value !== null && stored.value.kind === route.tracker.kind) {
-        return commentOn(run, stored.value, 'store');
+        return { ok: true, value: { ref: stored.value, foundBy: 'store' } };
       }
     }
   }
 
   const found = await step(run, `the ${route.channel} tracker find`, () => route.tracker.find({ text: searchText, type: 'bug' }));
-  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  if (!found.ok) return found;
   const [match] = found.value;
-  return match === undefined
-    ? fileNew(run)
-    : commentOn(run, match, 'find');
+  return {
+    ok: true,
+    value: match === undefined
+      ? null
+      : { ref: match, foundBy: 'find' },
+  };
+}
+
+/** The issue states closed as completed: a bug back after one is filed again; see the module note. */
+export const COMPLETED_ISSUE_STATES: readonly IssueState[] = ['done', 'released'];
+
+/**
+ * Answers a recurrence: on a route that reads state, the issue found is
+ * read first, and one closed as completed is superseded by a new issue,
+ * while any other is commented on; a read that fails answers `failed`.
+ * See the module note.
+ */
+async function answerRecurrence(run: BugRun, { ref, foundBy }: Recurrence): Promise<BugTriage> {
+  if (!run.route.readsState) return commentOn(run, ref, foundBy);
+
+  const issue = await step(run, `the ${run.route.channel} tracker get`, () => run.route.tracker.get(ref));
+  if (!issue.ok) return resultOf(run, 'failed', { ref, foundBy, problem: issue.problem });
+  return COMPLETED_ISSUE_STATES.includes(issue.value.state)
+    ? fileNew(run, { supersedes: ref })
+    : commentOn(run, ref, foundBy);
+}
+
+/** Comments on the open bug the similarity step matched, naming its score; see the module note. */
+async function commentOnNearest(run: BugRun, nearest: ScoredIssue, threshold: number): Promise<BugTriage> {
+  const opening = similarCommentOpening(nearest.score, threshold);
+  const comment = issueText(opening, run.filing.values, run.redact);
+  const result = await commentOn(run, nearest.issue.ref, 'similarity', 'commented', comment);
+  return { ...result, score: nearest.score };
+}
+
+/**
+ * Step 3, after a `find` miss: comments on the nearest open bug at or above
+ * the threshold, or files the bug listing the nearest below it; files it
+ * plainly where the step does not run. See the module note.
+ */
+async function answerMiss(run: BugRun): Promise<BugTriage> {
+  const { tracker, similarity } = run.route;
+  const list = tracker.openIssues;
+  if (similarity === null || list === undefined) return fileNew(run);
+
+  const listed = await step(run, `the ${run.route.channel} tracker openIssues`, () => list.call(tracker, 'bug'));
+  if (!listed.ok) return resultOf(run, 'failed', { problem: listed.problem });
+  const nearest = nearestOpenBugs(run.filing.compared, listed.value);
+  const [first] = nearest;
+  return first !== undefined && first.score >= similarity.threshold
+    ? commentOnNearest(run, first, similarity.threshold)
+    : fileNew(run, { duplicates: { threshold: similarity.threshold, nearest: nearest.slice(0, similarity.candidates) } });
+}
+
+/** Looks the bug up by its key, then answers what is found, or what step 3 makes of a miss. */
+async function triageBug(run: BugRun): Promise<BugTriage> {
+  const { key, searchText } = run.filing;
+  if (key === null || searchText === null) return fileNew(run);
+
+  const found = await lookUp(run, key, searchText);
+  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  return found.value === null
+    ? answerMiss(run)
+    : answerRecurrence(run, found.value);
+}
+
+/**
+ * Answers a bug the run inherited: files nothing, and comments on the
+ * open issue its key finds unless its key was commented on this run,
+ * adding the key to `commented` once it is; see the module note.
+ */
+async function triageInherited(run: BugRun, commented: Set<string>): Promise<BugTriage> {
+  const { key, searchText } = run.filing;
+  if (key === null || searchText === null || commented.has(key)) return resultOf(run, 'inherited');
+
+  const found = await lookUp(run, key, searchText);
+  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  if (found.value === null) return resultOf(run, 'inherited');
+
+  const { ref, foundBy } = found.value;
+  const issue = await step(run, `the ${run.route.channel} tracker get`, () => run.route.tracker.get(ref));
+  if (!issue.ok) return resultOf(run, 'failed', { ref, foundBy, problem: issue.problem });
+  if (!isOpenIssueState(issue.value.state)) return resultOf(run, 'inherited');
+
+  const result = await commentOn(run, ref, foundBy, 'inherited');
+  if (result.action === 'inherited') commented.add(key);
+  return result;
+}
+
+/** A bug's `what` and artifact with their local paths taken out, as its key reads them. */
+function localBug(bug: ReportBug, what: string, local: (text: string) => string): Pick<ReportBug, 'what' | 'artifact'> {
+  const artifact = artifactOf(bug);
+  return {
+    what: local(what),
+    artifact: artifact === null
+      ? null
+      : local(artifact),
+  };
 }
 
 /** A bug nothing was called for: its row, on the channel it was read onto. */
@@ -766,14 +921,26 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       channel: 'public',
       tracker: options.tracker,
       readStored: (key) => readTrackerRef(repoRoot, key),
-      store: (key, ref) => writeTrackerRef(repoRoot, {
+      store: (key, ref, supersedes) => writeTrackerRef(repoRoot, {
         dispatch: options.dispatch,
         outcome: options.outcome,
         artifact: key,
         ref,
+        ...supersedes === undefined
+          ? {}
+          : { supersedes },
       }, options.seams).action,
+      readsState: true,
+      similarity: similarityStepOf(options),
     },
-    private: { channel: 'private', tracker: privateTracker, readStored: null, store: null },
+    private: {
+      channel: 'private',
+      tracker: privateTracker,
+      readStored: null,
+      store: null,
+      readsState: false,
+      similarity: null,
+    },
   };
 
   const bugs: BugTriage[] = [];
@@ -792,7 +959,14 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       continue;
     }
     const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
-    bugs.push(await triageBug({ route, index, filing, redact }));
+    const run: BugRun = { route, index, filing, redact };
+    const { inherited } = options;
+    const isInherited = route.channel === 'public'
+      && inherited !== undefined
+      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null;
+    bugs.push(isInherited
+      ? await triageInherited(run, inherited.commented)
+      : await triageBug(run));
   }
   return { blocker, bugs };
 }

@@ -37,7 +37,8 @@
  * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
  * followed by a blank line, in that order, and each absent when it
  * rendered empty; with both absent the prompt is the one built before
- * sections existed.
+ * sections existed. After them, when the run started on a red suite, goes
+ * the `## Failures this run inherited` section (`start/inherited-notice.ts`).
  *
  * Two directories reach a dispatch, and are never confused. The PROJECT
  * ROOT, {@link TaskDispatchOptions.repoRoot}, holds `.rafa/`: the store
@@ -80,6 +81,7 @@ import type { InstinctRecord } from '../learning/index.js';
 import type { PlanInjection } from '../plan/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskReportRecord } from '../report/record.js';
+import type { SuiteFailure } from '../suite/run.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 import type { Resolution } from '../tiers/resolve.js';
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
@@ -101,6 +103,7 @@ import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
 import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
+import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
 import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
@@ -215,6 +218,11 @@ export interface TaskDispatchOptions {
    * an item is. None when left out, which leaves the prompt as it was.
    */
   knownMissing?: readonly string[];
+  /**
+   * The run-start suite failures (`start/triage.ts`'s `runStartFailures`),
+   * listed in the prompt's inherited section. None when left out.
+   */
+  inherited?: readonly SuiteFailure[];
   /**
    * What the session is served against (`start/serving.ts`): the run's
    * served directory is filled before the session spawns, and its flags
@@ -338,9 +346,9 @@ export interface TaskPromptSections {
 /** No section to hand out: the prompt {@link buildTaskPrompt} built before sections existed. */
 export const NO_TASK_SECTIONS: TaskPromptSections = { skills: '', lessons: '' };
 
-/** Each non-blank section of `sections`, skills first, each followed by a blank line. */
-function sectionLines(sections: TaskPromptSections): string[] {
-  return [sections.skills, sections.lessons]
+/** Each non-blank section of `sections`, skills, lessons, inherited, each followed by a blank line. */
+function sectionLines(sections: TaskPromptSections & { readonly inherited: string }): string[] {
+  return [sections.skills, sections.lessons, sections.inherited]
     .filter((section) => section.trim().length > 0)
     .flatMap((section) => [section, '']);
 }
@@ -401,6 +409,11 @@ function sectionLines(sections: TaskPromptSections): string[] {
  * the skills is not a field here, so it cannot reach the prompt. With
  * both blank, the default {@link NO_TASK_SECTIONS}, the prompt is the
  * one built before sections existed.
+ *
+ * `inherited` is the run-start failures. With any, the section
+ * `renderInheritedSection` renders follows the other sections, with a
+ * blank line of its own; with none, the default, the prompt is the one
+ * built before it existed.
  */
 export function buildTaskPrompt(
   taskText: string,
@@ -410,6 +423,7 @@ export function buildTaskPrompt(
   blocker: string | null = null,
   sections: TaskPromptSections = NO_TASK_SECTIONS,
   base: string | null = null,
+  inherited: readonly SuiteFailure[] = [],
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
@@ -417,7 +431,7 @@ export function buildTaskPrompt(
     ...blockerLines(blocker),
     ...baseLines(base),
     '',
-    ...sectionLines(sections),
+    ...sectionLines({ ...sections, inherited: renderInheritedSection(inherited) }),
     promptContent,
     planText,
     ...knownMissingNotice(knownMissing),
@@ -542,6 +556,7 @@ export async function dispatchTask(
     taskInfo.blocker ?? null,
     { skills: renderSkillsSection(handed.skills), lessons: renderLessonsSection(handed.lessons) },
     options.base,
+    options.inherited,
   ));
 
   const served = serveForSession(options.serving, resolution);

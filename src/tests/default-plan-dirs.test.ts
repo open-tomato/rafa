@@ -102,6 +102,10 @@ export function isScannedPath(path: string): boolean {
   if (path.startsWith('src/tests/')) return false;
   if (path === PRE_INIT_DIRS_PATH) return false;
   if (path === CHANGELOG_PATH) return false;
+  // TEMP-PATCH(#486): the scoring fixture quotes bug bodies that name the old
+  // plan and spec folders. Remove this line when the fixture is rewritten
+  // without them (#486's last task before its wrap-up).
+  if (path === 'src/triage/testdata/scoring.json') return false;
   return true;
 }
 

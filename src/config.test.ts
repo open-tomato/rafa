@@ -90,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -131,6 +131,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'roadmapIssue',
   'claimsStaleAfter',
   'claimsAhead',
+  'triageSimilarityThreshold',
+  'triageSimilarityCandidates',
   'releaseEnabled',
   'releaseVersionFile',
   'releaseChangelog',
@@ -196,6 +198,8 @@ const DEFAULTS: RafaConfig = {
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
+  triageSimilarityThreshold: 0.3,
+  triageSimilarityCandidates: 3,
   releaseEnabled: 'auto',
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
@@ -302,6 +306,10 @@ const FULL = [
   'claims:',
   '  staleAfter: 36h',
   '  ahead: allow',
+  'triage:',
+  '  similarity:',
+  '    threshold: 0.5',
+  '    candidates: 5',
   'release:',
   '  enabled: false',
   '  versionFile: deno.json',
@@ -392,6 +400,8 @@ const FULL_VALUES: RafaConfig = {
   roadmapIssue: 31,
   claimsStaleAfter: '36h',
   claimsAhead: 'allow',
+  triageSimilarityThreshold: 0.5,
+  triageSimilarityCandidates: 5,
   releaseEnabled: false,
   releaseVersionFile: 'deno.json',
   releaseChangelog: 'docs/CHANGES.md',
@@ -827,6 +837,16 @@ describe('parseConfigText', () => {
         'claims.ahead', 'claims:\n  ahead: false',
         'claims.ahead is false, expected one of: off, allow',
         'claims:\n  ahead: allow', 'claimsAhead', 'allow',
+      ],
+      [
+        'triage.similarity.threshold', 'triage:\n  similarity:\n    threshold: 0',
+        'triage.similarity.threshold is 0, expected false or a number above 0 and at most 1',
+        'triage:\n  similarity:\n    threshold: false', 'triageSimilarityThreshold', false,
+      ],
+      [
+        'triage.similarity.candidates', 'triage:\n  similarity:\n    candidates: 11',
+        'triage.similarity.candidates is 11, expected a whole number from 1 to 10',
+        'triage:\n  similarity:\n    candidates: 10', 'triageSimilarityCandidates', 10,
       ],
       [
         'release.enabled', 'release:\n  enabled: on',

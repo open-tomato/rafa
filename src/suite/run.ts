@@ -80,6 +80,22 @@
  * Two tests of one name in one file are one pair, so a failure appears
  * once in {@link SuiteResult.failures}, in the order the JUnit file
  * first names it.
+ *
+ * ## The message a failure carries
+ *
+ * A failure's {@link SuiteFailure.message} is the first line, trimmed,
+ * of the `message` attribute on the first `<failure>` or `<error>` element of
+ * its testcase that has one. It is left out when no such element has a
+ * `message` attribute or when that first line is blank. The element's
+ * text, the stack, is never read. Bun 1.4.2 wrote a `message` attribute on
+ * every `<failure>` it was seen to write: an assertion's
+ * `expect(received).toBe(expected)` heading the expected and received
+ * lines, a thrown error's own message, `test timed out`, `TODO passed`.
+ * It wrote no `<error>` element for an assertion, a thrown error, a
+ * timeout, an unhandled rejection, a failing hook, a passing `.failing`
+ * test, a passing todo or a missing assertion, so `<error>` is read for
+ * other JUnit writers. A repeated pair keeps the message of the testcase
+ * the JUnit file names first.
  */
 import type { SpawnEnv } from '../utils/session-env.js';
 
@@ -94,6 +110,11 @@ export interface SuiteFailure {
   readonly file: string;
   /** Its describe names, outermost first, and its own, joined by ` > `. */
   readonly name: string;
+  /**
+   * The first line of its JUnit failure's message; absent when the
+   * report gave none. Never compared: see the module note.
+   */
+  readonly message?: string;
 }
 
 /**
@@ -264,6 +285,8 @@ interface OpenCase {
   readonly file: string;
   readonly name: string;
   failed: boolean;
+  /** The first message line read from its failure elements, once one is. */
+  message?: string;
 }
 
 /** Where the JUnit walk is: the suite stack and the case open inside it. */
@@ -279,7 +302,24 @@ function closeCase(walk: JunitWalk): void {
   walk.open = null;
   if (open === null || !open.failed) return;
   const held = walk.failures.some((failure) => failure.file === open.file && failure.name === open.name);
-  if (!held) walk.failures.push({ file: open.file, name: open.name });
+  if (held) return;
+  walk.failures.push(open.message === undefined
+    ? { file: open.file, name: open.name }
+    : { file: open.file, name: open.name, message: open.message });
+}
+
+/** The first line of `message`, trimmed, or undefined when there is none or it is blank. */
+export function firstMessageLine(message: string | undefined): string | undefined {
+  const line = message?.split(/\r?\n/, 1)[0]?.trim() ?? '';
+  return line === ''
+    ? undefined
+    : line;
+}
+
+/** Marks the open case failed, taking its message from `attributes` when it has none yet. */
+function failCase(open: OpenCase, attributes: Readonly<Record<string, string>>): void {
+  open.failed = true;
+  if (open.message === undefined) open.message = firstMessageLine(attributes['message']);
 }
 
 /** Opens a testcase from its attributes, inside the suites on the stack. */
@@ -305,7 +345,7 @@ function takeTag(walk: JunitWalk, match: RegExpMatchArray): void {
     if (selfClosing === '/') closeCase(walk);
     return;
   }
-  if ((element === 'failure' || element === 'error') && closing !== '/' && walk.open !== null) walk.open.failed = true;
+  if ((element === 'failure' || element === 'error') && closing !== '/' && walk.open !== null) failCase(walk.open, attributes);
 }
 
 /**
