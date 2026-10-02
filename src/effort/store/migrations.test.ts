@@ -33,6 +33,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '../../tests/git-identity.js';
+
 import { classifyMigration } from './migration-shapes.js';
 import {
   LEGACY_GATE_CLOSED,
@@ -721,6 +723,7 @@ const GIT_ENV: Record<string, string> = {
     (entry): entry is [string, string] => !entry[0].startsWith('GIT_') && entry[1] !== undefined,
   )),
   GIT_CONFIG_GLOBAL: '/dev/null',
+  ...gitIdentityEnv(),
   GIT_CONFIG_NOSYSTEM: '1',
 };
 

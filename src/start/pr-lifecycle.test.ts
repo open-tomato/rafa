@@ -107,6 +107,7 @@ import { CommandExit } from '../cli/command.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
@@ -995,7 +996,7 @@ describe('prLifecycleSeamsIn', () => {
     const run = spawnSync('git', [...args], {
       cwd: dir,
       encoding: 'utf8',
-      env: { ...process.env, HOME: dir, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+      env: { ...process.env, HOME: dir, GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null' },
     });
     if (run.status !== 0) throw new Error(`git ${args.join(' ')}: ${run.stderr}`);
   };

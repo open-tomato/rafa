@@ -12,7 +12,8 @@
  * {@link runnerPrSeamsIn}'s tree reading and {@link fragmentNotesIn} are
  * effects, so they run over REAL git and real files under the case's
  * own `mkdtemp` directory, with `GIT_CONFIG_GLOBAL` and
- * `GIT_CONFIG_SYSTEM` at `/dev/null` and the author named in the repo.
+ * `GIT_CONFIG_SYSTEM` at `/dev/null` and the author named by
+ * `gitIdentityEnv`, whose variables win over the repo's own config.
  */
 import type { RunnerPrInput, RunnerPrSeams, WorkingTreeReading } from './runner-pr.js';
 import type { PullRequestDraft, PullRequestSummary, PushOutcome } from '../pr/index.js';
@@ -25,6 +26,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   fragmentNotesIn,
@@ -237,17 +239,17 @@ describe('over a real checkout', () => {
     dirs = [];
   });
 
-  /** Runs git in `cwd` with no user or system config. */
+  /** Runs git in `cwd` with no user or system config, committing as the test identity. */
   function git(cwd: string, args: readonly string[]): void {
     const result = spawnSync('git', [...args], {
       cwd,
       encoding: 'utf8',
-      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      env: { ...process.env, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
     });
     if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
   }
 
-  /** A scratch repository with one commit, its author named in its own config. */
+  /** A scratch repository with one commit, made under {@link gitIdentityEnv}'s author. */
   function repo(): string {
     const dir = mkdtempSync(join(tmpdir(), 'rafa-runner-pr-'));
     dirs = [...dirs, dir];

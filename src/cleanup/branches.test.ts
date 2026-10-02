@@ -16,6 +16,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 import { createGitRunner } from '../pr/git.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { BRANCH_FORMAT, isKept, parseBranchLine, readBranches, resolveBaseBranch } from './branches.js';
 
@@ -213,11 +214,8 @@ describe('readBranches over a real clone', () => {
       env: {
         ...process.env,
         LC_ALL: 'C',
-        GIT_AUTHOR_NAME: 'Test',
-        GIT_AUTHOR_EMAIL: 'test@example.com',
-        GIT_COMMITTER_NAME: 'Test',
-        GIT_COMMITTER_EMAIL: 'test@example.com',
         GIT_CONFIG_GLOBAL: '/dev/null',
+        ...gitIdentityEnv(),
         GIT_CONFIG_NOSYSTEM: '1',
       },
     });
