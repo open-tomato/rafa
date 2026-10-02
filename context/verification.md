@@ -151,12 +151,14 @@ itself is in that state. Check this list before investigating a failure
 you see in a run record.
 
 **The two parity suites skip unless `RAFA_LIVE_PARITY=1`.**
-`src/tests/parity-lineage.test.ts` compares the sibling's stored effort
-rows against a fresh collection over that sibling's live session
-directory, and `src/tests/parity-differential.test.ts` collects a frozen
-copy of that directory into both backends — input this repository does
-not own. Without the variable at exactly `1`, every case of both files
-skips under `live parity off: set RAFA_LIVE_PARITY=1 to run against the
+Run the live parity suites with `RAFA_LIVE_PARITY=1 bun test
+src/tests/parity-lineage.test.ts`. `src/tests/parity-lineage.test.ts`
+compares the sibling's stored effort rows against a fresh collection
+over that sibling's live session directory, and
+`src/tests/parity-differential.test.ts` collects a frozen copy of that
+directory into both backends — input this repository does not own.
+Without the variable at exactly `1`, every case of both files skips
+under `live parity off: set RAFA_LIVE_PARITY=1 to run against the
 sibling's live session logs and stored rows`, before anything on disk is
 read (`resolveLiveParity` in `src/tests/parity-fixture.ts`); with it on
 and the fixture absent, they skip under the fixture's own reason. Only
@@ -166,22 +168,6 @@ counterpart` means a `.jsonl` the stored rows name was deleted from the
 live directory, and it does not clear on a re-run. In the differential
 suite both backends read one frozen copy, so a difference between them
 is a real parity failure, not the sibling appending mid-run.
-
-**Three cleanup cases are red since 2026-09-24T12:00Z (baseline: 6 pass,
-3 fail).**
-`src/cleanup/scratch-repository.test.ts` reads its worktrees at fixed
-`SCRATCH_NOW` (2026-09-24T12:00Z), but worktrees carry their real
-modification time. Once wall-clock time passes `SCRATCH_NOW`, every
-worktree carries a `recent` blocker and the three `readCleanup over a
-scratch repository` cases fail. It stays red until the fixture dates
-worktrees relative to `SCRATCH_NOW`.
-
-**CHANGELOG.md holds old directory tokens red since 0.9.2.**
-`src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
-fails because `CHANGELOG.md`'s 0.9.2 section names old directories without
-a slash, and the sweep catches both spellings. A plan's session may not
-touch a released section, so it stays red until a change exempts
-`CHANGELOG.md` or rewords those lines.
 
 **One suite prints a model refusal on a clean run (baseline: passes).**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
