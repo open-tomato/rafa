@@ -61,6 +61,19 @@
  *    untracked case here and the pre-condition case that plants `??`
  *    in `./state.test.ts`. Every other tree planted is tracked, and
  *    none of them notices.
+ *
+ * Two more were driven the same way on 2026-10-02, over the 141 pass
+ * and 0 fail this file, `./state.test.ts` and
+ * `src/tests/next-chain-integration.test.ts` answer together:
+ *
+ *  - `unstartedPlan` reading any branch as started again
+ *    (`!hasBranch` in place of `!hasStartedBranch`): 135 pass and 6
+ *    fail, the claimed-plan case here, its row 9 pair in
+ *    `./state.test.ts` and four of the integration cases, whose
+ *    `plan create` pushes a claim branch.
+ *  - {@link claimsOnly} answering true for a branch with no commit past
+ *    its fork: 139 pass and 2 fail, the empty-branch case here and row
+ *    9's has-a-branch case, whose fake log answers nothing.
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
@@ -73,19 +86,24 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '../claims/record.js';
 import { plansDirAt } from '../commands/plan/plan-files.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
   branchLabel,
   changedPaths,
+  claimsOnly,
   hasBranch,
   hasRun,
+  hasStartedBranch,
   once,
   onBase,
   openWorld,
   readBranch,
+  readBranchMessages,
   readBranchPlan,
+  readBranchTips,
   readCheckout,
   readOpenPull,
   readPlans,
@@ -593,6 +611,149 @@ describe('a plan with a run, and a plan with a branch', () => {
 
   it('does not read a longer branch name as that plan', () => {
     expect(hasBranch([`refs/heads/${PLAN_BRANCH}-two`], STUB)).toBe(false);
+  });
+});
+
+/** The one claim commit `plan create` makes on the plan branch, as `git log --format=%B` writes it. */
+const CLAIM_MESSAGE = formatClaimMessage({ action: 'claim', issue: 63, store: 'store-a' });
+
+/** A task commit a loop makes on the plan branch. */
+const TASK_MESSAGE = 'feat: the first task\n\nThe body of the task commit.\n';
+
+/** The local tip of the plan branch. */
+const LOCAL_TIP = `refs/heads/${PLAN_BRANCH}`;
+
+/** The remote-tracking tip of the plan branch. */
+const TRACKING_TIP = `refs/remotes/origin/${PLAN_BRANCH}`;
+
+/** The argv that resolves `ref` as a commit. */
+function resolveArgv(ref: string): string {
+  return `rev-parse --verify --quiet ${ref}^{commit}`;
+}
+
+/** The argv that reads the messages of `ref` past the base. */
+function logArgv(ref: string): string {
+  return `log -z --format=%B ${BASE}..${ref}`;
+}
+
+/** What `git log -z --format=%B` writes for `messages`, newest first. */
+function logOf(...messages: readonly string[]): GitResult {
+  return said(messages.map((message) => `${message}\0`).join(''));
+}
+
+describe('a plan branch that holds claim commits alone', () => {
+  it('reads one claim commit as claims alone, and the same with a task commit on top as work', () => {
+    expect(claimsOnly([CLAIM_MESSAGE])).toBe(true);
+    expect(claimsOnly([TASK_MESSAGE, CLAIM_MESSAGE])).toBe(false);
+  });
+
+  it('reads a claim, a handover and its accept as claims alone', () => {
+    const hand = formatClaimMessage({ action: 'hand', issue: 63, store: 'store-a', to: 'store-b' });
+    const accept = formatClaimMessage({ action: 'accept', issue: 63, store: 'store-b' });
+
+    expect(claimsOnly([accept, hand, CLAIM_MESSAGE])).toBe(true);
+  });
+
+  it('reads a branch with no commit past its fork as no claim, the way a branch always read', () => {
+    expect(claimsOnly([])).toBe(false);
+  });
+
+  it('reads a claim subject with no trailers as work, the trailers deciding as `src/claims/record.ts` reads them', () => {
+    expect(claimsOnly(['claim(rafa-63): claim'])).toBe(false);
+  });
+
+  it('reads the messages past the base, the NUL-split log trimmed', () => {
+    const git = gitOf({ [logArgv(LOCAL_TIP)]: logOf(TASK_MESSAGE, CLAIM_MESSAGE) });
+    const noted = notes();
+
+    expect(readBranchMessages(sourcesOf({ git: git.git }), LOCAL_TIP, noted.note)).toEqual([TASK_MESSAGE.trim(), CLAIM_MESSAGE.trim()]);
+    expect(noted.held()).toEqual([]);
+  });
+
+  it('notes a log git refused and answers null', () => {
+    const git = gitOf({ [logArgv(LOCAL_TIP)]: refused('fatal: bad revision') });
+    const noted = notes();
+
+    expect(readBranchMessages(sourcesOf({ git: git.git }), LOCAL_TIP, noted.note)).toBeNull();
+    expect(noted.held()).toEqual([`the commits of \`${LOCAL_TIP}\` past \`${BASE}\` could not be read, so its plan reads as started: fatal: bad revision`]);
+  });
+
+  it('answers the tips this clone holds, an absent one left out', () => {
+    const git = gitOf({ [resolveArgv(TRACKING_TIP)]: said('abc1234\n'), [resolveArgv(LOCAL_TIP)]: refused('') });
+    const noted = notes();
+
+    expect(readBranchTips(sourcesOf({ git: git.git }), 'origin', STUB, noted.note)).toEqual([TRACKING_TIP]);
+    expect(noted.held()).toEqual([]);
+  });
+
+  it('notes a tip git could not resolve for a reason it named, and answers null', () => {
+    const git = gitOf({ [resolveArgv(LOCAL_TIP)]: refused('fatal: not a git repository') });
+    const noted = notes();
+
+    expect(readBranchTips(sourcesOf({ git: git.git }), 'origin', STUB, noted.note)).toBeNull();
+    expect(noted.held()).toEqual([`\`${LOCAL_TIP}\` could not be read, so its plan reads as started: fatal: not a git repository`]);
+  });
+
+  it('reads a branch holding claim commits alone as not started, and the same branch with a task commit as started', () => {
+    const claimed = gitOf({ [resolveArgv(LOCAL_TIP)]: said('abc1234\n'), [logArgv(LOCAL_TIP)]: logOf(CLAIM_MESSAGE) });
+    const worked = gitOf({ [resolveArgv(LOCAL_TIP)]: said('abc1234\n'), [logArgv(LOCAL_TIP)]: logOf(TASK_MESSAGE, CLAIM_MESSAGE) });
+    const noted = notes();
+
+    expect(hasStartedBranch(sourcesOf({ git: claimed.git }), 'origin', [LOCAL_TIP], STUB, noted.note)).toBe(false);
+    expect(hasStartedBranch(sourcesOf({ git: worked.git }), 'origin', [LOCAL_TIP], STUB, noted.note)).toBe(true);
+    expect(noted.held()).toEqual([]);
+  });
+
+  it('reads a branch as started when either tip holds work, the other claims alone', () => {
+    const git = gitOf({
+      [resolveArgv(LOCAL_TIP)]: said('abc1234\n'),
+      [resolveArgv(TRACKING_TIP)]: said('def5678\n'),
+      [logArgv(LOCAL_TIP)]: logOf(CLAIM_MESSAGE),
+      [logArgv(TRACKING_TIP)]: logOf(TASK_MESSAGE, CLAIM_MESSAGE),
+    });
+
+    expect(hasStartedBranch(sourcesOf({ git: git.git }), 'origin', [LOCAL_TIP, TRACKING_TIP], STUB, notes().note)).toBe(true);
+  });
+
+  it('asks git nothing for a plan with no branch', () => {
+    const git = gitOf();
+
+    expect(hasStartedBranch(sourcesOf({ git: git.git }), 'origin', [], STUB, notes().note)).toBe(false);
+    expect(git.ran()).toEqual([]);
+  });
+
+  it('reads a branch the remote holds and this clone has no tip of as started, and notes it', () => {
+    const git = gitOf({ [resolveArgv(LOCAL_TIP)]: refused(''), [resolveArgv(TRACKING_TIP)]: refused('') });
+    const noted = notes();
+
+    expect(hasStartedBranch(sourcesOf({ git: git.git }), 'origin', [LOCAL_TIP], STUB, noted.note)).toBe(true);
+    expect(noted.held()).toEqual([`\`${PLAN_BRANCH}\` is on origin but not fetched here, so its commits were not read and its plan reads as started`]);
+  });
+
+  it('reads a branch whose log git refused as started', () => {
+    const git = gitOf({ [resolveArgv(LOCAL_TIP)]: said('abc1234\n'), [logArgv(LOCAL_TIP)]: refused('fatal: bad revision') });
+    const noted = notes();
+
+    expect(hasStartedBranch(sourcesOf({ git: git.git }), 'origin', [LOCAL_TIP], STUB, noted.note)).toBe(true);
+    expect(noted.held()).toHaveLength(1);
+  });
+
+  it('answers the claimed plan as the unstarted one, and none once its branch holds a task commit', () => {
+    const scan = said(`${LOCAL_TIP}\n`);
+    const claimed = gitOf({
+      'for-each-ref --format=%(refname) refs/heads refs/remotes': scan,
+      [resolveArgv(LOCAL_TIP)]: said('abc1234\n'),
+      [logArgv(LOCAL_TIP)]: logOf(CLAIM_MESSAGE),
+    });
+    const worked = gitOf({
+      'for-each-ref --format=%(refname) refs/heads refs/remotes': scan,
+      [resolveArgv(LOCAL_TIP)]: said('abc1234\n'),
+      [logArgv(LOCAL_TIP)]: logOf(TASK_MESSAGE, CLAIM_MESSAGE),
+    });
+    const plans = (name: string): ReturnType<typeof plansDirAt> => plansDirAt(plantPlans(name, { [STUB]: PLAN }), '.rafa/plans');
+
+    expect(openWorld(sourcesOf({ git: claimed.git, plans: plans('claimed') })).unstartedPlan()?.stub).toBe(STUB);
+    expect(openWorld(sourcesOf({ git: worked.git, plans: plans('worked') })).unstartedPlan()).toBeNull();
   });
 });
 
