@@ -32,6 +32,8 @@
  * (`tracker-refs.ts`) once a bug is filed, is {@link SET_ONCE}: a
  * filled value beats NULL, and two different filled values mean one
  * finding was filed twice, which the merge keeps in `merge_conflicts`.
+ * A reference that supersedes another is a row of its own, never a new
+ * value of this field; the `findings` entry says how.
  * `commits.row_json` is {@link RECOMPUTED}: its `minutesSincePrevious`
  * is rewritten by the merge itself (`merge-commit-gaps.ts`) for each
  * commit brought in and the commit after it in time, so two rows of one
@@ -95,6 +97,16 @@ function appendOnly(...identity: readonly string[]): MergedTableRule {
 export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   sessions: appendOnly('session_id'),
   commits: { scope: 'merged', identity: ['sha'], edited: { row_json: RECOMPUTED } },
+  /**
+   * `tracker_ref` is set once. A superseding reference, filed after the
+   * issue under a key closed as completed, is inserted as a new row
+   * under the same key and never written over the old one, so a merge of
+   * two stores keeps both rows, as two rows with two ids. The lookup
+   * (`readTrackerRef`) answers the newest by `ACROSS_STORES_ORDER`
+   * (`origins.ts`) read backwards, which both sides of a merge read
+   * alike. One session holds one row per key (`findings_by_artifact`),
+   * so a session's write superseding its own row's reference is refused.
+   */
   findings: { scope: 'merged', identity: ['id'], edited: { tracker_ref: SET_ONCE } },
   blockers: appendOnly('id'),
   out_of_scope_bugs: appendOnly('id'),

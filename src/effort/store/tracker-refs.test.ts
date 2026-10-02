@@ -27,13 +27,27 @@
  * change and leaves the file's bytes and change counter as they were, so
  * no reading of the disk tells it from no update. The same path setting
  * `outcome` reddens both byte cases, the control that they can fail.
+ *
+ * That grid ran while the lookup answered the oldest reference, so its
+ * "newest reference answered" mutation is now the module itself. Once
+ * the lookup answered the newest and the superseding write came in, four
+ * more mutations were driven against this file, the module restored
+ * sha256-identical after each: the lookup in `ACROSS_STORES_ORDER`
+ * forwards reddened 4 cases, the lookup by `seq` descending alone 2 (the
+ * clock case and the merge case), the own-row refusal dropped 1, and a
+ * `supersedes` equal to the reference let through 1.
+ *
+ * Measuring the merge case needs the merge itself, so it plants two
+ * stores with origins and runs `mergeStore` both ways, as
+ * `merge-store.test.ts` does.
  */
 import type { FindingsWriterSeams } from './findings.js';
 import type { TrackerRefWrite } from './tracker-refs.js';
 import type { IssueRef } from '../../ports/index.js';
 import type { ReportFinding } from '../../report/parse.js';
+import type { RuntimeIdentity } from '../../runtime/identity.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -42,7 +56,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readProgressFindings, renderProgressText } from '../../utils/progress.js';
 
+import { bringForward } from './bring-forward.js';
 import { writeFindings } from './findings.js';
+import { mergeStore } from './merge-store.js';
 import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
 import { readTrackerRef, writeTrackerRef } from './tracker-refs.js';
@@ -68,7 +84,7 @@ interface StoredFinding {
   origin_seq: number | null;
 }
 
-const tempBase = mkdtempSync(join(tmpdir(), 'rafa-tracker-refs-'));
+const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-tracker-refs-')));
 let planted = 0;
 
 afterAll(() => {
@@ -140,6 +156,72 @@ function plantRef(root: string, sessionId: string, artifact: string, trackerRef:
   );
 }
 
+/** An installed runtime, which may swap a merged store in anywhere. */
+const INSTALLED: RuntimeIdentity = { kind: 'installed', entry: '/home/u/.rafa/runtime/0.24.1/cli.js' };
+
+/** A reference one store holds under {@link ARTIFACT}, as one session wrote it at `at`. */
+interface PlantedRef {
+  readonly sessionId: string;
+  readonly externalId: string;
+  readonly at: string;
+}
+
+/** A store of one origin and the references it holds, in append order. */
+interface PlantedStore {
+  readonly storeId: string;
+  readonly refs: readonly PlantedRef[];
+}
+
+/**
+ * Makes the store at `path` and plants `store`'s identity and references,
+ * stamped as a production insert stamps them. A store under the temp
+ * directory outside a repository is never minted, so `store_meta` is
+ * planted by hand, as `merge-store.test.ts` plants it.
+ */
+function plantStore(path: string, store: PlantedStore): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const db = new Database(path, { create: true, readwrite: true });
+  try {
+    bringForward(db, path, 'write', 'open', { identity: INSTALLED });
+    db.query(
+      'INSERT INTO store_meta (id, store_id, project_root_commit, project_remote, host_id, store_path, file_dev, file_ino, minted_at)'
+        + ' VALUES (1, ?, \'root-commit-1\', NULL, \'host\', ?, 1, 1, \'2026-09-15T00:00:00.000Z\')',
+    ).run(store.storeId, path);
+    for (const [index, planted] of store.refs.entries()) {
+      const seq = index + 1;
+      db.query(
+        'INSERT INTO findings (seq, origin_store, origin_seq, id, session_id, task_line, artifact, outcome, tracker_ref, collected_at)'
+          + ' VALUES (?, ?, ?, ?, ?, \'A merged task\', ?, \'done\', ?, ?)',
+      ).run(seq, store.storeId, seq, `${store.storeId}-${seq}`, planted.sessionId, ARTIFACT, localJson(planted.externalId), planted.at);
+    }
+  } finally {
+    db.close();
+  }
+}
+
+/** A repo root whose store holds `here` with `there` merged into it by `mergeStore`. */
+function mergedRoot(name: string, here: PlantedStore, there: PlantedStore): string {
+  const root = freshRoot(name);
+  const otherPath = join(`${root}-other`, 'effort.sqlite');
+  plantStore(storeFile(root), here);
+  plantStore(otherPath, there);
+
+  const merged = mergeStore({
+    path: storeFile(root),
+    otherPath,
+    backend: 'sqlite',
+    dryRun: false,
+    stamp: '20260915T120000Z',
+    now: () => new Date('2026-09-15T12:00:00.000Z'),
+    newMergeId: () => `merge-${name}`,
+    readProject: () => ({ rootCommit: null, remote: null }),
+    identity: INSTALLED,
+    isAlive: () => false,
+  });
+  expect([merged.status, merged.rowsAdded, merged.rowsInConflict]).toEqual(['merged', there.refs.length, 0]);
+  return root;
+}
+
 /** The artifact most cases file under. */
 const ARTIFACT = 'Cannot find package';
 
@@ -181,16 +263,28 @@ function finding(overrides: Partial<ReportFinding> = {}): ReportFinding {
   };
 }
 
-/** Ids no other case generates, and a fixed clock. */
-function seams(prefix: string): Required<FindingsWriterSeams> {
+/** Ids no other case generates, and a clock fixed at `at`. */
+function seams(prefix: string, at = '2026-09-15T10:00:00.000Z'): Required<FindingsWriterSeams> {
   let count = 0;
   return {
-    now: () => new Date('2026-09-15T10:00:00.000Z'),
+    now: () => new Date(at),
     newId: () => {
       count += 1;
       return `${prefix}-${count}`;
     },
   };
+}
+
+/** The dispatch of another session than {@link DISPATCH}'s. */
+function sessionOf(sessionId: string): typeof DISPATCH {
+  return { ...DISPATCH, sessionId };
+}
+
+/** The `tracker_ref` of every row under {@link ARTIFACT}, in append order. */
+function refsUnderArtifact(root: string): unknown[] {
+  return rowsOf(root)
+    .filter((row) => row.artifact === ARTIFACT)
+    .map((row) => row.tracker_ref);
 }
 
 describe('writeTrackerRef', () => {
@@ -370,6 +464,9 @@ describe('writeTrackerRef', () => {
       [writeOf({ ref: ref({ url: undefined as never }) }), /whose url is undefined, not a string or null/],
       [writeOf({ ref: ref({ module: 7 as never }) }), /whose module is 7, not a string/],
       [writeOf({ ref: ref({ repo: null as never }) }), /whose repo is null, not a string/],
+      [writeOf({ supersedes: null as never }), /supersedes a reference that is null, not an object/],
+      [writeOf({ supersedes: ref({ kind: '' }) }), /supersedes a reference whose kind is blank/],
+      [writeOf({ supersedes: { url: null, externalId: '1', kind: 'local', opt: 0 } }), /supersedes the reference it writes/],
     ];
     const existing = freshRoot('refused-existing');
     writeTrackerRef(existing, writeOf({ artifact: 'unrelated' }), seams('refused-existing'));
@@ -383,6 +480,53 @@ describe('writeTrackerRef', () => {
       expect(() => writeTrackerRef(existing, write)).toThrow(pattern);
     }
     expect(readRaw(existing)).toEqual(bytes);
+  });
+
+  it('inserts a superseding reference from a later session as a row of its own, keeping the one it supersedes', () => {
+    const root = freshRoot('supersede');
+    writeTrackerRef(root, writeOf(), seams('supersede-1', '2026-09-15T10:00:00.000Z'));
+    const [filed] = rowsOf(root);
+    const superseding = writeOf({ dispatch: sessionOf('cccc-3333'), ref: ref({ externalId: '2' }), supersedes: ref() });
+
+    const result = writeTrackerRef(root, superseding, seams('supersede-2', '2026-09-15T11:00:00.000Z'));
+
+    expect(result).toEqual({ path: storeFile(root), action: 'inserted', stored: ref({ externalId: '2' }) });
+    expect(rowsOf(root)[0]).toEqual(filed);
+    expect(refsUnderArtifact(root)).toEqual([localJson('1'), localJson('2')]);
+    expect(columnOf(root, 'session_id')).toEqual(['bbbb-2222', 'cccc-3333']);
+    expect(readTrackerRef(root, ARTIFACT)).toEqual(ref({ externalId: '2' }));
+  });
+
+  it('places a superseding write as any other when the session\'s row does not hold the superseded reference', () => {
+    const root = freshRoot('supersede-placed');
+    writeTrackerRef(root, writeOf(), seams('supersede-placed-0'));
+    const later = sessionOf('cccc-3333');
+    writeFindings(root, { dispatch: later, outcome: 'done', findings: [finding()] }, seams('supersede-placed-1'));
+    const superseding = writeOf({ dispatch: later, ref: ref({ externalId: '2' }), supersedes: ref() });
+
+    const actions = [superseding, superseding, writeOf({ ...superseding, ref: ref({ externalId: '3' }) })]
+      .map((write, index) => writeTrackerRef(root, write, seams(`supersede-placed-${index + 2}`)).action);
+
+    expect(actions).toEqual(['attached', 'held', 'conflict']);
+    expect(refsUnderArtifact(root)).toEqual([localJson('1'), localJson('2')]);
+  });
+
+  it('refuses a superseding write in one session onto its own row holding the superseded reference, writing no byte', () => {
+    const root = freshRoot('supersede-own');
+    writeTrackerRef(root, writeOf(), seams('supersede-own-1', '2026-09-15T10:00:00.000Z'));
+    const bytes = readRaw(root);
+    const superseding = writeOf({ ref: ref({ externalId: '2' }), supersedes: ref() });
+
+    expect(() => writeTrackerRef(root, superseding, seams('supersede-own-2', '2026-09-15T11:00:00.000Z')))
+      .toThrow(/tracker ref write supersedes the reference findings row 1 holds for this session and artifact, .*; nothing written$/);
+
+    expect(readRaw(root)).toEqual(bytes);
+    expect(readTrackerRef(root, ARTIFACT)).toEqual(ref());
+    // Controls: without `supersedes` the same write is the conflict it was,
+    // and the schema itself refuses the row a superseding insert would add.
+    expect(writeTrackerRef(root, writeOf({ ref: ref({ externalId: '2' }) })).action).toBe('conflict');
+    expect(() => plantRef(root, DISPATCH.sessionId, ARTIFACT, localJson('2')))
+      .toThrow(/UNIQUE constraint failed: findings\.session_id, findings\.artifact/);
   });
 
   it('refuses a store past this schema version, writing no byte', () => {
@@ -427,15 +571,26 @@ describe('readTrackerRef', () => {
     expect(readTrackerRef(root, 'another artifact')).toEqual(ref());
   });
 
-  it('answers the oldest reference stored under the artifact, whatever session or plan stored it', () => {
-    const root = freshRoot('oldest');
+  it('answers the newest reference stored under the artifact across two sessions, whatever plan stored it', () => {
+    const root = freshRoot('newest');
     const unfiled = { sessionId: 'aaaa-1111', planStub: 'phase-0', taskLine: 'An earlier task' };
-    writeFindings(root, { dispatch: unfiled, outcome: 'done', findings: [finding()] }, seams('oldest-0'));
+    writeFindings(root, { dispatch: unfiled, outcome: 'done', findings: [finding()] }, seams('newest-0'));
     const firstFiler = { sessionId: 'cccc-3333', planStub: null, taskLine: 'A global task' };
-    writeTrackerRef(root, writeOf({ dispatch: firstFiler, ref: ref({ externalId: '5' }) }), seams('oldest-1'));
-    writeTrackerRef(root, writeOf({ ref: ref({ externalId: '6' }) }), seams('oldest-2'));
+    const first = writeOf({ dispatch: firstFiler, ref: ref({ externalId: '5' }) });
+    writeTrackerRef(root, first, seams('newest-1', '2026-09-15T10:00:00.000Z'));
+    writeTrackerRef(root, writeOf({ ref: ref({ externalId: '6' }) }), seams('newest-2', '2026-09-15T11:00:00.000Z'));
 
     expect(columnOf(root, 'tracker_ref')).toEqual([null, localJson('5'), localJson('6')]);
+    expect(readTrackerRef(root, ARTIFACT)).toEqual(ref({ externalId: '6' }));
+  });
+
+  it('orders by the write\'s time before the append order, so a row stamped earlier answers older', () => {
+    const root = freshRoot('by-time');
+    writeTrackerRef(root, writeOf({ ref: ref({ externalId: '5' }) }), seams('by-time-1', '2026-09-15T11:00:00.000Z'));
+    const later = writeOf({ dispatch: sessionOf('cccc-3333'), ref: ref({ externalId: '6' }) });
+    writeTrackerRef(root, later, seams('by-time-2', '2026-09-15T10:00:00.000Z'));
+
+    expect(columnOf(root, 'tracker_ref')).toEqual([localJson('5'), localJson('6')]);
     expect(readTrackerRef(root, ARTIFACT)).toEqual(ref({ externalId: '5' }));
   });
 
@@ -465,6 +620,27 @@ describe('readTrackerRef', () => {
       plantRef(root, DISPATCH.sessionId, artifact, text);
       expect(() => readTrackerRef(root, artifact)).toThrow(pattern);
       expect(() => writeTrackerRef(root, writeOf({ artifact }))).toThrow(pattern);
+    }
+  });
+
+  it('answers one newest reference on both sides of a merge, where the append order answers two', () => {
+    const storeA: PlantedStore = { storeId: 'store-a', refs: [
+      { sessionId: 's-1', externalId: '1', at: '2026-09-15T10:00:00.000Z' },
+      { sessionId: 's-3', externalId: '3', at: '2026-09-15T11:00:00.000Z' },
+    ] };
+    const storeB: PlantedStore = { storeId: 'store-b', refs: [
+      { sessionId: 's-2', externalId: '2', at: '2026-09-15T11:00:00.000Z' },
+    ] };
+
+    const aTookB = mergedRoot('a-took-b', storeA, storeB);
+    const bTookA = mergedRoot('b-took-a', storeB, storeA);
+
+    const lastBySeq = 'SELECT tracker_ref FROM findings ORDER BY seq DESC LIMIT 1';
+    expect(rawQuery(aTookB, lastBySeq)).toEqual([{ tracker_ref: localJson('2') }]);
+    expect(rawQuery(bTookA, lastBySeq)).toEqual([{ tracker_ref: localJson('3') }]);
+    for (const root of [aTookB, bTookA]) {
+      expect(refsUnderArtifact(root).toSorted()).toEqual([localJson('1'), localJson('2'), localJson('3')]);
+      expect(readTrackerRef(root, ARTIFACT)).toEqual(ref({ externalId: '2' }));
     }
   });
 

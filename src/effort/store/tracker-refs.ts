@@ -48,6 +48,32 @@
  *     issue for the caller to surface, and an overwrite would lose the
  *     first.
  *
+ * ## A superseding reference
+ *
+ * An issue closed as completed that the bug comes back after is
+ * superseded: the caller files a new issue and writes its reference with
+ * `supersedes` naming the closed one. A superseding reference is never
+ * written over the one it supersedes. It goes into a row of its own under
+ * the same key, so the old row keeps its reference, a merge of two stores
+ * keeps both rows (`tracker_ref` is `SET_ONCE`, `merge-rules.ts`), and
+ * the lookup below answers the new one as the newest.
+ *
+ * The write places it as any reference is placed, above, with one case
+ * added: the session's row holds the reference it supersedes. That row
+ * would have the superseding one inserted beside it, and the store cannot
+ * hold that row. `findings_by_artifact` keys a row with an artifact by
+ * its session and that artifact, so one session holds one row per key;
+ * measured, a second insert under them throws `UNIQUE constraint failed:
+ * findings.session_id, findings.artifact`. The write is refused instead,
+ * naming the row, with no byte written, and the old reference stays the
+ * one the lookup answers. Only a migration of that index lets one session
+ * supersede its own reference. Every other superseding write, the usual
+ * one coming from a later session than the filing, is placed as above.
+ *
+ * `supersedes` is checked as a reference is, below, and is refused when
+ * it is the reference written. It is not stored: the lookup needs only
+ * the order, and the new issue is where the closed one is named.
+ *
  * The artifact matches byte for byte, as in the findings writer's dedupe.
  * A bug with no artifact has no recurrence key (roadmap Q18) and stores
  * no reference, so a write without one is refused. The lookup and the
@@ -83,12 +109,24 @@
  *
  * ## The lookup
  *
- * {@link readTrackerRef} answers the OLDEST reference stored under the
- * artifact, by `seq`, in any session and under any plan stub, or null
- * when no row holds one. The oldest is the issue the first sighting
- * filed. It opens and creates nothing when the store file does not
- * exist. Every row answers the lookup, so a reference no public lookup
- * may see, a `security: true` bug's, never belongs in this table.
+ * {@link readTrackerRef} answers the NEWEST reference stored under the
+ * artifact, in any session and under any plan stub, or null when no row
+ * holds one. The newest is the last in `ACROSS_STORES_ORDER`
+ * (`origins.ts`), so the rows are read in that order backwards: the
+ * latest `collected_at`, then the greatest origin pair, then the greatest
+ * `seq`. `seq` alone would not do, since a merge inserts the other
+ * store's rows after its own and the two sides of one merge would answer
+ * two references. A superseding reference, written after the one it
+ * supersedes, is the newest. A clock that went backwards between the two
+ * writes answers the old one; the order says why.
+ *
+ * Two references filed for one key with neither superseding the other,
+ * as two sessions or two devices filing at once may, answer the newer
+ * too. The lookup does not tell them apart from a supersession.
+ *
+ * It opens and creates nothing when the store file does not exist. Every
+ * row answers the lookup, so a reference no public lookup may see, a
+ * `security: true` bug's, never belongs in this table.
  *
  * A stored reference that is not one, written from outside, throws,
  * naming its row, whether a read or a write reaches it.
@@ -101,7 +139,9 @@
  * blank or holds a lone surrogate, or when its reference is not an
  * `IssueRef`: `opt` a safe integer, `kind` and `externalId` non-blank
  * strings, `url` a string or null, `module` and `repo` strings when
- * present. A read refuses its artifact by the same rule, opening nothing.
+ * present. A `supersedes` that is present is refused by the same rule,
+ * and when its stored form is the reference's own. A read refuses its
+ * artifact by the same rule, opening nothing.
  * Both throw the store's refusal of a schema past this rafa's version
  * with no byte changed, and bring an older store forward first.
  *
@@ -116,7 +156,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 
 import { checkDispatch, describeValue, textProblem } from './findings.js';
-import { STAMPED_COLUMNS, stampedValues } from './origins.js';
+import { ACROSS_STORES_ORDER, STAMPED_COLUMNS, stampedValues } from './origins.js';
 import { sqliteStorePath, withSqliteStore } from './sqlite.js';
 
 /** One write: a filed issue's reference, the artifact it is kept under, and its dispatch. */
@@ -127,6 +167,11 @@ export interface TrackerRefWrite {
   readonly artifact: string;
   /** What the tracker answered for the filed issue. */
   readonly ref: IssueRef;
+  /**
+   * The reference `ref` replaces, an issue closed as completed that the
+   * bug came back after; absent for a first filing. See the module note.
+   */
+  readonly supersedes?: IssueRef;
 }
 
 /** What one write did to the session's row for the artifact. */
@@ -184,11 +229,17 @@ const INSERT_REF = `
 /** The reference, set on a row that holds none. */
 const ATTACH_REF = 'UPDATE findings SET tracker_ref = ? WHERE seq = ? AND tracker_ref IS NULL';
 
-/** The oldest row holding a reference under an artifact. */
-const SELECT_OLDEST = `
+/** {@link ACROSS_STORES_ORDER} read backwards: each of its terms descending. */
+const NEWEST_FIRST = ACROSS_STORES_ORDER
+  .split(',')
+  .map((term) => `${term.trim()} DESC`)
+  .join(', ');
+
+/** The newest row holding a reference under an artifact. */
+const SELECT_NEWEST = `
   SELECT seq, tracker_ref FROM findings
   WHERE artifact = ? AND tracker_ref IS NOT NULL
-  ORDER BY seq
+  ORDER BY ${NEWEST_FIRST}
   LIMIT 1
 `;
 
@@ -298,6 +349,18 @@ function heldRefOf(path: string, seq: number, text: string): StoredRef {
 }
 
 /**
+ * The refusal of a superseding write onto the session's own row holding
+ * the superseded reference, which the store cannot hold beside it.
+ */
+function supersedesOwnRow(path: string, seq: number): Error {
+  return new Error(
+    `effort store: ${path}: tracker ref write supersedes the reference findings row ${seq} holds`
+      + ' for this session and artifact, and findings_by_artifact holds one row per session and'
+      + ' artifact; nothing written',
+  );
+}
+
+/**
  * Looks up the session's row for the artifact and places the reference
  * on it, inserting the row when there is none. Runs inside the write's
  * transaction.
@@ -307,6 +370,7 @@ function placeRef(
   path: string,
   write: TrackerRefWrite,
   wanted: StoredRef,
+  superseded: StoredRef | null,
   insertValues: () => Bound[],
 ): readonly [TrackerRefWriteAction, IssueRef] {
   const held = db
@@ -322,20 +386,36 @@ function placeRef(
   }
 
   const kept = heldRefOf(path, held.seq, held.tracker_ref);
+  if (kept.json === superseded?.json) throw supersedesOwnRow(path, held.seq);
   return kept.json === wanted.json
     ? ['held', kept.ref]
     : ['conflict', kept.ref];
 }
 
 /**
+ * The stored form of a write's `supersedes`, null when it has none.
+ * Throws a refusal when it is not a reference or is the written one.
+ */
+function supersededOf(write: TrackerRefWrite, wanted: StoredRef): StoredRef | null {
+  if (write.supersedes === undefined) return null;
+  const superseded = storedRefOf(write.supersedes);
+  if (typeof superseded === 'string') throw refused('write', `supersedes a reference ${superseded}`);
+  if (superseded.json === wanted.json) throw refused('write', 'supersedes the reference it writes');
+  return superseded;
+}
+
+/**
  * Keeps a filed issue's reference in the findings row the dispatch's
  * session holds under the artifact, inserting that row when there is
- * none, and answers what it did.
+ * none, and answers what it did. A write with `supersedes` keeps the
+ * superseded reference where it is.
  *
  * Throws, having opened nothing, when the dispatch, the outcome, the
- * artifact or the reference cannot be stored. Throws the store's own
- * refusal of a schema past this rafa's version, and on a row holding a
- * stored reference that is not one. See the module note.
+ * artifact, the reference or the superseded one cannot be stored. Throws
+ * the store's own refusal of a schema past this rafa's version, on a row
+ * holding a stored reference that is not one, and, writing nothing, when
+ * the session's own row holds the superseded reference. See the module
+ * note.
  */
 export function writeTrackerRef(
   repoRoot: string,
@@ -346,6 +426,7 @@ export function writeTrackerRef(
   checkArtifact('write', write.artifact);
   const wanted = storedRefOf(write.ref);
   if (typeof wanted === 'string') throw refused('write', `has a reference ${wanted}`);
+  const superseded = supersededOf(write, wanted);
   const path = sqliteStorePath(repoRoot);
 
   const { sessionId, planStub, taskLine } = write.dispatch;
@@ -358,15 +439,16 @@ export function writeTrackerRef(
   ];
 
   const [action, stored] = withSqliteStore(path, 'write', !existsSync(path), (db) => {
-    const place = db.transaction(() => placeRef(db, path, write, wanted, insertValues));
+    const place = db.transaction(() => placeRef(db, path, write, wanted, superseded, insertValues));
     return place.immediate();
   });
   return { path, action, stored };
 }
 
 /**
- * The oldest reference stored under an artifact, in the stored form, or
- * null when no row holds one or the store does not exist.
+ * The newest reference stored under an artifact, by
+ * `ACROSS_STORES_ORDER` read backwards, in the stored form, or null when
+ * no row holds one or the store does not exist.
  *
  * Throws, having opened nothing, on an artifact that cannot key a
  * reference. Throws the store's own refusal of a schema past this rafa's
@@ -378,10 +460,10 @@ export function readTrackerRef(repoRoot: string, artifact: string): IssueRef | n
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return null;
 
-  const oldest = withSqliteStore(path, 'read', false, (db) => db
-    .query<{ seq: number; tracker_ref: string }, [string]>(SELECT_OLDEST)
+  const newest = withSqliteStore(path, 'read', false, (db) => db
+    .query<{ seq: number; tracker_ref: string }, [string]>(SELECT_NEWEST)
     .get(artifact));
-  return oldest === null
+  return newest === null
     ? null
-    : heldRefOf(path, oldest.seq, oldest.tracker_ref).ref;
+    : heldRefOf(path, newest.seq, newest.tracker_ref).ref;
 }
