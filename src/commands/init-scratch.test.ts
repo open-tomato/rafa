@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scratch-')));
 
@@ -41,7 +42,7 @@ const claudePaths = (base: string): readonly string[] => readdirSync(base, { rec
 const gitStatus = (repo: string, home: string): string => execFileSync(
   'git',
   ['status', '--porcelain', '--untracked-files=all'],
-  { cwd: repo, encoding: 'utf8', env: { ...process.env, HOME: home, GIT_CONFIG_NOSYSTEM: '1' } },
+  { cwd: repo, encoding: 'utf8', env: { ...process.env, ...scratchHomeEnv(home), GIT_CONFIG_NOSYSTEM: '1' } },
 );
 
 describe('rafa init in a scratch repository', () => {

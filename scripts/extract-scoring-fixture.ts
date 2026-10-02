@@ -38,6 +38,19 @@ const ISSUE_LIMIT = '2000';
 /** The default file written, relative to the checkout. */
 const DEFAULT_OUT = 'src/triage/testdata/scoring.json';
 
+/** The indent `jsonc/indent` asks of every linted `.json` file. */
+export const FIXTURE_INDENT = 2;
+
+/**
+ * `value` as the text of a fixture file: JSON at {@link FIXTURE_INDENT}
+ * spaces, closed by one newline, so the file it writes passes `eslint`.
+ * Both `scoring.json` and the hand-kept `scoring-causes.json` are held in
+ * this form.
+ */
+export function serializeFixture(value: unknown): string {
+  return `${JSON.stringify(value, null, FIXTURE_INDENT)}\n`;
+}
+
 /** The bug issues of the board, open and closed, with their comments. */
 async function readBoard(): Promise<BoardIssue[]> {
   const run = Bun.spawnSync([
@@ -62,7 +75,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const leak = firstLeakIn(filings);
   if (leak !== null) throw new Error(`refusing to write: ${leak} after redaction`);
   const fixture: ScoringFixture = { repo: FIXTURE_REPO, filings };
-  await Bun.write(out, `${JSON.stringify(fixture, null, 1)}\n`);
+  await Bun.write(out, serializeFixture(fixture));
   console.log(`${TAG} wrote ${String(filings.length)} filings to ${out}`);
   return 0;
 }

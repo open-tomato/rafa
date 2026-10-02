@@ -35,6 +35,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { locateBlockerEpic } from '../board/blocker-epic.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { createGhOpenPullRequests, createRoadmapReadings } from '../board/roadmap.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { decideHop } from './hop-chain.js';
 
@@ -157,7 +158,7 @@ async function boardView(gh: ReturnType<typeof createGhRunner>): Promise<BoardVi
 describe('locateBlockerEpic, over a real board listing spanning two boards', () => {
   it('places #101 in epic #40 on board #11, across boards from home', RUN_TIMEOUT, async () => {
     const world = plantWorld();
-    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, HOME: world.repo } });
+    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
 
     const located = await locateBlockerEpic({ blocker: 101, home: HOME, view });
@@ -169,7 +170,7 @@ describe('locateBlockerEpic, over a real board listing spanning two boards', () 
 describe('decideHop, halt, over a real board listing', () => {
   it('halts with the chain when C (#102) has an open blocker B (#103)', RUN_TIMEOUT, async () => {
     const world = plantWorld();
-    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, HOME: world.repo } });
+    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
     const taken: TakenReadings = { branchFor: () => null, pullRequestFor: () => Promise.resolve(null) };
 
@@ -187,7 +188,7 @@ describe('decideHop, halt, over a real board listing', () => {
 
   it('halts on the mutual block when C (#104) is blocked by H itself', RUN_TIMEOUT, async () => {
     const world = plantWorld();
-    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, HOME: world.repo } });
+    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
     const taken: TakenReadings = { branchFor: () => null, pullRequestFor: () => Promise.resolve(null) };
 
@@ -207,7 +208,7 @@ describe('decideHop, halt, over a real board listing', () => {
 describe('decideHop, wait, over a real open pull request list', () => {
   it('waits when an open pull request (#55) closes C (#106)', RUN_TIMEOUT, async () => {
     const world = plantWorld();
-    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, HOME: world.repo } });
+    const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
     const readings = createRoadmapReadings({
       issues: UNUSED_ISSUES,

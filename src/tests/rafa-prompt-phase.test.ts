@@ -13,6 +13,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
+import { scratchHomeEnv } from './scratch-home-env.js';
+
 const EXTRAS = join(import.meta.dir, '..', '..', 'extras', 'zsh');
 const PLUGIN = join(EXTRAS, 'rafa-prompt', 'rafa-prompt.plugin.zsh');
 const THEME = join(EXTRAS, 'tomato', 'tomato.zsh-theme');
@@ -79,7 +81,7 @@ async function plantProject(run: PlantedRun, done: number, total: number): Promi
 /** Runs `script` in `zsh -f` with ROOT set, and returns its trimmed stdout. */
 async function runZsh(script: string, root: string): Promise<string> {
   const child = Bun.spawn(['zsh', '-f', '-c', script], {
-    env: { PATH: process.env.PATH ?? '', HOME: scratch, ROOT: root },
+    env: { PATH: process.env.PATH ?? '', ...scratchHomeEnv(scratch), ROOT: root },
     stdout: 'pipe',
     stderr: 'pipe',
     stdin: 'ignore',

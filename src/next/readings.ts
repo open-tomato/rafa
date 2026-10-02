@@ -44,6 +44,19 @@
  * pushed to an hour ago, and the row that reads it is the one that
  * exists to stop a plan being cut from that base.
  *
+ * ## A plan branch holding claim commits alone is not started
+ *
+ * `plan create` claims the issue it plans (`src/claims/`): one empty
+ * commit, subject `claim(rafa-<n>): claim`, on the base, pushed as
+ * `feat/<stub>`. So a plan nobody has run on has a branch all the same,
+ * and {@link NextWorld.unstartedPlan} reads past it: a plan is started
+ * by a run or by a branch tip, here or remote-tracking, holding any
+ * commit past its fork from the base that is no well-formed ownership
+ * commit ({@link hasStartedBranch}). A branch that holds no commit past
+ * its fork reads started, as every branch did before claims, and so
+ * does one whose commits could not be read: a remote-only branch this
+ * clone has not fetched is noted and never fetched here.
+ *
  * ## A failed reading is carried, not thrown
  *
  * Every read that fails for an ordinary reason — no network, no remote,
@@ -75,6 +88,7 @@ import type { Position } from '../project/position.js';
 import type { BaseStanding } from '../start/branch-decision.js';
 
 import { scanClaimBranches } from '../board/roadmap.js';
+import { parseClaimMessage } from '../claims/record.js';
 import { isLive } from '../commands/loop/loop-sessions.js';
 import { listPlans } from '../commands/plan/list.js';
 import { planFileName } from '../commands/plan/plan-files.js';
@@ -264,7 +278,11 @@ export interface NextWorld {
   readonly checkout: () => string | null;
   /** The plan the branch is named after, or null when the branch names none. */
   readonly branchPlan: () => PlanListing | null;
-  /** The first plan with no run and no branch, or null when every plan has one. */
+  /**
+   * The first plan with no run and no branch holding work, or null when
+   * every plan has one. A `feat/<stub>` holding claim commits alone past
+   * its fork from the base is no work: see {@link hasStartedBranch}.
+   */
   readonly unstartedPlan: () => PlanListing | null;
   /** The open pull request of the branch, or null when it has none. */
   readonly openPull: () => Promise<OpenPull | null>;
@@ -438,6 +456,83 @@ export function hasBranch(refs: readonly string[], stub: string): boolean {
   return refs.some((ref) => ref === branch || ref.endsWith(`/${branch}`));
 }
 
+/**
+ * The tips of `feat/<stub>` this clone holds, its own branch and its
+ * remote-tracking one, as full refs that resolve here; or null with a
+ * problem noted when git could not say. A ref git answers nothing for
+ * is absent, the way `src/claims/git.ts` reads one.
+ */
+export function readBranchTips(sources: NextSources, remote: string, stub: string, note: Note): readonly string[] | null {
+  const branch = `${BRANCH_PREFIX}${stub}`;
+  const tips: string[] = [];
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/${remote}/${branch}`]) {
+    const resolved = sources.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+    const said = gitSaid(resolved);
+    if (resolved.ok && resolved.stdout.trim() !== '') {
+      tips.push(ref);
+    } else if (said !== '') {
+      note(`\`${ref}\` could not be read, so its plan reads as started: ${said}`);
+      return null;
+    }
+  }
+  return tips;
+}
+
+/**
+ * The messages of the commits `ref` holds past its fork from the base,
+ * as `git log -z --format=%B <base>..<ref>` writes them, or null with a
+ * problem noted when git could not read them.
+ */
+export function readBranchMessages(sources: NextSources, ref: string, note: Note): readonly string[] | null {
+  const result = sources.git(['log', '-z', '--format=%B', `${sources.base}..${ref}`]);
+  if (!result.ok) {
+    note(`the commits of \`${ref}\` past \`${sources.base}\` could not be read, so its plan reads as started: ${gitSaid(result)}`);
+    return null;
+  }
+
+  return result.stdout
+    .split('\0')
+    .map((message) => message.trim())
+    .filter((message) => message !== '');
+}
+
+/**
+ * True when `messages` are claim commits and nothing else: at least one,
+ * and each a well-formed ownership record (`src/claims/record.ts`), its
+ * subject `claim(rafa-<n>): <action>` and its trailers both read. A
+ * branch with no commit past its fork reads false, as every branch did
+ * before `plan create` claimed one.
+ */
+export function claimsOnly(messages: readonly string[]): boolean {
+  return messages.length > 0
+    && messages.every((message) => parseClaimMessage(message).kind === 'ownership');
+}
+
+/**
+ * True when the plan `stub` has a branch, here or on the remote, that
+ * may hold work: any commit past its fork from the base that is no
+ * claim commit. A branch `plan create` claimed and nobody has run on
+ * holds claim commits alone, and reads false. Whatever cannot be read
+ * reads true, as a branch always did: a tip that does not resolve, a
+ * log git refused, and a branch the remote holds that this clone has
+ * no tip of, that last one with a problem noted too.
+ */
+export function hasStartedBranch(sources: NextSources, remote: string, refs: readonly string[], stub: string, note: Note): boolean {
+  if (!hasBranch(refs, stub)) return false;
+
+  const tips = readBranchTips(sources, remote, stub, note);
+  if (tips === null) return true;
+  if (tips.length === 0) {
+    note(`\`${BRANCH_PREFIX}${stub}\` is on ${remote} but not fetched here, so its commits were not read and its plan reads as started`);
+    return true;
+  }
+
+  return tips.some((ref) => {
+    const messages = readBranchMessages(sources, ref, note);
+    return messages === null || !claimsOnly(messages);
+  });
+}
+
 /** The readings of one answer, each made at most once and only when a row asks. */
 export function openWorld(sources: NextSources): NextWorld {
   let problems: readonly string[] = [];
@@ -466,7 +561,7 @@ export function openWorld(sources: NextSources): NextWorld {
     checkout: once(() => readCheckout(sources, note)),
     branchPlan: once(() => readBranchPlan(branch(), plans())),
     unstartedPlan: once(() => plans()
-      .find((plan) => !hasRun(runs(), plan.stub) && !hasBranch(refs(), plan.stub)) ?? null),
+      .find((plan) => !hasRun(runs(), plan.stub) && !hasStartedBranch(sources, remote, refs(), plan.stub, note)) ?? null),
     openPull: once(() => readOpenPull(sources, branch(), note)),
     roadmap,
     picked: once(async (): Promise<PickedLine | null> => {

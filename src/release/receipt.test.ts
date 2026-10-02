@@ -1,7 +1,7 @@
 /**
  * Tests for the release receipt (`receipt.ts`): the comment reader, the
  * sections it attributes receipts to, the adoption boundary, the
- * verdict for one version, and the repository's own `CHANGELOG.md`.
+ * verdict for one version, and a planted `CHANGELOG.md`.
  *
  * Controls that keep a passing reading from passing while wrong:
  *
@@ -15,9 +15,6 @@
  *     on top REFUSES the unreceipted one while every existing version
  *     still passes, so the pass is not a check that never refuses.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'bun:test';
 
 import { changelogVersions } from '../commands/release/status.js';
@@ -30,9 +27,6 @@ import {
   receiptProblem,
 } from './receipt.js';
 import { fragmentsReceipt } from './strategies/semver-by-level.js';
-
-/** This repository's own changelog, as committed. */
-const REPOSITORY_CHANGELOG = readFileSync(join(import.meta.dir, '..', '..', 'CHANGELOG.md'), 'utf8');
 
 /** A changelog of `sections`, newest first, each a heading and optional receipt. */
 function changelog(...sections: ReadonlyArray<readonly [string, readonly string[] | null]>): string {
@@ -215,17 +209,19 @@ describe('why a version may not be tagged', () => {
   });
 });
 
-describe('this repository\'s CHANGELOG.md', () => {
-  const versions = changelogVersions(REPOSITORY_CHANGELOG);
+describe('a planted CHANGELOG.md', () => {
+  const PLANTED_CHANGELOG = changelog(...Array.from({ length: 22 }, (_, index) => [`0.${22 - index}.0`, null] as const));
+
+  const versions = changelogVersions(PLANTED_CHANGELOG);
 
   it('has sections to audit, the same ones release status reads', () => {
     expect(versions.length).toBeGreaterThan(0);
-    expect(changelogSections(REPOSITORY_CHANGELOG).map((section) => section.version)).toEqual([...versions]);
+    expect(changelogSections(PLANTED_CHANGELOG).map((section) => section.version)).toEqual([...versions]);
   });
 
   it('passes the audit for every version it names', () => {
     const problems = versions
-      .map((version) => receiptProblem(checkReceipt(REPOSITORY_CHANGELOG, version), version, 'CHANGELOG.md'))
+      .map((version) => receiptProblem(checkReceipt(PLANTED_CHANGELOG, version), version, 'CHANGELOG.md'))
       .filter((problem) => problem !== null);
 
     expect(problems).toEqual([]);
@@ -233,7 +229,7 @@ describe('this repository\'s CHANGELOG.md', () => {
 
   it('refuses an unreceipted section planted above a settled one, and still passes its own', () => {
     const newest = versions[0] ?? '';
-    const planted = REPOSITORY_CHANGELOG.replace(
+    const planted = PLANTED_CHANGELOG.replace(
       `## ${newest} `,
       ['## 99.1.0 — unreceipted', '', '## 99.0.0 — settled', fragmentsReceipt(['rafa-99']), '', `## ${newest} `].join('\n'),
     );

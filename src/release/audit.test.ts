@@ -1,9 +1,9 @@
 /**
  * Tests for the released-history audit (`audit.ts`): the heading reader,
  * each of the four findings, the sentences and the cell, and the
- * repository's own `CHANGELOG.md`.
+ * planted `CHANGELOG.md`.
  *
- * The repository's changelog is audited with no tag at all, the worst
+ * The planted changelog is audited with no tag at all, the worst
  * reading a fresh clone can give, and two controls keep that pass from
  * passing while wrong: the same text with its second section's version
  * dropped must answer a gap, and with a receipt planted under its newest
@@ -25,13 +25,18 @@ import {
   successorsOf,
 } from './audit.js';
 
-/** The repository's own changelog, two directories up from this file. */
-const REPOSITORY_CHANGELOG = join(import.meta.dir, '..', '..', 'CHANGELOG.md');
-
 /** A changelog of `headings`, each with one note under it. */
 function changelog(...headings: readonly string[]): string {
   return ['# Changelog', '', ...headings.flatMap((heading) => [heading, '', '- a note', ''])].join('\n');
 }
+
+/** Versions of the planted changelog, newest first: 0.22.0 down to 0.1.0, one release a day. */
+const PLANTED_VERSIONS = Array.from({ length: 22 }, (_, index) => `0.${22 - index}.0`);
+
+/** A planted stand-in for the repository's changelog: 22 unreceipted sections, in step and dated in order. */
+const PLANTED_CHANGELOG = changelog(
+  ...PLANTED_VERSIONS.map((version, index) => `## ${version} — 2026-09-${String(30 - index).padStart(2, '0')}, release`),
+);
 
 describe('auditHeadings', () => {
   it('keeps every heading naming a version, repeats included, with its date', () => {
@@ -93,6 +98,7 @@ describe('auditChangelog', () => {
     const text = changelog('## 1.1.0-beta.1', '## 1.0.0', '## 1.0.0-rc.1', '## 0.9.0');
 
     expect(auditChangelog(text, [])).toEqual([]);
+    expect(auditChangelog(text, PLANTED_VERSIONS)).toEqual([]);
   });
 
   it('finds a heading dated before the one below it', () => {
@@ -141,26 +147,26 @@ describe('auditChangelog', () => {
   });
 });
 
-describe('the repository CHANGELOG.md', () => {
-  it('passes the audit, even with no tag read at all', async () => {
-    const text = await Bun.file(REPOSITORY_CHANGELOG).text();
+describe('a planted CHANGELOG.md', () => {
+  it('passes the audit, even with no tag read at all', () => {
+    const text = PLANTED_CHANGELOG;
 
     expect(auditHeadings(text).length).toBeGreaterThan(20);
     expect(auditChangelog(text, [])).toEqual([]);
   });
 
-  it('fails the audit once a section is dropped, so the pass above is a reading', async () => {
-    const text = await Bun.file(REPOSITORY_CHANGELOG).text();
+  it('fails the audit once a section is dropped, so the pass above is a reading', () => {
+    const text = PLANTED_CHANGELOG;
     const [newest, second] = auditHeadings(text);
-    if (newest === undefined || second === undefined) throw new Error('the changelog names under two versions');
+    if (newest === undefined || second === undefined) throw new Error('the planted changelog names under two versions');
     const secondLine = text.split('\n').find((line) => line.startsWith(`## ${second.version} `)) ?? '';
     const dropped = text.replace(secondLine, '## a section with no version');
 
     expect(auditChangelog(dropped, []).map((finding) => finding.kind)).toContain('gap');
   });
 
-  it('fails the audit once its newest section is receipted and untagged', async () => {
-    const text = await Bun.file(REPOSITORY_CHANGELOG).text();
+  it('fails the audit once its newest section is receipted and untagged', () => {
+    const text = PLANTED_CHANGELOG;
     const [newest] = auditHeadings(text);
     if (newest === undefined) throw new Error('the changelog names no version');
     const headingLine = text.split('\n').find((line) => line.startsWith(`## ${newest.version} `)) ?? '';

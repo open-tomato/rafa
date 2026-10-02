@@ -67,6 +67,7 @@ import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { builtPath, plantGitOnlyDir, plantStandInGh } from './stand-in-gh.js';
 
 /** The CLI entry every spawned case runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -76,13 +77,6 @@ const KILL_AFTER_MS = 45_000;
 
 /** How long a case driving one spawned run may take, over the kill above. */
 const RUN_TIMEOUT = { timeout: 60_000 };
-
-/** git's own directory, resolved once and appended to every scratch PATH beside a stand-in. */
-const GIT_DIR = (() => {
-  const found = Bun.which('git');
-  if (found === null) throw new Error('git is not on the PATH this suite runs under');
-  return dirname(found);
-})();
 
 /** Runs git for a fixture's own setup, inheriting this process's environment. */
 function git(cwd: string, ...args: string[]): void {
@@ -156,7 +150,7 @@ function plantCliScratch(config: readonly string[], task: string, branch: string
   writeFileSync(join(repo, '.plans', 'PLAN-halts.md'), `# Plan: halts\n\n- [ ] ${task}\n`, 'utf8');
   plantProjectConfig(repo, [...config, ''].join('\n'));
 
-  return { repo, home, claude, calls, path: [bin, GIT_DIR].join(delimiter) };
+  return { repo, home, claude, calls, path: builtPath(bin, plantGitOnlyDir(root)) };
 }
 
 /** Throws unless `claude` resolves to the scratch's own stand-in, so no case can reach a real session. */
@@ -266,7 +260,7 @@ describe('a pr.provider: gh run with no gh on the child\'s PATH', () => {
     () => {
       // Neither scratch PATH carries a `gh`: `plantScratchRepo` and this
       // file's own `plantCliScratch` build it from the stand-in `bin/`
-      // and git's own directory alone, so `pr.provider: gh` here meets
+      // and a git-only directory alone, so `pr.provider: gh` here meets
       // exactly the absence the task names, with no extra PATH surgery.
       const failing = plantCliScratch(config('gh'), TASK, 'feat/pr-provider-gh-missing');
       const passing = plantCliScratch(config('none'), TASK, 'feat/pr-provider-none');
@@ -294,6 +288,33 @@ describe('a pr.provider: gh run with no gh on the child\'s PATH', () => {
       expect(passedStart.exitCode).toBe(0);
       expect(passedStart.stderr).not.toContain('preflight halted');
       expect(existsSync(callsFile(passing, 'count'))).toBe(true);
+    },
+    RUN_TIMEOUT,
+  );
+});
+
+describe('a pr.provider: gh run over a stand-in gh', () => {
+  const TASK = 'A task a signed-in gh lets run';
+
+  it(
+    'halts on the one auth item when the stand-in is signed out, beside a signed-in control that runs a session',
+    () => {
+      const out = plantCliScratch(['pr:', '  provider: gh'], TASK, 'feat/gh-signed-out');
+      const inn = plantCliScratch(['pr:', '  provider: gh'], TASK, 'feat/gh-signed-in');
+      plantStandInGh(dirname(out.claude), 'signed-out');
+      plantStandInGh(dirname(inn.claude), 'signed-in');
+
+      const outStart = runLoopStart(out, [PLAN_FLAG, '--no-ci-wait']);
+      const inStart = runLoopStart(inn, [PLAN_FLAG, '--no-ci-wait']);
+
+      expect(outStart.exitCode).toBe(1);
+      expect(outStart.stderr).toContain('❌ preflight halted: 1 required item failed');
+      expect(outStart.stderr).toContain(`service "https://${DEFAULT_GH_HOST}": probe`);
+      expect(outStart.stderr).not.toContain('tool "gh": probe');
+      expect(existsSync(callsFile(out, 'count'))).toBe(false);
+
+      expect(inStart.stderr).not.toContain('preflight halted');
+      expect(existsSync(callsFile(inn, 'count'))).toBe(true);
     },
     RUN_TIMEOUT,
   );
@@ -539,7 +560,7 @@ function plantForkCase(files: Readonly<Record<string, string>>): ForkCase {
   mkdirSync(home, { recursive: true });
   plantForkBun(bin, log);
   const root = forkRepoWith(base, files);
-  return { root, env: { HOME: home, PATH: [bin, GIT_DIR].join(delimiter) }, log, worktree };
+  return { root, env: { HOME: home, PATH: builtPath(bin, plantGitOnlyDir(base)) }, log, worktree };
 }
 
 describe('a worktree fork\'s install', () => {

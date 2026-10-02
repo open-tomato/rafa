@@ -113,6 +113,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { formatClaimMessage } from '../claims/record.js';
 import { plansDirAt } from '../commands/plan/plan-files.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
@@ -178,8 +179,10 @@ interface Situation {
   readonly tree: readonly string[];
   /** What `git rev-list --left-right --count` wrote. */
   readonly standing: string;
-  /** The refs this clone holds. */
+  /** The refs this clone holds; each resolves here as a tip. */
   readonly refs: readonly string[];
+  /** The messages every planted ref holds past the base, newest first. */
+  readonly branchLog: readonly string[];
   /** The session records. */
   readonly runs: readonly SessionRecord[];
   /** The plans, by stub. */
@@ -200,6 +203,7 @@ const NOTHING: Situation = {
   tree: [],
   standing: '0\t0\n',
   refs: [],
+  branchLog: [],
   runs: [],
   plans: {},
   pull: null,
@@ -282,6 +286,10 @@ function sourcesFor(over: Partial<Situation> = {}): NextSources {
     'rev-parse --show-toplevel': said(`${CHECKOUT}\n`),
     [`rev-list --left-right --count ${BASE}...origin/${BASE}`]: said(situation.standing),
     'for-each-ref --format=%(refname) refs/heads refs/remotes': said(situation.refs.join('\n')),
+    ...Object.fromEntries(situation.refs.flatMap((ref) => [
+      [`rev-parse --verify --quiet ${ref}^{commit}`, said('abc1234\n')],
+      [`log -z --format=%B ${BASE}..${ref}`, said(situation.branchLog.map((message) => `${message}\0`).join(''))],
+    ])),
   };
   return {
     base: BASE,
@@ -483,6 +491,16 @@ describe('each row, with what it says and what it carries', () => {
     const hasBranch = await stateOf({ plans: { [STUB]: { plan: OPEN_PLAN } }, refs: [`refs/heads/${PLAN_BRANCH}`] });
 
     expect([hasRun.id, hasBranch.id]).toEqual(['nothing-left', 'nothing-left']);
+  });
+
+  it('row 9 offers a plan whose branch holds its claim commit alone, and passes over it once a task commit sits on top', async () => {
+    const claim = formatClaimMessage({ action: 'claim', issue: 63, store: 'store-a' });
+    const planted = { plans: { [STUB]: { plan: OPEN_PLAN } }, refs: [`refs/remotes/origin/${PLAN_BRANCH}`] };
+    const claimed = await stateOf({ ...planted, branchLog: [claim] });
+    const worked = await stateOf({ ...planted, branchLog: ['feat: the first task', claim] });
+
+    expect([claimed.id, worked.id]).toEqual(['plan-unstarted', 'nothing-left']);
+    expect(claimed.planStub).toBe(STUB);
   });
 
   it('row 10 names the ready line and proposes its plan', async () => {

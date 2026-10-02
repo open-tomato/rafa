@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { sinkOutput } from '../tests/output-sinks.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from './run.js';
 
@@ -69,7 +70,7 @@ function isUnderScratch(path: string): boolean {
 function scratchEnv(path: string = [bin, SYSTEM_PATH].join(delimiter)): Record<string, string> {
   expect(isUnderScratch(home)).toBe(true);
   expect(isUnderScratch(path.split(delimiter)[0] ?? '')).toBe(true);
-  return { HOME: home, PATH: path };
+  return { ...scratchHomeEnv(home), PATH: path };
 }
 
 /** Writes an executable `/bin/sh` script named `name` into the case's `bin/`. */
