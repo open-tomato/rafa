@@ -72,9 +72,12 @@
  *     defaults, {@link GITHUB_LABELS}, since rafa's config has none.
  *   - States. Without a board, GitHub holds an issue open or closed, and
  *     closed with a reason. `get` answers `todo` for an open issue,
- *     `cancelled` for one closed as not planned, and `done` for any other
- *     closed one. The source read the not-planned reason whatever the
- *     issue's state; the copy reads it on a closed issue alone.
+ *     `cancelled` for one closed as not planned or as a duplicate, and
+ *     `done` for any other closed one. Read off `gh` 2.101.0 on
+ *     2026-10-02, `gh issue list --repo cli/cli --state closed --search
+ *     reason:duplicate` answered `stateReason` `DUPLICATE`. The source read
+ *     the not-planned reason whatever the issue's state; the copy reads
+ *     either reason on a closed issue alone.
  *     `transition` makes the open or closed write the source made, and
  *     answers a `warning` for the four states that write cannot hold:
  *     `backlog`, `in-progress` and `in-review` read back as `todo`, and
@@ -198,8 +201,8 @@ const LIST_FIELDS = 'number,url,labels';
 /** How many issues `find` lists when the query sets no limit: `gh issue list`'s default. */
 const DEFAULT_FIND_LIMIT = 30;
 
-/** The close reason `gh issue view` answers for an issue closed as not planned. */
-const NOT_PLANNED = 'NOT_PLANNED';
+/** The close reasons `gh issue view` answers for an issue closed as not planned or as a duplicate. */
+const CANCELLED_REASONS: ReadonlySet<string> = new Set(['NOT_PLANNED', 'DUPLICATE']);
 
 /** An issue number as written: a positive whole number with no leading zero. */
 const ISSUE_NUMBER = /^[1-9]\d*$/;
@@ -540,7 +543,7 @@ export function moduleOfLabels(labels: readonly string[]): string {
 /** The state `get` answers for a viewed issue; see the module note. */
 function stateOf(viewed: ViewedIssue): IssueState {
   if (viewed.state === 'OPEN') return 'todo';
-  return viewed.stateReason === NOT_PLANNED
+  return viewed.stateReason !== null && CANCELLED_REASONS.has(viewed.stateReason)
     ? 'cancelled'
     : 'done';
 }

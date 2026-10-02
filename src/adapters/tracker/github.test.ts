@@ -386,7 +386,9 @@ describe('reading an issue', () => {
   it.each([
     ['OPEN', '', 'todo'],
     ['OPEN', 'NOT_PLANNED', 'todo'],
+    ['OPEN', 'DUPLICATE', 'todo'],
     ['CLOSED', 'NOT_PLANNED', 'cancelled'],
+    ['CLOSED', 'DUPLICATE', 'cancelled'],
     ['CLOSED', 'COMPLETED', 'done'],
   ] as const)('reads an issue in state %s with close reason %p as %s', async (state, stateReason, expected) => {
     const { tracker, fake } = overFake();
