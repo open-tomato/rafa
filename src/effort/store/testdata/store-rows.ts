@@ -25,12 +25,18 @@ export function storeRows(path: string): StoreRows {
   const db = new Database(path, { readonly: true });
   try {
     const names = db.query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\' ORDER BY name').all();
-    const tables = Object.fromEntries(names.map(({ name }) => [
-      name,
-      db.query<Record<string, unknown>, []>(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all()
-        .map((row) => JSON.stringify(row))
-        .sort(),
-    ]));
+    const tables = Object.fromEntries(names.map(({ name }) => {
+      const quoted = `"${name.replaceAll('"', '""')}"`;
+      const columns = db.query<{ name: string }, []>(`PRAGMA table_info(${quoted})`).all()
+        .map((column) => `"${column.name.replaceAll('"', '""')}"`)
+        .join(', ');
+      return [
+        name,
+        db.query<Record<string, unknown>, []>(`SELECT ${columns} FROM ${quoted}`).all()
+          .map((row) => JSON.stringify(row))
+          .sort(),
+      ];
+    }));
     const userVersion = db.query<{ user_version: number }, []>('PRAGMA user_version').get()?.user_version ?? 0;
     return { userVersion, tables };
   } finally {
