@@ -123,7 +123,9 @@ One loop at a time; never two at once inside a stretch.
    `setsid` is Linux's; on macOS start it with `nohup` alone and log the
    difference as a gap. Detached loops are a gap of their own.
 3. Watch it: read the log's `rafa·` lines and `rafa loop status`. Wait
-   with a background check on the log, never a tight loop of reads.
+   with a background check on the log, never a tight loop of reads. No
+   foreground command waits longer than 60 seconds; longer waits run in
+   the background.
 4. Merge its pull request into the integration branch:
    `rafa pr merge <pr> --skip-checks` when the repository reports no
    checks; `rafa pr wait <pr>` then `rafa pr merge <pr>` when it does.
