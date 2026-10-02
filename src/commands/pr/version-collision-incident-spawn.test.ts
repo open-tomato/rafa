@@ -61,6 +61,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseFragment } from '../../release/fragment.js';
 import { plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-version-collision-incident-')));
@@ -104,10 +105,7 @@ function isolatedEnv(home: string): Record<string, string> {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }

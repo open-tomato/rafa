@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-status-worktree-')));
 
@@ -38,10 +39,7 @@ function git(cwd: string, home: string, args: readonly string[]): void {
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
       LC_ALL: 'C',
     },
   });

@@ -61,6 +61,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { SEPARATOR } from './current.js';
 
@@ -122,6 +123,7 @@ function gitEnv(scratch: ScratchRepo): Readonly<Record<string, string | undefine
     HOME: scratch.home,
     GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
+    ...gitIdentityEnv(),
   };
 }
 

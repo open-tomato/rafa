@@ -59,6 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseSemanticVersion } from '../../release/version.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import {
   createReleaseTagCommand,
@@ -752,10 +753,7 @@ describe('what the default seams reach', () => {
         HOME: home,
         GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
         GIT_CONFIG_NOSYSTEM: '1',
-        GIT_AUTHOR_NAME: 'rafa test',
-        GIT_AUTHOR_EMAIL: 'test@example.invalid',
-        GIT_COMMITTER_NAME: 'rafa test',
-        GIT_COMMITTER_EMAIL: 'test@example.invalid',
+        ...gitIdentityEnv(),
       },
     });
   }
