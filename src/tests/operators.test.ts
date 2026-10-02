@@ -61,4 +61,35 @@ describe('the bundled operators', () => {
     expect(`${run.stdout.toString()}${run.stderr.toString()}`).not.toContain('error');
     expect(run.exitCode).toBe(0);
   });
+
+  describe('the stretch text for verify', () => {
+    /** A file's text with every run of whitespace folded to one space. */
+    const flat = (file: string): string => readFileSync(join(OPERATORS, file), 'utf8').replace(/\s+/g, ' ');
+
+    /** The numbered step of "Run one item" that opens with `n.`, up to the next step. */
+    const runOneItemStep = (n: number): string => {
+      const text = readFileSync(join(OPERATORS, 'agents/rafa-stretch-engineer.md'), 'utf8');
+      const section = text.split(/^### 2\. Run one item$/m)[1]?.split(/^### 3\./m)[0] ?? '';
+      const step = section.split(new RegExp(`^${n}\\. `, 'm'))[1]?.split(/^\d\. /m)[0] ?? '';
+
+      return step.replace(/\s+/g, ' ');
+    };
+
+    it('puts the 60-second line inside step 3 of "Run one item"', () => {
+      expect(runOneItemStep(3)).toContain('No foreground command waits longer than 60 seconds; longer waits run in the background.');
+    });
+
+    it('names the skip-checks merge for stretch/<n> and the wait for main in step 4', () => {
+      const step = runOneItemStep(4);
+
+      expect(step).toContain('Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`');
+      expect(step).toContain('Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>`');
+    });
+
+    it('names verify.yml in the pit stop CI row', () => {
+      const row = flat('skills/rafa-stretch-pit-stop/SKILL.md').match(/\| CI \|[^|]*\|/)?.[0] ?? '';
+
+      expect(row).toContain('gh run list --branch stretch/<n> --workflow verify.yml --limit 1');
+    });
+  });
 });
