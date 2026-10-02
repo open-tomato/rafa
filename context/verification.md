@@ -177,12 +177,6 @@ is a real parity failure, not the sibling appending mid-run.
 binary's stdout is not captured away from the suite's own, so both land in
 the run log. Read the counts and exit code, never the prose around them.
 
-**A worktree runs fewer skills-tier tests.** Three of the skills-tier
-checker suite's cases fail inside a `git worktree` of this repository and
-pass in the main checkout. The cause is not investigated. Run only the
-file you are proving in the worktree, or subtract those three before
-comparing a full run there against a run in the main checkout.
-
 **One `copy.test.ts` case reads a filesystem-specific error string.**
 `rafa effort copy over a live store`'s `copies while another connection
 holds a read transaction...` expects `database is locked` but this machine's
