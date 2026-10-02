@@ -7,6 +7,10 @@
  * a phrase both prompts carry anyway. The classifier key is read with
  * the classifier itself, as `wrap-up.test.ts` reads it.
  *
+ * The retry's create bullet names the run's base, `integration` here as
+ * `pr.base: integration` resolves it, and the cases read that the
+ * session `retryWrapUp` spawns is handed the same base.
+ *
  * `retryWrapUp` is driven through a stand-in spawner with no learning
  * and no serving, so no session, git or `gh` is reached: the cases read
  * the prompt it spawned, the directory it spawned in, and the message it
@@ -31,6 +35,9 @@ const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
 /** A plan body standing in for the `full` rendering appended below. */
 const PLAN = '# Plan: loop run ends delivered\n\n- [ ] A task\n';
 
+/** The run's base, as `runWrapUp` resolves it under `pr.base: integration`. */
+const BASE = 'integration';
+
 /** A final message as a session that stopped before `gh pr create` might write it. */
 const MESSAGE = [
   'Merged origin/main and pushed the branch.',
@@ -44,6 +51,7 @@ const MESSAGE = [
 function retryPrompt(previousMessage: string = MESSAGE): string {
   return buildWrapUpRetryPrompt({
     branch: BRANCH,
+    base: BASE,
     planContent: PLAN,
     release: null,
     lessons: [],
@@ -60,7 +68,7 @@ describe('the retry wrap-up prompt', () => {
   });
 
   test('says the pull request is missing, naming the branch, where the first prompt does not', () => {
-    const first = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
 
     expect(retryPrompt()).toContain(`The pull request is MISSING. An earlier wrap-up session on this run ended, and no open pull request exists for ${BRANCH}.`);
     expect(first).not.toContain('MISSING');
@@ -122,11 +130,28 @@ describe('the retry wrap-up prompt', () => {
     ]);
   });
 
-  test('asks for `gh pr create`, never the edit of an open pull request', () => {
+  test('asks for `gh pr create --base integration`, never the edit of an open pull request', () => {
     const prompt = retryPrompt();
 
-    expect(prompt).toContain(`No open PR was found for ${BRANCH}: open one with \`gh pr create\`.`);
+    expect(prompt).toContain(`No open PR was found for ${BRANCH}: open one with \`gh pr create --base integration\`.`);
+    expect(prompt).not.toContain('`gh pr create`');
     expect(prompt).not.toContain('is already open for');
+  });
+
+  test('names the base it is handed, not a default', () => {
+    const onMain = buildWrapUpRetryPrompt({
+      branch: BRANCH,
+      base: 'main',
+      planContent: PLAN,
+      release: null,
+      lessons: [],
+      previousMessage: MESSAGE,
+    });
+
+    // The control for the case above: the same retry over another base
+    // names that base and not `integration`.
+    expect(onMain).toContain('`gh pr create --base main`');
+    expect(onMain).not.toContain('--base integration');
   });
 
   test('is the first wrap-up prompt with the bullet inserted, the plan still appended whole', () => {
@@ -139,9 +164,10 @@ describe('the retry wrap-up prompt', () => {
       notesLevel: null,
       problems: [],
     };
-    const first = buildWrapUpPrompt(BRANCH, PLAN, null, skipped, []);
+    const first = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, skipped, []);
     const retry = buildWrapUpRetryPrompt({
       branch: BRANCH,
+      base: BASE,
       planContent: PLAN,
       release: skipped,
       lessons: [],
@@ -182,6 +208,7 @@ describe('retryWrapUp', () => {
     const answer = await retryWrapUp({
       previousMessage: MESSAGE,
       branch: BRANCH,
+      base: BASE,
       planContent: PLAN,
       settingSources: ['project'],
       serving: null,
@@ -204,6 +231,7 @@ describe('retryWrapUp', () => {
     // when a retry runs (see the module note).
     expect(spawned[0]?.prompt).toBe(withStamp(retryPrompt()));
     expect(spawned[0]?.prompt).toContain('  > Merged origin/main and pushed the branch.');
+    expect(spawned[0]?.prompt).toContain('`gh pr create --base integration`');
   });
 
   test('answers its own final message, so the next retry quotes this one', async () => {

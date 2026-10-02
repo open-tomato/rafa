@@ -113,7 +113,7 @@ describe('wrap-up over a scratch repository', () => {
       promoteAfter: 3,
       promoteMinConfidence: 0.7,
     });
-    const prompt = buildWrapUpPrompt(BRANCH, '# Plan\n', null, null, lessons);
+    const prompt = buildWrapUpPrompt(BRANCH, 'main', '# Plan\n', null, null, lessons);
 
     // Listed: the lesson at 0.7; the control, at 0.6, is not.
     expect(lessons.map((each) => each.id)).toEqual(['held-three']);

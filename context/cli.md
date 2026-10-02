@@ -424,6 +424,11 @@ New; it replaces no earlier text. What a row or an action added to
   from 1 to 3; `false` skips straight to opening the pull request). Each
   retry session is told that the pull request is missing and given the
   previous session's final message, allowing the session to correct course.
+  The wrap-up and each retry are told to open it with
+  `gh pr create --base <base>`, the run's base (`pr.base`, else
+  `origin/HEAD`'s target, else `main`) as `runWrapUp`
+  (`start/wrap-up-run.ts`) resolves it once for them and for the runner's
+  own open; a pull request already open is only pushed to and edited.
   If no retry succeeds in opening one, the runner opens it itself, titled
   `rafa-<n>: <plan title>`, with a body opening `Closes #<n>`, the release
   fragment's notes, and a line saying the wrap-up did not finish. A push or
