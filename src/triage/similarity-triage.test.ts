@@ -243,6 +243,27 @@ describe('the nearest open bug at or above the threshold', () => {
   });
 });
 
+describe('an open bug naming another test file', () => {
+  it('is skipped however many words it shares, and a new bug is filed', async () => {
+    const { issuesDir, calls, session } = freshCase();
+    const inFile = (file: string, bug: ReportBug): ReportBug => ({
+      ...bug,
+      artifact: `${bug.artifact} in ./src/${file}`,
+    });
+    await session(inFile('alpha.test.ts', FIRST));
+    const mark = calls.length;
+
+    const result = await session(inFile('beta.test.ts', REWORDED), DEFAULTS);
+
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', foundBy: null, problem: null });
+    expect(callsSince(calls, mark)).toEqual(['find', 'openIssues', 'create']);
+    const texts = issueTexts(issuesDir);
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).not.toContain('Reported again');
+    expect(texts[1]).not.toContain('alpha.test.ts');
+  });
+});
+
 describe('no open bug at the threshold', () => {
   it('files a new bug whose Possible duplicates section lists the nearest, highest score first', async () => {
     const { issuesDir, session } = freshCase();
