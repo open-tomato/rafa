@@ -61,10 +61,13 @@ means it is new. Only new failures block the next task. A stage-end step
 with new failures names them in the blocker text the retry session
 receives through `BLOCKER_PROMPT_PREFIX`.
 
-**These recorded steps are the WHOLE of verification; there is no hosted
-workflow.** The repository carries no `.github/workflows/` on any branch,
-so `gh pr checks <n>` answers `no checks reported`. That is the expected
-reading. To verify a PR's state, capture the three task session gates
+**One hosted workflow repeats the gates outside a loop.**
+`.github/workflows/verify.yml` runs one job, `verify`, on every pull
+request into `main` and every push to `stretch/**`: `bun test`,
+`bunx eslint .` and `bunx tsc --noEmit`, each a step that runs unless the
+job was cancelled. A pull request into `stretch/**` reports no check, so
+`gh pr checks <n>` answers `no checks reported` there; that is the
+expected reading. To verify a PR's state, capture the three task session gates
 at the commit that is actually the PR's head, and read the runner's
 recorded steps from the `.rafa/runs/<run-id>.json` file when a loop ran.
 One more gate runs at `git commit`: `.githooks/pre-commit` runs
