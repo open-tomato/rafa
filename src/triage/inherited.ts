@@ -10,22 +10,27 @@
  * A bug is inherited from a run-start failure ({@link inheritedFailureOf})
  * when:
  *
- *   - it names a test case (`./test-failure.ts`) with a test file and an
- *     evidence line;
+ *   - it names a test case (`./test-failure.ts`) with a test file;
  *   - its test file's base name equals the failure's, and its case name,
  *     put on one line, equals the failure's: the test the step-1 key of
  *     `./bug-key.ts` names, so a bug that quotes the file with a folder
  *     and a baseline that holds it without one still match;
- *   - its evidence line holds the failure's message, both read as the key
- *     reads an evidence line (`keyText`: commit hashes, folder prefixes
- *     and numbers taken out, on one line). Holds rather than equals, since
- *     a session quotes a line around what the JUnit message says.
+ *   - when the failure has a message, its evidence line holds that
+ *     message, both read as the key reads an evidence line (`keyText`:
+ *     commit hashes, folder prefixes and numbers taken out, on one line).
+ *     Holds rather than equals, since a session quotes a line around what
+ *     the JUnit message says. A bug with no evidence line matches no
+ *     failure that has a message.
  *
- * A run-start failure with no message, or a blank one, matches nothing:
- * the test name alone would also match a different failure of the same
- * test, which the run did not inherit. A bug with no test file or no
- * evidence line matches nothing for the same reason. The first failure
- * that matches is answered, in the baseline's order.
+ * A run-start failure with no message, or a blank one, is matched on test
+ * file and case alone, and the bug's evidence line is not read. Bun 1.3.14
+ * writes a failing `toBe`'s `<failure>` with no `message` attribute where
+ * 1.4.2 writes one (`../suite/testdata/no-message.junit.xml`), so under
+ * the pinned Bun a red test's baseline failure carries none. Matching on
+ * the name alone can also take a different failure of that same test as
+ * inherited; the test was red when the run started either way. A bug with
+ * no test file matches nothing. The first failure that matches is
+ * answered, in the baseline's order.
  *
  * The bug is read from the values triage keys it by, with local paths
  * already taken out; a baseline's file and message are compared as the
@@ -65,11 +70,12 @@ export function isOpenIssueState(state: IssueState): boolean {
 /** True when `failure`, read from a bug, is the run-start `baseline` failure; see the module note. */
 function sameFailure(failure: TestFailure, baseline: SuiteFailure): boolean {
   const { file, evidence } = failure;
+  if (file === null) return false;
+  const sameTest = basename(file) === basename(baseline.file)
+    && oneLine(failure.name) === oneLine(baseline.name);
   const message = baseline.message ?? null;
-  if (file === null || evidence === null || !hasText(message)) return false;
-  return basename(file) === basename(baseline.file)
-    && oneLine(failure.name) === oneLine(baseline.name)
-    && keyText(evidence).includes(keyText(message));
+  if (!sameTest || !hasText(message)) return sameTest;
+  return evidence !== null && keyText(evidence).includes(keyText(message));
 }
 
 /**

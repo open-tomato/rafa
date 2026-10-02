@@ -80,7 +80,13 @@ When the option is left out or its threshold is `false`, step 3 is off.
 
 When `TriageOptions.inherited` provides the run-start baseline's failures, a
 public bug that `./inherited.ts` reads as one of those is a red test the run
-started with, not one its task made: its action is `inherited`. Nothing is
+started with, not one its task made: its action is `inherited`. The bug
+matches a failure when it names a test file and case whose base name and
+case name equal the failure's, and, when the failure has a message, its
+evidence line holds that message. A failure with no message, or a blank one,
+is matched on test file and case alone: Bun 1.3.14 writes a failing `toBe`'s
+`<failure>` with no `message` attribute where 1.4.2 writes one, so under the
+pinned Bun a baseline failure often carries none. Nothing is
 filed for it. Its key is looked up as steps 1 and 2 above look one up, and
 the issue they find has its state read; an open one is commented on unless
 it already was this run. The key goes into the option's `commented` set once

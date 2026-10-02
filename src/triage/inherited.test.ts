@@ -5,25 +5,30 @@
  * The match is read on its own, then through a recording tracker over a
  * temporary directory and the real SQLite store under it: an inherited
  * bug files nothing and comments on its open issue once per run, while a
- * bug whose message differs, or that matches a run-start failure with no
- * message, is filed as before.
+ * bug whose message differs is filed as before. A run-start failure with
+ * no message is matched on test file and case alone, read both as built
+ * here and through `runSuite` over `../suite/testdata/no-message.junit.xml`,
+ * recorded from bun 1.3.14, whose `<failure>` carries no `message`.
  */
 import type { InheritedTriage } from './inherited.js';
 import type { TriageResult } from './triage.js';
 import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';
-import type { SuiteFailure } from '../suite/run.js';
+import type { SuiteFailure, SuiteSpawner } from '../suite/run.js';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { runSuite } from '../suite/run.js';
 
 import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import { triageReport } from './triage.js';
+
+const TESTDATA = join(import.meta.dir, '..', 'suite', 'testdata');
 
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-triage-inherited-'));
 let rootCount = 0;
@@ -66,11 +71,35 @@ describe('inheritedFailureOf', () => {
     expect(inheritedFailureOf(BUG, [other])).toBeNull();
   });
 
-  it('matches nothing for a baseline failure with no message, or a blank one', () => {
+  it('matches a baseline failure with no message, or a blank one, on file and case alone', () => {
     const { file, name } = BASELINE_FAILURE;
+    const noEvidence = { what: BUG.what, artifact: 'src/parse/parse.test.ts > parse > drops the last line' };
+    const otherCase = { what: BUG.what, artifact: ARTIFACT.replace('drops the last line', 'keeps the first line') };
 
-    expect(inheritedFailureOf(BUG, [{ file, name }])).toBeNull();
-    expect(inheritedFailureOf(BUG, [{ file, name, message: '  ' }])).toBeNull();
+    expect(inheritedFailureOf(BUG, [{ file, name }])).toEqual({ file, name });
+    expect(inheritedFailureOf(BUG, [{ file, name, message: '  ' }])).toEqual({ file, name, message: '  ' });
+    expect(inheritedFailureOf(noEvidence, [{ file, name }])).toEqual({ file, name });
+    // Control: the same failure with its message still reads the evidence line, and another case never matches.
+    expect(inheritedFailureOf(noEvidence, [BASELINE_FAILURE])).toBeNull();
+    expect(inheritedFailureOf(otherCase, [{ file, name }])).toBeNull();
+  });
+
+  it('matches the failure runSuite reads from a report whose <failure> has no message, as bun 1.3.14 writes it', async () => {
+    const dir = mkdtempSync(join(tempBase, 'suite-'));
+    const junitFile = join(dir, 'run.junit.xml');
+    const spawn: SuiteSpawner = async () => {
+      copyFileSync(join(TESTDATA, 'no-message.junit.xml'), junitFile);
+      return { exitCode: 1, stderr: readFileSync(join(TESTDATA, 'no-message.stderr.txt'), 'utf8') };
+    };
+
+    const { failures } = await runSuite({ cwd: dir, junitFile, spawn });
+
+    expect(readFileSync(join(TESTDATA, 'no-message.junit.xml'), 'utf8')).toContain('<failure type="AssertionError" />');
+    expect(failures).toEqual([{ file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' }]);
+    expect(inheritedFailureOf(BUG, failures)).toEqual(failures[0]!);
+    // Control: a bug naming another case of that file is not taken for it.
+    const otherCase = { what: BUG.what, artifact: ARTIFACT.replace('drops the last line', 'keeps the first line') };
+    expect(inheritedFailureOf(otherCase, failures)).toBeNull();
   });
 
   it('matches nothing for another case or another file', () => {
@@ -234,15 +263,15 @@ describe('triageReport with the run-start failures', () => {
     expect(recorded.created).toHaveLength(1);
   });
 
-  it('files a bug whose run-start failure has no message', async () => {
+  it('answers a bug inherited whose run-start failure has no message', async () => {
     const root = freshRoot();
     const recorded = recordingTracker(root);
     const { file, name } = BASELINE_FAILURE;
 
     const result = await triage(root, recorded, BUG, inheritedOf([{ file, name }]));
 
-    expect(result.bugs[0]).toMatchObject({ action: 'filed' });
-    expect(recorded.created).toHaveLength(1);
+    expect(result.bugs[0]).toMatchObject({ action: 'inherited' });
+    expect(recorded.created).toHaveLength(0);
   });
 
   it('comments once when the bug is seen twice in one run', async () => {
