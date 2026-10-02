@@ -78,7 +78,10 @@
  *     that is a `/pull/<n>` URL, refuses output holding none, and
  *     answers what `gh pr view <n>` then reads, rather than a summary
  *     built from what it sent. `editTitle` is `gh pr edit <n> --title`,
- *     read by its exit code alone, as `editBody` is.
+ *     read by its exit code alone, as `editBody` is, and `editBase` is
+ *     `gh pr edit <n> --base` (`-B, --base branch`, "Change the base
+ *     branch for this pull request", in `gh pr edit --help` on 2.101.0),
+ *     read the same way.
  *   - **The workflow count is `total_count`, never the length of
  *     `workflows`.** `gh api repos/<repo>/actions/workflows` without
  *     `--paginate` answers the first page of 30 beside the whole count
@@ -629,6 +632,13 @@ export function createGhPullRequests(options: GhPullRequestsOptions): PullReques
       const text = textArgument(title, 'editTitle', 'title', false);
       // Nothing reads what the edit wrote, as for `editBody`; see the module note.
       await succeed(['pr', 'edit', target, '--title', text], `gh pr edit ${target} --title <title>`);
+    },
+
+    editBase: async (number: number, base: string): Promise<void> => {
+      const target = pullNumber(number, 'editBase');
+      const branch = textArgument(base, 'editBase', 'base', false);
+      // Nothing reads what the edit wrote, as for `editBody`; see the module note.
+      await succeed(['pr', 'edit', target, '--base', branch], `gh pr edit ${target} --base ${branch}`);
     },
 
     editBody: async (number: number, body: string): Promise<void> => {
