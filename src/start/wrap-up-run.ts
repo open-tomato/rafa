@@ -189,7 +189,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   });
   emitLoopEvent({ kind: 'wrap-up', phase: 'release' });
   const finish = await finishRelease(
-    { repoRoot: checkout, settings, preparation: release },
+    { repoRoot: checkout, branch: expected.branch, settings, preparation: release },
     { readProvider },
   );
   // The pull request, delivered after step 3 and before the CI gate:

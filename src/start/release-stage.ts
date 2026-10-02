@@ -147,6 +147,17 @@
  * error level, because a configured `none` provider writing no body is
  * the setting working and not a fault — the failure it reports, when
  * there is one, was already printed above it at its own level.
+ *
+ * ## Whose branch is pushed, and whose body is written
+ *
+ * The push and the pull request lookup both name
+ * {@link ReleaseFinishInput.branch}, the run's head branch as the
+ * caller holds it (`expected.branch` in `src/start/wrap-up-run.ts`).
+ * It is a fact of the run, so it is handed in rather than read: under
+ * `loop start --as-worktree` the process stands in the main checkout,
+ * whose branch is the base, and a `getCurrentBranch()` with no
+ * directory would push the base and write the line into whatever pull
+ * request has the base as its head, or none (#627).
  */
 import type { GitResult, GitRunner, PrProviderReading, PullRequests, PushOutcome } from '../pr/index.js';
 import type { BranchForecast, BranchForecastInput, BranchForecastSettings } from '../release/branch-forecast.js';
@@ -175,7 +186,6 @@ import { releaseLevelReport } from '../release/level.js';
 import { prepareRelease } from '../release/prepare.js';
 import { verifyRelease } from '../release/verify.js';
 import { RELEASE_BASE_BRANCH } from '../release/version.js';
-import { getCurrentBranch } from '../utils/git.js';
 
 /**
  * The effects this stage reaches through, in one object so a test
@@ -202,8 +212,6 @@ export interface ReleaseStageSeams {
    * reaches no `gh`; see the module note.
    */
   readonly readProvider: (repoRoot: string) => PrProviderReading;
-  /** The branch whose pull request carries the body. */
-  readonly currentBranch: () => string;
   /** When the forecast is made; a merge now would add the fragment on its UTC day. */
   readonly now: () => Date;
 }
@@ -221,7 +229,6 @@ export const RELEASE_STAGE_SEAMS: ReleaseStageSeams = {
   // a reader carrying the run's own `pr.provider`; this default is what
   // a caller that names no seam gets.
   readProvider: (repoRoot: string) => resolvePrProvider({ configured: null, dir: repoRoot }),
-  currentBranch: getCurrentBranch,
   now: () => new Date(),
 };
 
@@ -262,6 +269,13 @@ export interface ReleaseFinishInput {
    * checkout, the same working tree step 1 wrote the two files in.
    */
   readonly repoRoot: string;
+  /**
+   * The run's head branch: the branch the fragment commit is pushed to
+   * and whose open pull request carries the body. Handed in rather than
+   * read, because the process may stand in another checkout than the
+   * run's; see the module note.
+   */
+  readonly branch: string;
   /** The release settings step 1 ran under; step 3 and the forecast read them too. */
   readonly settings: ReleaseStageSettings;
   /** Step 1's record, or null when no preparation ran; see the module note. */
@@ -566,18 +580,18 @@ function announceBody(write: ReleaseBodyWrite, count: number): void {
  * Writes `write` into the pull request body through the resolved
  * provider, or prints the one line naming what went unwritten.
  */
-async function writeBody(io: ReleaseStageSeams, repoRoot: string, write: BodyWrite): Promise<ReleaseBodyWrite> {
+async function writeBody(io: ReleaseStageSeams, input: ReleaseFinishInput, write: BodyWrite): Promise<ReleaseBodyWrite> {
   // Read BEFORE the provider is built, so a `none` repository spawns no
   // `gh`; the one line it prints names what went unwritten. See the
   // module note.
-  const reading = io.readProvider(repoRoot);
+  const reading = io.readProvider(input.repoRoot);
   if (reading.provider !== 'gh') {
     const problem = noProviderProblem(reading);
     activeOutput().info(`   No pull request body carries ${JSON.stringify(write.lines.join(' '))}: ${problem}.`);
     return unwritten(null, problem);
   }
 
-  const body = await carryIntoBody(io.pulls(repoRoot), io.currentBranch(), write);
+  const body = await carryIntoBody(io.pulls(input.repoRoot), input.branch, write);
   announceBody(body, write.lines.length);
   return body;
 }
@@ -588,7 +602,7 @@ type FinishFacts = Pick<ReleaseFinish, 'fragment' | 'subject' | 'sha' | 'levelRe
 /** A finish that ends in a sentence: written to the body, then reported. */
 async function reportFailure(
   io: ReleaseStageSeams,
-  repoRoot: string,
+  input: ReleaseFinishInput,
   outcome: Exclude<ReleaseFinishOutcome, 'none' | 'released'>,
   sentence: string,
   facts: FinishFacts,
@@ -602,7 +616,7 @@ async function reportFailure(
 
   const parts = { forecast: null, levelReport: facts.levelReport };
   const block = releaseBodyBlock(parts);
-  const body = await writeBody(io, repoRoot, { sentence, block, lines: [sentence, ...releaseBodyLines(parts)] });
+  const body = await writeBody(io, input, { sentence, block, lines: [sentence, ...releaseBodyLines(parts)] });
   return { outcome, sentence, forecast: null, body, ...facts };
 }
 
@@ -631,7 +645,7 @@ async function reportForecast(
 
   const parts = { forecast, levelReport: facts.levelReport };
   const block = releaseBodyBlock(parts);
-  const body = await writeBody(io, input.repoRoot, { sentence: null, block, lines: releaseBodyLines(parts) });
+  const body = await writeBody(io, input, { sentence: null, block, lines: releaseBodyLines(parts) });
   return { outcome: 'released', sentence: null, forecast, body, ...facts };
 }
 
@@ -651,7 +665,7 @@ export async function finishRelease(
   seams: Partial<ReleaseStageSeams> = {},
 ): Promise<ReleaseFinish> {
   const io: ReleaseStageSeams = { ...RELEASE_STAGE_SEAMS, ...seams };
-  const { preparation, repoRoot, settings } = input;
+  const { preparation, repoRoot, branch, settings } = input;
   if (preparation === null) return NO_RELEASE;
 
   const levelReport = releaseLevelReport({
@@ -661,20 +675,20 @@ export async function finishRelease(
   });
   const none: FinishFacts = { fragment: null, subject: null, sha: null, levelReport };
   if (preparation.kind === 'skipped') {
-    return reportFailure(io, repoRoot, 'skipped', preparation.sentence, none);
+    return reportFailure(io, input, 'skipped', preparation.sentence, none);
   }
 
   const git = io.git(repoRoot);
   const verification = io.verify(preparation, { git, settings });
   if (verification.kind === 'refused') {
-    return reportFailure(io, repoRoot, 'refused', verification.sentence, none);
+    return reportFailure(io, input, 'refused', verification.sentence, none);
   }
 
   const fragment = verification.path;
   const subject = releaseSubject(preparation);
   const commit = commitFragment(git, fragment, subject);
   if (!commit.committed) {
-    return reportFailure(io, repoRoot, 'uncommitted', commit.sentence, { ...none, fragment, subject });
+    return reportFailure(io, input, 'uncommitted', commit.sentence, { ...none, fragment, subject });
   }
 
   const out = activeOutput();
@@ -682,14 +696,13 @@ export async function finishRelease(
   const facts: FinishFacts = { fragment, subject, sha, levelReport };
   out.info(`\n📦 Committed ${commitName(sha, subject)} over ${fragment}.`);
 
-  const branch = io.currentBranch();
   const pushed = io.push(repoRoot, branch);
   if (!pushed.ok) {
     const said = pushed.output.trim() === ''
       ? ''
       : `: ${pushed.output.trim().split('\n')[0] ?? ''}`;
     const sentence = `${commitName(sha, subject)} was made but could not be pushed to ${branch}${said}`;
-    return reportFailure(io, repoRoot, 'unpushed', sentence, facts);
+    return reportFailure(io, input, 'unpushed', sentence, facts);
   }
 
   out.info(`   Pushed it to ${branch}.`);

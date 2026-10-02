@@ -271,9 +271,8 @@ describe('wrap-up release fragment over a scratch repository', () => {
 
     const double = bodyDouble(branch);
     const finish = await finishRelease(
-      { repoRoot: root, settings: SETTINGS, preparation },
+      { repoRoot: root, branch, settings: SETTINGS, preparation },
       {
-        currentBranch: () => branch,
         pulls: () => double.pulls.pulls,
         readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
         now: () => new Date('2026-09-20T09:00:00Z'),
@@ -328,9 +327,8 @@ describe('wrap-up release fragment over a scratch repository', () => {
 
     const double = bodyDouble(branch);
     const finish = await finishRelease(
-      { repoRoot: root, settings: SETTINGS, preparation },
+      { repoRoot: root, branch, settings: SETTINGS, preparation },
       {
-        currentBranch: () => branch,
         pulls: () => double.pulls.pulls,
         readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
         now: () => new Date('2026-09-20T09:00:00Z'),
