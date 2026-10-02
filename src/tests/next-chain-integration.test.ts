@@ -13,8 +13,9 @@
  * from. Neither runs the THREE actions in sequence: this is the first
  * suite to walk `merge` → `plan` → `start` as one `rafa next` invocation
  * would, over a repository real enough that the base checkout, the
- * pull, both branch deletions and the branch `loop start` cuts are real
- * git rather than a scripted answer.
+ * pull, both branch deletions, the claim branch `plan create` pushes and
+ * the switch `loop start` makes onto it are real git rather than a
+ * scripted answer.
  *
  * `./next-chain-zero-checks-integration.test.ts` is this suite's
  * sibling: the same scratch-repository shape, over a pull request that
@@ -52,17 +53,28 @@
  *  - The git seam wraps the real runner (`createGitRunner`): every
  *    call still runs for real, and every one is also pushed as
  *    `"git <args>"`, which is how the base checkout, the pull, both
- *    branch deletions and the branch `loop start` cuts from the pulled
- *    base all land in the one log, each in git's own words.
+ *    branch deletions and the switch `loop start` makes onto the claim
+ *    branch all land in the one log, each in git's own words.
  *  - The planner adapter — the stand-in planner session `plan create`
  *    resolves in place of a real Claude Code session — pushes
  *    `"plan create"` before writing `PLAN-<stub>.md` itself.
  *  - `loop start` is replaced with a command that pushes nothing of its
- *    own UNTIL it has created the branch for real, through the actual
- *    `offerRunBranch` (`src/start/branch.ts`) over the same git seam —
- *    proving the branch really is cut from the base `pr merge` just
- *    pulled — and only then pushes `"loop start"`. No session is
- *    spawned: the chain only needs to know a loop WOULD have started.
+ *    own UNTIL it has switched to the branch for real, through the
+ *    actual `offerRunBranch` (`src/start/branch.ts`) over the same git
+ *    seam, and only then pushes `"loop start"`. No session is spawned:
+ *    the chain only needs to know a loop WOULD have started.
+ *
+ * ## The branch is the claim branch
+ *
+ * The probe runs with a git identity (`scratchHomeEnv`), so `plan
+ * create` claims the issue for real: one empty `claim(rafa-<n>): claim`
+ * commit on the pulled base, pushed as `feat/<stub>` (`src/claims/`).
+ * `rafa next` reads that plan as unstarted all the same, because its
+ * branch holds claim commits alone (`src/next/readings.ts`), and
+ * `loop start` finds the branch on the remote and switches to it with
+ * `--track` rather than cutting it with `-c`. That the branch grows
+ * from the base `pr merge` just pulled is read off real git: the tip is
+ * the claim commit, and its parent is `origin/<base>`.
  *
  * `pr merge` and `plan create` are the real registered commands, run
  * exactly as `rafa next`'s own action table would call them
@@ -101,8 +113,14 @@ afterAll(() => {
 /** The stub `plan create --next` derives from {@link NEXT_ISSUE} and {@link NEXT_TITLE}. */
 const NEW_STUB = planStub(NEXT_ISSUE, NEXT_TITLE);
 
-/** The branch `loop start` cuts for {@link NEW_STUB}. */
+/** The claim branch `plan create` pushes for {@link NEW_STUB}, and `loop start` runs on. */
 const NEW_BRANCH = `feat/${NEW_STUB}`;
+
+/** The switch `loop start` makes onto {@link NEW_BRANCH}, which the remote already holds. */
+const SWITCH_TO_NEW = `git switch --track origin/${NEW_BRANCH}`;
+
+/** The subject of the one claim commit `plan create` makes on {@link NEW_BRANCH}. */
+const CLAIM_SUBJECT = `claim(rafa-${NEXT_ISSUE}): claim`;
 
 /** The roadmap issue's body: one undone line, naming {@link NEXT_ISSUE}. */
 const ROADMAP_BODY = `- [ ] #${NEXT_ISSUE} — ${NEXT_TITLE}\n`;
@@ -318,7 +336,7 @@ interface RepoSnapshot {
   readonly oldBranchLocal: boolean;
   /** Whether {@link OLD_BRANCH} still exists on the bare remote. */
   readonly oldBranchRemote: boolean;
-  /** Whether {@link NEW_BRANCH} has been cut in the work tree. */
+  /** Whether {@link NEW_BRANCH} exists as a local branch in the work tree. */
   readonly newBranchLocal: boolean;
   /** Whether the plan {@link NEW_STUB} names has been written. */
   readonly planExists: boolean;
@@ -354,7 +372,7 @@ describe('rafa next, over a real repository from a green pull request to a start
       `git branch -D ${OLD_BRANCH}`,
       `git push origin --delete ${OLD_BRANCH}`,
       'plan create',
-      `git switch -c ${NEW_BRANCH}`,
+      SWITCH_TO_NEW,
       'loop start',
     ];
     const positions = positionsOf(record.events, markers);
@@ -368,7 +386,8 @@ describe('rafa next, over a real repository from a green pull request to a start
     expect(git(scratch.work, scratch.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(NEW_BRANCH);
     expect(git(scratch.work, scratch.home, 'branch', '--list', OLD_BRANCH).stdout).toBe('');
     expect(git(join(scratch.root, 'origin.git'), scratch.home, 'show-ref', '--verify', `refs/heads/${OLD_BRANCH}`).ok).toBe(false);
-    expect(git(scratch.work, scratch.home, 'rev-parse', NEW_BRANCH).stdout)
+    expect(git(scratch.work, scratch.home, 'log', '-1', '--format=%s', NEW_BRANCH).stdout).toBe(CLAIM_SUBJECT);
+    expect(git(scratch.work, scratch.home, 'rev-parse', `${NEW_BRANCH}^`).stdout)
       .toBe(git(scratch.work, scratch.home, 'rev-parse', `origin/${BASE}`).stdout);
     expect(existsSync(join(scratch.work, '.rafa', 'plans', `PLAN-${NEW_STUB}.md`))).toBe(true);
   }, 30_000);
@@ -419,9 +438,9 @@ describe('rafa next --yes, over the same repository, at each ceiling this suite 
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
 
     // The loop is `start`, which this ceiling leaves out: nothing of its
-    // own ran, and the branch it would have cut was never cut.
+    // own ran, and nothing switched to the claim branch it would run on.
     expect(record.events.includes('loop start')).toBe(false);
-    expect(record.events.some((event) => event.startsWith(`git switch -c ${NEW_BRANCH}`))).toBe(false);
+    expect(record.events.some((event) => event.startsWith('git switch') && event.includes(NEW_BRANCH))).toBe(false);
     expect(stdout).toContain(`start the loop on \`${NEW_STUB}\`, creating its branch`);
 
     expect(git(scratch.work, scratch.home, 'rev-parse', '--abbrev-ref', 'HEAD').stdout).toBe(BASE);
@@ -443,7 +462,7 @@ describe('rafa next --yes, over the same repository, at each ceiling this suite 
       `git branch -D ${OLD_BRANCH}`,
       `git push origin --delete ${OLD_BRANCH}`,
       'plan create',
-      `git switch -c ${NEW_BRANCH}`,
+      SWITCH_TO_NEW,
       'loop start',
     ];
     const positions = positionsOf(record.events, markers);

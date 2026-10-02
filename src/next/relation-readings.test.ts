@@ -29,6 +29,12 @@ function readingsOver(closed: readonly number[], branches: ReadonlyMap<number, s
   return {
     isClosed: (issue) => Promise.resolve(closed.includes(issue)),
     branchFor: (issue) => branches.get(issue) ?? null,
+    branchClaimFor: (issue) => {
+      const branch = branches.get(issue) ?? null;
+      return Promise.resolve(branch === null
+        ? null
+        : { branch, claim: { state: 'none' } });
+    },
     pullRequestFor: () => Promise.resolve(null),
   };
 }

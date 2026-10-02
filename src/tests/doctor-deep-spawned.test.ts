@@ -60,7 +60,7 @@ const PLAN_FILE = 'PLAN-deep.md';
 
 /** Plants a TypeScript project with the skill under the scratch HOME only, and a stand-in `gh`. */
 function plantWorld(world: World = {}): ScratchRepo {
-  const scratch = plantScratchRepo(scratchBase);
+  const scratch = plantScratchRepo(scratchBase, { gitOnlyPath: true });
   plant(join(scratch.repo, 'tsconfig.json'), '{}\n');
   plant(
     join(scratch.home, '.claude', 'skills', SKILL, 'SKILL.md'),
