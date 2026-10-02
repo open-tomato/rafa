@@ -94,9 +94,14 @@
  * `what` names the epic and the criterion, and its `artifact` is
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
- * recurrence key is that artifact after {@link closeTriageFile}'s base
- * name, so a second close failing the same criterion comments on the
- * first issue rather than filing another. No file is read or written at
+ * recurrence key is that artifact, stripped of its numbers as
+ * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
+ * name, which keeps the epic's number, so a second close failing the same
+ * criterion comments on the first issue rather than filing another, unless
+ * that issue was closed as completed, when a new one is filed in its place
+ * (`src/triage/triage.ts`). A criterion whose key finds nothing is compared
+ * with the open bugs by its words, as the run's `triage.similarity` settings
+ * say, and comments on the nearest at the threshold. No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only
  * thing `triageReport` writes into its tracker file. The feedback holds
  * the check, the commit and the evidence. When #249's ladder lands it
@@ -453,6 +458,9 @@ export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly te
         ? 'an issue'
         : issueName(bug.ref)} on the ${bug.channel} tracker; commented on it.`, warn: false };
     }
+    case 'inherited': {
+      return { text: `${which}: not filed: a test failure the run started with.`, warn: false };
+    }
     case 'skipped': {
       return { text: `${which}: not filed: ${bug.problem ?? 'no reason given'}.`, warn: true };
     }
@@ -508,6 +516,7 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
         privateTracker: run.seams.privateTracker,
         secrets,
         seams: run.seams.findings,
+        similarity: run.config,
       });
       for (const bug of result.bugs) {
         const line = bugLine(criterion, bug);

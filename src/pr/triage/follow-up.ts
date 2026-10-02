@@ -53,7 +53,7 @@
  * ## The fence
  *
  * The excerpt goes in a fence one backtick longer than any backtick run
- * it holds, the rule `src/triage/triage.ts` already keeps for the text a
+ * it holds, the rule `src/triage/issue-text.ts` already keeps for the text a
  * session wrote: a CI log that prints a fenced snippet of its own would
  * otherwise close the excerpt early and spill the rest of the prompt
  * into the reader's own markdown. The helper is local rather than shared

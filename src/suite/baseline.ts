@@ -22,8 +22,9 @@
  *
  * A failure is its test file plus its full test name
  * ({@link SuiteFailure}); two failures are the same when both strings
- * are equal. Nothing else is compared: not the error text, not the
- * duration, not the test's position in the file.
+ * are equal. Nothing else is compared: not the error text (a failure's
+ * `message` is stored but never compared), not the duration, not the
+ * test's position in the file.
  *
  * With no baseline to compare against, every failure is new: the
  * comparison never assumes a failure was inherited. The same holds for a
@@ -41,6 +42,11 @@
  * parse, carries another version, or lacks a field reads as `unreadable`
  * with the reason, never as a throw: the caller decides whether to record
  * the baseline again.
+ *
+ * A failure's `message` is optional within version 1: it is written when
+ * the result holds one, and a failure without it reads as before, so a
+ * baseline written before messages were kept still reads as `read`. A
+ * `message` that is present but not a string makes the file `unreadable`.
  */
 import type { JunitReading, SuiteFailure, SuiteResult } from './run.js';
 
@@ -95,6 +101,13 @@ export function baselinePathFor(trackerPath: string): string {
   return join(dirname(trackerPath), `${BASELINE_FILE_PREFIX}${match[1] ?? ''}.json`);
 }
 
+/** `failure` as a new object, its message kept only when it has one. */
+function copyFailure(failure: SuiteFailure): SuiteFailure {
+  return failure.message === undefined
+    ? { file: failure.file, name: failure.name }
+    : { file: failure.file, name: failure.name, message: failure.message };
+}
+
 /** A baseline of `result`, recorded at `recordedAt` on `commit`, as a new object. */
 export function baselineOf(result: SuiteResult, recordedAt: Date, commit: string | null): SuiteBaseline {
   return {
@@ -104,7 +117,7 @@ export function baselineOf(result: SuiteResult, recordedAt: Date, commit: string
     command: [...result.command],
     exitCode: result.exitCode,
     summary: result.summary,
-    failures: result.failures.map((failure) => ({ file: failure.file, name: failure.name })),
+    failures: result.failures.map(copyFailure),
     errors: result.errors,
     junit: result.junit,
   };
@@ -130,7 +143,10 @@ function isStringOrNull(value: unknown): value is string | null {
 function isFailure(value: unknown): value is SuiteFailure {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record['file'] === 'string' && typeof record['name'] === 'string';
+  const message = record['message'];
+  return typeof record['file'] === 'string'
+    && typeof record['name'] === 'string'
+    && (message === undefined || typeof message === 'string');
 }
 
 /** The first field of `record` that does not hold what a baseline needs, or null. */

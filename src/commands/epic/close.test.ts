@@ -47,6 +47,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { draftFixture } from '../../adapters/tracker/contract.js';
 import { createLocalTracker } from '../../adapters/tracker/local.js';
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../../board/epic-template.js';
 import { renderCloseComment } from '../../board/epic-trail.js';
@@ -405,7 +406,7 @@ describe('failedCheckReport', () => {
     expect(report.outOfScopeBugs[0]?.what).toBe(`Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`);
     expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
     expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
-    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic #40 acceptance criterion: ${CRITERION_2}`);
+    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic # acceptance criterion: ${CRITERION_2}`);
   });
 });
 
@@ -460,6 +461,43 @@ describe('rafa epic close, dispatched', () => {
     expect(second.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
     expect(second.trackerCalls.map((call) => call.split(' ')[0])).toEqual(['comment']);
     expect(second.stdout).toContain('Criterion 2: recurs in local issue');
+  });
+
+  /** A fresh project under `extraConfig` whose local tracker holds one open bug worded near criterion 2's failure. */
+  async function projectWithNearBug(extraConfig: string): Promise<PlantedProject> {
+    const project = plantProject(mkdtempSync(join(tempBase, 'case-')), `tracker:\n  default: local\n${extraConfig}`);
+    const body = [
+      '## What', '', '```', 'Epic #40 acceptance criterion 2 fails against main: rafa epics shows one epic\'s issues', '```', '',
+      '## Artifact', '', '```', 'epic #40 acceptance criterion: rafa epics lists one epic\'s issues', '```', '',
+    ].join('\n');
+    const draft = draftFixture({ title: 'rafa epics lists one epic\'s issues', body, module: 'unassigned', priority: null, project: null });
+    await createLocalTracker({ issuesDir: join(project.root, '.rafa', 'issues'), fallbackReason: null }).create(draft);
+    return project;
+  }
+
+  it('comments on an open bug worded near a failed check, under the run\'s similarity settings', async () => {
+    const script: Script = {
+      checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
+    };
+
+    const outcome = await run(['40'], { script, project: await projectWithNearBug('') });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.trackerCalls).toEqual(['comment 1']);
+    expect(outcome.stdout).toContain('Criterion 2: recurs in local issue 1 on the public tracker; commented on it.');
+  });
+
+  it('files the failed check beside that open bug with the similarity step turned off, the control', async () => {
+    const script: Script = {
+      checks: { 'Run rafa epics': { exitCode: 0, stdout: verdictOutput('fail', 'it printed no issues') } },
+    };
+    const off = 'triage:\n  similarity:\n    threshold: false\n';
+
+    const outcome = await run(['40'], { script, project: await projectWithNearBug(off) });
+
+    expect(outcome.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expect(outcome.trackerCalls.map((call) => call.split(' ')[0])).toEqual(['create']);
+    expect(outcome.stdout).toContain('Criterion 2: filed on the public tracker as local issue 2.');
   });
 
   it('refuses on an uncheckable criterion before any check runs, naming it with its reason', async () => {

@@ -38,6 +38,8 @@ back into every turn and the split would save nothing.
 - `context/pull-requests.md` — the `pr` subject, the provider and its
   preflight items, merge, triage assessment and --resolve, trust, and the
   readiness gate for plans from the board.
+- `context/triage.md` — the channels, the two-step match and the keys,
+  inherited failures, the state read on a repeat, and similarity settings.
 - `context/terminology.md` — formal and colloquial names: the ledger,
   lore and hindsight, and how prose introduces them.
 - `context/release.md` — fragments and the fold, settle and its deliveries,

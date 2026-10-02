@@ -39,6 +39,13 @@
  *     ids are numbers, so such an adapter rejects the ref for being
  *     absent rather than for being malformed. `unknownExternalId`
  *     overrides it.
+ *   - `openIssues`: rafa's own optional reading, which the source
+ *     lacks, with three cases of its own. The open issues of a type are
+ *     answered with their titles and bodies, an issue moved to `done` or
+ *     to `cancelled` is left out, and a type with no open issue answers
+ *     none. Order is the adapter's, so ids are compared sorted. An
+ *     adapter run with `readsOpenIssues: false` is held to leaving the
+ *     reading out instead, by one case in place of the three.
  *   - The cases are also answered as a list, by
  *     {@link trackerContractCases}, each a name and a function that
  *     rejects when the adapter breaks the case. {@link runTrackerContract}
@@ -46,7 +53,7 @@
  *     adapters to hold which cases reject: the control that each case can
  *     fail. Case names hold no apostrophe, which `eslint --fix` escapes.
  */
-import type { IssueDraft, IssueRef, IssueState, Tracker, TrackerKind } from '../../ports/index.js';
+import type { IssueDraft, IssueRef, IssueState, IssueType, Tracker, TrackerKind } from '../../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -72,6 +79,8 @@ export interface TrackerContractOptions {
   readonly transitionableStates?: readonly IssueState[];
   /** An `externalId` no fresh tracker holds. `'999'` when left out. */
   readonly unknownExternalId?: string;
+  /** Whether the adapter implements the optional `openIssues` reading. True when left out. */
+  readonly readsOpenIssues?: boolean;
 }
 
 /** One contract case: its name, and a run that rejects when the adapter breaks it. */
@@ -98,6 +107,90 @@ export function draftFixture(overrides: Partial<IssueDraft> = {}): IssueDraft {
 /** The external ids of a list of refs, in order. */
 function externalIds(refs: readonly IssueRef[]): string[] {
   return refs.map((ref) => ref.externalId);
+}
+
+/** The `openIssues` reading of a tracker. Throws when the tracker has none. */
+function openIssuesOf(tracker: Tracker): NonNullable<Tracker['openIssues']> {
+  if (tracker.openIssues === undefined) throw new Error(`the ${tracker.kind} tracker has no openIssues reading`);
+  return tracker.openIssues;
+}
+
+/** An open issue as a case compares it: its external id, title and body. */
+type OpenIssueRow = readonly [externalId: string, title: string, body: string];
+
+/** `rows` sorted by external id, since the order `openIssues` answers in is the adapter's. */
+function sortedRows(rows: readonly OpenIssueRow[]): OpenIssueRow[] {
+  return [...rows].sort(([a], [b]) => a.localeCompare(b));
+}
+
+/** The open issues of `type` as rows, sorted by external id. */
+async function openIssueRows(tracker: Tracker, type: IssueType): Promise<OpenIssueRow[]> {
+  const open = await openIssuesOf(tracker)(type);
+  return sortedRows(open.map((issue): OpenIssueRow => [issue.ref.externalId, issue.title, issue.body]));
+}
+
+/** The cases of the optional `openIssues` reading, or the one case holding it left out. */
+function openIssuesCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
+  const { create } = options;
+  if (options.readsOpenIssues === false) {
+    return [
+      {
+        name: 'leaves out the openIssues reading it is run without',
+        run: async () => {
+          const tracker = await create();
+
+          expect(tracker.openIssues).toBeUndefined();
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'openIssues answers each open issue of the type with its title and body',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const replay = await tracker.create(draftFixture({ opt: 0, title: 'Replay window', body: 'Codes stay valid.\n' }));
+        const keys = await tracker.create(draftFixture({ opt: 0, title: 'Signing keys', body: 'Keys never rotate.\n' }));
+        await tracker.create(draftFixture({ opt: 0, type: 'spike', title: 'Try passkeys' }));
+
+        const open = await openIssuesOf(tracker)('bug');
+
+        expect(open.every((issue) => issue.ref.kind === tracker.kind)).toBe(true);
+        expect(await openIssueRows(tracker, 'bug')).toEqual(sortedRows([
+          [replay.externalId, 'Replay window', 'Codes stay valid.\n'],
+          [keys.externalId, 'Signing keys', 'Keys never rotate.\n'],
+        ]));
+      },
+    },
+    {
+      name: 'openIssues leaves out an issue moved to done or to cancelled',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const open = await tracker.create(draftFixture({ opt: 0, title: 'Still open' }));
+        const done = await tracker.create(draftFixture({ opt: 0, title: 'Fixed' }));
+        const cancelled = await tracker.create(draftFixture({ opt: 0, title: 'Not planned' }));
+
+        expect(await openIssueRows(tracker, 'bug')).toHaveLength(3);
+        await tracker.transition(done, 'done');
+        await tracker.transition(cancelled, 'cancelled');
+
+        expect((await openIssueRows(tracker, 'bug')).map(([id]) => id)).toEqual([open.externalId]);
+      },
+    },
+    {
+      name: 'openIssues answers nothing for a type with no open issue',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        await tracker.create(draftFixture());
+
+        expect(await openIssuesOf(tracker)('chore')).toEqual([]);
+      },
+    },
+  ];
 }
 
 /** Every contract case, in the order {@link runTrackerContract} registers them. */
@@ -306,6 +399,7 @@ export function trackerContractCases(options: TrackerContractOptions): readonly 
         })).rejects.toThrow();
       },
     },
+    ...openIssuesCases(options),
   ];
 }
 
