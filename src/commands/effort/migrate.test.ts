@@ -191,7 +191,7 @@ describe('rafa effort migrate', () => {
     expect(sameFiles(before, snapshot(dirname(path)))).toBe(true);
   });
 
-  it('swaps the migrated store in behind effort.sqlite.before-<id>-<stamp>.bak, the original kept whole', async () => {
+  it('swaps the migrated store in behind effort.sqlite.before-<id>-<stamp>.bak, a copy of the original', async () => {
     const project = plant();
     const path = plantNotesStore(project, ['kept', 'also kept']);
     const original = storeRows(path);
@@ -200,7 +200,7 @@ describe('rafa effort migrate', () => {
 
     const backup = `${path}.before-synthetic-notes-rebuild-${STAMP}.bak`;
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.stdout).toContain(`✅ Migrated. The original is kept whole at ${backup}`);
+    expect(outcome.stdout).toContain(`✅ Migrated. A copy of the original is kept at ${backup}; renamed back to undo, it takes a new store id on its next write.`);
     expect(readdirSync(dirname(path)).sort()).toEqual(['effort.sqlite', `effort.sqlite.before-synthetic-notes-rebuild-${STAMP}.bak`]);
     expect(storeRows(backup)).toEqual(original);
     expect(storeRows(path)).not.toEqual(original);
