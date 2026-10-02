@@ -1,8 +1,9 @@
 /**
- * Step 2 of loop-owned triage's public lookup (`./triage.ts`): the open
- * bugs nearest a report, by the words they share. The exact key of step 1
- * (`./bug-key.ts`) misses a failure worded a new way; this step compares
- * what the report says with what each open bug said when it was filed.
+ * Step 3 of loop-owned triage's public lookup (`./triage.ts`): the open
+ * bugs nearest a report, by the words they share. The exact key of steps
+ * 1 and 2 (`./bug-key.ts`) misses a failure worded a new way; this step
+ * compares what the report says with what each open bug said when it was
+ * filed.
  *
  * ## Word sets
  *

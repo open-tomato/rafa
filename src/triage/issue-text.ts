@@ -32,10 +32,28 @@
  * not a session's, so it is redacted but not fenced, and GitHub links it.
  * A comment never carries it.
  *
+ * ## The similarity step
+ *
+ * When `./triage.ts`'s nearest-open-bug step ran and found no open bug at
+ * or above its threshold, the issue filed ends, after `Feedback`, with a
+ * `Possible duplicates` section ({@link possibleDuplicatesSection}): the
+ * threshold, then the nearest open bugs it listed, each named as
+ * `Supersedes` names its issue and followed by its score to two decimals,
+ * or a sentence saying no open bug shares a word with this one. Names and
+ * scores are the tracker's and this module's, not a session's, so they are
+ * redacted but not fenced. An issue filed with the step off or skipped has
+ * no such section.
+ *
+ * A recurrence that step matched is commented on under its own opening
+ * ({@link similarCommentOpening}), naming the score and the threshold it
+ * met, so whoever reads the issue can tell a match by words from one by
+ * key. The sections after it are a recurrence's as ever.
+ *
  * Every value goes through the caller's `redact` before it is shown, and
  * the title is cut from text already redacted, so no cut leaves part of a
  * secret behind.
  */
+import type { ScoredIssue } from './similarity.js';
 import type { IssueRef } from '../ports/index.js';
 
 import { oneLine } from './bug-key.js';
@@ -91,6 +109,42 @@ export interface BugValues {
    * absent for a first filing and for a comment; see the module note.
    */
   readonly supersedes?: IssueRef;
+  /**
+   * The nearest open bugs the similarity step listed for an issue it filed,
+   * or absent when that step did not run, as for every comment.
+   */
+  readonly duplicates?: PossibleDuplicates;
+}
+
+/** What a new issue's `Possible duplicates` section shows; see the module note. */
+export interface PossibleDuplicates {
+  /** The threshold none of {@link nearest} met. */
+  readonly threshold: number;
+  /** The nearest open bugs, highest score first, already cut to the configured count. */
+  readonly nearest: readonly ScoredIssue[];
+}
+
+/** A similarity score as a filed text shows it: two decimals. */
+export function scoreText(score: number): string {
+  return score.toFixed(2);
+}
+
+/** The opening of a comment on an issue the similarity step matched; see the module note. */
+export function similarCommentOpening(score: number, threshold: number): string {
+  return `${COMMENT_OPENING} No key found this issue: the report's words match its first report`
+    + ` at a Jaccard similarity of ${scoreText(score)}, at or above the threshold of`
+    + ` ${String(threshold)}, so it is taken for the same bug.`;
+}
+
+/** The `Possible duplicates` section, redacted; see the module note. */
+export function possibleDuplicatesSection(duplicates: PossibleDuplicates, redact: (text: string) => string): string {
+  const intro = `No open bug scored at or above the similarity threshold of ${String(duplicates.threshold)}.`;
+  const listed = duplicates.nearest.length === 0
+    ? 'No open bug shares a word with this one.'
+    : duplicates.nearest
+      .map(({ issue, score }) => `- ${issueNameOf(issue.ref)} (score ${scoreText(score)})`)
+      .join('\n');
+  return `## Possible duplicates\n\n${redact(`${intro}\n\n${listed}`)}`;
 }
 
 /** How an issue is named: its URL, or its kind and id when it has none. */
@@ -134,5 +188,8 @@ export function issueText(opening: string, values: BugValues, redact: (text: str
     section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
     section('Task', values.taskText, '', redact),
     section('Feedback', values.feedback, 'The report gave no feedback.', redact),
+    ...values.duplicates === undefined
+      ? []
+      : [possibleDuplicatesSection(values.duplicates, redact)],
   ].join('\n\n') + '\n';
 }

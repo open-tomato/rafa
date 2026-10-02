@@ -17,22 +17,22 @@
  *
  * ## The two keys
  *
- * Step 2 of a public bug's lookup scores the report against each open
- * bug by Jaccard similarity of their word sets, after the exact-key
- * lookups have missed:
+ * Step 3 of a public bug's lookup (`triage/triage.ts`) scores the
+ * report against each open bug by Jaccard similarity of their word
+ * sets, after the exact-key lookups have missed:
  *
  *   - `triage.similarity.threshold` is the least score at which the
  *     nearest open bug is taken for the same bug and commented on. It
  *     defaults to `0.3` and accepts a number above 0 and at most 1: a
  *     Jaccard score lies in 0..1, so a threshold above 1 could never be
  *     met, and one of 0 or below would match every open bug, words
- *     shared or not. `false` turns step 2 off, so triage files with the
+ *     shared or not. `false` turns step 3 off, so triage files with the
  *     exact-key lookups alone. `true` is refused: it names no score, and
  *     reading it as the default would be a choice nobody wrote.
  *   - `triage.similarity.candidates` is how many of the nearest open
  *     bugs a new bug's `Possible duplicates` section lists. It defaults
  *     to `3` and accepts a whole number from 1 to 10; the cap keeps that
- *     section short enough to read. It takes no `false`: turning step 2
+ *     section short enough to read. It takes no `false`: turning step 3
  *     off is the threshold's to say.
  *
  * A quoted number is refused, as every other reader refuses a string

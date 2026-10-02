@@ -168,7 +168,14 @@ function writeRedBaseline(f: Fixture, junit: JunitReading = 'read'): void {
 function triageFor(f: Fixture): StartTriage {
   return createStartTriage({
     repoRoot: f.root,
-    config: { trackerDefault: 'local', trackerFallback: [], prerequisitesRequired: [], prerequisitesOptional: [] },
+    config: {
+      trackerDefault: 'local',
+      trackerFallback: [],
+      prerequisitesRequired: [],
+      prerequisitesOptional: [],
+      triageSimilarityThreshold: 0.3,
+      triageSimilarityCandidates: 3,
+    },
     env: {},
     resolve: () => Promise.resolve({
       tracker: f.publicSpy.tracker,

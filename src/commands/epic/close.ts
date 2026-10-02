@@ -99,7 +99,9 @@
  * name, which keeps the epic's number, so a second close failing the same
  * criterion comments on the first issue rather than filing another, unless
  * that issue was closed as completed, when a new one is filed in its place
- * (`src/triage/triage.ts`). No file is read or written at
+ * (`src/triage/triage.ts`). A criterion whose key finds nothing is compared
+ * with the open bugs by its words, as the run's `triage.similarity` settings
+ * say, and comments on the nearest at the threshold. No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only
  * thing `triageReport` writes into its tracker file. The feedback holds
  * the check, the commit and the evidence. When #249's ladder lands it
@@ -514,6 +516,7 @@ async function fileFailures(run: CloseRun, epic: number, failures: readonly Chec
         privateTracker: run.seams.privateTracker,
         secrets,
         seams: run.seams.findings,
+        similarity: run.config,
       });
       for (const bug of result.bugs) {
         const line = bugLine(criterion, bug);

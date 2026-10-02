@@ -65,6 +65,13 @@
  * local paths taken out, and its file and case are redacted of the named
  * secrets before either line is printed.
  *
+ * ## The nearest open bug
+ *
+ * The run's `triage.similarity` settings go to every `triageReport` as its
+ * `similarity` option, so a public bug whose key finds nothing is compared
+ * with the open bugs of the tracker the chain landed on
+ * (`triage/triage.ts`). A recurrence found that way is noted with its score.
+ *
  * ## Secrets
  *
  * The named secrets are read once, when the triage is made: `namedSecrets`
@@ -116,6 +123,7 @@ import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';
 import { inheritedFailureOf } from '../triage/inherited.js';
+import { scoreText } from '../triage/issue-text.js';
 import { localPathRedactor } from '../triage/local-paths.js';
 import {
   blockerTextOf,
@@ -139,7 +147,16 @@ const INDENT = '   ';
 const FOUND_BY: Readonly<Record<NonNullable<BugTriage['foundBy']>, string>> = {
   store: 'its stored reference',
   find: 'a tracker find',
+  similarity: 'word similarity',
 };
+
+/** How a line names what found a recurrence: {@link FOUND_BY}, then the score when it has one. */
+function foundByText(bug: BugTriage): string {
+  const found = FOUND_BY[bug.foundBy ?? 'find'];
+  return bug.score === undefined
+    ? found
+    : `${found} (score ${scoreText(bug.score)})`;
+}
 
 /** What the run's triage is made with. */
 export interface StartTriageOptions {
@@ -147,11 +164,17 @@ export interface StartTriageOptions {
   readonly repoRoot: string;
   /**
    * The run's resolved config: `tracker.default` and `tracker.fallback` for
-   * the chain, and the prerequisite tiers whose `env` items name secrets.
+   * the chain, the prerequisite tiers whose `env` items name secrets, and
+   * the `triage.similarity` settings.
    */
   readonly config: Pick<
     RafaConfig,
-    'trackerDefault' | 'trackerFallback' | 'prerequisitesRequired' | 'prerequisitesOptional'
+    | 'trackerDefault'
+    | 'trackerFallback'
+    | 'prerequisitesRequired'
+    | 'prerequisitesOptional'
+    | 'triageSimilarityThreshold'
+    | 'triageSimilarityCandidates'
   >;
   /** The environment the secrets' values are read from. `process.env` when left out. */
   readonly env?: SecretEnvironment;
@@ -242,7 +265,7 @@ function inheritedNote(bug: BugTriage, name: string, where: string, failure: Sui
     : `the run-start failure ${failureName(failure)}`;
   const comment = bug.ref === null
     ? ''
-    : `, and ${issueName(bug.ref)} on ${where}, found by ${FOUND_BY[bug.foundBy ?? 'find']}, was commented on`;
+    : `, and ${issueName(bug.ref)} on ${where}, found by ${foundByText(bug)}, was commented on`;
   return `${name}: inherited: ${test}; nothing was filed${comment}.`;
 }
 
@@ -269,7 +292,7 @@ function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTri
     : issueName(bug.ref);
   const reached = bug.action === 'filed'
     ? `${name}: filed on ${where} as ${issue}.`
-    : `${name}: recurs in ${issue} on ${where}, found by ${FOUND_BY[bug.foundBy ?? 'find']}; commented on it.`;
+    : `${name}: recurs in ${issue} on ${where}, found by ${foundByText(bug)}; commented on it.`;
   const note = bug.action === 'inherited'
     ? inheritedNote(bug, name, where, inherited)
     : reached;
@@ -436,6 +459,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       secrets,
       seams: options.seams,
       inherited: run,
+      similarity: options.config,
     });
 
     const named = inheritedByIndex(result, report, run.failures, local, redact);
