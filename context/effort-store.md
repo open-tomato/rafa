@@ -1035,7 +1035,8 @@ issue's reference in the row the dispatch's session holds under the text
 its caller keys the recurrence by: it sets `tracker_ref` on that
 session's row for the key, or inserts a row holding only the dispatch,
 the key, the reference and the origin pair every insert stamps, and
-keeps a reference already there.
+keeps a reference already there. See `context/triage.md` for the key
+a bug is looked up by and the two-step match.
 `readTrackerRef` answers the newest reference stored under a key, in any
 session: the last by `ACROSS_STORES_ORDER` (`store/origins.ts`), read
 backwards so both sides of a merge answer the same row, which `seq` alone
