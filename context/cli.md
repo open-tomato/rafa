@@ -1891,7 +1891,8 @@ New; it replaces no earlier text. What a row or an action added to
   one `security: false` bug and no blocker, its artifact the epic and the
   criterion on one line (`failedCheckArtifact`) and its key's file half
   `epic-<n>-close` (`closeTriageFile`, a name only: nothing is written
-  there), so a second failing close comments on the first issue; the
+  there), so a second failing close comments on the first issue, or files
+  one in its place when the first was closed as completed; the
   public tracker is resolved once, and only when a check failed. A failed
   check, and a check whose session answered nothing, which files
   nothing, each refuse the close. Otherwise one `IssueBoard.closeIssue`

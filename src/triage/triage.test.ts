@@ -52,7 +52,7 @@
  */
 import type { NamedSecret, TriageOptions, TriageResult } from './triage.js';
 import type { FindingsDispatch } from '../effort/store/findings.js';
-import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
@@ -77,6 +77,7 @@ import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { findNextTask } from '../utils/tracker.js';
 
+import { ISSUE_OPENING, supersedesSection } from './issue-text.js';
 import { HOME_MARKER } from './local-paths.js';
 import {
   blockerTextOf,
@@ -119,6 +120,7 @@ const TICKED_LINE = 2;
 
 const FIRST: FindingsDispatch = { sessionId: 'session-1', planStub: 'demo', taskLine: 'Wire the loop' };
 const SECOND: FindingsDispatch = { sessionId: 'session-2', planStub: 'demo', taskLine: 'Wire the loop' };
+const THIRD: FindingsDispatch = { sessionId: 'session-3', planStub: 'demo', taskLine: 'Wire the loop' };
 
 const ARTIFACT = 'TypeError: lines.at(-1) is undefined';
 
@@ -137,12 +139,16 @@ interface Spied {
   readonly calls: TrackerCall[];
 }
 
-/** Wraps `inner`, replacing any of `create`, `find` and `comment` with `overrides`. */
-function spy(inner: Tracker, overrides: Partial<Pick<Tracker, 'create' | 'find' | 'comment'>> = {}): Spied {
+/** The calls a case may replace on the public tracker. */
+type TrackerOverrides = Partial<Pick<Tracker, 'create' | 'find' | 'comment' | 'get'>>;
+
+/** Wraps `inner`, replacing any of `create`, `find`, `comment` and `get` with `overrides`. */
+function spy(inner: Tracker, overrides: TrackerOverrides = {}): Spied {
   const calls: TrackerCall[] = [];
   const create = overrides.create ?? inner.create;
   const find = overrides.find ?? inner.find;
   const comment = overrides.comment ?? inner.comment;
+  const get = overrides.get ?? inner.get;
   const tracker: Tracker = {
     kind: inner.kind,
     capabilities: inner.capabilities,
@@ -153,7 +159,7 @@ function spy(inner: Tracker, overrides: Partial<Pick<Tracker, 'create' | 'find' 
     },
     get: (ref) => {
       calls.push(['get', ref]);
-      return inner.get(ref);
+      return get(ref);
     },
     create: (draft) => {
       calls.push(['create', draft]);
@@ -187,7 +193,7 @@ interface Fixture {
 }
 
 /** A fresh root under the temporary directory, its public tracker's calls replaced by `overrides`. */
-function fixture(overrides: Partial<Pick<Tracker, 'create' | 'find' | 'comment'>> = {}): Fixture {
+function fixture(overrides: TrackerOverrides = {}): Fixture {
   const root = join(tempBase, `root-${rootCount}`);
   rootCount += 1;
   mkdirSync(root, { recursive: true });
@@ -463,7 +469,7 @@ describe('a public bug', () => {
     expect(existsSync(f.privateDir)).toBe(false);
   });
 
-  it('is commented on the stored issue when a later session reports its artifact, with no lookup and no second issue', async () => {
+  it('is commented on the stored issue when a later session reports its artifact, read open, with no find and no second issue', async () => {
     const f = fixture();
     await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
     const callsBefore = f.publicSpy.calls.length;
@@ -473,7 +479,7 @@ describe('a public bug', () => {
       outOfScopeBugs: [bug('Last line lost again', ARTIFACT, false)],
     }), { dispatch: SECOND });
 
-    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['comment']);
+    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['get', 'comment']);
     expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', stored: null, problem: null });
     const issue = onlyIssue(f.publicDir);
     expect(issue.comments).toHaveLength(1);
@@ -501,7 +507,7 @@ describe('a public bug', () => {
 
     const result = await triage(f, reportWith({ outOfScopeBugs: [bug('Parser drops the last line', ARTIFACT, false)] }));
 
-    expect(methodsOf(f.publicSpy)).toEqual(['find', 'comment']);
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'get', 'comment']);
     expect(result.bugs[0]).toMatchObject({ action: 'commented', ref: held, foundBy: 'find', stored: 'inserted' });
     expect(onlyIssue(f.publicDir).comments).toHaveLength(1);
     expect(readTrackerRef(f.root, KEY)).toEqual(held);
@@ -619,6 +625,208 @@ describe('a public bug', () => {
     expect(result.bugs[0]!.problem).toStartWith('reading the stored reference failed: ');
     expect(f.publicSpy.calls).toEqual([]);
     expect(issueFiles(f.publicDir)).toEqual([]);
+  });
+});
+
+describe('the state of the issue a recurrence finds', () => {
+  const WHAT = 'Parser drops the last line';
+  const ISSUE_ONE: IssueRef = { opt: 0, kind: 'local', externalId: '1', url: null };
+  const ISSUE_TWO: IssueRef = { opt: 0, kind: 'local', externalId: '2', url: null };
+  const NAMES_ISSUE_ONE = '## Supersedes\n\nThis bug came back after local issue 1 was closed as completed;'
+    + ' this issue is filed in its place.';
+
+  function reportOf(what: string = WHAT): TaskReport {
+    return reportWith({ outOfScopeBugs: [bug(what, ARTIFACT, false)] });
+  }
+
+  /** A second, unspied tracker over the case's public issues, for setting up what the spy then reads. */
+  function publicOver(f: Fixture): Tracker {
+    return createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+  }
+
+  /** Files the bug from the first session, then closes its issue as `state`; answers the calls made so far. */
+  async function filedThenClosed(f: Fixture, state: IssueState): Promise<number> {
+    await triage(f, reportOf());
+    await publicOver(f).transition(ISSUE_ONE, state);
+    return f.publicSpy.calls.length;
+  }
+
+  /** An issue holding the bug's key, filed from no store this case has, then closed as `state`. */
+  async function heldThenClosed(f: Fixture, state: IssueState): Promise<IssueRef> {
+    const tracker = publicOver(f);
+    const held = await tracker.create({
+      opt: 0,
+      title: 'Filed from another checkout',
+      body: `## Recurrence key\n\n${fence(KEY)}\n`,
+      type: 'bug',
+      module: 'x',
+      priority: null,
+      project: null,
+      blockedBy: [],
+    });
+    await tracker.transition(held, state);
+    return held;
+  }
+
+  /** Issue file `name` under the case's public tracker, parsed. */
+  function publicIssue(f: Fixture, name: string): ReturnType<typeof parseLocalIssue> {
+    const file = issueFiles(f.publicDir).find((entry) => entry.name === name);
+    expect(file).toBeDefined();
+    return parseLocalIssue(file!.contents);
+  }
+
+  it('closed as done: one new issue naming it is filed and stored as superseding, and the next recurrence comments on the new one', async () => {
+    const f = fixture();
+    const before = await filedThenClosed(f, 'done');
+
+    const result = await triage(f, reportOf('Last line lost again'), { dispatch: SECOND });
+
+    expect(f.publicSpy.calls.slice(before)).toEqual([['get', ISSUE_ONE], ['create', expect.anything()]]);
+    expect(result.bugs).toEqual([{
+      index: 0,
+      channel: 'public',
+      action: 'filed',
+      ref: ISSUE_TWO,
+      foundBy: null,
+      stored: 'inserted',
+      problem: null,
+    }]);
+    expect(issueFiles(f.publicDir).map(({ name }) => name)).toEqual(['1.md', '2.md']);
+    const closed = publicIssue(f, '1.md');
+    expect(closed.state).toBe('done');
+    expect(closed.comments).toEqual([]);
+    const filed = publicIssue(f, '2.md');
+    expect(filed.draft.title).toBe('Last line lost again');
+    expect(filed.draft.body.startsWith(`${ISSUE_OPENING}\n\n${NAMES_ISSUE_ONE}\n\n## What\n\n`)).toBe(true);
+    expect(filed.draft.body).toContain(`## Recurrence key\n\n${fence(KEY)}`);
+    // Control: the reading sees no such section where none was written.
+    expect(closed.draft.body).not.toContain('## Supersedes');
+    expect(refRows(f.root)).toEqual([
+      { session_id: 'session-1', artifact: KEY, tracker_ref: JSON.stringify(ISSUE_ONE) },
+      { session_id: 'session-2', artifact: KEY, tracker_ref: JSON.stringify(ISSUE_TWO) },
+    ]);
+    expect(readTrackerRef(f.root, KEY)).toEqual(ISSUE_TWO);
+
+    const later = f.publicSpy.calls.length;
+    const third = await triage(f, reportOf('Lost a third time'), { dispatch: THIRD });
+
+    expect(f.publicSpy.calls.slice(later).map(([method, argument]) => [method, method === 'comment'
+      ? (argument as { ref: IssueRef }).ref
+      : argument])).toEqual([['get', ISSUE_TWO], ['comment', ISSUE_TWO]]);
+    expect(third.bugs[0]).toMatchObject({ action: 'commented', ref: ISSUE_TWO, foundBy: 'store', stored: null, problem: null });
+    expect(issueFiles(f.publicDir)).toHaveLength(2);
+    expect(publicIssue(f, '2.md').comments).toHaveLength(1);
+    expect(publicIssue(f, '1.md').comments).toEqual([]);
+  });
+
+  it('closed as released is superseded as one closed as done is', async () => {
+    const f = fixture();
+    const before = await filedThenClosed(f, 'released');
+
+    const result = await triage(f, reportOf(), { dispatch: SECOND });
+
+    expect(methodsOf(f.publicSpy).slice(before)).toEqual(['get', 'create']);
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', ref: ISSUE_TWO, stored: 'inserted' });
+    expect(publicIssue(f, '2.md').draft.body).toContain(NAMES_ISSUE_ONE);
+  });
+
+  it('closed as done and found by find, with nothing stored: a new issue naming it is filed, and only the new one is stored', async () => {
+    const f = fixture();
+    const held = await heldThenClosed(f, 'done');
+
+    const result = await triage(f, reportOf());
+
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'get', 'create']);
+    expect(f.publicSpy.calls[1]).toEqual(['get', held]);
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', ref: ISSUE_TWO, foundBy: null, stored: 'inserted', problem: null });
+    expect(publicIssue(f, '2.md').draft.body).toContain(NAMES_ISSUE_ONE);
+    expect(publicIssue(f, '1.md').comments).toEqual([]);
+    expect(refRows(f.root)).toEqual([{ session_id: 'session-1', artifact: KEY, tracker_ref: JSON.stringify(ISSUE_TWO) }]);
+  });
+
+  it('closed as cancelled: commented on there, and nothing is filed', async () => {
+    const f = fixture();
+    const before = await filedThenClosed(f, 'cancelled');
+
+    const result = await triage(f, reportOf('Last line lost again'), { dispatch: SECOND });
+
+    expect(methodsOf(f.publicSpy).slice(before)).toEqual(['get', 'comment']);
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', ref: ISSUE_ONE, foundBy: 'store', stored: null, problem: null });
+    const issue = onlyIssue(f.publicDir);
+    expect(issue.state).toBe('cancelled');
+    expect(issue.comments).toHaveLength(1);
+    expect(issue.comments[0]).toContain(fence('Last line lost again'));
+    expect(refRows(f.root).map((row) => row.session_id)).toEqual(['session-1']);
+  });
+
+  it('closed as cancelled and found by find: commented on and stored, and nothing is filed', async () => {
+    const f = fixture();
+    const held = await heldThenClosed(f, 'cancelled');
+
+    const result = await triage(f, reportOf());
+
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'get', 'comment']);
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', ref: held, foundBy: 'find', stored: 'inserted', problem: null });
+    expect(onlyIssue(f.publicDir).comments).toHaveLength(1);
+    expect(readTrackerRef(f.root, KEY)).toEqual(held);
+  });
+
+  it('whose state cannot be read: the bug fails naming the issue, and nothing is filed or commented on', async () => {
+    const f = fixture({ get: () => Promise.reject(new Error('gh: HTTP 502')) });
+    await triage(f, reportOf());
+    const before = f.publicSpy.calls.length;
+
+    const result = await triage(f, reportOf('Last line lost again'), { dispatch: SECOND });
+
+    expect(methodsOf(f.publicSpy).slice(before)).toEqual(['get']);
+    expect(result.bugs).toEqual([{
+      index: 0,
+      channel: 'public',
+      action: 'failed',
+      ref: ISSUE_ONE,
+      foundBy: 'store',
+      stored: null,
+      problem: 'the public tracker get failed: gh: HTTP 502',
+    }]);
+    expect(onlyIssue(f.publicDir).comments).toEqual([]);
+    expect(refRows(f.root).map((row) => row.session_id)).toEqual(['session-1']);
+  });
+
+  it('closed as done in the session that stored it: the new issue is filed, and the store\'s refusal of the superseding write is named', async () => {
+    const f = fixture();
+    const before = await filedThenClosed(f, 'done');
+
+    const result = await triage(f, reportOf(), { dispatch: FIRST });
+
+    expect(methodsOf(f.publicSpy).slice(before)).toEqual(['get', 'create']);
+    expect(result.bugs[0]).toMatchObject({ action: 'filed', ref: ISSUE_TWO, stored: null });
+    expect(result.bugs[0]!.problem).toStartWith('storing the reference failed: effort store: ');
+    expect(result.bugs[0]!.problem).toContain('findings_by_artifact holds one row per session and artifact');
+    expect(refRows(f.root).map((row) => row.tracker_ref)).toEqual([JSON.stringify(ISSUE_ONE)]);
+  });
+
+  it('on the private route is not read: a security bug\'s issue closed as done is commented on as found', async () => {
+    const f = fixture();
+    const security = reportWith({ outOfScopeBugs: [bug('Token echoed in the log', ARTIFACT, true)] });
+    await triage(f, security);
+    await createPrivateTriageTracker(f.root, { now: CLOCK }).transition(ISSUE_ONE, 'done');
+    const before = f.privateSpy.calls.length;
+
+    const result = await triage(f, security, { dispatch: SECOND });
+
+    expect(methodsOf(f.privateSpy).slice(before)).toEqual(['find', 'comment']);
+    expect(result.bugs[0]).toMatchObject({ channel: 'private', action: 'commented', ref: ISSUE_ONE, foundBy: 'find' });
+    expect(issueFiles(f.privateDir).map(({ name }) => name)).toEqual(['1.md']);
+    expect(f.publicSpy.calls).toEqual([]);
+  });
+
+  it('names a superseded issue by its URL when it has one, through the redaction', () => {
+    const github: IssueRef = { opt: 0, kind: 'github', externalId: '7', url: 'https://github.com/o/r/issues/7' };
+
+    expect(supersedesSection(github, (text) => text.replace('o/r', '[redacted: REPO]'))).toBe(
+      '## Supersedes\n\nThis bug came back after https://github.com/[redacted: REPO]/issues/7 was closed as completed;'
+        + ' this issue is filed in its place.',
+    );
   });
 });
 
@@ -1106,7 +1314,7 @@ describe('local paths in what is filed', () => {
     const { filed, result, calls } = await triageOverLegacy(f, report, home, legacyKey);
 
     expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', ref: filed, problem: null });
-    expect(calls).toEqual(['comment']);
+    expect(calls).toEqual(['get', 'comment']);
     expect(issueFiles(f.publicDir)).toHaveLength(1);
   });
 
@@ -1119,7 +1327,7 @@ describe('local paths in what is filed', () => {
     const { filed, result, calls } = await triageOverLegacy(f, pathReport(f.root, home), home, legacyKey);
 
     expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', ref: filed, problem: null });
-    expect(calls).toEqual(['comment']);
+    expect(calls).toEqual(['get', 'comment']);
     expect(refRows(f.root).map((row) => row.artifact)).toEqual([legacyKey]);
   });
 

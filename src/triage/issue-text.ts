@@ -25,10 +25,19 @@
  * is written, so an issue filed before this rafa, with no key section of
  * its own, gains one from the first recurrence commented on it.
  *
+ * An issue filed because the bug came back after the issue its key found
+ * was closed as completed opens, after its opening sentence, with one more
+ * section, `Supersedes`, naming that issue ({@link supersedesSection}): its
+ * URL, or its kind and id when it has none. The name is the tracker's and
+ * not a session's, so it is redacted but not fenced, and GitHub links it.
+ * A comment never carries it.
+ *
  * Every value goes through the caller's `redact` before it is shown, and
  * the title is cut from text already redacted, so no cut leaves part of a
  * secret behind.
  */
+import type { IssueRef } from '../ports/index.js';
+
 import { oneLine } from './bug-key.js';
 
 /** The most code points a filed title holds, its cut marker included. */
@@ -77,6 +86,23 @@ export interface BugValues {
   readonly planStub: string | null;
   readonly taskText: string;
   readonly feedback: string | null;
+  /**
+   * The issue closed as completed that this one is filed in place of, or
+   * absent for a first filing and for a comment; see the module note.
+   */
+  readonly supersedes?: IssueRef;
+}
+
+/** How an issue is named: its URL, or its kind and id when it has none. */
+export function issueNameOf(ref: IssueRef): string {
+  return ref.url ?? `${ref.kind} issue ${ref.externalId}`;
+}
+
+/** The `Supersedes` section naming `closed`, redacted; see the module note. */
+export function supersedesSection(closed: IssueRef, redact: (text: string) => string): string {
+  const sentence = `This bug came back after ${issueNameOf(closed)} was closed as completed;`
+    + ' this issue is filed in its place.';
+  return `## Supersedes\n\n${redact(sentence)}`;
 }
 
 /** One section: its heading, then its value redacted in a fence, or the sentence for none. */
@@ -96,6 +122,9 @@ export function section(
 export function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
   return [
     opening,
+    ...values.supersedes === undefined
+      ? []
+      : [supersedesSection(values.supersedes, redact)],
     section('What', values.what, '', redact),
     section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
     ...values.refs === null

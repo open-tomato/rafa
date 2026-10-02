@@ -44,11 +44,12 @@
  *
  *   1. The reference stored under the key, then under each legacy key
  *      (`readTrackerRef`, which keeps a reference under the text its
- *      caller keys by, this module's key rather than the bare artifact).
- *      The first one of the tracker's own kind is the issue: the bug is
- *      commented on there, and nothing is stored. One of another kind is
- *      passed over, since the tracker cannot read it: a run that fell back
- *      from `github` to `local` asks `local` instead.
+ *      caller keys by, this module's key rather than the bare artifact,
+ *      and answers the newest under it). The first one of the tracker's
+ *      own kind is the issue, answered as the next section says, and is
+ *      not stored again when commented on. One of another kind is passed
+ *      over, since the tracker cannot read it: a run that fell back from
+ *      `github` to `local` asks `local` instead.
  *   2. No stored reference is found: `tracker.find` for a `bug` whose
  *      text holds the key's text, the same key built from the redacted
  *      artifact and `what`. Every issue this module files carries that
@@ -56,11 +57,42 @@
  *      bug from a checkout whose store this run does not have is found,
  *      while an issue that only quotes the artifact, under another key, is
  *      not. An issue filed before #486 carries a legacy key there, and is
- *      found by step 1 only. The first ref `find` answers is commented on,
- *      and stored under the key (`writeTrackerRef`), so a later recurrence
- *      is answered by step 1.
+ *      found by step 1 only. The first ref `find` answers is the issue,
+ *      answered as the next section says, and once commented on is stored
+ *      under the key (`writeTrackerRef`), so a later recurrence is
+ *      answered by step 1.
  *   3. Neither: the bug is filed with `tracker.create`, and the reference
  *      it answers is stored under the key.
+ *
+ * ## The state of the issue a recurrence finds
+ *
+ * Before anything is written for an issue steps 1 and 2 found, its state
+ * is read with `tracker.get`:
+ *
+ *   - Open, any state but the closed three: the bug is commented on there.
+ *   - Closed as completed, `done` or `released` ({@link COMPLETED_ISSUE_STATES}):
+ *     the fix did not hold, so the bug is filed as a new issue whose body
+ *     opens with a `Supersedes` section naming the closed one
+ *     (`./issue-text.ts`), and the new reference is stored under the key
+ *     with `supersedes` naming the closed one. The closed issue's row is
+ *     kept, and `readTrackerRef` answers the new one as the newest, so the
+ *     next recurrence comments on it. Its action is `filed`. A store that
+ *     refuses the superseding write, `SupersedeInSessionRefusal` among the
+ *     refusals (`store/tracker-refs.ts`), leaves the issue filed and names
+ *     the refusal, as any store failure here does.
+ *   - Closed as `cancelled`, which the GitHub adapter answers for an issue
+ *     closed as not planned or as a duplicate: somebody decided the bug is
+ *     not to be fixed there, or is tracked elsewhere, so it is commented on
+ *     and nothing is filed, as for an open one.
+ *   - A read that fails: the bug answers `failed`, naming the issue it was
+ *     for, and nothing is filed or commented on, since a second issue for a
+ *     bug whose first may still be open is the refiling this read exists
+ *     to stop.
+ *
+ * Only the public route reads the state. The private tracker stores no
+ * reference, so its `find`, which answers the oldest issue first, would
+ * find the closed one again on every recurrence, and filing in its place
+ * would file once per recurrence; a security bug is commented on as found.
  *
  * A reference therefore goes into a findings row of its own, keyed by the
  * bug's key and not by the artifact the report's findings are keyed by, so
@@ -184,8 +216,10 @@
  * tracker file that fails: each failure is answered in the result, for
  * the loop to warn about. A bug whose stored reference cannot be read
  * fails there, with no tracker call, rather than filing what may be a
- * second issue. A bug filed or commented on whose reference then cannot
- * be stored keeps its action and names the store's problem.
+ * second issue, and one whose found issue's state cannot be read fails
+ * there, as the section above says. A bug filed or commented on whose
+ * reference then cannot be stored keeps its action and names the store's
+ * problem.
  */
 import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
@@ -198,7 +232,7 @@ import type {
   FindingsWriterSeams,
 } from '../effort/store/findings.js';
 import type { TrackerRefWriteAction } from '../effort/store/tracker-refs.js';
-import type { IssueDraft, IssueRef, Tracker } from '../ports/index.js';
+import type { IssueDraft, IssueRef, IssueState, Tracker } from '../ports/index.js';
 import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
@@ -462,6 +496,8 @@ interface Filing {
    * {@link key} itself.
    */
   readonly legacyKeys: readonly string[];
+  /** The values {@link draft}'s body was built from, for the body of an issue filed in place of a closed one. */
+  readonly values: BugValues;
 }
 
 /** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
@@ -510,6 +546,7 @@ async function filingFor(
     searchText,
     key,
     legacyKeys: legacyKeysOf(options.trackerPath, key, reported, artifact),
+    values,
   };
 }
 
@@ -534,8 +571,13 @@ interface Route {
   readonly tracker: Tracker;
   /** The reference stored under a key; null for a channel that never reads the store. */
   readonly readStored: ((key: string) => IssueRef | null) | null;
-  /** Stores a reference under a key; null for a channel that never writes the store. */
-  readonly store: ((key: string, ref: IssueRef) => TrackerRefWriteAction) | null;
+  /**
+   * Stores a reference under a key, superseding `supersedes` when given;
+   * null for a channel that never writes the store.
+   */
+  readonly store: ((key: string, ref: IssueRef, supersedes?: IssueRef) => TrackerRefWriteAction) | null;
+  /** True when the issue a recurrence finds has its state read before anything is written. */
+  readonly readsState: boolean;
 }
 
 /** One bug on its way through a route. */
@@ -574,28 +616,40 @@ function resultOf(run: BugRun, action: BugTriageAction, fields: Partial<BugTriag
   };
 }
 
-/** Stores the reference of an issue reached, when the route stores and the bug has a key. */
+/**
+ * Stores the reference of an issue reached, when the route stores and the
+ * bug has a key, as superseding `supersedes` when given.
+ */
 async function settle(
   run: BugRun,
   action: 'filed' | 'commented' | 'inherited',
   ref: IssueRef,
   foundBy: RecurrenceSource | null,
+  supersedes?: IssueRef,
 ): Promise<BugTriage> {
   const { store } = run.route;
   const { key } = run.filing;
   if (store === null || key === null) return resultOf(run, action, { ref, foundBy });
 
-  const stored = await step(run, 'storing the reference', () => store(key, ref));
+  const stored = await step(run, 'storing the reference', () => store(key, ref, supersedes));
   return stored.ok
     ? resultOf(run, action, { ref, foundBy, stored: stored.value })
     : resultOf(run, action, { ref, foundBy, problem: stored.problem });
 }
 
-/** Files the bug as a new issue. */
-async function fileNew(run: BugRun): Promise<BugTriage> {
-  const created = await step(run, `the ${run.route.channel} tracker create`, () => run.route.tracker.create(run.filing.draft));
+/**
+ * Files the bug as a new issue, in place of `supersedes`, an issue closed
+ * as completed, when given: its body then names that issue, and its
+ * reference is stored as superseding it.
+ */
+async function fileNew(run: BugRun, supersedes?: IssueRef): Promise<BugTriage> {
+  const { filing } = run;
+  const draft = supersedes === undefined
+    ? filing.draft
+    : { ...filing.draft, body: issueText(ISSUE_OPENING, { ...filing.values, supersedes }, run.redact) };
+  const created = await step(run, `the ${run.route.channel} tracker create`, () => run.route.tracker.create(draft));
   return created.ok
-    ? settle(run, 'filed', created.value, null)
+    ? settle(run, 'filed', created.value, null, supersedes)
     : resultOf(run, 'failed', { problem: created.problem });
 }
 
@@ -648,7 +702,26 @@ async function lookUp(run: BugRun, key: string, searchText: string): Promise<Ste
   };
 }
 
-/** Looks the bug up by its key, then comments on what is found or files it. */
+/** The issue states closed as completed: a bug back after one is filed again; see the module note. */
+export const COMPLETED_ISSUE_STATES: readonly IssueState[] = ['done', 'released'];
+
+/**
+ * Answers a recurrence: on a route that reads state, the issue found is
+ * read first, and one closed as completed is superseded by a new issue,
+ * while any other is commented on; a read that fails answers `failed`.
+ * See the module note.
+ */
+async function answerRecurrence(run: BugRun, { ref, foundBy }: Recurrence): Promise<BugTriage> {
+  if (!run.route.readsState) return commentOn(run, ref, foundBy);
+
+  const issue = await step(run, `the ${run.route.channel} tracker get`, () => run.route.tracker.get(ref));
+  if (!issue.ok) return resultOf(run, 'failed', { ref, foundBy, problem: issue.problem });
+  return COMPLETED_ISSUE_STATES.includes(issue.value.state)
+    ? fileNew(run, ref)
+    : commentOn(run, ref, foundBy);
+}
+
+/** Looks the bug up by its key, then answers what is found or files it. */
 async function triageBug(run: BugRun): Promise<BugTriage> {
   const { key, searchText } = run.filing;
   if (key === null || searchText === null) return fileNew(run);
@@ -657,7 +730,7 @@ async function triageBug(run: BugRun): Promise<BugTriage> {
   if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
   return found.value === null
     ? fileNew(run)
-    : commentOn(run, found.value.ref, found.value.foundBy);
+    : answerRecurrence(run, found.value);
 }
 
 /**
@@ -752,14 +825,18 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       channel: 'public',
       tracker: options.tracker,
       readStored: (key) => readTrackerRef(repoRoot, key),
-      store: (key, ref) => writeTrackerRef(repoRoot, {
+      store: (key, ref, supersedes) => writeTrackerRef(repoRoot, {
         dispatch: options.dispatch,
         outcome: options.outcome,
         artifact: key,
         ref,
+        ...supersedes === undefined
+          ? {}
+          : { supersedes },
       }, options.seams).action,
+      readsState: true,
     },
-    private: { channel: 'private', tracker: privateTracker, readStored: null, store: null },
+    private: { channel: 'private', tracker: privateTracker, readStored: null, store: null, readsState: false },
   };
 
   const bugs: BugTriage[] = [];

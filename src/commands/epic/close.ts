@@ -97,7 +97,9 @@
  * recurrence key is that artifact, stripped of its numbers as
  * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
  * name, which keeps the epic's number, so a second close failing the same
- * criterion comments on the first issue rather than filing another. No file is read or written at
+ * criterion comments on the first issue rather than filing another, unless
+ * that issue was closed as completed, when a new one is filed in its place
+ * (`src/triage/triage.ts`). No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only
  * thing `triageReport` writes into its tracker file. The feedback holds
  * the check, the commit and the evidence. When #249's ladder lands it
