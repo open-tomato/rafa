@@ -1,6 +1,6 @@
 /**
- * Tests for the `create` and `editTitle` members of the `gh` provider
- * (`gh.ts`), over the recorded fake in `gh-fake.ts`.
+ * Tests for the `create`, `editTitle` and `editBase` members of the
+ * `gh` provider (`gh.ts`), over the recorded fake in `gh-fake.ts`.
  *
  * A file of their own because `gh.test.ts` sits near the 800-line cap.
  * The provider is the subject here, so it runs over the fake rather
@@ -134,6 +134,38 @@ describe('editTitle', () => {
 
     await expect(pr.editTitle(7, '')).rejects.toThrow('gh pull requests: editTitle refused title');
     await expect(pr.editTitle(0, 'chore: release 0.6.0')).rejects.toThrow('gh pull requests: editTitle refused pull request number');
+    expect(fake.calls()).toEqual([]);
+  });
+});
+
+describe('editBase', () => {
+  it('retargets the pull request, which get then reads under the new baseRefName, leaving the title and body', async () => {
+    const { fake, pr } = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, body: 'Closes #20' }));
+    // The control: the planted pull request reads another base before the edit.
+    expect((await pr.get(7))?.baseRefName).toBe('main');
+
+    await pr.editBase(7, 'stretch/1');
+
+    expect(fake.calls().slice(1)).toEqual([['pr', 'edit', '7', '--base', 'stretch/1']]);
+    expect(await pr.get(7)).toMatchObject({
+      baseRefName: 'stretch/1',
+      title: 'rafa-20: pull request commands',
+      body: 'Closes #20',
+    });
+  });
+
+  it('throws for a pull request that does not exist', async () => {
+    const { pr } = withOnePull();
+
+    await expect(pr.editBase(9, 'stretch/1')).rejects.toThrow('gh pull requests: gh pr edit 9 --base stretch/1 failed: GraphQL: Could not resolve to a PullRequest');
+  });
+
+  it('refuses an empty base and a bad number before any command is sent', async () => {
+    const { fake, pr } = withOnePull();
+
+    await expect(pr.editBase(7, '')).rejects.toThrow('gh pull requests: editBase refused base');
+    await expect(pr.editBase(0, 'stretch/1')).rejects.toThrow('gh pull requests: editBase refused pull request number');
     expect(fake.calls()).toEqual([]);
   });
 });

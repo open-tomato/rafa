@@ -15,6 +15,13 @@
  * (`../pr/pull-requests-double.js`) rather than the `gh` fake, since the
  * subject there is what the stage SENDS a provider — the forecast in
  * the body — and not a provider's own read-modify-write.
+ *
+ * The `pr.base` case (rafa-628, #627): under `pr.base: integration`, the
+ * prompt names `--base integration`, a pull request the session left
+ * against `main` is retargeted to `integration` with one line saying so,
+ * and the release step's line is written into the pull request found by
+ * the run's head branch. All three run over a real scratch repository
+ * with a bare `origin`, with the recorded `gh` fake as the provider.
  */
 import type { ReleaseStageSettings } from './release-stage.js';
 import type { ReportChange } from '../report/parse.js';
@@ -27,7 +34,8 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 
 import { localInstinctsDir } from '../adapters/learning/local.js';
-import { setActiveOutput } from '../adapters/output/active.js';
+import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
+import { resolveBaseBranch } from '../cleanup/index.js';
 import { RELEASE_AUTO } from '../config-sections.js';
 import { writeChanges } from '../effort/store/changes.js';
 import { actionHash } from '../learning/index.js';
@@ -37,8 +45,10 @@ import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { writeInstinct } from '../schema/instinct.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { retargetedLine, retargetPullRequest } from './pr-retarget.js';
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';
 import { finishRelease, prepareReleaseStage } from './release-stage.js';
+import { deliverPullRequest } from './wrap-up-run.js';
 import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
 
 const BRANCH = 'feat/rafa-25-rafa-learns-own-runs';
@@ -113,7 +123,7 @@ describe('wrap-up over a scratch repository', () => {
       promoteAfter: 3,
       promoteMinConfidence: 0.7,
     });
-    const prompt = buildWrapUpPrompt(BRANCH, '# Plan\n', null, null, lessons);
+    const prompt = buildWrapUpPrompt(BRANCH, 'main', '# Plan\n', null, null, lessons);
 
     // Listed: the lesson at 0.7; the control, at 0.6, is not.
     expect(lessons.map((each) => each.id)).toEqual(['held-three']);
@@ -271,9 +281,8 @@ describe('wrap-up release fragment over a scratch repository', () => {
 
     const double = bodyDouble(branch);
     const finish = await finishRelease(
-      { repoRoot: root, settings: SETTINGS, preparation },
+      { repoRoot: root, branch, settings: SETTINGS, preparation },
       {
-        currentBranch: () => branch,
         pulls: () => double.pulls.pulls,
         readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
         now: () => new Date('2026-09-20T09:00:00Z'),
@@ -328,9 +337,8 @@ describe('wrap-up release fragment over a scratch repository', () => {
 
     const double = bodyDouble(branch);
     const finish = await finishRelease(
-      { repoRoot: root, settings: SETTINGS, preparation },
+      { repoRoot: root, branch, settings: SETTINGS, preparation },
       {
-        currentBranch: () => branch,
         pulls: () => double.pulls.pulls,
         readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
         now: () => new Date('2026-09-20T09:00:00Z'),
@@ -345,5 +353,141 @@ describe('wrap-up release fragment over a scratch repository', () => {
     const subjects = git(['log', '--format=%s']).stdout.trim().split('\n');
     expect(subjects[0]).toBe(`chore: release fragment ${planStub}`);
     expect(double.edited()).toContain('Release forecast: this branch ships no release (level none)');
+  });
+});
+
+describe('wrap-up under pr.base over a scratch repository and the recorded gh fake', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'rafa-wrap-up-base-it-'));
+  const origin = join(scratch, 'origin.git');
+  const root = join(scratch, 'repo');
+  const BASE = 'integration';
+  const HEAD = 'feat/rafa-628-pr-base';
+  const PLAN_STUB = 'rafa-628-pr-base';
+  const RUN_PR = 628;
+  /** The pull request headed by the base: the one a branch read off the main checkout would write to. */
+  const BASE_PR = 627;
+  const RUN_BODY = 'Closes #628';
+  const BASE_BODY = 'Stretch work';
+
+  const SETTINGS: ReleaseStageSettings = {
+    releaseEnabled: RELEASE_AUTO,
+    releaseVersionFile: 'package.json',
+    releaseChangelog: 'CHANGELOG.md',
+    releaseFragments: '.changes',
+    releaseHeading: '## {version} — {date}, {title}',
+    releaseStrategy: 'semver-by-level',
+    prBase: BASE,
+  };
+
+  beforeAll(() => {
+    mkdirSync(root, { recursive: true });
+    const outside = createGitRunner(scratch);
+    outside(['init', '--quiet', '--bare', '--initial-branch=main', origin]);
+    outside(['init', '--quiet', '--initial-branch=main', root]);
+    const git = createGitRunner(root);
+    for (const args of [
+      ['config', 'user.email', 'test@example.com'],
+      ['config', 'user.name', 'Test'],
+      ['config', 'commit.gpgsign', 'false'],
+    ]) git(args);
+    writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n\nEvery notable change to this project, newest first.\n');
+    writeFileSync(join(root, 'package.json'), '{"name":"wrap-up-base-repo","version":"0.4.0"}\n');
+    git(['add', '--all']);
+    git(['commit', '-q', '-m', 'first']);
+    git(['remote', 'add', 'origin', origin]);
+    git(['push', '-q', '-u', 'origin', 'main']);
+    git(['branch', BASE]);
+    git(['push', '-q', 'origin', BASE]);
+    git(['checkout', '-q', '-b', HEAD]);
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  afterAll(() => {
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  test('names the base in the prompt, writes the release line into the head\'s pull request, and retargets it with one line', async () => {
+    const info: string[] = [];
+    const warn: string[] = [];
+    setActiveOutput(sinkOutput({ info: (line) => { info.push(line); }, warn: (line) => { warn.push(line); } }));
+    const git = createGitRunner(root);
+    const base = resolveBaseBranch(git, SETTINGS.prBase);
+    const fake = createFakePrGh();
+    fake.plant({ number: RUN_PR, headRefName: HEAD, baseRefName: 'main', body: RUN_BODY });
+    fake.plant({ number: BASE_PR, headRefName: BASE, baseRefName: 'main', body: BASE_BODY });
+    const pulls = createGhPullRequests({ gh: fake.run });
+
+    // The prompt, built over the one base the run resolved.
+    const prompt = buildWrapUpPrompt(HEAD, base, '# Plan\n');
+    expect(base).toBe(BASE);
+    expect(prompt).toContain(`gh pr create --base ${BASE}`);
+    expect(prompt).not.toContain('--base main');
+
+    // Step 1 and step 3 of the release, as `runWrapUp` runs them around the session.
+    const changes: readonly ReportChange[] = [
+      { level: 'patch', area: 'loop', summary: 'the wrap-up retargets a pull request', extras: [] },
+    ];
+    writeChanges(root, {
+      dispatch: { sessionId: 'wrap-up-base-session', planStub: PLAN_STUB, taskLine: '- [x] Retarget a pull request' },
+      changes,
+    });
+    const plan = [
+      '# Plan: rafa-628 — pr base',
+      '',
+      '```rafa:plan',
+      `stub: ${PLAN_STUB}`,
+      'issue: "628"',
+      'release: minor',
+      '```',
+      '',
+      '- [x] Retarget a pull request',
+    ].join('\n');
+    const preparation = prepareReleaseStage({ repoRoot: root, settings: SETTINGS, planStub: PLAN_STUB, planContent: plan });
+    if (preparation === null || preparation.kind !== 'prepared') {
+      throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
+    }
+    const finish = await finishRelease(
+      { repoRoot: root, branch: HEAD, settings: SETTINGS, preparation },
+      {
+        pulls: () => pulls,
+        readProvider: () => ({ provider: 'gh', source: 'config', remote: null, host: null }),
+        now: () => new Date('2026-10-02T09:00:00Z'),
+      },
+    );
+
+    expect(finish.outcome).toBe('released');
+    expect(finish.body?.number).toBe(RUN_PR);
+    expect(fake.pull(RUN_PR)?.body).toStartWith(RUN_BODY);
+    expect(fake.pull(RUN_PR)?.body).toContain('Release forecast:');
+    // The pull request headed by the base is not the one the line went to.
+    expect(fake.pull(BASE_PR)?.body).toBe(BASE_BODY);
+
+    // The delivery finds the session's pull request by the head, and it is retargeted.
+    const delivery = await deliverPullRequest(
+      { branch: HEAD, retries: 0, previousMessage: 'the session\'s final message' },
+      {
+        findOpen: (branch) => pulls.findOpen(branch),
+        retry: () => Promise.reject(new Error('a delivered pull request spends no retry')),
+        openRunnerPullRequest: () => Promise.reject(new Error('a delivered pull request needs no runner')),
+        isInterrupted: () => false,
+      },
+    );
+    if (delivery.kind !== 'delivered') throw new Error(`the delivery answered ${delivery.kind}`);
+    expect(delivery.pull.number).toBe(RUN_PR);
+    expect(delivery.pull.baseRefName).toBe('main');
+    const outcome = await retargetPullRequest(delivery.pull, base, { pulls, output: activeOutput() });
+
+    expect(outcome).toEqual({ kind: 'retargeted', from: 'main', to: BASE });
+    expect(fake.pull(RUN_PR)?.baseRefName).toBe(BASE);
+    expect(fake.pull(BASE_PR)?.baseRefName).toBe('main');
+    const baseEdits = fake.calls().filter((call) => call[0] === 'pr' && call[1] === 'edit' && call.includes('--base'));
+    expect(baseEdits).toEqual([['pr', 'edit', String(RUN_PR), '--base', BASE]]);
+    expect(info.filter((line) => line.includes('Retargeted'))).toEqual([retargetedLine(RUN_PR, 'main', BASE)]);
+    expect(warn.filter((line) => line.includes('retarget'))).toEqual([]);
+    // Retargeting rewrote the base only: the body the release step wrote stays.
+    expect(fake.pull(RUN_PR)?.body).toContain('Release forecast:');
   });
 });

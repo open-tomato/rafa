@@ -29,7 +29,7 @@
  * | `pr view <n> --web [--repo]` | `browse` |
  * | `pr checks <n> --json <fields> [--repo]` | `checks` |
  * | `pr merge <n> --squash or --merge or --rebase [--repo]` | `merge` |
- * | `pr edit <n> --body <text> or --title <text> [--repo]` | `editBody`, `editTitle` |
+ * | `pr edit <n> --body <text>, --title <text> or --base <branch> [--repo]` | `editBody`, `editTitle`, `editBase` |
  * | `pr create --head --base --title --body [--repo]` | `create` |
  * | `run view <id> --log-failed [--repo]` | `failedLog` |
  * | `api repos/<repo>/issues/<n>/comments [-X POST -f body=]` | `comments`, `comment` |
@@ -68,7 +68,9 @@
  * edit is that kind of write too: it replaces the stored body, which
  * every later `pr view --json body` then answers, and writes nothing to
  * either stream, because what `gh pr edit` writes was not recorded
- * either. A title edit is the same write to the title.
+ * either. A title edit is the same write to the title, and a base edit
+ * the same write to the base, which every later read then answers as
+ * `baseRefName`.
  *
  * `gh pr create` is modelled from its help text alone, which says the
  * new pull request's URL is printed: the fake opens the pull request
@@ -210,7 +212,7 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['pr view', { values: ['--json', '--repo'], switches: ['--web'], positionals: 1 }],
   ['pr checks', { values: ['--json', '--repo'], switches: [], positionals: 1 }],
   ['pr merge', { values: ['--repo'], switches: MERGE_SWITCHES, positionals: 1 }],
-  ['pr edit', { values: ['--body', '--title', '--repo'], switches: [], positionals: 1 }],
+  ['pr edit', { values: ['--body', '--title', '--base', '--repo'], switches: [], positionals: 1 }],
   ['pr create', { values: ['--head', '--base', '--title', '--body', '--repo'], switches: [], positionals: 0 }],
   ['run view', { values: ['--repo'], switches: ['--log-failed'], positionals: 1 }],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
@@ -400,13 +402,14 @@ export function createFakePrGh(options: FakePrGhOptions = {}): FakePrGh {
     if (refused !== null) return refused;
     const body = flagValue(parsed, '--body');
     const title = flagValue(parsed, '--title');
-    if (body === undefined && title === undefined) {
-      return failed('fake gh: pr edit models --body <text> and --title <text>, and was handed neither\n');
+    const base = flagValue(parsed, '--base');
+    if (body === undefined && title === undefined && base === undefined) {
+      return failed('fake gh: pr edit models --body <text>, --title <text> and --base <branch>, and was handed none\n');
     }
     const pull = namedPull(parsed.positionals[0] ?? '');
     if (isResult(pull)) return pull;
-    // The body and the title are replaced whole, and nothing is written: see the module note.
-    store({ ...pull, body: body ?? pull.body, title: title ?? pull.title });
+    // The body, the title and the base are replaced whole, and nothing is written: see the module note.
+    store({ ...pull, body: body ?? pull.body, title: title ?? pull.title, baseRefName: base ?? pull.baseRefName });
     return ok();
   };
 
