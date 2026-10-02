@@ -33,6 +33,10 @@ const SUMMARIES: readonly (readonly [LoopEvent, string])[] = [
   [{ kind: 'pr', number: 612 }, 'pr #612 opened'],
   [{ kind: 'no-pr', reason: 'no open pull request for feat/x' }, 'no pr            no open pull request for feat/x'],
   [{ kind: 'halt', reason: 'checkout moved' }, 'halt             checkout moved'],
+  [
+    { kind: 'inherited', file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' },
+    'inherited        src/parse/parse.test.ts > parse > drops the last line',
+  ],
 ];
 
 describe('summaryOf', () => {

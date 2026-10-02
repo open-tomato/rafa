@@ -40,6 +40,31 @@
  * public bug then fails with the chain's own refusal as its problem, while
  * the report's blocker text and security bugs are written as ever.
  *
+ * ## Inherited red, read once per run
+ *
+ * The run-start suite baseline (`suite/baseline.ts`), the
+ * `SUITE_BASELINE-<stub>.json` beside the tracker, is read once per run:
+ * when the first report with something to triage arrives, since `start()`
+ * records it at the first dispatch, after this triage is made. Its
+ * failures, and one set of keys commented on that the whole run shares,
+ * go to every `triageReport` of the run as its `inherited` option, so a
+ * public bug that is one of those failures files nothing and comments at
+ * most once per run on its open issue (`triage/inherited.ts`).
+ *
+ * A baseline that is missing, unreadable, or whose JUnit file was not read
+ * (`junit` other than `read`) names no failure, and neither does a tracker
+ * whose file name names no baseline: nothing is then inherited, and every
+ * bug is triaged as it was before. That reading is kept for the run too;
+ * the suite steps say what became of the baseline, so nothing is printed
+ * here about it.
+ *
+ * Each inherited bug is named, by the run-start failure's file and case,
+ * in its `Triage:` note and in one `inherited` loop event
+ * (`start/loop-events.ts`), which the events output prints as a `rafa· `
+ * line. The failure is read again from the bug as `triageReport` read it,
+ * local paths taken out, and its file and case are redacted of the named
+ * secrets before either line is printed.
+ *
  * ## Secrets
  *
  * The named secrets are read once, when the triage is made: `namedSecrets`
@@ -78,18 +103,28 @@ import type { TaskDispatch } from './dispatch.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
 import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';
+import type { SuiteFailure } from '../suite/run.js';
+import type { InheritedTriage } from '../triage/inherited.js';
 import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triage.js';
+
+import { homedir } from 'node:os';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
 import { messageOf } from '../config-sections.js';
 import { parseReport } from '../report/parse.js';
+import { baselinePathFor, readBaseline } from '../suite/baseline.js';
+import { artifactOf, hasText } from '../triage/bug-key.js';
+import { inheritedFailureOf } from '../triage/inherited.js';
+import { localPathRedactor } from '../triage/local-paths.js';
 import {
   blockerTextOf,
   namedSecrets,
   redactSecrets,
   triageReport,
 } from '../triage/triage.js';
+
+import { emitLoopEvent } from './loop-events.js';
 
 /** Why the stand-in handed to a report with no public bug refuses. */
 export const NOT_RESOLVED_REASON = 'start triage: no public tracker is resolved for a report with no public bug';
@@ -195,8 +230,27 @@ function issueName(ref: IssueRef): string {
   return ref.url ?? `${ref.kind} issue ${ref.externalId}`;
 }
 
-/** The lines for one bug: a note for an issue it reached, and a warning for everything else. */
-function bugLines(bug: BugTriage): StartTriageLines {
+/** How a line names a run-start failure: its file, then its case. */
+function failureName(failure: SuiteFailure): string {
+  return `${failure.file} > ${failure.name}`;
+}
+
+/** The note for a bug the run inherited from `failure`, naming the issue commented on, if any. */
+function inheritedNote(bug: BugTriage, name: string, where: string, failure: SuiteFailure | undefined): string {
+  const test = failure === undefined
+    ? 'a red test the run started with'
+    : `the run-start failure ${failureName(failure)}`;
+  const comment = bug.ref === null
+    ? ''
+    : `, and ${issueName(bug.ref)} on ${where}, found by ${FOUND_BY[bug.foundBy ?? 'find']}, was commented on`;
+  return `${name}: inherited: ${test}; nothing was filed${comment}.`;
+}
+
+/**
+ * The lines for one bug: a note for an issue it reached or a failure it
+ * inherited, and a warning for everything else.
+ */
+function bugLines(bug: BugTriage, inherited: SuiteFailure | undefined): StartTriageLines {
   const name = `out_of_scope_bugs[${bug.index}]`;
   const where = `the ${bug.channel} tracker`;
 
@@ -213,9 +267,12 @@ function bugLines(bug: BugTriage): StartTriageLines {
   const issue = bug.ref === null
     ? 'an issue'
     : issueName(bug.ref);
-  const note = bug.action === 'filed'
+  const reached = bug.action === 'filed'
     ? `${name}: filed on ${where} as ${issue}.`
     : `${name}: recurs in ${issue} on ${where}, found by ${FOUND_BY[bug.foundBy ?? 'find']}; commented on it.`;
+  const note = bug.action === 'inherited'
+    ? inheritedNote(bug, name, where, inherited)
+    : reached;
   const problem = bug.problem === null
     ? []
     : [`${name}: ${bug.problem}`];
@@ -227,11 +284,16 @@ function bugLines(bug: BugTriage): StartTriageLines {
 
 /**
  * What the operator is told about one triage, each line opening
- * `Triage: `: a note for the blocker text written and for each bug filed or
- * commented on, and a warning for everything that was not. Pure, so the
- * lines are tested beside what triage did.
+ * `Triage: `: a note for the blocker text written and for each bug filed,
+ * commented on or inherited, and a warning for everything that was not.
+ * `inherited` holds, by a bug's index, the run-start failure an inherited
+ * bug is, which its note names. Pure, so the lines are tested beside what
+ * triage did.
  */
-export function describeStartTriage(result: TriageResult): StartTriageLines {
+export function describeStartTriage(
+  result: TriageResult,
+  inherited: ReadonlyMap<number, SuiteFailure> = new Map(),
+): StartTriageLines {
   const { blocker } = result;
   const blockerNotes = blocker.written
     ? ['blockers: written onto the task line, for the next dispatch of this task.']
@@ -239,7 +301,7 @@ export function describeStartTriage(result: TriageResult): StartTriageLines {
   const blockerWarnings = blocker.problem === null
     ? []
     : [`blockers: ${blocker.problem}`];
-  const bugs = result.bugs.map(bugLines);
+  const bugs = result.bugs.map((bug) => bugLines(bug, inherited.get(bug.index)));
   const prefixed = (lines: readonly string[]): string[] => lines.map((line) => `${LINE_PREFIX}${line}`);
   return {
     notes: prefixed([...blockerNotes, ...bugs.flatMap((lines) => lines.notes)]),
@@ -274,14 +336,75 @@ async function resolvePublicTracker(
   }
 }
 
+/** The baseline file beside `trackerPath`, or null for a file name no baseline is named from. */
+function baselinePathOrNull(trackerPath: string): string | null {
+  try {
+    return baselinePathFor(trackerPath);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Makes the triage of one run: the chain unresolved, the secrets named.
- * See the module note.
+ * The failures of the run-start suite baseline beside `trackerPath`, as
+ * `readBaseline` reads them: none when the file is missing or unreadable,
+ * when its JUnit file was not read, or when the tracker's name names no
+ * baseline. See the module note.
+ */
+export function runStartFailures(trackerPath: string): readonly SuiteFailure[] {
+  const path = baselinePathOrNull(trackerPath);
+  const reading = path === null
+    ? null
+    : readBaseline(path);
+  return reading?.state === 'read' && reading.baseline.junit === 'read'
+    ? reading.baseline.failures
+    : [];
+}
+
+/**
+ * The run-start failure each inherited bug of `result` is, by its index,
+ * read again as `triageReport` read it: from the bug's `what` and artifact
+ * with local paths taken out. File and case are redacted by `redact`.
+ */
+function inheritedByIndex(
+  result: TriageResult,
+  report: TaskReport,
+  failures: readonly SuiteFailure[],
+  local: (text: string) => string,
+  redact: (text: string) => string,
+): ReadonlyMap<number, SuiteFailure> {
+  const named = result.bugs.flatMap((bug): (readonly [number, SuiteFailure])[] => {
+    const reported = report.outOfScopeBugs[bug.index];
+    if (bug.action !== 'inherited' || reported === undefined || !hasText(reported.what)) return [];
+    const artifact = artifactOf(reported);
+    const failure = inheritedFailureOf({
+      what: local(reported.what),
+      artifact: artifact === null
+        ? null
+        : local(artifact),
+    }, failures);
+    return failure === null
+      ? []
+      : [[bug.index, { file: redact(failure.file), name: redact(failure.name) }]];
+  });
+  return new Map(named);
+}
+
+/**
+ * Makes the triage of one run: the chain unresolved, the secrets named,
+ * the run-start baseline not yet read. See the module note.
  */
 export function createStartTriage(options: StartTriageOptions): StartTriage {
   const secrets = namedSecrets(options.config, options.env ?? process.env);
   const redact = (text: string): string => redactSecrets(text, secrets);
+  const local = localPathRedactor(options.repoRoot, homedir());
   let publicTracker: Promise<Tracker> | null = null;
+  let inherited: InheritedTriage | null = null;
+
+  const inheritedFor = (trackerPath: string): InheritedTriage => {
+    inherited ??= { failures: runStartFailures(trackerPath), commented: new Set() };
+    return inherited;
+  };
 
   const trackerFor = (report: TaskReport): Promise<Tracker> => {
     if (!report.outOfScopeBugs.some(filesPublicly)) {
@@ -296,6 +419,7 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
     if (!reading.present || !hasTriage(reading.report)) return null;
 
     const { report } = reading;
+    const run = inheritedFor(input.trackerPath);
     const result = await triageReport({
       repoRoot: options.repoRoot,
       trackerPath: input.trackerPath,
@@ -311,11 +435,14 @@ export function createStartTriage(options: StartTriageOptions): StartTriage {
       privateTracker: options.privateTracker,
       secrets,
       seams: options.seams,
+      inherited: run,
     });
 
-    const { notes, warnings } = describeStartTriage(result);
+    const named = inheritedByIndex(result, report, run.failures, local, redact);
+    const { notes, warnings } = describeStartTriage(result, named);
     for (const note of notes) activeOutput().info(`${INDENT}${note}`);
     for (const warning of warnings) activeOutput().warn(`${INDENT}${warning}`);
+    for (const failure of named.values()) emitLoopEvent({ kind: 'inherited', file: failure.file, name: failure.name });
     return result;
   };
 
