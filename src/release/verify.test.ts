@@ -74,6 +74,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '../config-sections.js';
 import { createGitRunner } from '../pr/index.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { prepareRelease } from './prepare.js';
 import { verifyRelease } from './verify.js';
@@ -149,10 +150,7 @@ function world(declared: 'minor' | 'none' = 'minor'): World {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
   const run = (cwd: string, args: readonly string[]): string => execFileSync(

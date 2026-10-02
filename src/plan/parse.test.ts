@@ -821,16 +821,15 @@ describe('issues', () => {
 
 describe('a real plan file on disk', () => {
   /**
-   * This phase's own plan, read from `.rafa/plans/`, not a fixture. It is
-   * the frozen template the loop dispatches from — `PLAN_TRACKER-*.md`
-   * is the copy its ticks land on — so its stage set, task count and
-   * declarations hold still for the run and are pinned here as
-   * measured, the same way `PLAN_LINES` above is written by hand. Per
-   * the module note, none of this repo's plans carry a `rafa:*` block
-   * yet, so this exercises the checklist grammar only; `blocks.test.ts`
-   * and the cases above cover the block reader itself.
+   * A whole plan committed under `testdata/`, written in the shape the
+   * loop dispatches from, read off disk rather than built from lines
+   * here. Its stage set, task count and declarations are pinned as
+   * measured, the same way `PLAN_LINES` above is written by hand, so an
+   * edit to the file moves these pins in the same commit. It carries no
+   * `rafa:*` block, so this exercises the checklist grammar only;
+   * `blocks.test.ts` and the cases above cover the block reader itself.
    */
-  const PATH = join(fileURLToPath(new URL('../../', import.meta.url)), '.rafa/plans/PLAN-phase-0-package-parity-cutover.md');
+  const PATH = fileURLToPath(new URL('testdata/real-plan.md', import.meta.url));
   const model = parsePlan(readFileSync(PATH, 'utf8'));
 
   it('reads no rafa:* block and reports nothing, so the checklist alone is under test', () => {
@@ -842,45 +841,39 @@ describe('a real plan file on disk', () => {
 
   it('reads every stage heading, in source order', () => {
     expect(stageNamesOf(model)).toEqual([
-      'Bootstrap the routing surface',
-      'Import the sibling loop',
-      'Store port',
-      'Reconciled schema',
-      'Parity',
-      'Structured plan format',
-      'Structured task report',
-      'Package and cutover',
+      'Column model',
+      'Writer',
+      'Command surface',
+      'Documentation and close-out',
     ]);
   });
 
-  it('counts the tasks under each stage, totalling the 62 tasks the plan states', () => {
+  it('counts the tasks under each stage, totalling the 14 tasks the plan holds', () => {
     const counts = model.stages.map(
       (_, index) => model.tasks.filter((task) => task.stage === index).length,
     );
-    expect(counts).toEqual([1, 12, 9, 3, 4, 12, 13, 8]);
-    expect(model.tasks).toHaveLength(62);
+    expect(counts).toEqual([3, 5, 3, 3]);
+    expect(model.tasks).toHaveLength(14);
     expect(counts.reduce((sum, count) => sum + count, 0)).toBe(model.tasks.length);
   });
 
   it('resolves every task declaration to a flag combination, histogrammed', () => {
     expect(declarationHistogram(model)).toEqual([
-      [['--agent', 'build-error-resolver'], 4],
+      [['--agent', 'build-error-resolver'], 1],
       [['--agent', 'code-reviewer'], 1],
-      [['--agent', 'doc-updater'], 6],
-      [['--agent', 'loop-implementer'], 24],
-      [['--agent', 'refactor-cleaner'], 2],
-      [['--agent', 'tdd-guide'], 13],
-      [['--agent', 'typescript-reviewer'], 1],
-      [['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Edit,Bash,Grep,Glob'], 3],
+      [['--agent', 'doc-updater'], 1],
+      [['--agent', 'loop-implementer', '--effort', 'high'], 1],
+      [['--agent', 'loop-implementer', '--effort', 'medium'], 4],
+      [['--agent', 'refactor-cleaner'], 1],
+      [['--agent', 'tdd-guide'], 2],
+      [['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Edit,Bash,Grep,Glob'], 1],
       [['--model', 'haiku', '--effort', 'low', '--tools', 'Read,Write,Bash,Grep,Glob'], 1],
-      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Edit,Bash,Grep,Glob'], 2],
-      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Write,Bash,Grep,Glob'], 3],
-      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Write,Edit,Bash,Grep,Glob'], 2],
+      [['--model', 'sonnet', '--effort', 'medium', '--tools', 'Read,Write,Bash,Grep,Glob'], 1],
     ]);
 
     // Every task on this plan declares something, and no agent task's
     // other keys are suppressed, because none pairs `agent=` with
-    // `model=`, `effort=` or `tools=`.
+    // `model=` or `tools=`.
     expect(model.tasks.every((task) => task.declaration !== null)).toBe(true);
     expect(model.tasks.every((task) => resolveDeclarationFlags(task.declaration, NO_OWN_EFFORT).suppressed.length === 0)).toBe(true);
   });

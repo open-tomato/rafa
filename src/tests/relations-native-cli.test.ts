@@ -61,6 +61,7 @@ import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board
 import { positionFilePath } from '../project/position.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-relations-native-cli-')));
@@ -91,7 +92,7 @@ function printVarFile(name: string): string {
  * which would land inside the captured bytes.
  */
 function gitSetup(scratch: ScratchRepo): void {
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };
@@ -562,7 +563,7 @@ describe('rafa next --roadmap in native mode, spawned', () => {
    * so the branch scan's remote half never fails and warns onto stdout.
    */
   function gitSetup(scratch: ScratchRepo): void {
-    const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+    const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
     const git = (args: readonly string[]): void => {
       execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
     };

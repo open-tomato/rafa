@@ -45,6 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry each spawned case runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -144,13 +145,13 @@ interface SpawnRun {
   readonly stderr: string;
 }
 
-/** Spawns `rafa <words>` in `scratch`, over its own PATH and HOME alone; see the module note. */
+/** Spawns `rafa <words>` in `scratch`, over its own PATH and HOME alone, with the bun cache variables `../tests/scratch-home-env.ts` sets beside that HOME; see the module note. */
 function runRafaIn(scratch: Scratch, words: readonly string[]): SpawnRun {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== null) throw new Error(`claude resolves to ${resolved}, and this suite plants no stand-in`);
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

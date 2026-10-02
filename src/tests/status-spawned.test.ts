@@ -26,6 +26,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { STATUS_NETWORK_TIMEOUT_MS } from '../status/sections.js';
 
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -76,10 +77,7 @@ function git(scratch: ScratchRepo, cwd: string, args: readonly string[]): string
       HOME: scratch.home,
       GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'Probe',
-      GIT_AUTHOR_EMAIL: 'probe@example.com',
-      GIT_COMMITTER_NAME: 'Probe',
-      GIT_COMMITTER_EMAIL: 'probe@example.com',
+      ...gitIdentityEnv(),
     },
   });
 }

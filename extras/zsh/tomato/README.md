@@ -4,7 +4,7 @@ A two-line zsh prompt for rafa projects. The first line holds git and
 rafa on the left, a spacer for short status messages, and the task
 counter alone at the top right. The second line is where you type.
 
-```
+```text
 rafa feat/rafa-367-releases-settle-base-branch +3130 -160 │ rafa:0.24.1 │ spec: #367 - Releases settle on the base bra…      │ 🍅 #367 13/47 · #370 8/33
 host >
 ```

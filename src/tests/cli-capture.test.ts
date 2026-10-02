@@ -23,13 +23,17 @@ import type { ProjectFound } from '../project/scope.js';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo } from './cli-capture.js';
+import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo, runRafa } from './cli-capture.js';
+
+/** The CLI entry the control spawns by hand, as `runRafa` spawns it. */
+const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cli-capture-')));
@@ -91,5 +95,23 @@ describe('plantScratchRepo', () => {
 
     expect(readFileSync(configFilePath(project.repo), 'utf8')).toBe(projectConfigText());
     expect(existsSync(configFilePath(bare.repo))).toBe(false);
+  });
+});
+
+describe('runRafa', () => {
+  it('leaves no .bun directory under the scratch HOME, where the same spawn under HOME alone leaves one', () => {
+    const scratch = plantScratchRepo(tempBase);
+    const control = plantScratchRepo(tempBase);
+
+    const run = runRafa(scratch, scratch.repo, ['--help']);
+    const bare = Bun.spawnSync([process.execPath, RAFA_ENTRY, '--help'], {
+      cwd: control.repo,
+      env: { PATH: control.path, HOME: control.home },
+    });
+
+    expect(run.exitCode).toBe(0);
+    expect(bare.exitCode).toBe(0);
+    expect(existsSync(join(control.home, '.bun'))).toBe(true);
+    expect(existsSync(join(scratch.home, '.bun'))).toBe(false);
   });
 });

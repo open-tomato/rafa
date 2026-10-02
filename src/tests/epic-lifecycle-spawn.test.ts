@@ -64,6 +64,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { positionAt, writePositionFile } from '../project/position.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-lifecycle-spawn-')));
@@ -223,6 +224,7 @@ function gitEnv(scratch: ScratchRepo): Readonly<Record<string, string | undefine
     HOME: scratch.home,
     GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
+    ...gitIdentityEnv(),
   };
 }
 

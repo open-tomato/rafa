@@ -22,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-roadmap-cli-')));
@@ -119,7 +120,7 @@ function plant(reachable: boolean): Planted {
   writeFileSync(join(scratch.repo, '.rafa', 'plans', 'PLAN-rafa-11-first.md'), '# plan\n', 'utf8');
 
   const bare = join(dirname(scratch.repo), 'origin.git');
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: string[], cwd: string): void => {
     execFileSync('git', args, { cwd, stdio: 'pipe', env });
   };

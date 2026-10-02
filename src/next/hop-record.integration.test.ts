@@ -48,6 +48,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { writeTrackingGitignore } from '../project/gitignore.js';
 import { positionAt, readPositionFile, writePositionFile } from '../project/position.js';
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from './hop-record.js';
 
@@ -81,6 +82,7 @@ function gitEnv(): Record<string, string | undefined> {
     XDG_CONFIG_HOME: gitHome,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }
@@ -242,7 +244,7 @@ function writeGhStub(scratch: ScratchRepo): void {
 function plantWorld(base: string): ScratchRepo {
   const scratch = plantScratchRepo(base, { project: false });
   plantProjectConfig(scratch.repo, 'pr:\n  provider: gh\n');
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };

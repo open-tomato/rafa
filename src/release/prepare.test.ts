@@ -63,6 +63,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RELEASE_AUTO } from '../config-sections.js';
 import { createGitRunner } from '../pr/index.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { parseFragment, serializeFragment } from './fragment.js';
 import { prepareRelease } from './prepare.js';
@@ -117,10 +118,7 @@ function gitEnv(home: string): Record<string, string> {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }

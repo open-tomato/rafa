@@ -62,6 +62,8 @@ import { parseBoardListing } from '../board/roadmap-board.js';
 import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '../commands/epic/cancel.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This module's own directory, `src/tests/`. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -313,7 +315,7 @@ function runCancelProbe(scratch: ScratchRepo, logPath: string): { readonly stdou
   writeFileSync(probe, buildCancelProbe(), 'utf8');
   const run = Bun.spawnSync([process.execPath, probe, logPath, 'epic', 'cancel', '40'], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: SPAWN_TIMEOUT,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
@@ -404,7 +406,7 @@ function writeEpicsGhStub(scratch: ScratchRepo, board: readonly object[]): void 
 
 /** A reachable, empty bare `origin` remote beside `scratch`, so the branch scan's remote half never warns. */
 function addOrigin(scratch: ScratchRepo): void {
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const bare = join(dirname(scratch.repo), 'origin.git');
   Bun.spawnSync(['git', 'init', '-q', '--bare', bare], { cwd: scratch.repo, env });
   Bun.spawnSync(['git', 'remote', 'add', 'origin', bare], { cwd: scratch.repo, env });

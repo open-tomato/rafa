@@ -34,6 +34,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '../tests/git-identity.js';
+
 import { writeTrackingGitignore } from './gitignore.js';
 import { positionAt, positionFilePath, readPositionFile, writePositionFile } from './position.js';
 
@@ -67,6 +69,7 @@ function gitEnv(): Record<string, string | undefined> {
     XDG_CONFIG_HOME: gitHome,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }

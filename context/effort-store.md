@@ -514,10 +514,14 @@ before comments are stripped, so a statement a comment swallowed fails
 here, and so does a `TEMP` table. SQLite also refuses an `ADD COLUMN`
 whose statement ends in a `--` comment before its `;` (`error in table
 <t> after add column: incomplete input`). Last, it reads
-`migrations.lock.json` at the newest `v*` tag by version order through
-`git show`, and fails a line changed or dropped since. The case is
-skipped, its title naming why, when git, the tag or the lock at the tag
-is absent. At v0.24.1 the lock is absent, since that release predates it.
+`migrations.lock.json` as released at v0.33.0, a copy committed as
+`src/effort/testdata/migrations/lock-v0.33.0.json`, and fails a line
+changed or dropped since; a newer release moves that copy and its
+`RELEASED_TAG` forward by hand. A provenance case holds the copy to
+`git show v0.33.0:` and is skipped, its title naming why, when git, the
+tag or the lock at the tag is absent. The 0.24.1 rule and history are
+read from an excerpt of that bundle committed beside it, never from
+`~/.rafa`. At v0.24.1 the lock is absent, since that release predates it.
 Each rule has a near-miss control, including a planted `DROP COLUMN`
 declared `[]`.
 
@@ -1088,8 +1092,9 @@ path; both patterns keep the real `.rafa/effort/` untouched.
 otherwise.** `guardTestProcess` (`store/location.ts`) runs before any file
 or directory is made, at every open of either backend and at
 `fix-schema`'s. In a process whose `Bun.main` ends in `.test.ts`, or whose
-environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (or its
-real path) throws `effort store: a test opened <path>, outside the temp
+environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (as
+spelled, or with the path and `tmpdir()` both read through their real
+paths, a path not made yet through its nearest existing ancestor) throws `effort store: a test opened <path>, outside the temp
 directory <tmp>; a test opens stores under tmpdir() only`. `runRafa` sets
 `RAFA_TEST=1` and the suite's `TMPDIR` on its child. A SQLite read of a
 file that does not exist opens nothing and so is not guarded; an NDJSON

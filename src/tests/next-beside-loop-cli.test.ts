@@ -28,6 +28,7 @@ import { beginSession } from '../loop/sessions.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-beside-loop-')));
 
@@ -42,7 +43,7 @@ const SESSION = '20260929-101500-beef';
 function plantEdited(): ScratchRepo {
   const scratch = plantScratchRepo(tempBase, { project: false });
   plantProjectConfig(scratch.repo, `${projectConfigText()}pr:\n  provider: gh\n  base: main\n`);
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };

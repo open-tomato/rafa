@@ -45,13 +45,15 @@
  * `./scratch-repository.test.ts` read red from 2026-09-24 12:00 UTC on,
  * measured on 2026-09-28 in a plain clone and in a linked worktree alike.
  *
- * Git runs with a fixed identity and without the user's or the
- * system's configuration.
+ * Git runs with the fixed test identity of `../tests/git-identity.ts`
+ * and without the user's or the system's configuration.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { ADMIN_FILES, GIT_DIR } from './worktrees.js';
 
@@ -105,10 +107,7 @@ export function createScratchRepository(): ScratchRepository {
       env: {
         PATH: process.env['PATH'],
         LC_ALL: 'C',
-        GIT_AUTHOR_NAME: 'Test',
-        GIT_AUTHOR_EMAIL: 'test@example.com',
-        GIT_COMMITTER_NAME: 'Test',
-        GIT_COMMITTER_EMAIL: 'test@example.com',
+        ...gitIdentityEnv(),
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
         ...dated(at),

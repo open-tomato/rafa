@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createScratchRepository } from '../cleanup/scratch-repository.js';
 import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 const SPAWN_TIMEOUT = 60_000;
 
@@ -58,7 +59,7 @@ describe('rafa doctor over a repository with nothing to clean', () => {
     const plain = plantScratchRepo(tempBase);
     writeFileSync(join(plain.repo, 'a.txt'), 'a\n');
     for (const args of [['add', '.'], ['-c', 'user.name=T', '-c', 'user.email=t@e.x', 'commit', '-q', '-m', 'first']]) {
-      Bun.spawnSync(['git', ...args], { cwd: plain.repo, env: { PATH: plain.path, HOME: plain.home, GIT_CONFIG_GLOBAL: '/dev/null' } });
+      Bun.spawnSync(['git', ...args], { cwd: plain.repo, env: { PATH: plain.path, HOME: plain.home, GIT_CONFIG_GLOBAL: '/dev/null', ...gitIdentityEnv() } });
     }
 
     const run = runRafa(plain, plain.repo, ['doctor']);

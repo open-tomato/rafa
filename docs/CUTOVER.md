@@ -163,10 +163,12 @@ resolve before continuing.
 ## Step 6: Run Parity Test Against Live Directory
 
 Verify that the store port is working correctly by running the parity
-test:
+test. It reads the sibling's live data, so it runs only with
+`RAFA_LIVE_PARITY=1`; without it every case skips under a reason naming
+the variable:
 
 ```bash
-bun test src/tests/parity-lineage.test.ts
+RAFA_LIVE_PARITY=1 bun test src/tests/parity-lineage.test.ts
 ```
 
 The test collects the sibling's 1,052+ session logs into both NDJSON and

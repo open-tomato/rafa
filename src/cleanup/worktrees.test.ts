@@ -15,6 +15,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '../tests/git-identity.js';
+
 import {
   countChanges,
   defaultWorktreeSeams,
@@ -398,11 +400,8 @@ describe('readWorktrees over a real repository', () => {
       env: {
         ...process.env,
         LC_ALL: 'C',
-        GIT_AUTHOR_NAME: 'Test',
-        GIT_AUTHOR_EMAIL: 'test@example.com',
-        GIT_COMMITTER_NAME: 'Test',
-        GIT_COMMITTER_EMAIL: 'test@example.com',
         GIT_CONFIG_GLOBAL: '/dev/null',
+        ...gitIdentityEnv(),
         GIT_CONFIG_NOSYSTEM: '1',
       },
     });
