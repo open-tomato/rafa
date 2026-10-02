@@ -102,8 +102,12 @@ export function strippedText(text: string): string {
   return oneLine(taken);
 }
 
-/** {@link strippedText}, or `text` on one line when stripping leaves nothing. */
-function keyText(text: string): string {
+/**
+ * {@link strippedText}, or `text` on one line when stripping leaves
+ * nothing: what an evidence line keys on, and what `./inherited.ts`
+ * compares an evidence line and a run-start message by.
+ */
+export function keyText(text: string): string {
   const stripped = strippedText(text);
   return stripped.length > 0
     ? stripped

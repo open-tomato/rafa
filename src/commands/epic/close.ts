@@ -454,6 +454,9 @@ export function bugLine(criterion: EpicCriterion, bug: BugTriage): { readonly te
         ? 'an issue'
         : issueName(bug.ref)} on the ${bug.channel} tracker; commented on it.`, warn: false };
     }
+    case 'inherited': {
+      return { text: `${which}: not filed: a test failure the run started with.`, warn: false };
+    }
     case 'skipped': {
       return { text: `${which}: not filed: ${bug.problem ?? 'no reason given'}.`, warn: true };
     }

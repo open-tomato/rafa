@@ -19,7 +19,7 @@
  *     machine-fault reading answers, and otherwise by its `security`
  *     flag. A bug with no usable `what` is skipped: it says nothing to
  *     file, and the store's triage writer refuses it for the same
- *     reason.
+ *     reason. A public bug the run inherited files nothing; see below.
  *
  * The loop never dispatches a task for a bug. A plan that wants one fixed
  * declares a task for it.
@@ -67,6 +67,24 @@
  * a finding this session reported under that artifact keeps its row
  * whichever was written first, and `progress.txt` renders the reference's
  * row as one more `- artifact: <key>` bullet (`store/tracker-refs.ts`).
+ *
+ * ## An inherited bug
+ *
+ * Given {@link TriageOptions.inherited}, a public bug that `./inherited.ts`
+ * reads as one of the run-start baseline's failures is a red test the run
+ * started with, not one its task made: its action is `inherited`, and
+ * nothing is filed for it. Its key is looked up as steps 1 and 2 above
+ * look one up, and the issue they find has its state read (`get`); an
+ * open one is commented on and, when `find` found it, stored under the
+ * key, as a recurrence is. A closed issue, or none, is left alone, and
+ * `create` is never called. The key goes into the option's `commented`
+ * set once the comment is made, and a bug whose key the set already
+ * holds is answered `inherited` with no call at all, so one red test
+ * reported by every task of a run comments once. A lookup, state read or
+ * comment that fails answers `failed`, as for any public bug, and leaves
+ * the set as it was. Security and machine-scoped bugs are never read
+ * against the failures: their channels never look anything up on the
+ * public tracker.
  *
  * ## A security bug
  *
@@ -169,6 +187,7 @@
  * second issue. A bug filed or commented on whose reference then cannot
  * be stored keeps its action and names the store's problem.
  */
+import type { InheritedTriage } from './inherited.js';
 import type { BugValues } from './issue-text.js';
 import type { MachineFault } from './machine-fault.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
@@ -192,6 +211,7 @@ import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
 import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
+import { inheritedFailureOf, isOpenIssueState } from './inherited.js';
 import { COMMENT_OPENING, ISSUE_OPENING, issueText, issueTitle } from './issue-text.js';
 import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
@@ -232,6 +252,12 @@ export type BugTriageAction =
   /** An issue it recurs in was found and commented on. */
   | 'commented'
   /**
+   * It is a test failure the run started with: nothing was filed, and the
+   * open issue its key found, if any, was commented on unless it already
+   * was this run.
+   */
+  | 'inherited'
+  /**
    * Nothing was called for it: it is machine-scoped, or it had no `what`
    * to file. Its problem says which.
    */
@@ -258,7 +284,11 @@ export interface BugTriage {
   readonly index: number;
   readonly channel: BugChannel;
   readonly action: BugTriageAction;
-  /** The issue filed or commented on, or the one a failed comment was for; else null. */
+  /**
+   * The issue filed or commented on, or the one a failed comment or state
+   * read was for; else null, as for an inherited bug that commented on
+   * nothing.
+   */
   readonly ref: IssueRef | null;
   /** How the issue was found, for a comment or a failed one; else null. */
   readonly foundBy: RecurrenceSource | null;
@@ -312,6 +342,12 @@ export interface TriageOptions {
   readonly home?: string;
   /** Seams for the reference write. */
   readonly seams?: FindingsWriterSeams;
+  /**
+   * The run-start failures and the keys commented on this run, for
+   * answering a public bug the run inherited; see the module note. Left
+   * out, no bug is inherited.
+   */
+  readonly inherited?: InheritedTriage;
 }
 
 /** The environment a secret's value is read from. */
@@ -541,7 +577,7 @@ function resultOf(run: BugRun, action: BugTriageAction, fields: Partial<BugTriag
 /** Stores the reference of an issue reached, when the route stores and the bug has a key. */
 async function settle(
   run: BugRun,
-  action: 'filed' | 'commented',
+  action: 'filed' | 'commented' | 'inherited',
   ref: IssueRef,
   foundBy: RecurrenceSource | null,
 ): Promise<BugTriage> {
@@ -563,38 +599,99 @@ async function fileNew(run: BugRun): Promise<BugTriage> {
     : resultOf(run, 'failed', { problem: created.problem });
 }
 
-/** Comments on the issue the bug recurs in. */
-async function commentOn(run: BugRun, ref: IssueRef, foundBy: RecurrenceSource): Promise<BugTriage> {
+/** Comments on the issue the bug recurs in, answering `action` once the comment is made. */
+async function commentOn(
+  run: BugRun,
+  ref: IssueRef,
+  foundBy: RecurrenceSource,
+  action: 'commented' | 'inherited' = 'commented',
+): Promise<BugTriage> {
   const commented = await step(run, `the ${run.route.channel} tracker comment`, () => run.route.tracker.comment(ref, run.filing.comment));
   if (!commented.ok) return resultOf(run, 'failed', { ref, foundBy, problem: commented.problem });
   return foundBy === 'store'
-    ? resultOf(run, 'commented', { ref, foundBy })
-    : settle(run, 'commented', ref, foundBy);
+    ? resultOf(run, action, { ref, foundBy })
+    : settle(run, action, ref, foundBy);
 }
 
-/** Looks the bug up by its key, then comments on what is found or files it. */
-async function triageBug(run: BugRun): Promise<BugTriage> {
-  const { route, filing } = run;
-  const { key, searchText } = filing;
-  if (key === null || searchText === null) return fileNew(run);
+/** The issue a bug's key found, and how. */
+interface Recurrence {
+  readonly ref: IssueRef;
+  readonly foundBy: RecurrenceSource;
+}
 
+/**
+ * The issue a bug's key finds: the stored reference under the key, then
+ * each legacy key, then `find` for the redacted key; null when none is
+ * found, or the failed result of the step that failed.
+ */
+async function lookUp(run: BugRun, key: string, searchText: string): Promise<StepOutcome<Recurrence | null>> {
+  const { route, filing } = run;
   const { readStored } = route;
   if (readStored !== null) {
     for (const storedKey of [key, ...filing.legacyKeys]) {
       const stored = await step(run, 'reading the stored reference', () => readStored(storedKey));
-      if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
+      if (!stored.ok) return stored;
       if (stored.value !== null && stored.value.kind === route.tracker.kind) {
-        return commentOn(run, stored.value, 'store');
+        return { ok: true, value: { ref: stored.value, foundBy: 'store' } };
       }
     }
   }
 
   const found = await step(run, `the ${route.channel} tracker find`, () => route.tracker.find({ text: searchText, type: 'bug' }));
-  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  if (!found.ok) return found;
   const [match] = found.value;
-  return match === undefined
+  return {
+    ok: true,
+    value: match === undefined
+      ? null
+      : { ref: match, foundBy: 'find' },
+  };
+}
+
+/** Looks the bug up by its key, then comments on what is found or files it. */
+async function triageBug(run: BugRun): Promise<BugTriage> {
+  const { key, searchText } = run.filing;
+  if (key === null || searchText === null) return fileNew(run);
+
+  const found = await lookUp(run, key, searchText);
+  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  return found.value === null
     ? fileNew(run)
-    : commentOn(run, match, 'find');
+    : commentOn(run, found.value.ref, found.value.foundBy);
+}
+
+/**
+ * Answers a bug the run inherited: files nothing, and comments on the
+ * open issue its key finds unless its key was commented on this run,
+ * adding the key to `commented` once it is; see the module note.
+ */
+async function triageInherited(run: BugRun, commented: Set<string>): Promise<BugTriage> {
+  const { key, searchText } = run.filing;
+  if (key === null || searchText === null || commented.has(key)) return resultOf(run, 'inherited');
+
+  const found = await lookUp(run, key, searchText);
+  if (!found.ok) return resultOf(run, 'failed', { problem: found.problem });
+  if (found.value === null) return resultOf(run, 'inherited');
+
+  const { ref, foundBy } = found.value;
+  const issue = await step(run, `the ${run.route.channel} tracker get`, () => run.route.tracker.get(ref));
+  if (!issue.ok) return resultOf(run, 'failed', { ref, foundBy, problem: issue.problem });
+  if (!isOpenIssueState(issue.value.state)) return resultOf(run, 'inherited');
+
+  const result = await commentOn(run, ref, foundBy, 'inherited');
+  if (result.action === 'inherited') commented.add(key);
+  return result;
+}
+
+/** A bug's `what` and artifact with their local paths taken out, as its key reads them. */
+function localBug(bug: ReportBug, what: string, local: (text: string) => string): Pick<ReportBug, 'what' | 'artifact'> {
+  const artifact = artifactOf(bug);
+  return {
+    what: local(what),
+    artifact: artifact === null
+      ? null
+      : local(artifact),
+  };
 }
 
 /** A bug nothing was called for: its row, on the channel it was read onto. */
@@ -681,7 +778,14 @@ export async function triageReport(options: TriageOptions): Promise<TriageResult
       continue;
     }
     const filing = await filingFor(what, bug, options, local, redact, verifyRefs);
-    bugs.push(await triageBug({ route, index, filing, redact }));
+    const run: BugRun = { route, index, filing, redact };
+    const { inherited } = options;
+    const isInherited = route.channel === 'public'
+      && inherited !== undefined
+      && inheritedFailureOf(localBug(bug, what, local), inherited.failures) !== null;
+    bugs.push(isInherited
+      ? await triageInherited(run, inherited.commented)
+      : await triageBug(run));
   }
   return { blocker, bugs };
 }
