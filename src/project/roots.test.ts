@@ -431,7 +431,7 @@ describe('gitToplevel on disk', () => {
     const gitFile = plantFile(join(dir, '.git'), 'gitdir: /nowhere/rafa-roots\n');
 
     expect(() => gitToplevel(dir)).toThrow(RootsError);
-    expect(() => gitToplevel(dir)).toThrow('exit 128: fatal: not a git repository: /nowhere/rafa-roots');
+    expect(() => gitToplevel(dir)).toThrow(/git rev-parse --show-toplevel.*exit 128: fatal:/);
     rmSync(gitFile);
     expect(gitToplevel(dir)).toBeNull();
   });
