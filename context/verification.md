@@ -62,18 +62,17 @@ with new failures names them in the blocker text the retry session
 receives through `BLOCKER_PROMPT_PREFIX`.
 
 **One hosted workflow repeats the gates outside a loop.**
-`.github/workflows/verify.yml` runs one job, `verify`, on every pull
-request into `main` and every push to `stretch/**`: `bun test`,
-`bunx eslint .` and `bunx tsc --noEmit`, each a step that runs unless the
-job was cancelled. A pull request into `stretch/**` reports no check, so
-`gh pr checks <n>` answers `no checks reported` there; that is the
-expected reading. To verify a PR's state, capture the three task session gates
-at the commit that is actually the PR's head, and read the runner's
-recorded steps from the `.rafa/runs/<run-id>.json` file when a loop ran.
-One more gate runs at `git commit`: `.githooks/pre-commit` runs
-`scripts/control-byte-gate/control-byte-gate.ts` with `--staged`, refusing
-a commit whose staged blobs carry a raw control byte or an invisible
-codepoint. The hook is live only where `git config core.hooksPath
+`.github/workflows/verify.yml` runs one job, `verify`, with two triggers
+and three gates. **Triggers:** pull requests into `main` and pushes to
+`stretch/**`. **Gates** (each step runs unless the job was cancelled):
+`bun test`, `bunx eslint .`, and `bunx tsc --noEmit`. **Two cases for
+`gh pr checks <n>`:** A pull request into `main` reports the `verify`
+check (merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull
+request into `stretch/**` reports no check (merge with `rafa pr merge <n>
+--skip-checks`). One more gate runs at `git commit`: `.githooks/pre-commit`
+runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
+refusing a commit whose staged blobs carry a raw control byte or an
+invisible codepoint. The hook is live only where `git config core.hooksPath
 .githooks` has been run.
 
 ### Baseline and known failures
