@@ -44,6 +44,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { verifyRelease } from '../release/verify.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import {
   BRANCH,
@@ -572,7 +573,7 @@ function gitIn(cwd: string, args: readonly string[]): void {
   const run = spawnSync('git', [...args], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, HOME: PLANTED_ROOT, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', LC_ALL: 'C' },
+    env: { ...process.env, HOME: PLANTED_ROOT, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', ...gitIdentityEnv(), LC_ALL: 'C' },
   });
   if (run.error !== undefined) throw run.error;
   if (run.status !== 0) throw new Error(`git ${args.join(' ')}: ${run.stderr}`);
