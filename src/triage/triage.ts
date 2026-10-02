@@ -26,24 +26,11 @@
  *
  * ## The key a bug is looked up by
  *
- * A bug's recurrence key is its artifact WITH the file it was reported
- * against: the base name of the task's tracker file, then the artifact on
- * one line, joined by {@link KEY_SEPARATOR} ({@link bugKeyOf}). The
- * artifact alone is not the defect. Two plans quoting one error string
- * report two different bugs, and keying on that string alone commented the
- * second on the first one's issue; keyed by the file as well, they stay
- * two issues, and two wordings of one defect under one file stay one.
- *
- * The artifact a key is built from has its local paths taken out
- * (`./local-paths.ts`), so one bug keys the same on every machine and a
- * key never holds a user's name. Every key builder takes that artifact,
- * #486's test-failure key too. Step 1 below also asks the store for the
- * legacy key, built from the artifact with its paths, when the two differ.
- *
- * A bug with no artifact has no key (roadmap Q18): it is filed every time,
- * with no lookup and no reference stored. An artifact that is blank, or
- * that holds a lone UTF-16 surrogate, which the store cannot key a
- * reference by, counts as none.
+ * A bug's recurrence key is its artifact, with its local paths taken
+ * out, WITH the file it was reported against ({@link bugKeyOf}).
+ * `./bug-key.ts` builds it, and its note holds why the file is part of
+ * it, the legacy key step 1 below also asks for, and why a bug with no
+ * artifact has no key and is filed every time.
  *
  * ## A public bug
  *
@@ -144,27 +131,10 @@
  * the module the GitHub adapter's `get` answers for an issue with no
  * module label, since a report names no module.
  *
- * The title is the bug's `what` on one line, cut to
- * {@link TITLE_MAX_LENGTH} code points. The body opens with a sentence
- * saying where the issue came from, then six sections, each value in a
- * fence one backtick longer than any backtick run it holds, so the text a
- * session wrote is shown verbatim and never rendered: `What`, `Artifact`,
- * `Recurrence key` (the key step 2 searches for), `Plan` (the plan stub),
- * `Task` (the task text, as the dispatch quoted it) and `Feedback` (the
- * report's feedback). A missing artifact, key, stub or feedback is a
- * sentence saying so.
- *
- * Between `Artifact` and `Recurrence key` goes a seventh, `Refs`, when the
- * redacted artifact names a path or a symbol: each one listed with its
- * target's fingerprint as {@link TriageOptions.verifyRefs} read it at
- * filing time. An artifact that names neither, and a missing one, have no
- * `Refs` section at all. `./refs-section.ts` holds what is read and how a
- * reading that fails is shown.
- *
- * A recurrence's comment carries the same sections under its own opening
- * sentence, its `Refs` stamped when the comment is written, so an issue
- * filed before this rafa, with no key section of its own, gains one from
- * the first recurrence commented on it.
+ * The title and the body, its sections and the comment a recurrence
+ * gets are `./issue-text.ts`'s, whose note holds what each shows. The
+ * `Refs` section among them is built here, from the redacted artifact,
+ * by {@link TriageOptions.verifyRefs}.
  *
  * ## Local paths and named secrets
  *
@@ -193,6 +163,7 @@
  * second issue. A bug filed or commented on whose reference then cannot
  * be stored keeps its action and names the store's problem.
  */
+import type { BugValues } from './issue-text.js';
 import type { MachineFault } from './machine-fault.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
 import type { RafaConfig } from '../config.js';
@@ -207,14 +178,15 @@ import type { RefVerifier } from '../refs/verify.js';
 import type { ReportBlocker, ReportBug, TaskReport } from '../report/parse.js';
 
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
 import { messageOf } from '../config-sections.js';
-import { textProblem } from '../effort/store/findings.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
+import { artifactOf, bugKeyOf, hasText } from './bug-key.js';
+import { COMMENT_OPENING, ISSUE_OPENING, issueText, issueTitle } from './issue-text.js';
 import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
 import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js';
@@ -231,24 +203,9 @@ export const TRIAGE_MODULE = 'unassigned';
 /** What joins the text of one report's blockers in the line's one comment. */
 export const BLOCKER_SEPARATOR = '; ';
 
-/** What stands between a bug's file and its artifact in its key. */
-export const KEY_SEPARATOR = ': ';
-
-/** The most code points a filed title holds, its cut marker included. */
-export const TITLE_MAX_LENGTH = 120;
-
-/** What ends a title that was cut. */
-const TITLE_CUT = '...';
-
-/** The shortest fence a value is shown in. */
-const MIN_FENCE_LENGTH = 3;
-
-/** What opens a filed issue's body. */
-const ISSUE_OPENING = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
-  + ' dispatches no task for it: a plan that wants it fixed declares a task.';
-
-/** What opens a recurrence's comment. */
-const COMMENT_OPENING = 'Reported again by a rafa task session.';
+/** Names `./bug-key.ts` and `./issue-text.ts` now hold, still answered from here. */
+export { KEY_SEPARATOR, bugKeyOf } from './bug-key.js';
+export { TITLE_MAX_LENGTH, issueTitle } from './issue-text.js';
 
 /** One named secret: the variable's name and the value it held. */
 export interface NamedSecret {
@@ -423,11 +380,6 @@ export function redactSecrets(text: string, secrets: readonly NamedSecret[]): st
   return text.replace(pattern, (value) => `[redacted: ${nameByValue.get(value)}]`);
 }
 
-/** True for text with something in it. */
-function hasText(value: string | null): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
 /** The text written for a report's blockers, or null when none has a `what`. */
 export function blockerTextOf(blockers: readonly ReportBlocker[]): string | null {
   const texts = blockers.map((blocker) => blocker.what).filter(hasText);
@@ -452,89 +404,6 @@ function triageBlockers(options: TriageOptions): BlockerTriage {
   } catch (error) {
     return { text, written: false, problem: `the blocker was not written: ${messageOf(error)}` };
   }
-}
-
-/** A bug's artifact when it can key a reference, or null; see the module note. */
-function artifactOf(bug: ReportBug): string | null {
-  return hasText(bug.artifact) && textProblem(bug.artifact) === null
-    ? bug.artifact
-    : null;
-}
-
-/** `text` on one line, every run of whitespace one space, trimmed. */
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * The key a bug's issue is looked up and kept under: the base name of the
- * tracker file it was reported against, then its artifact on one line,
- * joined by {@link KEY_SEPARATOR}. The base name, rather than the path, so
- * one plan keys the same from two checkouts; see the module note.
- */
-export function bugKeyOf(trackerPath: string, artifact: string): string {
-  return `${basename(trackerPath)}${KEY_SEPARATOR}${oneLine(artifact)}`;
-}
-
-/** A value in a fence one backtick longer than any run of backticks it holds. */
-function fenced(value: string): string {
-  const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
-  const fence = '`'.repeat(Math.max(MIN_FENCE_LENGTH, ...runs.map((length) => length + 1)));
-  const body = value.endsWith('\n')
-    ? value
-    : `${value}\n`;
-  return `${fence}\n${body}${fence}`;
-}
-
-/** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
-export function issueTitle(redactedWhat: string): string {
-  const line = oneLine(redactedWhat);
-  const points = Array.from(line);
-  if (points.length <= TITLE_MAX_LENGTH) return line;
-  const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
-  return `${kept.trimEnd()}${TITLE_CUT}`;
-}
-
-/** The values one bug's issue and comment show, before redaction. */
-interface BugValues {
-  readonly what: string;
-  readonly artifact: string | null;
-  /** The key `find` is asked for, redacted, or null for a bug with none. */
-  readonly key: string | null;
-  /** The `Refs` section, heading included and already redacted, or null for none. */
-  readonly refs: string | null;
-  readonly planStub: string | null;
-  readonly taskText: string;
-  readonly feedback: string | null;
-}
-
-/** One section: its heading, then its value redacted in a fence, or the sentence for none. */
-function section(
-  heading: string,
-  value: string | null,
-  absent: string,
-  redact: (text: string) => string,
-): string {
-  const shown = value === null
-    ? absent
-    : fenced(redact(value));
-  return `## ${heading}\n\n${shown}`;
-}
-
-/** An issue body or a comment: `opening`, then the sections; see the module note. */
-function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
-  return [
-    opening,
-    section('What', values.what, '', redact),
-    section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
-    ...values.refs === null
-      ? []
-      : [values.refs],
-    section('Recurrence key', values.key, 'The report gave no artifact, so this bug has no key.', redact),
-    section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
-    section('Task', values.taskText, '', redact),
-    section('Feedback', values.feedback, 'The report gave no feedback.', redact),
-  ].join('\n\n') + '\n';
 }
 
 /** Everything one bug is filed, commented and searched with, redacted. */

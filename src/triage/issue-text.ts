@@ -1,0 +1,109 @@
+/**
+ * The text loop-owned triage (`./triage.ts`) files a bug with: the title,
+ * and the body or comment its sections make up.
+ *
+ * The title is the bug's `what` on one line, cut to
+ * {@link TITLE_MAX_LENGTH} code points ({@link issueTitle}). The body
+ * opens with a sentence saying where the issue came from
+ * ({@link ISSUE_OPENING}), then six sections, each value in a fence one
+ * backtick longer than any backtick run it holds ({@link fenced}), so the
+ * text a session wrote is shown verbatim and never rendered: `What`,
+ * `Artifact`, `Recurrence key` (the key `./triage.ts`'s step 2 searches
+ * for), `Plan` (the plan stub), `Task` (the task text, as the dispatch
+ * quoted it) and `Feedback` (the report's feedback). A missing artifact,
+ * key, stub or feedback is a sentence saying so.
+ *
+ * Between `Artifact` and `Recurrence key` goes a seventh, `Refs`, when the
+ * redacted artifact names a path or a symbol: each one listed with its
+ * target's fingerprint as `TriageOptions.verifyRefs` read it at filing
+ * time. An artifact that names neither, and a missing one, have no `Refs`
+ * section at all. `./refs-section.ts` holds what is read and how a reading
+ * that fails is shown.
+ *
+ * A recurrence's comment carries the same sections under its own opening
+ * sentence ({@link COMMENT_OPENING}), its `Refs` stamped when the comment
+ * is written, so an issue filed before this rafa, with no key section of
+ * its own, gains one from the first recurrence commented on it.
+ *
+ * Every value goes through the caller's `redact` before it is shown, and
+ * the title is cut from text already redacted, so no cut leaves part of a
+ * secret behind.
+ */
+import { oneLine } from './bug-key.js';
+
+/** The most code points a filed title holds, its cut marker included. */
+export const TITLE_MAX_LENGTH = 120;
+
+/** What ends a title that was cut. */
+const TITLE_CUT = '...';
+
+/** The shortest fence a value is shown in. */
+const MIN_FENCE_LENGTH = 3;
+
+/** What opens a filed issue's body. */
+export const ISSUE_OPENING = 'An out-of-scope bug a rafa task session reported. The loop filed it and'
+  + ' dispatches no task for it: a plan that wants it fixed declares a task.';
+
+/** What opens a recurrence's comment. */
+export const COMMENT_OPENING = 'Reported again by a rafa task session.';
+
+/** A value in a fence one backtick longer than any run of backticks it holds. */
+export function fenced(value: string): string {
+  const runs = Array.from(value.matchAll(/`+/g), (run) => run[0].length);
+  const fence = '`'.repeat(Math.max(MIN_FENCE_LENGTH, ...runs.map((length) => length + 1)));
+  const body = value.endsWith('\n')
+    ? value
+    : `${value}\n`;
+  return `${fence}\n${body}${fence}`;
+}
+
+/** The title a bug is filed under: its redacted `what` on one line, cut to the cap. */
+export function issueTitle(redactedWhat: string): string {
+  const line = oneLine(redactedWhat);
+  const points = Array.from(line);
+  if (points.length <= TITLE_MAX_LENGTH) return line;
+  const kept = points.slice(0, TITLE_MAX_LENGTH - TITLE_CUT.length).join('');
+  return `${kept.trimEnd()}${TITLE_CUT}`;
+}
+
+/** The values one bug's issue and comment show, before redaction. */
+export interface BugValues {
+  readonly what: string;
+  readonly artifact: string | null;
+  /** The key `find` is asked for, redacted, or null for a bug with none. */
+  readonly key: string | null;
+  /** The `Refs` section, heading included and already redacted, or null for none. */
+  readonly refs: string | null;
+  readonly planStub: string | null;
+  readonly taskText: string;
+  readonly feedback: string | null;
+}
+
+/** One section: its heading, then its value redacted in a fence, or the sentence for none. */
+export function section(
+  heading: string,
+  value: string | null,
+  absent: string,
+  redact: (text: string) => string,
+): string {
+  const shown = value === null
+    ? absent
+    : fenced(redact(value));
+  return `## ${heading}\n\n${shown}`;
+}
+
+/** An issue body or a comment: `opening`, then the sections; see the module note. */
+export function issueText(opening: string, values: BugValues, redact: (text: string) => string): string {
+  return [
+    opening,
+    section('What', values.what, '', redact),
+    section('Artifact', values.artifact, 'The report gave no artifact, so a recurrence files again.', redact),
+    ...values.refs === null
+      ? []
+      : [values.refs],
+    section('Recurrence key', values.key, 'The report gave no artifact, so this bug has no key.', redact),
+    section('Plan', values.planStub, 'The dispatch resolved no plan stub.', redact),
+    section('Task', values.taskText, '', redact),
+    section('Feedback', values.feedback, 'The report gave no feedback.', redact),
+  ].join('\n\n') + '\n';
+}
