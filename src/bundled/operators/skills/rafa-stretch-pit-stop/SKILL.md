@@ -1,6 +1,6 @@
 ---
 name: rafa-stretch-pit-stop
-description: "Use after each stretch item: check effort, bugs, delivery and conflicts, then go on, insert one fix, or halt."
+description: "Use after each stretch item: check effort, bugs, delivery, conflicts and CI, then go on, insert one fix, or halt."
 provenance: first-party
 source: rafa
 stage: alpha
@@ -23,7 +23,7 @@ A pit stop is the check between two items. It fixes the one thing that
 would stop the next item, then rejoins the bucket: it is never a change
 of course, and never a reason to chase one issue down a rabbit hole.
 
-## The four checks
+## The five checks
 
 | Check | Line | What is wrong |
 |---|---|---|
@@ -31,6 +31,11 @@ of course, and never a reason to chase one issue down a rabbit hole.
 | Bugs | `rafa issue list --type=bug --limit=200` | the open count rising, or bugs filed during this loop that repeat an open one |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
+| CI | `gh run list --branch stretch/<n> --workflow verify.yml --limit 1` | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
+
+A CI failure already red in the local runs is inherited and noted in the pit-stop entry.
+A new failure is filed as one bug after a search for an existing one. A run still in progress
+is read at the next pit stop.
 
 A conflict goes to the resolve plans first:
 
@@ -67,5 +72,6 @@ Append one entry to `.rafa/stretch/<n>/pit-stops.md`:
 - Bugs: 61 open, 64 at the start; none filed during the loop.
 - Delivery: pull request #612 merged into stretch/3.
 - Conflicts: none.
+- CI: verify.yml passed.
 - Decision: next item, #486.
 ```
