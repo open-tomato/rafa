@@ -236,6 +236,18 @@ function letThrough(control: string, n: number): void {
 }
 
 /**
+ * {@link scratchHomeEnv} with the shared test identity taken back out, so a
+ * spawned settle commits under its caller's own `user.name` and
+ * `user.email` (see {@link caller}): under the one identity both racing
+ * settles would build the same release commit, and the losing push would
+ * find nothing to refuse.
+ */
+function ownIdentityHomeEnv(home: string): Readonly<Record<string, string>> {
+  const shared = gitIdentityEnv();
+  return Object.fromEntries(Object.entries(scratchHomeEnv(home)).filter(([key]) => !(key in shared)));
+}
+
+/**
  * Spawns `bun src/rafa.ts` with `words` in `cwd`, under `scratch`'s PATH
  * and HOME, without waiting for it: the async twin of `runRafa`, needed
  * here because a case must act (let another settle finish, or land a
@@ -248,7 +260,7 @@ function spawnRafaAsync(scratch: ScratchRepo, cwd: string, words: readonly strin
   }
   const proc = Bun.spawn([process.execPath, RAFA_ENTRY, ...words], {
     cwd,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...ownIdentityHomeEnv(scratch.home) },
     stdout: 'pipe',
     stderr: 'pipe',
   });

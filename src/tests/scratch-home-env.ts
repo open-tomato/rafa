@@ -17,10 +17,18 @@
  * whatever a spawned run would install; nothing creates it unless that
  * happens, so it leaves no directory behind on an ordinary run.
  *
+ * A swapped `HOME` also hides the operator's `~/.gitconfig`, and with it
+ * the `user.name` and `user.email` a commit needs, so the object carries
+ * {@link gitIdentityEnv} too: a spawned run that commits under the
+ * scratch `HOME` never fails with `Author identity unknown`. Git reads
+ * those variables before any repository configuration, so they also
+ * outrank a scratch repository's own `user.name`.
+ *
  * `packages/rafa-hub/src/testdata/scratch-home-env.ts` spells the same
  * variables for the hub's spawned suites, which may not import from
  * `src/` (`context/source.md`).
  */
+import { gitIdentityEnv } from './git-identity.js';
 
 /** The value of `BUN_RUNTIME_TRANSPILER_CACHE_PATH` that turns the cache off. */
 const TRANSPILER_CACHE_OFF = '0';
@@ -30,11 +38,13 @@ const INSTALL_CACHE_SUFFIX = '-bun-install-cache';
 
 /**
  * `HOME` set to `home`, beside the bun cache variables that keep a
- * spawned bun run from writing under it; see the module note. Spread
- * it where a spawned run's environment would set `HOME` alone.
+ * spawned bun run from writing under it and the test git identity; see
+ * the module note. Spread it where a spawned run's environment would set
+ * `HOME` alone.
  */
 export function scratchHomeEnv(home: string): Readonly<Record<string, string>> {
   return {
+    ...gitIdentityEnv(),
     HOME: home,
     BUN_INSTALL_CACHE_DIR: `${home}${INSTALL_CACHE_SUFFIX}`,
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: TRANSPILER_CACHE_OFF,
