@@ -11,7 +11,8 @@
  * promote the listed lessons, commit, push and open the pull request,
  * and the earlier session may have done any part of that or none. So
  * the prompt is {@link buildWrapUpPrompt}'s, built with no open pull
- * request, which gives it the `gh pr create` bullet, and one bullet
+ * request, which gives it the `gh pr create --base <base>` bullet over
+ * the run's base as `runWrapUp` resolved it once, and one bullet
  * more: {@link missingPullRequestBullet}, saying the pull request is
  * missing and quoting the earlier session's final message.
  *
@@ -58,6 +59,8 @@ import { buildWrapUpPrompt, runWrapUpSession } from './wrap-up.js';
 export interface WrapUpRetryPrompt {
   /** The run's branch, the one with no open pull request. */
   readonly branch: string;
+  /** The run's base branch, the one the create bullet names. */
+  readonly base: string;
   /** The plan the run executed, appended whole as the wrap-up's is. */
   readonly planContent: string;
   /** Step 1's release record, as the first wrap-up was given it, or null. */
@@ -97,8 +100,8 @@ export function missingPullRequestBullet(branch: string, previousMessage: string
  * line. The caller stamps it (`start/stamp.ts`), as it does the first.
  */
 export function buildWrapUpRetryPrompt(retry: WrapUpRetryPrompt): string {
-  const base = buildWrapUpPrompt(retry.branch, retry.planContent, null, retry.release, retry.lessons);
-  const [classifierKey, ...rest] = base.split('\n');
+  const first = buildWrapUpPrompt(retry.branch, retry.base, retry.planContent, null, retry.release, retry.lessons);
+  const [classifierKey, ...rest] = first.split('\n');
   return [
     classifierKey,
     ...missingPullRequestBullet(retry.branch, retry.previousMessage),
@@ -112,6 +115,8 @@ export interface WrapUpRetryRun {
   readonly previousMessage: string;
   /** The run's branch, with no open pull request. */
   readonly branch: string;
+  /** The run's base branch, as `runWrapUp` resolved it once. */
+  readonly base: string;
   /** The plan the run executed. */
   readonly planContent: string;
   /** The setting sources every session the run spawns loads. */
@@ -132,9 +137,9 @@ export interface WrapUpRetryRun {
  * note.
  */
 export function retryWrapUp(run: WrapUpRetryRun): Promise<string> {
-  const { branch, planContent, previousMessage } = run;
+  const { branch, base, planContent, previousMessage } = run;
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, planContent, release: null, lessons, previousMessage }),
+    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, base, planContent, release: null, lessons, previousMessage }),
     settingSources: run.settingSources,
     serving: run.serving,
     learning: run.learning,

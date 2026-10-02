@@ -120,6 +120,7 @@ const MEMBERS: readonly Member[] = [
   },
   { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => summary,'] },
   { name: 'editTitle', lines: ['  editTitle: async (_n: number, _title: string) => {},'] },
+  { name: 'editBase', lines: ['  editBase: async (_n: number, _base: string) => {},'] },
   { name: 'editBody', lines: ['  editBody: async (_n: number, _body: string) => {},'] },
   { name: 'comments', lines: ['  comments: async (_n: number) => [comment],'] },
   { name: 'comment', lines: ['  comment: async (_n: number, _body: string) => comment,'] },

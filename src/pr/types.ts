@@ -321,6 +321,14 @@ export interface PullRequests {
    */
   editTitle: (number: number, title: string) => Promise<void>;
   /**
+   * Retargets the PR onto the branch `base` and answers nothing. An
+   * absent PR throws, for the reason {@link PullRequests.editBody}
+   * gives; nothing reads back what the edit wrote, so a caller that
+   * needs the new {@link PullRequestSummary.baseRefName} reads the PR
+   * again.
+   */
+  editBase: (number: number, base: string) => Promise<void>;
+  /**
    * Replaces the PR's own body — the description above the
    * conversation, not a comment under it — and answers nothing.
    *

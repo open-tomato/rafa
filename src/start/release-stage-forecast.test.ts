@@ -20,6 +20,7 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { RELEASE_BLOCK_CLOSE } from '../release/branch-forecast.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import {
+  BRANCH,
   COMMITTED,
   detail,
   FORECAST,
@@ -60,7 +61,7 @@ const UNDER_DECLARED = prepared({ level: 'patch', levelSource: 'plan', notesLeve
 
 /** The finish input every case runs under, over `preparation`. */
 function finishOf(preparation: ReleasePreparation): Parameters<typeof finishRelease>[0] {
-  return { repoRoot: REPO, settings: SETTINGS, preparation };
+  return { repoRoot: REPO, branch: BRANCH, settings: SETTINGS, preparation };
 }
 
 describe('finishRelease forecast', () => {

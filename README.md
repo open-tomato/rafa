@@ -66,6 +66,27 @@ your accounts.
   nobody). `rafa loop resume` starts no session itself, but it lets a
   paused run go on spending. rafa calls no model API directly: all of
   it goes through the `claude` command.
+- **Your machine may go to sleep in the middle of a run.** rafa does not
+  keep it awake, so the operating system's power settings can suspend a
+  loop mid-task. The task carries on when the machine wakes, if its
+  session survived, and its recorded time includes the time asleep, which
+  then reads as an outlier in `rafa effort report --trend`. On a machine
+  you leave running loops, turn sleep off in its power settings, or run
+  the loop under the operating system's own sleep lock, which lasts as
+  long as the command it wraps:
+
+  ```bash
+  systemd-inhibit --what=sleep:idle --why="rafa loop" rafa loop start --plan=<plan>
+  ```
+
+  ```bash
+  caffeinate -i rafa loop start --plan=<plan>
+  ```
+
+  The first is Linux's, the second macOS's. **On a managed device, check
+  its power policy before you do either:** some organisations report, or
+  block, software that keeps a device awake. An opt-in `--keep-awake`
+  flag is planned (#641).
 - So run it in a repository, on a branch and on a machine where all of
   that is acceptable: a container or a disposable checkout is a good
   first home. Nothing here is a sandbox.

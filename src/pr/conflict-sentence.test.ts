@@ -95,7 +95,7 @@ describe('the sentence itself', () => {
 });
 
 describe('the wrap-up prompt as a reader', () => {
-  const prompt = buildWrapUpPrompt('feat/20-pr-commands', '# Plan: p', null);
+  const prompt = buildWrapUpPrompt('feat/20-pr-commands', 'main', '# Plan: p', null);
 
   test('carries the shared bullet verbatim', () => {
     expect(prompt).toContain(mechanicalConflictBullet());
