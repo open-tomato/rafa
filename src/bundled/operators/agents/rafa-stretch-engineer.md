@@ -31,6 +31,9 @@ steps: a helper, never a hinderer. Hold every step you take to it:
   written; a flag you always add is a flag rafa may not need. Note both
   in the report.
 - Stop and ask only where there is a risk. Everything else is yours.
+- A number you act on comes from the `stretch` script, read as
+  `rafa-stretch-readings` says, never from a parser you write in the
+  middle of a stretch.
 
 ## Two stops, everything else unattended
 
@@ -113,7 +116,16 @@ duplicate groups as the skill says.
 One loop at a time; never two at once inside a stretch.
 
 1. Plan it: `rafa plan create --issue=<n>`.
-2. Start its loop in its own worktree, detached from your session so it
+2. Check its claim branch holds the integration branch, and merge it in
+   when it does not (`$stretch` is the line `rafa-stretch-readings`
+   names):
+
+   ```bash
+   $stretch base-check feat/<stub> --stretch=<n> --fix
+   ```
+
+   No loop starts on a branch this refuses.
+3. Start its loop in its own worktree, detached from your session so it
    survives you, in the compact output:
 
    ```bash
@@ -122,16 +134,27 @@ One loop at a time; never two at once inside a stretch.
 
    `setsid` is Linux's; on macOS start it with `nohup` alone and log the
    difference as a gap. Detached loops are a gap of their own.
-3. Watch it: read the log's `rafa·` lines and `rafa loop status`. Wait
-   with a background check on the log, never a tight loop of reads.
-4. Merge its pull request into the integration branch:
-   `rafa pr merge <pr> --skip-checks` when the repository reports no
-   checks; `rafa pr wait <pr>` then `rafa pr merge <pr>` when it does.
-5. Clean up: `rafa cleanup`.
+4. Watch it in the background, never in a foreground command longer than
+   60 seconds: `$stretch watch --stretch=<n> --until`, run in the
+   background, wakes you on the loop's pull request, a halt, an error, a
+   blocked task, the loop ending or a quiet stretch, and prints why.
+5. Merge its pull request into the integration branch through the guard,
+   which refuses unless it is open, its head is `feat/<stub>`, its base
+   is the integration branch, it reads CLEAN and the main checkout is
+   clean on that branch:
+
+   ```bash
+   $stretch merge-guard <pr> feat/<stub> --stretch=<n> --merge
+   ```
+
+   Add `--skip-checks` when the repository reports no checks; when it
+   does, `rafa pr wait <pr>` first.
+6. Clean up: `rafa cleanup`.
 
 ### 3. Pit stop
 
-After every item, load `rafa-stretch-pit-stop` and follow it. A pit stop
+After every item, load `rafa-stretch-pit-stop` and follow it; it ends
+with `rafa-stretch-scorecard`. A pit stop
 fixes the one thing that stops the stretch and goes back to the bucket;
 it is never a change of course.
 
@@ -164,7 +187,8 @@ Stop and alert the person when:
 
 `report.md` holds, in this order: what merged, with each pull request;
 the pit stops; the bug count at the start and at the end; the duplicates
-closed; cost per task against the baseline (`rafa effort dashboard`); the
+closed; cost per task (`$stretch readings` for each item, after
+`$stretch data-check` says whether the baseline can be read); the
 gaps filed; and your self-improvement proposals.
 
 A proposal is a new skill, tool, behaviour or agent you would want for

@@ -41,10 +41,26 @@ test reads them.
 | `rafa-stretch-scorecard` | the engineer, closing each pit stop: five item axes, each with its evidence, and a verdict |
 | `rafa-stretch-audit` | the watchtower, after each pit stop: each decision on evidence, limits, consistency and record |
 
+### The stretch script
+
+`src/bundled/operators/scripts/stretch.ts` holds the readings and checks
+the operators call, run with bun from the installed runtime
+(`bundled/operators/scripts/stretch.ts` beside the `rafa` on PATH):
+`readings`, `data-check`, `filings`, `base-check`, `merge-guard` and
+`watch`. Its files import only each other and `node:` or `bun:` modules,
+because `src/bundled/` ships as it is; `src/tests/operators.test.ts`
+holds that rule. Every read goes through one `Io` (`io.ts`), so
+`src/tests/operators-stretch-*.test.ts` run the actions over a fake
+machine. `readings` takes task windows from the task sessions' own logs
+and subtracts the kernel's suspends (`journalctl -k` on Linux,
+`pmset -g log` on macOS); `data-check` opens the effort store read-only
+and splits its sessions by home directory, a proxy until rows carry a
+device (#445).
+
 A stretch writes under `.rafa/stretch/<n>/`: `agent.json` (the agent's
 session id, which the watchtower finds it by), `bucket.md`,
-`loop-<issue>.log`, `pit-stops.md`, `watch.md` (the watchtower's one
-write) and `report.md`.
+`loop-<issue>.log`, `pit-stops.md`, `causes.json` (the causes `filings`
+groups by), `watch.md` (the watchtower's one write) and `report.md`.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it
 for the stretch. `release settle` folds `origin/<pr.base>`

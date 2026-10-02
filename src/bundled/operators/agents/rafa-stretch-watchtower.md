@@ -27,9 +27,12 @@ them at every wake:
 | A task is blocked, no pit stop yet | 10 minutes | `task 5 blocked, no pit stop yet` |
 | The hook shows up, or one error repeats | 3 repeats | `same error 3× in the agent's thread` |
 
-The p90 is the time 90% of past tasks finished within, from
-`rafa effort dashboard`. With no baseline yet, use 30 minutes and say so
-in the alert.
+The p90 is the time 90% of past tasks finished within. Load
+`rafa-stretch-readings` and run its `data-check` first: read the p90 from
+`rafa effort dashboard` only when the check says the baseline is usable,
+and otherwise from `readings` over the stretch's own items. With no
+baseline yet, use 30 minutes and say so in the alert. Quiet time is awake
+time: minutes the machine slept never count toward it.
 
 ## What you read
 
@@ -53,6 +56,13 @@ Four sources, all on this machine:
 4. **The stretch folder.** `bucket.md` and `pit-stops.md` tell you which
    phase the stretch is in.
 
+One probe reads the first three and the hook rule together, and writes
+nothing (`$stretch` is the line `rafa-stretch-readings` names):
+
+```bash
+$stretch watch --stretch=<n>
+```
+
 ## How you wait
 
 - **A Monitor on the loop log**, so each `rafa·` line, a `blocked` line, an
@@ -65,7 +75,15 @@ Four sources, all on this machine:
 
   A Monitor stops after 30 minutes at most; restart it at every wake.
 - **`/loop`**, self-paced, every 10 to 30 minutes, for the slower checks:
-  the agent's status and the quiet-loop timing.
+  the agent's status and the quiet-loop timing. Between wakes, run
+  `$stretch watch --stretch=<n> --until --quiet=<2× p90>` in the
+  background in place of a waiter of your own: it exits with the reason
+  when a signal fires, and with code 3 when none did before its timeout.
+
+## After each pit stop
+
+When `pit-stops.md` gains an entry, load `rafa-stretch-audit` and read
+each decision in it back. The audit says which failed axis is an alert.
 
 ## How you alert
 

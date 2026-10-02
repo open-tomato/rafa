@@ -74,10 +74,30 @@ each one changes what you may say:
 |---|---|
 | How long did each task and test step take, awake? | `$stretch readings --stretch=<n> --item=<issue>` |
 | Can the store's baseline be read against this stretch? | `$stretch data-check --stretch=<n>` |
-| What did this loop file, and how much of it repeats? | `$stretch filings --since=<loop start> --stretch=<n>` |
-| Does the claim branch hold the integration branch? | `$stretch base-check <branch>` |
-| Is this pull request safe to merge? | `$stretch merge-guard <pr> <head>` |
+| What did this loop file, and how much of it repeats? | `$stretch filings --stretch=<n> --since=<loop start>` |
+| Does the claim branch hold the integration branch? | `$stretch base-check <branch> --stretch=<n>` |
+| Is this pull request safe to merge? | `$stretch merge-guard <pr> <head> --stretch=<n>` |
 | What does the watchtower see right now? | `$stretch watch --stretch=<n>` |
 
+Run every action from the main checkout, or pass `--root=<project>`.
 Every action takes `--output=json`. Quote its numbers with the action
 that produced them, so a reader can run it again.
+
+`readings` takes task windows from the task sessions' own logs, so it
+subtracts a suspend from the task it fell in. Test steps record no start
+or end, so sleep between sessions is only an upper bound on the sleep
+inside them; `readings` says so when it finds any, and gives the awake
+estimate.
+
+`filings` groups by `causes.json` in the stretch folder, one entry per
+cause the stretch keeps an issue for:
+
+```json
+[
+  { "cause": "native-pickers", "kept": 581, "pattern": "branchClaimFor|relation-readings" }
+]
+```
+
+A filing matching one pattern is a refile of that cause. A filing
+matching none or two is listed for you to judge; add a pattern when you
+decide it, so the next pit stop groups it.

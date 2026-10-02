@@ -29,9 +29,9 @@ item just merged, not the effort that went into it. Load
 |---|---|---|
 | Delivered | Did the pull request merge on the integration branch, with its release fragment? | `rafa pr show <pr>`: its base and merge commit; the fragment on the branch |
 | Verified | Do the fixes it claims show in the failure counts? | the run's test steps against the baseline, from `readings` |
-| Contained | Did it add red, or run from a stale base? | `base-check` before the loop; failures after the merge that the baseline lacks |
+| Contained | Did it add red, or run from a stale base? | `base-check <branch> --stretch=<n>` before the loop; failures after the merge that the baseline lacks |
 | Cost | How did task work, test steps and planning compare with the estimate? | `readings`, after `data-check` passed |
-| Filings | How many bugs did the loop file, and how many repeat a kept one? | `filings --since=<loop start>` |
+| Filings | How many bugs did the loop file, and how many repeat a kept one? | `filings --stretch=<n> --since=<loop start>` |
 
 Score each axis on its own, 1 to 5, before you look at the others:
 

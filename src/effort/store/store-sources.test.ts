@@ -123,6 +123,9 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/fixture-extract.ts',
   'src/effort/store/testdata/merge-scenarios.ts',
   'src/effort/sync/wire.ts',
+  // The stretch operators' script, read-only: it ships under src/bundled/,
+  // which imports nothing from src/, so it cannot open the store through sqlite.ts.
+  'src/bundled/operators/scripts/data-check.ts',
 ]);
 
 /** An `import … from 'bun:sqlite'` or from a `sqlite.{js,ts}` module. */

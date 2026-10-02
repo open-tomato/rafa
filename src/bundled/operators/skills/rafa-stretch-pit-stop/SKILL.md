@@ -23,12 +23,27 @@ A pit stop is the check between two items. It fixes the one thing that
 would stop the next item, then rejoins the bucket: it is never a change
 of course, and never a reason to chase one issue down a rabbit hole.
 
+## Before the checks
+
+Bring the store up to date, then ask whether its baseline can be read
+against this stretch (`$stretch` is the line `rafa-stretch-readings`
+names):
+
+```bash
+rafa effort collect
+$stretch data-check --stretch=<n>
+```
+
+When it answers no, the effort check compares the item with the
+stretch's earlier items from `readings`, never with the dashboard, and
+the entry says why.
+
 ## The four checks
 
 | Check | Line | What is wrong |
 |---|---|---|
-| Effort | `rafa effort dashboard` | cost per task drifting up against the baseline, not explained by the item's size |
-| Bugs | `rafa issue list --type=bug --limit=200` | the open count rising, or bugs filed during this loop that repeat an open one |
+| Effort | `$stretch readings --stretch=<n> --item=<issue>`, then `rafa effort dashboard` when the baseline is usable | awake minutes per task or test steps per task drifting up, not explained by the item's size |
+| Bugs | `rafa issue list --type=bug --limit=200`, `$stretch filings --stretch=<n> --since=<loop start>` | the open count rising, or bugs filed during this loop that repeat an open one |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
 
@@ -55,6 +70,11 @@ only after reading the run's last `rafa·` lines.
 
 Anything else you find is filed, not fixed: one issue, after a search for
 an existing one, and the stretch goes on.
+
+## The scorecard
+
+Every entry ends with the item's scorecard: load
+`rafa-stretch-scorecard` and add it under the decision.
 
 ## The entry
 

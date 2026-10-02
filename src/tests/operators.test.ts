@@ -63,6 +63,16 @@ describe('the bundled operators', () => {
     expect(body.trimStart().startsWith(ALPHA_LINE)).toBe(true);
   });
 
+  it('keep the stretch script self-contained: no import leaves its directory', () => {
+    const scripts = join(OPERATORS, 'scripts');
+    const leaving = readdirSync(scripts)
+      .filter((name) => name.endsWith('.ts'))
+      .flatMap((name) => [...readFileSync(join(scripts, name), 'utf8').matchAll(/from '([^']+)'/g)].map((match) => [name, match[1] ?? '']))
+      .filter(([, specifier = '']) => !specifier.startsWith('./') && !specifier.startsWith('node:') && !specifier.startsWith('bun:'));
+
+    expect(leaving).toEqual([]);
+  });
+
   it('pass the skill check', () => {
     const run = Bun.spawnSync([process.execPath, join(SRC_DIR, 'rafa.ts'), 'skill', 'check', join(OPERATORS, 'skills')], {
       env: { ...process.env, CLAUDECODE: '' },
