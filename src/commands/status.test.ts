@@ -262,10 +262,14 @@ describe('the exit codes of rafa status', () => {
     const outcome = await dispatchInProject(['status'], [], [statusCommand], project);
 
     expect(outcome.exitCode).toBe(0);
-    const written = lines(outcome.stdout);
+    // Git adds a continuation line to its own error on some hosts; that
+    // line is git's, not a line rafa writes, so it is left out.
+    const written = lines(outcome.stdout).filter((line) => !line.startsWith('Stopping at filesystem boundary'));
     expect(written).toHaveLength(6);
     expect(written[0]).toStartWith('warn: Branch: not read: ');
     expect(written[1]).toBe('Loops: 0 running, 0 tasks blocked');
+    expect(written[2]).toStartWith('warn: Pull request: not read: ');
+    expect(written[3]).toStartWith('warn: Board: not read: ');
     expect(written[4]).toStartWith('warn: Claims: not read: the origin branches could not be listed: ');
     expect(written[5]).toStartWith('warn: Housekeeping: not read: ');
   });
