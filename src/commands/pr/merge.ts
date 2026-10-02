@@ -67,7 +67,8 @@
  * refused, naming each row (`readMergeRefusal`, which is handed the rows
  * and the flag). What the flag adds past that is `./merge-unchecked.ts`'s
  * and is called at the three points its module note names: the workflow
- * count read and its two refusals in place of {@link requireTerminal},
+ * count read, the base's workflow files read through this module's git
+ * runner, and the two refusals in place of {@link requireTerminal},
  * the warning and `Merge #<n> with no checks? [y/N]` in place of
  * `Merge? [y/N]`, and the one comment posted straight after the provider
  * merged, before the roadmap tick and the clean-up, so a clean-up that
@@ -175,7 +176,8 @@
  * failed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
  * on a pull request that reports checks among them; no terminal to ask
  * on and no `--yes`; `--yes` beside `--skip-checks` where workflows exist
- * or their count could not be read; the release guard's refusals; a
+ * and one may run on pull requests into the base, or their count could
+ * not be read; the release guard's refusals; a
  * provider that would not merge; and a clean-up step that failed.
  */
 import type { MergeStepReport } from './merge-cleanup.js';
@@ -261,7 +263,7 @@ export const DEFAULT_MERGE_SEAMS: MergeSeams = Object.freeze({});
 export interface UncheckedMergeReport {
   /** The workflow count read, or null where it could not be read. */
   readonly workflowCount: number | null;
-  /** Which reading of "no checks" that count gives. */
+  /** Which reading of "no checks" that count and the base's workflow files give. */
   readonly case: UncheckedCase;
   /** The URL of the comment posted after the merge; null for a declined merge or a comment that would not post. */
   readonly commentUrl: string | null;
@@ -513,6 +515,16 @@ interface MergeAnswer {
   readonly unchecked: UncheckedMerge | null;
 }
 
+/** What {@link askToMerge} is asked about: the pull request, the flags, and its base and git for `--skip-checks`. */
+interface UncheckedAsk {
+  readonly number: number;
+  readonly summary: string;
+  readonly yes: boolean;
+  readonly skipChecks: boolean;
+  readonly base: string;
+  readonly git: GitRunner;
+}
+
 /**
  * Makes the terminal refusals, writes the summary line, and asks — the
  * unchecked question where `--skip-checks` was given, `Merge? [y/N]`
@@ -522,11 +534,11 @@ async function askToMerge(
   context: RafaContext,
   pr: PrContext,
   seams: MergeSeams,
-  ask: { readonly number: number; readonly summary: string; readonly yes: boolean; readonly skipChecks: boolean },
+  ask: UncheckedAsk,
 ): Promise<MergeAnswer> {
-  const { number, summary, yes, skipChecks } = ask;
+  const { number, summary, yes, skipChecks, base, git } = ask;
   const unchecked = skipChecks
-    ? await readUncheckedMerge({ pulls: pr.pulls, number, yes, summary, isTerminal: seams.isTerminal })
+    ? await readUncheckedMerge({ pulls: pr.pulls, number, yes, summary, isTerminal: seams.isTerminal, base, git })
     : null;
   if (unchecked === null && !yes) requireTerminal(seams, summary);
   context.output.info(summary);
@@ -606,7 +618,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
 
   const summary = summaryLine(detail, method);
   const answer: MergeAnswer = guard.go
-    ? await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks })
+    ? await askToMerge(context, pr, seams, { number: detail.number, summary, yes, skipChecks, base: detail.baseRefName, git })
     : { go: false, unchecked: null };
   // What the run answers if it stops here, and the base of what it answers if it does not.
   const answered: PrMergeResult = {
@@ -690,7 +702,8 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' and without a terminal and without `--yes` it refuses. A pull request that reports no checks at all is'
       + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'
       + ' with it the command reads how many workflows the repository defines, prints a warning for that case, asks'
-      + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow),'
+      + ' `Merge #<n> with no checks? [y/N]` (which `--yes` answers only where the repository defines no workflow, or'
+      + ' where no workflow file on the base has a `pull_request` trigger naming it),'
       + ' and after the merge posts one comment on the pull request saying so. Where the release runs, the release'
       + ' guard reads the branch before the question: a `collision` is refused unless'
       + ' `dangerous.acceptVersionCollision` is true, and `pr.versionCollision` sets whether a `missing` or'
@@ -722,7 +735,7 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
         name: 'skip-checks',
         description: 'Merge a pull request that reports no checks at all, after a warning and its own question.'
           + ' Refused where the pull request reports any check; `--yes` beside it is refused where the repository'
-          + ' defines a workflow or its workflow count could not be read.',
+          + ' defines a workflow that may run on pull requests into the base, or its workflow count could not be read.',
         type: 'boolean',
       },
       {

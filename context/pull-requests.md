@@ -215,25 +215,46 @@ refusal names each check row and its state. Without the flag, `none` is
 refused as today, naming `--skip-checks` and what it means.
 
 Before asking to merge, the command reads the repository's workflow count
-(`gh api repos/<repo>/actions/workflows`, `total_count`). Zero is the
-"no workflow" case; one or more, OR a count that could not be read, is the
-"workflows exist" case, which is the riskier one. Two warnings:
+(`gh api repos/<repo>/actions/workflows`, `total_count`). Where it reads one
+or more, it also reads the workflow files on the PR's base through its own
+`GitRunner`: `git fetch origin <base>`, then the `*.yml` and `*.yaml` blobs
+under `.github/workflows/` on `origin/<base>` (`git ls-tree --full-tree -z`,
+`git cat-file blob`), judged by `src/pr/workflow-triggers.ts`. Three cases
+(`src/pr/unchecked.ts`):
+
+- `no-workflow`: the count read zero.
+- `no-pull-request-workflow`: the count read one or more, and no workflow
+  file on the base has a `pull_request` trigger naming the base (a
+  `verify.yml` that runs on pull requests into `main` and on pushes to
+  `stretch/**`, for a PR into `stretch/1`).
+- `workflows-exist`, the riskier one: everything else. That is a file on
+  the base naming it, a count that could not be read (whatever the files
+  say), and any git failure — a base opening with `-`, `fetch`, `ls-tree` or
+  `cat-file` exiting non-zero, or a base with no workflow file at all, where
+  workflows the files cannot show (CodeQL's default setup, a file on another
+  branch) may still run — each of which falls back to the count rule.
+
+The count line (`The repository defines <n> workflows.`) is printed, then
+one line per case:
 
 - no workflow: "nothing on GitHub has tested this branch; you are relying on
   the checks run locally"
+- no pull-request workflow: "no workflow runs on pull requests into <base>"
 - workflows exist: "CI may not have started (a path filter, a draft, Actions
   disabled, or it has not registered yet); this is probably not what you want"
 
 Then it shows `#n title, branch → base, method` and asks `Merge #<n> with no
-checks? [y/N]`. `--yes` answers the question in the no-workflow case only and
-is REFUSED in the workflows-exist case. Without a TTY and without `--yes` it
-refuses.
+checks? [y/N]`. `--yes` answers the question in the no-workflow and
+no-pull-request-workflow cases and is REFUSED in the workflows-exist case.
+Without a TTY and without `--yes` it refuses. `rafa pr triage` reads the count
+alone and never the files, so it reports only the first and last case.
 
 After the merge, the usual clean-up runs (switch to the base branch, `git pull
 --ff-only`, delete local and remote branches, `git fetch --prune`), then ONE
 comment is posted on the PR: `Merged with no checks reported, by rafa pr merge
 --skip-checks.` followed by the workflow count that was read (or that it could
-not be read).
+not be read) and, in the no-pull-request-workflow case, the
+`no workflow runs on pull requests into <base>` line.
 
 `rafa next` sends a PR with verdict `none` to `pr triage` through
 `redClause` only when it conflicts; a mergeable PR with verdict `none`
