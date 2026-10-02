@@ -35,7 +35,9 @@
  * sha256-identical after each: the lookup in `ACROSS_STORES_ORDER`
  * forwards reddened 4 cases, the lookup by `seq` descending alone 2 (the
  * clock case and the merge case), the own-row refusal dropped 1, and a
- * `supersedes` equal to the reference let through 1.
+ * `supersedes` equal to the reference let through 1. Once that refusal
+ * became `SupersedeInSessionRefusal`, throwing a plain `Error` with its
+ * message reddened 1, the own-row case.
  *
  * Measuring the merge case needs the merge itself, so it plants two
  * stores with origins and runs `mergeStore` both ways, as
@@ -61,7 +63,7 @@ import { writeFindings } from './findings.js';
 import { mergeStore } from './merge-store.js';
 import { LEGACY_GATE_OPEN } from './migrations.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
-import { readTrackerRef, writeTrackerRef } from './tracker-refs.js';
+import { readTrackerRef, SupersedeInSessionRefusal, writeTrackerRef } from './tracker-refs.js';
 
 /** A findings row as the table holds it. */
 interface StoredFinding {
@@ -273,6 +275,16 @@ function seams(prefix: string, at = '2026-09-15T10:00:00.000Z'): Required<Findin
       return `${prefix}-${count}`;
     },
   };
+}
+
+/** What `call` throws. Fails the case when it throws nothing. */
+function caught(call: () => unknown): unknown {
+  try {
+    call();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('expected a throw, and none came');
 }
 
 /** The dispatch of another session than {@link DISPATCH}'s. */
@@ -517,14 +529,20 @@ describe('writeTrackerRef', () => {
     const bytes = readRaw(root);
     const superseding = writeOf({ ref: ref({ externalId: '2' }), supersedes: ref() });
 
-    expect(() => writeTrackerRef(root, superseding, seams('supersede-own-2', '2026-09-15T11:00:00.000Z')))
-      .toThrow(/tracker ref write supersedes the reference findings row 1 holds for this session and artifact, .*; nothing written$/);
+    const thrown = caught(() => writeTrackerRef(root, superseding, seams('supersede-own-2', '2026-09-15T11:00:00.000Z')));
+
+    expect(thrown).toBeInstanceOf(SupersedeInSessionRefusal);
+    expect(thrown).toMatchObject({ name: 'SupersedeInSessionRefusal', path: storeFile(root), seq: 1 });
+    expect((thrown as Error).message)
+      .toMatch(/tracker ref write supersedes the reference findings row 1 holds for this session and artifact, .*; nothing written$/);
 
     expect(readRaw(root)).toEqual(bytes);
     expect(readTrackerRef(root, ARTIFACT)).toEqual(ref());
     // Controls: without `supersedes` the same write is the conflict it was,
-    // and the schema itself refuses the row a superseding insert would add.
+    // a write refused for superseding itself is not of this class, and the
+    // schema itself refuses the row a superseding insert would add.
     expect(writeTrackerRef(root, writeOf({ ref: ref({ externalId: '2' }) })).action).toBe('conflict');
+    expect(caught(() => writeTrackerRef(root, writeOf({ supersedes: ref() })))).not.toBeInstanceOf(SupersedeInSessionRefusal);
     expect(() => plantRef(root, DISPATCH.sessionId, ARTIFACT, localJson('2')))
       .toThrow(/UNIQUE constraint failed: findings\.session_id, findings\.artifact/);
   });

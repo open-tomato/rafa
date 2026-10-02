@@ -1045,10 +1045,11 @@ the old one and is inserted as a new row under the same key, never over
 the old one, so `tracker_ref` stays `SET_ONCE` and a merge of two stores
 keeps both rows (the `findings` entry of `store/merge-rules.ts`). One
 session holds one row per key (`findings_by_artifact`), so a write
-superseding the reference its own session's row holds is refused, with
-nothing written. `triage/triage.ts` keys by the bug's artifact WITH the tracker
-file it was reported against, so its rows carry that key rather than a
-bare artifact and never land on a report's finding. A caller that does
+superseding the reference its own session's row holds is refused with a
+`SupersedeInSessionRefusal`, nothing written; the migration that would
+let it insert is #656's. `triage/triage.ts` keys by the bug's artifact
+WITH the tracker file it was reported against, so its rows carry that key
+rather than a bare artifact and never land on a report's finding. A caller that does
 key by a bare artifact writes a report's findings first: a finding
 written after a reference under the same session and artifact is skipped
 as that row's duplicate. An inserted row reaches `progress.txt` as the

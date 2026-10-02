@@ -105,7 +105,9 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
    * (`readTrackerRef`) answers the newest by `ACROSS_STORES_ORDER`
    * (`origins.ts`) read backwards, which both sides of a merge read
    * alike. One session holds one row per key (`findings_by_artifact`),
-   * so a session's write superseding its own row's reference is refused.
+   * so a session's write superseding its own row's reference is refused
+   * (`SupersedeInSessionRefusal`); the migration that would allow it is
+   * #656's.
    */
   findings: { scope: 'merged', identity: ['id'], edited: { tracker_ref: SET_ONCE } },
   blockers: appendOnly('id'),

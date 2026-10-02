@@ -64,11 +64,13 @@
  * hold that row. `findings_by_artifact` keys a row with an artifact by
  * its session and that artifact, so one session holds one row per key;
  * measured, a second insert under them throws `UNIQUE constraint failed:
- * findings.session_id, findings.artifact`. The write is refused instead,
- * naming the row, with no byte written, and the old reference stays the
- * one the lookup answers. Only a migration of that index lets one session
- * supersede its own reference. Every other superseding write, the usual
- * one coming from a later session than the filing, is placed as above.
+ * findings.session_id, findings.artifact`. The write is refused instead
+ * with a {@link SupersedeInSessionRefusal} naming the row, with no byte
+ * written, and the old reference stays the one the lookup answers. Only a
+ * migration of that index lets one session supersede its own reference,
+ * and none ships here: #656 owns it. Every other superseding write, the
+ * usual one coming from a later session than the filing, is placed as
+ * above.
  *
  * `supersedes` is checked as a reference is, below, and is refused when
  * it is the reference written. It is not stored: the lookup needs only
@@ -350,14 +352,26 @@ function heldRefOf(path: string, seq: number, text: string): StoredRef {
 
 /**
  * The refusal of a superseding write onto the session's own row holding
- * the superseded reference, which the store cannot hold beside it.
+ * the superseded reference, which the store cannot hold beside it, thrown
+ * with nothing written. A caller tells it from every other throw of the
+ * write by its class. See the module note.
  */
-function supersedesOwnRow(path: string, seq: number): Error {
-  return new Error(
-    `effort store: ${path}: tracker ref write supersedes the reference findings row ${seq} holds`
-      + ' for this session and artifact, and findings_by_artifact holds one row per session and'
-      + ' artifact; nothing written',
-  );
+export class SupersedeInSessionRefusal extends Error {
+  /** The store's file. */
+  readonly path: string;
+  /** The `seq` of the session's row, which keeps the superseded reference. */
+  readonly seq: number;
+
+  constructor(path: string, seq: number) {
+    super(
+      `effort store: ${path}: tracker ref write supersedes the reference findings row ${seq} holds`
+        + ' for this session and artifact, and findings_by_artifact holds one row per session and'
+        + ' artifact; nothing written',
+    );
+    this.name = 'SupersedeInSessionRefusal';
+    this.path = path;
+    this.seq = seq;
+  }
 }
 
 /**
@@ -386,7 +400,7 @@ function placeRef(
   }
 
   const kept = heldRefOf(path, held.seq, held.tracker_ref);
-  if (kept.json === superseded?.json) throw supersedesOwnRow(path, held.seq);
+  if (kept.json === superseded?.json) throw new SupersedeInSessionRefusal(path, held.seq);
   return kept.json === wanted.json
     ? ['held', kept.ref]
     : ['conflict', kept.ref];
@@ -413,9 +427,9 @@ function supersededOf(write: TrackerRefWrite, wanted: StoredRef): StoredRef | nu
  * Throws, having opened nothing, when the dispatch, the outcome, the
  * artifact, the reference or the superseded one cannot be stored. Throws
  * the store's own refusal of a schema past this rafa's version, on a row
- * holding a stored reference that is not one, and, writing nothing, when
- * the session's own row holds the superseded reference. See the module
- * note.
+ * holding a stored reference that is not one, and, writing nothing, a
+ * {@link SupersedeInSessionRefusal} when the session's own row holds the
+ * superseded reference. See the module note.
  */
 export function writeTrackerRef(
   repoRoot: string,
