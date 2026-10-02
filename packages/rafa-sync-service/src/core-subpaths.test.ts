@@ -23,7 +23,7 @@ import { describe, expect, it } from 'bun:test';
 
 const ROOT = new URL('../../../', import.meta.url);
 const CORE_PREFIX = '@open-tomato/rafa/';
-const UNRESOLVED = 'Cannot find package \'@open-tomato/rafa\'';
+const UNRESOLVED_CODE = 'ERR_MODULE_NOT_FOUND';
 
 async function readJson(name: string): Promise<unknown> {
   return Bun.file(new URL(name, ROOT)).json();
@@ -79,6 +79,12 @@ describe('core subpaths from this package', () => {
     '@open-tomato/rafa/src/effort/store/index.ts',
     '@open-tomato/rafa/cli',
   ])('leaves %s unresolved', async (specifier: string) => {
-    await expect(import(specifier)).rejects.toThrow(UNRESOLVED);
+    // The code, not Bun's message wording, is what both Bun versions share.
+    const failure: unknown = await import(specifier).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeDefined();
+    expect((failure as { code?: string }).code).toBe(UNRESOLVED_CODE);
   });
 });
