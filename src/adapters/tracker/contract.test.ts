@@ -28,6 +28,15 @@
  * `rejects.toThrow` over a promise resolving 30 ms later threw at the
  * call after 32 ms, over one rejecting 30 ms later threw nothing, and
  * the call answered undefined.
+ *
+ * The three `openIssues` cases arrived on 2026-10-02, each held by the
+ * breaks below, and by a tracker run with `readsOpenIssues: false` that
+ * still has the reading, which reddens the one case standing in for
+ * them. They create their issues with `opt: 0`, as triage does, so the
+ * break keying issues by opt reddens two of them too, and the
+ * transition case narrowed to `todo` no longer leaves every case
+ * green: the closed case moves its issues to `done` and `cancelled`
+ * whatever the narrowing, and rejects for a tracker that never moves.
  */
 import type { TrackerContractOptions } from './contract.js';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '../../ports/index.js';
@@ -54,7 +63,13 @@ const CASES = {
   comment: 'comment is retrievable after posting',
   transition: 'transition updates the state observed by get',
   unknown: 'get rejects for an unknown ref',
+  openOfType: 'openIssues answers each open issue of the type with its title and body',
+  openClosed: 'openIssues leaves out an issue moved to done or to cancelled',
+  openNone: 'openIssues answers nothing for a type with no open issue',
 } as const;
+
+/** The case an adapter run with `readsOpenIssues: false` gets in place of the three `openIssues` cases. */
+const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
 
 /** Faults the in-memory tracker can be made with, each breaking what it names. */
 interface Faults {
@@ -64,7 +79,14 @@ interface Faults {
   readonly textInTitleOnly?: boolean;
   /** `find` matches text without lowering its letter case. */
   readonly textCaseSensitive?: boolean;
+  /** `openIssues` answers closed issues too. */
+  readonly closedAsOpen?: boolean;
+  /** `openIssues` answers open issues of every type. */
+  readonly anyType?: boolean;
 }
+
+/** The states the in-memory tracker holds closed, as the port's `openIssues` note names them. */
+const CLOSED: ReadonlySet<IssueState> = new Set(['done', 'released', 'cancelled']);
 
 /** One issue the in-memory tracker holds. */
 interface HeldIssue {
@@ -130,6 +152,14 @@ function memoryTracker(faults: Faults = {}): {
       issues.set(ref.externalId, { ...held(ref), state });
       return {};
     },
+    openIssues: async (type) => [...issues]
+      .filter(([, issue]) => (faults.anyType === true || issue.draft.type === type)
+        && (faults.closedAsOpen === true || !CLOSED.has(issue.state)))
+      .map(([externalId, issue]) => ({
+        ref: { opt: issue.draft.opt, kind: 'memory', externalId, url: null },
+        title: issue.draft.title,
+        body: issue.draft.body,
+      })),
   };
   return { tracker, comments: (ref) => held(ref).comments };
 }
@@ -172,7 +202,7 @@ async function rejectedCases(options: TrackerContractOptions): Promise<string[]>
 
 /** Each break: what the tracker does, its options, and the cases it must redden. */
 const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly string[]])[] = [
-  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create]],
+  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create, CASES.openOfType]],
   [
     'claims project support',
     contractOptions({}, (base) => ({ capabilities: () => ({ ...base.capabilities(), projects: true }) })),
@@ -203,6 +233,9 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.bodyText,
       CASES.noText,
       CASES.comment,
+      CASES.openOfType,
+      CASES.openClosed,
+      CASES.openNone,
     ],
   ],
   [
@@ -210,7 +243,11 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     contractOptions({}, (base) => ({ create: async (draft) => ({ ...(await base.create(draft)), opt: 0 }) })),
     [CASES.create],
   ],
-  ['keys issues by their opt', contractOptions({ idFromOpt: true }), [CASES.sharedOpt, CASES.limit, CASES.titleText]],
+  [
+    'keys issues by their opt',
+    contractOptions({ idFromOpt: true }),
+    [CASES.sharedOpt, CASES.limit, CASES.titleText, CASES.openOfType, CASES.openClosed],
+  ],
   [
     'answers a fixed module',
     contractOptions({}, (base) => ({ get: async (ref) => ({ ...(await base.get(ref)), module: 'billing' }) })),
@@ -244,13 +281,35 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     [CASES.findModule, CASES.limit, CASES.titleText, CASES.bodyText],
   ],
   ['drops every comment', contractOptions({}, () => ({ comment: async () => {} })), [CASES.comment]],
-  ['never transitions', contractOptions({}, () => ({ transition: async () => ({}) })), [CASES.transition]],
+  ['never transitions', contractOptions({}, () => ({ transition: async () => ({}) })), [CASES.transition, CASES.openClosed]],
   [
     'answers an unknown ref',
     contractOptions({}, (base) => ({
       get: async (ref) => base.get(ref).catch(() => ({ ...draftFixture(), ref, state: 'todo' as const })),
     })),
     [CASES.unknown],
+  ],
+  [
+    'has no openIssues reading',
+    contractOptions({}, () => ({ openIssues: undefined })),
+    [CASES.openOfType, CASES.openClosed, CASES.openNone],
+  ],
+  ['answers closed issues from openIssues', contractOptions({ closedAsOpen: true }), [CASES.openClosed]],
+  ['ignores the type in openIssues', contractOptions({ anyType: true }), [CASES.openOfType, CASES.openNone]],
+  [
+    'answers open issues without their bodies',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? []).map((issue) => ({ ...issue, body: '' })),
+    })),
+    [CASES.openOfType],
+  ],
+  [
+    'answers open issues under another kind',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? [])
+        .map((issue) => ({ ...issue, ref: { ...issue.ref, kind: 'github' } })),
+    })),
+    [CASES.openOfType],
   ],
 ];
 
@@ -279,7 +338,9 @@ describe('the Tracker contract cases', () => {
   it('narrows the transition case to the states it is handed', async () => {
     const neverTransitions = contractOptions({}, () => ({ transition: async () => ({}) }));
 
-    expect(await rejectedCases({ ...neverTransitions, transitionableStates: ['todo'] })).toEqual([]);
+    // The openIssues case moves its issues to done and cancelled whatever
+    // states the transition case is narrowed to, so it still rejects.
+    expect(await rejectedCases({ ...neverTransitions, transitionableStates: ['todo'] })).toEqual([CASES.openClosed]);
   });
 
   it('asks for the unknown external id it is handed', async () => {
@@ -292,6 +353,23 @@ describe('the Tracker contract cases', () => {
 
     expect(await rejectedCases(answers999)).toEqual([CASES.unknown]);
     expect(await rejectedCases({ ...answers999, unknownExternalId: 'missing' })).toEqual([]);
+  });
+
+  it('swaps the three openIssues cases for one holding the reading left out, when run without it', () => {
+    const without = { ...contractOptions(), readsOpenIssues: false };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !name.startsWith('openIssues ')),
+      LEFT_OUT_CASE,
+    ]);
+  });
+
+  it('holds a tracker run without openIssues to having none, beside one that has none', async () => {
+    const withReading = { ...contractOptions(), readsOpenIssues: false };
+    const withoutReading = { ...contractOptions({}, () => ({ openIssues: undefined })), readsOpenIssues: false };
+
+    expect(await rejectedCases(withReading)).toEqual([LEFT_OUT_CASE]);
+    expect(await rejectedCases(withoutReading)).toEqual([]);
   });
 });
 
