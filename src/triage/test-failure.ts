@@ -118,8 +118,8 @@ function caseLinesOf(lines: readonly string[]): readonly CaseLine[] {
     .filter((found): found is CaseLine => found !== null);
 }
 
-/** Every test file path in `text`, in order. */
-function testFilesIn(text: string): readonly string[] {
+/** Every test file path in `text`, in order; `./similarity.ts` reads a bug's test file with it too. */
+export function testFilesIn(text: string): readonly string[] {
   return text.match(TEST_FILE_ANYWHERE) ?? [];
 }
 
