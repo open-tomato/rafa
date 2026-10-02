@@ -33,6 +33,13 @@
  * to deliver, and none of this runs: the CI gate's own `none` path
  * pushes the branch as before.
  *
+ * Whoever opened it, a DELIVERED pull request whose base is not the
+ * run's — the `base` resolved once at the top of {@link runWrapUp} —
+ * is then retargeted onto it (`start/pr-retarget.ts`), before the CI
+ * wait, so the checks the wait reads ran against the right base. A
+ * refused retarget is one warning and the run goes on to the wait; a
+ * blocked or interrupted delivery reaches no retarget.
+ *
  * The delivery is BLOCKED when the open pull request cannot be read
  * (the provider could not be asked), when the plan carries no issue
  * number the runner could title the pull request with, or when the
@@ -73,6 +80,7 @@ import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/inde
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
+import { retargetPullRequest } from './pr-retarget.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
 import { retryWrapUp } from './wrap-up-retry.js';
@@ -147,7 +155,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   });
   // The run's base, resolved ONCE here and handed to every reader of
   // it: the wrap-up's and each retry's `gh pr create --base` bullet,
-  // and the runner's own open.
+  // the runner's own open, and the retarget of a delivered pull request.
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
   const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
@@ -194,6 +202,11 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     );
     if (delivery.kind === 'interrupted') return;
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
+    // A delivered pull request opened into another base than the run's
+    // is retargeted onto it, BEFORE the CI wait, so the checks the wait
+    // reads are the ones GitHub runs against the right base. A refused
+    // edit is a warning and the run carries on (`start/pr-retarget.ts`).
+    await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
   }
   if (ciWait) {
     emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });

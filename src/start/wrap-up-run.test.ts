@@ -59,9 +59,21 @@
  * with no `gh`, no session and no git. Where it sits in `runWrapUp`, and
  * that a blocked delivery ends the run before `finished()`, is read off
  * the source as the release's order is, beside a planted control.
+ *
+ * ## The retarget
+ *
+ * Where `runWrapUp` retargets the delivered pull request — after a
+ * delivery that was neither blocked nor interrupted, before the CI gate,
+ * over the one `base` it resolved — is read off the source too, beside a
+ * planted control. What reaches `gh` for each of the three openers is
+ * driven: the delivery runs over the stand-ins below, reading pull
+ * requests the recorded `gh` fake (`pr/gh-fake.ts`) holds, and the pull
+ * request it answers is handed to `retargetPullRequest` over the real
+ * `gh` adapter on that fake, as `runWrapUp` hands it.
  */
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
-import type { PullRequestSummary } from '../pr/index.js';
+import type { FakePrGh } from '../pr/gh-fake.js';
+import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 
 import { readFileSync } from 'node:fs';
 
@@ -69,8 +81,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { createFakePrGh } from '../pr/gh-fake.js';
+import { createGhPullRequests } from '../pr/gh.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { retargetPullRequest } from './pr-retarget.js';
 import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
@@ -340,6 +355,42 @@ describe('where runWrapUp delivers the pull request', () => {
   });
 });
 
+describe('where runWrapUp retargets the delivered pull request', () => {
+  it('retargets it after the delivery and before the CI gate, over the base resolved once', () => {
+    const retarget = callTo(CALLS, 'retargetPullRequest');
+
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('retargetPullRequest'));
+    expect(NAMES.indexOf('retargetPullRequest')).toBeLessThan(NAMES.indexOf('pullRequestStarted'));
+    expect(NAMES.indexOf('retargetPullRequest')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+    expect(retarget.args.slice(0, 2)).toEqual(['delivery.pull', 'base']);
+    expect(NAMES.filter((name) => name === 'resolveBaseBranch')).toHaveLength(1);
+    expect(callTo(CALLS, 'resolveBaseBranch').bound).toBe('base');
+  });
+
+  it('retargets only after a blocked or interrupted delivery has left', () => {
+    const retarget = WRAP_UP_RUN.indexOf('await retargetPullRequest(delivery.pull, base,');
+
+    expect(retarget).toBeGreaterThan(WRAP_UP_RUN.indexOf('if (delivery.kind === \'interrupted\') return;'));
+    expect(retarget).toBeGreaterThan(WRAP_UP_RUN.indexOf('if (delivery.kind === \'blocked\') throw new CommandExit(1, delivery.message);'));
+    expect(retarget).toBeLessThan(WRAP_UP_RUN.indexOf('if (ciWait) {'));
+  });
+
+  it('reads a retarget planted after the CI gate as being after it', () => {
+    // The control for the first case: the same reader over a body that
+    // retargets once the gate is over answers that order.
+    const names = planted([
+      PREPARE,
+      SESSION,
+      FINISH,
+      'const delivery = await deliverPullRequest(input, seams);',
+      ...GATE,
+      'await retargetPullRequest(delivery.pull, base, seams);',
+    ]).map((call) => call.name);
+
+    expect(names.indexOf('verifyPullRequest')).toBeLessThan(names.indexOf('retargetPullRequest'));
+  });
+});
+
 /** The run's branch in every delivery case. */
 const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
 
@@ -507,6 +558,94 @@ describe('deliverPullRequest', () => {
 
     expect(delivery.kind).toBe('interrupted');
     expect(calls).not.toContain('runner');
+  });
+});
+
+/** The run's base in the retarget cases, as `pr.base` names it. */
+const RUN_BASE = 'stretch/1';
+
+/** A fake holding each of `planted`, opened into its base, the provider over it, and the lines written. */
+function retargetFixture(planted: readonly { readonly number: number; readonly base: string }[]): {
+  readonly fake: FakePrGh;
+  readonly pulls: PullRequests;
+  readonly info: string[];
+  readonly warn: string[];
+} {
+  const fake = createFakePrGh();
+  for (const { number, base } of planted) fake.plant({ number, headRefName: BRANCH, baseRefName: base });
+  return { fake, pulls: createGhPullRequests({ gh: fake.run }), info: [], warn: [] };
+}
+
+/** The branch's open pull request as the adapter reads it back from the fake, as a delivery finds it. */
+async function readBack(pulls: PullRequests, number: number): Promise<PullRequestSummary> {
+  const found = await pulls.findOpen(BRANCH);
+  if (found?.number !== number) throw new Error(`the fake answered no open pull request #${String(number)} for ${BRANCH}`);
+  return found;
+}
+
+/** The `gh pr edit` commands the fake was handed. */
+function edits(fake: FakePrGh): readonly (readonly string[])[] {
+  return fake.calls().filter((call) => call[0] === 'pr' && call[1] === 'edit');
+}
+
+describe('the retarget of each delivered pull request', () => {
+  beforeEach(() => {
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** Delivers over `seams`, then retargets what was delivered onto {@link RUN_BASE}, as `runWrapUp` does. */
+  async function deliverAndRetarget(
+    seams: PullRequestDeliverySeams,
+    fixture: ReturnType<typeof retargetFixture>,
+  ): Promise<PullRequestDelivery> {
+    const delivery = await deliverPullRequest({ branch: BRANCH, retries: 1, previousMessage: 'first final message' }, seams);
+    if (delivery.kind !== 'delivered') throw new Error(`the delivery answered ${delivery.kind}`);
+    const output = { info: (line: string) => { fixture.info.push(line); }, warn: (line: string) => { fixture.warn.push(line); } };
+    await retargetPullRequest(delivery.pull, RUN_BASE, { pulls: fixture.pulls, output });
+    return delivery;
+  }
+
+  it('retargets the pull request the wrap-up session opened into main', async () => {
+    const fixture = retargetFixture([{ number: 627, base: 'main' }]);
+    const { seams } = standIn({ readings: [await readBack(fixture.pulls, 627)] });
+
+    const delivery = await deliverAndRetarget(seams, fixture);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'wrap-up' });
+    expect(edits(fixture.fake)).toEqual([['pr', 'edit', '627', '--base', RUN_BASE]]);
+    expect(fixture.fake.pull(627)?.baseRefName).toBe(RUN_BASE);
+    expect(fixture.info).toEqual([`↪ Retargeted pull request #627 from main to ${RUN_BASE} (pr.base).`]);
+  });
+
+  it('retargets the pull request a retry session opened into main', async () => {
+    const fixture = retargetFixture([{ number: 628, base: 'main' }]);
+    const { seams } = standIn({ readings: [null, await readBack(fixture.pulls, 628)] });
+
+    const delivery = await deliverAndRetarget(seams, fixture);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'retry' });
+    expect(edits(fixture.fake)).toEqual([['pr', 'edit', '628', '--base', RUN_BASE]]);
+    expect(fixture.info).toEqual([`↪ Retargeted pull request #628 from main to ${RUN_BASE} (pr.base).`]);
+  });
+
+  it('sends no edit for the pull request the runner opened into the run\'s base', async () => {
+    // The control on the two cases above: the runner opens with
+    // `--base <base>`, so its pull request is already into the run's
+    // base and the same path sends no `gh pr edit` and prints nothing.
+    const fixture = retargetFixture([{ number: 629, base: RUN_BASE }]);
+    const opened = await readBack(fixture.pulls, 629);
+    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: opened } });
+
+    const delivery = await deliverAndRetarget(seams, fixture);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'runner' });
+    expect(edits(fixture.fake)).toEqual([]);
+    expect(fixture.info).toEqual([]);
+    expect(fixture.warn).toEqual([]);
   });
 });
 
