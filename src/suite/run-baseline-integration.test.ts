@@ -22,12 +22,19 @@ import { runSuite } from './run.js';
 const TO_BE_MESSAGE = 'expect(received).toBe(expected)';
 
 /**
+ * The version of the `bun` the suite spawns: the first on `PATH`, which
+ * need not be the Bun running this file (a pinned Bun run by path, with
+ * another on `PATH`, spawns that other).
+ */
+const SPAWNED_BUN_VERSION = Bun.spawnSync(['bun', '--version']).stdout.toString().trim();
+
+/**
  * Whether Bun's JUnit `<failure>` carries a `message` attribute. Measured:
  * Bun 1.4.2 writes it, Bun 1.3.14 writes none, so the run's failure has no
  * `message` there. Rafa's own reading is the same on both: file and case,
  * plus the message when the report had one.
  */
-const JUNIT_HAS_FAILURE_MESSAGE = Bun.semver.order(Bun.version, '1.4.0') >= 0;
+const JUNIT_HAS_FAILURE_MESSAGE = Bun.semver.order(SPAWNED_BUN_VERSION, '1.4.0') >= 0;
 
 /** `fail.test.ts`'s failure `name`, as the run reads it. */
 function failed(name: string) {
