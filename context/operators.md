@@ -37,6 +37,9 @@ test reads them.
 | `rafa-stretch-sweep` | phase 1: duplicate groups, ranking, tiers, the bucket report |
 | `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
+| `rafa-stretch-readings` | both: checks a baseline fits the machine and the period, and names the `stretch` script action for each reading |
+| `rafa-stretch-scorecard` | the engineer, closing each pit stop: five item axes, each with its evidence, and a verdict |
+| `rafa-stretch-audit` | the watchtower, after each pit stop: each decision on evidence, limits, consistency and record |
 
 A stretch writes under `.rafa/stretch/<n>/`: `agent.json` (the agent's
 session id, which the watchtower finds it by), `bucket.md`,
