@@ -28,7 +28,7 @@ This file is the single source of that format. `rafa plan` inlines it, without i
 | `<plan.dir>/PLAN-<stub>.md` | Full task checklist with structured blocks and technical context |
 | `<plan.dir>/PREREQUISITES-<stub>.md` | Non-automatable setup steps required before the plan can run (only when any exist) |
 
-`plan.dir` is `.rafa/plans` unless the project's `.rafa/config.yaml` names another directory. `rafa plan --spec=<spec>.md` generates both files (optionally `--stub=<name>`; the stub defaults to the spec's basename) and writes them into `plan.dir`, creating the directory when it is missing. It reads the spec from the project root, or from `specs.dir` (`.rafa/specs` by default) when the root holds no such file, and refuses to run when `<plan.dir>/PLAN-<stub>.md` already exists.
+`plan.dir` is `.rafa/plans` unless the project's `config.yaml` under `.rafa/` names another directory. `rafa plan --spec=<spec>.md` generates both files (optionally `--stub=<name>`; the stub defaults to the spec's basename) and writes them into `plan.dir`, creating the directory when it is missing. It reads the spec from the project root, or from `specs.dir` (`.rafa/specs` by default) when the root holds no such file, and refuses to run when `<plan.dir>/PLAN-<stub>.md` already exists.
 
 Execute a plan with `rafa start --plan=.rafa/plans/PLAN-<stub>.md`. With no `--plan`, `rafa start` runs `PLAN.md` in `plan.dir`, and falls back to a hand-written `PLAN.md` at the project root only when `plan.dir` holds no `PLAN.md`.
 
@@ -165,7 +165,7 @@ All rafa work follows a consistent naming scheme across specifications, plans, b
 
 | Artifact | Pattern | Example |
 | --- | --- | --- |
-| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `.rafa/specs/rafa-20-pr-commands.md` |
+| Specification file | `.rafa/specs/rafa-<n>-<slug>.md` | `rafa-20-pr-commands.md`, under `.rafa/specs/` |
 | Plan stub and directory | `rafa-<n>-<slug>` | `rafa-20-pr-commands` |
 | `issue:` field in `rafa:plan` | `<n>` (number only) | `issue: 20` |
 | Git branch | `feat/rafa-<n>-<slug>` | `feat/rafa-20-pr-commands` |
@@ -449,7 +449,7 @@ The second example above has no `skills=` and is still a valid task declaration.
 
 ## Three task-context injection modes
 
-The loop supports three modes of injecting task context, configured at plan start via `--inject=` or in `.rafa/config.yaml`:
+The loop supports three modes of injecting task context, configured at plan start via `--inject=` or in the project's `config.yaml` under `.rafa/`:
 
 | Mode | Contents | Use case |
 | --- | --- | --- |
