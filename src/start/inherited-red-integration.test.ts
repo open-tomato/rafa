@@ -14,9 +14,11 @@
  * `local`, so a filed bug would be a `.rafa/issues/<n>.md` file.
  *
  * The run-start baseline (`../suite/baseline.ts`) reads the failure's
- * message off bun's JUnit report, `expect(received).toBe(expected)`, and
- * the stand-in quotes that same first line as the bug's evidence, which
- * is what lets `../triage/inherited.ts` match the two.
+ * message off bun's JUnit report where Bun writes one (1.4.2 does,
+ * 1.3.14 writes none), and the stand-in quotes that first line as the
+ * bug's evidence. `../triage/inherited.ts` matches the two on file and
+ * case alone when the baseline holds no message, so the run reads the
+ * same on both versions.
  *
  * One assertion reads the local tracker's issue directory, which holds no
  * issue file at all; a second reads the run's output for the `Triage:`
