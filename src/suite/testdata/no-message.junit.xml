@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="1" assertions="1" failures="1" skipped="0" time="0.009774434">
+  <testsuite name="src/parse/parse.test.ts" file="src/parse/parse.test.ts" tests="1" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+    <testsuite name="parse" file="src/parse/parse.test.ts" line="2" tests="1" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+      <testcase name="drops the last line" classname="parse" time="0.000117" file="src/parse/parse.test.ts" line="2" assertions="1">
+        <failure type="AssertionError" />
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

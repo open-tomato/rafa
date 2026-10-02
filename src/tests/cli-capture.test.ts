@@ -99,7 +99,13 @@ describe('plantScratchRepo', () => {
 });
 
 describe('runRafa', () => {
-  it('leaves no .bun directory under the scratch HOME, where the same spawn under HOME alone leaves one', () => {
+  // Bun's behaviour differs here: 1.4.2 writes an install cache under
+  // $HOME/.bun on a bare spawn; 1.3.14 writes none. Rafa's claim (nothing
+  // under the scratch HOME) holds on every version; only the control's
+  // expectation is version-dependent.
+  const bunWritesInstallCache = Bun.semver.satisfies(Bun.version, '>=1.4.0');
+
+  it('leaves no .bun directory under the scratch HOME, where the same spawn under HOME alone leaves one only on Bun versions that write the install cache', () => {
     const scratch = plantScratchRepo(tempBase);
     const control = plantScratchRepo(tempBase);
 
@@ -111,7 +117,7 @@ describe('runRafa', () => {
 
     expect(run.exitCode).toBe(0);
     expect(bare.exitCode).toBe(0);
-    expect(existsSync(join(control.home, '.bun'))).toBe(true);
+    expect(existsSync(join(control.home, '.bun'))).toBe(bunWritesInstallCache);
     expect(existsSync(join(scratch.home, '.bun'))).toBe(false);
   });
 });

@@ -1,8 +1,8 @@
 /**
  * Tests for the suite runner (`src/suite/run.ts`).
  *
- * The fixtures under `testdata/` were recorded from real runs of bun
- * 1.4.2 over scratch projects, each run as `env -u CLAUDECODE bun test
+ * The fixtures under `testdata/` but one were recorded from real runs of
+ * bun 1.4.2 over scratch projects, each run as `env -u CLAUDECODE bun test
  * [paths] --reporter=junit --reporter-outfile=<name>.junit.xml` with
  * stderr captured to `<name>.stderr.txt`. Two edits were made after
  * recording, neither touching a name, a count or a summary line: every
@@ -21,6 +21,13 @@
  *     failure.
  *   - `clean`: `./sub` with one passing test. Exit 0.
  *   - `no-match`: `./nope`. Exit 1, stderr only: Bun wrote no JUnit file.
+ *
+ * One fixture was recorded the same way under bun 1.3.14, the version
+ * `package.json` pins, and is read by `src/triage/inherited.test.ts`:
+ *
+ *   - `no-message`: one failing `toBe` in `src/parse/parse.test.ts`,
+ *     whose `<failure>` carries no `message` attribute (1.4.2 wrote one
+ *     for the same test). Exit 1.
  *
  * Runs go through the spawner seam, which plants the recorded JUnit file
  * where it was asked to and answers the recorded stderr; no case spawns

@@ -1,20 +1,23 @@
 /**
  * The part of `rafa pr merge --skip-checks` that is not an ordinary
- * merge: the workflow count read, the refusals it decides, the warning,
- * the question, and the one comment posted after the merge.
+ * merge: the workflow count read, the workflow files on the base read,
+ * the refusals they decide, the warning, the question, and the one
+ * comment posted after the merge.
  *
  * What each of those SAYS is `src/pr/unchecked.ts`'s, a pure reading
- * over one workflow count. Whether `--skip-checks` is allowed at all —
- * verdict `none` alone — is `readMergeRefusal`'s in `src/pr/merge.ts`,
- * read before anything here. This module is the half that acts: it asks
- * the provider for the count, refuses, prints, asks the terminal and
- * posts. The merge itself and the clean-up after it stay
+ * over the workflow count and what the base's workflow files said.
+ * Whether `--skip-checks` is allowed at all — verdict `none` alone — is
+ * `readMergeRefusal`'s in `src/pr/merge.ts`, read before anything here.
+ * This module is the half that acts: it asks the provider for the count,
+ * reads the base's workflow files through git, refuses, prints, asks the
+ * terminal and posts. The merge itself and the clean-up after it stay
  * `./merge.ts`'s, which calls in here at three points.
  *
  * ## The three calls, in `./merge.ts`'s own order
  *
  *  1. {@link readUncheckedMerge}, after `readMergeRefusal` and BEFORE the
- *     summary line is written. It reads the count and makes the two
+ *     summary line is written. It reads the count, and the base's
+ *     workflow files where the count reads one or more, and makes the two
  *     refusals this flag adds, so a run that is refused writes nothing to
  *     stdout, which is the rule `./merge.ts` already keeps for its own
  *     no-terminal refusal.
@@ -49,6 +52,37 @@
  * command: null is the riskier reading, the one that refuses `--yes`,
  * so nothing an outage does can relax the rule.
  *
+ * ## The workflow files on the base
+ *
+ * A count of one or more does not say that anything tests THIS pull
+ * request: `verify.yml` runs on `pull_request` into `main` and on `push`
+ * to `stretch/**`, so a pull request into `stretch/1` reports no checks
+ * by design. So where the count reads one or more, and only there,
+ * {@link readBaseWorkflows} runs `git fetch origin <base>`, lists
+ * `.github/workflows/` on `origin/<base>` with
+ * `git ls-tree --full-tree -z` (the top of the tree, whichever directory
+ * the project root is), keeps the `*.yml` and `*.yaml` blobs, reads each
+ * with `git cat-file blob`, and hands the texts to
+ * `src/pr/workflow-triggers.ts`. Where none has a `pull_request`
+ * trigger naming the base, the case is `no-pull-request-workflow` and
+ * `--yes` may answer.
+ *
+ * Every git step goes through the command's own `GitRunner`, so a test
+ * double and a real repository with a bare `origin` drive the same path.
+ * Any reading that fails answers null, and null is today's count rule:
+ *
+ *  - a base that is empty or opens with `-`, which git would read as an
+ *    option rather than a branch;
+ *  - `fetch`, `ls-tree` or any `cat-file` exiting non-zero;
+ *  - a base with no workflow file at all. The count says workflows
+ *    exist, so ones this reading cannot see — a dynamic workflow such as
+ *    CodeQL's default setup, or a file on another branch — may run on
+ *    pull requests into it, and the riskier reading stands.
+ *
+ * A count of zero or one that could not be read never reaches git: zero
+ * already lets `--yes` answer, and an unreadable count keeps refusing it
+ * whatever the files say (see `src/pr/unchecked.ts`).
+ *
  * ## The comment, and why its failure is a warning
  *
  * It is posted once the provider has merged, and by then nothing about
@@ -60,19 +94,29 @@
  * behind the local clean-up, which can fail and would silently drop it.
  */
 import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { PullRequestComment, PullRequests } from '../../pr/index.js';
-import type { UncheckedReading } from '../../pr/unchecked.js';
+import type { GitRunner, PullRequestComment, PullRequests } from '../../pr/index.js';
+import type { BaseWorkflowReading, UncheckedReading } from '../../pr/unchecked.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { messageOf } from '../../config-sections.js';
 import { readUnchecked } from '../../pr/unchecked.js';
+import { workflowsRunOnPullRequestsInto } from '../../pr/workflow-triggers.js';
 
 /** The indent a refusal's quoted lines carry, as `./merge.ts` indents them. */
 const INDENT = '   ';
 
 /** The answers that mean yes to a question spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];
+
+/** Where GitHub reads workflow files from, at the top of the tree; the slash lists what is inside. */
+const WORKFLOWS_DIR = '.github/workflows/';
+
+/** The endings GitHub reads a workflow file under. */
+const WORKFLOW_ENDINGS: readonly string[] = ['.yml', '.yaml'];
+
+/** One `git ls-tree` entry: mode, type, object id, then the path after a tab. */
+const LS_TREE_ENTRY = /^\d+ (\w+) ([0-9a-f]+)\t(.+)$/s;
 
 /** What {@link readUncheckedMerge} is asked. */
 export interface UncheckedMergeOptions {
@@ -86,12 +130,18 @@ export interface UncheckedMergeOptions {
   readonly summary: string;
   /** True when a question can be answered. Standard input being a TTY when left out. */
   readonly isTerminal?: () => boolean;
+  /** The pull request's base branch, whose workflow files are read; the count rule alone when left out. */
+  readonly base?: string;
+  /** The git runner the base's workflow files are read through; the count rule alone when left out. */
+  readonly git?: GitRunner;
 }
 
 /** What an unchecked merge read, allowed past both refusals. */
 export interface UncheckedMerge {
   /** The workflow count read, or null where it could not be read. */
   readonly workflowCount: number | null;
+  /** What the base's workflow files said, or null where they were not read; see the module note. */
+  readonly baseWorkflows: BaseWorkflowReading | null;
   /** Everything `src/pr/unchecked.ts` reads from that count. */
   readonly reading: UncheckedReading;
   /** Whether `--yes` was given, and so answers the question; see the module note. */
@@ -117,16 +167,58 @@ async function workflowCountOf(pulls: PullRequests): Promise<number | null> {
   }
 }
 
+/** The object ids of the `*.yml` and `*.yaml` blobs a `git ls-tree -z` listing names. */
+export function workflowBlobsOf(listing: string): readonly string[] {
+  return listing.split('\0')
+    .map((entry) => LS_TREE_ENTRY.exec(entry))
+    .filter((match) => match !== null)
+    .filter(([, type, , path]) => type === 'blob' && WORKFLOW_ENDINGS.some((ending) => path?.endsWith(ending) === true))
+    .map(([, , oid]) => oid ?? '');
+}
+
+/**
+ * Reads the workflow files on `origin/<base>` after `git fetch origin
+ * <base>`, through `git`, and answers whether any of them runs on pull
+ * requests into `base` — or null where any step failed or the base has
+ * no workflow file, which is the count rule. Never throws; see the
+ * module note.
+ *
+ * @param git - The command's git runner, at the project root.
+ * @param base - The pull request's base branch.
+ * @returns What the base's workflow files said, or null where they could not be read.
+ */
+export function readBaseWorkflows(git: GitRunner, base: string): BaseWorkflowReading | null {
+  if (base === '' || base.startsWith('-')) return null;
+  if (!git(['fetch', 'origin', base]).ok) return null;
+  const listed = git(['ls-tree', '--full-tree', '-z', `origin/${base}`, WORKFLOWS_DIR]);
+  if (!listed.ok) return null;
+  const blobs = workflowBlobsOf(listed.stdout);
+  if (blobs.length === 0) return null;
+  const shown = blobs.map((oid) => git(['cat-file', 'blob', oid]));
+  if (shown.some((result) => !result.ok)) return null;
+  const texts = shown.map((result) => result.stdout);
+  return Object.freeze({ base, runsOnPullRequests: workflowsRunOnPullRequestsInto(texts, base) });
+}
+
+/** The base's workflow files, read only where the count read one or more and git and the base were given. */
+function baseWorkflowsOf(options: UncheckedMergeOptions, workflowCount: number | null): BaseWorkflowReading | null {
+  const { git, base } = options;
+  if (workflowCount === null || workflowCount === 0 || git === undefined || base === undefined) return null;
+  return readBaseWorkflows(git, base);
+}
+
 /**
  * Reads the workflow count for an unchecked merge of pull request
- * `number` and refuses, exit 1, where `--yes` was given in the
+ * `number` and, where it reads one or more, the workflow files on its
+ * base, and refuses, exit 1, where `--yes` was given in the
  * workflows-exist case or where there is no terminal and no `--yes`.
  * Writes nothing; see the module note for when it is called.
  */
 export async function readUncheckedMerge(options: UncheckedMergeOptions): Promise<UncheckedMerge> {
   const { pulls, number, yes, summary } = options;
   const workflowCount = await workflowCountOf(pulls);
-  const reading = readUnchecked(number, workflowCount);
+  const baseWorkflows = baseWorkflowsOf(options, workflowCount);
+  const reading = readUnchecked(number, workflowCount, baseWorkflows);
 
   if (yes && !reading.yesMayAnswer) {
     throw refusal(
@@ -150,7 +242,7 @@ export async function readUncheckedMerge(options: UncheckedMergeOptions): Promis
     );
   }
 
-  return Object.freeze({ workflowCount, reading, yes });
+  return Object.freeze({ workflowCount, baseWorkflows, reading, yes });
 }
 
 /** What {@link confirmUncheckedMerge} prints through and asks on. */
@@ -199,7 +291,8 @@ export function commentProblemLine(number: number, problem: string, body: string
 
 /**
  * Posts the one comment an unchecked merge leaves on pull request
- * `number` — the unchecked-merge sentence and the workflow count read —
+ * `number` — the unchecked-merge sentence, the workflow count read and,
+ * in the `no-pull-request-workflow` case, the base line —
  * and answers it as posted, or null where it would not post, which is a
  * warning through `warn` and nothing else. Never throws.
  */
