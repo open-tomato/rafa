@@ -94,9 +94,10 @@
  * `what` names the epic and the criterion, and its `artifact` is
  * {@link failedCheckArtifact}: the epic and the criterion's text on one
  * line, which is what stays the same when the close is run again. The
- * recurrence key is that artifact after {@link closeTriageFile}'s base
- * name, so a second close failing the same criterion comments on the
- * first issue rather than filing another. No file is read or written at
+ * recurrence key is that artifact, stripped of its numbers as
+ * `src/triage/bug-key.ts` strips it, after {@link closeTriageFile}'s base
+ * name, which keeps the epic's number, so a second close failing the same
+ * criterion comments on the first issue rather than filing another. No file is read or written at
  * that path: the report carries no blocker, and a blocker is the only
  * thing `triageReport` writes into its tracker file. The feedback holds
  * the check, the commit and the evidence. When #249's ladder lands it

@@ -83,6 +83,7 @@ import {
   bugKeyOf,
   createPrivateTriageTracker,
   issueTitle,
+  legacyBugKeyOf,
   namedSecrets,
   PRIVATE_TRIAGE_DIR,
   privateTriageDir,
@@ -1084,23 +1085,42 @@ describe('local paths in what is filed', () => {
     expect(refRows(onLinux.root).map((row) => row.artifact)).toEqual([key]);
   });
 
-  it('still find a reference an earlier rafa stored under the key built from the absolute path', async () => {
-    const f = fixture();
-    const home = '/Users/alice';
-    const report = pathReport(f.root, home);
-    const legacyKey = bugKeyOf(TRACKER_FILE, report.outOfScopeBugs[0]!.artifact!);
+  /** Stores `filed` under `legacyKey`, as a rafa before #486 did, and triages `report` again; its result and the calls it made. */
+  async function triageOverLegacy(f: Fixture, report: TaskReport, home: string, legacyKey: string) {
     const filed = await f.publicSpy.tracker.create({
       opt: 0, title: 'filed before', body: 'no key', type: 'bug',
       module: 'unassigned', priority: null, project: null, blockedBy: [],
     });
     writeTrackerRef(f.root, { dispatch: FIRST, outcome: 'blocked', artifact: legacyKey, ref: filed });
     const callsBefore = f.publicSpy.calls.length;
-
     const result = await triage(f, report, { home, dispatch: SECOND });
+    return { filed, result, calls: methodsOf(f.publicSpy).slice(callsBefore) };
+  }
+
+  it('still find a reference an earlier rafa stored under the key built from the absolute path', async () => {
+    const f = fixture();
+    const home = '/Users/alice';
+    const report = pathReport(f.root, home);
+    const legacyKey = legacyBugKeyOf(TRACKER_FILE, report.outOfScopeBugs[0]!.artifact!);
+
+    const { filed, result, calls } = await triageOverLegacy(f, report, home, legacyKey);
 
     expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', ref: filed, problem: null });
-    expect(methodsOf(f.publicSpy).slice(callsBefore)).toEqual(['comment']);
+    expect(calls).toEqual(['comment']);
     expect(issueFiles(f.publicDir)).toHaveLength(1);
+  });
+
+  it('still find a reference an earlier rafa stored under the unstripped key built from the relative path', async () => {
+    const f = fixture();
+    const home = '/Users/alice';
+    const legacyKey = legacyBugKeyOf(TRACKER_FILE, RELATIVE_ARTIFACT);
+    expect(legacyKey).not.toBe(bugKeyOf(TRACKER_FILE, RELATIVE_ARTIFACT));
+
+    const { filed, result, calls } = await triageOverLegacy(f, pathReport(f.root, home), home, legacyKey);
+
+    expect(result.bugs[0]).toMatchObject({ action: 'commented', foundBy: 'store', ref: filed, problem: null });
+    expect(calls).toEqual(['comment']);
+    expect(refRows(f.root).map((row) => row.artifact)).toEqual([legacyKey]);
   });
 
   it('control: a path outside the root and the home is filed as reported', async () => {

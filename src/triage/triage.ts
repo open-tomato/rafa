@@ -26,11 +26,15 @@
  *
  * ## The key a bug is looked up by
  *
- * A bug's recurrence key is its artifact, with its local paths taken
- * out, WITH the file it was reported against ({@link bugKeyOf}).
- * `./bug-key.ts` builds it, and its note holds why the file is part of
- * it, the legacy key step 1 below also asks for, and why a bug with no
- * artifact has no key and is filed every time.
+ * A bug's recurrence key is built from its artifact and `what`, with
+ * their local paths taken out and the artifact stripped of numbers,
+ * commit hashes and folder prefixes ({@link bugKeyOf}): the test file,
+ * case and evidence line of a bug naming a test case, else the tracker
+ * file it was reported against WITH its artifact. `./bug-key.ts` builds
+ * it, and its note holds why a test failure keys on the test and every
+ * other bug on its file too, what stripping takes out, the legacy keys
+ * step 1 below also asks for, and why a bug with no artifact has no key
+ * and is filed every time.
  *
  * ## A public bug
  *
@@ -38,21 +42,23 @@
  * `false`, goes to the tracker the degradation chain landed on, looked
  * up by its key:
  *
- *   1. The reference stored under the key (`readTrackerRef`, which keeps a
- *      reference under the text its caller keys by, this module's key
- *      rather than the bare artifact). One of the tracker's own kind is
- *      the issue: the bug is commented on there, and nothing is stored.
- *      One of another kind is passed over, since the tracker cannot read
- *      it: a run that fell back from `github` to `local` asks `local`
- *      instead.
- *   2. The stored reference is missing: `tracker.find` for a `bug` whose
- *      text holds the key's normalized text, the same key built from the
- *      redacted artifact. Every issue this module files carries that text
- *      in its `Recurrence key` section, so an issue filed for this bug
- *      from a checkout whose store this run does not have is found, while
- *      an issue that only quotes the artifact under another file is not.
- *      The first ref it answers is commented on, and stored under the key
- *      (`writeTrackerRef`), so a later recurrence is answered by step 1.
+ *   1. The reference stored under the key, then under each legacy key
+ *      (`readTrackerRef`, which keeps a reference under the text its
+ *      caller keys by, this module's key rather than the bare artifact).
+ *      The first one of the tracker's own kind is the issue: the bug is
+ *      commented on there, and nothing is stored. One of another kind is
+ *      passed over, since the tracker cannot read it: a run that fell back
+ *      from `github` to `local` asks `local` instead.
+ *   2. No stored reference is found: `tracker.find` for a `bug` whose
+ *      text holds the key's text, the same key built from the redacted
+ *      artifact and `what`. Every issue this module files carries that
+ *      text in its `Recurrence key` section, so an issue filed for this
+ *      bug from a checkout whose store this run does not have is found,
+ *      while an issue that only quotes the artifact, under another key, is
+ *      not. An issue filed before #486 carries a legacy key there, and is
+ *      found by step 1 only. The first ref `find` answers is commented on,
+ *      and stored under the key (`writeTrackerRef`), so a later recurrence
+ *      is answered by step 1.
  *   3. Neither: the bug is filed with `tracker.create`, and the reference
  *      it answers is stored under the key.
  *
@@ -185,7 +191,7 @@ import { messageOf } from '../config-sections.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
-import { artifactOf, bugKeyOf, hasText } from './bug-key.js';
+import { artifactOf, bugKeyOf, hasText, legacyBugKeyOf } from './bug-key.js';
 import { COMMENT_OPENING, ISSUE_OPENING, issueText, issueTitle } from './issue-text.js';
 import { localPathRedactor } from './local-paths.js';
 import { machineFaultSentence, readMachineFault } from './machine-fault.js';
@@ -204,7 +210,7 @@ export const TRIAGE_MODULE = 'unassigned';
 export const BLOCKER_SEPARATOR = '; ';
 
 /** Names `./bug-key.ts` and `./issue-text.ts` now hold, still answered from here. */
-export { KEY_SEPARATOR, bugKeyOf } from './bug-key.js';
+export { CASE_SEPARATOR, KEY_SEPARATOR, bugKeyOf, legacyBugKeyOf } from './bug-key.js';
 export { TITLE_MAX_LENGTH, issueTitle } from './issue-text.js';
 
 /** One named secret: the variable's name and the value it held. */
@@ -273,7 +279,7 @@ export interface TriageResult {
 export interface TriageOptions {
   /** The repo root the store lives under. */
   readonly repoRoot: string;
-  /** The tracker file holding the task's line, and half of each bug's key. */
+  /** The tracker file holding the task's line, and half of the key of each bug naming no test case. */
   readonly trackerPath: string;
   /** The task's line, counting from zero, as `findNextTask` answered it. */
   readonly lineNum: number;
@@ -412,10 +418,14 @@ interface Filing {
   readonly comment: string;
   /** The redacted key `find` is asked for, or null for a bug with none. */
   readonly searchText: string | null;
-  /** The key a reference is stored under, from the artifact with local paths taken out. */
+  /** The key a reference is stored under, from the artifact and `what` with local paths taken out. */
   readonly key: string | null;
-  /** The key from the artifact with its local paths, when it differs from {@link key}; else null. */
-  readonly legacyKey: string | null;
+  /**
+   * The legacy keys step 1 asks the store for after {@link key}: from the
+   * artifact without, then with, its local paths, each once and never
+   * {@link key} itself.
+   */
+  readonly legacyKeys: readonly string[];
 }
 
 /** The filing for one bug: `local` takes out paths only, `redact` secrets too; see the module note. */
@@ -433,7 +443,10 @@ async function filingFor(
     : local(reported);
   const searchText = artifact === null
     ? null
-    : bugKeyOf(options.trackerPath, redact(artifact));
+    : bugKeyOf(options.trackerPath, redact(artifact), redact(what));
+  const key = artifact === null
+    ? null
+    : bugKeyOf(options.trackerPath, artifact, local(what));
   const refs = await buildRefsSection(artifact === null
     ? null
     : redact(artifact), verifyRefs);
@@ -459,13 +472,21 @@ async function filingFor(
     },
     comment: issueText(COMMENT_OPENING, values, redact),
     searchText,
-    key: artifact === null
-      ? null
-      : bugKeyOf(options.trackerPath, artifact),
-    legacyKey: reported === null || reported === artifact
-      ? null
-      : bugKeyOf(options.trackerPath, reported),
+    key,
+    legacyKeys: legacyKeysOf(options.trackerPath, key, reported, artifact),
   };
+}
+
+/** The legacy keys of a bug whose artifact is `reported`, `artifact` once local paths are out; see {@link Filing}. */
+function legacyKeysOf(
+  trackerPath: string,
+  key: string | null,
+  reported: string | null,
+  artifact: string | null,
+): readonly string[] {
+  if (key === null || reported === null || artifact === null) return [];
+  const keys = [legacyBugKeyOf(trackerPath, artifact), legacyBugKeyOf(trackerPath, reported)];
+  return [...new Set(keys)].filter((legacy) => legacy !== key);
 }
 
 /** The channels that have a tracker to route a bug to: every one but `machine`. */
@@ -559,8 +580,7 @@ async function triageBug(run: BugRun): Promise<BugTriage> {
 
   const { readStored } = route;
   if (readStored !== null) {
-    for (const storedKey of [key, filing.legacyKey]) {
-      if (storedKey === null) continue;
+    for (const storedKey of [key, ...filing.legacyKeys]) {
       const stored = await step(run, 'reading the stored reference', () => readStored(storedKey));
       if (!stored.ok) return resultOf(run, 'failed', { problem: stored.problem });
       if (stored.value !== null && stored.value.kind === route.tracker.kind) {

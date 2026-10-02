@@ -405,7 +405,7 @@ describe('failedCheckReport', () => {
     expect(report.outOfScopeBugs[0]?.what).toBe(`Epic #40 acceptance criterion 2 fails against main: ${CRITERION_2}`);
     expect(report.outOfScopeBugs[0]?.artifact).toBe(failedCheckArtifact(40, criterion));
     expect(report.feedback).toContain(`Evidence, against commit ${COMMIT}:\nit printed nothing`);
-    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic #40 acceptance criterion: ${CRITERION_2}`);
+    expect(bugKeyOf(closeTriageFile('/r', 40), failedCheckArtifact(40, criterion))).toBe(`epic-40-close: epic # acceptance criterion: ${CRITERION_2}`);
   });
 });
 
