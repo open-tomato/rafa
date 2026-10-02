@@ -30,6 +30,11 @@
  * answering `y`. Each reads the real fake back afterwards for the one
  * comment `postUncheckedComment` posts, and reads real git for the same
  * clean-up `merge-driven.test.ts` proves for an ordinary merge.
+ *
+ * The last pair reads the base's real `verify.yml` (`pull_request` into
+ * `main`, `push` to `stretch/**`) with the fake reporting one workflow: a
+ * pull request into `stretch/x` merges under `--yes`, and one into `main`
+ * is refused with the workflows-exist warning.
  */
 import type { MergeSeams } from './merge.js';
 import type { FakePrCheck, FakePullRequestSeed, FakeWorkflow } from '../../pr/gh-fake.js';
@@ -47,6 +52,7 @@ import { createFakePrGh } from '../../pr/gh-fake.js';
 import { createGhPullRequests } from '../../pr/index.js';
 import {
   NO_WORKFLOW_WARNING,
+  noPullRequestWorkflowLine,
   UNCHECKED_MERGE_SENTENCE,
   WORKFLOWS_EXIST_WARNING,
   workflowCountLine,
@@ -114,13 +120,41 @@ interface MergeRepo {
   readonly headOid: string;
 }
 
+/** What a fixture repository carries beyond the default. */
+interface PlantOptions {
+  /** A base branch cut from {@link BASE} after its first commit; {@link BASE} itself when left out. */
+  readonly base?: string;
+  /** The text of `.github/workflows/verify.yml` committed on {@link BASE}, none when left out. */
+  readonly workflow?: string;
+}
+
+/** The repository's own `verify.yml` shape: pull requests into `main`, pushes to `stretch/**`. */
+const VERIFY_WORKFLOW = `name: verify
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - 'stretch/**'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+`;
+
+/** The base the `no-pull-request-workflow` case merges into. */
+const STRETCH_BASE = 'stretch/x';
+
 /**
  * Plants a work tree on {@link BASE} with one commit, pushed to a bare
  * `origin.git` beside it, then {@link BRANCH} off it with one more
  * commit, pushed too and left checked out — the same shape
  * `merge-driven.test.ts`'s own `plantMergeRepo` builds.
  */
-function plantMergeRepo(name: string): MergeRepo {
+function plantMergeRepo(name: string, options: PlantOptions = {}): MergeRepo {
+  const base = options.base ?? BASE;
   const root = realpathSync(mkdtempSync(join(tempBase, name)));
   const work = join(root, 'work');
   const bare = join(root, 'origin.git');
@@ -133,10 +167,18 @@ function plantMergeRepo(name: string): MergeRepo {
   // config after does not itself dirty the tree `readMergeRefusal` reads.
   writeFileSync(join(work, '.gitignore'), '.rafa/\n', 'utf8');
   writeFileSync(join(work, 'README.md'), 'first\n', 'utf8');
-  expect(git(work, home, 'add', '.gitignore', 'README.md').ok).toBe(true);
+  if (options.workflow !== undefined) {
+    mkdirSync(join(work, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(work, '.github', 'workflows', 'verify.yml'), options.workflow, 'utf8');
+  }
+  expect(git(work, home, 'add', '.').ok).toBe(true);
   expect(git(work, home, 'commit', '-q', '-m', 'first').ok).toBe(true);
   expect(git(work, home, 'remote', 'add', 'origin', bare).ok).toBe(true);
   expect(git(work, home, 'push', '-q', '-u', 'origin', BASE).ok).toBe(true);
+  if (base !== BASE) {
+    expect(git(work, home, 'switch', '-q', '-c', base).ok).toBe(true);
+    expect(git(work, home, 'push', '-q', '-u', 'origin', base).ok).toBe(true);
+  }
   expect(git(work, home, 'switch', '-q', '-c', BRANCH).ok).toBe(true);
   writeFileSync(join(work, 'feature.txt'), 'a feature\n', 'utf8');
   expect(git(work, home, 'add', 'feature.txt').ok).toBe(true);
@@ -363,5 +405,48 @@ describe('an unchecked merge that goes through, over the real fake and real git'
     expect(pull?.comments).toHaveLength(1);
     expect(pull?.comments[0]?.body).toContain(UNCHECKED_MERGE_SENTENCE);
     expect(pull?.comments[0]?.body).toContain(workflowCountLine(1));
+  });
+});
+
+describe('an unchecked merge over a base the workflow files do and do not test', () => {
+  it('merges a pull request into stretch/x under --yes, printing the one-line reason and posting the comment', async () => {
+    const repo = plantMergeRepo('stretch-base', { base: STRETCH_BASE, workflow: VERIFY_WORKFLOW });
+    const fake = createFakePrGh();
+    fake.plant(seed(repo, { checks: [], baseRefName: STRETCH_BASE }));
+    fake.plantWorkflows(ONE_WORKFLOW);
+
+    const run = await ran(repo, fake, [String(NUMBER), '--skip-checks', '--yes']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stderr).toBe('');
+    expect(run.asked).toEqual([]);
+    const reason = noPullRequestWorkflowLine(STRETCH_BASE);
+    expect(run.stdout).toContain(reason);
+    expect(run.stdout).not.toContain(WORKFLOWS_EXIST_WARNING);
+    expect(run.stdout).toContain(`Merged #${NUMBER} into ${STRETCH_BASE} (squash).`);
+    expect(mergeCommandsSent(fake)).toEqual([['pr', 'merge', String(NUMBER), '--squash']]);
+
+    const pull = fake.pull(NUMBER);
+    expect(pull?.state).toBe('MERGED');
+    expect(pull?.comments).toHaveLength(1);
+    expect(pull?.comments[0]?.body).toContain(UNCHECKED_MERGE_SENTENCE);
+    expect(pull?.comments[0]?.body).toContain(reason);
+  });
+
+  it('refuses --yes for a pull request into main, naming the workflows-exist warning, and merges nothing', async () => {
+    const repo = plantMergeRepo('main-base', { workflow: VERIFY_WORKFLOW });
+    const fake = createFakePrGh();
+    fake.plant(seed(repo, { checks: [] }));
+    fake.plantWorkflows(ONE_WORKFLOW);
+
+    const run = await ran(repo, fake, [String(NUMBER), '--skip-checks', '--yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain(`refuses --yes for #${NUMBER} with no checks`);
+    expect(run.stderr).toContain(WORKFLOWS_EXIST_WARNING);
+    expect(mergeCommandsSent(fake)).toEqual([]);
+    expect(fake.pull(NUMBER)?.state).toBe('OPEN');
+    expect(fake.pull(NUMBER)?.comments).toHaveLength(0);
   });
 });
