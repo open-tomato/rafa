@@ -58,6 +58,7 @@ import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, eventsOf, type ScratchRepo } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { SRC_DIR } from './next-chain-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
@@ -129,7 +130,7 @@ function printFile(file: string): string {
  * home base for the fixture's git reads is real; `next-roadmap-hop-cli.test.ts`'s own.
  */
 function gitSetup(scratch: ScratchRepo): void {
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };

@@ -44,6 +44,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { serializeFragment } from '../release/fragment.js';
 
 import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry an asynchronously spawned run executes; mirrors `cli-capture.ts`'s own. */
@@ -81,10 +82,7 @@ function isolatedEnv(home: string): Record<string, string> {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     GIT_AUTHOR_DATE: SETUP_DATE,
     GIT_COMMITTER_DATE: SETUP_DATE,
     LC_ALL: 'C',

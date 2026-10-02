@@ -32,6 +32,7 @@ import { unknownAdditiveWarning } from '../effort/store/schema-report.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -64,7 +65,7 @@ function git(scratch: ScratchRepo, ...args: string[]): void {
   execFileSync('git', ['-c', 'user.email=loop@example.test', '-c', 'user.name=Rafa Loop', '-c', 'commit.gpgsign=false', ...args], {
     cwd: scratch.repo,
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 

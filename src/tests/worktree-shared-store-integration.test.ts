@@ -44,6 +44,7 @@ import { CONFIG_DEFAULTS } from '../config-schema.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
@@ -110,7 +111,7 @@ function git(scratch: ScratchRepo, cwd: string, ...args: string[]): string {
       cwd,
       encoding: 'utf8',
       stdio: 'pipe',
-      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
     },
   ).trim();
 }
@@ -134,7 +135,7 @@ function worktreePathFor(scratch: ScratchRepo, run: PlantedRun): string {
 function initBareOrigin(scratch: ScratchRepo, path: string): void {
   execFileSync('git', ['init', '-q', '--bare', path], {
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 
