@@ -30,6 +30,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once the case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-switch-drift-')));
@@ -117,7 +118,7 @@ function writeGhStub(scratch: ScratchRepo): void {
  */
 function plantWorld(): ScratchRepo {
   const scratch = plantScratchRepo(tempBase);
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };

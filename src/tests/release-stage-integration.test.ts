@@ -12,12 +12,10 @@
  * reads the real fragments waiting on `origin/main`, `release/verify.ts`
  * reads the real fragment and the real `git status` back, the commit and
  * the push run over the real git history, and the forecast folds over
- * the real base version. Only `currentBranch` is fixed to the branch this
- * file checks out, because the real `getCurrentBranch`
- * (`src/utils/git.ts`) reads `process.cwd()` rather than the scratch
- * repository this suite plants. The two body cases name two seams more,
- * the provider and the reading that says there is one, for the reason
- * their own note gives.
+ * the real base version. The branch this file checks out is handed to
+ * the finish on its input, as `runWrapUp` hands it the run's branch. The
+ * two body cases name two seams, the provider and the reading that says
+ * there is one, for the reason their own note gives.
  *
  * One scenario: a plan that declares `release: minor` and whose sessions
  * stored two change notes under two different areas. It answers that the
@@ -48,6 +46,7 @@ import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
 import { sinkOutput } from './output-sinks.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The branch this suite checks out its release from. */
 const BRANCH = 'feat/scratch-release-e2e';
@@ -269,8 +268,8 @@ writeFileSync(RUNNER_SCRIPT, [
   'const provider = JSON.parse(providerJson);',
   '',
   'const finish = await finishRelease(',
-  '  { repoRoot, settings, preparation },',
-  '  { currentBranch: () => branch, readProvider: () => provider },',
+  '  { repoRoot, branch, settings, preparation },',
+  '  { readProvider: () => provider },',
   ');',
   '',
   'process.stdout.write(JSON.stringify(finish));',
@@ -308,7 +307,7 @@ function runFinishInSubprocess(
       branch,
       JSON.stringify(provider),
     ],
-    { env: { PATH: path, HOME: tempBase } },
+    { env: { PATH: path, ...scratchHomeEnv(tempBase) } },
   );
   if (!run.success) {
     throw new Error(`the subprocess exited ${String(run.exitCode)}: ${run.stderr.toString()}`);
@@ -347,9 +346,8 @@ describe('the release stage over a scratch repository', () => {
       expect(preparation.file.path).toBe(FRAGMENT_PATH);
 
       const finish = await finishRelease(
-        { repoRoot: scratch.repo, settings: SETTINGS, preparation },
+        { repoRoot: scratch.repo, branch: BRANCH, settings: SETTINGS, preparation },
         {
-          currentBranch: () => BRANCH,
           pulls: () => createGhPullRequests({ gh: fakeGh.run }),
           readProvider: () => GH_READING,
           now: () => new Date('2026-09-20T09:00:00Z'),
@@ -440,9 +438,8 @@ describe('the release stage over a scratch repository', () => {
     expect(preparation.levelSource).toBe(source);
 
     const finish = await finishRelease(
-      { repoRoot: scratch.repo, settings: SETTINGS, preparation },
+      { repoRoot: scratch.repo, branch: BRANCH, settings: SETTINGS, preparation },
       {
-        currentBranch: () => BRANCH,
         pulls: () => createGhPullRequests({ gh: fakeGh.run }),
         readProvider: () => GH_READING,
       },
@@ -472,9 +469,8 @@ describe('the release stage over a scratch repository', () => {
     expect(preparation.sentence).toBe(sentence);
 
     const finish = await finishRelease(
-      { repoRoot: scratch.repo, settings: RELEASE_OFF, preparation },
+      { repoRoot: scratch.repo, branch: BRANCH, settings: RELEASE_OFF, preparation },
       {
-        currentBranch: () => BRANCH,
         pulls: () => createGhPullRequests({ gh: fakeGh.run }),
         readProvider: () => GH_READING,
       },

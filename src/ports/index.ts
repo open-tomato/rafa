@@ -46,7 +46,9 @@
  *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
  *     is opened, {@link IssueType} gains `epic`, and the note on
  *     `IssueRef.externalId` names the `local` adapter's issue number
- *     where the source named a file path. Left
+ *     where the source named a file path. One member is rafa's own and
+ *     absent from the source: the optional `openIssues` reading, with
+ *     the {@link OpenIssue} it answers. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
@@ -281,6 +283,17 @@ export interface IssueQuery {
   limit?: number;
 }
 
+/**
+ * One open issue as `openIssues` answers it: where it lives, and the
+ * title and body it holds, so a caller comparing issue text reads every
+ * open issue in one call rather than a `get` for each.
+ */
+export interface OpenIssue {
+  ref: IssueRef;
+  title: string;
+  body: string;
+}
+
 /** What a tracker's platform supports beyond issues themselves. */
 export interface TrackerCapabilities {
   /** Supports project/board grouping (GitHub Projects v2, Linear projects). */
@@ -326,6 +339,15 @@ export interface Tracker {
   create: (draft: IssueDraft) => Promise<IssueRef>;
   comment: (ref: IssueRef, body: string) => Promise<void>;
   transition: (ref: IssueRef, state: IssueState) => Promise<TransitionResult>;
+  /**
+   * The open issues of `type`, each with its title and body, in the
+   * order the adapter lists them. Open is every state the tracker does
+   * not hold closed: `done`, `released` and `cancelled` are closed, the
+   * rest open. rafa's own member, absent from the source, and optional:
+   * a tracker without it reads no open issues, and a caller that needs
+   * them goes without.
+   */
+  openIssues?: (type: IssueType) => Promise<OpenIssue[]>;
 }
 
 // ---------------------------------------------------------------------

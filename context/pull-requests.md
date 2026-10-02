@@ -92,6 +92,21 @@ is `gh pr edit <n> --title`, read by its exit code, as `editBody` is.
 The fake models both, and the unmodelled-flag case on `pr edit` now
 sends `--add-label`.
 
+`editBase(number, base)` is rafa-628's, for the wrap-up's retarget of a
+pull request opened against another base than the run's. It is
+`gh pr edit <n> --base <base>` (`-B, --base branch` in `gh pr edit
+--help` on 2.101.0), a WRITE shaped like `editTitle`: a bad number or an
+empty base is refused before `gh` is sent anything, every failure throws,
+an absent pull request included, and nothing reads back what the edit
+wrote — a caller wanting the new `baseRefName` calls `get`. The fake
+stores the new base, so every later read of that pull request answers
+it as `baseRefName`. Its caller is `retargetPullRequest(pull, base,
+seams)` in `src/start/pr-retarget.ts`: it compares `pull.baseRefName`
+with `base` exactly, sends nothing when they match, prints one
+`↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line
+after an edit, and turns a refused edit into one warning naming the
+pull request, both bases and what `gh` said, never a throw.
+
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
 `headRefName`, `headRefOid`, `mergedAt` — through `gh pr list --state

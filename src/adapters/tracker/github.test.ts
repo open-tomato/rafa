@@ -67,6 +67,13 @@
  * lookup reddened the two not-found cases alone: bun 1.3.14 looks a bare
  * name up on `env.PATH` itself, so the bare-name case passes either way
  * and the lookup is held by the message a missing command answers.
+ *
+ * Three mutations of `openIssues` were driven on 2026-10-02 over
+ * `src/adapters/tracker/`, at 314 pass before, restored byte-identical
+ * (sha256) after. Listing `--state all` reddened the contract's closed
+ * case and two cases here; dropping the type label the contract's type
+ * cases and the same two here; dropping the type check the refused type
+ * case alone.
  */
 import type { FakeGh, FakeGhOptions } from './github-fake.js';
 import type { GhResult, GhRunner } from './github.js';
@@ -80,7 +87,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { draftFixture, runTrackerContract } from './contract.js';
 import { createFakeGh } from './github-fake.js';
-import { createGhRunner, createGithubTracker } from './github.js';
+import { createGhRunner, createGithubTracker, OPEN_ISSUES_LIMIT } from './github.js';
 
 /** The URL of issue 1 in the fake's default repository. */
 const ISSUE_1_URL = 'https://github.com/open-tomato/rafa/issues/1';
@@ -386,7 +393,9 @@ describe('reading an issue', () => {
   it.each([
     ['OPEN', '', 'todo'],
     ['OPEN', 'NOT_PLANNED', 'todo'],
+    ['OPEN', 'DUPLICATE', 'todo'],
     ['CLOSED', 'NOT_PLANNED', 'cancelled'],
+    ['CLOSED', 'DUPLICATE', 'cancelled'],
     ['CLOSED', 'COMPLETED', 'done'],
   ] as const)('reads an issue in state %s with close reason %p as %s', async (state, stateReason, expected) => {
     const { tracker, fake } = overFake();
@@ -609,6 +618,80 @@ describe('finding issues', () => {
     const { tracker } = overFake({ repo: null });
 
     await expect(tracker.find({})).rejects.toThrow('github tracker: gh issue list failed: no git remotes found');
+  });
+});
+
+describe('reading open issues', () => {
+  it('sends one gh issue list for open issues of the type label, asking for the text', async () => {
+    const { tracker, fake } = overFake();
+    await tracker.create(draftFixture({ type: 'bug' }));
+    const before = fake.calls().length;
+
+    await tracker.openIssues?.('bug');
+
+    expect(fake.calls().slice(before)).toEqual([[
+      'issue', 'list', '--state', 'open', '--json', 'number,url,labels,title,body', '--limit', String(OPEN_ISSUES_LIMIT),
+      '--label', 'type:bug',
+    ]]);
+  });
+
+  it('answers each open bug newest first, with opt 0, the url, the module label, the title and the body', async () => {
+    const { tracker, fake } = overFake();
+    await tracker.create(draftFixture({ title: 'First bug', body: 'One.\n' }));
+    await tracker.create(draftFixture({ title: 'A spike', type: 'spike' }));
+    await tracker.create(draftFixture({ title: 'Second bug', body: 'Two.\n', module: 'billing' }));
+    const closed = await tracker.create(draftFixture({ title: 'Closed bug' }));
+    await tracker.transition(closed, 'done');
+    fake.update('1', (issue) => ({ ...issue, labels: issue.labels.filter((label) => !label.startsWith('module:')) }));
+
+    expect(await tracker.openIssues?.('bug')).toStrictEqual([
+      {
+        ref: { opt: 0, kind: 'github', externalId: '3', url: 'https://github.com/open-tomato/rafa/issues/3', module: 'billing' },
+        title: 'Second bug',
+        body: 'Two.\n',
+      },
+      { ref: { opt: 0, kind: 'github', externalId: '1', url: ISSUE_1_URL }, title: 'First bug', body: 'One.\n' },
+    ]);
+  });
+
+  it('refuses a type the port does not name, sending nothing, beside one it names', async () => {
+    const { tracker, fake } = overFake();
+    const openIssues = tracker.openIssues;
+    if (openIssues === undefined) throw new Error('the github tracker has no openIssues reading');
+
+    // A cast: the refusal is of a value the port's type would not let through.
+    await expect(openIssues('bug,chore' as 'bug')).rejects.toThrow(
+      'github tracker: openIssues refused type "bug,chore", expected one of: code, bug, spike, adr, chore, package-api, epic',
+    );
+    expect(fake.calls()).toEqual([]);
+    expect(await openIssues('chore')).toEqual([]);
+    expect(fake.calls()).toHaveLength(1);
+  });
+
+  it.each([
+    ['a row with no title', '[{"number":1,"url":"u","labels":[],"body":""}]', 'answered row 0 with title undefined, expected a string'],
+    ['a row with no body', '[{"number":1,"url":"u","labels":[],"title":"t"}]', 'answered row 0 with body undefined, expected a string'],
+    ['a row with no number', '[{"url":"u","labels":[],"title":"t","body":""}]', 'answered row 0 with number undefined, expected an issue number'],
+    ['a mapping', '{}', 'answered a mapping, expected a list'],
+  ])('refuses %s from gh issue list', async (_label, stdout, problem) => {
+    const tracker = createGithubTracker({ gh: scripted(() => wrote(stdout)).run });
+
+    await expect(tracker.openIssues?.('bug')).rejects.toThrow(`github tracker: gh issue list ${problem}`);
+  });
+
+  it('answers a row holding its title and body, beside the refused ones', async () => {
+    const row = '[{"number":1,"url":"u","labels":[],"title":"t","body":"b"}]';
+    const tracker = createGithubTracker({ gh: scripted(() => wrote(row)).run });
+
+    expect(await tracker.openIssues?.('bug')).toEqual([
+      { ref: { opt: 0, kind: 'github', externalId: '1', url: 'u' }, title: 't', body: 'b' },
+    ]);
+  });
+
+  it('rejects with what gh wrote when the listing fails', async () => {
+    const { tracker } = overFake({ repo: null });
+
+    await expect(tracker.openIssues?.('bug')).rejects.toThrow('github tracker: gh issue list failed: no git remotes found');
   });
 });
 

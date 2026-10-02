@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -96,7 +98,7 @@ function git(cwd: string, home: string, ...args: string[]): void {
   execFileSync('git', args, {
     cwd,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 
@@ -175,7 +177,7 @@ export function runLoopStart(
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  const runEnv: Record<string, string> = { TMPDIR: RESOLVED_TMPDIR, ...env, PATH: scratch.path, HOME: scratch.home };
+  const runEnv: Record<string, string> = { TMPDIR: RESOLVED_TMPDIR, ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
   if (mode !== 'text') runEnv.RAFA_OUTPUT = mode;
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags, NO_HINT], {
     cwd: scratch.repo,

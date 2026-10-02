@@ -35,6 +35,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-worktree-integration-')));
@@ -53,6 +54,7 @@ function gitEnv(scratch: ScratchRepo): Record<string, string | undefined> {
     HOME: scratch.home,
     GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
+    ...gitIdentityEnv(),
   };
 }
 

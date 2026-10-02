@@ -90,6 +90,7 @@ import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
 import { expectSameMergedTables } from './testdata/compare-merged-stores.js';
+import { scratchHomeEnv } from './testdata/scratch-home-env.js';
 
 const VERSION = '0.0.0-hub-unreachable';
 const REPOSITORY = 'open-tomato/rafa';
@@ -359,7 +360,7 @@ async function runCommand(device: Device, words: readonly string[]): Promise<Com
       RAFA_TEST: '1',
       TMPDIR: tmpdir(),
       PATH: [device.bin, GIT_DIR].join(delimiter),
-      HOME: device.home,
+      ...scratchHomeEnv(device.home),
       ...secretsEnv(),
     },
     stdout: 'pipe',

@@ -54,6 +54,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { name as PACKAGE_NAME, version as PACKAGE_VERSION } from '../../package.json';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, holding one scratch repository per case. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-mechanics-')));
@@ -145,10 +146,7 @@ function git(cwd: string, home: string, args: readonly string[]): string {
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
     },
   });
 }

@@ -39,6 +39,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, test } from 'bun:test';
 
+import { gitIdentityEnv } from '../tests/git-identity.js';
+
 import {
   PROJECT_ID_LENGTH,
   PROJECT_ID_PATTERN,
@@ -137,7 +139,7 @@ afterAll(() => {
 describe('reading the remote from git', () => {
   test('answers the origin of a repository it is pointed at', () => {
     const dir = scratchDir();
-    const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' };
+    const env = { ...process.env, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' };
     spawnSync('git', ['init', '-q'], { cwd: dir, env });
     spawnSync('git', ['remote', 'add', 'origin', 'git@github.com:open-tomato/rafa.git'], {
       cwd: dir,

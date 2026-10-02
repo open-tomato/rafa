@@ -54,6 +54,7 @@ import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaf
 import { initHint } from '../project/scope.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, its real path. */
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scope-')));
@@ -97,6 +98,7 @@ function gitEnv(scratch: ScratchRepo): Readonly<Record<string, string | undefine
     HOME: scratch.home,
     GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
+    ...gitIdentityEnv(),
   };
 }
 

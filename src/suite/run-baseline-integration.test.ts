@@ -18,6 +18,14 @@ import { describe, expect, it } from 'bun:test';
 import { baselineOf, splitFailures } from './baseline.js';
 import { runSuite } from './run.js';
 
+/** The first line of the message Bun 1.4.2 writes for a failing `toBe`. */
+const TO_BE_MESSAGE = 'expect(received).toBe(expected)';
+
+/** `fail.test.ts`'s failure `name`, as the run reads it. */
+function failed(name: string) {
+  return { file: 'fail.test.ts', name, message: TO_BE_MESSAGE };
+}
+
 const PASSING_TEST = [
   'import { expect, test } from \'bun:test\';',
   '',
@@ -66,15 +74,16 @@ describe('runSuite and baseline over a real bun test', () => {
       expect(baselineResult.exitCode).toBe(1);
       expect(baselineResult.summary).toMatch(/^Ran 2 tests across 2 files\./);
       expect(baselineResult.junit).toBe('read');
-      expect(baselineResult.failures).toEqual([{ file: 'fail.test.ts', name: 'breaks' }]);
+      expect(baselineResult.failures).toEqual([failed('breaks')]);
 
       const baseline = baselineOf(baselineResult, new Date('2026-09-30T00:00:00.000Z'), 'abc123');
+      expect(baseline.failures).toEqual([failed('breaks')]);
 
       // A second, unchanged run against the recorded baseline: everything is known.
       const sameJunitFile = join(dir, '.rafa', 'runs', 'same.junit.xml');
       const sameResult = await runSuite({ cwd: dir, junitFile: sameJunitFile });
       const sameSplit = splitFailures(sameResult.failures, baseline);
-      expect(sameSplit).toEqual({ fresh: [], known: [{ file: 'fail.test.ts', name: 'breaks' }] });
+      expect(sameSplit).toEqual({ fresh: [], known: [failed('breaks')] });
 
       // A new failing test alongside the known one: the split tells them apart.
       writeProject(dir, 2);
@@ -83,15 +92,12 @@ describe('runSuite and baseline over a real bun test', () => {
 
       expect(laterResult.exitCode).toBe(1);
       expect(laterResult.summary).toMatch(/^Ran 3 tests across 2 files\./);
-      expect(laterResult.failures).toEqual([
-        { file: 'fail.test.ts', name: 'breaks' },
-        { file: 'fail.test.ts', name: 'also breaks' },
-      ]);
+      expect(laterResult.failures).toEqual([failed('breaks'), failed('also breaks')]);
 
       const split = splitFailures(laterResult.failures, baseline);
       expect(split).toEqual({
-        fresh: [{ file: 'fail.test.ts', name: 'also breaks' }],
-        known: [{ file: 'fail.test.ts', name: 'breaks' }],
+        fresh: [failed('also breaks')],
+        known: [failed('breaks')],
       });
     } finally {
       rmSync(dir, { recursive: true, force: true });

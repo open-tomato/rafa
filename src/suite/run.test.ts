@@ -47,6 +47,16 @@ import {
 
 const TESTDATA = join(import.meta.dir, 'testdata');
 
+/** The first line of the message Bun writes for a failing `toBe`. */
+const TO_BE = 'expect(received).toBe(expected)';
+
+/** A one-file report whose only testcase, `t`, holds `body`. */
+function oneCase(body: string): string {
+  return '<testsuites><testsuite name="x.test.ts" file="x.test.ts">'
+    + `<testcase name="t" file="x.test.ts">${body}</testcase>`
+    + '</testsuite></testsuites>';
+}
+
 /** A recorded fixture's text. */
 function fixture(file: string): string {
   return readFileSync(join(TESTDATA, file), 'utf8');
@@ -93,8 +103,8 @@ afterEach(() => {
 describe('parseJunitFailures', () => {
   it('names a nested failure by its describes outermost first, unescaped', () => {
     expect(failuresOf('mixed')).toEqual([
-      { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>' },
-      { file: 'sub/b.test.ts', name: 'b fails' },
+      { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>', message: TO_BE },
+      { file: 'sub/b.test.ts', name: 'b fails', message: 'boom' },
     ]);
   });
 
@@ -114,12 +124,12 @@ describe('parseJunitFailures', () => {
 
   it('reads hook failures, a timeout, a rejection and each rows, holding a repeated pair once', () => {
     expect(failuresOf('hooks')).toEqual([
-      { file: 'afterall.test.ts', name: '(unnamed)' },
-      { file: 'beforeall.test.ts', name: 'grp > (unnamed)' },
-      { file: 'dup.test.ts', name: 'same' },
-      { file: 'dup.test.ts', name: 'each 2' },
-      { file: 'timeout.test.ts', name: 'slow' },
-      { file: 'timeout.test.ts', name: 'rej' },
+      { file: 'afterall.test.ts', name: '(unnamed)', message: 'aa' },
+      { file: 'beforeall.test.ts', name: 'grp > (unnamed)', message: 'ba' },
+      { file: 'dup.test.ts', name: 'same', message: TO_BE },
+      { file: 'dup.test.ts', name: 'each 2', message: TO_BE },
+      { file: 'timeout.test.ts', name: 'slow', message: 'test timed out' },
+      { file: 'timeout.test.ts', name: 'rej', message: 'unh' },
     ]);
     // Control: the report holds `same` twice, so holding it once is the parser's doing.
     expect(fixture('hooks.junit.xml').match(/<testcase name="same"/g)).toHaveLength(2);
@@ -145,7 +155,45 @@ describe('parseJunitFailures', () => {
     const xml = '<testsuites><testsuite name="x.test.ts" file="x.test.ts">'
       + '<testcase name="a&#10;b&#x21;" file="x.test.ts"><error message="e" /></testcase>'
       + '</testsuite></testsuites>';
-    expect(parseJunitFailures(xml)).toEqual([{ file: 'x.test.ts', name: 'a\nb!' }]);
+    expect(parseJunitFailures(xml)).toEqual([{ file: 'x.test.ts', name: 'a\nb!', message: 'e' }]);
+  });
+});
+
+describe('parseJunitFailures, the message', () => {
+  it('keeps the first line of a <failure message=...>, unescaped, and never the stack in its text', () => {
+    const body = '<failure type="Error" message="boom &amp; &lt;x&gt; &quot;q&quot;&#10;second line">'
+      + 'Error: boom&#10;      at x.test.ts:3:9&#10;</failure>';
+
+    expect(parseJunitFailures(oneCase(body))).toEqual([{ file: 'x.test.ts', name: 't', message: 'boom & <x> "q"' }]);
+  });
+
+  it('keeps the first line of an <error> element\'s message', () => {
+    const body = '<error type="TypeError" message="cannot read x&#13;&#10;at y">TypeError: cannot read x</error>';
+
+    expect(parseJunitFailures(oneCase(body))).toEqual([{ file: 'x.test.ts', name: 't', message: 'cannot read x' }]);
+  });
+
+  it('takes the first failure element that carries a message', () => {
+    const body = '<error type="E">no attribute</error><failure message="second" /><failure message="third" />';
+
+    expect(parseJunitFailures(oneCase(body))).toEqual([{ file: 'x.test.ts', name: 't', message: 'second' }]);
+  });
+
+  it('leaves the message out when no element carries one, or its first line is blank', () => {
+    // Control: the same failure with a message does carry it, so its absence below is the parser's reading.
+    expect(parseJunitFailures(oneCase('<error message="m" />'))?.[0]).toHaveProperty('message', 'm');
+    for (const body of ['<error>text only</error>', '<failure message="" />', '<failure message="  &#10;later" />']) {
+      expect(parseJunitFailures(oneCase(body))).toEqual([{ file: 'x.test.ts', name: 't' }]);
+    }
+  });
+
+  it('keeps the message of the first testcase a repeated pair names', () => {
+    const xml = '<testsuites><testsuite name="x.test.ts" file="x.test.ts">'
+      + '<testcase name="t"><failure message="first" /></testcase>'
+      + '<testcase name="t"><failure message="later" /></testcase>'
+      + '</testsuite></testsuites>';
+
+    expect(parseJunitFailures(xml)).toEqual([{ file: 'x.test.ts', name: 't', message: 'first' }]);
   });
 });
 
@@ -233,8 +281,8 @@ describe('runSuite', () => {
       exitCode: 1,
       summary: 'Ran 7 tests across 3 files. [3.00ms]',
       failures: [
-        { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>' },
-        { file: 'sub/b.test.ts', name: 'b fails' },
+        { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>', message: TO_BE },
+        { file: 'sub/b.test.ts', name: 'b fails', message: 'boom' },
       ],
       errors: 1,
       junit: 'read',

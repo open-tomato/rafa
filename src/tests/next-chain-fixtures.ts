@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** This module's directory, `src/tests/`, one level under every module a probe imports. */
@@ -71,10 +73,7 @@ export function git(cwd: string, home: string, ...args: readonly string[]): { re
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
       LC_ALL: 'C',
     },
   });
@@ -213,7 +212,7 @@ export function runProbe(scratch: Scratch, words: readonly string[], name = 'rec
   const recordPath = join(scratch.root, name);
   const proc = Bun.spawnSync([process.execPath, scratch.probe, recordPath, ...words], {
     cwd: scratch.work,
-    env: { PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
   });
   const stdout = proc.stdout.toString();
   const stderr = proc.stderr.toString();

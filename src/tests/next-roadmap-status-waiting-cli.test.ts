@@ -49,6 +49,7 @@ import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-status-waiting-cli-')));
@@ -228,7 +229,7 @@ function plantHop(root: string): void {
  */
 function plantWorld(scratch: ScratchRepo, pullState: 'OPEN' | 'MERGED', withHop: boolean): void {
   plantProjectConfig(scratch.repo, `${projectConfigText()}pr:\n  provider: gh\n`);
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const git = (args: readonly string[]): void => {
     execFileSync('git', args, { cwd: scratch.repo, stdio: 'pipe', env });
   };

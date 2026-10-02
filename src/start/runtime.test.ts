@@ -42,6 +42,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import {
   forwardLine,
@@ -467,7 +468,7 @@ describe('rafa loop start --runtime, spawned', () => {
 
     const parent = Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', '--runtime=9.9.9'], {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, HOME: scratch.home },
+      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     });

@@ -19,6 +19,15 @@
  * because rafa's port answers what its own collector would have
  * answered for every one of them.
  *
+ * ## It runs only with `RAFA_LIVE_PARITY=1`
+ *
+ * Both inputs are the sibling's live data, which this repository does
+ * not own: a session log deleted from the live directory turns a stored
+ * row into one with no fresh counterpart, and the case goes red on a
+ * tree nobody changed. So without the variable at `1` every case skips
+ * under a reason naming it, before anything on disk is read; see the
+ * module note on `resolveLiveParity` in `parity-fixture.ts`.
+ *
  * ## Four accounted-for exceptions, and nothing else
  *
  * A stored row is not always byte-identical to what a fresh collect of
@@ -123,10 +132,13 @@ import { collectEffort } from '../effort/collect.js';
 import { openNdjsonStore } from '../effort/store/index.js';
 import { readStoreRows } from '../effort/store.js';
 
-import { resolveParityFixture } from './parity-fixture.js';
+import { resolveLiveParity } from './parity-fixture.js';
 
-/** Never throws; see the module note on {@link resolveParityFixture}. */
-const fixture = resolveParityFixture();
+/**
+ * Runs only with `RAFA_LIVE_PARITY=1` and the fixture present; never
+ * throws. See the module note on {@link resolveLiveParity}.
+ */
+const parity = resolveLiveParity();
 
 /**
  * The sibling checkout on disk: a real git repository and a real
@@ -306,9 +318,9 @@ function freshCounterpartOf<T>(
   return fresh;
 }
 
-const title = fixture.present
+const title = parity.run
   ? 'the lineage parity test, over the live sibling directory'
-  : `the lineage parity test (${fixture.reason})`;
+  : `the lineage parity test (${parity.reason})`;
 
 /**
  * One full collector run over the live sibling directory measured at
@@ -323,12 +335,12 @@ let freshCommits: CommitEffortRow[] | null = null;
 let storedSessions: Record<string, unknown>[] | null = null;
 let storedCommits: Record<string, unknown>[] | null = null;
 
-describe.skipIf(!fixture.present)(title, () => {
+describe.skipIf(!parity.run)(title, () => {
   beforeAll(async () => {
-    if (!fixture.present) {
-      throw new Error('unreachable: the describe block is skipped when absent');
+    if (!parity.run) {
+      throw new Error('unreachable: the describe block is skipped when not run');
     }
-    const fixturePaths: ParityFixturePaths = fixture;
+    const fixturePaths: ParityFixturePaths = parity.fixture;
     tempRoot = mkdtempSync(join(tmpdir(), 'rafa-parity-lineage-'));
     const store = openNdjsonStore(tempRoot);
 

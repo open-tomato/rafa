@@ -79,6 +79,12 @@
  *     {@link parseLocalIssue}, `listPending` is {@link listLocalIssues},
  *     and the `pendingDir` option is `issuesDir`.
  *   - The tracker answered is frozen, as the outputs are.
+ *   - `openIssues`, rafa's own reading, which the source lacks. It
+ *     reads the issue files as `find` does, keeps those of the type whose
+ *     state is not one of {@link CLOSED_STATES}, and answers each with
+ *     its title and body, lowest number first. An issue file it cannot
+ *     read is skipped and reported through `warn`, as `find` skips one,
+ *     the report naming `openIssues`.
  *
  * Kept as the source has them: `preflight` always answers ok, since the
  * file system is the last resort; the capabilities are all false; `find`
@@ -95,6 +101,7 @@ import type {
   IssueRef,
   IssueState,
   IssueType,
+  OpenIssue,
   Tracker,
   TrackerCapabilities,
   TransitionResult,
@@ -116,6 +123,12 @@ const FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
 
 /** An issue number as written: a positive whole number with no leading zero. */
 const ISSUE_NUMBER = /^[1-9]\d*$/;
+
+/**
+ * The states `openIssues` holds closed, the three GitHub holds closed
+ * (`REST_STATES` in `github.ts`); every other state is open.
+ */
+export const CLOSED_STATES: ReadonlySet<IssueState> = new Set(['done', 'released', 'cancelled']);
 
 /** What an issue file's name ends with. */
 const ISSUE_EXTENSION = '.md';
@@ -368,13 +381,15 @@ function warnThroughActiveOutput(message: string): void {
  * Every issue under `issuesDir` that can be read, lowest number first.
  *
  * One unreadable file never hides the others: each is read on its own,
- * and one that fails is reported through `warn` and left out. Answers
- * none when the directory does not exist, and rejects for any other
- * failure to list it.
+ * and one that fails is reported through `warn` and left out, the
+ * report naming `reader` as the reading that skipped it (`find` when
+ * left out). Answers none when the directory does not exist, and rejects
+ * for any other failure to list it.
  */
 export async function listLocalIssues(
   issuesDir: string,
   warn: (message: string) => void = warnThroughActiveOutput,
+  reader = 'find',
 ): Promise<LocalIssueFile[]> {
   const numbers = await issueNumbers(issuesDir);
   const settled = await Promise.allSettled(numbers.map(async (number): Promise<LocalIssueFile> => {
@@ -390,7 +405,7 @@ export async function listLocalIssues(
 
   return settled.flatMap((result) => {
     if (result.status === 'fulfilled') return [result.value];
-    warn(`${messageOf(result.reason)}; find skipped it`);
+    warn(`${messageOf(result.reason)}; ${reader} skipped it`);
     return [];
   });
 }
@@ -500,6 +515,16 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
       return matched
         .slice(0, query.limit ?? matched.length)
         .map(({ number, record }) => refFor(number, record.draft.opt));
+    },
+
+    openIssues: async (type: IssueType): Promise<OpenIssue[]> => {
+      const open = (await listLocalIssues(issuesDir, warn, 'openIssues'))
+        .filter(({ record }) => record.draft.type === type && !CLOSED_STATES.has(record.state));
+      return open.map(({ number, record }): OpenIssue => ({
+        ref: refFor(number, record.draft.opt),
+        title: record.draft.title,
+        body: record.draft.body,
+      }));
     },
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {

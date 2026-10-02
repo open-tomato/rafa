@@ -34,6 +34,7 @@ import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { serializeFragment } from '../../release/fragment.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createReleaseSettleCommand, settledResult } from './settle.js';
 
@@ -69,10 +70,7 @@ function isolatedEnv(home: string): Record<string, string> {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     GIT_AUTHOR_DATE: SETUP_DATE,
     GIT_COMMITTER_DATE: SETUP_DATE,
     LC_ALL: 'C',

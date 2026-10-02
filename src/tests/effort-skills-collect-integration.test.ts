@@ -68,6 +68,7 @@ import { writeTaskReport } from '../effort/store/reports.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command every run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -365,7 +366,7 @@ interface CommandRun {
 function run(scratch: Scratch, args: readonly string[]): CommandRun {
   const spawned = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, ...args],
-    { cwd: scratch.repo, env: { PATH: scratch.path, HOME: scratch.home }, timeout: 60_000 },
+    { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: 60_000 },
   );
   return {
     exitCode: spawned.exitCode,

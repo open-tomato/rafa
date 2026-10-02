@@ -299,11 +299,20 @@ describe('gh pr edit', () => {
     expect(fake.pull(7)?.body).toBe('');
   });
 
-  it('refuses an edit carrying neither --body nor --title, before it looks for the pull request', async () => {
+  it('refuses an edit carrying none of --body, --title and --base, before it looks for the pull request', async () => {
     // The fake holds no pull request 7 here, so a refusal naming the
-    // two flags is also the reading that they are checked first.
+    // three flags is also the reading that they are checked first.
     expect(await createFakePrGh().run(['pr', 'edit', '7']))
-      .toEqual(failure('fake gh: pr edit models --body <text> and --title <text>, and was handed neither\n'));
+      .toEqual(failure('fake gh: pr edit models --body <text>, --title <text> and --base <branch>, and was handed none\n'));
+  });
+
+  it('retargets the pull request when handed --base alone, which every later read answers as baseRefName', async () => {
+    const fake = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, body: 'Closes #20' }));
+
+    expect(await fake.run(['pr', 'edit', '7', '--base', 'stretch/1'])).toEqual({ ok: true, stdout: '', stderr: '' });
+    expect(await json(fake, ['pr', 'view', '7', '--json', 'baseRefName,title,body']))
+      .toEqual({ baseRefName: 'stretch/1', title: 'a change', body: 'Closes #20' });
   });
 
   it('replaces the title alone when handed --title alone, leaving the body', async () => {

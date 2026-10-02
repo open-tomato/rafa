@@ -133,6 +133,8 @@ const CONFIG: StartTriageOptions['config'] = {
   trackerFallback: ['local'],
   prerequisitesRequired: [],
   prerequisitesOptional: [],
+  triageSimilarityThreshold: 0.3,
+  triageSimilarityCandidates: 3,
 };
 
 /** One out-of-scope bug as a report lists it: its what, its artifact and its flag. */
@@ -795,5 +797,43 @@ describe('the stand-in for a tracker the run did not resolve', () => {
       expect(standIn.comment(ref, 'body')).rejects.toThrow(NOT_RESOLVED_REASON),
       expect(standIn.transition(ref, 'todo')).rejects.toThrow(NOT_RESOLVED_REASON),
     ]);
+  });
+});
+
+describe('the run\'s similarity settings', () => {
+  // 10 of 14 distinct words shared, counted by hand: a score of 0.71.
+  const first = ['Parser drops the last line', 'parse returned too few lines for the input', false] as const;
+  const reworded = ['Parser drops the final line', 'parse returned too few lines for the text', false] as const;
+
+  /** Triages `first`, then `reworded`, over a local tracker with its `openIssues` reading, under `config`. */
+  async function rewordedAfterFirst(f: Fixture, config: StartTriageOptions['config']): Promise<TriageResult | null> {
+    const tracker = createLocalTracker({ issuesDir: f.publicDir, fallbackReason: null, now: CLOCK });
+    const triage = triageFor(f, chainLanding(tracker), { config });
+    await triage(taskInput(f, sessionOutput({ bugs: [first] }), 'session-1'));
+    return triage(taskInput(f, sessionOutput({ bugs: [reworded] }), 'session-2'));
+  }
+
+  it('reach triage, so a reworded bug comments on the nearest open bug, its note naming the score', async () => {
+    const lines = captureLines();
+    const f = fixture();
+
+    const second = await rewordedAfterFirst(f, CONFIG);
+
+    expect(second?.bugs.map((bug) => [bug.action, bug.foundBy])).toEqual([['commented', 'similarity']]);
+    expect(issueNames(f.publicDir)).toEqual(['1.md']);
+    expect(lines.info.at(-1)).toBe(
+      '   Triage: out_of_scope_bugs[0]: recurs in local issue 1 on the public tracker,'
+        + ' found by word similarity (score 0.71); commented on it.',
+    );
+  });
+
+  it('turned off with a threshold of false, file the reworded bug as a second issue, the control', async () => {
+    captureLines();
+    const f = fixture();
+
+    const second = await rewordedAfterFirst(f, { ...CONFIG, triageSimilarityThreshold: false });
+
+    expect(second?.bugs.map((bug) => [bug.action, bug.foundBy])).toEqual([['filed', null]]);
+    expect(issueNames(f.publicDir)).toEqual(['1.md', '2.md']);
   });
 });

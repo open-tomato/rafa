@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import {
   isGitHubRemote,
@@ -159,7 +160,7 @@ describe('resolving the provider with pr.provider named', () => {
 describe('the default probe, which is a spawn', () => {
   it('reads the origin of the repository it is pointed at', () => {
     const dir = scratchDir();
-    const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' };
+    const env = { ...process.env, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' };
     spawnSync('git', ['init', '-q'], { cwd: dir, env });
     spawnSync('git', ['remote', 'add', 'origin', 'git@github.com:open-tomato/rafa.git'], {
       cwd: dir,

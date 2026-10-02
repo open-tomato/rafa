@@ -1,0 +1,17 @@
+{
+  "kind-tables": "a978d6f3d10bceb1f5c599ee15cea88ce7549826cff0fd895200d8d0acbf8b53",
+  "findings": "1420b5430e5afda283a7ae9cab7c3bcb995c9a26bb70f105e500915fda9e2d77",
+  "blockers-and-bugs": "0ebd42bfca7c18023ba14c0ca46e576eb29d3c6613d0e0df89c909ad48e1ba41",
+  "report-absences": "08ab3386f9dd4b27b55bfa05c61b55107d4ae33e4a17789e5b16b1abda4c0703",
+  "task-reports": "18ebbe9871e34cb0356b1d166a5a3c9f56b0f5d98b1929c21b4bc2a8d7ac6a45",
+  "preflight": "679b5ce0dda86245e482f991e7144b890497414b1599639de7e1c99cc8495681",
+  "dispatches": "38e27d10b9f5fb0c0da80ea3f63dbea07e507b1b1bb5ef8f39a4e7fff16b7f5c",
+  "changes": "47cd1d71f05556d857fa647d3868baaa6a535ee5146667048a97de00986bc695",
+  "out-of-scope-bug-scope": "29fe46edb5e06203eece4ff85d3445b8311596c9ffe0ae76989181c142a48b8d",
+  "dispatch-skills": "9ab38994c2a72d76e2a81b147a80c38c7fb99cd5aff4fce1ce13c5eacc3afb3b",
+  "skill-invocations": "8f31455bf70b50e1b0a8628c9b8d8ce0bd1ee638d916534a1bdd05d8fb8ef409",
+  "task-report-skills": "5aaa2574db0c07e59ff12cc911f9fe85433e5e9e5f6d11267fab326144826384",
+  "plan-ci": "23b3d7ec98f0e5460d24dd731d0dbd67b679bbbdb6b583f228b7abe908f830ff",
+  "row-origins": "114ce97f3ab20e4cee039a73f8cd65d36a538cb5beb8327dad6f19dab79bc927",
+  "store-meta": "80b4ab459067a358eef82fc1340f84085f4d6260ef58a7f04021b845c9da1809"
+}

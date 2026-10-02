@@ -117,6 +117,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '../config.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { stampPrompt } from '../utils/plan-stamp.js';
 
 import { PROMPT_SHAPES } from './classify.js';
@@ -1268,7 +1269,7 @@ function makeRepo(config: string): string {
 function runCollect(root: string, args: readonly string[]): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'collect', ...args],
-    { cwd: root, env: { ...process.env, HOME: makeScratch() } },
+    { cwd: root, env: { ...process.env, ...scratchHomeEnv(makeScratch()) } },
   );
   return {
     exitCode: run.exitCode,

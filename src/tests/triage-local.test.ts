@@ -265,7 +265,7 @@ describe('an out-of-scope bug over the local adapter', () => {
     }), SECOND);
 
     expect(second.bugs[0]).toMatchObject({ channel: 'public', action: 'commented', foundBy: 'store' });
-    expect(methodsOf(f.publicSpy)).toEqual(['find', 'create', 'comment']);
+    expect(methodsOf(f.publicSpy)).toEqual(['find', 'create', 'get', 'comment']);
     expect(issueNames(f.publicDir)).toEqual(['1.md']);
     expect(onlyIssue(f.publicDir)).toContain('Last line lost again');
   });

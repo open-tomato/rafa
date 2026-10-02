@@ -1,0 +1,251 @@
+// src/effort/store/migrations.ts
+var SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION;
+var init_migrations = __esm(() => {
+  SQLITE_MIGRATIONS = [
+    `
+  CREATE TABLE sessions (
+    seq        INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    row_json   TEXT NOT NULL
+  );
+
+  CREATE TABLE commits (
+    seq      INTEGER PRIMARY KEY,
+    sha      TEXT NOT NULL UNIQUE CHECK (sha <> ''),
+    row_json TEXT NOT NULL
+  );
+  `,
+    `
+  CREATE TABLE findings (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    kind         TEXT
+      CHECK (kind IN ('gotcha', 'pattern', 'location', 'skill-suggestion')),
+    trigger      TEXT CHECK (trigger <> ''),
+    what         TEXT CHECK (what <> ''),
+    cause        TEXT,
+    resolution   TEXT,
+    artifact     TEXT CHECK (artifact <> ''),
+    signal       TEXT CHECK (signal IN ('loud', 'silent')),
+    outcome      TEXT NOT NULL,
+    tracker_ref  TEXT,
+    collected_at TEXT NOT NULL,
+    CHECK (artifact IS NOT NULL OR (trigger IS NOT NULL AND what IS NOT NULL))
+  );
+
+  CREATE UNIQUE INDEX findings_by_artifact
+    ON findings (session_id, artifact)
+    WHERE artifact IS NOT NULL;
+
+  CREATE UNIQUE INDEX findings_by_trigger_what
+    ON findings (session_id, trigger, what)
+    WHERE artifact IS NULL;
+  `,
+    `
+  CREATE TABLE blockers (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    what         TEXT NOT NULL CHECK (what <> ''),
+    artifact     TEXT CHECK (artifact <> ''),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX blockers_by_entry
+    ON blockers (session_id, what, ifnull(artifact, ''));
+
+  CREATE TABLE out_of_scope_bugs (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    what         TEXT NOT NULL CHECK (what <> ''),
+    artifact     TEXT CHECK (artifact <> ''),
+    security     INTEGER CHECK (security IN (0, 1)),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX out_of_scope_bugs_by_entry
+    ON out_of_scope_bugs (session_id, what, ifnull(artifact, ''), ifnull(security, -1));
+  `,
+    `
+  CREATE TABLE report_absences (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    reason       TEXT NOT NULL CHECK (reason <> ''),
+    detail       TEXT NOT NULL CHECK (detail <> ''),
+    block_body   TEXT,
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+    `
+  CREATE TABLE task_reports (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    status       TEXT CHECK (status IN ('done', 'blocked')),
+    outcome      TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+    `
+  CREATE TABLE preflight (
+    seq          INTEGER PRIMARY KEY,
+    run_id       TEXT NOT NULL CHECK (run_id <> ''),
+    position     INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0),
+    tier         TEXT NOT NULL CHECK (tier IN ('required', 'optional')),
+    kind         TEXT NOT NULL CHECK (kind <> ''),
+    item         TEXT NOT NULL CHECK (item <> ''),
+    probe        TEXT CHECK (probe <> ''),
+    outcome      TEXT NOT NULL CHECK (outcome IN ('pass', 'fail', 'timeout')),
+    duration_ms  INTEGER NOT NULL CHECK (typeof(duration_ms) = 'integer' AND duration_ms >= 0),
+    failure      TEXT CHECK (failure <> ''),
+    collected_at TEXT NOT NULL,
+    UNIQUE (run_id, position),
+    CHECK ((outcome = 'pass') = (failure IS NULL))
+  );
+  `,
+    `
+  CREATE TABLE dispatches (
+    seq          INTEGER PRIMARY KEY,
+    session_id   TEXT NOT NULL UNIQUE CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    declaration  TEXT CHECK (declaration <> ''),
+    agent        TEXT CHECK (agent <> ''),
+    model        TEXT CHECK (model <> ''),
+    effort       TEXT CHECK (effort <> ''),
+    budget_usd   REAL CHECK (budget_usd IS NULL OR (typeof(budget_usd) IN ('integer', 'real') AND budget_usd > 0)),
+    tools        TEXT CHECK (tools <> ''),
+    flags        TEXT NOT NULL,
+    collected_at TEXT NOT NULL
+  );
+  `,
+    `
+  CREATE TABLE changes (
+    seq          INTEGER PRIMARY KEY,
+    id           TEXT NOT NULL UNIQUE CHECK (id <> ''),
+    session_id   TEXT NOT NULL CHECK (session_id <> ''),
+    plan_stub    TEXT,
+    task_line    TEXT NOT NULL,
+    level        TEXT NOT NULL
+      CHECK (level IN ('patch', 'minor', 'major', 'none')),
+    area         TEXT CHECK (area <> ''),
+    summary      TEXT NOT NULL CHECK (summary <> ''),
+    collected_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX changes_by_entry
+    ON changes (session_id, level, ifnull(area, ''), summary);
+  `,
+    `
+  ALTER TABLE out_of_scope_bugs
+    ADD COLUMN scope TEXT CHECK (scope IN ('machine', 'rafa'));
+  `,
+    `
+  ALTER TABLE dispatches
+    ADD COLUMN resolver TEXT CHECK (resolver IN ('planner', 'tag', 'none'));
+  ALTER TABLE dispatches
+    ADD COLUMN skills_offered TEXT CHECK (skills_offered IS NULL OR json_type(skills_offered) = 'array');
+  ALTER TABLE dispatches
+    ADD COLUMN lessons_offered TEXT CHECK (lessons_offered IS NULL OR json_type(lessons_offered) = 'array');
+  `,
+    `
+  CREATE TABLE skill_invocations (
+    seq        INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL CHECK (session_id <> ''),
+    name       TEXT CHECK (name <> ''),
+    sidechain  INTEGER CHECK (sidechain IN (0, 1)),
+    count      INTEGER CHECK (count IS NULL OR (typeof(count) = 'integer' AND count > 0)),
+    CHECK ((name IS NULL) = (count IS NULL) AND (name IS NULL) = (sidechain IS NULL))
+  );
+
+  CREATE UNIQUE INDEX skill_invocations_by_use
+    ON skill_invocations (session_id, ifnull(name, ''), ifnull(sidechain, -1));
+  `,
+    `
+  ALTER TABLE task_reports
+    ADD COLUMN skills_used TEXT CHECK (skills_used IS NULL OR json_type(skills_used) = 'array');
+  `,
+    `
+  CREATE TABLE plan_ci (
+    seq       INTEGER PRIMARY KEY,
+    plan_stub TEXT NOT NULL CHECK (plan_stub <> ''),
+    pr        INTEGER NOT NULL CHECK (typeof(pr) = 'integer' AND pr > 0),
+    head_sha  TEXT NOT NULL CHECK (head_sha <> ''),
+    verdict   TEXT NOT NULL CHECK (verdict IN ('green', 'red', 'none')),
+    failing   TEXT NOT NULL CHECK (json_valid(failing) AND json_type(failing) = 'array'),
+    read_at   TEXT NOT NULL CHECK (read_at <> ''),
+    UNIQUE (pr, head_sha, read_at),
+    CHECK ((verdict = 'red') = (json_array_length(failing) > 0))
+  );
+  `
+  ];
+  SQLITE_SCHEMA_VERSION = SQLITE_MIGRATIONS.length;
+});
+
+// src/effort/store/sqlite.ts
+import { existsSync as existsSync6, mkdirSync as mkdirSync4 } from "fs";
+import { dirname as dirname8, join as join13 } from "path";
+import { Database } from "bun:sqlite";
+function sqliteStorePath(repoRoot) {
+  return join13(repoRoot, EFFORT_STORE_DIR, STORE_FILE_NAME);
+}
+function hasKey(entry) {
+  return entry.key !== null;
+}
+function refused2(index, length, reason) {
+  return new Error(`effort store: row ${index} of ${length} ${reason}; batch refused`);
+}
+function batchEntries(kind, rows) {
+  const keyOf = EFFORT_KEY_PROJECTIONS[kind];
+  const projected = rows.map((row) => ({ key: keyOf(row), row }));
+  const keyed = projected.filter(hasKey);
+  if (keyed.length < projected.length) {
+    const keylessAt = projected.findIndex((entry) => !hasKey(entry));
+    throw refused2(keylessAt, rows.length, "carries no key");
+  }
+  const unholdableAt = keyed.findIndex(({ key }) => LONE_SURROGATE.test(key));
+  if (unholdableAt !== -1) {
+    const reason = "carries a key with a lone UTF-16 surrogate," + " which SQLite text cannot hold";
+    throw refused2(unholdableAt, rows.length, reason);
+  }
+  return keyed.map(({ key, row }) => ({ key, body: JSON.stringify(row) }));
+}
+function userVersion(db) {
+  const row = db.query("PRAGMA user_version").get();
+  return row?.user_version ?? 0;
+}
+function checkedVersion(db, path, latest) {
+  const version = userVersion(db);
+  if (version > latest) {
+    throw new Error(`effort store: ${path} is at schema version ${version}, past the` + ` ${latest} this rafa knows; refusing to read or write it`);
+  }
+  return version;
+}
+function migrateSchema(db, path, migrations = SQLITE_MIGRATIONS) {
+  const latest = migrations.length;
+  if (checkedVersion(db, path, latest) === latest)
+    return;
+  const applyPending = db.transaction(() => {
+    const from = checkedVersion(db, path, latest);
+    for (const sql of migrations.slice(from))
+      db.run(sql);
+    db.run(`PRAGMA user_version = ${latest}`);
+  });
+  applyPending.immediate();
+}

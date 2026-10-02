@@ -31,6 +31,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -61,7 +62,7 @@ function git(scratch: { repo: string; home: string }, ...args: string[]): void {
   execFileSync('git', ['-c', 'user.email=sync@example.test', '-c', 'user.name=Rafa Sync', '-c', 'commit.gpgsign=false', ...args], {
     cwd: scratch.repo,
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 

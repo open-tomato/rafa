@@ -329,6 +329,7 @@ import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -646,7 +647,7 @@ function plantPlanScratch(name: string): PlanScratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { root, repo, prompt, args, env: { PATH: path, HOME: home } };
+  return { root, repo, prompt, args, env: { PATH: path, ...scratchHomeEnv(home) } };
 }
 
 /** The arguments the stand-in keeps for a plan session under `sources`, one per line. */
@@ -791,7 +792,7 @@ describe('the built CLI', () => {
     cpSync(DIST, copy, { recursive: true });
     const env = {
       ...Object.fromEntries(Object.entries(withBunOnPath()).filter(([name]) => !name.startsWith('RAFA_'))),
-      HOME: tempRoot,
+      ...scratchHomeEnv(tempRoot),
     };
     const fromSource = run([process.execPath, join(REPO_ROOT, 'src', 'rafa.ts'), 'describe'], tempRoot, env);
     const fromBuild = run([process.execPath, join(copy, 'cli.js'), 'describe'], tempRoot, env);

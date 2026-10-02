@@ -66,6 +66,7 @@ import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js
 
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry every spawned case runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -173,12 +174,12 @@ interface SpawnRun {
   readonly stderr: string;
 }
 
-/** Runs `rafa loop start` in `scratch`, over its own PATH and HOME alone. */
+/** Runs `rafa loop start` in `scratch`, over its own PATH and HOME alone, with the bun cache variables `./scratch-home-env.ts` sets beside that HOME. */
 function runLoopStart(scratch: CliScratch, flags: readonly string[]): SpawnRun {
   assertStandIn(scratch);
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
@@ -188,7 +189,7 @@ function runLoopStart(scratch: CliScratch, flags: readonly string[]): SpawnRun {
 function runEffortReport(scratch: CliScratch): SpawnRun {
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'effort', 'report'], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

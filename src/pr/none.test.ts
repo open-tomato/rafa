@@ -30,11 +30,11 @@
  * under the case's own `mkdtemp` directory, which the case removes.
  * The {@link git} helper that plants each fixture points
  * `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` at `/dev/null` and names
- * its own author, so a user `.gitconfig` changes nothing about what is
- * planted. {@link pushBranch} itself inherits the process environment,
- * as it must to reach the operator's git, and its `origin` is a bare
- * repository beside the work tree, so the push stays on this
- * filesystem.
+ * its author through `gitIdentityEnv`, so a user `.gitconfig` changes
+ * nothing about what is planted. {@link pushBranch} itself inherits
+ * the process environment, as it must to reach the operator's git, and
+ * its `origin` is a bare repository beside the work tree, so the push
+ * stays on this filesystem.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -42,6 +42,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
+
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { compareUrl, pushBranch } from './none.js';
 
@@ -108,11 +110,8 @@ function git(cwd: string, ...args: readonly string[]): { status: number; stdout:
     env: {
       PATH: process.env.PATH ?? '',
       GIT_CONFIG_GLOBAL: '/dev/null',
+      ...gitIdentityEnv(),
       GIT_CONFIG_SYSTEM: '/dev/null',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
       LC_ALL: 'C',
     },
   });

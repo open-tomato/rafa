@@ -34,6 +34,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { announceRunDirs, resolveRunDirs } from './checkout.js';
@@ -59,6 +60,7 @@ function gitEnv(): Record<string, string | undefined> {
     XDG_CONFIG_HOME: gitHome,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }

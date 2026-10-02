@@ -42,15 +42,18 @@
  * `TMPDIR`, so the child judges paths by the temporary directory the
  * suite built its scratch project under.
  *
- * "The temporary directory" is `tmpdir()`, read at each open, or its
- * real path. Both are accepted because the two can differ, as on macOS,
- * where the default one sits under the `/var` symlink and a fixture
- * built with `realpathSync(mkdtempSync(...))` is spelled from
- * `/private/var`.
+ * "The temporary directory" is `tmpdir()`, read at each open. A path is
+ * under it as spelled, or when its real path is under the directory's
+ * real path; a path not made yet takes the real path of its nearest
+ * existing ancestor. Both spellings are accepted because they can
+ * differ, as on macOS, where the default directory sits under the `/var`
+ * symlink, so a fixture built with `realpathSync(mkdtempSync(...))` is
+ * spelled from `/private/var` and a store path may be spelled from
+ * either.
  */
 import { existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { EFFORT_STORE_DIR } from '../store.js';
 
@@ -82,6 +85,21 @@ function canonical(path: string): string {
   return existsSync(resolved)
     ? realpathSync(resolved)
     : resolved;
+}
+
+/**
+ * A path's real path, whether or not it exists yet: the real path of its
+ * nearest existing ancestor, with the rest of its resolved spelling
+ * appended.
+ */
+function realPathOf(path: string): string {
+  const resolved = resolve(path);
+  if (existsSync(resolved)) return realpathSync(resolved);
+
+  const parent = dirname(resolved);
+  return parent === resolved
+    ? resolved
+    : join(realPathOf(parent), basename(resolved));
 }
 
 /** True when `path` is `dir` or lies under it, compared as spelled. */
@@ -135,10 +153,11 @@ export function isTestProcess(main: string = Bun.main, env: StoreEnvironment = p
 
 /**
  * True when `path` is the temporary directory `tempDir` or lies under
- * it, as spelled or through `tempDir`'s real path.
+ * it, as spelled or with both resolved to their real paths; a `path`
+ * not made yet resolves through its nearest existing ancestor.
  */
 export function isUnderTempDir(path: string, tempDir: string = tmpdir()): boolean {
-  return isWithin(path, tempDir) || isWithin(path, canonical(tempDir));
+  return isWithin(path, tempDir) || isWithin(realPathOf(path), realPathOf(tempDir));
 }
 
 /** The probe of the process this runs in, read afresh at each call. */

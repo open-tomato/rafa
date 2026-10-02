@@ -106,6 +106,21 @@
  * learning merge. `PortVersions` without `sync` reddened the clean
  * probe and the registry's literal case, and `SyncPortVersion` widened
  * to `number` the literal case alone.
+ *
+ * The optional `openIssues` reading arrived on 2026-10-02 with
+ * `OpenIssue`'s name, a second tracker in the conforming probe that
+ * implements it beside the first that leaves it out, and four refusals.
+ * Five mutations of the entry were driven that day against this file,
+ * restored from a scratch copy and verified with `sha256sum -c`, at 36
+ * pass unmutated. `openIssues` made required reddened the clean probe,
+ * whose first tracker has none, and the refusals of a tracker with no
+ * `transition` and of a synchronous `openIssues`, whose readings it
+ * changed. `body` made optional and a synchronous answer
+ * allowed each reddened its own refusal alone. The parameter widened
+ * to `string` reddened the unknown-type call alone; before that
+ * refusal was written it reddened nothing, since a narrower parameter
+ * is refused either way. `OpenIssue` left unexported reddened the name
+ * list and the unknown-type call, which names it.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -157,6 +172,7 @@ const TYPE_EXPORTS = [
   'MergeDecision',
   'MergeResult',
   'MergeRule',
+  'OpenIssue',
   'Output',
   'OutputPortVersion',
   'PlanRequest',
@@ -213,10 +229,13 @@ function probeSource(...lines: string[]): string {
   ].join('\n');
 }
 
-/** A tracker literal: `kind` and `transition` as given, the rest conforming. */
-function trackerLiteral(kind: string, transition: string | null): string[] {
+/**
+ * A tracker literal: `kind` and `transition` as given, the rest
+ * conforming, and `openIssues` when one is given, left out when not.
+ */
+function trackerLiteral(kind: string, transition: string | null, openIssues: string | null = null, name = 'tracker'): string[] {
   return [
-    'export const tracker: P.Tracker = {',
+    `export const ${name}: P.Tracker = {`,
     `  kind: ${kind},`,
     '  capabilities: () => ({ projects: false, customFields: false, issueTypes: false }),',
     '  preflight: async () => ({ ok: true }),',
@@ -227,9 +246,15 @@ function trackerLiteral(kind: string, transition: string | null): string[] {
     ...transition === null
       ? []
       : [`  transition: ${transition},`],
+    ...openIssues === null
+      ? []
+      : [`  openIssues: ${openIssues},`],
     '};',
   ];
 }
+
+/** An `openIssues` answering one open issue of the type it is handed. */
+const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b" }]';
 
 /** An instinct literal carrying the signal given. */
 function instinctLiteral(signal: string): string {
@@ -248,6 +273,7 @@ const CONFORMING_PROBE = probeSource(
   `import { copyEffortStore } from ${specifierOf('effort', 'store', 'copy.js')};`,
   `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
+  ...trackerLiteral('"local"', 'async () => ({})', OPEN_ISSUES, 'reader'),
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
   `export const instinct: P.InstinctRecord = ${instinctLiteral('"silent"')};`,
@@ -360,6 +386,42 @@ const REFUSALS: readonly Refusal[] = [
     ),
     code: 2322,
     names: '_state: "done"',
+  },
+  {
+    title: 'a tracker whose open issues carry no body',
+    file: 'tracker-open-issues-no-body.ts',
+    source: probeSource(...trackerLiteral(
+      '"local"',
+      'async () => ({})',
+      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t" }]',
+    )),
+    code: 2322,
+    names: 'Property \'body\' is missing',
+  },
+  {
+    title: 'a tracker whose openIssues accepts less than the port hands it',
+    file: 'tracker-narrow-open-issues.ts',
+    source: probeSource(...trackerLiteral('"local"', 'async () => ({})', 'async (_type: "bug") => []')),
+    code: 2322,
+    names: '_type: "bug"',
+  },
+  {
+    title: 'a tracker whose openIssues answers without a promise',
+    file: 'tracker-sync-open-issues.ts',
+    source: probeSource(...trackerLiteral('"local"', 'async () => ({})', '() => []')),
+    code: 2322,
+    names: 'Promise<OpenIssue[]>',
+  },
+  {
+    title: 'an openIssues call for a type the port does not name',
+    file: 'tracker-open-issues-unknown-type.ts',
+    source: probeSource(
+      'export async function features(tracker: P.Tracker): Promise<P.OpenIssue[] | undefined> {',
+      '  return tracker.openIssues?.("feature");',
+      '}',
+    ),
+    code: 2345,
+    names: '"feature"',
   },
   {
     title: 'a tracker kind that is not a string',

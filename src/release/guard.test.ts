@@ -24,6 +24,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeChanges } from '../effort/store/changes.js';
 import { createGitRunner } from '../pr/git.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
 import {
@@ -111,10 +112,7 @@ function world(): World {
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
       GIT_AUTHOR_DATE: date,
       GIT_COMMITTER_DATE: date,
       LC_ALL: 'C',

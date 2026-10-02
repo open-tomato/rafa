@@ -68,10 +68,13 @@ rafa· wrap-up          session
 rafa· pr #612 opened
 rafa· no pr            no open pull request for feat/rafa-485
 rafa· halt             checkout moved
+rafa· inherited        src/parse/parse.test.ts > parse > drops the last line
 rafa· error            ❌ Task failed (exit 1). Marked as blocked. Run again to retry.
 ```
 
-`src/start/loop-events.ts` builds each line. A task's tokens are input,
+`src/start/loop-events.ts` builds each line. An `inherited` line names
+the run-start failure, by file and case, that a reported bug was read as
+(`src/start/triage.ts`): nothing was filed for it. A task's tokens are input,
 cache creation and output from its session log, read as
 `rafa effort collect` reads it; the effort store is never opened. A
 session's own stdout goes to `info`, which the events adapter drops.

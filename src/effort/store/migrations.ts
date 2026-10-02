@@ -37,8 +37,9 @@
  * of them a store holds. Read at their tags, 0.23.0, 0.24.0 and 0.24.1
  * each hold these thirteen. Their SQL is byte-identical here, so a
  * checksum taken now is the checksum of what those releases ran. This
- * module's test compares the SQL with an installed 0.24.1 runtime when
- * one is present. All thirteen are additive.
+ * module's test compares the SQL with an excerpt of the 0.24.1 bundle
+ * committed under `src/effort/testdata/migrations/`. All thirteen are
+ * additive.
  *
  * ## The legacy gate
  *

@@ -146,6 +146,7 @@ import ts from 'typescript';
 
 import { parseSpecReview } from '../board/spec-review.js';
 import { actionHash } from '../learning/index.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import {
   CORE_ADAPTER_REGISTRY,
@@ -549,7 +550,7 @@ describe('the core adapter registry', () => {
       'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',
     ].join('\n');
     const pulled = (scratchHome: string): { exitCode: number; stdout: string } => {
-      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { ...process.env, HOME: scratchHome } });
+      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { ...process.env, ...scratchHomeEnv(scratchHome) } });
       return { exitCode: child.exitCode, stdout: child.stdout.toString() };
     };
 
