@@ -57,7 +57,9 @@ function calleeName(expression: ts.Expression): string | null {
 function wrapUpBranch(file: ts.SourceFile): ts.Statement {
   const branches: ts.Statement[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isIfStatement(node) && node.expression.getText(file) === '!taskInfo') {
+    // The wrap-up branch is the braced one: a bare `if (!taskInfo) emitLoopEvent(...)`
+    // announcing the tests phase ahead of it is a statement, not the branch.
+    if (ts.isIfStatement(node) && node.expression.getText(file) === '!taskInfo' && ts.isBlock(node.thenStatement)) {
       branches.push(node.thenStatement);
     }
     ts.forEachChild(node, visit);
@@ -129,7 +131,9 @@ const START = readFileSync(new URL('./start.ts', import.meta.url), 'utf8');
 
 /** Its wrap-up branch, and the names it calls in order. */
 const CALLS = wrapUpCalls(START);
-const NAMES = CALLS.map((call) => call.name);
+/** The one call besides the hand-over the branch may make: the loop's event line. */
+const ALLOWED_BESIDE_HAND_OVER = new Set(['emitLoopEvent']);
+const NAMES = CALLS.map((call) => call.name).filter((name) => !ALLOWED_BESIDE_HAND_OVER.has(name));
 
 /** The first call named `name`, or a failure naming what was found instead. */
 function callTo(calls: readonly BranchCall[], name: string): BranchCall {
@@ -333,7 +337,9 @@ describe('where start.ts takes the suite steps', () => {
   });
 
   it('stops the run when a step before a session is red, and breaks on an interrupt it ran through', () => {
-    expect(START).toContain('if (!(await suiteSteps.beforeSession(taskInfo))) return;\n      if (interrupted) break;');
+    expect(START).toContain(
+      'if (!(await suiteSteps.beforeSession(taskInfo))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
+    );
   });
 
   it('takes the task step from the task\'s base once its commit is stored, before the usage check', () => {
@@ -342,7 +348,9 @@ describe('where start.ts takes the suite steps', () => {
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
     expect(after).toBeLessThan(indexOf(EVERY, 'checkUsage'));
-    expect(START).toContain('if (!(await suiteSteps.afterTask(taskInfo, base))) return;');
+    expect(START).toContain(
+      'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
+    );
   });
 
   it('reads a task step taken before the commit as taken before it', () => {
