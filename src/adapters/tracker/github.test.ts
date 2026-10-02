@@ -85,6 +85,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
+
 import { draftFixture, runTrackerContract } from './contract.js';
 import { createFakeGh } from './github-fake.js';
 import { createGhRunner, createGithubTracker, OPEN_ISSUES_LIMIT } from './github.js';
@@ -945,7 +947,7 @@ describe('the gh runner with an env', () => {
   });
 
   it('finds a bare command nowhere under an env with no PATH', async () => {
-    const result = await createGhRunner({ cwd: tempDir, command: 'sh', env: { HOME: tempDir } })(['-c', 'printf ran']);
+    const result = await createGhRunner({ cwd: tempDir, command: 'sh', env: scratchHomeEnv(tempDir) })(['-c', 'printf ran']);
 
     expect(result).toEqual({
       ok: false,
