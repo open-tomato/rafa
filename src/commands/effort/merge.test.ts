@@ -171,7 +171,7 @@ describe('rafa effort merge', () => {
     expect(outcome.stdout).toContain('  findings: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('  sessions: 0 added, 0 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict; 0 commit gaps recomputed.');
-    expect(outcome.stdout).toContain(`✅ Merged. The original is kept whole at ${backup}; rename it back to undo.`);
+    expect(outcome.stdout).toContain(`✅ Merged. A copy of the original is kept at ${backup}; renamed back to undo, it takes a new store id on its next write.`);
     expect(existsSync(backup)).toBe(true);
     expect(findingSessions(testCase.path)).toEqual(['session-a1', 'session-b1']);
     // Control for every byte-identical reading below: a merge changes this store's directory.

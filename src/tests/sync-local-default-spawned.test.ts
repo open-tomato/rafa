@@ -145,7 +145,7 @@ describe('a project naming no effort.sync at all', () => {
 
     const mergeRun = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath]);
     expect(mergeRun.exitCode).toBe(0);
-    expect(mergeRun.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(mergeRun.stdout).toContain('✅ Merged. A copy of the original is kept at');
     expect(`${mergeRun.stdout}${mergeRun.stderr}`).not.toContain('effort.sync');
   });
 

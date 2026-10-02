@@ -16,9 +16,9 @@
  * of its `store_meta` row, which its rows carry as `origin_store`. A
  * push cursor counts one store file's local `seq`s, so it holds only
  * for the store that wrote it. Core mints a new origin whenever a store
- * could be another file than it was (a copy, a restored backup, a
- * merged file swapped in), and a new origin finds no cursors here and
- * starts both from zero. That is always safe: the hub skips a row
+ * could be another file than it was (a copy, a restored backup), and a
+ * new origin finds no cursors here and starts both from zero. A merged
+ * file core swaps in keeps the origin, since the swap carries it. That is always safe: the hub skips a row
  * whose origin pair it holds, and `mergeStore` skips one this store
  * holds, so starting again resends rows and never loses one.
  *

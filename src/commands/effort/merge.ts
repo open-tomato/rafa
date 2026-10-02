@@ -109,7 +109,8 @@ function closingLine(result: MergeResult, command: string): string {
       + ` schema plan) and deleted. Run \`${command} ${result.otherPath}\` to swap it in; the original would be`
       + ` kept whole at ${result.path}.before-merge-<stamp>.bak.`;
   }
-  return `✅ Merged. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`;
+  return `✅ Merged. A copy of the original is kept at ${String(result.backupPath)}; renamed back to undo, it`
+    + ' takes a new store id on its next write.';
 }
 
 /**

@@ -10,6 +10,11 @@
  * unless it says otherwise, and reads no git: `readProject` answers no
  * project.
  *
+ * The backup a merge leaves is a `VACUUM INTO` snapshot of this store,
+ * not its bytes, so it is compared by every table's rows, its
+ * `user_version` and its `store_meta` row, and its inode is compared to
+ * the original's.
+ *
  * Each refusal snapshots both directories before and after and finds
  * them byte-identical. Each has a control beside it, the same planting
  * less the one fault, which merges, and the merge case finds this
@@ -19,7 +24,16 @@
 import type { MergeOptions } from './merge-store.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -32,6 +46,7 @@ import { bringForward } from './bring-forward.js';
 import { DevelopmentBuildRefusedError } from './development-build.js';
 import { MergeRefusal, mergeStore, MOVE_TO_SQLITE } from './merge-store.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
+import { storeRows } from './testdata/store-rows.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-merge-store-')));
 afterAll(() => {
@@ -176,6 +191,11 @@ function readRows<Row>(path: string, sql: string): Row[] {
   }
 }
 
+/** The inode of the file at `path`. */
+function inodeOf(path: string): bigint {
+  return statSync(path, { bigint: true }).ino;
+}
+
 /** The gap each commit of the store at `path` holds, by sha. */
 function gaps(path: string): Record<string, unknown> {
   return Object.fromEntries(readRows<{ sha: string; row_json: string }>(path, 'SELECT sha, row_json FROM commits')
@@ -212,7 +232,8 @@ describe('mergeStore', () => {
   it('swaps the union in behind a backup, recording the merge and recomputing the gaps around the commit brought in', () => {
     const testCase = freshCase();
     plantPair(testCase);
-    const original = readFileSync(testCase.path);
+    const original = storeRows(testCase.path);
+    const originalInode = inodeOf(testCase.path);
     const [, thereBefore] = snapshotBoth(testCase);
 
     const result = mergeStore(mergeOptions(testCase));
@@ -224,7 +245,12 @@ describe('mergeStore', () => {
     });
     expect(result.otherBroughtForward).toEqual([]);
     expect(result.backupPath).toBe(`${testCase.path}.before-merge-${STAMP}.bak`);
-    expect(readFileSync(`${testCase.path}.before-merge-${STAMP}.bak`).equals(original)).toBe(true);
+    const backupPath = `${testCase.path}.before-merge-${STAMP}.bak`;
+    expect(storeRows(backupPath)).toEqual(original);
+    expect(storeRows(testCase.path)).not.toEqual(original);
+    expect(original.tables.findings).toHaveLength(2);
+    expect(original.tables.store_meta).toHaveLength(1);
+    expect(inodeOf(backupPath)).not.toBe(originalInode);
     expect(readdirSync(dirname(testCase.path)).sort()).toEqual(['effort.sqlite', `effort.sqlite.before-merge-${STAMP}.bak`]);
     expect(readRows(testCase.path, 'SELECT id, origin_store, origin_seq FROM findings ORDER BY seq')).toEqual([
       { id: 'id-a1', origin_store: HERE, origin_seq: 1 },
