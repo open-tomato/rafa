@@ -7,7 +7,8 @@
  * labelled and what is taken out.
  *
  * The cause labels come from the board's closing comments and from
- * `src/triage/testdata/scoring-causes.json`, a reading kept by hand.
+ * `src/triage/testdata/scoring-causes.json`, a reading kept by hand, and
+ * an issue numbered after that reading's `through` gives no filing.
  *
  * Usage:
  *   bun scripts/extract-scoring-fixture.ts [--out=<file>]
