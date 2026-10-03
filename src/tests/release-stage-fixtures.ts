@@ -269,7 +269,7 @@ export const PUSHED: PushOutcome = { ok: true, output: `branch '${BRANCH}' set u
 export const COMMITTED: readonly GitResult[] = [OK, STAGED, OK, SHA_READ];
 
 /** The provider {@link stub} answers through, recording into `calls` and `bodies`. */
-function stubPulls(script: Script, calls: string[], bodies: string[]): PullRequests {
+export function stubPulls(script: Script, calls: string[], bodies: string[]): PullRequests {
   const ask = <T>(member: string, answer: () => T): Promise<T> => {
     calls.push(member);
     if (script.throws !== undefined) return Promise.reject(new Error(script.throws));
@@ -299,6 +299,7 @@ function stubPulls(script: Script, calls: string[], bodies: string[]): PullReque
     merge: () => unreached('merge'),
     create: () => unreached('create'),
     editTitle: () => unreached('editTitle'),
+    editBase: () => unreached('editBase'),
     comments: () => unreached('comments'),
     comment: () => unreached('comment'),
     editComment: () => unreached('editComment'),
@@ -348,7 +349,6 @@ export function stub(script: Script): Recorded {
     // asks it before it asks for a provider, so a stub that left it out
     // would send the real `resolvePrProvider` at `/repo`.
     readProvider: () => script.provider ?? PROVIDER_GH,
-    currentBranch: () => BRANCH,
     now: () => new Date('2026-09-20T09:00:00Z'),
   };
 

@@ -33,6 +33,13 @@
  * to deliver, and none of this runs: the CI gate's own `none` path
  * pushes the branch as before.
  *
+ * Whoever opened it, a DELIVERED pull request whose base is not the
+ * run's — the `base` resolved once at the top of {@link runWrapUp} —
+ * is then retargeted onto it (`start/pr-retarget.ts`), before the CI
+ * wait, so the checks the wait reads ran against the right base. A
+ * refused retarget is one warning and the run goes on to the wait; a
+ * blocked or interrupted delivery reaches no retarget.
+ *
  * The delivery is BLOCKED when the open pull request cannot be read
  * (the provider could not be asked), when the plan carries no issue
  * number the runner could title the pull request with, or when the
@@ -73,6 +80,7 @@ import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/inde
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
+import { retargetPullRequest } from './pr-retarget.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
 import { retryWrapUp } from './wrap-up-retry.js';
@@ -145,8 +153,12 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     planStub,
     planContent,
   });
+  // The run's base, resolved ONCE here and handed to every reader of
+  // it: the wrap-up's and each retry's `gh pr create --base` bullet,
+  // the runner's own open, and the retarget of a delivered pull request.
+  const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
-  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, checkout);
+  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
   if (activeOutputMode() !== 'text') {
     const pullRequest = await openPullRequestNumber(checkout, expected.branch);
     emitLoopEvent(pullRequest === null
@@ -177,7 +189,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   });
   emitLoopEvent({ kind: 'wrap-up', phase: 'release' });
   const finish = await finishRelease(
-    { repoRoot: checkout, settings, preparation: release },
+    { repoRoot: checkout, branch: expected.branch, settings, preparation: release },
     { readProvider },
   );
   // The pull request, delivered after step 3 and before the CI gate:
@@ -186,10 +198,15 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   if (readProvider().provider !== 'none') {
     const delivery = await deliverPullRequest(
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
-      deliverySeamsIn({ ...input, fragment: finish.fragment }),
+      deliverySeamsIn({ ...input, base, fragment: finish.fragment }),
     );
     if (delivery.kind === 'interrupted') return;
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
+    // A delivered pull request opened into another base than the run's
+    // is retargeted onto it, BEFORE the CI wait, so the checks the wait
+    // reads are the ones GitHub runs against the right base. A refused
+    // edit is a warning and the run carries on (`start/pr-retarget.ts`).
+    await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
   }
   if (ciWait) {
     emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });
@@ -396,8 +413,10 @@ export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
   };
 }
 
-/** What {@link deliverySeamsIn} closes over: the run's input and the fragment step 3 committed. */
+/** What {@link deliverySeamsIn} closes over: the run's input, its base and the fragment step 3 committed. */
 export interface DeliveryContext extends WrapUpRunInput {
+  /** The run's base branch, as `runWrapUp` resolved it once; never resolved again here. */
+  readonly base: string;
   /** The fragment `finishRelease` committed, relative to the checkout, or null. */
   readonly fragment: string | null;
 }
@@ -419,6 +438,7 @@ export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySe
     retry: (previousMessage) => retryWrapUp({
       previousMessage,
       branch: expected.branch,
+      base: context.base,
       planContent: context.planContent,
       settingSources: context.settingSources,
       serving: context.serving,
@@ -428,7 +448,7 @@ export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySe
     openRunnerPullRequest: async () => {
       const runnerInput = runnerPrInputFor({
         branch: expected.branch,
-        base: resolveBaseBranch(createGitRunner(checkout), context.settings.prBase),
+        base: context.base,
         planContent: context.planContent,
         planStub: context.planStub,
         notes: fragmentNotesIn(checkout, context.fragment),

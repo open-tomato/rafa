@@ -28,12 +28,15 @@
  * Files are planted at the LITERAL `.rafa/config.yaml` for the same
  * reason.
  *
- * Three cases are CHARACTERIZATIONS of bun rather than guards of this
- * module, and are named as such: a tab-indented child parsing as a
- * top-level key, `Bun.file().exists()` answering false for a directory,
- * and `yes` parsing as a string where `TRUE` parses as the boolean.
- * Each pins a measured claim the module note makes, so a bun upgrade
- * that changes one fails here and says which sentence went stale.
+ * One case here is a CHARACTERIZATION of bun rather than a guard of
+ * this module, and is named as such: `yes` parsing as a string where
+ * `TRUE` parses as the boolean. A second, `Bun.file().exists()`
+ * answering false for a directory, sits in `config-load.test.ts`. Each
+ * pins a measured claim the module note makes, so a bun upgrade that
+ * changes one fails and says which sentence went stale. A tab-indented
+ * child was a third until bun 1.4.2 began throwing where 1.3.14 read a
+ * top-level key; the module now refuses it before the parser runs, and
+ * the case guards that refusal.
  *
  * Fifty module mutations were driven against this file and
  * `config-sections.test.ts` together, each an exact string found once,
@@ -87,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, release, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -128,6 +131,8 @@ const SETTINGS: readonly ConfigSetting[] = [
   'roadmapIssue',
   'claimsStaleAfter',
   'claimsAhead',
+  'triageSimilarityThreshold',
+  'triageSimilarityCandidates',
   'releaseEnabled',
   'releaseVersionFile',
   'releaseChangelog',
@@ -193,6 +198,8 @@ const DEFAULTS: RafaConfig = {
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
+  triageSimilarityThreshold: 0.3,
+  triageSimilarityCandidates: 3,
   releaseEnabled: 'auto',
   releaseVersionFile: 'package.json',
   releaseChangelog: 'CHANGELOG.md',
@@ -299,6 +306,10 @@ const FULL = [
   'claims:',
   '  staleAfter: 36h',
   '  ahead: allow',
+  'triage:',
+  '  similarity:',
+  '    threshold: 0.5',
+  '    candidates: 5',
   'release:',
   '  enabled: false',
   '  versionFile: deno.json',
@@ -389,6 +400,8 @@ const FULL_VALUES: RafaConfig = {
   roadmapIssue: 31,
   claimsStaleAfter: '36h',
   claimsAhead: 'allow',
+  triageSimilarityThreshold: 0.5,
+  triageSimilarityCandidates: 5,
   releaseEnabled: false,
   releaseVersionFile: 'deno.json',
   releaseChangelog: 'docs/CHANGES.md',
@@ -592,11 +605,22 @@ describe('parseConfigText', () => {
     ]);
   });
 
-  it('characterizes a tab-indented child as a top-level key', () => {
-    const file = fileOf('plan:\n\tinject: full\n');
+  it('refuses a tab in a line\'s indentation, by line, before the parser sees it', () => {
+    const text = 'plan:\n\tinject: full\ntracking:\n  \tspecs: true\n';
+    const error = refusal(() => fileOf(text));
 
-    expect(file.values.inject).toBeUndefined();
-    expect(file.extras).toEqual([{ key: 'inject', value: 'full' }]);
+    expect(error.problems).toEqual([
+      `${PATH}: line 2 is indented with a tab; YAML indents with spaces only`,
+      `${PATH}: line 4 is indented with a tab; YAML indents with spaces only`,
+    ]);
+    expect(error.cause).toBeUndefined();
+  });
+
+  it('parses a tab inside a value, and a tab on a blank or comment line', () => {
+    const file = fileOf('plan:\n  inject: full\t# a tab before the comment\n\t\n\t# a comment\nnote: a\tb\n');
+
+    expect(file.values.inject).toBe('full');
+    expect(file.extras).toEqual([{ key: 'note', value: 'a\tb' }]);
   });
 
   it('characterizes yes as a string and TRUE as the boolean, so yes is refused', () => {
@@ -813,6 +837,16 @@ describe('parseConfigText', () => {
         'claims.ahead', 'claims:\n  ahead: false',
         'claims.ahead is false, expected one of: off, allow',
         'claims:\n  ahead: allow', 'claimsAhead', 'allow',
+      ],
+      [
+        'triage.similarity.threshold', 'triage:\n  similarity:\n    threshold: 0',
+        'triage.similarity.threshold is 0, expected false or a number above 0 and at most 1',
+        'triage:\n  similarity:\n    threshold: false', 'triageSimilarityThreshold', false,
+      ],
+      [
+        'triage.similarity.candidates', 'triage:\n  similarity:\n    candidates: 11',
+        'triage.similarity.candidates is 11, expected a whole number from 1 to 10',
+        'triage:\n  similarity:\n    candidates: 10', 'triageSimilarityCandidates', 10,
       ],
       [
         'release.enabled', 'release:\n  enabled: on',

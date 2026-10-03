@@ -47,8 +47,9 @@
  *     readings each later section's spec leaves are argued in
  *     `config-schema-readings.ts`, a note that exports nothing, except
  *     the `pr` and `release` sections', which sit with their fields in
- *     `config-schema-release.ts`, and the `tests` section's, which sit
- *     with theirs in `config-schema-tests.ts`, both spread into
+ *     `config-schema-release.ts`, the `tests` section's, which sit
+ *     with theirs in `config-schema-tests.ts`, and the `triage`
+ *     section's, in `config-schema-triage.ts`, each spread into
  *     `config-schema.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `config-schema.ts` reads its settings through. No caller reads a
@@ -63,7 +64,8 @@
  * `config-schema.ts` 396 and `config-sections.ts` 478. A new setting is
  * one field, one default and one spec in `config-schema.ts` (in
  * `config-schema-release.ts` for a `pr` or `release` key, in
- * `config-schema-tests.ts` for a `tests` key), its reader
+ * `config-schema-tests.ts` for a `tests` key, in
+ * `config-schema-triage.ts` for a `triage` key), its reader
  * in `config-sections.ts`, and one line in {@link readLayer}'s layer
  * literal here; the literal is exhaustive on purpose, so a setting
  * added there and forgotten here does not compile.
@@ -143,10 +145,15 @@
  *   - Malformed YAML throws a `SyntaxError` whose message carries no
  *     line or column. The refusal names the file; it cannot name the
  *     line.
- *   - A child indented with a TAB is not an error either: `plan:` over
- *     a tab-indented `inject: full` parses as `plan: null` beside a
- *     top-level `inject`. The unknown-key warning is the only signal
- *     that edit produces.
+ *   - A child indented with a TAB parses differently by version: on
+ *     bun 1.3.14 `plan:` over a tab-indented `inject: full` parses as
+ *     `plan: null` beside a top-level `inject`, and on bun 1.4.2 it
+ *     throws `Tab characters cannot be used as indentation`. So a line
+ *     whose indentation holds a tab is refused, by line number, before
+ *     the parser sees the text, and every bun gives one answer. A blank
+ *     or comment line may carry one, and a tab inside a value parses as
+ *     the value's own on both. One cost: a block scalar line whose
+ *     content opens with a tab after its spaces is refused too.
  *   - `yes` and `on` parse as strings, and `True` and `TRUE` as the
  *     boolean. So a `tracking` flag spelled `yes` is refused rather
  *     than read as true.
@@ -379,6 +386,8 @@ function readLayer(
     roadmapIssue: read('roadmapIssue'),
     claimsStaleAfter: read('claimsStaleAfter'),
     claimsAhead: read('claimsAhead'),
+    triageSimilarityThreshold: read('triageSimilarityThreshold'),
+    triageSimilarityCandidates: read('triageSimilarityCandidates'),
     releaseEnabled: read('releaseEnabled'),
     releaseVersionFile: read('releaseVersionFile'),
     releaseChangelog: read('releaseChangelog'),
@@ -465,8 +474,31 @@ function sortKeys(document: Mapping, path: string): SortedKeys {
   return { named, extras, problems };
 }
 
-/** Parses YAML, refusing text that is not YAML with the file named. */
+/**
+ * A line whose leading whitespace holds a tab and whose content after it
+ * is neither empty nor a comment. Such a line is a tab-indented one.
+ */
+const TAB_INDENTED_LINE = /^[ \t]*\t[ \t]*[^\s#]/;
+
+/**
+ * One problem per line that indents its content with a tab, named by
+ * line number. A blank line or a comment may carry a tab; a tab after
+ * the first non-blank character, inside a value, is the value's own.
+ */
+function tabIndentProblems(text: string, path: string): string[] {
+  return text.split(/\r?\n/).flatMap((line, index) => TAB_INDENTED_LINE.test(line)
+    ? [`${path}: line ${index + 1} is indented with a tab; YAML indents with spaces only`]
+    : []);
+}
+
+/**
+ * Parses YAML, refusing text that is not YAML with the file named. A
+ * tab in a line's indentation is refused before the parser sees the
+ * text, because bun's parser answers it differently by version.
+ */
 function parseYaml(text: string, path: string): unknown {
+  const tabProblems = tabIndentProblems(text, path);
+  if (tabProblems.length > 0) throw new ConfigError(tabProblems);
   try {
     return Bun.YAML.parse(text);
   } catch (error) {
@@ -484,8 +516,8 @@ export function configFilePath(root: string): string {
  * Reads config text into one file layer. Pure: `path` only labels the
  * layer and the refusals.
  *
- * Throws a {@link ConfigError} naming every problem the text has — not
- * YAML, not a mapping at the top, a section that is not a mapping, a
+ * Throws a {@link ConfigError} naming every problem the text has — a
+ * line indented with a tab, not YAML, not a mapping at the top, a section that is not a mapping, a
  * setting given twice, a value a setting does not accept. An unknown
  * key is none of these: it is retained in {@link ConfigFile.extras},
  * the keys an item carried after the keys of the document.

@@ -18,7 +18,8 @@
  * Each runs `bun src/rafa.ts` in a scratch git repository holding the
  * `.rafa/config.yaml` `rafa init` writes, with a HOME of its own, under a
  * PATH holding git's directory alone, in an environment
- * holding nothing else but what the case names, so no `RAFA_OUTPUT` the
+ * holding nothing else but the bun cache variables
+ * `./scratch-home-env.ts` sets beside that HOME and what the case names, so no `RAFA_OUTPUT` the
  * suite runs under reaches a text case. A json run is held to NDJSON:
  * every line parses, the first is the start event and the one terminal
  * result is the last. Where a command writes lines, the same planting is
@@ -62,6 +63,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */
@@ -147,7 +149,7 @@ function rafa(scratch: Scratch, words: readonly string[], env: Readonly<Record<s
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: dirname(gitBinary), HOME: scratch.home, ...env },
+    env: { PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
 }

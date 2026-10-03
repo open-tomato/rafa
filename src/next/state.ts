@@ -43,7 +43,7 @@
  * | 6 | `pr-red` | `triage` | that pull request is red, or conflicts |
  * | 7 | `pr-no-checks` | `merge-unchecked` | that pull request reports no check at all and merges |
  * | 8 | `pr-green` | `merge` | that pull request is green and merges |
- * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run and no branch |
+ * | 9 | `plan-unstarted` | `start` | the branch is the base and a plan has no run, and no branch or one holding claim commits alone |
  * | 10 | `issue-ready` | `plan` | the branch is the base and the roadmap's next line is ready |
  * | 11 | `issue-blocked` | `unblock` | that line waits on issues that have not closed, in `labels` mode |
  * | 12 | `issue-not-ready` | `ready` | that line carries no `spec:ready` label |
@@ -433,7 +433,7 @@ async function readPrGreen(world: NextWorld): Promise<RowAnswer | null> {
   };
 }
 
-/** Row 9: on the base branch, and a plan has no run and no branch. */
+/** Row 9: on the base branch, and a plan has no run and no branch past its claim commits (`./readings.ts`). */
 function readPlanUnstarted(world: NextWorld): RowAnswer | null {
   if (!onBase(world)) return null;
 

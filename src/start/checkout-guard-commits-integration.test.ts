@@ -32,6 +32,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 
@@ -96,7 +98,7 @@ function git(cwd: string, home: string, ...args: string[]): void {
   execFileSync('git', args, {
     cwd,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
   });
 }
 
@@ -106,7 +108,7 @@ function gitOut(cwd: string, home: string, ...args: string[]): string {
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
   }).trim();
 }
 
@@ -188,7 +190,7 @@ function plant(): Scratch {
 function run(scratch: Scratch, words: readonly string[]): { readonly exitCode: number | null; readonly stdout: string } {
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: 30_000,
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString() };
@@ -202,7 +204,7 @@ function spawnLoopStart(scratch: Scratch) {
   }
   return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });

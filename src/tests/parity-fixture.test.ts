@@ -26,6 +26,12 @@
  * running as root defeats, so they are skipped there rather than
  * reporting a false red.
  *
+ * The live gate carries its own property: with `RAFA_LIVE_PARITY`
+ * anything but `1`, a COMPLETE planted fixture still answers skip, under
+ * a reason naming the variable. The planted fixture is the control: it
+ * answers run once the gate is `1`, so the skip came from the gate and
+ * not from a fixture that was never there.
+ *
  * The freeze carries a fourth property, in the last describe block: a
  * copy taken from a directory that then MOVES still holds what it
  * froze. Every case there appends to its source after freezing and
@@ -60,11 +66,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
+  LIVE_PARITY_ENV,
+  LIVE_PARITY_OFF_REASON,
   PARITY_ABSENCE_CODES,
   PARITY_LOG_DIR_ENV,
   PARITY_STORE_DIR_ENV,
   freezeParitySessionLogs,
   parityFixturePaths,
+  resolveLiveParity,
   resolveParityFixture,
 } from './parity-fixture.js';
 
@@ -556,6 +565,52 @@ const SECOND_SESSION_ID = 'bbbb-2222';
 
 /** The first log's only line, as {@link plantFixture} writes it. */
 const FIRST_LOG_BYTES = '{}\n';
+
+describe('the live parity gate', () => {
+  it('skips a complete fixture while the variable is unset, naming it', () => {
+    const tree = plantFixture();
+    // Control: the same tree answers present, so the skip below is the gate's.
+    expect(resolvePlanted(tree).present).toBe(true);
+
+    const parity = resolveLiveParity({ env: tree.env, home: tree.root });
+
+    expect(parity).toEqual({ run: false, reason: LIVE_PARITY_OFF_REASON });
+    expect(LIVE_PARITY_OFF_REASON).toContain(`${LIVE_PARITY_ENV}=1`);
+    expect(LIVE_PARITY_ENV).toBe('RAFA_LIVE_PARITY');
+  });
+
+  it('takes no value but 1 as on', () => {
+    const tree = plantFixture();
+
+    for (const value of ['', '0', 'true', 'yes', ' 1', '1 ']) {
+      const env = { ...tree.env, [LIVE_PARITY_ENV]: value };
+      expect(resolveLiveParity({ env, home: tree.root }))
+        .toEqual({ run: false, reason: LIVE_PARITY_OFF_REASON });
+    }
+  });
+
+  it('runs a complete fixture once the variable is 1', () => {
+    const tree = plantFixture();
+    const env = { ...tree.env, [LIVE_PARITY_ENV]: '1' };
+
+    expect(resolveLiveParity({ env, home: tree.root })).toEqual({
+      run: true,
+      fixture: resolvePlanted(tree),
+    });
+  });
+
+  it('still skips an absent fixture once on, under the fixture\'s own reason', () => {
+    const home = makeScratch();
+    const env = { [LIVE_PARITY_ENV]: '1' };
+
+    const parity = resolveLiveParity({ env, home });
+
+    expect(parity).toEqual({
+      run: false,
+      reason: reasonOf(resolveParityFixture({ env, home })),
+    });
+  });
+});
 
 /** An mtime old enough that no copy could have acquired it by accident. */
 const OLD_MTIME = new Date('2020-01-02T03:04:05.000Z');

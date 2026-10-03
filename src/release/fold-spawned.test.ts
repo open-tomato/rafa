@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../pr/index.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { readFragmentTree } from './fragment-tree.js';
 import { serializeFragment } from './fragment.js';
@@ -74,10 +75,7 @@ function plantTree(): string {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     GIT_AUTHOR_DATE: COMMIT_DATE,
     GIT_COMMITTER_DATE: COMMIT_DATE,
     LC_ALL: 'C',

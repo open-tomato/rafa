@@ -41,6 +41,7 @@ import { forecastRelease } from '../../release/forecast.js';
 import { serializeFragment } from '../../release/fragment.js';
 import { releaseStrategyFor } from '../../release/strategy.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import {
   createBaseReader,
@@ -205,10 +206,7 @@ function isolatedEnv(home: string): Record<string, string> {
     HOME: home,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'rafa test',
-    GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'rafa test',
-    GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    ...gitIdentityEnv(),
     GIT_AUTHOR_DATE: '2026-09-01T12:00:00Z',
     GIT_COMMITTER_DATE: '2026-09-01T12:00:00Z',
     LC_ALL: 'C',

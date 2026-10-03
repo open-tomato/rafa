@@ -26,7 +26,7 @@ const RESULT: SuiteResult = {
   exitCode: 1,
   summary: 'Ran 3 tests across 2 files. [12.00ms]',
   failures: [
-    { file: 'a.test.ts', name: 'outer > fails' },
+    { file: 'a.test.ts', name: 'outer > fails', message: 'expect(received).toBe(expected)' },
     { file: 'sub/b.test.ts', name: 'breaks' },
   ],
   errors: 0,
@@ -75,6 +75,9 @@ describe('baselineOf', () => {
       commit: 'abc123',
     });
     expect(baseline.failures).not.toBe(RESULT.failures);
+    expect(baseline.failures[0]).not.toBe(RESULT.failures[0]);
+    // A failure without a message gains no `message` key, not even an undefined one.
+    expect(Object.keys(baseline.failures[1] ?? {})).toEqual(['file', 'name']);
     expect(baseline.command).not.toBe(RESULT.command);
   });
 });
@@ -146,6 +149,36 @@ describe('writeBaseline and readBaseline', () => {
     }
   });
 
+  it('stores a failure\'s message in the file and reads it back', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+
+    writeBaseline(path, baselineOf(RESULT, RECORDED_AT, null));
+
+    const stored = JSON.parse(readFileSync(path, 'utf8')) as { failures: unknown[] };
+    expect(stored.failures[0]).toEqual({ file: 'a.test.ts', name: 'outer > fails', message: 'expect(received).toBe(expected)' });
+    const reading = readBaseline(path);
+    expect(reading.state === 'read' && reading.baseline.failures[0]?.message).toBe('expect(received).toBe(expected)');
+  });
+
+  it('reads a version 1 baseline whose failures carry no message as read', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const before = { ...baselineOf(RESULT, RECORDED_AT, null), failures: [{ file: 'a.test.ts', name: 'outer > fails' }] };
+    writeFileSync(path, JSON.stringify(before), 'utf8');
+
+    expect(BASELINE_VERSION).toBe(1);
+    expect(readBaseline(path)).toEqual({ state: 'read', baseline: before });
+  });
+
+  it('reads a message that is not a string as unreadable', () => {
+    const path = join(dir, 'SUITE_BASELINE.json');
+    const whole = baselineOf(RESULT, RECORDED_AT, null);
+
+    for (const message of [3, null, ['x']]) {
+      writeFileSync(path, JSON.stringify({ ...whole, failures: [{ file: 'a.test.ts', name: 'n', message }] }), 'utf8');
+      expect(readBaseline(path)).toEqual({ state: 'unreadable', reason: 'field failures is missing or malformed' });
+    }
+  });
+
   it('reads a baseline written without failures field as unreadable', () => {
     const path = join(dir, 'SUITE_BASELINE.json');
     const rest = Object.fromEntries(Object.entries(baselineOf(RESULT, RECORDED_AT, null)).filter(([key]) => key !== 'failures'));
@@ -188,6 +221,16 @@ describe('splitFailures', () => {
     const baseline = { failures: [{ file: 'a', name: 'b c' }] };
 
     expect(splitFailures([{ file: 'a b', name: 'c' }], baseline).known).toEqual([]);
+  });
+
+  it('compares by file and name only, never by message', () => {
+    const baseline = baselineOf(RESULT, RECORDED_AT, null);
+    const later = [
+      { file: 'a.test.ts', name: 'outer > fails', message: 'a different first line' },
+      { file: 'sub/b.test.ts', name: 'breaks', message: 'now with one' },
+    ];
+
+    expect(splitFailures(later, baseline)).toEqual({ fresh: [], known: later });
   });
 
   it('reads every failure as new with no baseline', () => {

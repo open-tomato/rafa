@@ -18,6 +18,31 @@ import { describe, expect, it } from 'bun:test';
 import { baselineOf, splitFailures } from './baseline.js';
 import { runSuite } from './run.js';
 
+/** The first line of the message Bun writes for a failing `toBe`, where it writes one. */
+const TO_BE_MESSAGE = 'expect(received).toBe(expected)';
+
+/**
+ * The version of the `bun` the suite spawns: the first on `PATH`, which
+ * need not be the Bun running this file (a pinned Bun run by path, with
+ * another on `PATH`, spawns that other).
+ */
+const SPAWNED_BUN_VERSION = Bun.spawnSync(['bun', '--version']).stdout.toString().trim();
+
+/**
+ * Whether Bun's JUnit `<failure>` carries a `message` attribute. Measured:
+ * Bun 1.4.2 writes it, Bun 1.3.14 writes none, so the run's failure has no
+ * `message` there. Rafa's own reading is the same on both: file and case,
+ * plus the message when the report had one.
+ */
+const JUNIT_HAS_FAILURE_MESSAGE = Bun.semver.order(SPAWNED_BUN_VERSION, '1.4.0') >= 0;
+
+/** `fail.test.ts`'s failure `name`, as the run reads it. */
+function failed(name: string) {
+  return JUNIT_HAS_FAILURE_MESSAGE
+    ? { file: 'fail.test.ts', name, message: TO_BE_MESSAGE }
+    : { file: 'fail.test.ts', name };
+}
+
 const PASSING_TEST = [
   'import { expect, test } from \'bun:test\';',
   '',
@@ -64,17 +89,20 @@ describe('runSuite and baseline over a real bun test', () => {
       const baselineResult = await runSuite({ cwd: dir, junitFile });
 
       expect(baselineResult.exitCode).toBe(1);
-      expect(baselineResult.summary).toMatch(/^Ran 2 tests across 2 files\./);
+      // Rafa's parsed reading: a summary was found, with no error outside a test.
+      expect(baselineResult.summary).not.toBeNull();
+      expect(baselineResult.errors).toBe(0);
       expect(baselineResult.junit).toBe('read');
-      expect(baselineResult.failures).toEqual([{ file: 'fail.test.ts', name: 'breaks' }]);
+      expect(baselineResult.failures).toEqual([failed('breaks')]);
 
       const baseline = baselineOf(baselineResult, new Date('2026-09-30T00:00:00.000Z'), 'abc123');
+      expect(baseline.failures).toEqual([failed('breaks')]);
 
       // A second, unchanged run against the recorded baseline: everything is known.
       const sameJunitFile = join(dir, '.rafa', 'runs', 'same.junit.xml');
       const sameResult = await runSuite({ cwd: dir, junitFile: sameJunitFile });
       const sameSplit = splitFailures(sameResult.failures, baseline);
-      expect(sameSplit).toEqual({ fresh: [], known: [{ file: 'fail.test.ts', name: 'breaks' }] });
+      expect(sameSplit).toEqual({ fresh: [], known: [failed('breaks')] });
 
       // A new failing test alongside the known one: the split tells them apart.
       writeProject(dir, 2);
@@ -82,16 +110,14 @@ describe('runSuite and baseline over a real bun test', () => {
       const laterResult = await runSuite({ cwd: dir, junitFile: laterJunitFile });
 
       expect(laterResult.exitCode).toBe(1);
-      expect(laterResult.summary).toMatch(/^Ran 3 tests across 2 files\./);
-      expect(laterResult.failures).toEqual([
-        { file: 'fail.test.ts', name: 'breaks' },
-        { file: 'fail.test.ts', name: 'also breaks' },
-      ]);
+      expect(laterResult.summary).not.toBeNull();
+      expect(laterResult.errors).toBe(0);
+      expect(laterResult.failures).toEqual([failed('breaks'), failed('also breaks')]);
 
       const split = splitFailures(laterResult.failures, baseline);
       expect(split).toEqual({
-        fresh: [{ file: 'fail.test.ts', name: 'also breaks' }],
-        known: [{ file: 'fail.test.ts', name: 'breaks' }],
+        fresh: [failed('also breaks')],
+        known: [failed('breaks')],
       });
     } finally {
       rmSync(dir, { recursive: true, force: true });

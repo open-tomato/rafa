@@ -40,6 +40,8 @@ import { SKILL_DELIVERY } from '../tiers/delivery.js';
 import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 const BUNDLED_BIN = join(dirname(RAFA_ENTRY), 'bundled', 'bin');
@@ -88,7 +90,7 @@ function git(cwd: string, home: string, ...args: string[]): void {
   execFileSync('git', args, {
     cwd,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 
@@ -160,7 +162,7 @@ describe('rafa loop start, spawned with a recording stand-in claude', () => {
 
     const proc = Bun.spawnSync(
       [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'],
-      { cwd: scratch.repo, env: { PATH: scratch.path, HOME: scratch.home }, timeout: SPAWN_KILL_MS },
+      { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: SPAWN_KILL_MS },
     );
     expect(proc.exitCode).toBe(0);
 

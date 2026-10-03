@@ -58,6 +58,7 @@ import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-commands-spawned-')));
@@ -345,7 +346,7 @@ function spawnRafaAsync(scratch: ScratchRepo, cwd: string, words: readonly strin
   }
   const proc = Bun.spawn([process.execPath, RAFA_ENTRY, ...words], {
     cwd,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'pipe',
     stderr: 'pipe',
   });

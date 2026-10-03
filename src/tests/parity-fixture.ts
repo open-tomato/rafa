@@ -14,6 +14,18 @@
  *
  * ## Where it looks
  *
+ * ## Nothing is looked for unless the live gate is on
+ *
+ * Present inputs are not enough to run: the logs and rows are the
+ * sibling's live data, which this repository does not own, so a
+ * checkout of `main` on a machine that happens to hold them would read
+ * red over input it never committed. The parity tests therefore run
+ * only with `RAFA_LIVE_PARITY=1`, and {@link resolveLiveParity} is what
+ * they call. With the variable anything else, unset included, it
+ * answers skip under {@link LIVE_PARITY_OFF_REASON}, which names the
+ * variable, and reads nothing on disk. With it on, it answers what
+ * {@link resolveParityFixture} finds.
+ *
  * Each fixture has one override and one documented default, and the
  * override outranks the default. An override set to the empty string
  * counts as unset, so a stray `RAFA_PARITY_LOG_DIR=` in a profile falls
@@ -119,6 +131,13 @@ import { basename, isAbsolute, join } from 'node:path';
 
 import { listSessionLogs, sessionLogDir } from '../effort/collect.js';
 
+/** The variable that has to read exactly `1` for the parity tests to run. */
+export const LIVE_PARITY_ENV = 'RAFA_LIVE_PARITY';
+
+/** The skip reason while {@link LIVE_PARITY_ENV} is not `1`. */
+export const LIVE_PARITY_OFF_REASON = `live parity off: set ${LIVE_PARITY_ENV}=1 `
+  + 'to run against the sibling\'s live session logs and stored rows';
+
 /** The variable that points the parity tests at a session log directory. */
 export const PARITY_LOG_DIR_ENV = 'RAFA_PARITY_LOG_DIR';
 
@@ -206,7 +225,10 @@ export type ParityFixture = PresentParityFixture | AbsentParityFixture;
 
 /** Where the resolver reads its overrides and home directory from. */
 export interface ParityFixtureOptions {
-  /** Read for the two overrides alone. Defaults to `process.env`. */
+  /**
+   * Read for the two overrides alone, and by {@link resolveLiveParity}
+   * for its gate. Defaults to `process.env`.
+   */
   env?: Readonly<Record<string, string | undefined>>;
   /** Both defaults sit under it. Defaults to `homedir()`. */
   home?: string;
@@ -427,6 +449,31 @@ export function resolveParityFixture(
     absences,
     reason: `parity fixture absent: ${absences.map(describeAbsence).join('; ')}`,
   };
+}
+
+/** What {@link resolveLiveParity} answers: a fixture to run on, or why not. */
+export type LiveParity =
+  | { run: true; fixture: PresentParityFixture }
+  | { run: false; reason: string };
+
+/**
+ * The parity tests' run-or-skip decision: skip under
+ * {@link LIVE_PARITY_OFF_REASON} unless {@link LIVE_PARITY_ENV} reads
+ * exactly `1`, and otherwise skip under the fixture's own reason when it
+ * is absent. Reads nothing on disk while the gate is off, and never
+ * throws; see the module note.
+ */
+export function resolveLiveParity(
+  options: ParityFixtureOptions = {},
+): LiveParity {
+  const env = options.env ?? process.env;
+  if (env[LIVE_PARITY_ENV] !== '1') {
+    return { run: false, reason: LIVE_PARITY_OFF_REASON };
+  }
+  const fixture = resolveParityFixture(options);
+  return fixture.present
+    ? { run: true, fixture }
+    : { run: false, reason: fixture.reason };
 }
 
 /** One log in a frozen copy, as the collector lists it there. */

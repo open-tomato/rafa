@@ -17,6 +17,11 @@
  * So "merged nothing" is read off the double's log (no `merge` was sent),
  * "asked nothing" off the prompter's log, and every refusal has a control
  * beside it differing in one input that DOES merge.
+ *
+ * The base's workflow files are planted as git answers on the same
+ * recording runner, so the cases over a pull request into a base no
+ * workflow tests read the argv the command sent (`fetch origin <base>`)
+ * as well as what it printed and posted.
  */
 import type { MergeSeams } from './merge.js';
 import type { RafaCommand } from '../../cli/command.js';
@@ -42,6 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import {
   NO_WORKFLOW_WARNING,
+  noPullRequestWorkflowLine,
   UNCHECKED_MERGE_SENTENCE,
   WORKFLOWS_EXIST_WARNING,
   workflowCountLine,
@@ -84,15 +90,24 @@ const UNCHECKED_QUESTION = `Merge #${NUMBER} with no checks? [y/N] `;
 /** Typed by every case so the ending never composes the real sources. */
 const NO_HINT = '--no-hint';
 
-/** A pull request detail as the double answers one. */
-function detail(): PullRequestDetail {
+/** A base no workflow tests pull requests into, as `verify.yml` leaves a stretch branch. */
+const STRETCH = 'stretch/1';
+
+/** The object id the planted `verify.yml` is listed under. */
+const VERIFY_OID = '5003747ae06e6f49f5b3ee77d83106acd6e86876';
+
+/** A workflow running on pull requests into `main` and on pushes to `stretch/**`, as `verify.yml` does. */
+const VERIFY_YML = 'on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [\'stretch/**\']\njobs: {}\n';
+
+/** A pull request detail as the double answers one, into `base`. */
+function detail(base: string = BASE): PullRequestDetail {
   return {
     number: NUMBER,
     title: 'rafa-86: merge with no checks',
     url: `https://github.com/open-tomato/rafa/pull/${NUMBER}`,
     state: 'open',
     headRefName: BRANCH,
-    baseRefName: BASE,
+    baseRefName: base,
     author: { login: 'octo', isBot: false },
     isCrossRepository: false,
     updatedAt: '2026-09-22T11:00:00Z',
@@ -117,6 +132,8 @@ const GREEN: ChecksReading = { rows: [passing('unit-tests')], verdict: 'green' }
 
 /** What the double answers beyond the defaults. */
 interface PullAnswers {
+  /** The pull request's base branch; {@link BASE} when left out. */
+  readonly base?: string;
   readonly checks?: ChecksReading;
   /** The workflow count; zero when left out. */
   readonly workflowCount?: number | null;
@@ -141,7 +158,7 @@ function pullsDouble(answers: PullAnswers = {}): PullRequestsDouble {
     ? answers.workflowCount ?? null
     : 0;
   return createPullRequestsDouble({
-    get: () => Promise.resolve(detail()),
+    get: () => Promise.resolve(detail(answers.base)),
     checks: () => Promise.resolve(answers.checks ?? NO_CHECKS),
     merge: () => Promise.resolve({ merged: true, detail: `Squashed and merged pull request #${NUMBER}` }),
     workflowCount: () => Promise.resolve(count),
@@ -154,6 +171,15 @@ function pullsDouble(answers: PullAnswers = {}): PullRequestsDouble {
 /** A git answer that worked, carrying `stdout`. */
 function ok(stdout = ''): GitResult {
   return { ok: true, stdout, stderr: '' };
+}
+
+/** The git answers of a base `base` whose `.github/workflows/` holds the planted `verify.yml` alone. */
+function verifyOnBase(base: string): Record<string, GitResult> {
+  return {
+    [`fetch origin ${base}`]: ok(),
+    [`ls-tree --full-tree -z origin/${base} .github/workflows/`]: ok(`100644 blob ${VERIFY_OID}\t.github/workflows/verify.yml\0`),
+    [`cat-file blob ${VERIFY_OID}`]: ok(VERIFY_YML),
+  };
 }
 
 /** A git runner over planted answers, and the log of every command it was handed. */
@@ -433,5 +459,77 @@ describe('the comment after an unchecked merge', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('is merged, and the merge is left alone');
     expect(commentBodies(double)).toHaveLength(1);
+  });
+});
+
+describe('an unchecked merge into a base no workflow runs on pull requests into', () => {
+  it('merges under --yes with no question, printing the base line and carrying it into the comment', async () => {
+    const { run, double, asked, gitRan } = await ran(
+      [String(NUMBER), '--skip-checks', '--yes'],
+      { base: STRETCH, workflowCount: 1, git: verifyOnBase(STRETCH) },
+    );
+
+    expect(run.exitCode).toBe(0);
+    expect(asked).toEqual([]);
+    expect(warnings(run)).toEqual([workflowCountLine(1), noPullRequestWorkflowLine(STRETCH)]);
+    expect(warnings(run)).not.toContain(WORKFLOWS_EXIST_WARNING);
+    expect(members(double)).toEqual(['get', 'checks', 'workflowCount', 'merge', 'comment']);
+    expect(commentBodies(double)).toEqual([
+      `${UNCHECKED_MERGE_SENTENCE}\n\n${workflowCountLine(1)}\n\nno workflow runs on pull requests into ${STRETCH}`,
+    ]);
+    expect(gitRan).toContain(`fetch origin ${STRETCH}`);
+    expect(gitRan).toContain(`cat-file blob ${VERIFY_OID}`);
+  });
+
+  it('carries the third case in the result', async () => {
+    const { events } = await ran(
+      [String(NUMBER), '--skip-checks', '--yes', '--output=json'],
+      { base: STRETCH, workflowCount: 1, git: verifyOnBase(STRETCH) },
+    );
+
+    expect(dataOf(events)['merged']).toBe(true);
+    expect(dataOf(events)['unchecked']).toEqual({
+      workflowCount: 1,
+      case: 'no-pull-request-workflow',
+      commentUrl: COMMENT_URL,
+    });
+  });
+
+  it('refuses --yes into main, which the same file names, and merges nothing: the control on the cases above', async () => {
+    const { run, double, gitRan } = await ran(
+      [String(NUMBER), '--skip-checks', '--yes'],
+      { base: BASE, workflowCount: 1, git: verifyOnBase(BASE) },
+    );
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe('');
+    expect(run.stderr).toContain(WORKFLOWS_EXIST_WARNING);
+    expect(members(double)).toEqual(['get', 'checks', 'workflowCount']);
+    expect(gitRan).toContain(`cat-file blob ${VERIFY_OID}`);
+  });
+
+  it('falls back to the count rule and refuses --yes where git cannot fetch the base', async () => {
+    const { run, double } = await ran(
+      [String(NUMBER), '--skip-checks', '--yes'],
+      {
+        base: STRETCH,
+        workflowCount: 1,
+        git: { ...verifyOnBase(STRETCH), [`fetch origin ${STRETCH}`]: { ok: false, stdout: '', stderr: 'fatal: unable to access' } },
+      },
+    );
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(WORKFLOWS_EXIST_WARNING);
+    expect(members(double)).not.toContain('merge');
+  });
+
+  it('reads no workflow file where the repository defines none', async () => {
+    const { run, gitRan } = await ran(
+      [String(NUMBER), '--skip-checks', '--yes'],
+      { base: STRETCH, workflowCount: 0, git: verifyOnBase(STRETCH) },
+    );
+
+    expect(run.exitCode).toBe(0);
+    expect(gitRan).not.toContain(`fetch origin ${STRETCH}`);
   });
 });

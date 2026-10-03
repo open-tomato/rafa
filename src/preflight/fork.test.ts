@@ -48,6 +48,8 @@ import { delimiter, dirname, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+
 import { forkWorktree, spawnCommand } from './fork.js';
 
 /** The system directories `git`, `sh` and `echo` are found in. */
@@ -97,14 +99,14 @@ function forkEnv(path: string = [bin, SYSTEM_PATH].join(delimiter)): Record<stri
   expect(isUnderScratch(bin)).toBe(true);
   expect(isUnderScratch(log)).toBe(true);
   expect(process.env.FORK_LOG).toBeUndefined();
-  return { HOME: home, PATH: path, FORK_LOG: log };
+  return { ...scratchHomeEnv(home), PATH: path, FORK_LOG: log };
 }
 
 /** Runs the real `git` for a fixture, under the case's `HOME`, answering its stdout. */
 function git(cwd: string, args: readonly string[]): string {
   const run = Bun.spawnSync(['git', '-c', 'user.name=rafa', '-c', 'user.email=rafa@example.invalid', ...args], {
     cwd,
-    env: { HOME: home, PATH: SYSTEM_PATH },
+    env: { ...scratchHomeEnv(home), PATH: SYSTEM_PATH },
     stdout: 'pipe',
     stderr: 'pipe',
   });

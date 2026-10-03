@@ -52,6 +52,13 @@
  *     `check-types` failed with TS1360 at the record: that closure is the
  *     compiler's to hold, since no file this module reads or writes can
  *     carry a comment the check would refuse.
+ *
+ * Three mutations of `openIssues` were driven on 2026-10-02 over
+ * `src/adapters/tracker/`, at 314 pass before, restored byte-identical
+ * (sha256) after. Keeping closed issues reddened the contract's closed
+ * case and the every-state case here; `released` held open the
+ * every-state case alone, since the contract closes no issue as
+ * released; the skip reported under `find` the skip case alone.
  */
 import type { LocalIssueRecord, LocalTrackerOptions } from './local.js';
 import type { IssueRef, IssueState, IssueType, Output, Tracker } from '../../ports/index.js';
@@ -636,6 +643,51 @@ describe('find over local issues', () => {
 
     expect(warned).toEqual([
       `local tracker: the issue at ${join(dir, '2.md')} has no YAML frontmatter block; find skipped it`,
+    ]);
+  });
+});
+
+describe('open issues over local issues', () => {
+  it('answers the bugs in every state but done, released and cancelled, lowest number first, with their text', async () => {
+    const dir = freshDir('open');
+    const tracker = localTracker(dir);
+    const states: readonly IssueState[] = ['backlog', 'todo', 'in-progress', 'in-review', 'done', 'released', 'cancelled'];
+    for (const state of states) {
+      const ref = await tracker.create(draftFixture({ opt: 0, title: `In ${state}`, body: `Held ${state}.\n` }));
+      await tracker.transition(ref, state);
+    }
+    await tracker.create(draftFixture({ opt: 0, type: 'chore', title: 'A chore' }));
+
+    expect(await tracker.openIssues?.('bug')).toEqual([
+      { ref: { opt: 0, kind: 'local', externalId: '1', url: null }, title: 'In backlog', body: 'Held backlog.\n' },
+      { ref: { opt: 0, kind: 'local', externalId: '2', url: null }, title: 'In todo', body: 'Held todo.\n' },
+      { ref: { opt: 0, kind: 'local', externalId: '3', url: null }, title: 'In in-progress', body: 'Held in-progress.\n' },
+      { ref: { opt: 0, kind: 'local', externalId: '4', url: null }, title: 'In in-review', body: 'Held in-review.\n' },
+    ]);
+    expect(ids((await tracker.openIssues?.('chore'))?.map(({ ref }) => ref) ?? [])).toEqual(['8']);
+  });
+
+  it('answers no open issues for a directory that does not exist, creating none', async () => {
+    const dir = freshDir('open-absent');
+
+    expect(await localTracker(dir).openIssues?.('bug')).toEqual([]);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('skips an unreadable issue file, reporting it under its own name, and answers the rest', async () => {
+    const dir = freshDir('open-corrupt');
+    const warned: string[] = [];
+    const tracker = localTracker(dir, {
+      warn: (message) => {
+        warned.push(message);
+      },
+    });
+    await tracker.create(draftFixture());
+    writeFileSync(join(dir, '2.md'), 'no frontmatter\n');
+
+    expect(ids((await tracker.openIssues?.('bug'))?.map(({ ref }) => ref) ?? [])).toEqual(['1']);
+    expect(warned).toEqual([
+      `local tracker: the issue at ${join(dir, '2.md')} has no YAML frontmatter block; openIssues skipped it`,
     ]);
   });
 });

@@ -72,9 +72,12 @@
  *     defaults, {@link GITHUB_LABELS}, since rafa's config has none.
  *   - States. Without a board, GitHub holds an issue open or closed, and
  *     closed with a reason. `get` answers `todo` for an open issue,
- *     `cancelled` for one closed as not planned, and `done` for any other
- *     closed one. The source read the not-planned reason whatever the
- *     issue's state; the copy reads it on a closed issue alone.
+ *     `cancelled` for one closed as not planned or as a duplicate, and
+ *     `done` for any other closed one. Read off `gh` 2.101.0 on
+ *     2026-10-02, `gh issue list --repo cli/cli --state closed --search
+ *     reason:duplicate` answered `stateReason` `DUPLICATE`. The source read
+ *     the not-planned reason whatever the issue's state; the copy reads
+ *     either reason on a closed issue alone.
  *     `transition` makes the open or closed write the source made, and
  *     answers a `warning` for the four states that write cannot hold:
  *     `backlog`, `in-progress` and `in-review` read back as `todo`, and
@@ -103,6 +106,15 @@
  *     `preflight` would have thrown.
  *   - Every port function is a property, and the tracker answered is
  *     frozen, as the `local` adapter's is.
+ *   - `openIssues`, rafa's own reading, which the source lacks. It is
+ *     one `gh issue list --state open` narrowed by the `type:` label,
+ *     asking for each row's title and body beside what `find` asks for,
+ *     so no issue is read with a `get` of its own. It lists up to
+ *     {@link OPEN_ISSUES_LIMIT} issues, newest first as `gh` lists them,
+ *     where `find` stops at 30 unless told otherwise. An issue with no
+ *     `type:` label, which `get` reads as `code`, is not listed for
+ *     `code`, as `find` by type does not find it either. A type the
+ *     port does not name is refused before anything is sent.
  *
  * Kept as the source has them: `create` makes every label it sends with
  * `gh label create --force` before `gh issue create`, because the source
@@ -127,6 +139,7 @@ import type {
   IssueRef,
   IssueState,
   IssueType,
+  OpenIssue,
   PreflightResult,
   Tracker,
   TrackerCapabilities,
@@ -192,14 +205,28 @@ export const GITHUB_LABELS = Object.freeze({
 /** The fields `get` asks `gh issue view` for. */
 const VIEW_FIELDS = 'number,title,body,state,stateReason,labels,url';
 
+/** How a listing is named in what the tracker throws. */
+const LIST_COMMAND = 'gh issue list';
+
 /** The fields `find` asks `gh issue list` for. */
 const LIST_FIELDS = 'number,url,labels';
+
+/** The fields `openIssues` asks `gh issue list` for: `find`'s, and the text. */
+const OPEN_LIST_FIELDS = 'number,url,labels,title,body';
+
+/**
+ * How many open issues `openIssues` lists: past it the oldest are left
+ * out. `gh issue list` honours a limit above 100: read off `gh` 2.101.0
+ * on 2026-10-02, `gh issue list --repo cli/cli --state open --limit 150
+ * --json number` answered 150 rows.
+ */
+export const OPEN_ISSUES_LIMIT = 1000;
 
 /** How many issues `find` lists when the query sets no limit: `gh issue list`'s default. */
 const DEFAULT_FIND_LIMIT = 30;
 
-/** The close reason `gh issue view` answers for an issue closed as not planned. */
-const NOT_PLANNED = 'NOT_PLANNED';
+/** The close reasons `gh issue view` answers for an issue closed as not planned or as a duplicate. */
+const CANCELLED_REASONS: ReadonlySet<string> = new Set(['NOT_PLANNED', 'DUPLICATE']);
 
 /** An issue number as written: a positive whole number with no leading zero. */
 const ISSUE_NUMBER = /^[1-9]\d*$/;
@@ -489,25 +516,63 @@ interface ListedIssue {
   readonly labels: readonly string[];
 }
 
+/** One row `gh issue list` wrote for `openIssues`, checked. */
+interface ListedOpenIssue extends ListedIssue {
+  readonly title: string;
+  readonly body: string;
+}
+
+/** What `gh issue list` wrote, as a list. Throws when it is not JSON or not a list. */
+function listedRows(stdout: string): unknown[] {
+  const payload = parseJson(stdout, LIST_COMMAND);
+  if (!Array.isArray(payload)) {
+    throw new Error(`${PREFIX}: ${LIST_COMMAND} answered ${describeValue(payload)}, expected a list`);
+  }
+  return payload as unknown[];
+}
+
+/** The refusal of row `index` of a `gh issue list` answer, for `problem`. */
+function rowRefusal(index: number, problem: string): Error {
+  return new Error(`${PREFIX}: ${LIST_COMMAND} answered row ${index} ${problem}`);
+}
+
+/** Row `index` of a `gh issue list` answer, checked. Throws, naming the row, when it is not an issue. */
+function listedRow(row: unknown, index: number): ListedIssue {
+  if (!isMapping(row)) throw rowRefusal(index, `${describeValue(row)}, expected a mapping`);
+  const { number, url } = row;
+  const labels = labelNames(row['labels']);
+  if (typeof number !== 'number' || !isIssueNumber(String(number))) {
+    throw rowRefusal(index, `with number ${describeValue(number)}, expected an issue number`);
+  }
+  if (typeof url !== 'string') throw rowRefusal(index, `with url ${describeValue(url)}, expected a string`);
+  if (labels === null) throw rowRefusal(index, 'with labels that are not a list of named labels');
+  return { number, url, labels };
+}
+
 /** The rows `gh issue list` wrote. Throws, naming the first row refused, when they are not issues. */
 function listedIssues(stdout: string): ListedIssue[] {
-  const command = 'gh issue list';
-  const payload = parseJson(stdout, command);
-  if (!Array.isArray(payload)) {
-    throw new Error(`${PREFIX}: ${command} answered ${describeValue(payload)}, expected a list`);
-  }
-  return payload.map((row: unknown, index): ListedIssue => {
-    const refuse = (problem: string): Error => new Error(`${PREFIX}: ${command} answered row ${index} ${problem}`);
-    if (!isMapping(row)) throw refuse(`${describeValue(row)}, expected a mapping`);
-    const { number, url } = row;
-    const labels = labelNames(row['labels']);
-    if (typeof number !== 'number' || !isIssueNumber(String(number))) {
-      throw refuse(`with number ${describeValue(number)}, expected an issue number`);
-    }
-    if (typeof url !== 'string') throw refuse(`with url ${describeValue(url)}, expected a string`);
-    if (labels === null) throw refuse('with labels that are not a list of named labels');
-    return { number, url, labels };
+  return listedRows(stdout).map(listedRow);
+}
+
+/** The rows `gh issue list` wrote for `openIssues`, each also checked for its title and body. */
+function listedOpenIssues(stdout: string): ListedOpenIssue[] {
+  return listedRows(stdout).map((row, index): ListedOpenIssue => {
+    const listed = listedRow(row, index);
+    // `listedRow` refused any row that is not a mapping.
+    const { title, body } = row as Record<string, unknown>;
+    if (typeof title !== 'string') throw rowRefusal(index, `with title ${describeValue(title)}, expected a string`);
+    if (typeof body !== 'string') throw rowRefusal(index, `with body ${describeValue(body)}, expected a string`);
+    return { ...listed, title, body };
   });
+}
+
+/** The ref `find` and `openIssues` answer for a listed row: opt 0, and the module label when it has one. */
+function refOfRow(row: ListedIssue): IssueRef {
+  const module = labelValue(row.labels, GITHUB_LABELS.modulePrefix);
+  const ref: IssueRef = { opt: 0, kind: 'github', externalId: String(row.number), url: row.url };
+  return module === undefined
+    ? ref
+    : { ...ref, module };
 }
 
 /** The value a label with `prefix` carries, or undefined when no label has it. */
@@ -540,7 +605,7 @@ export function moduleOfLabels(labels: readonly string[]): string {
 /** The state `get` answers for a viewed issue; see the module note. */
 function stateOf(viewed: ViewedIssue): IssueState {
   if (viewed.state === 'OPEN') return 'todo';
-  return viewed.stateReason === NOT_PLANNED
+  return viewed.stateReason !== null && CANCELLED_REASONS.has(viewed.stateReason)
     ? 'cancelled'
     : 'done';
 }
@@ -698,15 +763,31 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
         ...optionalFlag('--label', moduleLabel),
         ...optionalFlag('--label', typeLabel),
         ...optionalFlag('--search', query.text),
-      ], 'gh issue list');
+      ], LIST_COMMAND);
 
-      return listedIssues(stdout).map((row): IssueRef => {
-        const module = labelValue(row.labels, GITHUB_LABELS.modulePrefix);
-        const ref: IssueRef = { opt: 0, kind: 'github', externalId: String(row.number), url: row.url };
-        return module === undefined
-          ? ref
-          : { ...ref, module };
-      });
+      return listedIssues(stdout).map(refOfRow);
+    },
+
+    openIssues: async (type: IssueType): Promise<OpenIssue[]> => {
+      if (!isOneOf(ISSUE_TYPES, type)) {
+        throw new TypeError(
+          `${PREFIX}: openIssues refused type ${describeValue(type)}, expected one of: ${ISSUE_TYPES.join(', ')}`,
+        );
+      }
+      const stdout = await run([
+        'issue',
+        'list',
+        '--state',
+        'open',
+        '--json',
+        OPEN_LIST_FIELDS,
+        '--limit',
+        String(OPEN_ISSUES_LIMIT),
+        '--label',
+        `${GITHUB_LABELS.typePrefix}${type}`,
+      ], LIST_COMMAND);
+
+      return listedOpenIssues(stdout).map((row): OpenIssue => ({ ref: refOfRow(row), title: row.title, body: row.body }));
     },
 
     comment: async (ref: IssueRef, body: string): Promise<void> => {

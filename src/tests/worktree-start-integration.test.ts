@@ -42,6 +42,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 
 import { plantScratchRepo } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -84,7 +86,7 @@ function git(scratch: ScratchRepo, cwd: string, ...args: string[]): string {
       cwd,
       encoding: 'utf8',
       stdio: 'pipe',
-      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
     },
   ).trim();
 }
@@ -108,7 +110,7 @@ function worktreePathFor(scratch: ScratchRepo): string {
 function initBareOrigin(scratch: ScratchRepo, path: string): void {
   execFileSync('git', ['init', '-q', '--bare', path], {
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 
@@ -192,7 +194,7 @@ function spawnLoopStart(scratch: ScratchRepo) {
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${PLAN_REL}`, '--as-worktree', '--no-ci-wait'],
     {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, HOME: scratch.home },
+      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     },

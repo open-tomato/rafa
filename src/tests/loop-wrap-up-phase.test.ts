@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -49,10 +50,7 @@ function plantWrapUpProject(): { readonly scratch: ScratchRepo } {
     HOME: scratch.home,
     GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'Probe',
-    GIT_AUTHOR_EMAIL: 'probe@example.com',
-    GIT_COMMITTER_NAME: 'Probe',
-    GIT_COMMITTER_EMAIL: 'probe@example.com',
+    ...gitIdentityEnv(),
   };
   // `git rev-parse --abbrev-ref HEAD` needs a commit to name the branch.
   execFileSync('git', ['checkout', '-q', '-b', BRANCH], { cwd: repo, stdio: 'pipe', env: gitEnv });

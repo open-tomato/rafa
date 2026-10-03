@@ -86,6 +86,7 @@ import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { recordTaskReport } from '../report/record.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command every black-boxed run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -166,7 +167,7 @@ interface CommandRun {
 function runCollect(repo: Repo): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'collect'],
-    { cwd: repo.root, env: { ...process.env, HOME: repo.home } },
+    { cwd: repo.root, env: { ...process.env, ...scratchHomeEnv(repo.home) } },
   );
   return {
     exitCode: run.exitCode,

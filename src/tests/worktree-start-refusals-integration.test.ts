@@ -34,6 +34,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -51,7 +52,7 @@ function git(scratch: ScratchRepo, ...args: string[]): string {
       cwd: scratch.repo,
       encoding: 'utf8',
       stdio: 'pipe',
-      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
     },
   ).trim();
 }

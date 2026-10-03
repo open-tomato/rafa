@@ -55,9 +55,12 @@
  * carried, a commit subject someone pasted a tab into. Running the
  * real collector over the sibling's real logs is what a small fixture
  * cannot substitute for; that is the whole reason this suite is gated
- * on {@link resolveParityFixture} rather than planting its own tree
+ * on {@link resolveLiveParity} rather than planting its own tree
  * the way those two do. The freeze above copies those logs; it does
- * not simplify them.
+ * not simplify them. It is also why the suite runs only with
+ * `RAFA_LIVE_PARITY=1`: the logs are input this repository does not
+ * own, so a clean checkout skips every case under a reason naming that
+ * variable rather than reading whatever the machine happens to hold.
  *
  * ## What "byte-identical" is checked against
  *
@@ -96,10 +99,10 @@
  * holds, so both are read from {@link SIBLING_CHECKOUT_ROOT} — the
  * checkout itself, derived from the home directory the same way the
  * fixture resolver's own (overridable) defaults are, and NOT from
- * `fixture.storeDir`, which a caller is free to point somewhere with
- * no repository behind it at all. `fixture.logDir` is still read from
- * the fixture, since it IS one of the two things the resolver locates
- * and does carry an override.
+ * `parity.fixture.storeDir`, which a caller is free to point somewhere
+ * with no repository behind it at all. `parity.fixture.logDir` is still
+ * read from the fixture, since it IS one of the two things the resolver
+ * locates and does carry an override.
  *
  * `repoRoot` is passed as the checkout for exactly this reason, and a
  * store and the checkout's `.plans/` are passed explicitly for every run,
@@ -127,17 +130,20 @@ import { openNdjsonStore, openSqliteStore } from '../effort/store/index.js';
 
 import {
   freezeParitySessionLogs,
-  resolveParityFixture,
+  resolveLiveParity,
 } from './parity-fixture.js';
 
-/** Never throws; see the module note on {@link resolveParityFixture}. */
-const fixture = resolveParityFixture();
+/**
+ * Runs only with `RAFA_LIVE_PARITY=1` and the fixture present; never
+ * throws. See the module note on {@link resolveLiveParity}.
+ */
+const parity = resolveLiveParity();
 
 /**
  * The sibling checkout on disk: a real git repository and a real
  * `.plans/` roster, read for the commit half and the plan-stub
  * grouping. See the module note on why this is not derived from
- * {@link fixture}'s own paths.
+ * {@link parity}'s fixture paths.
  */
 const SIBLING_CHECKOUT_ROOT = join(homedir(), 'projects', 'agentic-research');
 
@@ -209,9 +215,9 @@ const BACKENDS: readonly Backend[] = [
   { name: 'sqlite', open: openSqliteStore },
 ];
 
-const title = fixture.present
+const title = parity.run
   ? 'the differential parity test, over the live sibling directory'
-  : `the differential parity test (${fixture.reason})`;
+  : `the differential parity test (${parity.reason})`;
 
 /** The directory name the frozen logs sit in, under the temporary root. */
 const FROZEN_LOG_DIR = 'frozen-logs';
@@ -252,14 +258,14 @@ async function collectOnce(
  */
 const BEFORE_ALL_TIMEOUT_MS = 120_000;
 
-describe.skipIf(!fixture.present)(title, () => {
+describe.skipIf(!parity.run)(title, () => {
   beforeAll(async () => {
-    if (!fixture.present) {
-      throw new Error('unreachable: the describe block is skipped when absent');
+    if (!parity.run) {
+      throw new Error('unreachable: the describe block is skipped when not run');
     }
     tempRoot = mkdtempSync(join(tmpdir(), 'rafa-parity-differential-'));
     frozen = freezeParitySessionLogs(
-      fixture.logDir,
+      parity.fixture.logDir,
       join(tempRoot, FROZEN_LOG_DIR),
     );
 

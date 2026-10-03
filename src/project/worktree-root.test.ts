@@ -16,6 +16,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { gitIdentityEnv } from '../tests/git-identity.js';
+
 import { NOT_A_REPOSITORY } from './roots.js';
 import { mainCheckoutOf, WORKTREE_LIST_ARGS, WorktreeRootError } from './worktree-root.js';
 
@@ -36,6 +38,7 @@ function gitEnv(): Record<string, string | undefined> {
     XDG_CONFIG_HOME: gitHome,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
+    ...gitIdentityEnv(),
     LC_ALL: 'C',
   };
 }

@@ -1,9 +1,11 @@
 /**
  * The loop's events: a task's start, its end done or blocked, each phase
- * of the wrap-up, the pull request or its absence, and a halt. Each is
- * emitted as one named `event` through the active output, which the
- * events output prints as one `rafa· ` line, json writes whole, and text
- * drops, because the loop's own text lines already say each of them.
+ * of the wrap-up, the pull request or its absence, a halt, and each
+ * reported bug triage read as a red test the run started with
+ * (`start/triage.ts`). Each is emitted as one named `event` through the
+ * active output, which the events output prints as one `rafa· ` line,
+ * json writes whole, and text drops, because the loop's own text lines
+ * already say each of them.
  *
  * A task's tokens are read from its session log, the same reading
  * `rafa effort collect` makes, and never from the effort store: nothing
@@ -36,7 +38,8 @@ export type LoopEvent =
   | { readonly kind: 'wrap-up'; readonly phase: WrapUpPhase }
   | { readonly kind: 'pr'; readonly number: number }
   | { readonly kind: 'no-pr'; readonly reason: string }
-  | { readonly kind: 'halt'; readonly reason: string };
+  | { readonly kind: 'halt'; readonly reason: string }
+  | { readonly kind: 'inherited'; readonly file: string; readonly name: string };
 
 /** Milliseconds in a minute. */
 const MINUTE_MS = 60_000;
@@ -78,6 +81,8 @@ export function summaryOf(event: LoopEvent): string {
       return `${padKind('no pr')}${oneLine(event.reason)}`;
     case 'halt':
       return `${padKind('halt')}${oneLine(event.reason)}`;
+    case 'inherited':
+      return `${padKind('inherited')}${oneLine(`${event.file} > ${event.name}`)}`;
   }
 }
 

@@ -18,6 +18,13 @@
  * it is killed once task two's commit lands, before the wrap-up that
  * follows would add git traffic this file proves nothing with, as
  * `worktree-start-integration.test.ts` does.
+ *
+ * The refusals are the other half: a start over a worktree path that
+ * holds another branch, and one whose `feat/<stub>` is checked out at
+ * another path. Each is spawned with a `git` stand-in first on the PATH
+ * that logs every call before running the real one, so the case reads
+ * from the log that no `git worktree add` ran, and from the main
+ * checkout that its branch, HEAD and working tree were left alone.
  */
 import type { ScratchRepo } from './cli-capture.js';
 
@@ -41,6 +48,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 
 import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostGitDir } from './stand-in-gh.js';
 
 /** The CLI entry the second start spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -89,7 +99,7 @@ function git(scratch: ScratchRepo, cwd: string, ...args: string[]): string {
       cwd,
       encoding: 'utf8',
       stdio: 'pipe',
-      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+      env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
     },
   ).trim();
 }
@@ -163,7 +173,7 @@ function plantRestartScratch(): ScratchRepo {
   const originPath = join(dirname(scratch.repo), 'origin.git');
   execFileSync('git', ['init', '-q', '--bare', originPath], {
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 
   git(scratch, scratch.repo, 'config', 'user.name', 'Rafa Loop');
@@ -215,11 +225,127 @@ function calledIn(scratch: ScratchRepo): string[] {
 function spawnSecondStart(scratch: ScratchRepo) {
   return Bun.spawn([process.execPath, RAFA_ENTRY, ...START_ARGS], {
     cwd: scratch.repo,
-    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, HOME: scratch.home },
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });
 }
+
+/** The file the `git` stand-in appends each call's arguments to, one line per call. */
+function gitLogFor(scratch: ScratchRepo): string {
+  return join(scratch.home, 'git-calls.log');
+}
+
+/**
+ * Writes a `git` stand-in into `scratch`'s `bin/`, first on the PATH: it
+ * logs its arguments, then runs the host's git with them unchanged.
+ */
+function plantGitRecorder(scratch: ScratchRepo): void {
+  const recorder = join(scratch.bin, 'git');
+  writeFileSync(recorder, [
+    '#!/bin/sh',
+    `echo "$*" >> '${gitLogFor(scratch)}'`,
+    `exec '${join(hostGitDir(), 'git')}' "$@"`,
+    '',
+  ].join('\n'), 'utf8');
+  chmodSync(recorder, 0o755);
+}
+
+/** The git calls the recorder logged, one entry per call; none when git never ran. */
+function gitCalls(scratch: ScratchRepo): string[] {
+  const log = gitLogFor(scratch);
+  return existsSync(log)
+    ? readFileSync(log, 'utf8').split('\n')
+      .filter((line) => line !== '')
+    : [];
+}
+
+/** Whether a logged git call is a `git worktree add`, whatever global options precede it. */
+function isWorktreeAdd(call: string): boolean {
+  return /(^|\s)worktree add(\s|$)/.test(call);
+}
+
+/** Leaves the main checkout with an edited tracked file and an untracked one, so "untouched" has something to keep. */
+function dirtyMainCheckout(scratch: ScratchRepo): void {
+  writeFileSync(join(scratch.repo, 'kept.txt'), 'edited by hand\n', 'utf8');
+  writeFileSync(join(scratch.repo, 'untracked.txt'), 'not committed\n', 'utf8');
+}
+
+/** What the main checkout holds that a refused start must leave as it is. */
+function mainCheckoutState(scratch: ScratchRepo) {
+  return {
+    branch: git(scratch, scratch.repo, 'rev-parse', '--abbrev-ref', 'HEAD'),
+    head: git(scratch, scratch.repo, 'rev-parse', 'HEAD'),
+    status: git(scratch, scratch.repo, 'status', '--short'),
+    kept: readFileSync(join(scratch.repo, 'kept.txt'), 'utf8'),
+    untracked: existsSync(join(scratch.repo, 'untracked.txt')),
+  };
+}
+
+/**
+ * Runs the start over `scratch` and asserts it refused: exit 1, the
+ * refusal text, no session, no `git worktree add`, and the main checkout
+ * as `before` read it.
+ */
+function expectRefusedUntouched(
+  scratch: ScratchRepo,
+  before: ReturnType<typeof mainCheckoutState>,
+  refusal: string,
+): void {
+  const run = runRafa(scratch, scratch.repo, START_ARGS);
+  const output = `${run.stdout}${run.stderr}`;
+
+  expect(run.exitCode).toBe(1);
+  expect(output).toContain(refusal);
+  expect(output).toContain('The main checkout\'s branch and working tree were not touched.');
+  expect(existsSync(scratch.callLog)).toBe(false);
+  const calls = gitCalls(scratch);
+  expect(calls.some((call) => call.includes('worktree list'))).toBe(true);
+  expect(calls.filter(isWorktreeAdd)).toEqual([]);
+  expect(mainCheckoutState(scratch)).toEqual(before);
+}
+
+describe('rafa loop start --as-worktree, refused over a worktree it cannot reuse', () => {
+  it('refuses a worktree path that holds another branch, adding nothing', () => {
+    const scratch = plantRestartScratch();
+    const worktreePath = worktreePathFor(scratch);
+    git(scratch, scratch.repo, 'worktree', 'add', '-q', '-b', 'feat/someone-elses', worktreePath);
+    plantGitRecorder(scratch);
+    dirtyMainCheckout(scratch);
+    const listingBefore = worktreePaths(scratch);
+    const before = mainCheckoutState(scratch);
+
+    expectRefusedUntouched(
+      scratch,
+      before,
+      `Refusing to reuse the worktree at ${worktreePath} for ${BRANCH}: it holds feat/someone-elses.`,
+    );
+
+    expect(worktreePaths(scratch)).toEqual(listingBefore);
+    expect(git(scratch, worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('feat/someone-elses');
+    expect(git(scratch, scratch.repo, 'branch', '--list', BRANCH)).toBe('');
+  }, RUN_TIMEOUT);
+
+  it('refuses a run whose feat/<stub> is checked out at another path, adding nothing', () => {
+    const scratch = plantRestartScratch();
+    const elsewhere = join(dirname(scratch.repo), 'elsewhere');
+    git(scratch, scratch.repo, 'worktree', 'add', '-q', '-b', BRANCH, elsewhere);
+    plantGitRecorder(scratch);
+    dirtyMainCheckout(scratch);
+    const listingBefore = worktreePaths(scratch);
+    const before = mainCheckoutState(scratch);
+
+    expectRefusedUntouched(
+      scratch,
+      before,
+      `Refusing to add a worktree for ${BRANCH}: it is checked out in another worktree at ${elsewhere}.`,
+    );
+
+    expect(worktreePaths(scratch)).toEqual(listingBefore);
+    expect(existsSync(worktreePathFor(scratch))).toBe(false);
+    expect(git(scratch, elsewhere, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(BRANCH);
+  }, RUN_TIMEOUT);
+});
 
 describe('rafa loop start --as-worktree, started again over a stopped run\'s worktree', () => {
   it('adds no worktree and runs the tracker\'s first unticked task in the one already there', async () => {

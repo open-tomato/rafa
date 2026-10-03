@@ -32,8 +32,10 @@
  * after this one.
  */
 import type { ReleaseStageSeams } from './release-stage.js';
+import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { ReleasePreparation, ReleasePrepared } from '../release/prepare.js';
 
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,12 +44,14 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { verifyRelease } from '../release/verify.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import {
   BRANCH,
   COMMITTED,
   commitArgv,
   detail,
+  FORECAST_LINE,
   FRAGMENT_PATH,
   noProvider,
   NOTES,
@@ -69,10 +73,13 @@ import {
   STAGE_INPUT,
   STAGED,
   stub,
+  stubPulls,
   SUBJECT,
+  SUMMARY,
   unreached,
   VERIFIED,
 } from '../tests/release-stage-fixtures.js';
+import { getCurrentBranch } from '../utils/git.js';
 
 import { bodyWithSentence, finishRelease, prepareReleaseStage, RELEASE_STAGE_SEAMS } from './release-stage.js';
 
@@ -98,7 +105,7 @@ function textAt(path: string): string | null {
 
 /** The finish input every case runs under, over `preparation`. */
 function finishOf(preparation: ReleasePreparation | null): Parameters<typeof finishRelease>[0] {
-  return { repoRoot: REPO, settings: SETTINGS, preparation };
+  return { repoRoot: REPO, branch: BRANCH, settings: SETTINGS, preparation };
 }
 
 /**
@@ -555,6 +562,111 @@ describe('finishRelease', () => {
   });
 });
 
+/** The base the process's own checkout sits on under `--as-worktree` (#627). */
+const BASE_BRANCH = 'stretch/1';
+
+/** The pull request whose head is the base: the one a regression would write to. */
+const BASE_PR = 627;
+
+/** Runs git in `cwd` with no global or system config, throwing with what it said when it fails. */
+function gitIn(cwd: string, args: readonly string[]): void {
+  const run = spawnSync('git', [...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: PLANTED_ROOT, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', ...gitIdentityEnv(), LC_ALL: 'C' },
+  });
+  if (run.error !== undefined) throw run.error;
+  if (run.status !== 0) throw new Error(`git ${args.join(' ')}: ${run.stderr}`);
+}
+
+/** A repository under {@link PLANTED_ROOT} with one empty commit on {@link BASE_BRANCH}. */
+function checkoutOnBase(): string {
+  const dir = mkdtempSync(join(PLANTED_ROOT, 'main-checkout-'));
+  gitIn(dir, ['init', '-q', '-b', BASE_BRANCH]);
+  gitIn(dir, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init']);
+  return dir;
+}
+
+/**
+ * A provider with TWO open pull requests, one headed by the run's branch
+ * and one by the base, each answering only for its own head, so a body
+ * written through the wrong branch lands in the wrong pull request.
+ */
+function twoHeads(): { readonly pulls: PullRequests; readonly asked: string[]; readonly edits: string[] } {
+  const asked: string[] = [];
+  const edits: string[] = [];
+  const heads: Record<string, PullRequestSummary> = {
+    [BRANCH]: SUMMARY,
+    [BASE_BRANCH]: { ...SUMMARY, number: BASE_PR, headRefName: BASE_BRANCH, baseRefName: 'main' },
+  };
+  const bodies: Record<number, PullRequestDetail> = {
+    [PR]: detail('Closes #21'),
+    [BASE_PR]: { ...detail('Stretch work'), number: BASE_PR, headRefName: BASE_BRANCH },
+  };
+  const pulls: PullRequests = {
+    ...stubPulls({}, [], []),
+    findOpen: async (branch: string) => {
+      asked.push(branch);
+      return Promise.resolve(heads[branch] ?? null);
+    },
+    get: async (number: number) => Promise.resolve(bodies[number] ?? null),
+    editBody: async (number: number, body: string) => {
+      edits.push(`#${number}: ${body}`);
+      await Promise.resolve();
+    },
+  };
+  return { pulls, asked, edits };
+}
+
+describe('finishRelease on the run\'s head branch', () => {
+  const cwd = process.cwd();
+
+  afterEach(() => {
+    process.chdir(cwd);
+  });
+
+  it('pushes the run\'s branch and writes into its pull request while the process sits on the base', async () => {
+    const checkout = checkoutOnBase();
+    process.chdir(checkout);
+    // The control: every other way of reading a branch answers the base,
+    // so a finish that read one instead of its input would push the base
+    // and write into pull request #627.
+    expect(getCurrentBranch()).toBe(BASE_BRANCH);
+    expect(getCurrentBranch(checkout)).toBe(BASE_BRANCH);
+    const world = stub({ git: COMMITTED });
+    const provider = twoHeads();
+
+    const finish = await finishRelease(
+      { repoRoot: checkout, branch: BRANCH, settings: SETTINGS, preparation: prepared() },
+      { ...world.seams, verify: () => VERIFIED, pulls: () => provider.pulls },
+    );
+
+    expect(finish.outcome).toBe('released');
+    expect(world.calls[0]).toBe(`push ${checkout} ${BRANCH}`);
+    expect(provider.asked).toEqual([BRANCH]);
+    expect(finish.body).toEqual({ number: PR, carried: true, already: false, problem: null });
+    expect(provider.edits).toHaveLength(1);
+    expect(provider.edits[0]).toStartWith(`#${PR}: Closes #21`);
+    expect(provider.edits[0]).toContain(FORECAST_LINE);
+  });
+
+  it('writes a skip sentence into the run\'s pull request, not the base\'s', async () => {
+    const checkout = checkoutOnBase();
+    process.chdir(checkout);
+    const world = stub({});
+    const provider = twoHeads();
+
+    const finish = await finishRelease(
+      { repoRoot: checkout, branch: BRANCH, settings: SETTINGS, preparation: SKIPPED },
+      { ...world.seams, pulls: () => provider.pulls },
+    );
+
+    expect(finish.body?.number).toBe(PR);
+    expect(provider.asked).toEqual([BRANCH]);
+    expect(provider.edits).toEqual([`#${PR}: Closes #21\n\n${SKIP_SENTENCE}`]);
+  });
+});
+
 describe('bodyWithSentence', () => {
   it('puts the sentence under the body as its own paragraph', () => {
     expect(bodyWithSentence('Closes #21\n\n## What changed\n\nthings\n', 'no release commit: x'))
@@ -569,7 +681,6 @@ describe('bodyWithSentence', () => {
 describe('RELEASE_STAGE_SEAMS', () => {
   it('names a real helper for every effect the stage reaches through', () => {
     expect(Object.keys(RELEASE_STAGE_SEAMS).sort()).toEqual([
-      'currentBranch',
       'forecast',
       'git',
       'now',

@@ -24,6 +24,13 @@
  * `toContain` from passing on a prompt that emits every bullet
  * unconditionally.
  *
+ * A group of its own covers the base the create bullet names: the
+ * run's base as `runWrapUp` resolves it, read here through the same
+ * `resolveBaseBranch` under `pr.base: integration` over a repository
+ * whose `origin/HEAD` names `main`, so a prompt that named the default
+ * branch instead would read `main` and fail. The already-open bullet is
+ * pinned byte for byte, since it names no base at all.
+ *
  * The third group covers the `## Lessons to promote` section that
  * replaced the three promotion bullets, and the fourth
  * `lessonsToPromote`, which reads the list off a stub adapter at the
@@ -35,12 +42,14 @@ import type { WrapUpLearning } from './wrap-up.js';
 import type { AdapterContext } from '../adapters/registry.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
+import type { GitRunner } from '../pr/index.js';
 import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
+import { resolveBaseBranch } from '../cleanup/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { actionHash } from '../learning/index.js';
 import { serializeFragment } from '../release/fragment.js';
@@ -55,9 +64,64 @@ const BRANCH = 'feat/rafa-20-pr-commands';
 /** A plan body standing in for the `full` rendering appended below. */
 const PLAN = '# Plan: pull-request commands\n\n- [ ] A task\n';
 
+/** A repository whose `origin/HEAD` names `main`, and the git calls made of it. */
+function originHeadMain(): { readonly git: GitRunner; readonly calls: string[] } {
+  const calls: string[] = [];
+  const git: GitRunner = (args) => {
+    calls.push(args.join(' '));
+    return { ok: true, stdout: 'origin/main\n', stderr: '' };
+  };
+  return { git, calls };
+}
+
+/** The run's base under `pr.base: integration`, as `runWrapUp` resolves it. */
+const BASE = resolveBaseBranch(originHeadMain().git, 'integration');
+
+/** The open pull request a case reads the already-open bullet for. */
+const OPEN_PULL = 601;
+
+describe('the wrap-up prompt\'s pull-request base', () => {
+  test('resolves `pr.base: integration` to `integration` over an origin/HEAD naming main', () => {
+    const configured = originHeadMain();
+    const unset = originHeadMain();
+
+    expect(resolveBaseBranch(configured.git, 'integration')).toBe('integration');
+    expect(configured.calls).toEqual([]);
+
+    // The control: with no `pr.base` the same repository answers `main`,
+    // so a prompt that read the default branch would name `main` below.
+    expect(resolveBaseBranch(unset.git, null)).toBe('main');
+    expect(unset.calls).toHaveLength(1);
+  });
+
+  test('writes the create bullet as `gh pr create --base integration`', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
+
+    expect(prompt).toContain(`* No open PR was found for ${BRANCH}: open one with \`gh pr create --base integration\`.`);
+    expect(prompt).not.toContain('`gh pr create`');
+    expect(prompt).not.toContain('--base main');
+
+    // The control: the base is read off the argument, not a constant.
+    expect(buildWrapUpPrompt(BRANCH, 'main', PLAN, null)).toContain('`gh pr create --base main`');
+    expect(buildWrapUpPrompt(BRANCH, 'main', PLAN, null)).not.toContain('--base integration');
+  });
+
+  test('leaves an already-open pull request\'s bullet unchanged, naming no base', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, OPEN_PULL);
+
+    expect(prompt).toContain(`* PR #${String(OPEN_PULL)} is already open for ${BRANCH}, likely opened by the plan's close-out: push to it and update its body with \`gh pr edit ${String(OPEN_PULL)}\` so the description covers the promotions this session committed.`);
+    expect(prompt).not.toContain('--base');
+    expect(prompt).not.toContain('gh pr create');
+
+    // The control: the same base with no open pull request does name it,
+    // so the absence above is the open bullet's.
+    expect(buildWrapUpPrompt(BRANCH, BASE, PLAN, null)).toContain('--base integration');
+  });
+});
+
 describe('the wrap-up prompt\'s pull-request naming', () => {
   test('spells the title `rafa-<n>: <title>` and closes the issue from the body', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
 
     expect(prompt).toContain('Title the PR `rafa-<n>: <title>`');
     expect(prompt).toContain('`Closes #<n>`');
@@ -69,7 +133,7 @@ describe('the wrap-up prompt\'s pull-request naming', () => {
   });
 
   test('names both places the number is read from, the plan then the branch', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
     const fromPlan = prompt.indexOf('`issue: <n>`');
     const fromBranch = prompt.indexOf(`the branch name (${BRANCH})`);
 
@@ -78,7 +142,7 @@ describe('the wrap-up prompt\'s pull-request naming', () => {
   });
 
   test('keeps every naming bullet below the classifier key', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
     const [firstLine] = prompt.split('\n');
 
     expect(firstLine).toBe('* Read `@progress.txt` in full.');
@@ -143,8 +207,8 @@ function skippedRelease(): ReleaseSkipped {
 
 describe('the wrap-up prompt\'s release bullets', () => {
   test('keeps the classifier key first-line whatever the release preparation holds', () => {
-    const prepared = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
-    const skipped = buildWrapUpPrompt(BRANCH, PLAN, null, skippedRelease());
+    const prepared = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
+    const skipped = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, skippedRelease());
 
     for (const prompt of [prepared, skipped]) {
       const [firstLine] = prompt.split('\n');
@@ -155,7 +219,7 @@ describe('the wrap-up prompt\'s release bullets', () => {
   });
 
   test('asks for the rewrite inside the fragment and nowhere else', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
 
     expect(prompt).toContain(`release fragment: \`${FRAGMENT_PATH}\`, for plan \`${PLAN_ID}\` at level \`minor\``);
     expect(prompt).toContain('Rewrite the raw `- <area>: <summary>` lines below its front matter into one line per area');
@@ -166,13 +230,13 @@ describe('the wrap-up prompt\'s release bullets', () => {
     // The control: with no preparation the prompt says none of it, so
     // the assertions above read the bullets and not the rest of the
     // list.
-    const bare = buildWrapUpPrompt(BRANCH, PLAN, null);
+    const bare = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
     expect(bare).not.toContain(FRAGMENT_PATH);
     expect(bare).not.toContain('Rewrite the raw');
   });
 
   test('no longer asks for a rewrite under a changelog heading', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
 
     expect(prompt).not.toContain('under THAT heading');
     expect(prompt).not.toContain('now carries a new section headed');
@@ -181,7 +245,7 @@ describe('the wrap-up prompt\'s release bullets', () => {
   });
 
   test('leaves the fragment unstaged for the loop\'s own fragment commit', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
 
     expect(prompt).toContain(`Leave \`${FRAGMENT_PATH}\` UNSTAGED and UNCOMMITTED`);
     expect(prompt).toContain('do not sweep it up with `git add -A`');
@@ -189,13 +253,13 @@ describe('the wrap-up prompt\'s release bullets', () => {
   });
 
   test('keeps the session off the version file, the changelog and the other fragments', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
 
     expect(prompt).toContain('Do not edit the version file, the changelog, or any other file under `.changes/` either');
   });
 
   test('carries the fragment into the pull request body with no version number', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease());
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease());
 
     expect(prompt).toContain('Carry the fragment into the pull request body: its level, `minor`');
     expect(prompt).toContain('as a section of the description');
@@ -203,7 +267,7 @@ describe('the wrap-up prompt\'s release bullets', () => {
   });
 
   test('asks for the same rewrite over a none fragment, naming its level', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease('none'));
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease('none'));
 
     expect(prompt).toContain(`for plan \`${PLAN_ID}\` at level \`none\``);
     expect(prompt).toContain('its level, `none`');
@@ -211,12 +275,12 @@ describe('the wrap-up prompt\'s release bullets', () => {
 
     // The control: the minor record's prompt names its own level, so
     // the level above is read off the record and not a constant.
-    expect(buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease())).not.toContain('at level `none`');
+    expect(buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease())).not.toContain('at level `none`');
   });
 
   test('writes the skip sentence verbatim instead of the three bullets', () => {
     const skipped = skippedRelease();
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, skipped);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, skipped);
 
     expect(prompt).toContain(`This pull request ships NO release fragment: ${skipped.sentence}.`);
     expect(prompt).toContain('do not write a fragment, an entry or a version by hand');
@@ -225,7 +289,7 @@ describe('the wrap-up prompt\'s release bullets', () => {
     // and a prompt built from the prepared record carries them.
     expect(prompt).not.toContain('UNSTAGED and UNCOMMITTED');
     expect(prompt).not.toContain('Rewrite the raw');
-    expect(buildWrapUpPrompt(BRANCH, PLAN, null, preparedRelease())).toContain('UNSTAGED and UNCOMMITTED');
+    expect(buildWrapUpPrompt(BRANCH, BASE, PLAN, null, preparedRelease())).toContain('UNSTAGED and UNCOMMITTED');
   });
 });
 
@@ -261,21 +325,21 @@ const REMOVED_BULLETS: readonly string[] = [
 
 describe('the wrap-up prompt\'s lessons to promote', () => {
   test('writes no section, heading or block when no lesson is promotable', () => {
-    for (const prompt of [buildWrapUpPrompt(BRANCH, PLAN, null), buildWrapUpPrompt(BRANCH, PLAN, null, null, [])]) {
+    for (const prompt of [buildWrapUpPrompt(BRANCH, BASE, PLAN, null), buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [])]) {
       expect(prompt).not.toContain(SECTION);
       expect(prompt).not.toContain('rafa:promoted');
     }
 
     // The control: one lesson brings both in, so the absence above is
     // the empty list's and not a prompt that never writes them.
-    const listed = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const listed = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
     expect(listed).toContain(SECTION);
     expect(listed).toContain('```rafa:promoted');
   });
 
   test('drops the three promotion bullets whatever the list holds', () => {
-    const bare = buildWrapUpPrompt(BRANCH, PLAN, null);
-    const listed = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const bare = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
+    const listed = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
 
     for (const phrase of REMOVED_BULLETS) {
       expect(bare).not.toContain(phrase);
@@ -286,7 +350,7 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
   test('lists each lesson by id, trigger, action and artifact, in the order given', () => {
     const first = lesson('bun-test-worktree-1a2b3c4d', 3, 0.8, { artifact: 'Cannot find package' });
     const second = lesson('lint-type-imports-5e6f7a8b', 4, 0.7);
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [first, second]);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [first, second]);
 
     expect(prompt).toContain([
       '- `bun-test-worktree-1a2b3c4d`',
@@ -301,7 +365,7 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
   });
 
   test('writes a multi-line action as one line of the list', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [
       lesson('multi-line-9c8d7e6f', 3, 0.7, { action: '  run bun install\n\n  before   the first test  ' }),
     ]);
 
@@ -310,7 +374,7 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
   });
 
   test('keeps the classifier key first and the section between the bullets and the plan', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
     const [firstLine] = prompt.split('\n');
     const section = prompt.indexOf(SECTION);
 
@@ -322,7 +386,7 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
   });
 
   test('asks for a block whose two line shapes the parser reads', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)]);
     const opening = prompt.indexOf('```rafa:promoted\n');
     const body = prompt.slice(opening, prompt.indexOf('\n```', opening)).split('\n')
       .slice(1);

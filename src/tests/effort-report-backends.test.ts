@@ -38,6 +38,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { collectEffort } from '../effort/collect.js';
 import { buildReport } from '../effort/report.js';
 
+import { scratchHomeEnv } from './scratch-home-env.js';
+
 /** The command a spawned case executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 
@@ -223,7 +225,7 @@ interface CommandRun {
 function runReportJson(root: string, home: string): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'report', '--output=json'],
-    { cwd: root, env: { ...process.env, HOME: home } },
+    { cwd: root, env: { ...process.env, ...scratchHomeEnv(home) } },
   );
   return {
     exitCode: run.exitCode,

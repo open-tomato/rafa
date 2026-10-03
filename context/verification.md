@@ -61,16 +61,18 @@ means it is new. Only new failures block the next task. A stage-end step
 with new failures names them in the blocker text the retry session
 receives through `BLOCKER_PROMPT_PREFIX`.
 
-**These recorded steps are the WHOLE of verification; there is no hosted
-workflow.** The repository carries no `.github/workflows/` on any branch,
-so `gh pr checks <n>` answers `no checks reported`. That is the expected
-reading. To verify a PR's state, capture the three task session gates
-at the commit that is actually the PR's head, and read the runner's
-recorded steps from the `.rafa/runs/<run-id>.json` file when a loop ran.
-One more gate runs at `git commit`: `.githooks/pre-commit` runs
-`scripts/control-byte-gate/control-byte-gate.ts` with `--staged`, refusing
-a commit whose staged blobs carry a raw control byte or an invisible
-codepoint. The hook is live only where `git config core.hooksPath
+**One hosted workflow repeats the gates outside a loop.**
+`.github/workflows/verify.yml` runs one job, `verify`, with two triggers
+and three gates. **Triggers:** pull requests into `main` and pushes to
+`stretch/**`. **Gates** (each step runs unless the job was cancelled):
+`bun test`, `bunx eslint .`, and `bunx tsc --noEmit`. **Two cases for
+`gh pr checks <n>`:** A pull request into `main` reports the `verify`
+check (merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull
+request into `stretch/**` reports no check (merge with `rafa pr merge <n>
+--skip-checks`). One more gate runs at `git commit`: `.githooks/pre-commit`
+runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
+refusing a commit whose staged blobs carry a raw control byte or an
+invisible codepoint. The hook is live only where `git config core.hooksPath
 .githooks` has been run.
 
 ### Baseline and known failures
@@ -150,89 +152,30 @@ The following failures appear on every run because the tree or the test
 itself is in that state. Check this list before investigating a failure
 you see in a run record.
 
-**Two parity-lineage tests read the sibling's live store (baseline: 4
-pass, 2 fail).**
-`src/tests/parity-lineage.test.ts` compares the sibling's stored effort
-rows against a fresh collection over that sibling's live session directory
-— input this repository does not own. Two of six cases fail: `matches
-every plainly-stored session row to its fresh counterpart, byte for byte`
-and `accounts for every grown session log: neither size nor mtime moved
-backward`. Both throw `parity lineage: stored session <id> has no fresh
-counterpart` because the `.jsonl` for a session the stored rows name has
-been deleted from the live directory. This does NOT clear on a re-run.
-Prove it pre-existing by running the test at `origin/main` in a worktree
-(do not stash, since the input is outside the tree): `git worktree add -q
---detach <tmp> origin/main`, `ln -s` the real `node_modules` into it, run
-the one file there (about 5s, no `bun install` needed), and remove with
-`git worktree remove --force`. Measured at both ends: `4 pass`, `2 fail`.
-
-**One case reads a frozen snapshot of logs (baseline: passes, race
-possible).**
-`src/tests/parity-differential.test.ts` runs the collector twice over a
-frozen snapshot from the sibling's session directory to eliminate the race
-where the sibling's loop appends to `.jsonl` files while collection runs.
-Both backends read identical input. The race does not survive a re-run
-against a sibling that has since gone quiet. If one run passes and the
-next fails, re-run the same suite: a real parity failure reproduces; a
-race does not.
-
-**One case reads a gitignored plan (baseline: red).**
-`src/plan/parse.test.ts`'s `a real plan file on disk` reads
-`.rafa/plans/PLAN-phase-0-package-parity-cutover.md` rather than a
-fixture, and `.rafa/` is gitignored. Where the file is absent, the test
-fails with an unhandled `ENOENT` between tests. Prove pre-existing in a
-worktree at `origin/main`, not a stash (a stash is a no-op once a plan's
-diff commits).
-
-**Three cleanup cases are red since 2026-09-24T12:00Z (baseline: 6 pass,
-3 fail).**
-`src/cleanup/scratch-repository.test.ts` reads its worktrees at fixed
-`SCRATCH_NOW` (2026-09-24T12:00Z), but worktrees carry their real
-modification time. Once wall-clock time passes `SCRATCH_NOW`, every
-worktree carries a `recent` blocker and the three `readCleanup over a
-scratch repository` cases fail. It stays red until the fixture dates
-worktrees relative to `SCRATCH_NOW`.
-
-**CHANGELOG.md holds old directory tokens red since 0.9.2.**
-`src/tests/default-plan-dirs.test.ts`'s `finds nothing in the live tree`
-fails because `CHANGELOG.md`'s 0.9.2 section names old directories without
-a slash, and the sweep catches both spellings. A plan's session may not
-touch a released section, so it stays red until a change exempts
-`CHANGELOG.md` or rewords those lines.
+**The two parity suites skip unless `RAFA_LIVE_PARITY=1`.**
+Run the live parity suites with `RAFA_LIVE_PARITY=1 bun test
+src/tests/parity-lineage.test.ts`. `src/tests/parity-lineage.test.ts`
+compares the sibling's stored effort rows against a fresh collection
+over that sibling's live session directory, and
+`src/tests/parity-differential.test.ts` collects a frozen copy of that
+directory into both backends — input this repository does not own.
+Without the variable at exactly `1`, every case of both files skips
+under `live parity off: set RAFA_LIVE_PARITY=1 to run against the
+sibling's live session logs and stored rows`, before anything on disk is
+read (`resolveLiveParity` in `src/tests/parity-fixture.ts`); with it on
+and the fixture absent, they skip under the fixture's own reason. Only
+a run with the variable set can go red, and its red is about the live
+input: lineage's `parity lineage: stored session <id> has no fresh
+counterpart` means a `.jsonl` the stored rows name was deleted from the
+live directory, and it does not clear on a re-run. In the differential
+suite both backends read one frozen copy, so a difference between them
+is a real parity failure, not the sibling appending mid-run.
 
 **One suite prints a model refusal on a clean run (baseline: passes).**
 `src/tests/backfill-pipeline.test.ts` plants a fake `claude` that echoes
 `Sorry, this request could not be completed.` and exits 3; the planted
 binary's stdout is not captured away from the suite's own, so both land in
 the run log. Read the counts and exit code, never the prose around them.
-
-**About twenty spawned tests fail due to `isUnderTempDir` on macOS.**
-`src/effort/store/location.test.ts`'s `answers true for a path under the
-real path of a symlinked temporary directory` is red because `isUnderTempDir`
-canonicalizes the temp dir but not the path, so paths through the symlink
-read as outside. This cascades to every spawned test that runs a task
-session through this checkout's `bun src/rafa.ts` and needs a migrated
-table, halting the loop with `effort store: <path> needs migration ...;
-a development build migrates only a store under the temp directory or
-RAFA_EFFORT_DIR`. Affected files: `src/tests/loop-sessions.test.ts`,
-`src/tests/task-report.test.ts` (six cases), `src/tests/loop-output.test.ts`
-(three cases), `src/tests/effort-skills-collect-integration.test.ts`,
-`src/tests/serve-spawned.test.ts`, `src/tests/command-output.test.ts`,
-`src/tests/preflight-halts.test.ts` (two cases), and
-`src/tests/lesson-push-e2e.test.ts`. Confirmed pre-existing at `origin/main`
-(commit `e5041c5`) with a worktree.
-
-**A worktree runs fewer skills-tier tests.** Three of the skills-tier
-checker suite's cases fail inside a `git worktree` of this repository and
-pass in the main checkout. The cause is not investigated. Run only the
-file you are proving in the worktree, or subtract those three before
-comparing a full run there against a run in the main checkout.
-
-**Two `migrations.test.ts` cases read machine state.**
-`describe('the installed 0.24.1 runtime')`'s `holds the rule the
-transcription copies` and `describe('the lock at the newest release tag')`'s
-`keeps every line of the lock at v0.28.0` fail when the installed binary
-and the checked-out tag are older than this tree expects.
 
 **One `copy.test.ts` case reads a filesystem-specific error string.**
 `rafa effort copy over a live store`'s `copies while another connection

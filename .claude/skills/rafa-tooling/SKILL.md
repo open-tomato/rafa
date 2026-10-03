@@ -123,10 +123,13 @@ that a running loop may be using, so run `rafa loop list` and
 
 `rafa pr merge` refuses in three cases a suggestion can check first:
 
-- **No CI.** A pull request that reports no checks is refused unless
-  `--skip-checks` is given, and that flag is refused on one that does
-  report checks. On a repository with no `.github/workflows/`, hand over
-  `rafa pr merge <n> --skip-checks`.
+- **Pull request into `main`.** A pull request into the base branch reports
+  the `verify` check. Merge by handing over `rafa pr wait <n>`, waiting for
+  the checks to pass or fail, then `rafa pr merge <n>`. Never use
+  `--skip-checks` on a PR into `main`.
+- **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
+  reports no check. Merge by handing over `rafa pr merge <n>
+  --skip-checks`.
 - **A dirty tree.** It refuses on uncommitted changes, which a loop running
   in the same checkout leaves. Check `git status` in the checkout the
   command is for.

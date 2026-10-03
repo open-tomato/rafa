@@ -17,9 +17,10 @@
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
  * the real home. Its environment holds a PATH of that `bin/` directory
- * then git's own, the scratch HOME, `RAFA_TEST=1` and the suite's
- * `TMPDIR` for the effort store's test guard, and nothing else but what
- * the case names. So `claude` resolves to the stand-in
+ * then git's own, the scratch HOME with the bun cache variables that
+ * keep bun from writing under it (`./scratch-home-env.ts`), `RAFA_TEST=1`
+ * and the suite's `TMPDIR` for the effort store's test guard, and nothing
+ * else but what the case names. So `claude` resolves to the stand-in
  * {@link plantStandInClaude} writes there, or to nothing: {@link runRafa}
  * refuses to spawn when it resolves anywhere else.
  *
@@ -37,13 +38,17 @@ import type { CliEvent } from '../ports/index.js';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+
+import { gitIdentityEnv } from './git-identity.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
+import { builtPath, hostGitDir, plantGitOnlyDir } from './stand-in-gh.js';
 
 /** The CLI entry a spawned run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -170,7 +175,7 @@ export interface ScratchRepo {
   readonly bin: string;
   /** The file a stand-in `claude` appends one line to per call. */
   readonly callLog: string;
-  /** The PATH a spawned run gets: `bin`, then git's own directory. */
+  /** The PATH a spawned run gets: `bin`, then git's own directory, or a directory holding only a link to git under `gitOnlyPath`. */
   readonly path: string;
 }
 
@@ -178,6 +183,12 @@ export interface ScratchRepo {
 export interface ScratchOptions {
   /** Whether the repository is a project, holding {@link plantProjectConfig}'s file. Defaults to true. */
   readonly project?: boolean;
+  /**
+   * Whether the PATH takes a directory holding only a link to git, so no
+   * host `gh` can resolve on it. Defaults to false: git's own directory,
+   * which a stand-in script may lean on for `cat` and the like.
+   */
+  readonly gitOnlyPath?: boolean;
 }
 
 /**
@@ -195,13 +206,19 @@ export function plantScratchRepo(base: string, options: ScratchOptions = {}): Sc
   execFileSync('git', ['init', '-q', '.'], {
     cwd: repo,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
   if (options.project !== false) plantProjectConfig(repo);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return {
+    repo,
+    home,
+    bin,
+    callLog: join(root, 'calls.log'),
+    path: builtPath(bin, options.gitOnlyPath === true
+      ? plantGitOnlyDir(root)
+      : hostGitDir()),
+  };
 }
 
 /** Writes a stand-in `claude` into the scratch `bin/`, which reads its stdin, logs the call and exits 0. */
@@ -228,7 +245,7 @@ function refuseForeignClaude(scratch: ScratchRepo): void {
 
 /** The environment a spawned run gets; see {@link runRafa}. */
 function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>): Record<string, string> {
-  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, HOME: scratch.home };
+  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
 }
 
 /**

@@ -23,6 +23,7 @@ import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
 import { readStoreMeta } from '../../effort/store/store-meta.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createSchemaCommand } from './schema.js';
 
@@ -107,7 +108,7 @@ function commitRoot(scratch: ScratchRepo): void {
   execFileSync('git', ['-c', 'user.name=rafa-test', '-c', 'user.email=rafa-test@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'root'], {
     cwd: scratch.repo,
     stdio: 'pipe',
-    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 

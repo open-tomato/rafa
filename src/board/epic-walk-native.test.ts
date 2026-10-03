@@ -212,7 +212,12 @@ describe('descendRoadmap in native mode', () => {
   it('runs dry on an epic whose only sub-issues are taken, naming sub-issues', async () => {
     const board = [epic(10, 'alpha', [11]), spec(11, 10)];
     const seams = seamsOver(board);
-    const taken = { ...seams, readings: { ...seams.readings, branchFor: () => 'feat/rafa-11-taken' } };
+    const taken = { ...seams, readings: {
+      ...seams.readings,
+      branchFor: () => 'feat/rafa-11-taken',
+      branchClaimFor: () => Promise.resolve({ branch: 'feat/rafa-11-taken', claim: { state: 'none' as const } }),
+    },
+    };
 
     const { dry, descent } = await pickDescendedLine(roadmap(10), taken);
 

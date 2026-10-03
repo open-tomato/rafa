@@ -34,6 +34,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
+import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createPrMergeCommand } from './merge.js';
 
@@ -81,10 +82,7 @@ function git(cwd: string, home: string, ...args: readonly string[]): GitResult {
       HOME: home,
       GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 'rafa test',
-      GIT_AUTHOR_EMAIL: 'test@example.invalid',
-      GIT_COMMITTER_NAME: 'rafa test',
-      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+      ...gitIdentityEnv(),
       LC_ALL: 'C',
     },
   });

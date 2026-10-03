@@ -32,6 +32,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { readBoardOwnership } from '../board/board-owns.js';
 import { createOwnerResolver } from '../board/owner-resolve.js';
+import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { createGhPullRequests } from './gh.js';
 import { createGhTeamMembership, readOwnerApproval } from './owner-approval.js';
@@ -148,7 +149,7 @@ function plantWorld(): ScratchWorld {
 
 /** The gate's seams over one spawned `gh`, every reading real. */
 function seamsOf(world: ScratchWorld): OwnerApprovalSeams {
-  const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, HOME: world.repo } });
+  const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
   return {
     pullRequests: createGhPullRequests({ gh }),
     resolveOwner: createOwnerResolver({ gh }),

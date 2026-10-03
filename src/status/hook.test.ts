@@ -34,6 +34,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { projectConfigText } from '../project/scaffold.js';
 import { resolveScope } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { createStatusHook, isQuietCommand, QUIET_COMMANDS } from './hook.js';
 import { CLEANUP_COMMAND, NOTICE_PREFIX, STATUS_COMMAND } from './notice.js';
@@ -301,7 +302,7 @@ describe('the real reading, every seam left out', () => {
   it('writes an empty snapshot for a git repository with one commit and nothing to clean', async () => {
     const project = plantProject();
     const git = (...args: string[]): void => {
-      const done = Bun.spawnSync(['git', ...args], { cwd: project.root, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } });
+      const done = Bun.spawnSync(['git', ...args], { cwd: project.root, env: { ...process.env, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null' } });
       if (done.exitCode !== 0) throw new Error(`git ${args.join(' ')}: ${done.stderr.toString()}`);
     };
     git('init', '-q', '-b', 'main');

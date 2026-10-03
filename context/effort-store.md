@@ -514,10 +514,14 @@ before comments are stripped, so a statement a comment swallowed fails
 here, and so does a `TEMP` table. SQLite also refuses an `ADD COLUMN`
 whose statement ends in a `--` comment before its `;` (`error in table
 <t> after add column: incomplete input`). Last, it reads
-`migrations.lock.json` at the newest `v*` tag by version order through
-`git show`, and fails a line changed or dropped since. The case is
-skipped, its title naming why, when git, the tag or the lock at the tag
-is absent. At v0.24.1 the lock is absent, since that release predates it.
+`migrations.lock.json` as released at v0.33.0, a copy committed as
+`src/effort/testdata/migrations/lock-v0.33.0.json`, and fails a line
+changed or dropped since; a newer release moves that copy and its
+`RELEASED_TAG` forward by hand. A provenance case holds the copy to
+`git show v0.33.0:` and is skipped, its title naming why, when git, the
+tag or the lock at the tag is absent. The 0.24.1 rule and history are
+read from an excerpt of that bundle committed beside it, never from
+`~/.rafa`. At v0.24.1 the lock is absent, since that release predates it.
 Each rule has a near-miss control, including a planted `DROP COLUMN`
 declared `[]`.
 
@@ -1031,11 +1035,22 @@ issue's reference in the row the dispatch's session holds under the text
 its caller keys the recurrence by: it sets `tracker_ref` on that
 session's row for the key, or inserts a row holding only the dispatch,
 the key, the reference and the origin pair every insert stamps, and
-keeps a reference already there.
-`readTrackerRef` answers the oldest reference stored under a key, in any
-session. `triage/triage.ts` keys by the bug's artifact WITH the tracker
-file it was reported against, so its rows carry that key rather than a
-bare artifact and never land on a report's finding. A caller that does
+keeps a reference already there. See `context/triage.md` for the key
+a bug is looked up by and the two-step match.
+`readTrackerRef` answers the newest reference stored under a key, in any
+session: the last by `ACROSS_STORES_ORDER` (`store/origins.ts`), read
+backwards so both sides of a merge answer the same row, which `seq` alone
+would not. A reference that supersedes another, filed after the issue
+under the key closed as completed, is written with `supersedes` naming
+the old one and is inserted as a new row under the same key, never over
+the old one, so `tracker_ref` stays `SET_ONCE` and a merge of two stores
+keeps both rows (the `findings` entry of `store/merge-rules.ts`). One
+session holds one row per key (`findings_by_artifact`), so a write
+superseding the reference its own session's row holds is refused with a
+`SupersedeInSessionRefusal`, nothing written; the migration that would
+let it insert is #656's. `triage/triage.ts` keys by the bug's artifact
+WITH the tracker file it was reported against, so its rows carry that key
+rather than a bare artifact and never land on a report's finding. A caller that does
 key by a bare artifact writes a report's findings first: a finding
 written after a reference under the same session and artifact is skipped
 as that row's duplicate. An inserted row reaches `progress.txt` as the
@@ -1088,8 +1103,9 @@ path; both patterns keep the real `.rafa/effort/` untouched.
 otherwise.** `guardTestProcess` (`store/location.ts`) runs before any file
 or directory is made, at every open of either backend and at
 `fix-schema`'s. In a process whose `Bun.main` ends in `.test.ts`, or whose
-environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (or its
-real path) throws `effort store: a test opened <path>, outside the temp
+environment sets `RAFA_TEST=1`, a store path outside `tmpdir()` (as
+spelled, or with the path and `tmpdir()` both read through their real
+paths, a path not made yet through its nearest existing ancestor) throws `effort store: a test opened <path>, outside the temp
 directory <tmp>; a test opens stores under tmpdir() only`. `runRafa` sets
 `RAFA_TEST=1` and the suite's `TMPDIR` on its child. A SQLite read of a
 file that does not exist opens nothing and so is not guarded; an NDJSON

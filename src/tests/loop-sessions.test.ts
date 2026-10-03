@@ -83,7 +83,9 @@ import { readSessions } from '../loop/sessions.js';
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
 import { plantProjectConfig } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
+import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry every case spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -177,7 +179,7 @@ function git(cwd: string, home: string, ...args: string[]): void {
   execFileSync('git', args, {
     cwd,
     stdio: 'pipe',
-    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+    env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
   });
 }
 
@@ -279,7 +281,7 @@ function run(scratch: Scratch, words: readonly string[], env: Readonly<Record<st
   }
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { ...env, PATH: scratch.path, HOME: scratch.home },
+    env: { ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: SPAWN_KILL_MS,
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
@@ -293,7 +295,7 @@ function spawnLoopStart(scratch: Scratch) {
   }
   return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, HOME: scratch.home },
+    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });

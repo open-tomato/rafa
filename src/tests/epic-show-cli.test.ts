@@ -51,6 +51,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { gitIdentityEnv } from './git-identity.js';
 
 /** The file holding the pre-move captures; see the module note. */
 const PRE_MOVE_FILE = join(import.meta.dir, 'fixtures', 'epics-pre-move.json');
@@ -112,7 +113,7 @@ function printFile(file: string): string {
 function plant(): ScratchRepo {
   const scratch = plantScratchRepo(tempBase, { project: false });
   plantProjectConfig(scratch.repo, `${projectConfigText()}roadmap:\n  issue: ${String(ROADMAP)}\n`);
-  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...process.env, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() };
   const bare = join(dirname(scratch.repo), 'origin.git');
   execFileSync('git', ['init', '-q', '--bare', bare], { cwd: scratch.repo, stdio: 'pipe', env });
   execFileSync('git', ['remote', 'add', 'origin', bare], { cwd: scratch.repo, stdio: 'pipe', env });
