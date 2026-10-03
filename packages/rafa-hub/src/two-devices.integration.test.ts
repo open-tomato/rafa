@@ -188,8 +188,8 @@ async function runCollect(device: Device): Promise<CollectRun> {
   const child = Bun.spawn([process.execPath, RAFA_ENTRY, 'effort', 'collect', '--no-sessions'], {
     cwd: device.root,
     env: {
-      RAFA_TEST: '1',
       TMPDIR: tmpdir(),
+      RAFA_TEST: '1',
       PATH: GIT_DIR,
       ...scratchHomeEnv(device.home),
       ...secretsEnv(),
