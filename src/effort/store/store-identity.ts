@@ -36,9 +36,10 @@
  * Two copies these facts cannot see, measured on 2026-09-29 on tmpfs:
  * a `.bak` restored with `cp` over the existing file is written into
  * the old inode, so all three facts match; and a disk cloned whole
- * matches all three as well. The merge catches both afterwards, since
- * one origin pair holding two contents can only come from a missed
- * copy.
+ * matches all three as well. The generation below catches the first
+ * once the store was written after the `.bak` was taken. The merge
+ * catches what is left afterwards, since one origin pair holding two
+ * contents can only come from a missed copy.
  *
  * ## The generation
  *

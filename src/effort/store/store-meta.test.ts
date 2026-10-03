@@ -1,15 +1,16 @@
 /**
  * `store-meta.ts` through the open every store call takes,
- * `withSqliteStore`: which opens write the `store_meta` row, which keep
- * it and which never touch it. Every store is a real file under
- * `tmpdir()`, so a copy, a restore and a rename are the filesystem's
- * own; the host id and the project are injected, and no case reads
- * this machine's host id or spawns git.
+ * `withSqliteStore`: which opens mint the `store_meta` row, which keep
+ * it, how every writing open rotates the generation in the row and the
+ * side record, and which opens never touch either. Every store is a
+ * real file under `tmpdir()`, so a copy, a restore and a rename are the
+ * filesystem's own; the host id, the project and each generation are
+ * injected, and no case reads this machine's host id or spawns git.
  */
 import type { ProjectIdentity } from './store-identity.js';
 import type { IdentityOutcome, StoreIdentitySeams, StoreMeta } from './store-meta.js';
 
-import { copyFileSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +20,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bringForward } from './bring-forward.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { withSqliteStore } from './sqlite.js';
+import { readStoreGeneration, storeGenerationPath, writeStoreGeneration } from './store-generation.js';
 import {
   fromStoredInteger,
   readStoreMeta,
@@ -37,7 +39,7 @@ const NO_PROJECT: ProjectIdentity = { rootCommit: null, remote: null };
 
 const MINTED_AT = new Date('2026-09-29T10:00:00.000Z');
 
-/** Seams answering `hostId` and `project`, numbering each store id and counting each call. */
+/** Seams answering `hostId` and `project`, numbering each store id and generation and counting each call. */
 function seamsOf(hostId = 'host-a', project: ProjectIdentity = PROJECT): {
   seams: StoreIdentitySeams;
   hostReads: () => number;
@@ -45,6 +47,7 @@ function seamsOf(hostId = 'host-a', project: ProjectIdentity = PROJECT): {
 } {
   let hostReads = 0;
   let minted = 0;
+  let rotated = 0;
   const projectReads: string[] = [];
   const seams: StoreIdentitySeams = {
     readHostId: () => {
@@ -58,6 +61,10 @@ function seamsOf(hostId = 'host-a', project: ProjectIdentity = PROJECT): {
     newStoreId: () => {
       minted += 1;
       return `${hostId}-store-${String(minted)}`;
+    },
+    newGeneration: () => {
+      rotated += 1;
+      return `gen-${String(rotated)}`;
     },
     now: () => MINTED_AT,
   };
@@ -84,6 +91,53 @@ function metaOf(path: string): StoreMeta | null {
   }
 }
 
+/** Settles the identity of the store at `path` for one writing open of `seams` on a connection of its own, answering what it did. */
+function settleWrite(path: string, seams: StoreIdentitySeams): IdentityOutcome {
+  const db = new Database(path, { readwrite: true });
+  try {
+    return settleStoreIdentity(db, path, 'write', seams);
+  } finally {
+    db.close();
+  }
+}
+
+/** Where a planted row says its store file was and which file it was. */
+interface PlantedFile {
+  readonly storePath: string;
+  readonly fileDev: bigint;
+  readonly fileIno: bigint;
+}
+
+/**
+ * A store `bringForward` left at `store-meta`, before the generation
+ * column, holding one row minted on `host-a` for the file `fileOf`
+ * answers (device 1 and inode 2 at its own path when absent): what a
+ * read-only merge of an older store reads, and what an older runtime
+ * left behind.
+ */
+function storeBeforeGeneration(
+  name: string,
+  fileOf: (path: string) => PlantedFile = (path) => ({ storePath: path, fileDev: 1n, fileIno: 2n }),
+): string {
+  const path = freshPath(name);
+  const through = SQLITE_MIGRATIONS.findIndex(({ id }) => id === 'store-meta') + 1;
+  const db = new Database(path, { readwrite: true, create: true });
+  try {
+    bringForward(db, path, 'write', 'open', { migrations: SQLITE_MIGRATIONS.slice(0, through) });
+    const file = fileOf(path);
+    db.run('INSERT INTO store_meta (id, store_id, project_root_commit, project_remote, host_id, store_path,'
+      + ' file_dev, file_ino, minted_at) VALUES (1, \'store-old\', \'a1b2\', NULL, \'host-a\', ?, ?, ?, ?)', [
+      file.storePath,
+      toStoredInteger(file.fileDev),
+      toStoredInteger(file.fileIno),
+      MINTED_AT.toISOString(),
+    ]);
+  } finally {
+    db.close();
+  }
+  return path;
+}
+
 /** A store minted by one writing open of `seams`, and its row. */
 function mintedStore(name: string, seams: StoreIdentitySeams): { path: string; meta: StoreMeta } {
   const path = freshPath(name);
@@ -93,7 +147,7 @@ function mintedStore(name: string, seams: StoreIdentitySeams): { path: string; m
 }
 
 describe('a writing open of withSqliteStore', () => {
-  it('mints on the first write to a fresh store, recording the store id, project, host, real path, device, inode and time', () => {
+  it('mints on the first write to a fresh store, recording the store id, project, host, real path, device, inode, time and generation', () => {
     const { seams, projectReads } = seamsOf();
     const path = freshPath('first-write');
 
@@ -109,20 +163,21 @@ describe('a writing open of withSqliteStore', () => {
       fileDev: stats.dev,
       fileIno: stats.ino,
       mintedAt: '2026-09-29T10:00:00.000Z',
-      generation: null,
+      generation: 'gen-1',
     });
+    expect(readStoreGeneration(path)).toBe('gen-1');
     expect(projectReads()).toEqual([realpathSync(join(path, '..'))]);
   });
 
-  it('keeps the origin on a second write to the same file, writing no byte and asking git nothing', () => {
+  it('keeps the origin on a second write to the same file, rotating the generation in the row and the side record and asking git nothing', () => {
     const { seams, projectReads } = seamsOf();
     const { path, meta } = mintedStore('second-write', seams);
-    const before = readFileSync(path);
 
     const again = openAs(path, 'write', seams);
 
-    expect(again).toEqual(meta);
-    expect(readFileSync(path).equals(before)).toBe(true);
+    expect(meta.generation).toBe('gen-1');
+    expect(again).toEqual({ ...meta, generation: 'gen-2' });
+    expect(readStoreGeneration(path)).toBe('gen-2');
     expect(projectReads()).toHaveLength(1);
   });
 
@@ -138,22 +193,27 @@ describe('a writing open of withSqliteStore', () => {
 
     expect(copied?.storeId).toBe('host-a-store-2');
     expect(copied?.storePath).toBe(realpathSync(copy));
-    expect(kept).toEqual(original.meta);
+    expect(readStoreGeneration(copy)).toBe(copied?.generation ?? 'none');
+    expect(kept?.storeId).toBe(original.meta.storeId);
+    expect(readStoreGeneration(original.path)).toBe(kept?.generation ?? 'none');
   });
 
-  it('mints on a .bak renamed back over the store, which has the path and host and a new inode', () => {
+  it('mints on a .bak renamed back over the store after a write, which has the path and host, a new inode and an older generation', () => {
     const { seams } = seamsOf();
     const { path, meta } = mintedStore('bak-restore', seams);
     const backup = `${path}.bak`;
     copyFileSync(path, backup);
+    openAs(path, 'write', seams);
     rmSync(path);
     renameSync(backup, path);
     expect(statSync(path, { bigint: true }).ino).not.toBe(meta.fileIno);
+    expect([metaOf(path)?.generation, readStoreGeneration(path)]).toEqual(['gen-1', 'gen-2']);
 
-    const restored = openAs(path, 'write', seams);
+    const restored = settleWrite(path, seams);
 
-    expect(restored?.storeId).toBe('host-a-store-2');
-    expect(restored?.storePath).toBe(meta.storePath);
+    expect(restored).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons: ['file', 'generation'] });
+    expect(metaOf(path)?.storePath).toBe(meta.storePath);
+    expect(readStoreGeneration(path)).toBe(metaOf(path)?.generation ?? 'none');
   });
 
   it('mints when another host opens the store for a write', () => {
@@ -173,7 +233,42 @@ describe('a writing open of withSqliteStore', () => {
     renameSync(path, aside);
     renameSync(aside, path);
 
-    expect(openAs(path, 'write', seams)).toEqual(meta);
+    expect(openAs(path, 'write', seams)).toEqual({ ...meta, generation: 'gen-2' });
+  });
+
+  it('keeps the id of a store written without a generation on its first write, and holds one in the row and the side record after it', () => {
+    const { seams } = seamsOf();
+    const path = storeBeforeGeneration('no-generation', (planted) => {
+      const stats = statSync(planted, { bigint: true });
+      return { storePath: planted, fileDev: stats.dev, fileIno: stats.ino };
+    });
+    expect(existsSync(storeGenerationPath(path))).toBe(false);
+
+    const first = openAs(path, 'write', seams);
+    const second = openAs(path, 'write', seams);
+
+    expect([first?.storeId, first?.generation]).toEqual(['store-old', 'gen-1']);
+    expect([second?.storeId, second?.generation]).toEqual(['store-old', 'gen-2']);
+    expect(readStoreGeneration(path)).toBe('gen-2');
+  });
+
+  it.each([
+    ['behind the row, as a side record restored from before the last write leaves it', 'gen-1'],
+    ['ahead of the row, as a crash between the side record\'s rename and the row\'s commit leaves it', 'gen-ahead'],
+  ] as const)('mints once on a side record one rotation %s, and keeps on the write after', (_title, side) => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('one-rotation', seams);
+    openAs(path, 'write', seams);
+    writeStoreGeneration(path, side);
+    expect(metaOf(path)?.generation).toBe('gen-2');
+
+    const outcomes = [settleWrite(path, seams), settleWrite(path, seams)];
+
+    expect(outcomes).toEqual([
+      { action: 'mint', storeId: 'host-a-store-2', reasons: ['generation'] },
+      { action: 'keep', storeId: 'host-a-store-2' },
+    ]);
+    expect(readStoreGeneration(path)).toBe(metaOf(path)?.generation ?? 'none');
   });
 
   it('keeps the project the copy recorded when git in its new directory finds no root commit', () => {
@@ -216,6 +311,21 @@ describe('a reading open of withSqliteStore', () => {
     const written = openAs(path, 'write', counted.seams);
     expect(written?.storeId).toBe('host-a-store-1');
     expect(readFileSync(path).equals(before)).toBe(false);
+  });
+
+  it('writes no side record and rotates no generation, while a write open, the control, does both', () => {
+    const { seams } = seamsOf();
+    const path = freshPath('read-side-record');
+    openAs(path, 'read', seams, true);
+    const unmintedRead = existsSync(storeGenerationPath(path));
+    const written = openAs(path, 'write', seams);
+
+    const read = openAs(path, 'read', seams);
+
+    expect(unmintedRead).toBe(false);
+    expect(written?.generation).toBe('gen-1');
+    expect(read?.generation).toBe('gen-1');
+    expect(readStoreGeneration(path)).toBe('gen-1');
   });
 
   it('never mints a copy it only reads, while a write open of the same copy does', () => {
@@ -266,6 +376,7 @@ describe('settleStoreIdentity', () => {
       db.close();
     }
     expect(readFileSync(path).equals(before)).toBe(true);
+    expect(existsSync(storeGenerationPath(path))).toBe(false);
   });
 
   it('decides again under the lock, so a store another open minted meanwhile keeps that origin', () => {
@@ -297,28 +408,6 @@ describe('settleStoreIdentity', () => {
 });
 
 describe('readStoreMeta and the generation column', () => {
-  /**
-   * A store `bringForward` left at `store-meta`, before the generation
-   * column, holding one row: what a read-only merge of an older store
-   * reads.
-   */
-  function storeBeforeGeneration(name: string): string {
-    const path = freshPath(name);
-    const through = SQLITE_MIGRATIONS.findIndex(({ id }) => id === 'store-meta') + 1;
-    const db = new Database(path, { readwrite: true, create: true });
-    try {
-      bringForward(db, path, 'write', 'open', { migrations: SQLITE_MIGRATIONS.slice(0, through) });
-      db.run('INSERT INTO store_meta (id, store_id, project_root_commit, project_remote, host_id, store_path,'
-        + ' file_dev, file_ino, minted_at) VALUES (1, \'store-old\', \'a1b2\', NULL, \'host-a\', ?, 1, 2, ?)', [
-        path,
-        MINTED_AT.toISOString(),
-      ]);
-    } finally {
-      db.close();
-    }
-    return path;
-  }
-
   it('answers a null generation for a store whose row predates the column, without throwing', () => {
     const path = storeBeforeGeneration('no-column');
 

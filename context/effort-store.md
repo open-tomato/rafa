@@ -401,10 +401,13 @@ today and in the future.
 store.** The row holds the origin the store stamps (`origin_store`, a
 UUID), the project git reads in the store's directory (or the one the
 row already names when git finds no root commit there), and the host,
-path and file identity the store was minted under. It is written on a
-write open, at most once per store, behind the first migration named
-`store-meta`; a write open that keeps the existing origin asks git
-nothing. The row is unminted if it has no value in `origin_store` (the
+path and file identity the store was minted under. The origin is
+minted on a write open, at most once per store file, behind the first
+migration named `store-meta`; a write open that keeps the existing
+origin asks git nothing. Every write open also rotates the store's
+generation (`store_meta.generation`, added by `store-meta-generation`),
+as **Every write open rotates the generation** below says. The row is
+unminted if it has no value in `origin_store` (the
 column is `NOT NULL` for every runtime, but minting is skipped when git
 finds no project or repository). A read open never reads or writes the
 `store_meta` row, which is why `rafa effort schema` leaves an unminted
@@ -416,21 +419,40 @@ asks for a keyed hash and a store travels between machines.** The path is
 the real path, so a symlinked spelling does not trigger a copy-detection
 mint. The device and inode are bigints: when a `.bak` file is renamed
 over the store, it has a new inode and triggers a copy-detection mint,
-but one restored with `cp` over the existing file keeps the old inode
-and does not (measured on tmpfs). The merge's collision check is what
-catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
+but one restored with `cp` over the existing file keeps the old inode,
+so those three facts match (measured on tmpfs). The generation catches
+that restore once the store has been written since the `.bak` was
+taken, as the next paragraph says, and the merge's collision check
+catches whatever the open misses. SQLite's INTEGER is signed and bun binds
 a bigint past 2^63 by wrapping without warning, so the device and inode
 are written as their two's complement and read back through `CAST(… AS TEXT)`
 as unsigned.
 
+**Every write open rotates the generation, under `BEGIN IMMEDIATE`.**
+`settleStoreIdentity` (`store-meta.ts`) takes the write lock, reads the
+row, decides again under the lock (`decideStoreIdentity`,
+`store-identity.ts`), and writes a new random generation in that
+transaction: into the row it keeps, or into the new row it mints. It
+writes the same value to the **side record**, the file
+`<real path of the store file>.generation` beside the store
+(`store-generation.ts`), then commits. A write open mints when the row
+is absent, any of the three facts moved, or the row holds a generation
+the side record does not; a NULL generation, written by a runtime that
+did not know the column, is judged by the three facts alone, so such a
+store keeps its id on its first write and holds a generation after it.
+The row is written before the side record and both before the commit:
+a crash between the side record's rename and the commit leaves the side
+record one rotation ahead, and the next write open mints once and keeps
+on the write after. A read open neither reads the side record nor
+writes it. Measured in `store-meta.test.ts` and `store-identity.test.ts`.
+
 **A test passes its fifth argument to `withSqliteStore` to inject the
-host and project, so test stores can be minted independently.** The store
-module reads these values from `settleStoreIdentity`
-(`src/effort/store/store-identity.ts`) on a write, and `store-meta.ts`
-reads and writes the row. `withSqliteStore` calls `settleStoreIdentity`
-after `bringForward`, so a write open mints when the row is absent or a
-fact moved (the filesystem identity changed), under `BEGIN IMMEDIATE`
-with a second decision.
+host, the project, the store id and the generation, so test stores can
+be minted independently.** `store-identity.ts` observes the facts and
+decides, `store-generation.ts` reads and writes the side record, and
+`store-meta.ts` reads and writes the row. `withSqliteStore` calls
+`settleStoreIdentity` after `bringForward`, so the `generation` column
+exists on every write open.
 
 ### Copy detection
 
@@ -445,6 +467,25 @@ filesystem identity (device, inode, path) is found in the local store's
 `merges` table (a log of every completed merge) or it collides on
 `origin_store`. When a copy is detected and merged, the merge refusal
 entry names the copy's origin and what copied it.
+
+**The generation catches a copy of the store file at the open, on the
+copy's first write.** A copy carries `store_meta.generation` and leaves
+the side record, which sits beside the original's real path as
+`<store file>.generation`, behind. So a copy at another path finds no
+side record, and a store deleted and replaced by a copy taken before
+its last write, or a `.bak` renamed or `cp`'d back over it after a
+write, finds a side record one rotation or more ahead of its row, and
+mints
+with the reason `generation` whether or not the host handed the copy
+the freed inode number. It does not catch a restore of the whole
+directory, the store file and its side record together: the two agree,
+and when the file comes back at its old inode, as `cp` over the existing
+file writes it, the three facts match too and nothing mints (measured
+on tmpfs). A store deleted and replaced by a copy taken after its last
+write holds the generation its side record holds, so only a new inode
+number mints it; with the original gone there is one store again, and
+no origin pair can collide. The merge's collision check above is what
+catches the copies the open misses.
 
 **A development build mints on the first write after copy detection.**
 Between the first plan and the lock in `bringForward`, an open with

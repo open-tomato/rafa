@@ -1,20 +1,41 @@
 /**
  * `store-identity.ts`: the three facts a writing open compares (host id,
  * the store file's absolute path, its device and inode), the side
- * record's generation, the project identity, and the decision. Every file is a real one under `tmpdir()`,
- * so a copy, a restore and a rename are the filesystem's own; every host
- * id is injected, and no case reads this machine's.
+ * record's generation, the project identity, and the decision. Every
+ * file is a real one under `tmpdir()`, so a copy, a restore and a
+ * rename are the filesystem's own; every host id is injected, and no
+ * case reads this machine's.
+ *
+ * Whether a freed inode number goes to the next file is the
+ * filesystem's choice, so {@link INODE_NUMBER_REPEATS} is probed when
+ * this file loads, and the case that depends on it is titled by the
+ * answer and runs either way. On 2026-10-03 the tmpfs `tmpdir()` of the
+ * Linux host this was written on gave a new number every time.
  */
 import type { RecordedIdentity, StoreIdentityFacts } from './store-identity.js';
+import type { StoreIdentitySeams } from './store-meta.js';
 import type { GitResult, GitRunner } from '../../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { withSqliteStore } from './sqlite.js';
 import { writeStoreGeneration } from './store-generation.js';
 import {
   decideStoreIdentity,
@@ -25,6 +46,7 @@ import {
   readProjectIdentity,
   readStoreFileFacts,
 } from './store-identity.js';
+import { readStoreMeta } from './store-meta.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-store-identity-')));
 afterAll(() => {
@@ -35,6 +57,49 @@ afterAll(() => {
 function fresh(name: string): string {
   return realpathSync(mkdtempSync(join(scope, `${name}-`)));
 }
+
+/** The file at `path`'s inode number. */
+function inodeOf(path: string): bigint {
+  return statSync(path, { bigint: true }).ino;
+}
+
+/**
+ * Deletes the file at `path` and copies `source` to it, as a store
+ * deleted and replaced by a copy is, answering whether the new file got
+ * the deleted one's inode number.
+ */
+function replaceWithCopy(path: string, source: string): boolean {
+  const before = inodeOf(path);
+  rmSync(path);
+  copyFileSync(source, path);
+  return inodeOf(path) === before;
+}
+
+/**
+ * Whether this host's `tmpdir()` hands a deleted file's inode number to
+ * a copy made at its path, probed once when this file loads with the
+ * steps the inode-reuse case takes.
+ */
+function probeInodeNumberRepeats(): boolean {
+  const path = join(fresh('inode-probe'), 'effort.sqlite');
+  writeFileSync(path, 'probe bytes', 'utf8');
+  const copy = `${path}.copy`;
+  copyFileSync(path, copy);
+  return replaceWithCopy(path, copy);
+}
+
+/** The `store_meta` row of the store at `path`, read on a connection of its own. */
+function recordedRowOf(path: string): RecordedIdentity | null {
+  const db = new Database(path, { readonly: true });
+  try {
+    return readStoreMeta(db);
+  } finally {
+    db.close();
+  }
+}
+
+/** {@link probeInodeNumberRepeats}'s answer. */
+const INODE_NUMBER_REPEATS = probeInodeNumberRepeats();
 
 /** A store file with some bytes in it, in a fresh directory. */
 function plantStore(name: string): string {
@@ -225,6 +290,37 @@ describe('decideStoreIdentity', () => {
     const facts = observeStore(path, () => 'host-b');
 
     expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'mint', reasons: ['host'], facts });
+  });
+
+  it.each([
+    [INODE_NUMBER_REPEATS
+      ? 'repeated'
+      : 'did not repeat', INODE_NUMBER_REPEATS],
+  ] as const)('mints on a write to a store deleted and replaced by a copy of its state before the last write, whose inode number %s', (_title, repeats) => {
+    const path = join(fresh('inode-reuse'), 'effort.sqlite');
+    const seams: StoreIdentitySeams = {
+      readHostId: () => 'host-a',
+      readProject: () => ({ rootCommit: 'a1b2c3d4', remote: null }),
+    };
+    withSqliteStore(path, 'write', true, () => undefined, seams);
+    const older = `${path}.copy`;
+    copyFileSync(path, older);
+    withSqliteStore(path, 'write', false, () => undefined, seams);
+
+    const repeated = replaceWithCopy(path, older);
+    const row = recordedRowOf(path);
+    const facts = observeStore(path, () => 'host-a');
+
+    expect(repeated).toBe(repeats);
+    expect(row?.generation).not.toBeNull();
+    expect(facts.generation).not.toBe(row?.generation);
+    expect(decideStoreIdentity('write', row, () => facts)).toEqual({
+      action: 'mint',
+      reasons: repeats
+        ? ['generation']
+        : ['file', 'generation'],
+      facts,
+    });
   });
 
   it('decides nothing on a read, unminted or copied, and never observes the store', () => {
