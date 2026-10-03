@@ -89,7 +89,6 @@ rafa doctor
 rafa loop list
 rafa status
 rafa release status
-rafa usage
 ```
 
 Then:
@@ -108,8 +107,8 @@ Then:
    any command is denied by a hook, stop and alert the person. Never read
    a permission denial as a hook denial, and never install a hook.
 
-Stop before phase 1 when `rafa doctor` fails, another loop of the project
-is live, or usage is too low for a stretch.
+Stop before phase 1 when `rafa doctor` fails, or another loop of the
+project is live.
 
 ### 1. Sweep and bucket
 
@@ -184,7 +183,6 @@ Stop and alert the person when:
 
 - one failure happens twice;
 - the hook rule fires;
-- usage runs low;
 - an action would touch anything outside the integration branch, `main`
   included;
 - a `rafa self-update` while another project's stretch runs on this

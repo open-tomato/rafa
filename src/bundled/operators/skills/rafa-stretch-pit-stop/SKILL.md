@@ -55,8 +55,8 @@ only after reading the run's last `rafa·` lines.
    When the bucket is full, the lowest-ranked preparation item leaves it.
    Add a line to `bucket.md` saying so.
 3. **A halt.** Stop the stretch and alert the person when one failure
-   happens twice, when the hook rule fires, when usage runs low, or when
-   the fix would touch anything outside the integration branch.
+   happens twice, when the hook rule fires, or when the fix would touch
+   anything outside the integration branch.
 
 Anything else you find is filed, not fixed: one issue, after a search for
 an existing one, and the stretch goes on.
