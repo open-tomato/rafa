@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,6 +38,12 @@ describe('readProjectLock', () => {
     writeFileSync(join(root, LOCK_FILE), JSON.stringify({ lockfileVersion: 2, rafa: '1.4.0' }), 'utf8');
 
     expect(() => readProjectLock(root)).toThrow('lockfileVersion 2');
+  });
+
+  it('refuses a lock that is a link to nothing, rather than adopting through it', () => {
+    symlinkSync(join(root, 'gone.json'), join(root, LOCK_FILE));
+
+    expect(() => readProjectLock(root)).toThrow('a link to nothing');
   });
 
   it('refuses a lock whose rafa is no version', () => {

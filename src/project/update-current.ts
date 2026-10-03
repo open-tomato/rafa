@@ -14,8 +14,16 @@
  *      and changes nothing else.
  *   3. **Deprecations.** The step a deprecated feature's own migration
  *      will run in (#718). None is registered yet, so it reads empty.
- *   4. **The lock.** `rafa.lock` at the root, written at the installed
- *      version unless it already records it.
+ *   4. **The lock.** `rafa.lock`, written at the installed version
+ *      unless it already records it. It sits at the top level of the
+ *      checkout the command runs in, which is the project root in the
+ *      main checkout and the worktree in a linked one: the lock is
+ *      tracked, so it belongs to the branch checked out where the person
+ *      runs it, while `.rafa/` stays the main checkout's.
+ *
+ * A step that throws stops the apply there as an {@link UpdateStepError}
+ * naming the step and what was already written, which stays written:
+ * labels on GitHub cannot be taken back.
  *
  * Each step changes only what is missing, so a rerun at the same version
  * is safe, and it is how a label refused the first time gets made.
@@ -56,6 +64,8 @@ export type LockChange = 'created' | 'updated' | 'unchanged';
 /** Everything `update current` would change, read before anything is written. */
 export interface UpdatePlan {
   readonly root: string;
+  /** The directory `rafa.lock` is read from and written to; see the module note. */
+  readonly lockRoot: string;
   /** The version the lock records, null when there is no lock. */
   readonly from: string | null;
   /** The installed version the project is brought to. */
@@ -109,9 +119,15 @@ function fromOf(range: AllowedRange): string | null {
 }
 
 /** Reads what `update current` would change under `root`; writes nothing. */
-export async function readUpdatePlan(root: string, range: AllowedRange, board: BoardAccess): Promise<UpdatePlan> {
+export async function readUpdatePlan(
+  roots: { readonly root: string; readonly lockRoot: string },
+  range: AllowedRange,
+  board: BoardAccess,
+): Promise<UpdatePlan> {
+  const { root, lockRoot } = roots;
   return {
     root,
+    lockRoot,
     from: fromOf(range),
     to: range.to,
     folders: missingFolders(root),
@@ -138,23 +154,58 @@ export interface UpdateApplied {
   readonly lock: LockChange;
 }
 
+/** The steps an apply can stop at. */
+export type UpdateStep = 'folders' | 'lock';
+
+/** An apply that stopped at `step`, after writing `written`, which stays. */
+export class UpdateStepError extends Error {
+  override readonly name = 'UpdateStepError';
+
+  constructor(readonly step: UpdateStep, message: string, readonly written: readonly string[]) {
+    super(message);
+  }
+}
+
+/** The planned folders that are there now, for a folder step that stopped part-way. */
+function foldersNowThere(plan: UpdatePlan): readonly string[] {
+  return plan.folders.filter((relative) => existsSync(join(plan.root, relative)));
+}
+
+function writeFolders(plan: UpdatePlan): readonly string[] {
+  if (plan.folders.length === 0) return [];
+  try {
+    return writeProjectScope(plan.root)
+      .filter((write) => write.change === 'created')
+      .map((write) => write.path);
+  } catch (error) {
+    throw new UpdateStepError('folders', messageOf(error), foldersNowThere(plan));
+  }
+}
+
+/** The labels `parts` says were created, as written entries. */
+function createdLabels(parts: readonly BoardPart[]): readonly string[] {
+  return parts.filter((part) => part.outcome === 'created').map((part) => `label ${part.name}`);
+}
+
 /**
  * Applies `plan`: the folders, the labels through `gh`, then the lock.
  * A label `gh` refuses is answered as a refused part, never thrown, and
- * the lock is still written.
+ * the lock is still written, so a rerun makes the label.
  *
- * @throws ScaffoldError when a folder cannot be written; nothing after
- * it is applied then.
+ * @throws UpdateStepError when a folder or the lock cannot be written;
+ * nothing after that step is applied.
  */
 export async function applyUpdatePlan(plan: UpdatePlan, gh: GhRunner | null): Promise<UpdateApplied> {
-  const folders = plan.folders.length === 0
-    ? []
-    : writeProjectScope(plan.root)
-      .filter((write) => write.change === 'created')
-      .map((write) => write.path);
+  const folders = writeFolders(plan);
   const labels = gh !== null && plan.board.kind === 'labels' && plan.board.missing.length > 0
     ? await setUpLabels(gh)
     : [];
-  if (plan.lock !== 'unchanged') writeProjectLock(plan.root, plan.to);
+  if (plan.lock !== 'unchanged') {
+    try {
+      writeProjectLock(plan.lockRoot, plan.to);
+    } catch (error) {
+      throw new UpdateStepError('lock', messageOf(error), [...folders, ...createdLabels(labels)]);
+    }
+  }
   return { folders, labels, lock: plan.lock };
 }

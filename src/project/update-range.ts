@@ -8,8 +8,11 @@
  * the lock existed has none. A newer minor or major is another action's
  * (`rafa update next`, `rafa update latest`, #716), and an installed
  * rafa older than the lock is a downgrade, which nothing allows before
- * 1.0.0 (#715, #718).
+ * 1.0.0 (#715, #718). Versions order by semver precedence, so a release
+ * moves a lock past its own release candidate, and a release candidate
+ * installed over its release is a downgrade.
  */
+import { compareVersions } from '../commands/release/status.js';
 import { parseSemanticVersion } from '../release/version.js';
 
 /** Why a move was refused. */
@@ -34,20 +37,17 @@ export function readCurrentRange(recorded: string | null, installed: string): Cu
   const from = parseSemanticVersion(recorded);
   if (from === null) return refused('unreadable', `the project records rafa "${recorded}", which is no version`);
 
-  if (to.major !== from.major) {
-    return to.major > from.major
-      ? refused('newer-major', `the installed rafa ${installed} is a newer major than the project's ${recorded}; that move is rafa update latest`)
-      : refused('older', `the installed rafa ${installed} is older than the project's ${recorded}, and no downgrade runs before 1.0.0`);
-  }
-  if (to.minor !== from.minor) {
-    return to.minor > from.minor
-      ? refused('newer-minor', `the installed rafa ${installed} is a newer minor than the project's ${recorded}; that move is rafa update next`)
-      : refused('older', `the installed rafa ${installed} is older than the project's ${recorded}, and no downgrade runs before 1.0.0`);
-  }
-  if (to.patch < from.patch) {
+  const order = compareVersions(to, from);
+  if (order < 0) {
     return refused('older', `the installed rafa ${installed} is older than the project's ${recorded}, and no downgrade runs before 1.0.0`);
   }
-  return to.patch === from.patch
+  if (to.major !== from.major) {
+    return refused('newer-major', `the installed rafa ${installed} is a newer major than the project's ${recorded}; that move is rafa update latest`);
+  }
+  if (to.minor !== from.minor) {
+    return refused('newer-minor', `the installed rafa ${installed} is a newer minor than the project's ${recorded}; that move is rafa update next`);
+  }
+  return order === 0
     ? { kind: 'same', to: installed }
     : { kind: 'patch', from: recorded, to: installed };
 }

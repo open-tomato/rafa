@@ -35,13 +35,15 @@ afterEach(() => {
 });
 
 /** A `gh` stand-in holding `held` labels, recording each call's words. */
-function standInGh(held: readonly string[], calls: string[]): GhRunner {
+function standInGh(held: readonly string[], calls: string[], refuseCreate = false): GhRunner {
   return (args) => {
     calls.push(args.join(' '));
     if (args[0] === 'label' && args[1] === 'list') {
       return Promise.resolve({ ok: true, stdout: JSON.stringify(held.map((name) => ({ name }))), stderr: '' });
     }
-    return Promise.resolve({ ok: true, stdout: '', stderr: '' });
+    return Promise.resolve(refuseCreate
+      ? { ok: false, stdout: '', stderr: 'HTTP 403: Resource not accessible by integration' }
+      : { ok: true, stdout: '', stderr: '' });
   };
 }
 
@@ -62,15 +64,16 @@ interface World {
   readonly questions: string[];
 }
 
-function seamsOf(world: World, options: { held?: readonly string[]; terminal?: boolean; answer?: string | null; remote?: string | null } = {}): UpdateCurrentSeams {
+function seamsOf(world: World, options: { held?: readonly string[]; terminal?: boolean; answer?: string | null; remote?: string | null; lockRoot?: string; refuseCreate?: boolean } = {}): UpdateCurrentSeams {
   return {
     installed: INSTALLED,
-    openGh: () => standInGh(options.held ?? [], world.gh),
+    openGh: () => standInGh(options.held ?? [], world.gh, options.refuseCreate ?? false),
     readRemote: () => (options.remote === undefined
       ? GITHUB_REMOTE
       : options.remote),
     isTerminal: () => options.terminal ?? false,
     openPrompter: () => scriptedPrompter(options.answer ?? null, world.questions),
+    lockRootOf: (root) => options.lockRoot ?? root,
   };
 }
 
@@ -211,7 +214,61 @@ describe('rafa update current', () => {
   });
 });
 
+describe('rafa update current, when something stands in the way', () => {
+  it('writes the lock where the checkout it runs in is, naming that path, and the folders at the project root', async () => {
+    const worktree = join(scope, 'worktree');
+    mkdirSync(worktree);
+    const run = await update(['current', '--yes'], seamsOf(newWorld(), { lockRoot: worktree }));
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`create at ${INSTALLED} in ${worktree}`);
+    expect(existsSync(join(worktree, LOCK_FILE))).toBe(true);
+    expect(existsSync(join(project.root, LOCK_FILE))).toBe(false);
+    expect(existsSync(join(project.root, '.rafa', 'specs'))).toBe(true);
+  });
+
+  it('applies everything else, then exits 1, when gh will not create a label', async () => {
+    const run = await update(['current', '--yes'], seamsOf(newWorld(), { refuseCreate: true }));
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toContain('warn: label type:spec was not created');
+    expect(run.stderr).toContain('board label(s) were not created; everything else was applied');
+    expect(existsSync(join(project.root, LOCK_FILE))).toBe(true);
+  });
+
+  it('exits 2 before asking when a .rafa/ folder path holds a file, changing nothing', async () => {
+    Bun.write(join(project.root, '.rafa', 'specs'), 'not a folder');
+    await Bun.sleep(0);
+    const world = newWorld();
+    const run = await update(['current'], seamsOf(world, { terminal: true, answer: 'y' }));
+
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr).toContain('the project scope cannot be written');
+    expect(world.questions).toEqual([]);
+    expect(existsSync(join(project.root, LOCK_FILE))).toBe(false);
+  });
+
+  it('names the lock step and what was kept when the lock cannot be written', async () => {
+    const run = await update(['current', '--yes'], seamsOf(newWorld(), { lockRoot: join(scope, 'no-such-dir') }));
+
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr).toContain('FAIL — lock:');
+    expect(run.stderr).toContain('Already written, and kept:');
+    expect(run.stderr).toContain(join('.rafa', 'specs'));
+    expect(existsSync(join(project.root, '.rafa', 'specs'))).toBe(true);
+  });
+});
+
 describe('rafa update stubs', () => {
+  it('refuses outside a project too, in the same line', async () => {
+    const outside = join(scope, 'outside');
+    mkdirSync(outside);
+    const run = await dispatchInProject(['update', 'self'], SUBJECTS, [self], { root: outside, home: project.home });
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('rafa update self is a feature in development');
+  });
+
   it('refuses rafa update self in one line naming its issue, changing nothing', async () => {
     const run = await update(['self'], seamsOf(newWorld()));
 

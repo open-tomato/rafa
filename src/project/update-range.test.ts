@@ -37,6 +37,20 @@ describe('readCurrentRange', () => {
     expect(reading.kind === 'refused' && reading.message).toContain('0.34.2');
   });
 
+  it('moves a lock past its own release candidate, as a newer patch', () => {
+    expect(readCurrentRange('0.34.0-rc.1', '0.34.0')).toEqual({ kind: 'patch', from: '0.34.0-rc.1', to: '0.34.0' });
+  });
+
+  it('refuses a release candidate installed over its release as a downgrade', () => {
+    const reading = readCurrentRange('0.34.1', '0.34.1-rc.2');
+
+    expect(reading.kind === 'refused' && reading.reason).toBe('older');
+  });
+
+  it('reads two builds of one version as the same, build metadata ignored', () => {
+    expect(readCurrentRange('0.34.0+a', '0.34.0+b')).toEqual({ kind: 'same', to: '0.34.0+b' });
+  });
+
   it('refuses an installed version that is no version', () => {
     const reading = readCurrentRange('0.34.0', 'dev');
 

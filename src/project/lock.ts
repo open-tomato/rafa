@@ -13,7 +13,7 @@
  * not read is refused rather than overwritten, since a newer rafa wrote
  * it. `rafa update current` is its only writer.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
@@ -49,6 +49,15 @@ export function projectLockText(version: string): string {
   return `${JSON.stringify(lock, null, 2)}\n`;
 }
 
+/** True when `path` is a link, whether or not it resolves. */
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function refuse(problem: string): never {
   throw new ProjectLockError(`${LOCK_FILE} ${problem}`);
 }
@@ -71,12 +80,15 @@ function lockOf(value: unknown): ProjectLock {
 /**
  * The lock under `root`, or null when there is none.
  *
- * @throws ProjectLockError for a lock that cannot be read, is not JSON,
- * is in another format, or names no version.
+ * @throws ProjectLockError for a lock that cannot be read, is a link to
+ * nothing, is not JSON, is in another format, or names no version.
  */
 export function readProjectLock(root: string): ProjectLock | null {
   const path = lockPath(root);
-  if (!existsSync(path)) return null;
+  if (!existsSync(path)) {
+    if (isLink(path)) refuse('is a link to nothing');
+    return null;
+  }
   let text: string;
   try {
     text = readFileSync(path, 'utf8');

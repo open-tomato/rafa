@@ -20,9 +20,20 @@
  * ## The exit code
  *
  * 0 applied, nothing to change, a dry run, or a no to the question. 1 for
- * an argument, a flag value, a refused move, and no terminal without
- * `--yes`. 2 when it could not run: a lock or a config that cannot be
- * read, or a folder that cannot be written.
+ * an argument, a flag value, a refused move, no terminal without
+ * `--yes`, and a board label `gh` would not create, everything else
+ * applied. 2 when it could not run: a lock or a config that cannot be
+ * read, a `.rafa/` path that holds something else, checked before
+ * anything is asked, or a folder or the lock that could not be written,
+ * the message naming the step and what was already written.
+ *
+ * ## Where the lock is
+ *
+ * `.rafa/` is the main checkout's, and `rafa.lock` is the checkout's the
+ * command runs in ({@link checkoutLockRoot}): run in a linked worktree,
+ * the lock lands on that worktree's branch, beside the change it goes
+ * with, and its line names the path when it differs from the project
+ * root.
  *
  * ## Seams
  *
@@ -44,8 +55,10 @@ import { loadConfig } from '../../config-load.js';
 import { messageOf } from '../../config-sections.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 import { LOCK_FILE, readProjectLock } from '../../project/lock.js';
-import { applyUpdatePlan, planChanges, readUpdatePlan } from '../../project/update-current.js';
+import { scaffoldConflicts } from '../../project/scaffold.js';
+import { applyUpdatePlan, planChanges, readUpdatePlan, UpdateStepError } from '../../project/update-current.js';
 import { readCurrentRange } from '../../project/update-range.js';
+import { mainCheckoutOf } from '../../project/worktree-root.js';
 import { gitRemoteUrl } from '../../schema/project-id.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
@@ -70,6 +83,22 @@ export interface UpdateCurrentSeams {
   readonly isTerminal: () => boolean;
   /** Opens the prompter the question is asked through. Called only to ask. */
   readonly openPrompter: () => Prompter;
+  /** The directory `rafa.lock` sits in, for the project at `root`; see the module note. */
+  readonly lockRootOf: (root: string) => string;
+}
+
+/**
+ * The top level of the checkout `dir` sits in, when that checkout belongs
+ * to the project at `root` (its main checkout is `root`), else `root`:
+ * a nested repository never takes the project's lock.
+ */
+export function checkoutLockRoot(root: string, dir: string): string {
+  const run = Bun.spawnSync(['git', 'rev-parse', '--show-toplevel'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' });
+  if (run.exitCode !== 0) return root;
+  const top = run.stdout.toString().trim();
+  return top !== '' && mainCheckoutOf(top) === root
+    ? top
+    : root;
 }
 
 /** The seams the registered command runs with. */
@@ -79,6 +108,7 @@ export const DEFAULT_UPDATE_CURRENT_SEAMS: UpdateCurrentSeams = Object.freeze({
   readRemote: gitRemoteUrl,
   isTerminal: () => process.stdin.isTTY === true,
   openPrompter: () => createLinePrompter(process.stdin, process.stderr),
+  lockRootOf: (root: string) => checkoutLockRoot(root, process.cwd()),
 });
 
 /** What json mode gives as the terminal result's `data`. */
@@ -136,9 +166,12 @@ function deprecationsText(plan: UpdatePlan): string {
 }
 
 function lockText(plan: UpdatePlan): string {
-  if (plan.lock === 'unchanged') return `unchanged at ${plan.to}`;
-  if (plan.lock === 'created') return `create at ${plan.to}`;
-  return `update ${String(plan.from)} → ${plan.to}`;
+  const where = plan.lockRoot === plan.root
+    ? ''
+    : ` in ${plan.lockRoot}`;
+  if (plan.lock === 'unchanged') return `unchanged at ${plan.to}${where}`;
+  if (plan.lock === 'created') return `create at ${plan.to}${where}`;
+  return `update ${String(plan.from)} → ${plan.to}${where}`;
 }
 
 /** The lines the plan prints, one per step. */
@@ -193,26 +226,68 @@ function readRange(root: string, installed: string): Exclude<ReturnType<typeof r
   return range;
 }
 
+/** Refuses, before anything is read further, a `.rafa/` path that holds something else. */
+function refuseConflicts(project: ProjectFound): void {
+  const conflicts = scaffoldConflicts(project.root, project.home);
+  if (conflicts.length === 0) return;
+  throw couldNotRun(`the project scope cannot be written:\n${conflicts.map((conflict) => `  ${conflict}`).join('\n')}`);
+}
+
+/** The exit an apply stopped part-way is answered with. */
+function stoppedPartWay(error: UpdateStepError): CommandExit {
+  const kept = error.written.length === 0
+    ? 'Nothing was written before it.'
+    : `Already written, and kept: ${error.written.join(', ')}.`;
+  return new CommandExit(2, `FAIL — ${error.step}: ${error.message}\nstopped part-way. ${kept}`
+    + '\nFix the cause and run rafa update current again: each step writes only what is missing.');
+}
+
+/** Applies `plan`, prints what was written, and refuses when a label was not created. */
+async function applyAndReport(plan: UpdatePlan, gh: GhRunner | null, context: RafaContext): Promise<UpdateApplied> {
+  let applied: UpdateApplied;
+  try {
+    applied = await applyUpdatePlan(plan, gh);
+  } catch (error) {
+    if (error instanceof UpdateStepError) throw stoppedPartWay(error);
+    throw error;
+  }
+  appliedLines(applied, plan, context);
+  return applied;
+}
+
+/** The exit for labels `gh` would not create, once everything else is applied; null when none. */
+function refusedLabels(applied: UpdateApplied): CommandExit | null {
+  const refused = applied.labels.filter((part) => part.outcome === 'refused');
+  if (refused.length === 0) return null;
+  return new CommandExit(1, `${String(refused.length)} board label(s) were not created; everything else was applied.`
+    + ' Run rafa update current again once gh can create them.');
+}
+
+/** The line a run that writes nothing ends on, or null when it goes on to ask. */
+function stopLine(plan: UpdatePlan, dryRun: boolean): string | null {
+  if (!planChanges(plan)) return 'Nothing to change.';
+  if (dryRun) return 'Dry run: nothing was written. Run rafa update current to apply it.';
+  return null;
+}
+
 async function runUpdateCurrent(context: RafaContext, seams: UpdateCurrentSeams): Promise<void> {
   expectNoArgument(context.args, USAGE);
   const dryRun = readSwitch(context, 'dry-run');
   const yes = readSwitch(context, 'yes');
   const project = projectOf(context);
-  const range = readRange(project.root, seams.installed);
+  const lockRoot = seams.lockRootOf(project.root);
+  const range = readRange(lockRoot, seams.installed);
+  refuseConflicts(project);
   const access = boardAccess(project, seams);
-  const plan = await readUpdatePlan(project.root, range, access);
+  const plan = await readUpdatePlan({ root: project.root, lockRoot }, range, access);
   for (const line of planLines(plan)) context.output.info(line);
 
   const finish = (applied: UpdateApplied | null): void => {
     if (context.outputMode === 'json') context.output.result({ plan, applied } satisfies UpdateCurrentResult);
   };
-  if (!planChanges(plan)) {
-    context.output.info('Nothing to change.');
-    finish(null);
-    return;
-  }
-  if (dryRun) {
-    context.output.info('Dry run: nothing was written. Run rafa update current to apply it.');
+  const stop = stopLine(plan, dryRun);
+  if (stop !== null) {
+    context.output.info(stop);
     finish(null);
     return;
   }
@@ -222,14 +297,10 @@ async function runUpdateCurrent(context: RafaContext, seams: UpdateCurrentSeams)
     finish(null);
     return;
   }
-  let applied: UpdateApplied;
-  try {
-    applied = await applyUpdatePlan(plan, access.gh);
-  } catch (error) {
-    throw couldNotRun(`folders: ${messageOf(error)}`);
-  }
-  appliedLines(applied, plan, context);
+  const applied = await applyAndReport(plan, access.gh, context);
   finish(applied);
+  const refusal = refusedLabels(applied);
+  if (refusal !== null) throw refusal;
 }
 
 /** `rafa update current` over `seams`. */
@@ -246,9 +317,11 @@ export function createUpdateCurrentCommand(seams: UpdateCurrentSeams = DEFAULT_U
       + ` and writes \`${LOCK_FILE}\`. It prints every change first; \`--dry-run\` stops there. Otherwise it`
       + ' warns that the changes cannot be rolled back and asks once, `--yes` answering; with no terminal and'
       + ' no `--yes` it refuses with exit code 1. A newer minor or major, or an installed rafa older than the'
-      + ' lock, refuses with exit code 1. A lock or config that cannot be read, or a folder that cannot be'
-      + ' written, exits 2. With `--output=json` the plan and what was applied are the data of the terminal'
-      + ' result event.',
+      + ' lock, refuses with exit code 1, and so does a board label `gh` would not create, once everything'
+      + ' else is applied. A lock or config that cannot be read, or a `.rafa/` path holding something else,'
+      + ' exits 2 before anything is asked; a folder or the lock that cannot be written exits 2 naming the'
+      + ' step and what was already written. In a linked worktree the lock is the worktree\'s, on its branch.'
+      + ' With `--output=json` the plan and what was applied are the data of the terminal result event.',
     args: [],
     flags: [
       { name: 'dry-run', description: 'Print every change and write nothing.', type: 'boolean' },

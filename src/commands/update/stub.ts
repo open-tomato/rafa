@@ -2,7 +2,8 @@
  * The `rafa update` actions that are not built yet (#713): each is
  * registered so the interface exists, and each refuses with exit code 1
  * in one line saying it is in development and naming its issue. Nothing
- * is read or written. `update current` is the one built (`./current.ts`).
+ * is read or written, inside a project or outside one. `update current`
+ * is the one built (`./current.ts`).
  *
  * `rafa` and `port` are hidden spellings of `project`, so the roster
  * lists `project` once while all three are dispatched.
@@ -42,6 +43,7 @@ export function createUpdateStub(spec: UpdateStubSpec): RafaCommand {
     flags: [],
     examples: [{ cmd: `rafa update ${spec.action}`, note: `Refuses, naming #${String(spec.issue)}; changes nothing.` }],
     outputs: ['text', 'json'],
+    needsProject: false,
     ...(spec.hidden === true
       ? { hidden: true }
       : {}),

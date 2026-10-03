@@ -277,7 +277,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
 };
 
 /** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `skill check` and `instinct check`, whose only project seam is `--project`, `init`, which makes one, and `describe`. */
-const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'init', 'describe'];
+const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'update self', 'update project', 'update rafa', 'update port', 'update board', 'update next', 'update latest', 'init', 'describe'];
 
 /** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
@@ -576,7 +576,7 @@ describe('the core roster', () => {
     expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length - 2);
   });
 
-  it('runs every command inside a project but module exec, the two checkers, init and describe, which declare needsProject false', () => {
+  it('runs every command inside a project but module exec, the two checkers, the seven update stubs, init and describe, which declare needsProject false', () => {
     const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);
