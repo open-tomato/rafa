@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
@@ -25,7 +25,6 @@ import { scratchHomeEnv } from '../../src/tests/scratch-home-env.js';
 const STRETCH_SH = resolve(import.meta.dir, 'stretch.sh');
 const DEFAULT_PROMPT = resolve(import.meta.dir, 'engineer-prompt-default.md');
 const CHECK_SH = resolve(import.meta.dir, '..', 'device', 'check.sh');
-const OPERATOR_AGENTS = ['rafa-stretch-engineer', 'rafa-stretch-watchtower', 'rafa-stretch-analyst'];
 
 let base = '';
 
@@ -59,7 +58,7 @@ function git(cwd: string, env: Record<string, string>, ...words: string[]): void
 }
 
 /** A main checkout with `.rafa/stretch/1/agent.json`, a HOME, and stand-ins. */
-function plantWorld(options: { linked?: boolean } = {}): World {
+function plantWorld(): World {
   const repo = join(base, 'repo');
   const home = join(base, 'home');
   const bin = join(base, 'bin');
@@ -73,11 +72,6 @@ function plantWorld(options: { linked?: boolean } = {}): World {
   git(repo, env, 'commit', '-q', '--allow-empty', '-m', 'root');
   mkdirSync(join(repo, '.rafa', 'stretch', '1'), { recursive: true });
   writeFileSync(join(repo, '.rafa', 'stretch', '1', 'agent.json'), '{}\n', 'utf8');
-
-  if (options.linked !== false) {
-    mkdirSync(join(home, '.claude', 'agents'), { recursive: true });
-    for (const name of OPERATOR_AGENTS) writeFileSync(join(home, '.claude', 'agents', `${name}.md`), '---\n---\n', 'utf8');
-  }
   return { repo, home, bin };
 }
 
@@ -95,9 +89,10 @@ function run(world: World, script: string, words: string[], cwd = world.repo): {
  * A stand-in rafa checkout beside the project: a git main checkout with
  * `.rafa/`, the script and both prompts under `scripts/stretch/`, rafa's
  * own prompt marked so a case can tell it from the default, and one
- * operator of each kind. Answers the copied script's path.
+ * operator of each kind beside the plugin manifest, unless `plugin` is
+ * false. Answers the copied script's path.
  */
-function plantRafa(world: World): { readonly root: string; readonly script: string } {
+function plantRafa(world: World, options: { plugin?: boolean } = {}): { readonly root: string; readonly script: string } {
   const root = join(base, 'rafa');
   const stretchDir = join(root, 'scripts', 'stretch');
   mkdirSync(stretchDir, { recursive: true });
@@ -108,6 +103,10 @@ function plantRafa(world: World): { readonly root: string; readonly script: stri
   for (const kind of ['agents', 'skills']) mkdirSync(join(root, 'src/bundled/operators', kind), { recursive: true });
   writeFileSync(join(root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'), 'x', 'utf8');
   mkdirSync(join(root, 'src/bundled/operators/skills/rafa-stretch-sweep'));
+  if (options.plugin !== false) {
+    mkdirSync(join(root, 'src/bundled/operators/.claude-plugin'));
+    writeFileSync(join(root, 'src/bundled/operators/.claude-plugin/plugin.json'), '{"name":"rafa-operators"}\n', 'utf8');
+  }
   const env = spawnEnv(world);
   git(root, env, 'init', '-q', '-b', 'main');
   git(root, env, 'commit', '-q', '--allow-empty', '-m', 'root');
@@ -135,7 +134,7 @@ describe('stretch.sh', () => {
     const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('claude --agent rafa-stretch-engineer -n stretch\\ 2\\ engineer');
+    expect(out).toContain(`claude --plugin-dir ${join(world.repo, '.rafa/stretch/2/operators')} --agent rafa-operators:rafa-stretch-engineer -n repo\\ stretch\\ 2\\ engineer`);
     expect(out).toContain('Start stretch 2.');
     expect(out).toContain('.rafa/stretch/1/report.md');
     expect(out).not.toContain('{{');
@@ -147,7 +146,7 @@ describe('stretch.sh', () => {
     const { code, out } = run(world, STRETCH_SH, ['engineer', '--remote-control', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('--remote-control stretch\\ 2\\ engineer');
+    expect(out).toContain('--remote-control repo\\ stretch\\ 2\\ engineer');
     expect(out).not.toContain(' -n ');
   });
 
@@ -156,7 +155,7 @@ describe('stretch.sh', () => {
     const { code, out } = run(world, STRETCH_SH, ['watchtower', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('claude --agent rafa-stretch-watchtower -n stretch\\ 1\\ watchtower /loop');
+    expect(out).toContain('--agent rafa-operators:rafa-stretch-watchtower -n repo\\ stretch\\ 1\\ watchtower /loop');
   });
 
   it('starts the analyst on that stretch, naming its folder in the opening message', () => {
@@ -164,7 +163,7 @@ describe('stretch.sh', () => {
     const { code, out } = run(world, STRETCH_SH, ['analyst', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('claude --agent rafa-stretch-analyst -n stretch\\ 1\\ analyst');
+    expect(out).toContain('--agent rafa-operators:rafa-stretch-analyst -n repo\\ stretch\\ 1\\ analyst');
     expect(out).toContain('Read\\ .rafa/stretch/1/');
     expect(out).not.toContain('{{');
   });
@@ -174,11 +173,12 @@ describe('stretch.sh', () => {
     const { code, out } = run(world, STRETCH_SH, ['start', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('tmux new-session -d -s rafa-stretch-2');
+    expect(out).toContain('tmux new-session -d -s stretch-repo-2');
+    expect(out).toContain('tmux new-window -t =stretch-repo-2:');
     expect(out).toContain('watchtower\\ --stretch=2');
     expect(out).toContain('analyst\\ --stretch=2');
-    expect(out).toContain('dry run: would start stretch 2 in tmux session rafa-stretch-2');
-    expect(calls(world, 'tmux')).toBe('has-session -t rafa-stretch-2\n');
+    expect(out).toContain('dry run: would start stretch 2 in tmux session stretch-repo-2');
+    expect(calls(world, 'tmux')).toBe('has-session -t =stretch-repo-2\n');
   });
 
   it('refuses in a worktree, naming the main checkout', () => {
@@ -191,28 +191,67 @@ describe('stretch.sh', () => {
     expect(out).toContain('run this from the main checkout, not a worktree');
   });
 
-  it('refuses before the operators are linked, naming the link command', () => {
-    const world = plantWorld({ linked: false });
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
+  it('refuses a rafa checkout whose operators carry no plugin manifest', () => {
+    const world = plantWorld();
+    const rafa = plantRafa(world, { plugin: false });
+    const { code, out } = run(world, rafa.script, ['engineer', '--dry-run']);
 
     expect(code).toBe(1);
-    expect(out).toContain('stretch.sh link');
+    expect(out).toContain('.claude-plugin/plugin.json is missing');
   });
 
-  it('links each operator from the rafa checkout it runs from, and keeps a file that is not a link', () => {
-    const world = plantWorld({ linked: false });
+  it('copies the operators into the stretch folder once, and loads that copy', () => {
+    const world = plantWorld();
     const rafa = plantRafa(world);
-    mkdirSync(join(world.home, '.claude', 'skills'), { recursive: true });
-    writeFileSync(join(world.home, '.claude/skills/rafa-stretch-sweep'), 'mine', 'utf8');
+    const copy = join(world.repo, '.rafa/stretch/2/operators');
 
-    const { code, out } = run(world, rafa.script, ['link']);
+    expect(run(world, rafa.script, ['engineer']).code).toBe(0);
+    expect(readFileSync(join(copy, '.claude-plugin/plugin.json'), 'utf8')).toContain('rafa-operators');
+    expect(calls(world, 'claude')).toContain(`--plugin-dir ${copy} --agent rafa-operators:rafa-stretch-engineer`);
+
+    writeFileSync(join(rafa.root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'), 'pulled', 'utf8');
+    writeFileSync(join(world.repo, '.rafa/stretch/2/agent.json'), '{}\n', 'utf8');
+    expect(run(world, rafa.script, ['watchtower', '--stretch=2']).code).toBe(0);
+    expect(readFileSync(join(copy, 'agents/rafa-stretch-engineer.md'), 'utf8')).toBe('x');
+  });
+
+  it('copies nothing under --dry-run', () => {
+    const world = plantWorld();
+    const { out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
+
+    expect(out).toContain('cp -R');
+    expect(existsSync(join(world.repo, '.rafa/stretch/2'))).toBe(false);
+  });
+
+  it('reopens a stretch whose folder holds the copy but no agent.json', () => {
+    const world = plantWorld();
+    mkdirSync(join(world.repo, '.rafa/stretch/2/operators'), { recursive: true });
+    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
 
     expect(code).toBe(0);
-    const engineer = join(world.home, '.claude/agents/rafa-stretch-engineer.md');
-    expect(lstatSync(engineer).isSymbolicLink()).toBe(true);
-    expect(realpathSync(engineer)).toBe(join(rafa.root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'));
-    expect(readFileSync(join(world.home, '.claude/skills/rafa-stretch-sweep'), 'utf8')).toBe('mine');
-    expect(out).toContain('kept');
+    expect(out).toContain('Start stretch 2.');
+    expect(out).not.toContain('cp -R');
+  });
+
+  it('names sessions after the project, so another project\'s stretch never shares one', () => {
+    const world = plantWorld();
+    const other = join(base, 'other project');
+    mkdirSync(join(other, '.rafa'), { recursive: true });
+    git(other, spawnEnv(world), 'init', '-q', '-b', 'main');
+    const { out } = run(world, STRETCH_SH, ['start', '--dry-run'], other);
+
+    expect(out).toContain('tmux new-session -d -s stretch-other-project-1');
+  });
+
+  it('warns at start about operators an earlier launcher linked into ~/.claude', () => {
+    const world = plantWorld();
+    mkdirSync(join(world.home, '.claude/agents'), { recursive: true });
+    symlinkSync(STRETCH_SH, join(world.home, '.claude/agents/rafa-stretch-engineer.md'));
+    const { code, out } = run(world, STRETCH_SH, ['start', '--dry-run']);
+
+    expect(code).toBe(0);
+    expect(out).toContain('linked operators found');
+    expect(out).toContain('.claude/agents/rafa-stretch-engineer.md');
   });
 
   it('gives another project the default prompt, never rafa\'s own', () => {

@@ -1,0 +1,5 @@
+{
+  "name": "rafa-operators",
+  "description": "Alpha: rafa's stretch operators, loaded per session with --plugin-dir by scripts/stretch/stretch.sh. Never a loop task executor.",
+  "author": { "name": "open-tomato" }
+}

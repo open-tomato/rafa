@@ -18,10 +18,15 @@ over the skills.
 
 Never link an operator into this repository's `.claude/`, as the
 loop's agents are: there it would be a project-tier item, served to
-every loop. On a loop host they are linked into the user's
-`~/.claude/agents/` and `~/.claude/skills/` instead, which a loop
-reads only when `loop.settingSources` holds `user`; each operator's
-description says it is never a loop task executor.
+every loop. Nor into `~/.claude/`: a loop reads that tier when
+`loop.settingSources` holds `user`, and one link there is shared by
+every stretch on the machine. `.claude-plugin/plugin.json` makes the
+folder a Claude Code plugin, `rafa-operators`, which the launcher loads
+per session with `--plugin-dir`, so an agent is
+`rafa-operators:rafa-stretch-engineer` and a skill
+`rafa-operators:rafa-stretch-sweep`. The engineer carries the `Skill`
+tool to load its skills by those names. Each operator's description
+says it is never a loop task executor.
 
 Every operator's frontmatter carries `provenance: first-party`,
 `source: rafa` and `stage: alpha`, and its body opens with the alpha
@@ -39,10 +44,12 @@ test reads them.
 | `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
 
-A stretch writes under `.rafa/stretch/<n>/`: `agent.json` (the agent's
-session id, which the watchtower finds it by), `bucket.md`,
-`loop-<issue>.log`, `pit-stops.md`, `watch.md` (the watchtower's one
-write), `analysis.md` (the analyst's one write) and `report.md`.
+A stretch writes under `.rafa/stretch/<n>/`: `operators/` (the
+launcher's copy, below), `agent.json` (the agent's session id, which
+the watchtower finds it by), `bucket.md`, `loop-<issue>.log`,
+`pit-stops.md`, `watch.md` (the watchtower's one write), `analysis.md`
+(the analyst's one write) and `report.md`. Its wrap-up writes the next
+stretch's opening message to `.rafa/stretch/engineer-prompt.md`.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it
 for the stretch. `release settle` folds `origin/<pr.base>`
@@ -58,10 +65,23 @@ from the main checkout of the project the stretch runs in;
 has no such script, so it runs `bash <rafa>/scripts/stretch/stretch.sh`
 by its path: the project is the checkout the shell stands in, and the
 operators and prompts are the rafa checkout's the script sits in.
-`link` links every operator from that rafa checkout into `~/.claude/`
-(a file that is not a link is kept), `engineer`, `watchtower` and
-`analyst` start one session each, and `start` opens all three in one
-tmux session, `rafa-stretch-<n>`. The watchtower and analyst windows
+`engineer`, `watchtower` and `analyst` start one session each, and
+`start` opens all three in one tmux session,
+`stretch-<project>-<n>`, named after the project's folder so two
+projects' stretches on one machine never meet. tmux reads a bare `-t`
+as a prefix, so every target is written `=<name>`, the exact match.
+The Claude sessions are named `<project> stretch <n> <role>`.
+
+The first session of a stretch copies the operators from the rafa
+checkout into `.rafa/stretch/<n>/operators/`, once, and every session
+of that stretch loads that copy. A pull, a worktree switch or a
+`rafa self-update` in the rafa checkout therefore never changes a
+stretch that runs; the next one takes the new files. Since the copy
+makes the folder, the next stretch is the highest folder while it has
+no `agent.json`, and one more than it after. `start` warns about
+operators still linked into `~/.claude` by the launcher before the
+copies: no new stretch reads them, and one started with them may.
+The watchtower and analyst windows
 wait for the new stretch's `agent.json`, since both find the engineer's
 stretch by it. `--remote-control` starts each session with Remote
 Control, so another device drives it from claude.ai; `--dry-run` prints
@@ -73,8 +93,9 @@ The engineer's opening message is the first of three files, with
 `scripts/stretch/engineer-prompt.md`, then
 `scripts/stretch/engineer-prompt-default.md`. So no other project is
 handed rafa's carried work. A first stretch drops each line naming
-`{{PREVIOUS}}`, since there is no report before it. The person edits
-the prompt between stretches, with what the last report carried over.
+`{{PREVIOUS}}`, since there is no report before it. The engineer's
+wrap-up writes the project's own prompt for the next stretch, and the
+person reviews it and adds the proposals they said yes to.
 
 `scripts/device/check.sh` (`bun run device:check`) is the reading from
 another device, such as a Mac: it runs `bun test` and `bunx eslint .`,
