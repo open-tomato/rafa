@@ -412,6 +412,7 @@ function readLayer(
     taskLessons: read('taskLessons'),
     testsFullSuiteTriggers: read('testsFullSuiteTriggers'),
     testsIntegration: read('testsIntegration'),
+    testsAlwaysRun: read('testsAlwaysRun'),
   };
   return { layer, problems, extras };
 }

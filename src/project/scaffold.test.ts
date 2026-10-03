@@ -220,18 +220,21 @@ describe('the config files', () => {
       '# tests:',
       '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
       '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
+      '#   alwaysRun: ["src/**/*.sweep.test.ts"]',
     ]);
-    expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration])
-      .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration]);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration]).toEqual(['file', 'file']);
+    expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsAlwaysRun])
+      .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsAlwaysRun]);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun])
+      .toEqual(['file', 'file', 'file']);
   });
 
   it('answers each tests setting from the default once its line is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration):/.test(line));
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration|alwaysRun):/.test(line));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 2);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration]).toEqual(['default', 'default']);
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 3);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun])
+      .toEqual(['default', 'default', 'default']);
   });
 
   it('carries the triage section, threshold at 0.3 and candidates at 3, which resolve from the file once uncommented', () => {

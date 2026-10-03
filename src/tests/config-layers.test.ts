@@ -234,6 +234,7 @@ const PROJECT_TEXT = [
   'tests:',
   '  fullSuiteTriggers: ["project/*.toml"]',
   '  integration: ["project/**/*.e2e.ts"]',
+  '  alwaysRun: ["project/**/*.sweep.ts"]',
   '',
 ].join('\n');
 
@@ -320,6 +321,7 @@ const PROJECT_VALUES: RafaConfig = {
   taskLessons: 'off',
   testsFullSuiteTriggers: ['project/*.toml'],
   testsIntegration: ['project/**/*.e2e.ts'],
+  testsAlwaysRun: ['project/**/*.sweep.ts'],
 };
 
 /** A user-scope file naming every setting at a value other than the project's. */
@@ -417,6 +419,7 @@ const USER_TEXT = [
   'tests:',
   '  fullSuiteTriggers: []',
   '  integration: ["user/**/*.e2e.ts"]',
+  '  alwaysRun: []',
   '',
 ].join('\n');
 
@@ -489,6 +492,7 @@ const USER_VALUES: RafaConfig = {
   taskLessons: 'on',
   testsFullSuiteTriggers: [],
   testsIntegration: ['user/**/*.e2e.ts'],
+  testsAlwaysRun: [],
 };
 
 /** Command-line values, one per setting a flag can name, distinct from both files. */
@@ -891,6 +895,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'tests.integration', 'tests:\n  integration: { e2e: true }',
     'tests.integration is a mapping, expected a list of glob patterns',
     'tests:\n  integration: []', 'testsIntegration', [],
+  ],
+  [
+    'tests.alwaysRun', 'tests:\n  alwaysRun: ["/src/*.sweep.test.ts"]',
+    'tests.alwaysRun[0] is "/src/*.sweep.test.ts", expected a glob pattern relative to the repository root',
+    'tests:\n  alwaysRun: ["src/*.sweep.test.ts"]', 'testsAlwaysRun', ['src/*.sweep.test.ts'],
   ],
 ];
 
