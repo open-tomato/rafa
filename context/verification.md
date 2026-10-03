@@ -1,5 +1,26 @@
 ## Verification
 
+### Scoped first, full at merge
+
+A change made through an agent, a loop task or a session by hand, is
+tested at its scope first: `changed` (`bun test --changed=<base>`, the
+`tests=affected` scope below) for an isolated change, `related` (the
+touched module's test files by path, the `tests=module` scope) when it
+reaches further. The full suite runs about 20 minutes a pass, so it is
+the warranty before a merge, run once every scoped run is green, and
+never the quick check between edits.
+
+A change still asks for the full suite before the merge-time run when:
+
+- it touches a file in `tests.fullSuiteTriggers` (`bunfig.toml`,
+  `tsconfig*.json`, `package.json`, the lockfile, a test preload);
+- it changes a module used across the codebase, the `tests=full` case;
+- a scoped run is green and the failure it chases is still unexplained,
+  so the full run is the capture that names it.
+
+The runner's recorded steps below are full runs at fixed points of a
+loop; a session never adds its own between them.
+
 ### Gate tiers and task declaration
 
 **A task session runs a targeted subset of checks; the runner runs the full

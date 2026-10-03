@@ -8,6 +8,21 @@ The hub's two packages sit beside it as bun workspaces under `packages/`.
 The `rafa` CLI is installed here: read `.claude/skills/rafa-tooling/SKILL.md`
 before running or suggesting any `gh`, `rafa` or branch-cleanup command.
 
+## Testing a change
+
+An isolated or small change is tested at its own scope. The full suite
+takes about 20 minutes a pass, so it is never the quick check:
+
+- `changed`: `bun test --changed=<base>`, with `tsc` and `eslint` on the
+  changed files. The default.
+- `related`: the test files of the module the change touches, by path
+  (`bun test src/effort/`), when the change reaches past what `changed`
+  finds.
+
+The full suite is the last warranty: run once, before a merge, after
+every scoped run is green. `context/verification.md` names the changes
+that still ask for it sooner.
+
 ## Context pages
 
 One page per tag, each the authority for its own subject; read the page your
