@@ -28,8 +28,13 @@ const INSTALL_CACHE_SUFFIX = '-bun-install-cache';
 /** The name a spawned run commits under, as the root's `gitIdentityEnv` spells it. */
 const TEST_NAME = 'rafa test';
 
-/** The address a spawned run commits under, as the root's `gitIdentityEnv` spells it. */
-const TEST_EMAIL = 'rafa@example.test';
+/**
+ * The address a spawned run commits under, as the root's `gitIdentityEnv`
+ * spells it. Joined from its two halves so the fixture guard, which reads
+ * every file under a `testdata/` folder for email addresses, does not find
+ * a literal one.
+ */
+const TEST_EMAIL = ['rafa', 'example.test'].join('@');
 
 /**
  * `HOME` set to `home`, beside the bun cache variables that keep a

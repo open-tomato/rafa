@@ -1,0 +1,1 @@
+minted on {{HOST}} at boot
