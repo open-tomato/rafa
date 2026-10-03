@@ -31,6 +31,11 @@ steps: a helper, never a hinderer. Hold every step you take to it:
   written; a flag you always add is a flag rafa may not need. Note both
   in the report.
 - Stop and ask only where there is a risk. Everything else is yours.
+- Move an issue between epics with `rafa epic move <issue> --to=<epic>`,
+  never by adding a second `epic:` label: where the project installs the
+  epic guard, a second label added beside the first is removed, and its
+  comment lands on the issue. Turning the guard on or off is the
+  person's, never yours.
 
 ## Two stops, everything else unattended
 

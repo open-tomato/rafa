@@ -361,6 +361,29 @@ the old mode's marks is asked separately, only after every write succeeded;
 any marks kept are named by `rafa doctor` alongside the marks of the
 other mode that are still on the board.
 
+### The epic guard
+
+In `labels` mode an issue belongs to one epic at most, and
+`.github/workflows/epic-guard.yml` can hold that on GitHub as labels
+land: when an issue gains an `epic:` label while it carries another, the
+guard removes the one just added and comments why. It is rafa's
+template (`src/board/templates/epic-guard.yml`, the file
+`rafa init --board --epic-guard` writes) committed unchanged, and
+`src/tests/epic-guard-workflow.test.ts` holds the two identical.
+
+It is installed **disabled**: while only rafa writes epic labels, no
+issue gets two, since `rafa epic move` swaps the old label for the new
+one in a single `gh issue edit`. Measured on 2026-10-03: none of the
+last 500 issues ever carried two `epic:` labels, and `rafa doctor`
+lists one that does whether or not the guard runs. The person turns it
+on when another person or tool starts adding epic labels:
+`gh workflow enable "Epic guard"`, and `gh workflow disable "Epic guard"`
+turns it off. A disabled workflow starts no run on any event.
+
+While it is on, moving an issue between epics by hand on GitHub means
+removing the old `epic:` label before adding the new one, since a new
+label added beside the old one is the one the guard removes.
+
 ### Marking a spec ready
 
 **`rafa issue ready <n>` marks an issue as ready for planning** after
