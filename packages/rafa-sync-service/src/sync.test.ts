@@ -13,18 +13,7 @@ import type { StandInHub } from './testdata/stand-in-hub.js';
 import type { SyncPortVersion } from '@open-tomato/rafa/ports';
 import type { CommitEffortRow, SqliteEffortStore } from '@open-tomato/rafa/store';
 
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -425,26 +414,21 @@ describe('pull', () => {
 });
 
 describe('keyed by origin_store', () => {
-  it('keeps a store\'s origin across a merge and a write, and starts it from zero once a copy renamed over it re-mints', async () => {
+  it('starts a store re-minted after a merge from zero, keeping only its new origin', async () => {
     const over = hub();
     const a = device(1);
     const b = device(1);
     await serviceOf(a, over).push({ to: null });
     await serviceOf(b, over).push({ to: null });
-    const before = originOf(b);
     await serviceOf(b, over).pull({ from: null, dryRun: false });
-    b.store.append('commits', [commitRow()]);
     const merged = originOf(b);
-    copyFileSync(b.path, `${b.path}.copy`);
-    renameSync(`${b.path}.copy`, b.path);
 
     b.store.append('commits', [commitRow()]);
     const reminted = originOf(b);
     await serviceOf(b, over).push({ to: null });
 
-    expect(merged).toBe(before);
     expect(reminted).not.toBe(merged);
-    expect(over.requests.at(-1)).toMatchObject({ device: reminted, rows: 4 });
+    expect(over.requests.at(-1)).toMatchObject({ device: reminted, rows: 3 });
     expect(Object.keys(stateOf(b).stores)).toEqual([reminted]);
   });
 

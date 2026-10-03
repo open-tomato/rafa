@@ -1,7 +1,7 @@
 /**
  * The build-aside convention: a SQLite store is never changed in place.
  * A new file is built beside it, checked, and swapped in behind a
- * backup of the whole store, or deleted under a dry run.
+ * whole-file backup, or deleted under a dry run.
  *
  * ## The steps
  *
@@ -24,43 +24,18 @@
  *    journal, and leaves the store untouched.
  * 5. Under a dry run the parallel file is then deleted, so the run can
  *    be repeated and leaves the directory as it found it. Otherwise the
- *    parallel file is swapped in ({@link swapIn}), in three steps:
- *    a. The store is written out to the backup with `VACUUM INTO` on a
- *       read-only connection (`vacuumInto`, `copy.ts`), and the backup
- *       is flushed with `fsync`, since SQLite's documentation says
- *       `VACUUM INTO` does not sync the file it writes.
- *    b. The store's identity is carried onto the parallel file
- *       (`carryStoreIdentity`, `store-meta.ts`): its `store_meta` row,
- *       when it names the live file, is given the parallel file's own
- *       device and inode. A file with no `store_meta` table or no row
- *       is not written.
- *    c. The parallel file is renamed over the store, which replaces it
- *       in one step.
- *    A failure at any of the three removes the backup and the parallel
- *    file and leaves the store untouched, since it is only read until
- *    the rename, and a rename that fails replaces nothing.
- *
- * ## The backup is a snapshot, not the original file
- *
- * The backup holds every row the store held, with its schema and
- * `user_version`, but it is a new file: its bytes need not equal the
- * original's, and its inode is its own. Its `store_meta` row still names
- * the original's inode, so a backup renamed back over the store mints a
- * new origin on its next writing open, as any restored copy must
- * (`store-identity.ts`). The swapped-in file keeps the store's origin,
- * since the carry recorded the inode the rename gives the store.
+ *    store is renamed to the backup and the parallel file renamed into
+ *    its place ({@link swapIn}); a failed second rename puts the store
+ *    back. The backup is the whole original, and restoring it is
+ *    renaming it back.
  *
  * The caller names both files, so each command keeps its own spelling
- * of them beside the store. The checks work over a handle the caller
- * opened; the swap opens the store read-only for the backup and the
- * parallel file for the carry.
+ * of them beside the store. The steps work over a handle the caller
+ * opened, and open no store themselves.
  */
 import type { Database } from 'bun:sqlite';
 
-import { closeSync, existsSync, fsyncSync, openSync, renameSync, rmSync } from 'node:fs';
-
-import { vacuumInto } from './copy.js';
-import { carryStoreIdentity } from './store-meta.js';
+import { existsSync, renameSync, rmSync } from 'node:fs';
 
 /** A build-aside step refused before the live store was changed. */
 export class RebuildRefusal extends Error {
@@ -136,46 +111,13 @@ function removeParallel(parallelPath: string): void {
   rmSync(`${parallelPath}-journal`, { force: true });
 }
 
-/** Writes the store at `path` out to `backupPath` as one snapshot, and flushes it to disk. */
-function writeBackup(path: string, backupPath: string): void {
-  vacuumInto(path, backupPath);
-  const backup = openSync(backupPath, 'r');
+/** Renames the original to its backup and the rebuild into its place, undoing the first on a failed second. */
+function swapIn(path: string, parallelPath: string, backupPath: string): void {
+  renameSync(path, backupPath);
   try {
-    fsyncSync(backup);
-  } finally {
-    closeSync(backup);
-  }
-}
-
-/** The three steps of a swap, in the order {@link swapIn} runs them. */
-export interface SwapSteps {
-  /** Writes the store at `path` out to `backupPath`. */
-  readonly backup: (path: string, backupPath: string) => void;
-  /** Carries the store's identity at `path` onto the file at `parallelPath`. */
-  readonly carry: (path: string, parallelPath: string) => unknown;
-  /** Renames `parallelPath` over `path`. */
-  readonly replace: (parallelPath: string, path: string) => void;
-}
-
-/** The steps a swap runs when the caller names none. */
-const SWAP_STEPS: SwapSteps = { backup: writeBackup, carry: carryStoreIdentity, replace: renameSync };
-
-/**
- * Swaps the parallel file in over the store at `path`: writes the
- * backup, carries the store's identity, and renames the parallel file
- * over the store. A failed step removes the backup and the parallel
- * file, leaves the store untouched and rethrows. `steps` replaces any
- * of the three, so a test can fail one. See the module note.
- */
-export function swapIn(path: string, parallelPath: string, backupPath: string, steps: Partial<SwapSteps> = {}): void {
-  const { backup, carry, replace } = { ...SWAP_STEPS, ...steps };
-  try {
-    backup(path, backupPath);
-    carry(path, parallelPath);
-    replace(parallelPath, path);
+    renameSync(parallelPath, path);
   } catch (error) {
-    removeParallel(parallelPath);
-    rmSync(backupPath, { force: true });
+    renameSync(backupPath, path);
     throw error;
   }
 }

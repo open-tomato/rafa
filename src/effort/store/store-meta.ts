@@ -44,20 +44,6 @@
  * complement explicitly, the row is read through `CAST(… AS TEXT)`,
  * and {@link fromStoredInteger} turns it back unsigned. Every value
  * below 2^63 is written and read as itself.
- *
- * ## Carrying the identity onto a file that replaces the store
- *
- * A rebuild beside the store (`rebuild-aside.ts`) builds a parallel file
- * holding the store's own `store_meta` row, then renames it over the
- * store. The renamed file has the store's path and host and the parallel
- * file's inode, so its next writing open would mint although it is the
- * same store. {@link carryStoreIdentity} rewrites that row's device and
- * inode to the parallel file's own before the rename, and only when the
- * row's recorded path, device and inode are the live file's: a row
- * naming another file is a copy's, and it is left to mint. The host is
- * not compared, so a store minted on another host still mints on the
- * first write here. A parallel file with no `store_meta` table, or no
- * row, is not written at all; an unminted store has nothing to carry.
  */
 import type { StoreAccess } from './schema-plan.js';
 import type {
@@ -65,21 +51,18 @@ import type {
   MintReason,
   ProjectIdentity,
   RecordedIdentity,
-  StoreFileFacts,
   StoreIdentityFacts,
 } from './store-identity.js';
+import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
-
-import { Database } from 'bun:sqlite';
 
 import {
   decideStoreIdentity,
   observeStore,
   readHostId,
   readProjectIdentity,
-  readStoreFileFacts,
 } from './store-identity.js';
 
 /** The width of the unsigned device and inode values. */
@@ -251,55 +234,4 @@ export function settleStoreIdentity(
     return { action: 'mint', storeId, reasons: second.reasons };
   });
   return mintUnderLock.immediate();
-}
-
-/**
- * What {@link carryStoreIdentity} did to the parallel file: nothing,
- * since it holds no `store_meta` table (`no-table`), no row
- * (`no-row`), or a row naming another path, device or inode than the
- * live file's (`other-file`); or its row now records its own device and
- * inode (`carried`).
- */
-export type CarryOutcome = 'no-table' | 'no-row' | 'other-file' | 'carried';
-
-/** Whether `db` holds a `store_meta` table. */
-function hasStoreMetaTable(db: Database): boolean {
-  return db
-    .query<{ n: number }, []>('SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = \'store_meta\'')
-    .get()?.n === 1;
-}
-
-/** Whether `recorded` was minted for the file `live` describes. */
-function namesFile(recorded: StoreMeta, live: StoreFileFacts): boolean {
-  return recorded.storePath === live.storePath
-    && recorded.fileDev === live.fileDev
-    && recorded.fileIno === live.fileIno;
-}
-
-/**
- * Carries the identity of the live store at `livePath` onto the file
- * at `parallelPath` that is about to be renamed over it: writes the
- * parallel file's own device and inode into its `store_meta` row when
- * that row's recorded path, device and inode are the live file's, and
- * writes nothing otherwise. The path and every other column are kept.
- * Throws the filesystem's own error when either file does not exist.
- * See the module note.
- */
-export function carryStoreIdentity(livePath: string, parallelPath: string): CarryOutcome {
-  const live = readStoreFileFacts(livePath);
-  const parallel = readStoreFileFacts(parallelPath);
-  const db = new Database(parallelPath, { readwrite: true });
-  try {
-    if (!hasStoreMetaTable(db)) return 'no-table';
-    const recorded = readStoreMeta(db);
-    if (recorded === null) return 'no-row';
-    if (!namesFile(recorded, live)) return 'other-file';
-    db.query('UPDATE store_meta SET file_dev = ?, file_ino = ? WHERE id = 1').run(
-      toStoredInteger(parallel.fileDev),
-      toStoredInteger(parallel.fileIno),
-    );
-    return 'carried';
-  } finally {
-    db.close();
-  }
 }

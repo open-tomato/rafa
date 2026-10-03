@@ -117,10 +117,9 @@ It writes to `effort.sqlite.merge-<stamp>`, brings the file forward
 (adopting and applying any migrations the incoming store has and the
 local one does not), checks the row count of every table in both files
 against the live store (the merge cannot lose rows), `integrity_check`
-and that `planSchema` finds it current, then writes the original out to
-`effort.sqlite.before-merge-<stamp>.bak` with `VACUUM INTO`, and swaps
-the new file in through `rebuildAside`, which carries the store's
-identity onto it so the merge keeps the store's origin.
+and that `planSchema` finds it current, then renames the original to
+`effort.sqlite.before-merge-<stamp>.bak`, and swaps the new file in
+through `rebuildAside`.
 
 ### Rafa effort move
 

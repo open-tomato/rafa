@@ -1,7 +1,7 @@
 /**
  * The merge `rafa effort merge` runs: another device's store file
  * unioned into this store, built beside it, checked, and swapped in
- * behind a backup of the whole store.
+ * behind a whole-file backup.
  *
  * ## What it refuses
  *
@@ -79,15 +79,11 @@
  * file one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
  *
  * Under `dryRun` the parallel file is then deleted, and the answer says
- * what the merge would have done. Otherwise this store is written out to
- * `<store>.before-merge-<stamp>.bak` with `VACUUM INTO`, its identity is
- * carried onto the parallel file, and the parallel file is renamed over
- * it (`rebuildAside`). The backup holds every row of the original. The
- * merged file carries the `store_meta` row `VACUUM INTO` copied from
- * this store, so the carry records its inode there and it keeps this
- * store's origin. The backup has an inode of its own under that same
- * row, so restored by renaming it back it mints a new origin on its
- * next writing open.
+ * what the merge would have done. Otherwise this store is renamed to
+ * `<store>.before-merge-<stamp>.bak` and the parallel file renamed into
+ * its place (`rebuildAside`). The backup is the whole original, and
+ * restoring it is renaming it back. The merged file is a new file, so
+ * its first writing open mints a new origin, which is harmless.
  *
  * ## What the counts leave out
  *

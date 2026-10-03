@@ -80,9 +80,9 @@ development build). It copies every table and column this rafa knows
 except the log, checks the row counts, `integrity_check` and that
 `planSchema` finds the rebuild current, and lists the unknown
 migrations, tables and columns only the newer schema holds, which stay
-in the backup alone. The original is then written out with `VACUUM INTO`
-to `effort.sqlite.v<user_version>-<stamp>.bak`, every row of it, and
-the rebuild is renamed over it. `--dry-run` deletes the rebuild instead, so it can be
+in the backup alone. The original is then renamed to
+`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
+takes its place. `--dry-run` deletes the rebuild instead, so it can be
 repeated and runs beside a live loop and from a development build; the
 swap refuses while a loop session is running or paused, and from a
 development build before anything is built. A newer schema that dropped
@@ -101,11 +101,7 @@ the swap is refused, the dry run runs. The steps around the build, from
 the in-flight journal refusal through the row-count check,
 `integrity_check` and the swap to removal on failure, are `rebuildAside`
 (`src/effort/store/rebuild-aside.ts`), which takes the two file names
-and the build from its caller. Its swap writes the backup with
-`VACUUM INTO`, carries the store's identity onto the rebuild
-(`carryStoreIdentity`, `store-meta.ts`) and renames the rebuild over
-the store, so the store keeps its origin, and a failed step removes
-both files and leaves the store untouched;
+and the build from its caller and opens no store itself;
 `SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
 `MigrateRefusal`.
 
@@ -153,7 +149,7 @@ store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
 `bringForward` with `builtAside`, checks the row count of every table
 both files hold against the live store (`checkedCounts`: a table rebuild
 that lost a row is refused), `integrity_check` and that `planSchema`
-finds it current, then writes the original out to
+finds it current, then renames the original to
 `effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
 applied or `schema_migrations` for an adoption alone, and swaps the new
 file in through `rebuildAside`. `--dry-run` deletes it instead and is
@@ -422,14 +418,10 @@ mint. The device and inode are bigints: when a `.bak` file is renamed
 over the store, it has a new inode and triggers a copy-detection mint,
 but one restored with `cp` over the existing file keeps the old inode
 and does not (measured on tmpfs). The merge's collision check is what
-catches a missed `.bak` restore. **When rafa rebuilds a store** (`merge`,
-`migrate`, or `fix-schema`), it carries the live file's device and inode
-into the rebuild's row before the rename, but only when the live row
-matches the live file; the backup is written with `VACUUM INTO`, so a
-restore has a new inode and mints a new identity. SQLite's INTEGER is
-signed and bun binds a bigint past 2^63 by wrapping without warning, so
-the device and inode are written as their two's complement and read back
-through `CAST(… AS TEXT)` as unsigned.
+catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
+a bigint past 2^63 by wrapping without warning, so the device and inode
+are written as their two's complement and read back through `CAST(… AS TEXT)`
+as unsigned.
 
 **A test passes its fifth argument to `withSqliteStore` to inject the
 host and project, so test stores can be minted independently.** The store
@@ -684,10 +676,6 @@ spelling does not mint; the device and inode are bigints. A `.bak`
 renamed over the store has a new inode and mints, but one restored
 with `cp` over the existing file keeps the old inode and does not
 (measured on tmpfs); the merge's collision check is what catches it.
-When rafa rebuilds a store (`merge`, `migrate`, or `fix-schema`), it
-carries the live file's device and inode into the rebuild's row before
-the rename, but only when the live row matches the live file; the backup
-is written with `VACUUM INTO`, so a restore has a new inode and mints.
 Every production insert into the twelve tables a merge unions stamps
 `origin_store` from that row and `origin_seq` as the row's own `seq`,
 which the insert names itself as `COALESCE(MAX(seq), 0) + 1` so the

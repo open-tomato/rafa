@@ -94,8 +94,7 @@ export function renderMigrate(result: MigrateResult): string[] {
     case 'migrated':
       return [
         ...builtLines(result),
-        `✅ Migrated. A copy of the original is kept at ${String(result.backupPath)}; renamed back to undo, it`
-          + ' takes a new store id on its next write.',
+        `✅ Migrated. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`,
       ];
   }
 }
@@ -159,9 +158,8 @@ export function createMigrateCommand(seams: MigrateCommandSeams = {}): RafaComma
       + ' rafa knows, including one that breaks older runtimes, which no ordinary open applies. It writes the'
       + ' store to `effort.sqlite.migrate-<stamp>` beside it with `VACUUM INTO`, applies the pending migrations'
       + ' there with log rows naming this rafa, checks the row count of every table against the store,'
-      + ' SQLite\'s integrity_check and the schema plan, then writes a copy of the original, every row, to'
-      + ' `effort.sqlite.before-<id>-<stamp>.bak` and moves the migrated file into its place, which keeps the'
-      + ' store\'s id; the copy, renamed back, takes a new store id on its next write. A store'
+      + ' SQLite\'s integrity_check and the schema plan, then renames the original to'
+      + ' `effort.sqlite.before-<id>-<stamp>.bak`, whole, and moves the migrated file into its place. A store'
       + ' with nothing pending, or no store, is left alone. It refuses, changing nothing, while a loop session'
       + ' under the project is running or paused, from a development build over any store but a copy under'
       + ' `RAFA_EFFORT_DIR`, while a journal beside the store shows a write in flight, when a row count'

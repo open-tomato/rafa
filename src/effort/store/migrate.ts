@@ -1,7 +1,7 @@
 /**
  * The forward move `rafa effort migrate` runs: a SQLite store's pending
  * migrations, breaking ones included, applied to a copy built beside it,
- * checked, and swapped in behind a backup of the whole store.
+ * checked, and swapped in behind a whole-file backup.
  *
  * ## What it applies
  *
@@ -33,13 +33,10 @@
  * one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
  *
  * Under `dryRun` the parallel file is then deleted. Otherwise the live
- * file is written out to `<store>.before-<id>-<stamp>.bak` with
- * `VACUUM INTO`, its identity is carried onto the parallel file, and the
- * parallel file is renamed over it. `<id>` is the first migration
- * applied, or `schema_migrations` when the run only adopts the store.
- * The backup holds every row of the original. The migrated file keeps
- * the store's origin, since its `store_meta` row, copied by `VACUUM INTO`,
- * is given its inode; the backup, renamed back, mints a new one.
+ * file is renamed to `<store>.before-<id>-<stamp>.bak` and the parallel
+ * file renamed into its place. `<id>` is the first migration applied, or
+ * `schema_migrations` when the run only adopts the store. The backup is
+ * the whole original; restoring it is renaming it back.
  *
  * Those steps, from the in-flight refusal to the swap and the removal of
  * the parallel file on any failure, are `rebuild-aside.ts`'s, the same

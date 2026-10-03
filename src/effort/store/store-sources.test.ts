@@ -122,8 +122,6 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/merge-store.ts',
   'src/effort/store/fixture-extract.ts',
   'src/effort/store/testdata/merge-scenarios.ts',
-  'src/effort/store/testdata/store-rows.ts',
-  'src/effort/store/store-meta.ts',
   'src/effort/sync/wire.ts',
 ]);
 

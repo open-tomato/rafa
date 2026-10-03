@@ -68,15 +68,13 @@
  *
  * ## After a merge
  *
- * The merged file core swaps in keeps the store's origin, since the swap
- * carries it onto that file (`rebuild-aside.ts` in core). `sync.test.ts`
- * measures both sides: a store keeps its origin across a pull that
- * merged and a write after it, and records another once a copy renamed
- * over it is written, as it does across writes with no merge between
- * them. The state file keys its cursors by origin, so a store core
- * re-mints starts both cursors from zero at its next contact and
- * resends what it holds; both sides skip every row they hold, so this
- * costs time and never a row.
+ * A merged file is a new file, so core mints the store a new origin at
+ * its next writing open. `sync.test.ts` measures both sides: a store
+ * records another origin after a pull merged and a write followed, and
+ * keeps its origin across writes with no merge between them. The state
+ * file keys its cursors by origin, so that store's next contact starts
+ * both cursors from zero and resends what it holds; both sides skip
+ * every row they hold, so this costs time and never a row.
  *
  * ## Errors
  *
