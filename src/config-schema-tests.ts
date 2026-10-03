@@ -48,9 +48,9 @@
  *     selects one. Its default is one pattern: any file under `src/`
  *     whose name ends `.sweep.test.ts`, the suffix this repository gives
  *     a content sweep. A pattern that matches no file today is accepted,
- *     since the sweeps it names may not have been written yet. When
- *     this key was added no caller read it yet: the same plan's task
- *     gate stage wires it into the task prompt and the task step.
+ *     since the sweeps it names may not have been written yet. The task
+ *     prompt reads it (`start/task-gate-lines.ts`), naming the files it
+ *     resolves to; the runner's task step does not read it yet.
  *
  * An empty list is a value every key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage

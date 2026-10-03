@@ -303,6 +303,7 @@ import { CommandExit } from './cli/command.js';
 import { ConfigError } from './config.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
+import { createGitRunner } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
 import {
   advanceExpectation,
@@ -342,6 +343,7 @@ import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
+import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
@@ -607,7 +609,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
       // The HEAD the checkout is held to is the task's base commit: the
       // session runs `bun test --changed=<base>` against it, and the task
-      // step runs over what the task changed since it.
+      // step runs over what the task changed since it. The
+      // `tests.alwaysRun` files are read per task, so a sweep an earlier
+      // task added is named to the next one.
       const base = expected.head;
       const position = taskPosition(trackerContent, taskInfo.lineNum);
       const startedAt = Date.now();
@@ -624,6 +628,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         settingSources,
         knownMissing,
         inherited: runStartFailures(trackerPath),
+        alwaysRun: readAlwaysRunFiles(createGitRunner(checkout), runConfig.config.testsAlwaysRun),
         serving,
         handout,
         base,
