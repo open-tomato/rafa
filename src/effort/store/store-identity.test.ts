@@ -1,7 +1,7 @@
 /**
  * `store-identity.ts`: the three facts a writing open compares (host id,
- * the store file's absolute path, its device and inode), the project
- * identity, and the decision. Every file is a real one under `tmpdir()`,
+ * the store file's absolute path, its device and inode), the side
+ * record's generation, the project identity, and the decision. Every file is a real one under `tmpdir()`,
  * so a copy, a restore and a rename are the filesystem's own; every host
  * id is injected, and no case reads this machine's.
  */
@@ -15,6 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { writeStoreGeneration } from './store-generation.js';
 import {
   decideStoreIdentity,
   hostIdFrom,
@@ -158,6 +159,74 @@ describe('decideStoreIdentity', () => {
     expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'keep', storeId: 'store-a' });
   });
 
+  it('keeps the origin on a write to the same file whose row and side record hold one generation', () => {
+    const path = plantStore('generation-match');
+    writeStoreGeneration(path, 'gen-1');
+    const minted = recorded(observeStore(path, () => 'host-a'));
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(minted.generation).toBe('gen-1');
+    expect(decision).toEqual({ action: 'keep', storeId: 'store-a' });
+  });
+
+  it.each([
+    ['the same inode', false, ['generation']],
+    ['a new inode', true, ['file', 'generation']],
+  ] as const)('mints on a write whose side record holds another generation than the row, with %s', (_title, restored, reasons) => {
+    const path = plantStore('generation-stale');
+    writeStoreGeneration(path, 'gen-1');
+    const minted = recorded(observeStore(path, () => 'host-a'));
+    if (restored) {
+      const backup = `${path}.bak`;
+      copyFileSync(path, backup);
+      renameSync(backup, path);
+    }
+    writeStoreGeneration(path, 'gen-2');
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(facts.fileIno === BigInt(minted.fileIno)).toBe(!restored);
+    expect(decision).toEqual({ action: 'mint', reasons: [...reasons], facts });
+  });
+
+  it('mints on a write whose row holds a generation and whose side record is absent, as a copy carries the row alone', () => {
+    const path = plantStore('generation-absent');
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: 'gen-1' };
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(facts.generation).toBeNull();
+    expect(decision).toEqual({ action: 'mint', reasons: ['generation'], facts });
+  });
+
+  it.each([
+    ['a side record', 'gen-1'],
+    ['no side record', null],
+  ] as const)('keeps the origin of a row written before the generation column, its three facts matching, with %s', (_title, side) => {
+    const path = plantStore('generation-null');
+    if (side !== null) writeStoreGeneration(path, side);
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: null };
+
+    const facts = observeStore(path, () => 'host-a');
+
+    expect(facts.generation).toBe(side);
+    expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'keep', storeId: 'store-a' });
+  });
+
+  it('judges a row written before the generation column by the three facts alone, so a moved file still mints', () => {
+    const path = plantStore('generation-null-moved');
+    writeStoreGeneration(path, 'gen-1');
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: null };
+
+    const facts = observeStore(path, () => 'host-b');
+
+    expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'mint', reasons: ['host'], facts });
+  });
+
   it('decides nothing on a read, unminted or copied, and never observes the store', () => {
     const source = plantStore('read-source');
     const minted = recorded(observeStore(source, () => 'host-a'));
@@ -173,6 +242,22 @@ describe('decideStoreIdentity', () => {
 
     expect(decideStoreIdentity('write', minted, copied.observe).action).toBe('mint');
     expect(copied.calls()).toBe(1);
+  });
+});
+
+describe('observeStore', () => {
+  it('reads the side record beside the real path, so a symlinked spelling reads the store\'s own generation', () => {
+    const path = plantStore('observe-symlink');
+    writeStoreGeneration(path, 'gen-1');
+    const link = join(fresh('observe-symlink-dir'), 'linked.sqlite');
+    symlinkSync(path, link);
+
+    expect(observeStore(link, () => 'host-a')).toEqual(observeStore(path, () => 'host-a'));
+    expect(observeStore(link, () => 'host-a').generation).toBe('gen-1');
+  });
+
+  it('answers a null generation for a store with no side record', () => {
+    expect(observeStore(plantStore('observe-absent'), () => 'host-a').generation).toBeNull();
   });
 });
 

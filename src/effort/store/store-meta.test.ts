@@ -16,6 +16,8 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { bringForward } from './bring-forward.js';
+import { SQLITE_MIGRATIONS } from './migrations.js';
 import { withSqliteStore } from './sqlite.js';
 import {
   fromStoredInteger,
@@ -107,6 +109,7 @@ describe('a writing open of withSqliteStore', () => {
       fileDev: stats.dev,
       fileIno: stats.ino,
       mintedAt: '2026-09-29T10:00:00.000Z',
+      generation: null,
     });
     expect(projectReads()).toEqual([realpathSync(join(path, '..'))]);
   });
@@ -290,6 +293,58 @@ describe('settleStoreIdentity', () => {
       db.close();
     }
     expect(metaOf(path)?.storeId).toBe('host-a-store-1');
+  });
+});
+
+describe('readStoreMeta and the generation column', () => {
+  /**
+   * A store `bringForward` left at `store-meta`, before the generation
+   * column, holding one row: what a read-only merge of an older store
+   * reads.
+   */
+  function storeBeforeGeneration(name: string): string {
+    const path = freshPath(name);
+    const through = SQLITE_MIGRATIONS.findIndex(({ id }) => id === 'store-meta') + 1;
+    const db = new Database(path, { readwrite: true, create: true });
+    try {
+      bringForward(db, path, 'write', 'open', { migrations: SQLITE_MIGRATIONS.slice(0, through) });
+      db.run('INSERT INTO store_meta (id, store_id, project_root_commit, project_remote, host_id, store_path,'
+        + ' file_dev, file_ino, minted_at) VALUES (1, \'store-old\', \'a1b2\', NULL, \'host-a\', ?, 1, 2, ?)', [
+        path,
+        MINTED_AT.toISOString(),
+      ]);
+    } finally {
+      db.close();
+    }
+    return path;
+  }
+
+  it('answers a null generation for a store whose row predates the column, without throwing', () => {
+    const path = storeBeforeGeneration('no-column');
+
+    expect(metaOf(path)).toMatchObject({ storeId: 'store-old', fileDev: 1n, fileIno: 2n, generation: null });
+  });
+
+  it('control: the store held before the column has no generation to select', () => {
+    const db = new Database(storeBeforeGeneration('no-column-control'), { readonly: true });
+    try {
+      expect(() => db.query('SELECT generation FROM store_meta').get()).toThrow('no such column: generation');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('answers the generation the column holds', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('filled-column', seams);
+    const db = new Database(path, { readwrite: true });
+    try {
+      db.run('UPDATE store_meta SET generation = \'gen-1\' WHERE id = 1');
+    } finally {
+      db.close();
+    }
+
+    expect(metaOf(path)?.generation).toBe('gen-1');
   });
 });
 

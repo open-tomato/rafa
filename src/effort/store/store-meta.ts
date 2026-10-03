@@ -10,9 +10,11 @@
  * decision: a `read` open answers `none` and this module neither reads
  * the row nor observes the file, so a read writes nothing. A `write`
  * open reads the row, observes the host, the real path and the file's
- * device and inode, and mints when the row is absent or any of the
- * three moved. Otherwise it keeps the recorded origin and writes
- * nothing, taking no lock.
+ * device and inode, and the side record's generation, and mints when
+ * the row is absent, any of the three moved, or the row holds a
+ * generation the side record does not. A row's generation is read as
+ * NULL when its store has no `generation` column yet. Otherwise it
+ * keeps the recorded origin and writes nothing, taking no lock.
  *
  * A mint takes the write lock with `BEGIN IMMEDIATE`, reads the row and
  * decides again under it, since another process may have minted the
@@ -125,6 +127,7 @@ interface StoreMetaColumns {
   readonly file_dev: string;
   readonly file_ino: string;
   readonly minted_at: string;
+  readonly generation: string | null;
 }
 
 /** An unsigned 64-bit value as the signed INTEGER SQLite stores. */
@@ -137,12 +140,29 @@ export function fromStoredInteger(text: string): bigint {
   return BigInt.asUintN(STORED_INTEGER_BITS, BigInt(text));
 }
 
-/** The `store_meta` row of the store `db` holds, or null when it holds none. */
+/**
+ * Whether `store_meta` has the `generation` column. A store a read open
+ * or a read-only merge reads may predate `store-meta-generation`.
+ */
+function hasGenerationColumn(db: Database): boolean {
+  return db.query<{ n: number }, []>(
+    'SELECT count(*) AS n FROM pragma_table_info(\'store_meta\') WHERE name = \'generation\'',
+  ).get()?.n === 1;
+}
+
+/**
+ * The `store_meta` row of the store `db` holds, or null when it holds
+ * none. The generation is null for a row whose store has no
+ * `generation` column yet, as for one written before it.
+ */
 export function readStoreMeta(db: Database): StoreMeta | null {
+  const generation = hasGenerationColumn(db)
+    ? 'generation'
+    : 'NULL AS generation';
   const row = db.query<StoreMetaColumns, []>(
     'SELECT store_id, project_root_commit, project_remote, host_id, store_path,'
-      + ' CAST(file_dev AS TEXT) AS file_dev, CAST(file_ino AS TEXT) AS file_ino, minted_at'
-      + ' FROM store_meta WHERE id = 1',
+      + ' CAST(file_dev AS TEXT) AS file_dev, CAST(file_ino AS TEXT) AS file_ino, minted_at,'
+      + ` ${generation} FROM store_meta WHERE id = 1`,
   ).get();
   if (row === null) return null;
   return {
@@ -154,6 +174,7 @@ export function readStoreMeta(db: Database): StoreMeta | null {
     fileDev: fromStoredInteger(row.file_dev),
     fileIno: fromStoredInteger(row.file_ino),
     mintedAt: row.minted_at,
+    generation: row.generation,
   };
 }
 
