@@ -155,11 +155,13 @@
  * catch-up for one that never ran; before the wrap-up, the full suite
  * runs as the pre-wrap-up step. Once a task is committed `done` and its
  * report stored, the task step runs over what it changed since the
- * commit it was dispatched on, the base its prompt names. A step with
- * failures the baseline does not hold is red: it writes its blocker on
- * the next open task, when one is left, and the run stops as it does
- * after a blocked task, so the next run retries that task handed the
- * failing files. A red pre-wrap-up step stops the run before the wrap-up.
+ * commit it was dispatched on, the base its prompt names, and lints the
+ * files it changed (`start/lint-step.ts`). A step with failures the
+ * baseline does not hold, or a task step with ESLint errors, is red: it
+ * writes its blocker on the next open task, when one is left, and the
+ * run stops as it does after a blocked task, so the next run retries
+ * that task handed the failing files. A red pre-wrap-up step stops the
+ * run before the wrap-up.
  * Each task prompt lists the baseline's failures as inherited
  * (`start/inherited-notice.ts`), read again before each dispatch.
  *

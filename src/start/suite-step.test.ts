@@ -543,6 +543,90 @@ describe('runTaskStep timing the always-run files', () => {
   });
 });
 
+describe('runTaskStep linting the task\'s diff', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const lintKey = `diff --name-only -z --no-renames --diff-filter=d ${BASE} HEAD`;
+  const lintRed = { exitCode: 1, stdout: JSON.stringify([{ filePath: 'x', messages: [], errorCount: 1 }]), stderr: '' };
+
+  /** A git answering the task step's diff and the lint step's filtered one, each `paths`. */
+  function gitLinting(paths: readonly string[]): GitRunner {
+    const tests = gitAt({ [BASE]: paths });
+    return (args) => args.join(' ') === lintKey
+      ? { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' }
+      : tests(args);
+  }
+
+  /** Seams linting with `answer`, recording each argv. */
+  function linting(answer: { exitCode: number; stdout: string; stderr: string }, argvs: (readonly string[])[] = []): SuiteStepSeams {
+    return {
+      git: gitLinting(['src/a.ts', 'a.json']),
+      runLint: (options) => {
+        argvs.push(options.argv);
+        return Promise.resolve({ ...answer, stdout: answer.stdout.replace('"x"', JSON.stringify(join(dir, 'a.json'))) });
+      },
+    };
+  }
+
+  beforeEach(() => {
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  });
+
+  it('lints the task\'s diff after a green test run and stays green on a green lint', async () => {
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([result()], { seams: linting({ exitCode: 0, stdout: '[]', stderr: '' }, argvs) });
+    const outcome = await runTaskStep(context, input);
+    expect(argvs).toEqual([['bunx', 'eslint', '--no-warn-ignored', '--format', 'json', 'src/a.ts', 'a.json']]);
+    expect(outcome).toMatchObject({ red: false, blocker: null, blockedLine: null });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('is red on a red lint under green tests, blocking the next open task with the lint\'s text', async () => {
+    const { context, seen } = contextWith([result()], { seams: linting(lintRed) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: true, interrupted: false, blockedLine: 9 });
+    expect(seen.steps[0]?.newFailures).toEqual([]);
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.status).toBe('blocked');
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(next?.blocker).toBe('The runner\'s lint step after "second task" found ESLint errors in the task\'s diff. Files with errors: a.json (1 error). Run bunx eslint --no-warn-ignored a.json and make them pass.');
+  });
+
+  it('writes one blocker holding both texts, the tests\' first, when both are red', async () => {
+    const { context } = contextWith([red([FRESH])], { seams: linting(lintRed) });
+    const outcome = await runTaskStep(context, input);
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.task).toBe('third task');
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(outcome.blocker?.startsWith('The runner\'s task step after "second task" found failures')).toBe(true);
+    expect(outcome.blocker).toContain('bun test src/new.test.ts');
+    expect(outcome.blocker).toContain('Run bunx eslint --no-warn-ignored a.json');
+  });
+
+  it('reads a lint ended by SIGINT as a stop, blocking nothing', async () => {
+    const { context, seen } = contextWith([result()], { seams: linting({ ...lintRed, exitCode: SIGINT_EXIT_CODE }) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(seen.steps[0]?.interrupted).toBe(true);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('does not lint after a test run read as a stop', async () => {
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([killed()], { seams: linting(lintRed, argvs) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome.interrupted).toBe(true);
+    expect(argvs).toEqual([]);
+  });
+
+  it('runs no lint in a checkout with no eslint.config file, where the same red lint blocks with one', async () => {
+    rmSync(join(dir, 'eslint.config.mjs'));
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([result()], { seams: linting(lintRed, argvs) });
+    expect((await runTaskStep(context, input)).red).toBe(false);
+    expect(argvs).toEqual([]);
+  });
+});
+
 describe('dueStages', () => {
   it('answers a finished stage while a task is open, and nothing once the ledger names it', () => {
     expect(dueStages(TRACKER, [])).toEqual([{ stage: 0, name: 'One' }]);
