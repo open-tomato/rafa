@@ -9,6 +9,12 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.34.1 — 2026-10-03, rafa update current, and the stretch launcher for any project
+<!-- rafa:fragments rafa-714-update-current -->
+
+- CLI: New `rafa update current [--dry-run] [--yes]` brings a project to the installed rafa within its patch range: it creates the missing `.rafa/` folders and the missing board labels on a GitHub board, and records the version in `rafa.lock` at the repository root, adopting a project that has none. It prints every change first and asks once; a newer minor or major, or an older installed rafa, is refused. `rafa update self`, `project`, `board`, `next` and `latest` are registered and say they are in development, naming their issues.
+- Stretch: `scripts/stretch/stretch.sh` starts a stretch in any project: the engineer's prompt is the project's own `.rafa/stretch/engineer-prompt.md`, rafa's own only in the rafa checkout, or a new default, and a first stretch no longer asks for a previous report. `link` takes the operators from the rafa checkout the script sits in.
+
 ## 0.34.0 — 2026-10-03, A clean checkout of main passes bun test and eslint; Stop refiling one red test as many bugs; Bug sweep 3 — a clean main passes `bun test` and `bunx eslint .`; A loop's pull request opens against pr.base; CI verifies pull requests into main, asynchronously on stretch branches; Tests pass on the pinned Bun 1.3.14 and the runner's git, as on a Bun 1.4.2 host
 <!-- rafa:fragments docs-sleep-mid-run-note rafa-485-green-main rafa-486-stop-refiling rafa-607-bug-sweep-3 rafa-628-pr-base rafa-637-ci-verify-pull-requests rafa-687-bun-git-versions rafa-687b-hub-core-subpaths -->
 
