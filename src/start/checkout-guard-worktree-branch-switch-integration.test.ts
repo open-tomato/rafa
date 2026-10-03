@@ -265,7 +265,14 @@ describe('the loop guard leaving the main checkout\'s own branch switches alone 
       expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\n');
 
       const trackerPath = join(scratch.repo, '.plans', TRACKER_NAME);
-      const tracker = readFileSync(trackerPath, 'utf8');
+      // The loop ticks the tracker after it commits, so wait for the
+      // tick rather than reading between the commit and the tick (#696).
+      const tracker = await waitUntil(() => {
+        const text = readFileSync(trackerPath, 'utf8');
+        return text.includes(`- [x] ${TASK}`)
+          ? text
+          : null;
+      }, RUN_TIMEOUT);
       expect(tracker).toContain(`- [x] ${TASK}`);
       expect(tracker).not.toContain(CHECKOUT_MOVED);
 
