@@ -10,7 +10,7 @@ migrates from NDJSON storage to SQLite.
 columns can change, and what happens when they cannot.** The rules are
 in `src/effort/store/merge-rules.ts` in a `MERGE_RULES` registry, keyed
 by table name. A new table must declare its rule in the same commit as
-its migration entry, or `merge-rules.test.ts` will fail.
+its migration entry, or `merge-rules.sweep.test.ts` will fail.
 
 **A table's scope is either `merged` or `local`.** Merged tables travel
 between stores and their rows combine; local tables stay on their
@@ -32,7 +32,7 @@ from the other store when NULL), `skipped` (a field written only by one
 store and never merged), or `unchanged` (a field that must be equal in
 both rows, or one is a conflict).
 
-**Every writer of a merged table must be checked.** `merge-rules.test.ts`
+**Every writer of a merged table must be checked.** `merge-rules.sweep.test.ts`
 reads every `UPDATE <table> SET <column>` in every module under `src/`
 (not tests or `store/`) whose column is not in the table's rule, and
 fails, so a new edit of an existing table's column needs its rule

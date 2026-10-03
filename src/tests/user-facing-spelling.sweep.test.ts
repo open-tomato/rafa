@@ -30,7 +30,7 @@ import { CORE_REGISTRY } from '../commands/index.js';
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
 /** This file, relative to `src/`: excluded from the repository scan, which it plants a hit in. */
-const SELF = 'tests/user-facing-spelling.test.ts';
+const SELF = 'tests/user-facing-spelling.sweep.test.ts';
 
 /** A literal naming a command under the old spelling, for the control. */
 const PLANTED = 'Usage: ralph plan --spec=<spec-file>.md';

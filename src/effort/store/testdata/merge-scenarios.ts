@@ -55,7 +55,7 @@
  * device, the project a fixed root commit, the path and file identity
  * the store file's own. A copy minted a new origin is given its new row
  * by deleting the copied one and inserting another, the statement a mint
- * would write, since this file is scanned for edits (`merge-rules.test.ts`)
+ * would write, since this file is scanned for edits (`merge-rules.sweep.test.ts`)
  * as every non-test module under `src/` is. Copies are taken with
  * `vacuumInto` (`copy.ts`), the snapshot `rafa effort copy` writes.
  *

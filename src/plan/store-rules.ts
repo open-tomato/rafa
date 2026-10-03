@@ -47,7 +47,7 @@
  * The refusal's copy command is spelled with the runner the refused span
  * used, so a plan running `bun run rafa` is told `bun run rafa effort
  * copy`, and no literal here names the checkout-only entry
- * (`src/tests/user-facing-spelling.test.ts`).
+ * (`src/tests/user-facing-spelling.sweep.test.ts`).
  *
  * `effort copy` is the one command exempt: the dev-planner's own rule
  * runs `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort`

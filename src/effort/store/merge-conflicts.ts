@@ -39,7 +39,7 @@
  *
  * ## The fill statements
  *
- * A fill is an `UPDATE` of a merged table, which `merge-rules.test.ts`
+ * A fill is an `UPDATE` of a merged table, which `merge-rules.sweep.test.ts`
  * reads from source and holds to `MERGE_RULES`; it can only read a
  * statement whose table and column are spelled out. So each set-once
  * field has its statement in {@link SET_ONCE_FILLS}, and a set-once

@@ -41,7 +41,7 @@
  *
  * ## What holds the registry to the schema
  *
- * `merge-rules.test.ts` reads a store brought through every migration
+ * `merge-rules.sweep.test.ts` reads a store brought through every migration
  * and fails on a table with no entry, an entry with no table, a merged
  * table without both origin columns and their partial unique index, an
  * identity or edited column the table lacks, and a production edit of a

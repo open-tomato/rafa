@@ -534,7 +534,7 @@ New; it replaces no earlier text. What a row or an action added to
   `plansDirAt`, or the config's warnings are written twice. A config
   `loadConfig` refuses is refused with exit code 1, and a line handing
   the wrong number of arguments is refused before the config is read.
-  The sweep guard in `src/tests/default-plan-dirs.test.ts` still spells
+  The sweep guard in `src/tests/default-plan-dirs.sweep.test.ts` still spells
   its forbidden tokens with a trailing slash, so the slashless spelling
   of either swept directory passes it in a tracked file; widening those
   tokens is a separate change.

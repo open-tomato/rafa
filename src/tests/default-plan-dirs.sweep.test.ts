@@ -23,7 +23,7 @@
  * Prose in this repository wraps by hand, which is why the sweep tasks
  * this suite closes out all read a whitespace-normalised copy of a
  * file rather than `git grep` output — the same method
- * `routing-table-agents.test.ts` and `repo-hygiene.test.ts` use.
+ * `routing-table-agents.sweep.test.ts` and `repo-hygiene.sweep.test.ts` use.
  * `forbiddenTokensIn` collapses every run of whitespace (spaces, tabs,
  * blank lines) to one space before testing for the literal `.plans/`
  * and `.specs/` substrings, and their slashless `.plans` and `.specs`
@@ -177,7 +177,7 @@ describe('no tracked file outside the test suite still names .plans/ or .specs/'
   });
 
   it('excludes *.test.ts files, everything under src/tests/, pre-init-dirs.ts and CHANGELOG.md, nothing else', () => {
-    expect(isScannedPath('src/tests/default-plan-dirs.test.ts')).toBe(false);
+    expect(isScannedPath('src/tests/default-plan-dirs.sweep.test.ts')).toBe(false);
     expect(isScannedPath('src/tests/loop-session-fixtures.ts')).toBe(false);
     expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/project/pre-init-dirs.ts')).toBe(false);
