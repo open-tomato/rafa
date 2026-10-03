@@ -35,7 +35,10 @@
  * ## The exemption is a path rule, not a content rule
  *
  * `isScannedPath` excludes a path two ways: it ends in `.test.ts`, or it
- * sits under `src/tests/`; it also excludes the two files named above.
+ * sits under `src/tests/`; it also excludes the two files named above,
+ * and every fixture path `isFixturePath` (`src/fixtures/fixture-path.ts`)
+ * names: a file under a `testdata/` folder quotes text as it stood when
+ * the fixture was made, old folder names included.
  * Every one of these holds regardless of what the file says, which is
  * what lets `src/tests/loop-session-fixtures.ts` — a fixture module,
  * not itself a `*.test.ts` file — keep planting non-default directories
@@ -58,6 +61,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
+
+import { isFixturePath } from '../fixtures/fixture-path.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -95,17 +100,16 @@ const CHANGELOG_PATH = 'CHANGELOG.md';
  *
  * Tests keep their fixtures: a `*.test.ts` case anywhere, or any file
  * under `src/tests/` regardless of its own extension, is exempt. So are
- * {@link PRE_INIT_DIRS_PATH} and {@link CHANGELOG_PATH}.
+ * {@link PRE_INIT_DIRS_PATH} and {@link CHANGELOG_PATH}, and every
+ * fixture path `isFixturePath` names, since a fixture may quote text that
+ * named the old folders when it was written.
  */
 export function isScannedPath(path: string): boolean {
   if (path.endsWith('.test.ts')) return false;
   if (path.startsWith('src/tests/')) return false;
   if (path === PRE_INIT_DIRS_PATH) return false;
   if (path === CHANGELOG_PATH) return false;
-  // TEMP-PATCH(#486): the scoring fixture quotes bug bodies that name the old
-  // plan and spec folders. Remove this line when the fixture is rewritten
-  // without them (#486's last task before its wrap-up).
-  if (path === 'src/triage/testdata/scoring.json') return false;
+  if (isFixturePath(path)) return false;
   return true;
 }
 
@@ -176,12 +180,14 @@ describe('no tracked file outside the test suite still names .plans/ or .specs/'
     expect(SCANNED.length).toBeLessThan(TRACKED.length);
   });
 
-  it('excludes *.test.ts files, everything under src/tests/, pre-init-dirs.ts and CHANGELOG.md, nothing else', () => {
+  it('excludes *.test.ts files, everything under src/tests/, fixture paths, pre-init-dirs.ts and CHANGELOG.md, nothing else', () => {
     expect(isScannedPath('src/tests/default-plan-dirs.sweep.test.ts')).toBe(false);
     expect(isScannedPath('src/tests/loop-session-fixtures.ts')).toBe(false);
     expect(isScannedPath('src/board/gate.test.ts')).toBe(false);
     expect(isScannedPath('src/project/pre-init-dirs.ts')).toBe(false);
     expect(isScannedPath('CHANGELOG.md')).toBe(false);
+    expect(isScannedPath('src/effort/store/testdata/merge/scenario-4/a.json')).toBe(false);
+    expect(isScannedPath('src/testdata-old/a.json')).toBe(true);
     expect(isScannedPath('docs/CHANGELOG.md')).toBe(true);
     expect(isScannedPath('AGENTS.md')).toBe(true);
     expect(isScannedPath('src/board/gate.ts')).toBe(true);
