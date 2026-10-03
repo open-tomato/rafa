@@ -53,18 +53,28 @@ the integration branch reaches `main`.
 ### Starting them
 
 `scripts/stretch/stretch.sh` starts the operators on the loop host,
-from the main checkout; `bun run stretch <command>` is the same line.
-`link` links every operator into `~/.claude/` (a file that is not a
-link is kept), `engineer`, `watchtower` and `analyst` start one session
-each, and `start` opens all three in one tmux session,
-`rafa-stretch-<n>`. The watchtower and analyst windows wait for the new
-stretch's `agent.json`, since both find the engineer's stretch by it. `--remote-control` starts each
-session with Remote Control, so another device drives it from
-claude.ai; `--dry-run` prints what would run.
+from the main checkout of the project the stretch runs in;
+`bun run stretch <command>` is the same line in rafa. Another project
+has no such script, so it runs `bash <rafa>/scripts/stretch/stretch.sh`
+by its path: the project is the checkout the shell stands in, and the
+operators and prompts are the rafa checkout's the script sits in.
+`link` links every operator from that rafa checkout into `~/.claude/`
+(a file that is not a link is kept), `engineer`, `watchtower` and
+`analyst` start one session each, and `start` opens all three in one
+tmux session, `rafa-stretch-<n>`. The watchtower and analyst windows
+wait for the new stretch's `agent.json`, since both find the engineer's
+stretch by it. `--remote-control` starts each session with Remote
+Control, so another device drives it from claude.ai; `--dry-run` prints
+what would run.
 
-The engineer's opening message is `scripts/stretch/engineer-prompt.md`,
-with `{{STRETCH}}` and `{{PREVIOUS}}` filled in. The person edits it
-between stretches, with what the last report carried over.
+The engineer's opening message is the first of three files, with
+`{{STRETCH}}` and `{{PREVIOUS}}` filled in: the project's own
+`.rafa/stretch/engineer-prompt.md`, then, in the rafa checkout alone,
+`scripts/stretch/engineer-prompt.md`, then
+`scripts/stretch/engineer-prompt-default.md`. So no other project is
+handed rafa's carried work. A first stretch drops each line naming
+`{{PREVIOUS}}`, since there is no report before it. The person edits
+the prompt between stretches, with what the last report carried over.
 
 `scripts/device/check.sh` (`bun run device:check`) is the reading from
 another device, such as a Mac: it runs `bun test` and `bunx eslint .`,

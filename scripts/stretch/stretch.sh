@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # stretch — start the stretch operators on the loop host, in the project's
-# main checkout, without copying their prompts by hand.
+# main checkout, without copying their prompts by hand. From a project that
+# is not rafa, run it by its path in the rafa checkout:
+# bash <rafa>/scripts/stretch/stretch.sh start
 #
 #   bash scripts/stretch/stretch.sh link          link the operators into ~/.claude
 #   bash scripts/stretch/stretch.sh start         engineer, watchtower and analyst in one tmux session
@@ -15,15 +17,23 @@
 #                      the newest with an agent.json; start passes the one it opens)
 #   --dry-run          print what would run, and run nothing
 #
+# The engineer's prompt is the project's .rafa/stretch/engineer-prompt.md,
+# else rafa's own engineer-prompt.md in the rafa checkout, else
+# engineer-prompt-default.md. A first stretch drops lines naming {{PREVIOUS}}.
+#
 # The operators and the stretch folder are described in context/operators.md.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OPERATORS="src/bundled/operators"
-PROMPT_FILE="$HERE/engineer-prompt.md"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# The rafa checkout this script sits in: the operators and prompts are its.
+RAFA_ROOT="$(cd "$HERE/../.." && pwd -P)"
+OPERATORS="$RAFA_ROOT/src/bundled/operators"
+RAFA_PROMPT="$HERE/engineer-prompt.md"
+DEFAULT_PROMPT="$HERE/engineer-prompt-default.md"
+PROJECT_PROMPT=".rafa/stretch/engineer-prompt.md"
 AGENT_WAIT_SECONDS=5
 
-usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 fail() { echo "stretch: $*" >&2; exit 1; }
 
 COMMAND="${1:-}"
@@ -79,7 +89,7 @@ require_operators() {
   local name
   for name in rafa-stretch-engineer rafa-stretch-watchtower rafa-stretch-analyst; do
     [ -e "$HOME/.claude/agents/$name.md" ] \
-      || fail "~/.claude/agents/$name.md is missing; run: bash scripts/stretch/stretch.sh link"
+      || fail "~/.claude/agents/$name.md is missing; run: bash $HERE/stretch.sh link"
   done
   command -v claude >/dev/null 2>&1 || fail "claude is not on PATH"
 }
@@ -102,10 +112,11 @@ claude_session() {
 }
 
 cmd_link() {
-  local root="$1" kind src name target
+  local kind src name target
+  [ -d "$OPERATORS" ] || fail "$OPERATORS is missing; run link from a rafa checkout's scripts/stretch/"
   for kind in agents skills; do
     run mkdir -p "$HOME/.claude/$kind"
-    for src in "$root/$OPERATORS/$kind"/*; do
+    for src in "$OPERATORS/$kind"/*; do
       [ -e "$src" ] || continue
       name="$(basename "$src")"
       target="$HOME/.claude/$kind/$name"
@@ -119,12 +130,29 @@ cmd_link() {
   done
 }
 
+# engineer_prompt_file <root>: the project's own prompt, rafa's own for the
+# rafa checkout, or the default, so no project is handed rafa's carried work.
+engineer_prompt_file() {
+  if [ -f "$1/$PROJECT_PROMPT" ]; then
+    echo "$1/$PROJECT_PROMPT"
+  elif [ "$1" = "$RAFA_ROOT" ]; then
+    echo "$RAFA_PROMPT"
+  else
+    echo "$DEFAULT_PROMPT"
+  fi
+}
+
 cmd_engineer() {
-  local root="$1" stretch prompt
+  local root="$1" stretch file fill prompt
   require_operators
   stretch="$(next_stretch "$root")"
-  [ -f "$PROMPT_FILE" ] || fail "$PROMPT_FILE is missing"
-  prompt="$(sed "s/{{STRETCH}}/$stretch/g; s/{{PREVIOUS}}/$((stretch - 1))/g" "$PROMPT_FILE")"
+  file="$(engineer_prompt_file "$root")"
+  [ -f "$file" ] || fail "$file is missing"
+  fill="s/{{STRETCH}}/$stretch/g; s/{{PREVIOUS}}/$((stretch - 1))/g"
+  # A first stretch has no previous report to read.
+  [ "$stretch" -eq 1 ] && fill="/{{PREVIOUS}}/d; $fill"
+  prompt="$(sed "$fill" "$file" | cat -s)"
+  echo "prompt: $file"
   cd "$root" || fail "cannot enter $root"
   claude_session rafa-stretch-engineer "stretch $stretch engineer" "$prompt"
 }
@@ -160,9 +188,9 @@ cmd_start() {
   [ "$REMOTE" -eq 1 ] && flags=" --remote-control"
   if ! command -v tmux >/dev/null 2>&1; then
     echo "tmux is not installed: starting the engineer here. In a second terminal run:"
-    echo "  bash scripts/stretch/stretch.sh watchtower --stretch=$stretch$flags"
+    echo "  bash '$HERE/stretch.sh' watchtower --stretch=$stretch$flags"
     echo "and in a third, for the analyst:"
-    echo "  bash scripts/stretch/stretch.sh analyst --stretch=$stretch$flags"
+    echo "  bash '$HERE/stretch.sh' analyst --stretch=$stretch$flags"
     cmd_engineer "$root"
     return
   fi
@@ -195,7 +223,7 @@ case "$COMMAND" in
 esac
 ROOT="$(main_checkout)" || exit 1
 case "$COMMAND" in
-  link) cmd_link "$ROOT" ;;
+  link) cmd_link ;;
   start) cmd_start "$ROOT" ;;
   engineer) cmd_engineer "$ROOT" ;;
   watchtower) cmd_watchtower "$ROOT" ;;
