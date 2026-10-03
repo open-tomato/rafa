@@ -30,9 +30,11 @@
  *
  * Also for the task's base commit reaching the prompt: `buildTaskPrompt`
  * placing the line naming `bun test --changed=<base>` after the blocker
- * line and ahead of the sections, no line for a null base, and a base
- * that is not a commit name refused; and `dispatchTask` handing the
- * runner the prompt its `base` option put that line in.
+ * line and ahead of the sections, and no line for a null base; and
+ * `dispatchTask` handing the
+ * runner the prompt its `base` option put that line in. The line's own
+ * shape, an abbreviated base and a refused one, are driven in
+ * `task-gate-lines.test.ts`.
  *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
@@ -65,13 +67,13 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
 import {
-  BASE_PROMPT_PREFIX,
   buildTaskPrompt,
   dispatchTask,
   NO_TASK_SECTIONS,
   renderProgressForDispatch,
   storeTaskReport,
 } from './dispatch.js';
+import { BASE_PROMPT_PREFIX } from './task-gate-lines.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -1044,16 +1046,6 @@ describe('buildTaskPrompt and dispatchTask, handing the task its base commit', (
     expect(lines[3]).toBe(BASE_LINE);
     expect(lines[4]).toBe('');
     expect(lines[5]).toBe('## Skills for this task');
-  });
-
-  it('takes an abbreviated commit name', () => {
-    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, 'a5a383a')).toContain('--changed=a5a383a`');
-  });
-
-  it('refuses a base that is not a commit name, which the line would paste into a shell command', () => {
-    for (const base of ['', 'HEAD', 'origin/main', 'a5a383a; rm -rf .', 'A5A383A']) {
-      expect(() => buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, base)).toThrow('is not a commit name');
-    }
   });
 
   it('hands the runner a prompt naming the base its dispatch was given', async () => {

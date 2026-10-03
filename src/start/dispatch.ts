@@ -107,6 +107,7 @@ import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
 import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
+import { baseLines } from './task-gate-lines.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
 export const SESSION_ID_FLAG = '--session-id';
@@ -309,29 +310,6 @@ function blockerLines(blocker: string | null): string[] {
 }
 
 /**
- * What opens the prompt line handing a session its task's base commit.
- * The loop's words open it, as they open the blocker line.
- */
-export const BASE_PROMPT_PREFIX = 'The base commit of this task is ';
-
-/** A full or abbreviated git object name, the only shape a base may take. */
-const COMMIT_NAME = /^[0-9a-f]{7,64}$/;
-
-/**
- * The prompt line naming `base` and the `bun test --changed=<base>` the
- * session runs, or none for no base. Throws on a base that is not a
- * commit name: it is pasted into a shell command the session runs, and
- * the loop only ever hands it the HEAD git answered.
- */
-function baseLines(base: string | null): string[] {
-  if (base === null) return [];
-  if (!COMMIT_NAME.test(base)) {
-    throw new Error(`The task's base \`${base}\` is not a commit name; the prompt pastes it into \`bun test --changed=\`.`);
-  }
-  return [`${BASE_PROMPT_PREFIX}${base}: run \`bun test --changed=${base}\` for the tests your changes reach.`];
-}
-
-/**
  * The rendered sections a task is handed ahead of `PROMPT.md`: what
  * `renderSkillsSection` and `renderLessonsSection` (`task/sections.ts`)
  * answered for it. A blank section is absent from the prompt.
@@ -393,9 +371,10 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  * is the one built before blockers were carried.
  *
  * `base` is the task's base commit, {@link TaskDispatchOptions.base}.
- * With one, a line opening {@link BASE_PROMPT_PREFIX} follows the blocker
- * line (or the second line, with no blocker), naming the commit and the
- * `bun test --changed=<base>` the session's scoped test gate is. A base
+ * With one, a line opening `BASE_PROMPT_PREFIX` (`task-gate-lines.ts`)
+ * follows the blocker line (or the second line, with no blocker), naming
+ * the commit and the `bun test --changed=<base>` the session's scoped
+ * test gate is. A base
  * that is not a commit name throws: the line puts it in a shell command.
  * With none, the default, the prompt is the one built before bases were
  * carried.
