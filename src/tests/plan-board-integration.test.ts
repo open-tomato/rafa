@@ -416,7 +416,7 @@ function runPlan(scratch: Scratch, recordName: string, args: readonly string[]):
   const record = join(scratch.root, `${recordName}.json`);
   const proc = Bun.spawnSync(
     [process.execPath, scratch.probe, record, ...args],
-    { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) } },
+    { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) } },
   );
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString(), record };
 }

@@ -1269,7 +1269,7 @@ function makeRepo(config: string): string {
 function runCollect(root: string, args: readonly string[]): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'collect', ...args],
-    { cwd: root, env: { ...process.env, ...scratchHomeEnv(makeScratch()) } },
+    { cwd: root, env: { TMPDIR: tmpdir(), ...process.env, ...scratchHomeEnv(makeScratch()) } },
   );
   return {
     exitCode: run.exitCode,

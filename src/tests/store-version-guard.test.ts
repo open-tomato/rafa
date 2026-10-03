@@ -167,7 +167,7 @@ interface CommandRun {
 function runCollect(repo: Repo): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'collect'],
-    { cwd: repo.root, env: { ...process.env, ...scratchHomeEnv(repo.home) } },
+    { cwd: repo.root, env: { TMPDIR: tmpdir(), ...process.env, ...scratchHomeEnv(repo.home) } },
   );
   return {
     exitCode: run.exitCode,

@@ -93,20 +93,20 @@ function isUnderScratch(path: string): boolean {
   return rel !== '' && !rel.startsWith('..') && !rel.startsWith('/');
 }
 
-/** The environment a fork is handed: the case's `HOME`, a `PATH` holding its `bin/` first, and `FORK_LOG`. */
+/** The environment a fork is handed: the suite's `TMPDIR`, the case's `HOME`, a `PATH` holding its `bin/` first, and `FORK_LOG`. */
 function forkEnv(path: string = [bin, SYSTEM_PATH].join(delimiter)): Record<string, string> {
   expect(isUnderScratch(home)).toBe(true);
   expect(isUnderScratch(bin)).toBe(true);
   expect(isUnderScratch(log)).toBe(true);
   expect(process.env.FORK_LOG).toBeUndefined();
-  return { ...scratchHomeEnv(home), PATH: path, FORK_LOG: log };
+  return { TMPDIR: tmpdir(), ...scratchHomeEnv(home), PATH: path, FORK_LOG: log };
 }
 
 /** Runs the real `git` for a fixture, under the case's `HOME`, answering its stdout. */
 function git(cwd: string, args: readonly string[]): string {
   const run = Bun.spawnSync(['git', '-c', 'user.name=rafa', '-c', 'user.email=rafa@example.invalid', ...args], {
     cwd,
-    env: { ...scratchHomeEnv(home), PATH: SYSTEM_PATH },
+    env: { TMPDIR: tmpdir(), ...scratchHomeEnv(home), PATH: SYSTEM_PATH },
     stdout: 'pipe',
     stderr: 'pipe',
   });

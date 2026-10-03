@@ -151,7 +151,7 @@ function runRafaIn(scratch: Scratch, words: readonly string[]): SpawnRun {
   if (resolved !== null) throw new Error(`claude resolves to ${resolved}, and this suite plants no stand-in`);
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

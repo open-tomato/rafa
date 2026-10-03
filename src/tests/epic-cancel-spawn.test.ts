@@ -315,7 +315,7 @@ function runCancelProbe(scratch: ScratchRepo, logPath: string): { readonly stdou
   writeFileSync(probe, buildCancelProbe(), 'utf8');
   const run = Bun.spawnSync([process.execPath, probe, logPath, 'epic', 'cancel', '40'], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: SPAWN_TIMEOUT,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

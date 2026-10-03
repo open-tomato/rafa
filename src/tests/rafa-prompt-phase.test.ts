@@ -81,7 +81,7 @@ async function plantProject(run: PlantedRun, done: number, total: number): Promi
 /** Runs `script` in `zsh -f` with ROOT set, and returns its trimmed stdout. */
 async function runZsh(script: string, root: string): Promise<string> {
   const child = Bun.spawn(['zsh', '-f', '-c', script], {
-    env: { PATH: process.env.PATH ?? '', ...scratchHomeEnv(scratch), ROOT: root },
+    env: { TMPDIR: tmpdir(), PATH: process.env.PATH ?? '', ...scratchHomeEnv(scratch), ROOT: root },
     stdout: 'pipe',
     stderr: 'pipe',
     stdin: 'ignore',
