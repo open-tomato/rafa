@@ -281,7 +281,7 @@ function run(scratch: Scratch, words: readonly string[], env: Readonly<Record<st
   }
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: SPAWN_KILL_MS,
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
@@ -295,7 +295,7 @@ function spawnLoopStart(scratch: Scratch) {
   }
   return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     stdout: 'ignore',
     stderr: 'ignore',
   });

@@ -270,7 +270,7 @@ describe('the frozen help snapshots', () => {
 
   it('holds the root snapshot as what src/rafa.ts prints for --help', () => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('RAFA_')));
-    const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, '--help'], { cwd: tempBase, env: { ...env, ...scratchHomeEnv(tempBase) } });
+    const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, '--help'], { cwd: tempBase, env: { TMPDIR: tmpdir(), ...env, ...scratchHomeEnv(tempBase) } });
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr.toString()).toBe('');

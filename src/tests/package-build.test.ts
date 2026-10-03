@@ -647,7 +647,7 @@ function plantPlanScratch(name: string): PlanScratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { root, repo, prompt, args, env: { PATH: path, ...scratchHomeEnv(home) } };
+  return { root, repo, prompt, args, env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(home) } };
 }
 
 /** The arguments the stand-in keeps for a plan session under `sources`, one per line. */
@@ -791,6 +791,7 @@ describe('the built CLI', () => {
     const copy = join(tempRoot, 'describe-outside', 'dist');
     cpSync(DIST, copy, { recursive: true });
     const env = {
+      TMPDIR: tmpdir(),
       ...Object.fromEntries(Object.entries(withBunOnPath()).filter(([name]) => !name.startsWith('RAFA_'))),
       ...scratchHomeEnv(tempRoot),
     };

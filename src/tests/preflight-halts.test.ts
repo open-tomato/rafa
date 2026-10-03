@@ -173,7 +173,7 @@ function runLoopStart(scratch: CliScratch, flags: readonly string[]): SpawnRun {
   assertStandIn(scratch);
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
@@ -183,7 +183,7 @@ function runLoopStart(scratch: CliScratch, flags: readonly string[]): SpawnRun {
 function runEffortReport(scratch: CliScratch): SpawnRun {
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'effort', 'report'], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

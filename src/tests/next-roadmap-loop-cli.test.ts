@@ -358,7 +358,7 @@ function runProbe(loop: LoopScratch, words: readonly string[]): { readonly event
   const recordPath = join(dirname(loop.scratch.repo), 'record.json');
   const proc = Bun.spawnSync([process.execPath, loop.probe, recordPath, ...words], {
     cwd: loop.scratch.repo,
-    env: { PATH: loop.scratch.path, ...scratchHomeEnv(loop.scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
+    env: { TMPDIR: tmpdir(), PATH: loop.scratch.path, ...scratchHomeEnv(loop.scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
   });
   const stdout = proc.stdout.toString();
   const stderr = proc.stderr.toString();

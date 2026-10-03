@@ -22,6 +22,11 @@
  * skipped, its title saying why, when git, the tag or the lock at the
  * tag is absent. A repository planted under the temporary directory
  * drives the same reader through each of those answers.
+ *
+ * `store-meta-generation` is held to a store `bringForward` left at the
+ * `store-meta` entry with its row written: the next open adds the
+ * column, leaves the row's generation NULL and every other column as it
+ * was, and a control shows the column's CHECK refuses an empty value.
  */
 import type { CreatedObject, ShapeProblem } from './migration-shapes.js';
 import type { MigrationBreak, MigrationLock, MigrationSpec, SqliteMigration } from './migrations.js';
@@ -35,6 +40,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
+import { bringForward } from './bring-forward.js';
 import { classifyMigration } from './migration-shapes.js';
 import {
   LEGACY_GATE_CLOSED,
@@ -417,6 +423,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
     () => ['add-column', 'add-column', 'create-unique-index-on-new-column'],
   ).flat(),
   'store-meta': ['create-table', 'create-table', 'create-table'],
+  'store-meta-generation': ['add-column'],
 };
 
 describe('classifyMigration over the catalogue', () => {
@@ -831,5 +838,104 @@ describe('the lock at the last release pinned here', () => {
     expect(readLockAtTag(bare, 'v0.1.0')).toEqual({ found: false, why: 'not a git checkout' });
     expect(readLockAtTag(untagged, 'v0.1.0')).toEqual({ found: false, why: 'no tag v0.1.0' });
     expect(readLockAtTag(lockless, 'v0.1.0')).toEqual({ found: false, why: `v0.1.0 holds no ${LOCK_PATH}` });
+  });
+});
+
+/** The index of `store-meta` in the catalogue, the entry the generation column follows. */
+const STORE_META_INDEX = SQLITE_MIGRATIONS.findIndex(({ id }) => id === 'store-meta');
+
+/**
+ * A `store_meta` row as a runtime before `store-meta-generation` writes
+ * it. The inode is negative, the two's complement of one past 2^63, so
+ * a column rewritten through a JavaScript number would show here.
+ */
+const STORE_META_ROW = {
+  id: 1,
+  store_id: '0c0ffee0-0000-4000-8000-000000000001',
+  project_root_commit: 'a'.repeat(40),
+  project_remote: 'git@github.com:open-tomato/rafa.git',
+  host_id: 'b'.repeat(64),
+  store_path: '/home/someone/project/.rafa/effort/effort.sqlite',
+  file_dev: 66311,
+  file_ino: -9223372036854775807n,
+  minted_at: '2026-09-30T08:00:00.000Z',
+};
+
+/** The columns `store-meta` creates, the ones a later column must leave alone. */
+const STORE_META_COLUMNS = Object.keys(STORE_META_ROW);
+
+/** The `store_meta` row at `path`, read column by column with the inode as text. */
+function storeMetaRowAt(path: string, columns: readonly string[]): Record<string, unknown> | null {
+  const db = new Database(path, { readonly: true, safeIntegers: true });
+  try {
+    return db
+      .query<Record<string, unknown>, []>(`SELECT ${columns.join(', ')} FROM store_meta WHERE id = 1`)
+      .get();
+  } finally {
+    db.close();
+  }
+}
+
+/** A store file `bringForward` brought to `store-meta`, holding {@link STORE_META_ROW}. */
+function plantStoreMetaStore(): string {
+  planted += 1;
+  const path = join(tempBase, `store-${String(planted)}.sqlite`);
+  const db = new Database(path, { readwrite: true, create: true });
+  try {
+    bringForward(db, path, 'write', 'open', { migrations: SQLITE_MIGRATIONS.slice(0, STORE_META_INDEX + 1) });
+    db.query(`INSERT INTO store_meta (${STORE_META_COLUMNS.join(', ')})`
+      + ` VALUES (${STORE_META_COLUMNS.map(() => '?').join(', ')})`)
+      .run(...Object.values(STORE_META_ROW));
+  } finally {
+    db.close();
+  }
+  return path;
+}
+
+describe('store-meta-generation over a store at store-meta', () => {
+  it('is the entry right after store-meta, additive, adding one column', () => {
+    expect(SQLITE_MIGRATIONS[STORE_META_INDEX + 1]?.id).toBe('store-meta-generation');
+    expect(SQLITE_MIGRATIONS[STORE_META_INDEX + 1]?.breaks).toEqual([]);
+  });
+
+  it('brings the store forward with the row\'s generation NULL and every other column unchanged', () => {
+    const path = plantStoreMetaStore();
+    const before = storeMetaRowAt(path, STORE_META_COLUMNS);
+
+    const db = new Database(path, { readwrite: true });
+    const result = (() => {
+      try {
+        return bringForward(db, path, 'write', 'open');
+      } finally {
+        db.close();
+      }
+    })();
+
+    expect(result.applied).toEqual(SQLITE_MIGRATIONS.slice(STORE_META_INDEX + 1).map(({ id }) => id));
+    expect(storeMetaRowAt(path, STORE_META_COLUMNS)).toEqual(before);
+    expect(before).toEqual({ ...STORE_META_ROW, id: 1n, file_dev: 66311n });
+    expect(storeMetaRowAt(path, ['generation'])).toEqual({ generation: null });
+  });
+
+  it('control: the row at store-meta has no generation column to read', () => {
+    const path = plantStoreMetaStore();
+
+    expect(() => storeMetaRowAt(path, ['generation'])).toThrow('no such column: generation');
+  });
+
+  it('control: the column refuses an empty generation and takes a filled one', () => {
+    const path = plantStoreMetaStore();
+    const db = new Database(path, { readwrite: true });
+    try {
+      bringForward(db, path, 'write', 'open');
+
+      expect(() => db.run('UPDATE store_meta SET generation = \'\' WHERE id = 1'))
+        .toThrow('CHECK constraint failed');
+      db.run('UPDATE store_meta SET generation = \'7f3a\' WHERE id = 1');
+      expect(db.query<{ generation: string }, []>('SELECT generation FROM store_meta').get())
+        .toEqual({ generation: '7f3a' });
+    } finally {
+      db.close();
+    }
   });
 });

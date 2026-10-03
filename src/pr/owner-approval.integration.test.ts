@@ -149,7 +149,7 @@ function plantWorld(): ScratchWorld {
 
 /** The gate's seams over one spawned `gh`, every reading real. */
 function seamsOf(world: ScratchWorld): OwnerApprovalSeams {
-  const gh = createGhRunner({ cwd: world.repo, env: { PATH: world.path, ...scratchHomeEnv(world.repo) } });
+  const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
   return {
     pullRequests: createGhPullRequests({ gh }),
     resolveOwner: createOwnerResolver({ gh }),

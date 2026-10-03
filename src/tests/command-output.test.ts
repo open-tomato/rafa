@@ -149,7 +149,7 @@ function rafa(scratch: Scratch, words: readonly string[], env: Readonly<Record<s
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
+    env: { TMPDIR: tmpdir(), PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
 }

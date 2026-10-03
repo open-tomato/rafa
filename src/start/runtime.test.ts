@@ -468,7 +468,7 @@ describe('rafa loop start --runtime, spawned', () => {
 
     const parent = Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', '--runtime=9.9.9'], {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+      env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     });
