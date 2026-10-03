@@ -49,6 +49,28 @@ for the stretch. `release settle` folds `origin/<pr.base>`
 back at `main` before it settles: one version per stretch, cut after
 the integration branch reaches `main`.
 
+### Starting them
+
+`scripts/stretch/stretch.sh` starts the operators on the loop host,
+from the main checkout; `bun run stretch <command>` is the same line.
+`link` links every operator into `~/.claude/` (a file that is not a
+link is kept), `engineer` and `watchtower` start one session each, and
+`start` opens both in one tmux session, `rafa-stretch-<n>`. The
+watchtower window waits for the new stretch's `agent.json`, since the
+watchtower finds the engineer by it. `--remote-control` starts each
+session with Remote Control, so another device drives it from
+claude.ai; `--dry-run` prints what would run.
+
+The engineer's opening message is `scripts/stretch/engineer-prompt.md`,
+with `{{STRETCH}}` and `{{PREVIOUS}}` filled in. The person edits it
+between stretches, with what the last report carried over.
+
+`scripts/device/check.sh` (`bun run device:check`) is the reading from
+another device, such as a Mac: it runs `bun test` and `bunx eslint .`,
+writes a report with each failure's own output, and with `--issue=<n>`
+posts it through `gh`, so no terminal output is copied between
+machines. `--from-log=<file>` builds the report from a saved log.
+
 ### The events output
 
 `RAFA_OUTPUT=events` (or `--output=events`) is the output the

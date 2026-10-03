@@ -57,7 +57,9 @@
     "lint": "eslint .",
     "check-types": "tsc --noEmit && bun run --filter './packages/*' check-types",
     "gate:control-bytes": "bun scripts/control-byte-gate/control-byte-gate.ts",
-    "snapshot": "bun scripts/snapshot-runtime.ts"
+    "snapshot": "bun scripts/snapshot-runtime.ts",
+    "stretch": "bash scripts/stretch/stretch.sh",
+    "device:check": "bash scripts/device/check.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
