@@ -3,15 +3,16 @@
 # main checkout, without copying their prompts by hand.
 #
 #   bash scripts/stretch/stretch.sh link          link the operators into ~/.claude
-#   bash scripts/stretch/stretch.sh start         engineer and watchtower in one tmux session
+#   bash scripts/stretch/stretch.sh start         engineer, watchtower and analyst in one tmux session
 #   bash scripts/stretch/stretch.sh engineer      the engineer alone, in this terminal
 #   bash scripts/stretch/stretch.sh watchtower    the watchtower alone, in this terminal
+#   bash scripts/stretch/stretch.sh analyst       the analyst (da²) alone, in this terminal
 #
 # Flags, after the command:
 #   --remote-control   start each session with Remote Control, so another
 #                      device can drive it from claude.ai
-#   --stretch=<n>      the stretch the watchtower watches (default: the newest
-#                      with an agent.json; start passes the one it opens)
+#   --stretch=<n>      the stretch the watchtower and analyst read (default:
+#                      the newest with an agent.json; start passes the one it opens)
 #   --dry-run          print what would run, and run nothing
 #
 # The operators and the stretch folder are described in context/operators.md.
@@ -22,7 +23,7 @@ OPERATORS="src/bundled/operators"
 PROMPT_FILE="$HERE/engineer-prompt.md"
 AGENT_WAIT_SECONDS=5
 
-usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 fail() { echo "stretch: $*" >&2; exit 1; }
 
 COMMAND="${1:-}"
@@ -76,7 +77,7 @@ next_stretch() {
 
 require_operators() {
   local name
-  for name in rafa-stretch-engineer rafa-stretch-watchtower; do
+  for name in rafa-stretch-engineer rafa-stretch-watchtower rafa-stretch-analyst; do
     [ -e "$HOME/.claude/agents/$name.md" ] \
       || fail "~/.claude/agents/$name.md is missing; run: bash scripts/stretch/stretch.sh link"
   done
@@ -128,19 +129,27 @@ cmd_engineer() {
   claude_session rafa-stretch-engineer "stretch $stretch engineer" "$prompt"
 }
 
-cmd_watchtower() {
+# beside_engineer <root> <agent> <role> <prompt>: a session that reads a
+# running stretch. It finds the engineer by the agent.json the engineer
+# writes first, so one started beside a new engineer waits for that file.
+beside_engineer() {
   local root="$1" stretch="$STRETCH"
   require_operators
   [ -n "$stretch" ] || stretch="$(newest_watched "$root")"
   [ "$stretch" -gt 0 ] || fail "no .rafa/stretch/<n>/agent.json yet; start the engineer first, or pass --stretch=<n>"
-  # The engineer writes agent.json first, and the watchtower finds it by
-  # that file, so a watchtower started beside a new engineer waits for it.
   while [ "$DRY" -eq 0 ] && [ ! -f "$root/.rafa/stretch/$stretch/agent.json" ]; do
     echo "waiting for .rafa/stretch/$stretch/agent.json …"
     sleep "$AGENT_WAIT_SECONDS"
   done
   cd "$root" || fail "cannot enter $root"
-  claude_session rafa-stretch-watchtower "stretch $stretch watchtower" "/loop"
+  claude_session "$2" "stretch $stretch $3" "${4//\{\{STRETCH\}\}/$stretch}"
+}
+
+cmd_watchtower() { beside_engineer "$1" rafa-stretch-watchtower watchtower "/loop"; }
+
+cmd_analyst() {
+  beside_engineer "$1" rafa-stretch-analyst analyst \
+    "Stretch {{STRETCH}} is running. Read .rafa/stretch/{{STRETCH}}/, then wait for my first hunch."
 }
 
 cmd_start() {
@@ -152,6 +161,8 @@ cmd_start() {
   if ! command -v tmux >/dev/null 2>&1; then
     echo "tmux is not installed: starting the engineer here. In a second terminal run:"
     echo "  bash scripts/stretch/stretch.sh watchtower --stretch=$stretch$flags"
+    echo "and in a third, for the analyst:"
+    echo "  bash scripts/stretch/stretch.sh analyst --stretch=$stretch$flags"
     cmd_engineer "$root"
     return
   fi
@@ -163,12 +174,13 @@ cmd_start() {
   local hold='; echo "exited: $?, press Enter to close"; read -r _'
   run tmux new-session -d -s "$session" -c "$root" -n engineer "bash '$HERE/stretch.sh' engineer$flags$hold"
   run tmux new-window -t "$session" -c "$root" -n watchtower "bash '$HERE/stretch.sh' watchtower --stretch=$stretch$flags$hold"
+  run tmux new-window -t "$session" -c "$root" -n analyst "bash '$HERE/stretch.sh' analyst --stretch=$stretch$flags$hold"
   run tmux select-window -t "$session:engineer"
   if [ "$DRY" -eq 1 ]; then
     echo "dry run: would start stretch $stretch in tmux session $session"
     return
   fi
-  echo "stretch $stretch started in tmux session $session (windows: engineer, watchtower)"
+  echo "stretch $stretch started in tmux session $session (windows: engineer, watchtower, analyst)"
   if [ -n "${TMUX:-}" ]; then
     tmux switch-client -t "$session"
   elif [ -t 1 ]; then
@@ -187,5 +199,6 @@ case "$COMMAND" in
   start) cmd_start "$ROOT" ;;
   engineer) cmd_engineer "$ROOT" ;;
   watchtower) cmd_watchtower "$ROOT" ;;
-  *) fail "unknown command: $COMMAND (link, start, engineer, watchtower)" ;;
+  analyst) cmd_analyst "$ROOT" ;;
+  *) fail "unknown command: $COMMAND (link, start, engineer, watchtower, analyst)" ;;
 esac

@@ -24,7 +24,7 @@ import { scratchHomeEnv } from '../../src/tests/scratch-home-env.js';
 
 const STRETCH_SH = resolve(import.meta.dir, 'stretch.sh');
 const CHECK_SH = resolve(import.meta.dir, '..', 'device', 'check.sh');
-const OPERATOR_AGENTS = ['rafa-stretch-engineer', 'rafa-stretch-watchtower'];
+const OPERATOR_AGENTS = ['rafa-stretch-engineer', 'rafa-stretch-watchtower', 'rafa-stretch-analyst'];
 
 let base = '';
 
@@ -135,13 +135,24 @@ describe('stretch.sh', () => {
     expect(out).toContain('claude --agent rafa-stretch-watchtower -n stretch\\ 1\\ watchtower /loop');
   });
 
-  it('opens one tmux session whose watchtower window waits for the new stretch', () => {
+  it('starts the analyst on that stretch, naming its folder in the opening message', () => {
+    const world = plantWorld();
+    const { code, out } = run(world, STRETCH_SH, ['analyst', '--dry-run']);
+
+    expect(code).toBe(0);
+    expect(out).toContain('claude --agent rafa-stretch-analyst -n stretch\\ 1\\ analyst');
+    expect(out).toContain('Read\\ .rafa/stretch/1/');
+    expect(out).not.toContain('{{');
+  });
+
+  it('opens one tmux session whose watchtower and analyst windows wait for the new stretch', () => {
     const world = plantWorld();
     const { code, out } = run(world, STRETCH_SH, ['start', '--dry-run']);
 
     expect(code).toBe(0);
     expect(out).toContain('tmux new-session -d -s rafa-stretch-2');
     expect(out).toContain('watchtower\\ --stretch=2');
+    expect(out).toContain('analyst\\ --stretch=2');
     expect(out).toContain('dry run: would start stretch 2 in tmux session rafa-stretch-2');
     expect(calls(world, 'tmux')).toBe('has-session -t rafa-stretch-2\n');
   });
