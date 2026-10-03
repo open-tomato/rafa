@@ -629,7 +629,10 @@ The last three, which migration `store-meta` creates, are the store's
 own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
-`merge_conflicts` each incoming row one could not settle. `mergeStore`
+`merge_conflicts` each incoming row one could not settle. Migration
+`store-meta-generation` adds `store_meta.generation`, a nullable
+non-empty text column; NULL there means a runtime that did not know the
+column wrote the row. `mergeStore`
 (`store/merge-store.ts`) writes one `merges` row per merge into the
 build it swaps in through `rebuildAside`, behind
 `effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded

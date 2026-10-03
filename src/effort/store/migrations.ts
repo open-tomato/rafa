@@ -543,6 +543,18 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   );
   `,
   },
+  // A random token a writing open rotates on every write, kept both here
+  // and in a side record beside the store file. A store restored or
+  // rebuilt over the original carries a generation the side record no
+  // longer holds, which the file's host, path and inode alone can miss.
+  // NULL means a runtime that did not know this column wrote the row.
+  {
+    id: 'store-meta-generation',
+    breaks: [],
+    sql: `
+  ALTER TABLE store_meta ADD COLUMN generation TEXT CHECK (generation <> '');
+  `,
+  },
 ];
 
 /**
