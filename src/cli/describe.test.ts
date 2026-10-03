@@ -246,6 +246,8 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('merge');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('import');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('move');
+    expect(document.subjects.find((subject) => subject.name === 'update')?.actions.map((action) => action.name)).toContain('current');
+    expect(document.subjects.find((subject) => subject.name === 'update')?.actions.find((action) => action.name === 'current')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
     expect(document.subjects.find((subject) => subject.name === 'claim')?.actions.map((action) => action.name)).toEqual(['release', 'hand', 'accept', 'take']);
   });

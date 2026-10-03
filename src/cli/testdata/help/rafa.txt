@@ -19,6 +19,7 @@ Quick start:
   rafa board list
   rafa epic show
   rafa claim release 324
+  rafa update current --dry-run
   rafa status
   rafa next
   rafa roadmap
@@ -57,6 +58,8 @@ Subjects:
              cancel it 🪙
   claim      give up this device's claim on an issue; hand it to another store
              or withdraw the offer; accept a handover; take over a stale claim
+  update     bring this project to the installed rafa; the other updates are in
+             development
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,
