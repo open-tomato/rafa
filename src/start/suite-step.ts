@@ -34,7 +34,12 @@
  * as `bun test --changed=<base>`. The plan's `Owns:` folders and the
  * project's test files are read only for a `tests=module` line, the one
  * answer that needs them. A diff git will not answer runs the full
- * suite, the scope that can miss nothing.
+ * suite, the scope that can miss nothing. A `module` or `affected` step
+ * also runs the tracked files `tests.alwaysRun` names, the content
+ * sweeps no changed file selects (`task-always-run.ts`): `module` in its
+ * own path list, and `affected` as a second run, since Bun filters a
+ * path list by `--changed`, written to {@link alwaysRunJunitFileFor} and
+ * folded into the first run's result before the step is settled.
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
@@ -163,6 +168,8 @@ import {
 } from '../suite/scope.js';
 import { findNextTask, writeTrackerBlocker } from '../utils/tracker.js';
 
+import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
+
 /** The stage ledger's file name before its stub. */
 export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
 
@@ -201,7 +208,7 @@ export interface SuiteStepContext {
   readonly trackerPath: string;
   /** The run's session id, naming its record. */
   readonly sessionId: string;
-  readonly settings: Pick<TestsSettings, 'testsFullSuiteTriggers' | 'testsIntegration'>;
+  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsFullSuiteTriggers' | 'testsIntegration'>;
   /** The plan's `Owns:` folders, or null without any; see {@link planOwnsReader}. */
   readonly owns: () => Promise<readonly string[] | null>;
   /** True once the runner has received SIGINT; never, when left out. See the module note. */
@@ -290,6 +297,11 @@ function seamsOf(context: SuiteStepContext): Required<SuiteStepSeams> {
 /** Where the step of `kind` has Bun write its JUnit file: under the run's own directory. */
 export function junitFileFor(repoRoot: string, sessionId: string, kind: SessionStepKind): string {
   return join(runsDir(repoRoot), sessionId, 'suite', `${kind}.junit.xml`);
+}
+
+/** Where the task step's second run, over the `tests.alwaysRun` files, has Bun write its JUnit file. */
+export function alwaysRunJunitFileFor(repoRoot: string, sessionId: string): string {
+  return join(runsDir(repoRoot), sessionId, 'suite', 'task-always-run.junit.xml');
 }
 
 /** The ledger beside the tracker (or plan) at `trackerPath`; throws as `baselinePathFor` does. */
@@ -530,11 +542,11 @@ function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, 
   return { kind, step, red: true, interrupted: false, blocker, blockedLine };
 }
 
-/** Runs one suite: over `paths`, since `changedSince`, or the whole project. */
-function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: SessionStepKind, narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>): Promise<SuiteResult> {
+/** Runs one suite: over `paths`, since `changedSince`, or the whole project; its JUnit file is `kind`'s unless `junitFile` names one. */
+function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: SessionStepKind, narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>, junitFile?: string): Promise<SuiteResult> {
   return seams.runSuite({
     cwd: context.checkout,
-    junitFile: junitFileFor(context.repoRoot, context.sessionId, kind),
+    junitFile: junitFile ?? junitFileFor(context.repoRoot, context.sessionId, kind),
     ...narrowing,
   });
 }
@@ -571,11 +583,17 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   return { baseline, step: outcome.step, interrupted: false };
 }
 
-/** The run a task scope asks for. */
-function taskNarrowing(scope: TaskStepScope, base: string): Pick<SuiteRunOptions, 'paths' | 'changedSince'> {
-  if (scope.scope === 'full') return {};
-  if (scope.scope === 'module') return { paths: scope.paths };
-  return { changedSince: base };
+/** The runs a task step makes: its own, and the paths of a second run over the always-run files, or none. */
+interface TaskRuns {
+  readonly narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>;
+  readonly alwaysRun: readonly string[];
+}
+
+/** The runs a task scope asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
+function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): TaskRuns {
+  if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [] };
+  if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [] };
+  return { narrowing: { changedSince: base }, alwaysRun };
 }
 
 /** The preload files, with a warning when `bunfig.toml` does not read. */
@@ -603,15 +621,24 @@ async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepS
   });
 }
 
+/** Runs the task step's own run, then its always-run run unless there is none or the first was a stop. */
+async function runTaskRuns(context: SuiteStepContext, seams: Required<SuiteStepSeams>, runs: TaskRuns): Promise<SuiteResult> {
+  const first = await runOne(context, seams, 'task', runs.narrowing);
+  if (runs.alwaysRun.length === 0 || isStepInterrupted(context, first)) return first;
+  const junitFile = alwaysRunJunitFileFor(context.repoRoot, context.sessionId);
+  const second = await runOne(context, seams, 'task', { paths: runs.alwaysRun }, junitFile);
+  return foldResults(first, second, SIGINT_EXIT_CODE);
+}
+
 /** Runs the task step after a task commits; see the module note. */
 export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
   const seams = seamsOf(context);
   const scope = await taskScopeOf(context, seams, input);
-  const narrowing = scope === null
-    ? {}
-    : taskNarrowing(scope, input.base);
+  const runs = scope === null || scope.scope === 'full'
+    ? { narrowing: {}, alwaysRun: [] }
+    : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
   const recorded = scope?.scope ?? 'full';
-  const result = await runOne(context, seams, 'task', narrowing);
+  const result = await runTaskRuns(context, seams, runs);
   const label = `task step after "${input.task}"`;
   return settleStep(context, seams, { kind: 'task', scope: recorded, label, result, baseline: input.baseline, blocks: true });
 }

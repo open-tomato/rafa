@@ -50,7 +50,9 @@
  *     a content sweep. A pattern that matches no file today is accepted,
  *     since the sweeps it names may not have been written yet. The task
  *     prompt reads it (`start/task-gate-lines.ts`), naming the files it
- *     resolves to; the runner's task step does not read it yet.
+ *     resolves to, and so does the runner's task step
+ *     (`start/task-always-run.ts`), running those files beside a
+ *     `module` or `affected` scope.
  *
  * An empty list is a value every key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage

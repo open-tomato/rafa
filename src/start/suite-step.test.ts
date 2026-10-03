@@ -27,6 +27,7 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import {
+  alwaysRunJunitFileFor,
   blockerText,
   dueStages,
   ensureBaseline,
@@ -41,6 +42,7 @@ import {
   SIGINT_EXIT_CODE,
   stageLedgerPathFor,
 } from './suite-step.js';
+import { FOLDED_COMMAND_JOINER } from './task-always-run.js';
 
 const BASE = 'base0000';
 const HEAD = 'head1111';
@@ -120,11 +122,12 @@ function scriptedGit(answers: Readonly<Record<string, GitResult>>, calls: string
   };
 }
 
-/** The git answers of a checkout at {@link HEAD} whose diff from `from` is `paths`. */
-function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = []): GitRunner {
+/** The git answers of a checkout at {@link HEAD} whose diff from `from` is `paths`, tracking `tracked` when handed. */
+function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = [], tracked?: readonly string[]): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
   };
+  if (tracked !== undefined) answers['ls-files -z'] = { ok: true, stdout: tracked.map((path) => `${path}\0`).join(''), stderr: '' };
   for (const [from, paths] of Object.entries(diffs)) {
     answers[`diff --name-only -z --no-renames ${from} HEAD`] = { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' };
   }
@@ -143,7 +146,12 @@ interface Seen {
 /** A context over the temporary tracker, its runs answered in turn from `results`. */
 function contextWith(
   results: readonly SuiteResult[],
-  options: { readonly git?: GitRunner; readonly owns?: readonly string[] | null; readonly seams?: SuiteStepSeams } = {},
+  options: {
+    readonly git?: GitRunner;
+    readonly owns?: readonly string[] | null;
+    readonly alwaysRun?: readonly string[];
+    readonly seams?: SuiteStepSeams;
+  } = {},
 ): { readonly context: SuiteStepContext; readonly seen: Seen } {
   const seen: Seen = { runs: [], steps: [], trackerAtAppend: [], ownsReads: 0 };
   const queue = [...results];
@@ -155,6 +163,7 @@ function contextWith(
     settings: {
       testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json'],
       testsIntegration: ['**/*-integration.test.ts'],
+      testsAlwaysRun: options.alwaysRun ?? [],
     },
     owns: () => {
       seen.ownsReads += 1;
@@ -365,6 +374,109 @@ describe('runTaskStep', () => {
     expect(outcome).toMatchObject({ red: true, blockedLine: null });
     expect(outcome.blocker).toContain('src/new.test.ts');
     expect(readFileSync(trackerPath, 'utf8')).toBe(done);
+  });
+});
+
+describe('runTaskStep with tests.alwaysRun', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const glob = ['src/**/*.sweep.test.ts'];
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+  const swept: SuiteFailure = { file: sweep, name: 'leak > names a plan path' };
+  const lsFiles = 'ls-files -z';
+
+  it('runs an affected step\'s always-run files as a second run, settled as one step', async () => {
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[0]).toMatchObject({ changedSince: BASE, junitFile: junitFileFor(dir, SESSION, 'task') });
+    expect(seen.runs[0]?.paths).toBeUndefined();
+    expect(seen.runs[1]).toMatchObject({ paths: [sweep], junitFile: alwaysRunJunitFileFor(dir, SESSION) });
+    expect(seen.runs[1]?.changedSince).toBeUndefined();
+    expect(seen.steps).toHaveLength(1);
+    expect(seen.steps[0]?.scope).toBe('affected');
+    expect(seen.steps[0]?.command).toContain(FOLDED_COMMAND_JOINER);
+    expect(outcome).toMatchObject({ red: false, blocker: null });
+  });
+
+  it('blocks the next open task on a failure only the always-run run found, naming the sweep', async () => {
+    const { context, seen } = contextWith([result(), red([swept])], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.blockedLine).toBe(9);
+    expect(seen.steps[0]?.newFailures).toEqual([swept]);
+    expect(outcome.blocker).toContain(`${sweep} (1 test)`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.status).toBe('blocked');
+  });
+
+  it('runs a module step\'s always-run files in its own path list, in one run', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], {
+      alwaysRun: glob,
+      owns: ['src/b', 'src/c'],
+      git: gitAt({ [BASE]: ['src/b/x.ts'] }, calls, tracked),
+    });
+    await runTaskStep(context, { ...input, declared: 'module' });
+
+    expect(calls).toContain(lsFiles);
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toEqual(['src/b/b.test.ts', sweep]);
+    expect(seen.steps[0]?.scope).toBe('module');
+  });
+
+  it('adds nothing to a full step, which already runs every file, and does not ask git for them', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked) });
+    await runTaskStep(context, { ...input, declared: 'full' });
+
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toBeUndefined();
+    expect(calls).not.toContain(lsFiles);
+  });
+
+  it('adds nothing to the full suite a diff git will not answer runs', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: glob, git: gitAt({}, calls, tracked) });
+    await runTaskStep(context, input);
+
+    expect(seen.steps[0]?.scope).toBe('full');
+    expect(seen.runs).toHaveLength(1);
+    expect(calls).not.toContain(lsFiles);
+  });
+
+  it('runs one run and asks git nothing for [], where the same checkout with the default glob runs two', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked) });
+    await runTaskStep(context, input);
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.changedSince).toBe(BASE);
+    expect(calls).not.toContain(lsFiles);
+
+    const module = contextWith([result()], { alwaysRun: [], owns: ['src/b'], git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked) });
+    await runTaskStep(module.context, { ...input, declared: 'module' });
+    expect(module.seen.runs[0]?.paths).toEqual(['src/b/b.test.ts']);
+  });
+
+  it('runs one run for a glob matching no tracked file, saying nothing', async () => {
+    const { context, seen } = contextWith([result()], { alwaysRun: ['e2e/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    await runTaskStep(context, input);
+    expect(seen.runs).toHaveLength(1);
+    expect(linesAt('warn')).toEqual([]);
+  });
+
+  it('takes no second run after a first run ended on SIGINT, and reads a SIGINT in the second as a stop', async () => {
+    const first = contextWith([killed()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const stoppedFirst = await runTaskStep(first.context, input);
+    expect(first.seen.runs).toHaveLength(1);
+    expect(stoppedFirst).toMatchObject({ red: false, interrupted: true, blocker: null });
+
+    const second = contextWith([red([FRESH]), killed()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const stoppedSecond = await runTaskStep(second.context, input);
+    expect(second.seen.runs).toHaveLength(2);
+    expect(stoppedSecond).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
   });
 });
 
