@@ -15,6 +15,7 @@
  */
 import type { Extract, ExtractSide, ExtractValue, OverlapCap } from './fixture-extract.js';
 import type { OriginTable } from './origins.js';
+import type { ScrubContext } from '../../fixtures/scrub.js';
 import type { SQLQueryBindings } from 'bun:sqlite';
 
 import { copyFileSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,6 +24,9 @@ import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
+import { EMAIL_MARKER, fixtureScrubber, HOST_MARKER, ScrubRefusal } from '../../fixtures/scrub.js';
+import { HOME_MARKER } from '../../triage/local-paths.js';
 
 import { bringForward } from './bring-forward.js';
 import {
@@ -34,6 +38,7 @@ import {
   PlaceholderCollision,
   readExtractSide,
   restoreExtractSide,
+  scrubbedTree,
   writeExtract,
 } from './fixture-extract.js';
 import { unionStores } from './merge-union.js';
@@ -470,6 +475,61 @@ describe('writeExtract and readExtractSide', () => {
       writeFileSync(path, JSON.stringify(content));
       expect(() => readExtractSide(path)).toThrow(message);
     }
+  });
+});
+
+/** The machine the scrub cases plant: host `workbox`, home `/home/alice`. */
+const PLANTED_MACHINE: ScrubContext = { host: 'workbox.lan', secrets: [], repoRoot: '/srv/checkout', home: '/home/alice' };
+
+/** A one-row side holding a kept word, a count-map key and JSON leaves that each name `PLANTED_MACHINE`. */
+function plantedSide(side: 'a' | 'b'): ExtractSide {
+  return {
+    format: 'rafa-merge-fixture/1',
+    side,
+    userVersion: 1,
+    schema: ['CREATE TABLE findings (kind TEXT, row_json TEXT)'],
+    tables: {
+      findings: {
+        columns: ['kind', 'row_json'],
+        rows: [['workbox', '{"workbox":3,"to":"dev@example.com","pin":"pkg@1.2.3","at":"/home/alice/x"}']],
+      },
+    },
+  };
+}
+
+/** An extract whose kept values name `PLANTED_MACHINE`, as a real store's may. */
+const PLANTED_EXTRACT: Extract = { a: plantedSide('a'), b: plantedSide('b'), perSide: 1, overlap: 1, summary: [] };
+
+describe('writeExtract through the fixture scrub', () => {
+  it('writes every kept value and key scrubbed, two spaces deep, where the extract held the leak', () => {
+    const outDir = join(base, 'scrubbed');
+    const held = JSON.stringify(PLANTED_EXTRACT.a);
+    for (const leak of ['workbox', 'dev@example.com', '/home/alice']) expect([leak, held.includes(leak)]).toEqual([leak, true]);
+
+    writeExtract(PLANTED_EXTRACT, outDir, fixtureScrubber(PLANTED_MACHINE));
+
+    const text = readFileSync(join(outDir, EXTRACT_FILE_NAMES.a), 'utf8');
+    for (const leak of ['workbox', 'dev@example.com', '/home/alice']) expect([leak, text.includes(leak)]).toEqual([leak, false]);
+    expect(text.startsWith('{\n  "format": "rafa-merge-fixture/1",\n')).toBe(true);
+    expect(text.endsWith('}\n')).toBe(true);
+    const [kind, rowJson] = readExtractSide(join(outDir, EXTRACT_FILE_NAMES.a)).tables['findings']?.rows[0] ?? [];
+    expect(kind).toBe(HOST_MARKER);
+    expect(JSON.parse(String(rowJson))).toEqual({ [HOST_MARKER]: 3, to: EMAIL_MARKER, pin: 'pkg@1.2.3', at: `${HOME_MARKER}/x` });
+  });
+
+  it('writes no file when the scrub refuses a value', () => {
+    const outDir = join(base, 'refused');
+    const refusing = fixtureScrubber({ ...PLANTED_MACHINE, secrets: [{ name: 'TOKEN', value: 'redacted' }] });
+
+    expect(() => writeExtract(PLANTED_EXTRACT, outDir, refusing)).toThrow(ScrubRefusal);
+    expect(readdirSync(base)).not.toContain('refused');
+  });
+
+  it('refuses two keys of one object that scrub to one key, and passes other values through', () => {
+    const scrub = fixtureScrubber(PLANTED_MACHINE);
+
+    expect(() => scrubbedTree({ workbox: 1, WORKBOX: 2 }, scrub)).toThrow(`two keys of one object scrub to ${JSON.stringify(HOST_MARKER)}`);
+    expect(scrubbedTree([1, null, { kept: 'gotcha' }], scrub)).toEqual([1, null, { kept: 'gotcha' }]);
   });
 });
 

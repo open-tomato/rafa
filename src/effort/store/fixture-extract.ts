@@ -79,8 +79,21 @@
  * given and nowhere else, refusing to replace one already there: one
  * {@link ExtractSide} per store, holding its `user_version`, its schema
  * as the store's own DDL, and its kept rows, and a summary of counts.
- * They are JSON, for a person to review before any is committed, and
- * {@link restoreExtractSide} builds a store file from a side again.
+ * They are JSON with two-space indent, for a person to review before any
+ * is committed, and {@link restoreExtractSide} builds a store file from a
+ * side again.
+ *
+ * ## The scrub
+ *
+ * Every text value written goes through the fixture scrub of
+ * `src/fixtures/scrub.ts` first: each string of the three files and each
+ * object key, placeholders, kept words, timestamps and DDL included. A
+ * placeholder never names the machine, but a kept value can: a one-word
+ * count-map key or a closed-vocabulary word may be the host name, and a
+ * JSON leaf may hold an address. The scrub redacts home paths, email
+ * addresses, the host name and named secrets, and throws `ScrubRefusal`,
+ * writing nothing, when a leak is left. Two keys of one object that the
+ * scrub makes equal throw too, since one would silently drop the other.
  *
  * Both stores are opened read-only. Every path is passed through the
  * test guard (`guardTestProcess`, `location.ts`) first, so a test reads
@@ -93,6 +106,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
+
+import { fixtureScrubber, machineScrubContext } from '../../fixtures/scrub.js';
 
 import { guardTestProcess } from './location.js';
 import { MERGE_RULES } from './merge-rules.js';
@@ -523,17 +538,45 @@ export function extractStores(
   }
 }
 
+/** What takes the machine's identity out of one text, throwing when it cannot; see the module note. */
+export type TextScrub = (text: string) => string;
+
+/** The indent of every file written: two spaces, as the repository's JSON is. */
+const FILE_INDENT = 2;
+
 /** One file's content: pretty JSON with a closing newline. */
 function jsonText(value: unknown): string {
-  return `${JSON.stringify(value, null, 2)}\n`;
+  return `${JSON.stringify(value, null, FILE_INDENT)}\n`;
+}
+
+/**
+ * `value` with every string and object key passed through `scrub`, as a
+ * new tree. Throws when two keys of one object scrub to the same key.
+ */
+export function scrubbedTree(value: unknown, scrub: TextScrub): unknown {
+  if (typeof value === 'string') return scrub(value);
+  if (Array.isArray(value)) return value.map((item) => scrubbedTree(item, scrub));
+  if (typeof value !== 'object' || value === null) return value;
+  const entries = Object.entries(value).map(([key, item]): [string, unknown] => [scrub(key), scrubbedTree(item, scrub)]);
+  const keys = entries.map(([key]) => key);
+  const twice = keys.find((key, index) => keys.indexOf(key) !== index);
+  if (twice !== undefined) throw new Error(`two keys of one object scrub to ${JSON.stringify(twice)}`);
+  return Object.fromEntries(entries);
 }
 
 /**
  * Writes `extract` under `outDir` as {@link EXTRACT_FILE_NAMES}, making
- * the directory when absent, and answers the paths written. Refuses,
- * writing nothing, when any of the three files is already there.
+ * the directory when absent, and answers the paths written. Every text
+ * value goes through `scrub` first, the running machine's fixture scrub
+ * unless the caller hands one, as the module note says. Refuses, writing
+ * nothing, when any of the three files is already there or when the
+ * scrub refuses a value.
  */
-export function writeExtract(extract: Extract, outDir: string): readonly string[] {
+export function writeExtract(
+  extract: Extract,
+  outDir: string,
+  scrub: TextScrub = fixtureScrubber(machineScrubContext(process.cwd())),
+): readonly string[] {
   guardTestProcess(outDir);
   const files: readonly [string, unknown][] = [
     [join(outDir, EXTRACT_FILE_NAMES.a), extract.a],
@@ -545,8 +588,9 @@ export function writeExtract(extract: Extract, outDir: string): readonly string[
   ];
   const present = files.map(([path]) => path).filter((path) => existsSync(path));
   if (present.length > 0) throw new Error(`the extract would replace ${present.join(', ')}; remove it first`);
+  const texts = files.map(([path, content]): [string, string] => [path, jsonText(scrubbedTree(content, scrub))]);
   mkdirSync(outDir, { recursive: true });
-  for (const [path, content] of files) writeFileSync(path, jsonText(content), { flag: 'wx' });
+  for (const [path, text] of texts) writeFileSync(path, text, { flag: 'wx' });
   return files.map(([path]) => path);
 }
 

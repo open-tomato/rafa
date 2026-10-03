@@ -14,6 +14,9 @@
  * keeps, both copies of each, the ones nearest the divergence: 200 unless
  * given, and `all` keeps every one. Every placeholder is keyed by a random key drawn for the
  * run and never written, so a second run gives different placeholders.
+ * Every text value written goes through the fixture scrub of
+ * `src/fixtures/scrub.ts`, and nothing is written when one still holds a
+ * home path, an email address, the host name or a named secret after it.
  *
  * Run it over copies, never over the live store: `bun src/rafa.ts effort
  * copy --to=<dir>` makes one. The extract lands in a scratch directory
