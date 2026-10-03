@@ -158,7 +158,11 @@ that task's stage completes:
   file or a globally-used module; stage step always runs full suite
 
 **Config keys determine when a task triggers `tests=module` or `tests=full`
-automatically:**
+automatically, and which tests always run:**
+- `tests.alwaysRun` (glob list; defaults to `src/**/*.sweep.test.ts`) —
+  content sweeps that always run alongside scoped tests in every task's
+  gates, since they read files at run time and `bun test --changed=<base>`
+  follows only the import graph
 - `tests.fullSuiteTriggers` (glob list; defaults include `bunfig.toml`,
   `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
   named in `[test] preload` of `bunfig.toml`) — when a task touches any
