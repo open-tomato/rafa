@@ -23,6 +23,7 @@ const OPERATORS = join(SRC_DIR, 'bundled', 'operators');
 
 /** Every operator file, agents and skills, by its path under {@link OPERATORS}. */
 const FILES: readonly string[] = [
+  'agents/rafa-stretch-analyst.md',
   'agents/rafa-stretch-engineer.md',
   'agents/rafa-stretch-watchtower.md',
   'skills/rafa-stretch-gap-log/SKILL.md',
@@ -34,8 +35,8 @@ const FILES: readonly string[] = [
 const ALPHA_LINE = 'Alpha: tested on rafa\'s own development, may become a feature.';
 
 describe('the bundled operators', () => {
-  it('ship two agents and three skills, every one named rafa-stretch-*', () => {
-    expect(readdirSync(join(OPERATORS, 'agents')).sort()).toEqual(['rafa-stretch-engineer.md', 'rafa-stretch-watchtower.md']);
+  it('ship three agents and three skills, every one named rafa-stretch-*', () => {
+    expect(readdirSync(join(OPERATORS, 'agents')).sort()).toEqual(['rafa-stretch-analyst.md', 'rafa-stretch-engineer.md', 'rafa-stretch-watchtower.md']);
     expect(readdirSync(join(OPERATORS, 'skills')).sort()).toEqual(['rafa-stretch-gap-log', 'rafa-stretch-pit-stop', 'rafa-stretch-sweep']);
   });
 

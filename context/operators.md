@@ -34,6 +34,7 @@ test reads them.
 |---|---|
 | `rafa-stretch-engineer` | runs one stretch: sweep, bucket, loops, pit stops, wrap-up |
 | `rafa-stretch-watchtower` | watches it read-only and alerts the person |
+| `rafa-stretch-analyst` | da²: tests the person's hunches against the stretch's data, read-only, writing only `analysis.md` |
 | `rafa-stretch-sweep` | phase 1: duplicate groups, ranking, tiers, the bucket report |
 | `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
@@ -41,13 +42,35 @@ test reads them.
 A stretch writes under `.rafa/stretch/<n>/`: `agent.json` (the agent's
 session id, which the watchtower finds it by), `bucket.md`,
 `loop-<issue>.log`, `pit-stops.md`, `watch.md` (the watchtower's one
-write) and `report.md`.
+write), `analysis.md` (the analyst's one write) and `report.md`.
 
 The integration branch is `stretch/<n>`, and `pr.base` points at it
 for the stretch. `release settle` folds `origin/<pr.base>`
 (`src/release/settle-worktree.ts`), so the wrap-up points `pr.base`
 back at `main` before it settles: one version per stretch, cut after
 the integration branch reaches `main`.
+
+### Starting them
+
+`scripts/stretch/stretch.sh` starts the operators on the loop host,
+from the main checkout; `bun run stretch <command>` is the same line.
+`link` links every operator into `~/.claude/` (a file that is not a
+link is kept), `engineer`, `watchtower` and `analyst` start one session
+each, and `start` opens all three in one tmux session,
+`rafa-stretch-<n>`. The watchtower and analyst windows wait for the new
+stretch's `agent.json`, since both find the engineer's stretch by it. `--remote-control` starts each
+session with Remote Control, so another device drives it from
+claude.ai; `--dry-run` prints what would run.
+
+The engineer's opening message is `scripts/stretch/engineer-prompt.md`,
+with `{{STRETCH}}` and `{{PREVIOUS}}` filled in. The person edits it
+between stretches, with what the last report carried over.
+
+`scripts/device/check.sh` (`bun run device:check`) is the reading from
+another device, such as a Mac: it runs `bun test` and `bunx eslint .`,
+writes a report with each failure's own output, and with `--issue=<n>`
+posts it through `gh`, so no terminal output is copied between
+machines. `--from-log=<file>` builds the report from a saved log.
 
 ### The events output
 
