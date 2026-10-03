@@ -480,6 +480,69 @@ describe('runTaskStep with tests.alwaysRun', () => {
   });
 });
 
+describe('runTaskStep timing the always-run files', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+
+  /** A `runSuite` writing a JUnit file timing {@link sweep} at `seconds`, in each run, and recording the files written. */
+  function timedRuns(seconds: number, written: string[] = []): SuiteStepSeams {
+    return {
+      runSuite: (runOptions) => {
+        mkdirSync(join(runOptions.junitFile, '..'), { recursive: true });
+        writeFileSync(runOptions.junitFile, `<testsuites>\n  <testsuite name="${sweep}" file="${sweep}" time="${seconds}">\n  </testsuite>\n</testsuites>\n`, 'utf8');
+        written.push(runOptions.junitFile);
+        return Promise.resolve(result());
+      },
+    };
+  }
+
+  /** The slow-sweep lines printed. */
+  function slowLines(): readonly string[] {
+    return linesAt('info').filter((line) => line.startsWith('🐢'));
+  }
+
+  it('names an affected step\'s sweep over the limit, read off the second run\'s JUnit file', async () => {
+    const written: string[] = [];
+    const { context } = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12, written) });
+    await runTaskStep(context, input);
+
+    expect(written).toEqual([junitFileFor(dir, SESSION, 'task'), alwaysRunJunitFileFor(dir, SESSION)]);
+    expect(slowLines()).toEqual([`🐢 1 tests.alwaysRun file(s) took over 10s in the task step: ${sweep} (12.0s).`]);
+  });
+
+  it('prints no line for the same step with its sweep under the limit', async () => {
+    const { context } = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(3) });
+    await runTaskStep(context, input);
+    expect(linesAt('info').some((line) => line.startsWith('🧪'))).toBe(true);
+    expect(slowLines()).toEqual([]);
+  });
+
+  it('names a module step\'s sweep over the limit, read off the step\'s own JUnit file', async () => {
+    const written: string[] = [];
+    const { context } = contextWith([], {
+      alwaysRun: ['src/**/*.sweep.test.ts'],
+      owns: ['src/b'],
+      git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked),
+      seams: timedRuns(12, written),
+    });
+    await runTaskStep(context, { ...input, declared: 'module' });
+
+    expect(written).toEqual([junitFileFor(dir, SESSION, 'task')]);
+    expect(slowLines()).toHaveLength(1);
+  });
+
+  it('times nothing for [], where the same slow report under the default glob prints a line', async () => {
+    const { context } = contextWith([], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12) });
+    await runTaskStep(context, input);
+    expect(slowLines()).toEqual([]);
+
+    const control = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12) });
+    await runTaskStep(control.context, input);
+    expect(slowLines()).toHaveLength(1);
+  });
+});
+
 describe('dueStages', () => {
   it('answers a finished stage while a task is open, and nothing once the ledger names it', () => {
     expect(dueStages(TRACKER, [])).toEqual([{ stage: 0, name: 'One' }]);

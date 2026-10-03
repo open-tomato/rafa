@@ -39,7 +39,10 @@
  * sweeps no changed file selects (`task-always-run.ts`): `module` in its
  * own path list, and `affected` as a second run, since Bun filters a
  * path list by `--changed`, written to {@link alwaysRunJunitFileFor} and
- * folded into the first run's result before the step is settled.
+ * folded into the first run's result before the step is settled. Once
+ * settled, a step not read as a stop prints one line naming each of
+ * those files its JUnit file times over `SLOW_SWEEP_SECONDS`
+ * (`sweep-timing.ts`), and no line when none is.
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
@@ -168,6 +171,7 @@ import {
 } from '../suite/scope.js';
 import { findNextTask, writeTrackerBlocker } from '../utils/tracker.js';
 
+import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
 
 /** The stage ledger's file name before its stub. */
@@ -587,13 +591,15 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
 interface TaskRuns {
   readonly narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>;
   readonly alwaysRun: readonly string[];
+  /** The always-run files either run holds, whose times the step reads (`sweep-timing.ts`). */
+  readonly timed: readonly string[];
 }
 
 /** The runs a task scope asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
 function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): TaskRuns {
-  if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [] };
-  if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [] };
-  return { narrowing: { changedSince: base }, alwaysRun };
+  if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [], timed: [] };
+  if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
+  return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
 }
 
 /** The preload files, with a warning when `bunfig.toml` does not read. */
@@ -635,12 +641,17 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const seams = seamsOf(context);
   const scope = await taskScopeOf(context, seams, input);
   const runs = scope === null || scope.scope === 'full'
-    ? { narrowing: {}, alwaysRun: [] }
+    ? { narrowing: {}, alwaysRun: [], timed: [] }
     : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
   const recorded = scope?.scope ?? 'full';
   const result = await runTaskRuns(context, seams, runs);
   const label = `task step after "${input.task}"`;
-  return settleStep(context, seams, { kind: 'task', scope: recorded, label, result, baseline: input.baseline, blocks: true });
+  const outcome = settleStep(context, seams, { kind: 'task', scope: recorded, label, result, baseline: input.baseline, blocks: true });
+  const timedIn = runs.alwaysRun.length > 0
+    ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
+    : junitFileFor(context.repoRoot, context.sessionId, 'task');
+  if (!outcome.interrupted) reportSlowSweeps(timedIn, runs.timed);
+  return outcome;
 }
 
 /** The commit a stage's diff is taken from: the last stage step's, else the baseline's. */

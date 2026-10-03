@@ -269,7 +269,7 @@ function unescapeXml(value: string): string {
 }
 
 /** The attributes of one tag, their values unescaped. */
-function attributesOf(text: string): Readonly<Record<string, string>> {
+export function attributesOf(text: string): Readonly<Record<string, string>> {
   const found: Record<string, string> = {};
   for (const match of text.matchAll(/([\w:-]+)="([^"]*)"/g)) {
     found[match[1] ?? ''] = unescapeXml(match[2] ?? '');
