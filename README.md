@@ -451,13 +451,10 @@ hit and what it would change about itself, which waits for your yes. A
 second session, `rafa-stretch-watchtower`, watches it and its loops
 without writing anything, and alerts you when one of them needs you.
 
-On the machine that runs the loops, link the operators where Claude Code
-finds them, from the project's checkout:
-
-```bash
-ln -s "$PWD/src/bundled/operators/agents/"*.md ~/.claude/agents/
-ln -s "$PWD/src/bundled/operators/skills/"* ~/.claude/skills/
-```
+Nothing is linked into `~/.claude`. Each stretch runs on its own copy of
+the operators, made under `.rafa/stretch/<n>/operators/` when it starts
+and loaded with `claude --plugin-dir`, so a stretch already running is
+never changed by a pull or an update of rafa.
 
 Allow what they run without a prompt in the project's
 `.claude/settings.local.json`, and keep every push away from `main`:
@@ -487,16 +484,14 @@ Allow what they run without a prompt in the project's
 }
 ```
 
-Then start the two sessions, each in a terminal of its own, with Remote
-Control on so the bucket question and the alerts reach you away from the
-machine:
+Then start the engineer, the watchtower and the analyst in one tmux
+session, `stretch-<project>-<n>`, from the project's main checkout, with
+Remote Control on so the bucket question and the alerts reach you away
+from the machine. From a rafa checkout beside the project:
 
 ```bash
-claude --agent rafa-stretch-engineer
-claude --agent rafa-stretch-watchtower
+bash ../rafa/scripts/stretch/stretch.sh start --remote-control
 ```
-
-and type `/loop` in the watchtower's session.
 
 The agents read loops in the compact output, which you can use on your
 own too: `RAFA_OUTPUT=events rafa loop start …` (or `--output=events`)

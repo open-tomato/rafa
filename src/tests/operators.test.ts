@@ -63,6 +63,25 @@ describe('the bundled operators', () => {
     expect(run.exitCode).toBe(0);
   });
 
+  describe('the plugin the launcher loads', () => {
+    /** The plugin name in `.claude-plugin/plugin.json`. */
+    const pluginName = (JSON.parse(readFileSync(join(OPERATORS, '.claude-plugin', 'plugin.json'), 'utf8')) as { name: string }).name;
+
+    it('is the name the launcher passes to --agent', () => {
+      const script = readFileSync(join(SRC_DIR, '..', 'scripts', 'stretch', 'stretch.sh'), 'utf8');
+
+      expect(script.match(/^PLUGIN="([^"]+)"$/m)?.[1]).toBe(pluginName);
+    });
+
+    it('prefixes every skill the engineer loads, and gives the engineer the Skill tool', () => {
+      const text = readFileSync(join(OPERATORS, 'agents/rafa-stretch-engineer.md'), 'utf8');
+      const loads = [...text.matchAll(/load `([^`]+)`/gi)].map((match) => match[1]);
+
+      expect(loads.sort()).toEqual(['rafa-stretch-gap-log', 'rafa-stretch-pit-stop', 'rafa-stretch-sweep'].map((skill) => `${pluginName}:${skill}`));
+      expect(text).toMatch(/^tools: .*\bSkill\b/m);
+    });
+  });
+
   describe('the stretch text for verify', () => {
     /** A file's text with every run of whitespace folded to one space. */
     const flat = (file: string): string => readFileSync(join(OPERATORS, file), 'utf8').replace(/\s+/g, ' ');

@@ -4,7 +4,6 @@
 # is not rafa, run it by its path in the rafa checkout:
 # bash <rafa>/scripts/stretch/stretch.sh start
 #
-#   bash scripts/stretch/stretch.sh link          link the operators into ~/.claude
 #   bash scripts/stretch/stretch.sh start         engineer, watchtower and analyst in one tmux session
 #   bash scripts/stretch/stretch.sh engineer      the engineer alone, in this terminal
 #   bash scripts/stretch/stretch.sh watchtower    the watchtower alone, in this terminal
@@ -16,6 +15,12 @@
 #   --stretch=<n>      the stretch the watchtower and analyst read (default:
 #                      the newest with an agent.json; start passes the one it opens)
 #   --dry-run          print what would run, and run nothing
+#
+# Each stretch runs on its own copy of the operators, made once under
+# .rafa/stretch/<n>/operators/ and loaded with --plugin-dir, so nothing is
+# linked into ~/.claude and a pull, a worktree or a self-update in the rafa
+# checkout never changes a stretch that is running. Sessions and the tmux
+# session carry the project's name, so two projects' stretches never share one.
 #
 # The engineer's prompt is the project's .rafa/stretch/engineer-prompt.md,
 # else rafa's own engineer-prompt.md in the rafa checkout, else
@@ -31,9 +36,12 @@ OPERATORS="$RAFA_ROOT/src/bundled/operators"
 RAFA_PROMPT="$HERE/engineer-prompt.md"
 DEFAULT_PROMPT="$HERE/engineer-prompt-default.md"
 PROJECT_PROMPT=".rafa/stretch/engineer-prompt.md"
+# The plugin name the operators load under: --agent and the engineer's
+# skill loads name each operator as <plugin>:<name>.
+PLUGIN="rafa-operators"
 AGENT_WAIT_SECONDS=5
 
-usage() { sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 fail() { echo "stretch: $*" >&2; exit 1; }
 
 COMMAND="${1:-}"
@@ -73,8 +81,8 @@ main_checkout() {
   printf '%s\n' "$top"
 }
 
-# The stretch the next engineer opens: one more than the highest folder.
-next_stretch() {
+# The highest numbered stretch folder, or 0.
+highest_stretch() {
   local highest=0 dir n
   for dir in "$1"/.rafa/stretch/*/; do
     [ -d "$dir" ] || continue
@@ -82,52 +90,72 @@ next_stretch() {
     case "$n" in *[!0-9]*) continue ;; esac
     [ "$n" -gt "$highest" ] && highest="$n"
   done
-  echo $((highest + 1))
+  echo "$highest"
 }
 
+# The stretch the next engineer opens: one more than the highest folder,
+# or the highest itself while no engineer has written its agent.json there,
+# as when a start copied the operators and the engineer never ran.
+next_stretch() {
+  local highest
+  highest="$(highest_stretch "$1")"
+  if [ "$highest" -gt 0 ] && [ ! -f "$1/.rafa/stretch/$highest/agent.json" ]; then
+    echo "$highest"
+  else
+    echo $((highest + 1))
+  fi
+}
+
+# The project's name in session names: its folder, in letters tmux keeps.
+project_name() { basename "$1" | tr -c 'A-Za-z0-9_-' '-' | sed 's/-*$//'; }
+
 require_operators() {
-  local name
-  for name in rafa-stretch-engineer rafa-stretch-watchtower rafa-stretch-analyst; do
-    [ -e "$HOME/.claude/agents/$name.md" ] \
-      || fail "~/.claude/agents/$name.md is missing; run: bash $HERE/stretch.sh link"
-  done
+  [ -f "$OPERATORS/.claude-plugin/plugin.json" ] \
+    || fail "$OPERATORS/.claude-plugin/plugin.json is missing; run this script from a rafa checkout"
   command -v claude >/dev/null 2>&1 || fail "claude is not on PATH"
+}
+
+# copy_path <root> <stretch>: where the stretch's own operators sit.
+copy_path() { printf '%s\n' "$1/.rafa/stretch/$2/operators"; }
+
+# make_copy <root> <stretch>: copies the operators from this rafa checkout
+# the first time a session of the stretch starts, and never again.
+make_copy() {
+  local copy
+  copy="$(copy_path "$1" "$2")"
+  [ -d "$copy" ] && return 0
+  run mkdir -p "$1/.rafa/stretch/$2"
+  run cp -R "$OPERATORS" "$copy"
+}
+
+# Operators linked into ~/.claude by the launcher before the copies: they
+# do not reach a stretch started now, and a stretch started with them may
+# still read them.
+warn_linked() {
+  local found="" path
+  for path in "$HOME"/.claude/agents/rafa-stretch-*.md "$HOME"/.claude/skills/rafa-stretch-*; do
+    [ -L "$path" ] && found="$found $path"
+  done
+  [ -n "$found" ] || return 0
+  echo "stretch: linked operators found:$found"
+  echo "  this stretch uses its own copy; remove the links once no stretch started with them runs"
 }
 
 # The newest stretch whose engineer has written its agent.json, or 0.
 newest_watched() {
   local n
-  for n in $(seq $(($(next_stretch "$1") - 1)) -1 1); do
+  for n in $(seq "$(highest_stretch "$1")" -1 1); do
     [ -f "$1/.rafa/stretch/$n/agent.json" ] && { echo "$n"; return; }
   done
   echo 0
 }
 
-# claude_session <agent> <session name> <prompt>: Remote Control names the
-# session itself, so it replaces -n rather than joining it.
+# claude_session <operators copy> <agent> <session name> <prompt>: Remote
+# Control names the session itself, so it replaces -n rather than joining it.
 claude_session() {
   local name_flag=-n
   [ "$REMOTE" -eq 1 ] && name_flag=--remote-control
-  run claude --agent "$1" "$name_flag" "$2" "$3"
-}
-
-cmd_link() {
-  local kind src name target
-  [ -d "$OPERATORS" ] || fail "$OPERATORS is missing; run link from a rafa checkout's scripts/stretch/"
-  for kind in agents skills; do
-    run mkdir -p "$HOME/.claude/$kind"
-    for src in "$OPERATORS/$kind"/*; do
-      [ -e "$src" ] || continue
-      name="$(basename "$src")"
-      target="$HOME/.claude/$kind/$name"
-      if [ -e "$target" ] && [ ! -L "$target" ]; then
-        echo "  kept     $target (a file, not a link; remove it to link the operator)"
-        continue
-      fi
-      run ln -sfn "$src" "$target"
-      [ "$DRY" -eq 1 ] || echo "  linked   $target"
-    done
-  done
+  run claude --plugin-dir "$1" --agent "$PLUGIN:$2" "$name_flag" "$3" "$4"
 }
 
 # engineer_prompt_file <root>: the project's own prompt, rafa's own for the
@@ -143,7 +171,7 @@ engineer_prompt_file() {
 }
 
 cmd_engineer() {
-  local root="$1" stretch file fill prompt
+  local root="$1" stretch file fill prompt copy
   require_operators
   stretch="$(next_stretch "$root")"
   file="$(engineer_prompt_file "$root")"
@@ -153,15 +181,17 @@ cmd_engineer() {
   [ "$stretch" -eq 1 ] && fill="/{{PREVIOUS}}/d; $fill"
   prompt="$(sed "$fill" "$file" | cat -s)"
   echo "prompt: $file"
+  make_copy "$root" "$stretch"
+  copy="$(copy_path "$root" "$stretch")"
   cd "$root" || fail "cannot enter $root"
-  claude_session rafa-stretch-engineer "stretch $stretch engineer" "$prompt"
+  claude_session "$copy" rafa-stretch-engineer "$(project_name "$root") stretch $stretch engineer" "$prompt"
 }
 
 # beside_engineer <root> <agent> <role> <prompt>: a session that reads a
 # running stretch. It finds the engineer by the agent.json the engineer
 # writes first, so one started beside a new engineer waits for that file.
 beside_engineer() {
-  local root="$1" stretch="$STRETCH"
+  local root="$1" stretch="$STRETCH" copy
   require_operators
   [ -n "$stretch" ] || stretch="$(newest_watched "$root")"
   [ "$stretch" -gt 0 ] || fail "no .rafa/stretch/<n>/agent.json yet; start the engineer first, or pass --stretch=<n>"
@@ -169,8 +199,10 @@ beside_engineer() {
     echo "waiting for .rafa/stretch/$stretch/agent.json …"
     sleep "$AGENT_WAIT_SECONDS"
   done
+  make_copy "$root" "$stretch"
+  copy="$(copy_path "$root" "$stretch")"
   cd "$root" || fail "cannot enter $root"
-  claude_session "$2" "stretch $stretch $3" "${4//\{\{STRETCH\}\}/$stretch}"
+  claude_session "$copy" "$2" "$(project_name "$root") stretch $stretch $3" "${4//\{\{STRETCH\}\}/$stretch}"
 }
 
 cmd_watchtower() { beside_engineer "$1" rafa-stretch-watchtower watchtower "/loop"; }
@@ -184,7 +216,8 @@ cmd_start() {
   local root="$1" stretch session flags=""
   require_operators
   stretch="$(next_stretch "$root")"
-  session="rafa-stretch-$stretch"
+  session="stretch-$(project_name "$root")-$stretch"
+  warn_linked
   [ "$REMOTE" -eq 1 ] && flags=" --remote-control"
   if ! command -v tmux >/dev/null 2>&1; then
     echo "tmux is not installed: starting the engineer here. In a second terminal run:"
@@ -194,25 +227,27 @@ cmd_start() {
     cmd_engineer "$root"
     return
   fi
-  if tmux has-session -t "$session" 2>/dev/null; then
+  # tmux reads a bare -t as a prefix, so stretch-rafa-2 would find
+  # stretch-rafa-23; a leading = asks for the exact name.
+  if tmux has-session -t "=$session" 2>/dev/null; then
     fail "tmux session $session already runs; attach with: tmux attach -t $session"
   fi
   # A window closes with its command, taking a refusal's message with it,
   # so each one waits for Enter after the session ends.
   local hold='; echo "exited: $?, press Enter to close"; read -r _'
   run tmux new-session -d -s "$session" -c "$root" -n engineer "bash '$HERE/stretch.sh' engineer$flags$hold"
-  run tmux new-window -t "$session" -c "$root" -n watchtower "bash '$HERE/stretch.sh' watchtower --stretch=$stretch$flags$hold"
-  run tmux new-window -t "$session" -c "$root" -n analyst "bash '$HERE/stretch.sh' analyst --stretch=$stretch$flags$hold"
-  run tmux select-window -t "$session:engineer"
+  run tmux new-window -t "=$session:" -c "$root" -n watchtower "bash '$HERE/stretch.sh' watchtower --stretch=$stretch$flags$hold"
+  run tmux new-window -t "=$session:" -c "$root" -n analyst "bash '$HERE/stretch.sh' analyst --stretch=$stretch$flags$hold"
+  run tmux select-window -t "=$session:engineer"
   if [ "$DRY" -eq 1 ]; then
     echo "dry run: would start stretch $stretch in tmux session $session"
     return
   fi
   echo "stretch $stretch started in tmux session $session (windows: engineer, watchtower, analyst)"
   if [ -n "${TMUX:-}" ]; then
-    tmux switch-client -t "$session"
+    tmux switch-client -t "=$session"
   elif [ -t 1 ]; then
-    tmux attach -t "$session"
+    tmux attach -t "=$session"
   else
     echo "attach with: tmux attach -t $session"
   fi
@@ -223,10 +258,9 @@ case "$COMMAND" in
 esac
 ROOT="$(main_checkout)" || exit 1
 case "$COMMAND" in
-  link) cmd_link ;;
   start) cmd_start "$ROOT" ;;
   engineer) cmd_engineer "$ROOT" ;;
   watchtower) cmd_watchtower "$ROOT" ;;
   analyst) cmd_analyst "$ROOT" ;;
-  *) fail "unknown command: $COMMAND (link, start, engineer, watchtower, analyst)" ;;
+  *) fail "unknown command: $COMMAND (start, engineer, watchtower, analyst)" ;;
 esac
