@@ -1115,6 +1115,43 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
     ['./release.js', ['pushOnClaimTip', 'readClaimStoreId', 'readIssueArgument', 'readIssueBranches']],
   ]],
+  ['./commands/update/current.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../../cli/version.js', ['RAFA_VERSION']],
+    ['../../config-load.js', ['loadConfig']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../pr/provider.js', ['resolvePrProvider']],
+    ['../../project/lock.js', ['LOCK_FILE', 'readProjectLock']],
+    ['../../project/scaffold.js', ['scaffoldConflicts']],
+    ['../../project/update-current.js', ['applyUpdatePlan', 'planChanges', 'readUpdatePlan', 'UpdateStepError']],
+    ['../../project/update-range.js', ['readCurrentRange']],
+    ['../../project/worktree-root.js', ['mainCheckoutOf']],
+    ['../../schema/project-id.js', ['gitRemoteUrl']],
+    ['../plan/plan-files.js', ['expectNoArgument']],
+  ]],
+  ['./commands/update/self.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/project.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/rafa.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/port.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/board.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/next.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
+  ['./commands/update/latest.js', [
+    ['./stub.js', ['createUpdateStub']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
@@ -1475,6 +1512,14 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/claim/hand.js',
       './commands/claim/accept.js',
       './commands/claim/take.js',
+      './commands/update/current.js',
+      './commands/update/self.js',
+      './commands/update/project.js',
+      './commands/update/rafa.js',
+      './commands/update/port.js',
+      './commands/update/board.js',
+      './commands/update/next.js',
+      './commands/update/latest.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

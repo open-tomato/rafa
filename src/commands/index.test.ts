@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the seventy-nine commands it registers: what the registry
+ * declarations of the eighty-seven commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -9,7 +9,7 @@
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`,
- * the four `claim` actions and the seven `pr` actions
+ * the four `claim` actions, the eight `update` actions and the seven `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -180,6 +180,14 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'claim hand': ['text', 'json'],
   'claim accept': ['text', 'json'],
   'claim take': ['text', 'json'],
+  'update current': ['text', 'json'],
+  'update self': ['text', 'json'],
+  'update project': ['text', 'json'],
+  'update rafa': ['text', 'json'],
+  'update port': ['text', 'json'],
+  'update board': ['text', 'json'],
+  'update next': ['text', 'json'],
+  'update latest': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -256,12 +264,20 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'claim hand': [['n'], ['to', 'withdraw']],
   'claim accept': [['n'], []],
   'claim take': [['n'], ['stale']],
+  'update current': [[], ['dry-run', 'yes']],
+  'update self': [[], []],
+  'update project': [[], []],
+  'update rafa': [[], []],
+  'update port': [[], []],
+  'update board': [[], []],
+  'update next': [[], []],
+  'update latest': [[], []],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
 
 /** The commands running outside a project too: `module exec`, whose modules route before any project is resolved, `skill check` and `instinct check`, whose only project seam is `--project`, `init`, which makes one, and `describe`. */
-const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'init', 'describe'];
+const OUTSIDE_A_PROJECT = ['module exec', 'skill check', 'instinct check', 'update self', 'update project', 'update rafa', 'update port', 'update board', 'update next', 'update latest', 'init', 'describe'];
 
 /** A temporary directory of this file's own, holding the project and the home every routing case dispatches with. */
 const tempBase = mkdtempSync(join(tmpdir(), 'rafa-roster-'));
@@ -360,6 +376,9 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['claim hand 324 --withdraw', 'claim hand', ['324', '--withdraw'], ''],
   ['claim accept 324', 'claim accept', ['324'], ''],
   ['claim take 324 --stale', 'claim take', ['324', '--stale'], ''],
+  ['update current --dry-run', 'update current', ['--dry-run'], ''],
+  ['update self 0.34.0', 'update self', ['0.34.0'], ''],
+  ['update port', 'update port', [], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -458,12 +477,12 @@ function numberWord(word: string): number {
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the thirteen subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim']);
+  it('registers the fourteen subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -534,6 +553,14 @@ describe('the core roster', () => {
       'claim hand',
       'claim accept',
       'claim take',
+      'update current',
+      'update self',
+      'update project',
+      'update rafa',
+      'update port',
+      'update board',
+      'update next',
+      'update latest',
       'status',
       'next',
       'roadmap',
@@ -545,10 +572,11 @@ describe('the core roster', () => {
       'usage',
       'describe',
     ]);
-    expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length);
+    expect(CORE_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
+    expect(CORE_REGISTRY.commands()).toHaveLength(CORE_COMMANDS.length - 2);
   });
 
-  it('runs every command inside a project but module exec, the two checkers, init and describe, which declare needsProject false', () => {
+  it('runs every command inside a project but module exec, the two checkers, the seven update stubs, init and describe, which declare needsProject false', () => {
     const outside = CORE_COMMANDS.filter((command) => command.needsProject === false).map(commandSpelling);
 
     expect(outside).toEqual(OUTSIDE_A_PROJECT);

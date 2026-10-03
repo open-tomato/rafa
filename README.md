@@ -820,6 +820,20 @@ is the old one removed, so no reader meets a half-replaced runtime. The
 link lands by a rename too, so a shell meets the old link or the new one
 and never none.
 
+## Bringing a project up to the installed rafa
+
+`rafa self-update` moves the rafa every project on the device runs, and
+leaves what each project holds as it was set up. `rafa update current`,
+run inside a project, brings that project to the installed rafa: it
+creates the `.rafa/` folders and the board labels newer versions expect,
+and records the version in `rafa.lock` at the repository root, a small
+JSON file meant to be committed. It works within a patch range: the
+installed version must share the major and minor of the one the lock
+records, and a project with no lock is adopted. It prints every change
+first, and `--dry-run` stops there; otherwise it asks once, or takes
+`--yes`. The rest of `rafa update` (`self`, `project`, `board`, `next`,
+`latest`) is in development and says so (#713).
+
 ## Runtime
 
 The build targets bun, and `engines` names `bun` alone: there is no

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the seventy-nine registered so far wrap a
+ * of each is its command. Five of the eighty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -272,6 +272,11 @@
  *     stale claim, `rafa:in-development` only under `--stale`; each
  *     refused with exit code 1 when this device's standing does not allow
  *     it, and none starts a session.
+ *   - `update current [--dry-run] [--yes]`: the project brought to the
+ *     installed rafa within its patch range, `rafa.lock` written at the
+ *     root (#714). `update self`, `project`, `board`, `next` and `latest`,
+ *     with `rafa` and `port` as hidden spellings of `project`, are stubs
+ *     refusing with exit code 1 and naming their issue (#713).
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -386,6 +391,14 @@ import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
 import switchCommand from './switch.js';
+import updateBoard from './update/board.js';
+import updateCurrent from './update/current.js';
+import updateLatest from './update/latest.js';
+import updateNext from './update/next.js';
+import updatePort from './update/port.js';
+import updateProject from './update/project.js';
+import updateRafa from './update/rafa.js';
+import updateSelf from './update/self.js';
 import usage from './usage.js';
 
 /** The core subjects, in roster order. */
@@ -403,6 +416,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
+  { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
 ]);
 
 /** The core commands, in roster order. */
@@ -476,6 +490,14 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   claimHand,
   claimAccept,
   claimTake,
+  updateCurrent,
+  updateSelf,
+  updateProject,
+  updateRafa,
+  updatePort,
+  updateBoard,
+  updateNext,
+  updateLatest,
   status,
   next,
   roadmap,
