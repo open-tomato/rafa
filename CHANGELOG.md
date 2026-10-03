@@ -9,6 +9,30 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.34.0 — 2026-10-03, A clean checkout of main passes bun test and eslint; Stop refiling one red test as many bugs; Bug sweep 3 — a clean main passes `bun test` and `bunx eslint .`; A loop's pull request opens against pr.base; CI verifies pull requests into main, asynchronously on stretch branches; Tests pass on the pinned Bun 1.3.14 and the runner's git, as on a Bun 1.4.2 host
+<!-- rafa:fragments docs-sleep-mid-run-note rafa-485-green-main rafa-486-stop-refiling rafa-607-bug-sweep-3 rafa-628-pr-base rafa-637-ci-verify-pull-requests rafa-687-bun-git-versions rafa-687b-hub-core-subpaths -->
+
+- Fixed: rafa refuses a `.rafa/config.yaml` line indented with a tab with its own error naming the line, on every Bun version, and the test-only store guard now accepts a temp-directory path spelled through a symlink (such as macOS's `/var`), even before the path exists.
+- Tests: the live parity suites skip unless `RAFA_LIVE_PARITY=1` is set; the real-plan and migrations cases read data committed to the repository; spawned and git-committing fixtures carry their own git identity and Bun cache, so a clean checkout no longer depends on the host.
+- Documentation: the README notes that tab indentation in `.rafa/config.yaml` is refused; `context/verification.md` names `RAFA_LIVE_PARITY=1` for the live parity suites and drops the known failures this release removes; the zsh README's code fence gains a language.
+- Documentation: New `context/triage.md` covers the channels, the two-step match and its keys, inherited failures, the state read on a repeat and the similarity settings.
+- Triage: A failing test is now tracked by its test file, case and first error line instead of by plan, ignoring line numbers, commit hashes, folders and spacing, so one red test reported by two plans or worded two ways is filed once while two failures in one test stay two bugs; issues filed under the old key are still found. A report worded differently comments on the nearest open bug with its similarity score, a new bug lists its possible duplicates, and a repeat reads its issue's state first: closed as completed files a new issue naming the old one, closed as not planned or duplicate gets a comment, and a failed read files nothing.
+- Loop: A run that starts on a red suite no longer files issues for the failures it inherited; it comments on their open issues at most once per run, names each as inherited in the triage notes and events output, and lists them in task prompts by file and case so sessions need not prove them pre-existing.
+- Config: New `triage.similarity.threshold` (default 0.3, or `false` to turn the similarity step off) and `triage.similarity.candidates` (default 3, 1 to 10) settings, written commented out by `rafa init`.
+- Trackers: Trackers can list the open issues of one type with their text in one call (one `gh issue list` on GitHub, the issue files locally), and a GitHub issue closed as a duplicate now reads as cancelled instead of done.
+- Effort store: Stored issue references now answer the newest under a key, the same on both sides of a store merge, and a filed issue's reference can supersede a closed one as a new row; a second superseding write in one session is refused with `SupersedeInSessionRefusal` and nothing written.
+- Suite: The run-start suite baseline keeps the first line of each failing test's message, and older baselines still read.
+- skills: The bundled dev-planner and git-workflow skills no longer name gitignored `.rafa/` files as project paths, so the project skills check passes on a clean checkout.
+- rafa next: Offers a plan whose branch holds only its claim commits, instead of passing it over as already started.
+- docs: Removed the "A worktree runs fewer skills-tier tests" known-failure note from `context/verification.md`, now that the cause is fixed.
+- loop: A loop's pull request now opens against the run's base (`pr.base`, else `origin/HEAD`, else `main`) rather than the repository's default branch; one opened against another base is retargeted before the CI wait with one line saying so, and under `loop start --as-worktree` the release step pushes the run's branch and writes its line into that branch's pull request.
+- pr: Pull requests can now be retargeted to another base (`gh pr edit --base`), with a warning instead of a failure if `gh` refuses.
+- CI: A `verify` workflow runs the test, lint and type gates on every pull request into `main` and on every push to a `stretch/**` branch.
+- operators: The stretch engineer merges stretch pull requests on a local pass with `--skip-checks`, waits for `verify` before merging into `main`, and keeps no foreground command waiting past 60 seconds; the pit stop reads CI as its fifth check.
+- documentation: `context/verification.md` and the `rafa-tooling` skill describe the `verify` workflow and how to hand over a merge into `main` versus into a stretch branch.
+- triage: A test already failing when the run started is now recognised as inherited even when Bun's JUnit report gives its failure no message, as the pinned Bun 1.3.14 does, so it is no longer filed as a new issue.
+- pr merge: `rafa pr merge --skip-checks --yes` now merges a pull request whose base no workflow's `pull_request` trigger names, and says why: `no workflow runs on pull requests into <base>`.
+
 ## 0.33.0 — 2026-10-01, rafa-hub, the service a team's devices sync the effort store through; Loop task sessions run only the tests their change reaches; Stretch agent, alpha, and the events output for loops; A loop run ends delivered — eight loop bugs fixed
 <!-- rafa:fragments rafa-325-rafa-hub rafa-479-loop-task-sessions-run rafa-598 rafa-579-loop-run-ends-delivered -->
 
