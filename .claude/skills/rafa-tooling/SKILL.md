@@ -170,6 +170,7 @@ Each row pairs the verbose command with the rafa line that replaces it.
 | `gh issue create --title … --label …` | `rafa issue create --title=… --type=… --priority=…` |
 | `gh issue comment 12 --body …` | `rafa issue comment 12 --body=…` |
 | `gh issue close 12`, label edits for state | `rafa issue move 12 done` |
+| `gh issue edit 12 --add-label epic:… --remove-label epic:…` | `rafa epic move 12 --to=<epic>` |
 | `gh pr view --json … \| jq …` for the current branch | `rafa pr current` |
 | `gh pr view 41`, `gh pr checks 41` | `rafa pr show 41` |
 | `gh pr view 41 --web` | `rafa pr view 41` |
@@ -188,6 +189,22 @@ Board and roadmap reads have no short `gh` form at all: use `rafa status`,
 Some steps have no rafa action, so use the plain command for them:
 `gh pr create` outside a loop, `gh pr checkout`, `gh run view --log`, and
 `gh api` reads. Plain `git` stays for commits, pushes and rebases.
+
+The epic guard (`.github/workflows/epic-guard.yml`, `context/workflow.md`)
+is installed and disabled. Turning it on or off is a repository setting,
+so it goes to the user as in case 1, one line per block, and only when
+they ask for it:
+
+```bash
+gh workflow enable "Epic guard"
+```
+
+```bash
+gh workflow disable "Epic guard"
+```
+
+`gh workflow list --all` is a read: it shows whether the guard is
+`active` or `disabled_manually`.
 
 ## Finding a command not listed here
 
