@@ -20,7 +20,9 @@
  * then git's own, the scratch HOME with the bun cache variables that
  * keep bun from writing under it (`./scratch-home-env.ts`), `RAFA_TEST=1`
  * and the suite's `TMPDIR` for the effort store's test guard, and nothing
- * else but what the case names. So `claude` resolves to the stand-in
+ * else but what the case names. What the case names outranks all of it
+ * but the PATH, so a case naming its own `TMPDIR` is the one whose
+ * `TMPDIR` the child reads. So `claude` resolves to the stand-in
  * {@link plantStandInClaude} writes there, or to nothing: {@link runRafa}
  * refuses to spawn when it resolves anywhere else.
  *
@@ -243,9 +245,17 @@ function refuseForeignClaude(scratch: ScratchRepo): void {
   }
 }
 
-/** The environment a spawned run gets; see {@link runRafa}. */
-function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>): Record<string, string> {
-  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
+/**
+ * The environment a spawned run gets, in this order: `RAFA_TEST=1` and
+ * the suite's `TMPDIR` first, then {@link scratchHomeEnv} for the scratch
+ * HOME, then the variables `env` names, then the scratch PATH last. So a
+ * case naming no `TMPDIR` hands its child this process's `tmpdir()`, a
+ * case naming one (or `RAFA_TEST`, or a variable `scratchHomeEnv` sets)
+ * wins, and no case moves the PATH {@link refuseForeignClaude} checked.
+ * Exported for the case that spawns a child under it; see {@link runRafa}.
+ */
+export function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>): Record<string, string> {
+  return { RAFA_TEST: '1', TMPDIR: tmpdir(), ...scratchHomeEnv(scratch.home), ...env, PATH: scratch.path };
 }
 
 /**
@@ -256,7 +266,9 @@ function spawnedEnv(scratch: ScratchRepo, env: Readonly<Record<string, string>>)
  * the effort store's test guard (`src/effort/store/location.ts`), and
  * this suite's temporary directory as `TMPDIR`, so the guard judges its
  * opens by the directory the scratch project was built under. A case
- * naming either in `env` overrides it.
+ * naming either in `env` overrides it, as it overrides the scratch HOME
+ * variables; the scratch PATH comes last, and no case overrides it
+ * ({@link spawnedEnv}).
  */
 export function runRafa(
   scratch: ScratchRepo,

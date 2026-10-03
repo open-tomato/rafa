@@ -166,7 +166,16 @@ export interface LoopRun {
   readonly stderr: string;
 }
 
-/** Runs `rafa loop start` in a scratch repository, in one output mode, with `env` added to its environment. */
+/**
+ * Runs `rafa loop start` in a scratch repository, in one output mode,
+ * with `env` added to its environment. That environment is built in
+ * this order: the resolved temporary directory as `TMPDIR` first, then
+ * {@link scratchHomeEnv} for the scratch HOME, then the variables `env`
+ * names, then the scratch PATH last, and `RAFA_OUTPUT` for a mode other
+ * than text. So a case naming no `TMPDIR` hands its child this process's
+ * temporary directory, a case naming one wins, and no case moves the
+ * PATH the stand-in `claude` was checked against.
+ */
 export function runLoopStart(
   scratch: Scratch,
   mode: OutputMode,
@@ -177,7 +186,7 @@ export function runLoopStart(
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  const runEnv: Record<string, string> = { TMPDIR: RESOLVED_TMPDIR, ...env, PATH: scratch.path, ...scratchHomeEnv(scratch.home) };
+  const runEnv: Record<string, string> = { TMPDIR: RESOLVED_TMPDIR, ...scratchHomeEnv(scratch.home), ...env, PATH: scratch.path };
   if (mode !== 'text') runEnv.RAFA_OUTPUT = mode;
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...flags, NO_HINT], {
     cwd: scratch.repo,

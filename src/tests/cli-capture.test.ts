@@ -30,7 +30,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo, runRafa } from './cli-capture.js';
+import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo, runRafa, spawnedEnv } from './cli-capture.js';
 
 /** The CLI entry the control spawns by hand, as `runRafa` spawns it. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -119,5 +119,34 @@ describe('runRafa', () => {
     expect(bare.exitCode).toBe(0);
     expect(existsSync(join(control.home, '.bun'))).toBe(bunWritesInstallCache);
     expect(existsSync(join(scratch.home, '.bun'))).toBe(false);
+  });
+});
+
+describe('spawnedEnv', () => {
+  // The first case can only fail when this process runs under a TMPDIR
+  // other than the system default: with none set, a child handed no
+  // TMPDIR reads /tmp as well. Driven on 2026-10-03 under a TMPDIR made
+  // with `mktemp -d -p "$HOME"`: dropping TMPDIR from spawnedEnv reddened
+  // the first case alone, and moving it after the case's env reddened
+  // the second alone; with no TMPDIR set the dropped key left both green.
+  /** What `tmpdir()` answers in a child spawned under the environment `spawnedEnv` gives for `env`. */
+  function childTmpdir(env: Readonly<Record<string, string>>): string {
+    const scratch = plantScratchRepo(tempBase);
+    const child = Bun.spawnSync([process.execPath, '-e', 'process.stdout.write(require("node:os").tmpdir())'], {
+      cwd: scratch.repo,
+      env: spawnedEnv(scratch, env),
+    });
+    expect(child.exitCode).toBe(0);
+    return child.stdout.toString();
+  }
+
+  it('hands a spawned child the tmpdir() of the parent process when the case names no TMPDIR', () => {
+    expect(childTmpdir({})).toBe(tmpdir());
+  });
+
+  it('hands a spawned child the TMPDIR the case names when the case names one', () => {
+    const own = join(tempBase, 'case-tmpdir');
+
+    expect(childTmpdir({ TMPDIR: own })).toBe(own);
   });
 });
