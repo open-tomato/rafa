@@ -49,11 +49,12 @@
  *
  * ## Taken out
  *
- * Local paths ({@link localPathRedactor}) and named secrets
- * ({@link redactSecrets}) are taken out of every value as triage takes them
- * out of a filed text, then {@link leaksIn} refuses any value still holding
- * a home path or a token-shaped word, so a fixture is never written with
- * one.
+ * Every value goes through the redaction {@link filingsOf} is handed. The
+ * extract hands it the fixture scrub of `src/fixtures/scrub.ts`, which
+ * takes out home paths, email addresses, the host name and named secrets,
+ * and refuses any value still holding one, so a fixture is never written
+ * with one. {@link leaksIn} is the narrower check the committed fixture is
+ * read against: no home path and no token-shaped word.
  */
 import { COMMENT_OPENING, ISSUE_OPENING } from './issue-text.js';
 import { issueTextOf, sectionValueOf } from './similarity.js';
