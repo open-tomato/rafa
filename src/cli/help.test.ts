@@ -22,7 +22,7 @@
  * change is read in the diff. With the variable unset, or set to anything
  * else, nothing is written, and a snapshot that no longer matches is red.
  * The sensitivity case is the control that the comparison can fail: the
- * core roster less `usage` renders a root help that differs from the
+ * core roster less `describe` renders a root help that differs from the
  * snapshot.
  *
  * ## The rules
@@ -254,17 +254,16 @@ describe('the frozen help snapshots', () => {
   });
 
   it('differs from the root snapshot once one command leaves the roster, so the comparison can fail', () => {
-    const lessUsage = createCommandRegistry({
+    const lessDescribe = createCommandRegistry({
       subjects: CORE_SUBJECTS,
-      commands: CORE_COMMANDS.filter((held) => commandSpelling(held) !== 'usage'),
+      commands: CORE_COMMANDS.filter((held) => commandSpelling(held) !== 'describe'),
     });
     const snapshot = readSnapshot('rafa.txt');
 
     expect(renderHelp({ level: 'root' }, CORE_REGISTRY)).toBe(snapshot);
-    expect(renderHelp({ level: 'root' }, lessUsage)).not.toBe(snapshot);
+    expect(renderHelp({ level: 'root' }, lessDescribe)).not.toBe(snapshot);
     expect(blockOf(snapshot, 'Commands')).toEqual([
-      '  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,',
-      '  describe',
+      '  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe',
     ]);
   });
 

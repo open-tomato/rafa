@@ -6,7 +6,7 @@
  *
  * ## What is covered
  *
- *   - **`--output=json` over `describe`, `usage`, `plan validate`,
+ *   - **`--output=json` over `describe`, `status`, `plan validate`,
  *     `effort report` and a refused command** (`plan show` of a stub no
  *     plan carries): each run's stdout is NDJSON, every line parsing as
  *     JSON, with exactly one terminal `result` event among them, as
@@ -15,6 +15,9 @@
  *     phase 0, each print their one deprecation line to stderr exactly
  *     once, whatever the command they alias goes on to do.
  *   - **An unknown subject** exits nonzero.
+ *   - **The removed `usage` subject**, bare and with `--output=json`, is
+ *     refused as unknown with an empty stdout, beside a kept command
+ *     exiting 0 in the same project.
  *   - **A command outside a project** exits 1 with the `rafa init` hint,
  *     where the same command runs in a scratch repository holding
  *     `.rafa/config.yaml`: the control for the file every other case's
@@ -77,13 +80,13 @@ interface JsonCase {
 }
 
 /**
- * `describe`, `usage`, `plan validate` and `effort report`, each
+ * `describe`, `status`, `plan validate` and `effort report`, each
  * exiting 0, and a refused command (`plan show` of a stub no plan
  * carries), exiting 1: every one run over `--output=json`.
  */
 const JSON_CASES: readonly (readonly [string, JsonCase])[] = [
   ['describe', { words: ['describe', '--output=json'], exitCode: 0 }],
-  ['usage', { words: ['usage', '--output=json'], exitCode: 0 }],
+  ['status', { words: ['status', '--output=json'], exitCode: 0 }],
   ['plan validate', {
     words: ['plan', 'validate', 'plan.md', '--output=json'],
     exitCode: 0,
@@ -143,13 +146,32 @@ describe('an unknown subject', () => {
   }, RUN_TIMEOUT);
 });
 
+describe('the removed usage subject', () => {
+  it('is refused as unknown in both output modes, where a kept command runs in the same project', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const plain = runRafa(scratch, scratch.repo, ['usage']);
+    const json = runRafa(scratch, scratch.repo, ['usage', '--output=json']);
+    const control = runRafa(scratch, scratch.repo, ['status']);
+
+    expect(plain.exitCode).not.toBe(0);
+    expect(plain.stderr).toContain('rafa: unknown subject or command "usage"');
+    expect(plain.stdout).toBe('');
+    // In json mode the refusal is the terminal result event on stdout, and stderr stays empty.
+    expect(json.exitCode).not.toBe(0);
+    expect(json.stderr).toBe('');
+    expect(json.stdout).toContain('"message":"unknown subject or command \\"usage\\""');
+    expect(control.exitCode).toBe(0);
+  }, RUN_TIMEOUT);
+});
+
 describe('a command outside a project', () => {
   it('exits 1 with the init hint, where the same command runs in a scratch repository holding the config', () => {
     const outside = plantScratchRepo(tempBase, { project: false });
     const inside = plantScratchRepo(tempBase);
 
-    const refused = runRafa(outside, outside.repo, ['usage']);
-    const ran = runRafa(inside, inside.repo, ['usage']);
+    const refused = runRafa(outside, outside.repo, ['status']);
+    const ran = runRafa(inside, inside.repo, ['status']);
 
     expect([refused.exitCode, refused.stdout]).toEqual([1, '']);
     expect(refused.stderr).toBe(`rafa: ${initHint(outside.repo)}\n`);

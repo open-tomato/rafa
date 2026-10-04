@@ -365,12 +365,11 @@ describe('where start.ts takes the suite steps', () => {
     );
   });
 
-  it('takes the task step from the task\'s base once its commit is stored, before the usage check', () => {
+  it('takes the task step from the task\'s base once its commit is stored', () => {
     expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
     const after = indexOf(EVERY, 'afterTask');
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
-    expect(after).toBeLessThan(indexOf(EVERY, 'checkUsage'));
     expect(START).toContain(
       'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
     );

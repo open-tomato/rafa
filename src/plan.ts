@@ -227,7 +227,6 @@ import { branchNameFor } from './start/branch-decision.js';
 import { resolveSessionTiers } from './start/serving.js';
 import { renderSkillIndex } from './task/skill-index.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
-import { checkUsage } from './utils/claude.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -626,8 +625,6 @@ export default async function plan(
   const specRequest = resolved.spec.path;
   const specPath = path.resolve(repoRoot, specRequest);
   const planFile = planFilePath(planDir, `PLAN-${stub}.md`);
-
-  await checkUsage('issue');
 
   // Feed the loop's accumulated findings into planning (opt out with
   // --no-progress): the planner never used to see progress.txt, which meant

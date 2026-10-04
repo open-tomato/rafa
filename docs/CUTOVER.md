@@ -62,10 +62,10 @@ cd /Users/marcos/projects/agentic-research
 Test the new entry point:
 
 ```bash
-bun run ralph usage
+bun run ralph --help
 ```
 
-Should output the rafa usage help without error. If the command fails, verify
+Should output the rafa help without error. If the command fails, verify
 that `~/.rafa/bin` is on your `PATH` and that `rafa` resolves to the global
 snapshot (not a local `node_modules` entry). Do not use `bun link` or
 `bun pm ls` — the link carries no `bun` context.
@@ -240,7 +240,7 @@ restored:
 git revert <cutover-commit-SHA>
 
 # Verify ralph is restored
-bun run ralph usage
+bun run ralph --help
 ```
 
 This rollback reverts the `tools/ralph` deletion and restores the
@@ -268,7 +268,7 @@ After the cutover commit is merged and the rollback is documented:
 
    ```bash
    cd /Users/marcos/projects/agentic-research
-   bun run ralph usage
+   bun run ralph --help
    ```
 
 2. **Run a simple plan to confirm end-to-end operation:**

@@ -11,7 +11,7 @@
  * `subject` and `action` are the words a line routes by: `rafa loop start`
  * runs the command whose subject is `loop` and whose action is `start`.
  * A command whose action is its subject is a top-level command, reached
- * by its one word: `usage`, with subject and action both `usage`. That is
+ * by its one word: `status`, with subject and action both `status`. That is
  * open-tomato's rule for a single-token verb, which it registers with
  * tool and command equal. `name` is for display, and routes nothing.
  *
@@ -310,7 +310,7 @@ export function isTopLevel(command: Pick<RafaCommand, 'subject' | 'action'>): bo
   return command.subject === command.action;
 }
 
-/** A command's canonical spelling after `rafa`: `loop start`, or `usage` for a top-level command. */
+/** A command's canonical spelling after `rafa`: `loop start`, or `status` for a top-level command. */
 export function commandSpelling(command: Pick<RafaCommand, 'subject' | 'action'>): string {
   return isTopLevel(command)
     ? command.subject

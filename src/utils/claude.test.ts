@@ -125,18 +125,14 @@
  * rather than passing. The control sets that same output in `text`, and
  * reads the bytes on stdout and no line.
  *
- * `checkUsage` is read through a `sinkOutput` recording every level, with
- * `CLAUDE_USAGE_PERCENT` set for the case and put back after it: one case
- * per branch, and one for a usage that cannot be read.
- *
  * Six mutations of `claude.ts` were driven against these cases on
  * 2026-09-15, each restored sha256-identical with the suites green before
  * and after, and every one reddened at least one case of this file. The
  * tee's mode inverted reddened all four json cases and two text ones. A
  * last line left unflushed reddened 2, and blank lines dropped 1. Bytes
  * written in json mode as well reddened 2. `spawnClaude` never handing a
- * json-mode session to the capturing spawner reddened 1, and so did the
- * usage line written at `warn`.
+ * json-mode session to the capturing spawner reddened 1. The sixth, the
+ * usage line written at `warn`, was in the usage check, since removed.
  *
  * ## The spend guard
  *
@@ -182,7 +178,6 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import {
   CLAUDE_BASE_ARGS,
   carriesFlag,
-  checkUsage,
   claudeArgs,
   interruptClaudeSessions,
   runClaude,
@@ -1215,67 +1210,6 @@ describe('both doors in json mode, against a stand-in claude on PATH', () => {
       .rejects.toThrow('the event stream is gone');
 
     expect(existsSync(exited)).toBe(true);
-  });
-});
-
-describe('checkUsage', () => {
-  /** Every line a check wrote, tagged by its level. */
-  let seen: string[] = [];
-
-  /** `CLAUDE_USAGE_PERCENT` as the case found it. */
-  let savedPercent: string | undefined;
-
-  beforeEach(() => {
-    seen = [];
-    savedPercent = process.env['CLAUDE_USAGE_PERCENT'];
-    setActiveOutput(sinkOutput({
-      info: (message) => {
-        seen.push(`info:${message}`);
-      },
-      warn: (message) => {
-        seen.push(`warn:${message}`);
-      },
-      error: (message) => {
-        seen.push(`error:${message}`);
-      },
-      debug: (message) => {
-        seen.push(`debug:${message}`);
-      },
-    }));
-  });
-
-  afterEach(() => {
-    setActiveOutput(null);
-    if (savedPercent === undefined) {
-      delete process.env['CLAUDE_USAGE_PERCENT'];
-    } else {
-      process.env['CLAUDE_USAGE_PERCENT'] = savedPercent;
-    }
-  });
-
-  /** Each reading: what it shows, its context, the percent, whether it pauses, and its one line. */
-  const READINGS: readonly (readonly [string, 'issue' | 'task', string, boolean, string])[] = [
-    ['pauses a task at 90 or more, through warn', 'task', '95', true, 'warn:\nClaude usage at 95% (>=90%). Pausing after current task to avoid hitting the limit.'],
-    ['warns a task at 80 or more without pausing it', 'task', '85', false, 'warn:\nClaude usage at 85% (>=80%). Monitor closely — tasks may be interrupted.'],
-    ['warns an issue at 90 or more without pausing it', 'issue', '92', false, 'warn:\nClaude usage at 92% (>=80%). Monitor closely — tasks may be interrupted.'],
-    ['warns an issue at 70 or more', 'issue', '75', false, 'warn:\nClaude usage at 75% (>=70%). Consider whether to start the next issue.'],
-    ['tells a task under 80 its usage through info', 'task', '75', false, 'info:\nClaude usage: 75%'],
-  ];
-
-  it.each(READINGS)('%s', async (_label, context, percent, pauses, line) => {
-    process.env['CLAUDE_USAGE_PERCENT'] = percent;
-
-    await expect(checkUsage(context)).resolves.toBe(pauses);
-
-    expect(seen).toEqual([line]);
-  });
-
-  it('writes nothing and never pauses when no usage can be read', async () => {
-    delete process.env['CLAUDE_USAGE_PERCENT'];
-
-    await expect(checkUsage('task')).resolves.toBe(false);
-
-    expect(seen).toEqual([]);
   });
 });
 

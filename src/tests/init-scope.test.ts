@@ -257,7 +257,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
     const fixture = plantFixture(tempRoot);
     initAt(fixture, fixture.scratch.repo);
 
-    const run = runRafa(fixture.scratch, fixture.outside, ['usage']);
+    const run = runRafa(fixture.scratch, fixture.outside, ['status']);
 
     expect(run.exitCode).toBe(1);
     expect(run.stdout).toBe('');

@@ -80,7 +80,7 @@ describe('rafa --help, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
     expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,\n  describe\n');
+    expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe\n');
   }, RUN_TIMEOUT);
 });
 
