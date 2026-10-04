@@ -20,13 +20,15 @@
  * hub token through `Bun.secrets` (`token.ts`'s `bunSecretReader`) with
  * no seam this acceptance test could override, so the suite stores a
  * real credential under service `rafa` before each case and removes it
- * after, skipping whole when this machine's `Bun.secrets` cannot be
- * reached at all (`SECRETS_OK`), rather than fail on a machine with no
- * secret-service backend. On Linux, `Bun.secrets` reaches the desktop
- * secret service over `DBUS_SESSION_BUS_ADDRESS`, which the child process
- * does not inherit unless it is named in its own environment, so
- * `secretsEnv()` carries it (and `XDG_RUNTIME_DIR`) from this process's
- * into the spawned CLI's.
+ * after, skipping whole when a child spawned under the CLI's own
+ * environment cannot round-trip a credential (`SECRETS_OK`), rather than
+ * fail on a machine with no secret-service backend reachable from it. On
+ * Linux, `Bun.secrets` reaches the desktop secret service over
+ * `DBUS_SESSION_BUS_ADDRESS`, which the child process does not inherit
+ * unless it is named in its own environment, so
+ * `testdata/secrets-env.js`'s `secretsChildEnv()` carries it (and
+ * `XDG_RUNTIME_DIR`) from this process's into the spawned CLI's, and its
+ * `probeSecrets()` asks a child spawned under exactly that environment.
  *
  * A device "writes a row apart" by committing a file of its own under a
  * fresh git repository, so `rafa effort collect --no-sessions` finds one
@@ -58,7 +60,7 @@ import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
 import { expectSameMergedTables, mergedTableNames, sortedContent } from './testdata/compare-merged-stores.js';
-import { scratchHomeEnv } from './testdata/scratch-home-env.js';
+import { probeSecrets, secretsChildEnv } from './testdata/secrets-env.js';
 
 const VERSION = '0.0.0-two-devices';
 const REPOSITORY = 'open-tomato/rafa';
@@ -82,32 +84,11 @@ const SYNC_SERVICE_PACKAGE = fileURLToPath(new URL('../../rafa-sync-service', im
 /** The `name` the package's `package.json` carries, and `allowList:` must match. */
 const SYNC_SERVICE_NAME = '@open-tomato/rafa-sync-service';
 
-/** The environment variables a libsecret-backed `Bun.secrets` reaches its session bus through; carried into the spawned CLI only when this process itself has them. */
-const SECRET_BUS_ENV = ['DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR'] as const;
-
 /** The reason this suite skips, when it does. */
-const SKIP_REASON = 'Bun.secrets could not store and read a credential on this machine';
+const SKIP_REASON = 'a child spawned under the secret environment this suite spawns its CLI under could not store and read a credential through Bun.secrets';
 
-/** Whether `Bun.secrets` can round-trip a credential here, probed once at load. */
-async function probeSecrets(): Promise<boolean> {
-  const probe = { service: SECRET_SERVICE, name: `two-devices-probe-${randomUUID()}` };
-  try {
-    await Bun.secrets.set({ ...probe, value: 'probe' });
-    await Bun.secrets.delete(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
+/** Whether a child spawned under {@link secretsChildEnv} can round-trip a credential, probed once at load. */
 const SECRETS_OK = await probeSecrets();
-
-/** `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`, carried from this process's own environment when it has them. */
-function secretsEnv(): Readonly<Record<string, string>> {
-  return Object.fromEntries(SECRET_BUS_ENV
-    .map((name): readonly [string, string | undefined] => [name, process.env[name]])
-    .filter((entry): entry is readonly [string, string] => entry[1] !== undefined));
-}
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
 function gitEnv(): Record<string, string> {
@@ -191,8 +172,7 @@ async function runCollect(device: Device): Promise<CollectRun> {
       TMPDIR: tmpdir(),
       RAFA_TEST: '1',
       PATH: GIT_DIR,
-      ...scratchHomeEnv(device.home),
-      ...secretsEnv(),
+      ...secretsChildEnv(device.home),
     },
     stdout: 'pipe',
     stderr: 'pipe',
