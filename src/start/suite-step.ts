@@ -157,6 +157,14 @@
  * which {@link planOwnsReader} builds over a `gh` runner, reading them
  * at most once per run. Every line goes through the active output
  * (`adapters/output/active.ts`).
+ *
+ * ## Where the stage step lives
+ *
+ * The stage step's code is in `suite-stage-step.ts` and re-exported
+ * here; this note stays its account. The helpers it shares with the
+ * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
+ * {@link addToLedger}, {@link runOne}, {@link settleStep},
+ * {@link retakeOnErrors} and {@link Settling}) are exported for it alone.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
@@ -191,7 +199,6 @@ import { runSuite } from '../suite/run.js';
 import {
   listTestFiles,
   readPreloadFiles,
-  stageStepScope,
   taskStepScope,
 } from '../suite/scope.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -202,6 +209,7 @@ import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
 
 export { blockerText } from './suite-blocker.js';
+export { runDueStageSteps, runStageStep } from './suite-stage-step.js';
 export type { StepVerdict } from './suite-blocker.js';
 
 /** The stage ledger's file name before its stub. */
@@ -307,7 +315,7 @@ export interface TaskStepInput {
 }
 
 /** The seams, each filled with the system's own. */
-function seamsOf(context: SuiteStepContext): Required<SuiteStepSeams> {
+export function seamsOf(context: SuiteStepContext): Required<SuiteStepSeams> {
   const seams = context.seams ?? {};
   return {
     runSuite: seams.runSuite ?? runSuite,
@@ -389,7 +397,7 @@ function writeStageLedger(path: string, entries: readonly StageLedgerEntry[]): v
 }
 
 /** Adds `added` to the ledger, each stage not already in it; a failed write is a warning. */
-function addToLedger(trackerPath: string, added: readonly StageLedgerEntry[]): void {
+export function addToLedger(trackerPath: string, added: readonly StageLedgerEntry[]): void {
   if (added.length === 0) return;
   const path = stageLedgerPathFor(trackerPath);
   const entries = readStageLedger(path);
@@ -428,7 +436,7 @@ export function dueStages(trackerContent: string, ledger: readonly StageLedgerEn
 }
 
 /** HEAD in the checkout, or null when git does not answer. */
-function readHead(git: GitRunner): string | null {
+export function readHead(git: GitRunner): string | null {
   const result = git(['rev-parse', '--verify', 'HEAD^{commit}']);
   const head = result.stdout.trim();
   return result.ok && head !== ''
@@ -437,7 +445,7 @@ function readHead(git: GitRunner): string | null {
 }
 
 /** The paths changed from `from` to HEAD, or null with a warning when git does not answer. */
-function readDiff(git: GitRunner, from: string): readonly string[] | null {
+export function readDiff(git: GitRunner, from: string): readonly string[] | null {
   const result = git(['diff', '--name-only', '-z', '--no-renames', from, 'HEAD']);
   if (result.ok) return result.stdout.split('\0').filter((path) => path !== '');
   activeOutput().warn(`⚠️  git diff from ${from} did not answer (${gitSaid(result) || 'nothing said'}); the step runs the full suite.`);
@@ -494,7 +502,7 @@ function announce(label: string, result: SuiteResult, known: readonly SuiteFailu
 }
 
 /** What {@link settleStep} is handed about a run already made. */
-interface Settling {
+export interface Settling {
   readonly kind: SessionStepKind;
   readonly scope: SessionStep['scope'];
   readonly label: string;
@@ -520,7 +528,7 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
 }
 
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
-function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
+export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result, baseline } = settling;
   if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = verdictOf(result, baseline);
@@ -556,7 +564,7 @@ function isErrorsOnly(verdict: StepVerdict, lint: LintOutcome | undefined): bool
  * errors outside any test, its retake by `rerun`, the first run recorded
  * and printed before it. See the module note.
  */
-async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
+export async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
   const { kind, label, result, baseline } = settling;
   if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settling;
   const verdict = verdictOf(result, baseline);
@@ -574,7 +582,7 @@ async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteSt
 }
 
 /** Runs one suite: over `paths`, since `changedSince`, or the whole project; its JUnit file is `kind`'s unless `junitFile` names one. */
-function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: SessionStepKind, narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>, junitFile?: string): Promise<SuiteResult> {
+export function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: SessionStepKind, narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>, junitFile?: string): Promise<SuiteResult> {
   return seams.runSuite({
     cwd: context.checkout,
     junitFile: junitFile ?? junitFileFor(context.repoRoot, context.sessionId, kind),
@@ -689,67 +697,6 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
     : junitFileFor(context.repoRoot, context.sessionId, 'task');
   if (!outcome.interrupted) reportSlowSweeps(timedIn, runs.timed);
   return outcome;
-}
-
-/** The commit a stage's diff is taken from: the last stage step's, else the baseline's. */
-function stageSince(trackerPath: string, baseline: SuiteBaseline | null): string | null {
-  const taken = readStageLedger(stageLedgerPathFor(trackerPath)).filter((entry) => entry.commit !== null);
-  return taken.at(-1)?.commit ?? baseline?.commit ?? null;
-}
-
-/** The stage step's run: its paths, or the whole project when unnarrowed. */
-async function stageNarrowing(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null): Promise<readonly string[] | null> {
-  const since = stageSince(context.trackerPath, baseline);
-  const diff = since === null
-    ? null
-    : readDiff(seams.git, since);
-  if (diff === null) return null;
-  const scope = stageStepScope({
-    diff,
-    owns: await context.owns(),
-    integration: context.settings.testsIntegration,
-    testFiles: seams.listTestFiles(context.checkout),
-  });
-  return scope.scope === 'full'
-    ? null
-    : scope.paths;
-}
-
-/** Runs the step of one stage and enters it in the ledger; see the module note. */
-export async function runStageStep(context: SuiteStepContext, stage: DueStage, baseline: SuiteBaseline | null): Promise<StepOutcome> {
-  const seams = seamsOf(context);
-  const commit = readHead(seams.git);
-  const paths = await stageNarrowing(context, seams, baseline);
-  const label = `stage step for "${stage.name}"`;
-  if (paths !== null && paths.length === 0) {
-    activeOutput().info(`🧪 ${label}: no test file under the Owns: folders it changed and no integration file; nothing to run.`);
-    addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
-    return { kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null };
-  }
-  const narrowing = paths === null
-    ? {}
-    : { paths };
-  const result = await runOne(context, seams, 'stage', narrowing);
-  const settling: Settling = { kind: 'stage', scope: paths ?? 'full', label, result, baseline, repair: { kind: 'stage' } };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'stage', narrowing)));
-  if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
-  return outcome;
-}
-
-/**
- * Runs every stage step due before the next dispatch, in order,
- * stopping after the first red or interrupted one. See the module note.
- */
-export async function runDueStageSteps(context: SuiteStepContext, baseline: SuiteBaseline | null): Promise<readonly StepOutcome[]> {
-  const ledger = readStageLedger(stageLedgerPathFor(context.trackerPath));
-  const due = dueStages(readFileSync(context.trackerPath, 'utf8'), ledger);
-  const outcomes: StepOutcome[] = [];
-  for (const stage of due) {
-    const outcome = await runStageStep(context, stage, baseline);
-    outcomes.push(outcome);
-    if (outcome.red || outcome.interrupted) break;
-  }
-  return outcomes;
 }
 
 /** Runs the full suite before the wrap-up; a red one writes no blocker. See the module note. */
