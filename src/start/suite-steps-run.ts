@@ -27,16 +27,37 @@
  *     on, scoped by its line's `tests=` value (`readTestScope`, the
  *     `affected` default for a line with none).
  *
- * Each answers true when the run goes on and false when it stops. A red
- * task or stage step has already inserted a `[BLOCKED]` repair task
- * carrying its blocker, or written it on the repair it followed
- * (`suite-blocker.ts`), so that repair is dispatched first on the next
- * run, handed the blocker text through `BLOCKER_PROMPT_PREFIX`
- * (`start/dispatch.ts`), exactly as a blocked task's own is. A red
- * pre-wrap-up step has inserted a `[BLOCKED]` repair after the
- * checklist's last task, or written its blocker on the ticked
- * pre-wrap-up repair an earlier red inserted: the run stops before the
- * wrap-up, and the next run dispatches that repair first.
+ * `afterTask` answers true when the run goes on and false when it
+ * stops; `beforeSession` answers `go-on` and `stop` for the same, and
+ * `repair` for the pre-wrap-up repair below ({@link BeforeSessionAnswer}).
+ * A red task or stage step has already inserted a `[BLOCKED]` repair
+ * task carrying its blocker, or written it on the repair it followed
+ * (`suite-blocker.ts`), so the run stops and that repair is dispatched
+ * first on the next run, handed the blocker text through
+ * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`), exactly as a blocked
+ * task's own is.
+ *
+ * ## A red pre-wrap-up step
+ *
+ * The pre-wrap-up step stays a full suite run. Red with failures the
+ * baseline does not hold, it inserts a `[BLOCKED]` repair task after the
+ * checklist's last task (`suite-blocker.ts`), and `beforeSession(null)`
+ * answers `repair`: `start.ts` goes back to `findNextTask` instead of
+ * starting the wrap-up, which answers that repair first, so it is
+ * dispatched in the same run, handed its blocker through
+ * `BLOCKER_PROMPT_PREFIX` as any blocked task is, and its task step
+ * runs after it. With no open task left once it is done, the next
+ * `beforeSession(null)` runs the pre-wrap-up step again: green, the
+ * wrap-up starts; red a second time, the step finds the ticked
+ * pre-wrap-up repair on the tracker, writes its blocker on that line
+ * instead of inserting another, and `beforeSession` answers `stop`, so
+ * the run halts before the wrap-up and the next run dispatches that
+ * repair first. One repair session is thus the most a pre-wrap-up step
+ * adds to a run. Should the step insert a second repair in the same run
+ * all the same (the first one's text no longer reading as a pre-wrap-up
+ * repair), the answer is `stop` too, and the new repair waits for the
+ * next run. A red step that wrote no line at all stops the run, and the
+ * next run takes the step again.
  *
  * ## A step stopped by SIGINT
  *
@@ -126,10 +147,18 @@ export interface RunSuiteStepsOptions {
   readonly isInterrupted?: () => boolean;
 }
 
+/**
+ * What {@link RunSuiteSteps.beforeSession} answers: `go-on` lets the
+ * session start, `stop` ends the run, and `repair`, answered only before
+ * the wrap-up, sends the loop back to `findNextTask` for the pre-wrap-up
+ * repair a red pre-wrap-up step has just inserted. See the module note.
+ */
+export type BeforeSessionAnswer = 'go-on' | 'stop' | 'repair';
+
 /** The loop's two calls; see the module note. */
 export interface RunSuiteSteps {
-  /** Before the session for `taskInfo`, or for the wrap-up when null; false stops the run. */
-  readonly beforeSession: (taskInfo: TaskInfo | null) => Promise<boolean>;
+  /** Before the session for `taskInfo`, or for the wrap-up when null; see {@link BeforeSessionAnswer}. */
+  readonly beforeSession: (taskInfo: TaskInfo | null) => Promise<BeforeSessionAnswer>;
   /** After `taskInfo` committed `done` from `base`; false stops the run. */
   readonly afterTask: (taskInfo: TaskInfo, base: string) => Promise<boolean>;
 }
@@ -171,6 +200,33 @@ function goesOn(outcome: StepOutcome | null): boolean {
   return false;
 }
 
+/** `beforeSession`'s answer for a step that either lets the run go on or stops it. */
+function answerOf(goingOn: boolean): BeforeSessionAnswer {
+  return goingOn
+    ? 'go-on'
+    : 'stop';
+}
+
+/** True when the pre-wrap-up `outcome` is red and inserted a repair task now. */
+function insertedRepair(outcome: StepOutcome | null): outcome is StepOutcome {
+  return outcome !== null && outcome.red && !outcome.interrupted && outcome.repairInserted;
+}
+
+/** True when the pre-wrap-up `outcome` is red and wrote its blocker on an existing repair. */
+function blockedRepairAgain(outcome: StepOutcome | null): outcome is StepOutcome {
+  return outcome !== null && outcome.red && !outcome.interrupted && !outcome.repairInserted && outcome.blockedLine !== null;
+}
+
+/** Says the loop goes back to dispatch the pre-wrap-up repair task now. */
+function announceRepair(): void {
+  activeOutput().info('   Dispatching that repair task now; the pre-wrap-up step runs again once it is done.');
+}
+
+/** Says the run stops on a pre-wrap-up step red again after its repair. */
+function announceRedAgain(): void {
+  activeOutput().error('   Stopping here: the pre-wrap-up step is red again after its repair. Run again to retry that repair, which is handed these failures.');
+}
+
 /** The suite steps of one run; see the module note. */
 export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteSteps {
   const calls: SuiteStepCalls = {
@@ -208,14 +264,30 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     return held;
   };
 
-  const beforeSession = async (taskInfo: TaskInfo | null): Promise<boolean> => {
+  // Set once this run has gone back to dispatch a pre-wrap-up repair.
+  let repairSent = false;
+  const preWrapUp = async (known: SuiteBaseline): Promise<BeforeSessionAnswer> => {
+    const outcome = await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known));
+    if (insertedRepair(outcome) && !repairSent) {
+      repairSent = true;
+      announceRepair();
+      return 'repair';
+    }
+    if (blockedRepairAgain(outcome)) {
+      announceRedAgain();
+      return 'stop';
+    }
+    return answerOf(goesOn(outcome));
+  };
+
+  const beforeSession = async (taskInfo: TaskInfo | null): Promise<BeforeSessionAnswer> => {
     const known = await baseline();
-    if (known === 'interrupted') return false;
-    if (known === 'off') return true;
-    if (taskInfo === null) return goesOn(await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known)));
-    if (taskInfo.status === 'blocked') return true;
+    if (known === 'interrupted') return 'stop';
+    if (known === 'off') return 'go-on';
+    if (taskInfo === null) return preWrapUp(known);
+    if (taskInfo.status === 'blocked') return 'go-on';
     const stages = await guarded('stage steps', () => calls.runDueStageSteps(context, known));
-    return (stages ?? []).every((outcome) => goesOn(outcome));
+    return answerOf((stages ?? []).every((outcome) => goesOn(outcome)));
   };
 
   const afterTask = async (taskInfo: TaskInfo, base: string): Promise<boolean> => {

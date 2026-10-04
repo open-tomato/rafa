@@ -81,7 +81,9 @@
  * checklist's last task, or, when the tracker holds a ticked pre-wrap-up
  * repair already, writes its blocker on that line again and inserts
  * nothing ({@link StepOutcome.repairInserted} false), so one repair
- * session is the most it adds; the caller stops before the wrap-up.
+ * session is the most it adds. The caller (`suite-steps-run.ts`) turns
+ * the loop back to dispatch an inserted repair in the same run, and
+ * stops before the wrap-up on a repair blocked again.
  *
  * ## Red, and what a red step writes
  *

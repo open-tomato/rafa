@@ -196,9 +196,9 @@ describe('beforeSession', () => {
 
   it('runs the due stage steps before a task, split against the baseline, and not the pre-wrap-up step', async () => {
     const { calls, seen } = scripted();
-    const goesOn = await stepsWith(calls).beforeSession(taskAt('second task', 8));
+    const answer = await stepsWith(calls).beforeSession(taskAt('second task', 8));
 
-    expect(goesOn).toBe(true);
+    expect(answer).toBe('go-on');
     expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
     expect(seen.baselines).toEqual([BASELINE]);
   });
@@ -209,11 +209,11 @@ describe('beforeSession', () => {
     const steps = stepsWith(calls);
     const blocked: TaskInfo = { task: 'repair the suite', lineNum: 8, status: 'blocked', blocker: 'New failing test files.' };
 
-    expect(await steps.beforeSession(blocked)).toBe(true);
+    expect(await steps.beforeSession(blocked)).toBe('go-on');
     expect(seen.names).toEqual(['ensureBaseline']);
     expect(linesAt('error')).toEqual([]);
 
-    expect(await steps.beforeSession(taskAt('third task', 9))).toBe(false);
+    expect(await steps.beforeSession(taskAt('third task', 9))).toBe('stop');
     expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
   });
 
@@ -221,15 +221,15 @@ describe('beforeSession', () => {
     // The control for the case above: the same due step, an open task.
     const { calls, seen } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage')]) });
 
-    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('go-on');
     expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
   });
 
   it('runs the pre-wrap-up step before the wrap-up, and no stage step', async () => {
     const { calls, seen } = scripted();
-    const goesOn = await stepsWith(calls).beforeSession(null);
+    const answer = await stepsWith(calls).beforeSession(null);
 
-    expect(goesOn).toBe(true);
+    expect(answer).toBe('go-on');
     expect(seen.names).toEqual(['ensureBaseline', 'runPreWrapUpStep']);
     expect(seen.baselines).toEqual([BASELINE]);
   });
@@ -237,7 +237,7 @@ describe('beforeSession', () => {
   it('lets the run go on after green stage steps', async () => {
     const { calls } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage'), outcome('stage')]) });
 
-    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('go-on');
     expect(linesAt('error')).toEqual([]);
   });
 
@@ -245,15 +245,84 @@ describe('beforeSession', () => {
     // The control for the case above: the same call over a red outcome.
     const { calls } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage'), outcome('stage', true, 8)]) });
 
-    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(false);
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('stop');
     expect(linesAt('error')).toEqual(['   Stopping here. Run again to retry the blocked task, which is handed these failures.']);
   });
 
-  it('stops the run before the wrap-up after a red pre-wrap-up step, saying the next run takes it again', async () => {
+  it('stops the run before the wrap-up after a red pre-wrap-up step that wrote no line, saying the next run takes it again', async () => {
     const { calls } = scripted({ runPreWrapUpStep: () => Promise.resolve(outcome('pre-wrap-up', true)) });
 
-    expect(await stepsWith(calls).beforeSession(null)).toBe(false);
+    expect(await stepsWith(calls).beforeSession(null)).toBe('stop');
     expect(linesAt('error')).toEqual(['   Stopping here: no task was left to mark, so the next run takes this step again.']);
+  });
+});
+
+describe('beforeSession on a red pre-wrap-up step', () => {
+  const REPAIR_LINE = '   Dispatching that repair task now; the pre-wrap-up step runs again once it is done.';
+  const RED_AGAIN_LINE = '   Stopping here: the pre-wrap-up step is red again after its repair. Run again to retry that repair, which is handed these failures.';
+
+  /** A red pre-wrap-up outcome that wrote its blocker on the existing repair at `line`. */
+  const blockedAgain = (line: number): StepOutcome => ({ ...outcome('pre-wrap-up', true, line), repairInserted: false });
+
+  /** The pre-wrap-up step scripted to answer `outcomes` in turn. */
+  const inTurn = (outcomes: readonly StepOutcome[]): Partial<SuiteStepCalls> => {
+    const queue = [...outcomes];
+    return { runPreWrapUpStep: () => Promise.resolve(queue.shift() ?? outcome('pre-wrap-up')) };
+  };
+
+  it('answers repair when the step inserted a repair task, so the loop dispatches it in this run', async () => {
+    const { calls } = scripted(inTurn([outcome('pre-wrap-up', true, 10)]));
+
+    expect(await stepsWith(calls).beforeSession(null)).toBe('repair');
+    expect(linesAt('info')).toContain(REPAIR_LINE);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('answers go-on when the step is green again after its repair', async () => {
+    const { calls, seen } = scripted(inTurn([outcome('pre-wrap-up', true, 10), outcome('pre-wrap-up')]));
+    const steps = stepsWith(calls);
+
+    expect(await steps.beforeSession(null)).toBe('repair');
+    expect(await steps.beforeSession({ task: 'Repair the red pre-wrap-up step at commit head1111', lineNum: 10, status: 'blocked' })).toBe('go-on');
+    expect(await steps.beforeSession(null)).toBe('go-on');
+    expect(seen.names).toEqual(['ensureBaseline', 'runPreWrapUpStep', 'runPreWrapUpStep']);
+  });
+
+  it('answers stop when the step is red again and blocked the ticked repair again', async () => {
+    // The control for the case above: the same run, its second step red.
+    const { calls } = scripted(inTurn([outcome('pre-wrap-up', true, 10), blockedAgain(10)]));
+    const steps = stepsWith(calls);
+
+    expect(await steps.beforeSession(null)).toBe('repair');
+    expect(await steps.beforeSession(null)).toBe('stop');
+    expect(linesAt('error')).toEqual([RED_AGAIN_LINE]);
+  });
+
+  it('answers stop on a run\'s first call when the step blocked a repair an earlier run ticked', async () => {
+    const { calls } = scripted(inTurn([blockedAgain(10)]));
+
+    expect(await stepsWith(calls).beforeSession(null)).toBe('stop');
+    expect(linesAt('info')).not.toContain(REPAIR_LINE);
+    expect(linesAt('error')).toEqual([RED_AGAIN_LINE]);
+  });
+
+  it('answers stop when the step inserts a second repair in the same run, leaving it for the next run', async () => {
+    const { calls } = scripted(inTurn([outcome('pre-wrap-up', true, 10), outcome('pre-wrap-up', true, 11)]));
+    const steps = stepsWith(calls);
+
+    expect(await steps.beforeSession(null)).toBe('repair');
+    expect(await steps.beforeSession(null)).toBe('stop');
+    expect(linesAt('info').filter((line) => line === REPAIR_LINE)).toHaveLength(1);
+    expect(linesAt('error')).toEqual(['   Stopping here. Run again to retry the blocked task, which is handed these failures.']);
+  });
+
+  it('answers stop, not repair, on an interrupted step and go-on on one that throws', async () => {
+    const interrupted = scripted({ runPreWrapUpStep: () => Promise.resolve(stopped('pre-wrap-up')) });
+    const thrown = scripted({ runPreWrapUpStep: () => Promise.reject(new Error('spawn failed')) });
+
+    expect(await stepsWith(interrupted.calls).beforeSession(null)).toBe('stop');
+    expect(await stepsWith(thrown.calls).beforeSession(null)).toBe('go-on');
+    expect(linesAt('info')).not.toContain(REPAIR_LINE);
   });
 });
 
@@ -301,7 +370,7 @@ describe('a step stopped by SIGINT', () => {
   it('stops the run after an interrupted stage step, as loop stop does, with no blocked-task line', async () => {
     const { calls } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage'), stopped('stage')]) });
 
-    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(false);
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe('stop');
     expect(linesAt('error')).toEqual([]);
     expect(linesAt('info')).toContain(STOP_LINE);
   });
@@ -314,7 +383,7 @@ describe('a step stopped by SIGINT', () => {
     const steps = stepsWith(calls);
 
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
-    expect(await steps.beforeSession(null)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe('stop');
     expect(linesAt('error')).toEqual([]);
     expect(linesAt('info').filter((line) => line === STOP_LINE)).toHaveLength(2);
   });
@@ -323,9 +392,9 @@ describe('a step stopped by SIGINT', () => {
     const { calls, seen } = scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true }) });
     const steps = stepsWith(calls);
 
-    expect(await steps.beforeSession(taskAt('second task', 8))).toBe(false);
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('stop');
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
-    expect(await steps.beforeSession(null)).toBe(false);
+    expect(await steps.beforeSession(null)).toBe('stop');
 
     expect(seen.names).toEqual(['ensureBaseline']);
     expect(linesAt('info').filter((line) => line === STOP_LINE)).toHaveLength(1);
@@ -338,9 +407,9 @@ describe('a step that throws', () => {
     const { calls, seen } = scripted({ ensureBaseline: () => Promise.reject(new RangeError('not a PLAN or PLAN_TRACKER file')) });
     const steps = stepsWith(calls);
 
-    expect(await steps.beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('go-on');
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(true);
-    expect(await steps.beforeSession(null)).toBe(true);
+    expect(await steps.beforeSession(null)).toBe('go-on');
 
     expect(seen.names).toEqual(['ensureBaseline']);
     expect(linesAt('warn')).toEqual([
@@ -353,7 +422,7 @@ describe('a step that throws', () => {
     const { calls, seen } = scripted({ runDueStageSteps: () => Promise.reject(new Error('spawn failed')) });
     const steps = stepsWith(calls);
 
-    expect(await steps.beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('go-on');
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(true);
 
     expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps', 'runTaskStep']);
@@ -420,7 +489,7 @@ describe('with suite-step.ts\'s own steps', () => {
   it('records the baseline, then a green task step over the task\'s --changed selection, and goes on', async () => {
     const { steps, runs, recorded } = realSteps([suiteResult(), suiteResult()]);
 
-    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe(true);
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
     tickSecondTask();
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(true);
 
@@ -433,7 +502,7 @@ describe('with suite-step.ts\'s own steps', () => {
     const sigint: SuiteResult = { ...suiteResult(), exitCode: 130, summary: null, errors: null, junit: 'missing' };
     const { steps, recorded } = realSteps([suiteResult(), sigint]);
 
-    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe(true);
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
     tickSecondTask();
     const ticked = readFileSync(trackerPath, 'utf8');
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
@@ -448,7 +517,7 @@ describe('with suite-step.ts\'s own steps', () => {
     const broken = { file: 'src/a.test.ts', name: 'a > broke' };
     const { steps, recorded } = realSteps([suiteResult(), suiteResult([broken])]);
 
-    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe(true);
+    expect(await steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
     tickSecondTask();
     expect(await steps.afterTask(taskAt('second task', 8), BASE)).toBe(false);
 
@@ -457,5 +526,32 @@ describe('with suite-step.ts\'s own steps', () => {
     expect(next?.lineNum).toBe(9);
     expect(next?.status).toBe('blocked');
     expect(next?.blocker).toContain('src/a.test.ts (1 test)');
+  });
+
+  it('answers repair on a red pre-wrap-up step over a real tracker, then stop with the blocker on that repair\'s line', async () => {
+    const broken = { file: 'src/a.test.ts', name: 'a > broke' };
+    writeFileSync(trackerPath, TRACKER.replaceAll('- [ ] ', '- [x] '), 'utf8');
+    const { steps, recorded } = realSteps([suiteResult(), suiteResult([broken]), suiteResult([broken])]);
+
+    expect(await steps.beforeSession(null)).toBe('repair');
+    const repair = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(repair?.status).toBe('blocked');
+    expect(repair?.task).toStartWith(`Repair the red pre-wrap-up step at commit ${HEAD}`);
+    expect(repair?.blocker).toContain('src/a.test.ts (1 test)');
+
+    // The repair session's commit ticks it; the step then runs red again.
+    if (repair === undefined || repair === null) throw new Error('no repair task was inserted');
+    const blocked = readFileSync(trackerPath, 'utf8').split('\n');
+    const ticked = blocked.map((line, index) => index === repair.lineNum
+      ? line.replace('- [BLOCKED] ', '- [x] ')
+      : line);
+    writeFileSync(trackerPath, ticked.join('\n'), 'utf8');
+    expect(await steps.beforeSession(null)).toBe('stop');
+
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(findNextTask(after)?.lineNum).toBe(repair.lineNum);
+    expect(findNextTask(after)?.status).toBe('blocked');
+    expect(after.match(/Repair the red pre-wrap-up step/g)).toHaveLength(1);
+    expect(recorded.map((step) => step.kind)).toEqual(['baseline', 'pre-wrap-up', 'pre-wrap-up']);
   });
 });
