@@ -35,7 +35,7 @@
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { CliEvent } from '../ports/index.js';
+import type { CliEvent, CliEventNamed } from '../ports/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -319,4 +319,75 @@ export function startRafa(
       ? exitCode
       : null, stdout, stderr }));
   return { pid: child.pid, result };
+}
+
+/** How many lines of each stream {@link describeRun} keeps: the last ones, where a failure is told. */
+export const RUN_TAIL_LINES = 80;
+
+/**
+ * The scratch paths a failure names beside the run: a {@link ScratchRepo},
+ * or any paths a case names itself.
+ */
+export type ScratchPaths = ScratchRepo | Readonly<Record<string, string>>;
+
+/**
+ * The last {@link RUN_TAIL_LINES} lines of one stream under a heading
+ * naming it, with a line saying how many earlier lines were cut when any
+ * were. A trailing newline ends the last line and opens none.
+ */
+function streamTail(name: string, text: string): string[] {
+  if (text === '') return [`${name}: (empty)`];
+  const lines = text.replace(/\n$/, '').split('\n');
+  const cut = Math.max(0, lines.length - RUN_TAIL_LINES);
+  return [
+    `${name}:`,
+    ...(cut > 0
+      ? [`[${cut} earlier lines cut]`]
+      : []),
+    ...lines.slice(cut),
+  ];
+}
+
+/**
+ * What a spawned or in-process run did, as text a failing case attaches
+ * to its message: the exit code, the last {@link RUN_TAIL_LINES} lines of
+ * stderr and of stdout, each cut on its own, then each path `scratch`
+ * names. {@link expectExit} and {@link expectEvent} fail with it; a case
+ * asserting something else passes it as its own message.
+ */
+export function describeRun(run: CapturedRun, scratch?: ScratchPaths): string {
+  const exit = run.exitCode === null
+    ? 'killed (no exit code)'
+    : String(run.exitCode);
+  const paths = scratch === undefined
+    ? []
+    : ['scratch:', ...Object.entries(scratch).map(([key, value]) => `  ${key}: ${String(value)}`)];
+  return [`exit code: ${exit}`, ...streamTail('stderr', run.stderr), ...streamTail('stdout', run.stdout), ...paths].join('\n');
+}
+
+/**
+ * Passes silently when `run` exited with `code`; otherwise throws an
+ * `Error` naming both codes, with {@link describeRun}'s text below.
+ */
+export function expectExit(run: CapturedRun, code: number, scratch?: ScratchPaths): void {
+  if (run.exitCode === code) return;
+  throw new Error(`expected exit code ${code}, got ${String(run.exitCode)}\n${describeRun(run, scratch)}`);
+}
+
+/**
+ * Answers the first named event (`type: 'event'`) called `name` on the
+ * run's json stdout, read with {@link eventsOf}. Throws an `Error` with
+ * {@link describeRun}'s text below when no such event is there, or when
+ * a stdout line is no JSON; passes silently otherwise.
+ */
+export function expectEvent(run: CapturedRun, name: string, scratch?: ScratchPaths): CliEventNamed {
+  let events: CliEvent[];
+  try {
+    events = eventsOf(run.stdout);
+  } catch (error) {
+    throw new Error(`expected event ${name}, but stdout is not json events (${String(error)})\n${describeRun(run, scratch)}`);
+  }
+  const found = events.find((event): event is CliEventNamed => event.type === 'event' && event.name === name);
+  if (found !== undefined) return found;
+  throw new Error(`expected event ${name}, found none\n${describeRun(run, scratch)}`);
 }
