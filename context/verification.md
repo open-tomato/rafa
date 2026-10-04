@@ -200,6 +200,19 @@ success is not blocked. When reading the exit code immediately with `$?`,
 capture both stdout and stderr to a file first, so the task step captures
 the warnings in the gate output without reading them as a failure.
 
+**The runner's lint step tells "could not run ESLint" from "found ESLint
+errors" by the JSON report** (`src/start/lint-step.ts`). A nonzero exit
+whose stdout is ESLint's JSON report names the files with errors and
+the command to run: `found ESLint errors in the task's diff`. A nonzero
+exit with no report is a step that could not run ESLint, and its blocker
+gives the exit code and the first stderr line under the crash banner, as
+in `could not run ESLint: bunx eslint exited 2 and printed no report:
+ResolveMessage {}`. Exit 2 with no report is a config ESLint could not
+load (a config that throws `boom` prints `Error: boom`, measured on
+ESLint 9.39.5) or no ESLint for `bunx` to resolve (`ResolveMessage {}`).
+Neither is a rule the task broke, so read that blocker as a setup
+problem in the checkout, not as lint errors to fix in the diff.
+
 ### The summary line is what the runner reads
 
 **Bun writes a line like `Ran 390 tests, 385 pass, 5 fail (~175s)` after

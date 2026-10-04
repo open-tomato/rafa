@@ -197,12 +197,27 @@ describe('runLintStep', () => {
     expect(red).toMatchObject({ red: true, interrupted: false });
   });
 
-  it('is red on a crash with no report, naming the exit code and the cause ESLint printed', async () => {
+  it('says it could not run ESLint on exit 2 with no report and ResolveMessage {} on stderr', async () => {
+    const outcome = await runLintStep(inputWith(['src/a.ts'], { exitCode: 2, stdout: '', stderr: 'ResolveMessage {}\n' }));
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).not.toContain('found ESLint errors');
+    expect(outcome.blocker).toBe(
+      'The runner\'s lint step after "second task" could not run ESLint: '
+      + 'bunx eslint exited 2 and printed no report: ResolveMessage {}',
+    );
+    expect(linesAt('info')).toEqual([`🧹 lint step after "second task": ${LINT_COMMAND.join(' ')} over 1 file(s) exited 2 and printed no report.`]);
+
+    // Control: the same exit with a report naming a file is found errors.
+    const found = await runLintStep(inputWith(['a.json', 'src/b.ts'], { exitCode: 2, stdout: redReport(), stderr: 'ResolveMessage {}\n' }));
+    expect(found.blocker).toContain('found ESLint errors');
+  });
+
+  it('says it could not run ESLint on a crash with no report, naming the exit code and the cause ESLint printed', async () => {
     const stderr = '\nOops! Something went wrong! :(\n\nESLint: 9.39.5\n\nNo files matching the pattern "gone.ts" were found.\n';
     const outcome = await runLintStep(inputWith(['src/a.ts'], { exitCode: 2, stdout: '', stderr }));
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toBe(
-      'The runner\'s lint step after "second task" found ESLint errors in the task\'s diff. '
+      'The runner\'s lint step after "second task" could not run ESLint: '
       + 'bunx eslint exited 2 and printed no report: No files matching the pattern "gone.ts" were found.',
     );
   });
@@ -248,8 +263,13 @@ describe('lintBlockerText', () => {
   });
 
   it('ends on the exit code alone when ESLint printed nothing to stderr', () => {
-    const text = lintBlockerText('lint step after "t"', { exitCode: 2, stderr: '' }, []);
-    expect(text.endsWith('bunx eslint exited 2 and printed no report.')).toBe(true);
+    const text = lintBlockerText('lint step after "t"', { exitCode: 2, stderr: '' }, null);
+    expect(text).toBe('The runner\'s lint step after "t" could not run ESLint: bunx eslint exited 2 and printed no report.');
+  });
+
+  it('keeps the found-errors wording for a report that names no file', () => {
+    const text = lintBlockerText('lint step after "t"', { exitCode: 1, stderr: '' }, []);
+    expect(text).toBe('The runner\'s lint step after "t" found ESLint errors in the task\'s diff. bunx eslint exited 1 and its report named no file with an error.');
   });
 });
 
