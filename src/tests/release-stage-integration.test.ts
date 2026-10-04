@@ -26,6 +26,7 @@
  * the bare `origin`, and that the pull request body gets a forecast of
  * the base bumped by that level, with the level report beside it.
  */
+import type { CapturedRun } from './cli-capture.js';
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
 import type { ReleasePreparation } from '../release/prepare.js';
 import type { ReportChange } from '../report/parse.js';
@@ -45,6 +46,7 @@ import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
 import { finishRelease, prepareReleaseStage } from '../start/release-stage.js';
 
+import { expectExit } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
@@ -309,10 +311,9 @@ function runFinishInSubprocess(
     ],
     { env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(tempBase) } },
   );
-  if (!run.success) {
-    throw new Error(`the subprocess exited ${String(run.exitCode)}: ${run.stderr.toString()}`);
-  }
-  return JSON.parse(run.stdout.toString()) as ReleaseFinish;
+  const captured: CapturedRun = { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };
+  expectExit(captured, 0, { repoRoot });
+  return JSON.parse(captured.stdout) as ReleaseFinish;
 }
 
 /** The planted pull request's body before the release stage writes to it. */

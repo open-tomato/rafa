@@ -39,7 +39,7 @@ import { readSessions } from '../loop/sessions.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
+import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
 
@@ -185,7 +185,7 @@ describe('rafa loop start sent SIGINT during its suite step', () => {
     } catch (error) {
       process.kill(run.pid, 'SIGKILL');
       const ended = await run.result;
-      throw new Error(`${String(error)}\n${ended.stdout}${ended.stderr}`);
+      throw new Error(`${String(error)}\n${describeRun(ended, scratch)}`);
     }
     process.kill(run.pid, 'SIGINT');
     await Bun.sleep(SIGNAL_SETTLE_MS);

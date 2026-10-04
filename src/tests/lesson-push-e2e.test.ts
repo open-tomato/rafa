@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { describeRun, expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -115,17 +115,17 @@ describe('a finding with a resolution, through rafa start', () => {
       [process.execPath, RAFA_ENTRY, 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait'],
       { cwd: repo, env, timeout: KILL_AFTER_MS },
     );
-    const startOutput = `${start.stdout.toString()}${start.stderr.toString()}`;
-    expect(start.exitCode, startOutput).toBe(0);
+    const started = { exitCode: start.exitCode, stdout: start.stdout.toString(), stderr: start.stderr.toString() };
+    expectExit(started, 0, { repo });
 
     const dir = join(repo, '.rafa', 'instincts');
-    expect(existsSync(dir), startOutput).toBe(true);
+    expect(existsSync(dir), describeRun(started, { repo })).toBe(true);
     const records = readdirSync(dir).filter((name) => name.endsWith('.md'));
     expect(records).toHaveLength(1);
     const text = readFileSync(join(dir, records[0] ?? ''), 'utf8');
     expect(text).toContain('run the generator before the build');
 
     const check = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'instinct', 'check', dir], { cwd: repo, env });
-    expect(check.exitCode, `${check.stdout.toString()}${check.stderr.toString()}`).toBe(0);
+    expectExit({ exitCode: check.exitCode, stdout: check.stdout.toString(), stderr: check.stderr.toString() }, 0, { repo });
   }, 60_000);
 });
