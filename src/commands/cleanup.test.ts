@@ -456,6 +456,7 @@ describe('rafa cleanup reading', () => {
       home: project.home,
       cwd: '/repo',
       projectRoot: project.root,
+      worktreeDir: join('.rafa', 'worktrees'),
     });
   });
 

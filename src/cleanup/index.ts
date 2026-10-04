@@ -126,6 +126,8 @@ export interface CleanupSettings {
   readonly cwd: string;
   /** The project root whose `.rafa/runs/` holds the loop's session records. */
   readonly projectRoot: string;
+  /** `loop.worktreeDir`, resolved from {@link projectRoot}; the loop's worktrees are listed from it. */
+  readonly worktreeDir: string;
 }
 
 /** The four groups, and the notes about readings that could not be taken. */
@@ -199,6 +201,7 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
     home: settings.home,
     cwd: settings.cwd,
     projectRoot: settings.projectRoot,
+    worktreeDir: settings.worktreeDir,
     idleDays: settings.worktreeIdleDays,
     now: settings.now,
     mergedBranches: groups.merged.map((row) => row.branch.name),

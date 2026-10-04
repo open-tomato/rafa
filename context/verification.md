@@ -86,9 +86,16 @@ is identified by its test file path and full test name (the pair the
 JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
-means it is new. Only new failures block the next task. A stage-end step
-with new failures names them in the blocker text the retry session
-receives through `BLOCKER_PROMPT_PREFIX`.
+means it is new. Only new failures make a step red. A red task or stage
+step inserts a `[BLOCKED]` repair task above the first open plan task,
+which it leaves as it was: the repair's text names the commit the step
+ran at (`Repair the red task step at commit <sha>`), its declaration is
+`{agent=build-error-resolver}`, and its blocker names the new failures,
+which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
+no open task left, the repair goes after the checklist's last task. A
+red task step after a repair task writes its blocker on that repair's
+line, marking it `[BLOCKED]` again, and inserts no second one
+(`src/start/suite-blocker.ts`).
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
@@ -119,6 +126,21 @@ failure by its test file path and the test's full name (including any
 nested `describe` blocks). Two failures are identical when both match; a
 test name that changes counts as a different failure, so rewriting a test
 name can hide a failure without fixing it.
+
+**An error outside any test is counted, named from stderr, and retaken
+once.** A test file that throws while it loads is no failure in the
+JUnit file: Bun prints it to stderr under `# Unhandled error between
+tests` and counts it on the summary's `errors` line. The baseline keeps
+that count only, and a step counting more is red. Its blocker names each
+block's file and first error line, as `src/boom.test.ts threw "error:
+boom"` (`src/start/suite-blocker.ts`), and the blocks with the summary
+lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`. A task,
+stage or pre-wrap-up step whose only red is that excess is taken once
+more over the same run (`src/start/suite-step.ts`). A retake at or under
+the baseline's count prints an `Intermittent` warning naming the first
+run's files and lines, and the run goes on; a retake over it again is
+red, and the run halts as it does on any red step. Both runs are
+recorded, and the files on disk are the retake's.
 
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.
@@ -177,6 +199,19 @@ the pass are correct: the files are ignored (no error), and the tool's
 success is not blocked. When reading the exit code immediately with `$?`,
 capture both stdout and stderr to a file first, so the task step captures
 the warnings in the gate output without reading them as a failure.
+
+**The runner's lint step tells "could not run ESLint" from "found ESLint
+errors" by the JSON report** (`src/start/lint-step.ts`). A nonzero exit
+whose stdout is ESLint's JSON report names the files with errors and
+the command to run: `found ESLint errors in the task's diff`. A nonzero
+exit with no report is a step that could not run ESLint, and its blocker
+gives the exit code and the first stderr line under the crash banner, as
+in `could not run ESLint: bunx eslint exited 2 and printed no report:
+ResolveMessage {}`. Exit 2 with no report is a config ESLint could not
+load (a config that throws `boom` prints `Error: boom`, measured on
+ESLint 9.39.5) or no ESLint for `bunx` to resolve (`ResolveMessage {}`).
+Neither is a rule the task broke, so read that blocker as a setup
+problem in the checkout, not as lint errors to fix in the diff.
 
 ### The summary line is what the runner reads
 

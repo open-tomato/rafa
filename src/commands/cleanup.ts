@@ -344,6 +344,7 @@ export async function runCleanup(context: RafaContext, seams: CleanupCommandSeam
     home: project.home,
     cwd,
     projectRoot: project.root,
+    worktreeDir: config.loopWorktreeDir,
   });
 
   if (context.outputMode === 'json') {
@@ -369,9 +370,10 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
       + ' four groups, each row its name, its last commit date and why it is listed: Merged (reachable from'
       + ' the base, its pull request merged per the provider, or its upstream gone), Stale (an upstream, not'
       + ' merged, no commit in `cleanup.staleDays`), Not pushed (no upstream, or commits ahead of it) and'
-      + ' Worktrees (under `.claude/worktrees/` and `~/.rafa/worktrees/`). The current branch, the base and'
-      + ' every name a `cleanup.keep` glob matches are never listed. With a terminal the groups are one'
-      + ' checklist: space ticks a row, `a` ticks a whole group, and Merged rows and clean worktrees on a'
+      + ' Worktrees (under `.claude/worktrees/`, `~/.rafa/worktrees/` and `loop.worktreeDir`). The current'
+      + ' branch, the base and every name a `cleanup.keep` glob matches are never listed. With a terminal'
+      + ' the groups are one checklist: space ticks a row, `a` ticks a whole group, and Merged rows and'
+      + ' clean worktrees on a'
       + ' Merged branch start ticked; a worktree that is dirty, locked, the current one, running a loop'
       + ' session or modified within `cleanup.worktreeIdleDays` cannot be ticked, and says why. A ticked'
       + ' Not-pushed branch asks again, naming the commits deleting it loses. Enter then asks `Delete <n>'

@@ -26,6 +26,8 @@ import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { PullRequests } from '../pr/types.js';
 
+import { join } from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
@@ -47,6 +49,7 @@ const CONFIG: DoctorCleanupInput['config'] = {
   cleanupKeep: ['release/*'],
   cleanupStaleDays: 45,
   cleanupWorktreeIdleDays: 3,
+  loopWorktreeDir: '../trees',
 };
 
 const ZERO: CleanupCounts = { merged: 0, stale: 0, notPushed: 0, worktrees: 0 };
@@ -110,7 +113,20 @@ describe('doctorCleanupSettings', () => {
       home: HOME,
       cwd: ROOT,
       projectRoot: ROOT,
+      worktreeDir: '../trees',
     });
+  });
+
+  it('reads the loop\'s worktrees under the default directory when the config carries no loop.worktreeDir', () => {
+    const config: DoctorCleanupInput['config'] = {
+      prBase: CONFIG.prBase,
+      cleanupKeep: CONFIG.cleanupKeep,
+      cleanupStaleDays: CONFIG.cleanupStaleDays,
+      cleanupWorktreeIdleDays: CONFIG.cleanupWorktreeIdleDays,
+    };
+    const input: DoctorCleanupInput = { root: ROOT, home: HOME, config, gh: null };
+
+    expect(doctorCleanupSettings(input, SCRATCH_NOW).worktreeDir).toBe(join('.rafa', 'worktrees'));
   });
 });
 

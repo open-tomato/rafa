@@ -35,6 +35,7 @@ const REPO = '/repo';
 const HOME = '/home/me';
 const CLAUDE = `${REPO}/.claude/worktrees`;
 const RAFA = `${HOME}/.rafa/worktrees`;
+const LOOP = `${REPO}/.rafa/worktrees`;
 
 function said(stdout: string): GitResult {
   return { ok: true, stdout, stderr: '' };
@@ -115,7 +116,16 @@ function scripted(script: Script): { seams: WorktreeSeams; log: string[] } {
 }
 
 function settings(overrides: Partial<WorktreeRead> = {}): WorktreeRead {
-  return { home: HOME, cwd: REPO, projectRoot: REPO, idleDays: 7, now: NOW, mergedBranches: ['done'], ...overrides };
+  return {
+    home: HOME,
+    cwd: REPO,
+    projectRoot: REPO,
+    worktreeDir: '.rafa/worktrees',
+    idleDays: 7,
+    now: NOW,
+    mergedBranches: ['done'],
+    ...overrides,
+  };
 }
 
 /** The rows, or a throw naming why none were read. */
@@ -194,6 +204,37 @@ describe('readWorktrees: the listing', () => {
       links: { [`${HOME}/.rafa/worktrees`]: '/private/home/me/.rafa/worktrees' },
     });
     expect(rows(seams).map((row) => row.path)).toEqual(['/private/home/me/.rafa/worktrees/pr-1']);
+  });
+});
+
+describe('readWorktrees: the loop\'s worktrees', () => {
+  it('lists a clean worktree under loop.worktreeDir whose branch is gone as removable', () => {
+    const row = onlyRow({}, `${LOOP}/plan-a`, 'gone');
+    expect([row.path, row.tickable, row.ticked, row.reason])
+      .toEqual([`${LOOP}/plan-a`, true, false, 'clean; branch gone is not merged']);
+  });
+
+  it('resolves a relative loop.worktreeDir from the project root, and an absolute one as written', () => {
+    const { seams } = scripted({
+      list: said(listing(block('/trees/plan-b', 'b'), block('/abs/plan-c', 'c'), block(`${LOOP}/plan-d`, 'd'))),
+    });
+    expect(rows(seams, settings({ worktreeDir: '../trees' })).map((row) => row.path)).toEqual(['/trees/plan-b']);
+    expect(rows(seams, settings({ worktreeDir: '/abs' })).map((row) => row.path)).toEqual(['/abs/plan-c']);
+  });
+
+  it('blocks a dirty loop worktree', () => {
+    const row = onlyRow({ status: said(' M f\n') }, `${LOOP}/plan-a`, 'gone');
+    expect([row.tickable, row.blockers]).toEqual([false, [{ kind: 'dirty', reason: '1 uncommitted change' }]]);
+  });
+
+  it('blocks a loop worktree whose branch a live loop session names', () => {
+    const path = `${LOOP}/plan-a`;
+    const { seams } = scripted({
+      list: said(listing(block(path, 'plan-a'))),
+      projectSessions: [record('s5', 'plan-a', 'running')],
+    });
+    const [row] = rows(seams);
+    expect([row?.tickable, row?.blockers]).toEqual([false, [{ kind: 'session', reason: 'loop session s5 is running in it' }]]);
   });
 });
 
@@ -427,6 +468,7 @@ describe('readWorktrees over a real repository', () => {
     git(repo, 'worktree', 'lock', '--reason', 'in use', '.claude/worktrees/locked');
     git(repo, 'worktree', 'add', '-q', '-b', 'pr', join(home, '.rafa', 'worktrees', 'pr-7'));
     git(repo, 'worktree', 'add', '-q', '-b', 'mine', join(tempBase, 'mine'));
+    git(repo, 'worktree', 'add', '-q', '-b', 'plan-x', '.rafa/worktrees/plan-x');
 
     // Date the clean worktree's index and tracked file back, so a status
     // that refreshes the index would rewrite it.
@@ -441,6 +483,7 @@ describe('readWorktrees over a real repository', () => {
       home,
       cwd: repo,
       projectRoot: repo,
+      worktreeDir: '.rafa/worktrees',
       idleDays: 7,
       now: later,
       mergedBranches: ['done'],
@@ -456,6 +499,7 @@ describe('readWorktrees over a real repository', () => {
       { path: join(real, 'repo/.claude/worktrees/clean'), branch: 'done', ticked: true, reason: 'clean; branch done is merged' },
       { path: join(real, 'repo/.claude/worktrees/dirty'), branch: 'dirty', ticked: false, reason: '1 untracked file' },
       { path: join(real, 'repo/.claude/worktrees/locked'), branch: 'held', ticked: false, reason: 'locked: in use' },
+      { path: join(real, 'repo/.rafa/worktrees/plan-x'), branch: 'plan-x', ticked: false, reason: 'clean; branch plan-x is not merged' },
     ]);
     expect(statSync(index).mtime).toEqual(past);
 
@@ -466,7 +510,7 @@ describe('readWorktrees over a real repository', () => {
 
     // With the clock now, every worktree was just made, so each is recent.
     const now = readWorktrees(defaultWorktreeSeams(repo), {
-      home, cwd: repo, projectRoot: repo, idleDays: 7, now: new Date(), mergedBranches: ['done'],
+      home, cwd: repo, projectRoot: repo, worktreeDir: '.rafa/worktrees', idleDays: 7, now: new Date(), mergedBranches: ['done'],
     });
     if (!now.ok) throw new Error(now.detail);
     expect(now.worktrees.every((row) => row.blockers.some((blocker) => blocker.kind === 'recent'))).toBe(true);

@@ -23,7 +23,9 @@
  * project's, and a doctor run from a subdirectory reads the same ones.
  * The settings are the resolved config's `pr.base`, `cleanup.keep`,
  * `cleanup.staleDays` and `cleanup.worktreeIdleDays`, as `rafa cleanup`
- * reads them.
+ * reads them, and `loop.worktreeDir` when the config handed in carries
+ * it; `rafa status`'s narrower config does not, so its counts read the
+ * loop's worktrees under the default `.rafa/worktrees`.
  *
  * ## The row
  *
@@ -42,6 +44,7 @@ import type { RafaConfig } from '../config.js';
 import type { PullRequests } from '../pr/types.js';
 
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
+import { CONFIG_DEFAULTS } from '../config.js';
 import { createGhPullRequests } from '../pr/index.js';
 
 /** The command the row points at. */
@@ -62,7 +65,8 @@ export interface DoctorCleanupInput {
   /** The home `~/.rafa/worktrees/` is under. */
   readonly home: string;
   /** The resolved config the four settings are read from. */
-  readonly config: Pick<RafaConfig, 'prBase' | 'cleanupKeep' | 'cleanupStaleDays' | 'cleanupWorktreeIdleDays'>;
+  readonly config: Pick<RafaConfig, 'prBase' | 'cleanupKeep' | 'cleanupStaleDays' | 'cleanupWorktreeIdleDays'>
+    & Partial<Pick<RafaConfig, 'loopWorktreeDir'>>;
   /** The `gh` runner `doctor` opened for the board, or null for a provider that is not `gh`. */
   readonly gh: GhRunner | null;
 }
@@ -85,6 +89,7 @@ export function doctorCleanupSettings(input: DoctorCleanupInput, now: Date): Cle
     home: input.home,
     cwd: input.root,
     projectRoot: input.root,
+    worktreeDir: config.loopWorktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir,
   };
 }
 

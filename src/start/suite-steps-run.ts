@@ -11,10 +11,16 @@
  *     session. The first call of the run ensures the baseline
  *     (`ensureBaseline`: the stored one, or the full suite at HEAD), so
  *     the baseline is taken at the plan's first dispatch whether that is
- *     a task or, on a run with none left open, the wrap-up. Before a
- *     task every stage step due runs (`runDueStageSteps`: the step after
- *     a stage's last task, and the catch-up for a stage whose step never
- *     ran); before the wrap-up the pre-wrap-up step runs, the full suite.
+ *     a task or, on a run with none left open, the wrap-up. Before an
+ *     open task every stage step due runs (`runDueStageSteps`: the step
+ *     after a stage's last task, and the catch-up for a stage whose step
+ *     never ran); before the wrap-up the pre-wrap-up step runs, the full
+ *     suite. Before a `[BLOCKED]` task no stage step runs: the blocked
+ *     line is the repair (or retry) a red step left, and a due stage
+ *     step run first would only meet the same failures again and stop
+ *     the run before the repair gets its session. The ledger is read
+ *     from the tracker on every call, so the steps still due are taken
+ *     before the first open task after the repair.
  *   - {@link RunSuiteSteps.afterTask}, once a task is committed as
  *     `done` and its report stored: the task step (`runTaskStep`) over
  *     what the task changed since `base`, the commit it was dispatched
@@ -22,12 +28,13 @@
  *     `affected` default for a line with none).
  *
  * Each answers true when the run goes on and false when it stops. A red
- * step has already written its blocker on the next open task, when one
- * is left (`suite-step.ts`), so the task that stop leaves `[BLOCKED]` is
- * retried first on the next run, handed the blocker text through
- * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`), exactly as a blocked
- * task's own is. A red pre-wrap-up step has no task to block: the run
- * stops before the wrap-up, and the next run takes that step again.
+ * task or stage step has already inserted a `[BLOCKED]` repair task
+ * carrying its blocker, or written it on the repair it followed
+ * (`suite-blocker.ts`), so that repair is dispatched first on the next
+ * run, handed the blocker text through `BLOCKER_PROMPT_PREFIX`
+ * (`start/dispatch.ts`), exactly as a blocked task's own is. A red
+ * pre-wrap-up step has no task to block: the run stops before the
+ * wrap-up, and the next run takes that step again.
  *
  * ## A step stopped by SIGINT
  *
@@ -204,6 +211,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     if (known === 'interrupted') return false;
     if (known === 'off') return true;
     if (taskInfo === null) return goesOn(await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known)));
+    if (taskInfo.status === 'blocked') return true;
     const stages = await guarded('stage steps', () => calls.runDueStageSteps(context, known));
     return (stages ?? []).every((outcome) => goesOn(outcome));
   };

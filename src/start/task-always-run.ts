@@ -36,10 +36,10 @@
  *
  * {@link foldResults} makes the two runs one `SuiteResult`, which the step
  * settles as it settles any run: one recorded step, one verdict, one
- * blocker on the next open task. The folded result holds both commands,
+ * blocker on its repair task. The folded result holds both commands,
  * joined by `;`, the failures of both with each test file and name pair
- * once (a changed sweep can run in both), the errors of both summed, and
- * both summary lines. Its exit code is the stop code when either run
+ * once (a changed sweep can run in both), the errors of both summed, the
+ * errors outside any test of both in run order, and both summary lines. Its exit code is the stop code when either run
  * ended on it, so a SIGINT during either run still reads as a stop; else
  * the exit code of a run that exited nonzero with no summary line and
  * held test files, with the summary dropped, so the step reads that run
@@ -141,6 +141,7 @@ export function foldResults(first: SuiteResult, second: SuiteResult, stopCode: n
     failures: foldedFailures(first, second),
     errors: foldedErrors(first, second),
     junit: foldedJunit(first, second),
+    unhandled: [...first.unhandled, ...second.unhandled],
   };
   return first.noTestFiles === true && second.noTestFiles === true
     ? { ...folded, noTestFiles: true }

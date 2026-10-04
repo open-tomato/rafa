@@ -38,10 +38,11 @@
  *
  * One JSON object, pretty-printed with a trailing newline, holding
  * {@link BASELINE_VERSION}, when it was recorded, the commit it was
- * recorded at, and the {@link SuiteResult} fields. A file that does not
- * parse, carries another version, or lacks a field reads as `unreadable`
- * with the reason, never as a throw: the caller decides whether to record
- * the baseline again.
+ * recorded at, and the {@link SuiteResult} fields but `unhandled`, the
+ * errors outside any test, which it holds as the `errors` count only. A
+ * file that does not parse, carries another version, or lacks a field
+ * reads as `unreadable` with the reason, never as a throw: the caller
+ * decides whether to record the baseline again.
  *
  * A failure's `message` is optional within version 1: it is written when
  * the result holds one, and a failure without it reads as before, so a
@@ -65,8 +66,11 @@ const PLAN_FILE_NAME = /^PLAN(?:_TRACKER)?(-.+)?\.md$/;
 /** The JUnit readings a stored baseline may hold. */
 const JUNIT_READINGS: readonly JunitReading[] = ['read', 'missing', 'unreadable'];
 
-/** A suite result as the baseline file holds it. */
-export interface SuiteBaseline extends SuiteResult {
+/**
+ * A suite result as the baseline file holds it: every field but
+ * `unhandled`, whose errors the file keeps as the `errors` count only.
+ */
+export interface SuiteBaseline extends Omit<SuiteResult, 'unhandled'> {
   readonly version: typeof BASELINE_VERSION;
   /** When the run finished, as an ISO 8601 string. */
   readonly recordedAt: string;

@@ -157,7 +157,16 @@ sentence replaces nothing.
    mergeable (the refusal names which; `pending` and `red` point at
    `pr triage`, and verdict `none` — no checks at all — points at
    `--skip-checks` instead, since triage has nothing to fix there), and
-   when the branch is checked out in another worktree (names it).
+   when the branch is checked out in another worktree (names it). Before
+   those refusals, a branch held by a loop worktree one directory below
+   `loop.worktreeDir` is freed when that worktree is clean and no live
+   loop session holds it: `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md`
+   are copied into the main checkout's `plan.dir` (a later-modified file
+   there is kept), `git worktree remove` runs, and one line says so. A
+   dirty one, one a live loop holds, one whose session records cannot be
+   read, and one git will not remove are refused naming the path, before
+   anything is merged (`src/commands/pr/merge-loop-worktree.ts`). Any
+   other holder gets the refusal above.
 2. Where the release runs (`release.enabled`), read the release guard
    (`src/commands/pr/merge-guard.ts`) over `origin/<head>` against
    `origin/<base>`, both fetched first: `clean` prints its lines and the
@@ -177,7 +186,8 @@ sentence replaces nothing.
    reported as `delete the local branch <name>: skipped — no local branch
    <name>; nothing to delete`; the remote delete and the prune still run,
    and the exit code stays 0. A branch checked out in another worktree is
-   present, so step 1 still refuses it.
+   present, so step 1 still refuses it, or frees it when an ended loop
+   worktree holds it.
 5. Tick the roadmap and print what is ready.
 6. Run the unblock reading over every open issue labelled
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,

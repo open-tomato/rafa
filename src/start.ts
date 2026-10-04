@@ -150,18 +150,21 @@
  * to the run record's `steps` before the loop acts on it. Past the loop
  * guard and ahead of rendering `progress.txt`, the first session of the
  * run, task or wrap-up, is preceded by the suite baseline: the one
- * stored beside the tracker, or the full suite at HEAD. Before each task
- * every stage step due runs, the step after a stage's last task and the
- * catch-up for one that never ran; before the wrap-up, the full suite
- * runs as the pre-wrap-up step. Once a task is committed `done` and its
+ * stored beside the tracker, or the full suite at HEAD. Before each open
+ * task every stage step due runs, the step after a stage's last task and
+ * the catch-up for one that never ran; before a `[BLOCKED]` task none
+ * runs, so a repair gets its session first and the steps still due wait
+ * for the next open task; before the wrap-up, the full suite runs as the
+ * pre-wrap-up step. Once a task is committed `done` and its
  * report stored, the task step runs over what it changed since the
  * commit it was dispatched on, the base its prompt names, and lints the
  * files it changed (`start/lint-step.ts`). A step with failures the
  * baseline does not hold, or a task step with ESLint errors, is red: it
- * writes its blocker on the next open task, when one is left, and the
- * run stops as it does after a blocked task, so the next run retries
- * that task handed the failing files. A red pre-wrap-up step stops the
- * run before the wrap-up.
+ * inserts a `[BLOCKED]` repair task above the first open task, or blocks
+ * the repair it followed (`start/suite-blocker.ts`), and the run stops as
+ * it does after a blocked task, so the next run dispatches that repair
+ * handed the failing files. A red pre-wrap-up step stops the run before
+ * the wrap-up.
  * Each task prompt lists the baseline's failures as inherited
  * (`start/inherited-notice.ts`), read again before each dispatch.
  *
@@ -574,9 +577,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       }
 
       // The baseline at the first dispatch, then the stage steps due
-      // before a task or the pre-wrap-up step before the wrap-up. A red
-      // one has blocked the next open task, when one is left, and stops
-      // the run as a blocked task does.
+      // before an open task (none before a blocked one, which is the
+      // repair a red step left and runs first) or the pre-wrap-up step
+      // before the wrap-up. A red stage step has inserted a blocked
+      // repair task, and a red one stops the run as a blocked task does.
       if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
       if (!(await suiteSteps.beforeSession(taskInfo))) {
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
@@ -704,7 +708,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       }
 
       // The task step over what the task changed since its base; a red
-      // one has blocked the next open task, and stops the run.
+      // one has inserted a blocked repair task, or blocked the repair it
+      // followed, and stops the run.
       if (!(await suiteSteps.afterTask(taskInfo, base))) {
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;

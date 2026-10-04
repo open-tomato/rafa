@@ -55,6 +55,7 @@ function result(command: string, overrides: Partial<SuiteResult> = {}): SuiteRes
     failures: [],
     errors: 0,
     junit: 'read',
+    unhandled: [],
     ...overrides,
   };
 }
@@ -101,6 +102,13 @@ describe('withAlwaysRun', () => {
 });
 
 describe('foldResults', () => {
+  it('holds the errors outside any test of both runs, the first run\'s first', () => {
+    const thrown = { file: 'src/a.test.ts', firstLine: 'error: boom' };
+    const swept = { file: 'src/x.sweep.test.ts', firstLine: null };
+    const folded = foldResults(result('changed', { unhandled: [thrown] }), result('sweep', { unhandled: [swept] }), STOP);
+    expect(folded.unhandled).toEqual([thrown, swept]);
+  });
+
   it('holds both commands, both summaries, and the failures and errors of both', () => {
     const folded = foldResults(
       result('changed', { exitCode: 1, failures: [FAILED], errors: 1 }),

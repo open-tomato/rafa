@@ -1,8 +1,9 @@
 /**
  * Reading the worktrees `rafa cleanup` may list: every checkout
- * `git worktree list --porcelain` names under `<repo>/.claude/worktrees/`
- * or `<home>/.rafa/worktrees/`, each marked with whether it may be
- * ticked, why not when it may not, and whether it starts ticked.
+ * `git worktree list --porcelain` names under `<repo>/.claude/worktrees/`,
+ * `<home>/.rafa/worktrees/` or the loop's `loop.worktreeDir`, each marked
+ * with whether it may be ticked, why not when it may not, and whether it
+ * starts ticked.
  *
  * This module prints nothing and removes nothing. It reaches git only
  * through the runners it is handed, the session records only through
@@ -12,12 +13,17 @@
  *
  * ## Which worktrees are listed
  *
- * The two directories worktrees are made in on a person's behalf:
- * Claude Code's `<repo>/.claude/worktrees/<name>`, and
+ * The three directories worktrees are made in on a person's behalf:
+ * Claude Code's `<repo>/.claude/worktrees/<name>`,
  * `<home>/.rafa/worktrees/` (`WORKTREES_SUBDIR`, `src/pr/worktree.ts`),
  * which holds `rafa pr triage --resolve`'s `pr-<n>` and the epic
  * verification run's detached `epic-<n>` (`src/epic/verify-run.ts`), the
- * second left there only when its run could not remove it.
+ * second left there only when its run could not remove it, and the
+ * loop's own `loop.worktreeDir`, `.rafa/worktrees/<stub>` unless a layer
+ * names another, resolved from the project root by `worktreeDirAt`
+ * (`src/start/worktree-dir.ts`) as the loop resolves it when it adds one.
+ * A loop worktree is judged by the same blockers as the other two, so
+ * one a live loop session holds, or one with uncommitted work, stays.
  * `<repo>` is the main worktree, the block git lists first, so the
  * reading is the same from whichever checkout the command runs in. Any
  * other checkout is somebody's own and is not listed.
@@ -94,6 +100,7 @@ import { readSessions, runsDir } from '../loop/sessions.js';
 import { createGitRunner, gitSaid } from '../pr/git.js';
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
+import { worktreeDirAt } from '../start/worktree-dir.js';
 
 /** Where under the repository Claude Code makes its worktrees. */
 export const CLAUDE_WORKTREES_SUBDIR = join('.claude', 'worktrees');
@@ -195,6 +202,8 @@ export interface WorktreeRead {
   readonly cwd: string;
   /** The project root whose `.rafa/runs/` holds the loop's session records. */
   readonly projectRoot: string;
+  /** `loop.worktreeDir` as configured, resolved from {@link projectRoot}. */
+  readonly worktreeDir: string;
   /** `cleanup.worktreeIdleDays`. */
   readonly idleDays: number;
   /** The clock, read once by the caller. */
@@ -227,9 +236,9 @@ export function defaultWorktreeSeams(cwd: string): WorktreeSeams {
 }
 
 /**
- * Every worktree under `<repo>/.claude/worktrees/` or
- * `<home>/.rafa/worktrees/`, each marked by the rules in the module
- * note.
+ * Every worktree under `<repo>/.claude/worktrees/`,
+ * `<home>/.rafa/worktrees/` or `loop.worktreeDir`, each marked by the
+ * rules in the module note.
  */
 export function readWorktrees(seams: WorktreeSeams, read: WorktreeRead): WorktreesReading {
   const listed = seams.git(WORKTREE_LIST);
@@ -245,6 +254,7 @@ export function readWorktrees(seams: WorktreeSeams, read: WorktreeRead): Worktre
   const roots = [
     ...pathForms(seams, join(main, CLAUDE_WORKTREES_SUBDIR)),
     ...pathForms(seams, join(read.home, WORKTREES_SUBDIR)),
+    ...pathForms(seams, worktreeDirAt(read.projectRoot, read.worktreeDir)),
   ];
   const locks = parseLocks(listed.stdout);
   const context: RowContext = {
