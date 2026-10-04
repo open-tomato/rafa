@@ -42,6 +42,7 @@ const HOME = '/home/me';
 const CLAUDE = `${REPO}/.claude/worktrees`;
 
 const FETCH = FETCH_PRUNE.join(' ');
+const SYMBOLIC_REF = 'symbolic-ref --quiet --short refs/remotes/origin/HEAD';
 const FOR_EACH_REF = `for-each-ref --format=${BRANCH_FORMAT} refs/heads`;
 const MERGED_CALL = 'branch --merged refs/heads/main --format=%(refname:lstrip=2)';
 const COUNT_WIP = 'rev-list --count refs/heads/wip --not --remotes refs/heads/main --';
@@ -80,6 +81,7 @@ const WORKTREES = block(REPO, 'here') + block(`${CLAUDE}/a`, 'done') + block(`${
 /** The answers of the repository the scripted git reads. */
 const ANSWERS: Readonly<Record<string, GitResult>> = {
   [FETCH]: said(''),
+  [SYMBOLIC_REF]: said('origin/main\n'),
   [FOR_EACH_REF]: said(BRANCHES),
   [MERGED_CALL]: said('done\n'),
   [COUNT_WIP]: said('2\n'),
@@ -144,7 +146,7 @@ describe('readCleanup over scripted seams', () => {
     const reading = await readCleanup(seams, settings());
     if (!reading.ok) throw new Error(reading.detail);
 
-    expect(log).toEqual([FETCH, FOR_EACH_REF, MERGED_CALL, COUNT_WIP, WORKTREE_LIST.join(' ')]);
+    expect(log).toEqual([FETCH, SYMBOLIC_REF, FOR_EACH_REF, MERGED_CALL, COUNT_WIP, WORKTREE_LIST.join(' ')]);
     expect(reading.fetched).toBe(true);
     expect(reading.base).toBe('main');
     expect(reading.merged.map((row) => [row.branch.name, row.reason])).toEqual([['done', 'merged into main']]);
@@ -170,7 +172,7 @@ describe('readCleanup over scripted seams', () => {
     if (!reading.ok) throw new Error(reading.detail);
 
     expect(log).not.toContain(FETCH);
-    expect(log[0]).toBe(FOR_EACH_REF);
+    expect(log[0]).toBe(SYMBOLIC_REF);
     expect(reading.fetched).toBe(false);
   });
 

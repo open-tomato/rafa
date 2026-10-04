@@ -162,8 +162,24 @@ describe('readBranches', () => {
       .toEqual(['ahead', 'gone', 'local', 'release/a/b', 'release/x', 'trunk']);
   });
 
-  it('drops pr.base rather than the branch origin/HEAD names', () => {
-    const { git } = scriptedListing(said('origin/main\n'));
+  it('drops the branch origin/HEAD names beside pr.base, in no section', () => {
+    const listing = [
+      line('feature', 'origin/feature', '', 1790000000, '*'),
+      line('integration', 'origin/integration', '', 1790228800),
+      line('main', 'origin/main', 'behind 3', 1790228799),
+      line('topic', '', '', 1790228799),
+    ].join('\n') + '\n';
+    const { git } = scriptedGit({
+      [FOR_EACH_REF.join(' ')]: said(listing),
+      [SYMBOLIC_REF.join(' ')]: said('origin/main\n'),
+    });
+    const reading = readBranches(git, { base: 'integration', keep: [] });
+    expect(reading.ok && reading.base).toBe('integration');
+    expect(reading.ok && reading.branches.map((branch) => branch.name)).toEqual(['topic']);
+  });
+
+  it('keeps pr.base and the current branch only when origin/HEAD is not set', () => {
+    const { git } = scriptedListing({ ok: false, stdout: '', stderr: '' });
     const reading = readBranches(git, { base: 'trunk', keep: [] });
     expect(reading.ok && reading.base).toBe('trunk');
     expect(reading.ok && reading.branches.map((branch) => branch.name))
@@ -187,7 +203,10 @@ describe('readBranches', () => {
   });
 
   it('answers the unreadable line rather than a partial listing', () => {
-    const { git } = scriptedGit({ [FOR_EACH_REF.join(' ')]: said(`${line('a', '', '', 1)}\nbroken\n`) });
+    const { git } = scriptedGit({
+      [SYMBOLIC_REF.join(' ')]: said('origin/main\n'),
+      [FOR_EACH_REF.join(' ')]: said(`${line('a', '', '', 1)}\nbroken\n`),
+    });
     expect(readBranches(git, { base: 'main', keep: [] })).toEqual({
       ok: false,
       detail: 'git for-each-ref wrote a line with 1 fields, expected 5: "broken"',
@@ -195,7 +214,7 @@ describe('readBranches', () => {
   });
 
   it('answers no branches for an empty listing', () => {
-    const { git } = scriptedGit({ [FOR_EACH_REF.join(' ')]: said('') });
+    const { git } = scriptedGit({ [SYMBOLIC_REF.join(' ')]: said('origin/main\n'), [FOR_EACH_REF.join(' ')]: said('') });
     expect(readBranches(git, { base: 'main', keep: [] })).toEqual({ ok: true, base: 'main', branches: [] });
   });
 });

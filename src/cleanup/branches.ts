@@ -38,7 +38,7 @@
  *
  * ## The never-listed set
  *
- * Three kinds of branch are dropped here, before any group sees them,
+ * Four kinds of branch are dropped here, before any group sees them,
  * so no later reader can list one by mistake:
  *
  *   - the current branch, the `*` above;
@@ -46,6 +46,12 @@
  *     remote's `HEAD` names (`git symbolic-ref refs/remotes/origin/HEAD`),
  *     else {@link DEFAULT_BASE_BRANCH}, the base `rafa next` reads
  *     against where `pr.base` names none;
+ *   - the branch the remote's `HEAD` names, whenever that ref resolves,
+ *     even when `pr.base` names another. A repository whose `pr.base` is
+ *     an integration branch keeps its default branch too, and that
+ *     branch, behind the base, would otherwise read as merged into it
+ *     and be offered for deletion. `BranchesRead.base` stays `pr.base`
+ *     first: the groups still compare against the configured base;
  *   - every branch a `cleanup.keep` pattern matches.
  *
  * A `cleanup.keep` pattern is matched with `Bun.Glob`, whose `*` stops
@@ -134,6 +140,20 @@ export interface BranchSettings {
 }
 
 /**
+ * The branch `origin`'s `HEAD` names, or null when that ref is not set
+ * or names nothing under `origin/`.
+ */
+export function readRemoteHead(git: GitRunner): string | null {
+  const result = git(['symbolic-ref', '--quiet', '--short', `refs/remotes/${REMOTE}/HEAD`]);
+  const target = result.stdout.trim();
+  const prefix = `${REMOTE}/`;
+  if (!result.ok || !target.startsWith(prefix) || target.length === prefix.length) {
+    return null;
+  }
+  return target.slice(prefix.length);
+}
+
+/**
  * The base branch: `configured` when it is set, else the branch
  * `origin`'s `HEAD` names, else {@link DEFAULT_BASE_BRANCH}. Runs git
  * only when `configured` is null.
@@ -142,13 +162,7 @@ export function resolveBaseBranch(git: GitRunner, configured: string | null): st
   if (configured !== null) {
     return configured;
   }
-  const result = git(['symbolic-ref', '--quiet', '--short', `refs/remotes/${REMOTE}/HEAD`]);
-  const target = result.stdout.trim();
-  const prefix = `${REMOTE}/`;
-  if (!result.ok || !target.startsWith(prefix) || target.length === prefix.length) {
-    return DEFAULT_BASE_BRANCH;
-  }
-  return target.slice(prefix.length);
+  return readRemoteHead(git) ?? DEFAULT_BASE_BRANCH;
 }
 
 /** True when `name` matches any of the `cleanup.keep` patterns. */
@@ -158,11 +172,12 @@ export function isKept(name: string, keep: readonly string[]): boolean {
 
 /**
  * Every local branch `rafa cleanup` may list, read from one
- * `git for-each-ref` call, with the current branch, the base branch and
- * every `cleanup.keep` match dropped.
+ * `git for-each-ref` call, with the current branch, the base branch, the
+ * branch `origin`'s `HEAD` names and every `cleanup.keep` match dropped.
  */
 export function readBranches(git: GitRunner, settings: BranchSettings): BranchesReading {
-  const base = resolveBaseBranch(git, settings.base);
+  const remoteHead = readRemoteHead(git);
+  const base = settings.base ?? remoteHead ?? DEFAULT_BASE_BRANCH;
   const result = git(['for-each-ref', `--format=${BRANCH_FORMAT}`, 'refs/heads']);
   if (!result.ok) {
     const said = gitSaid(result);
@@ -181,11 +196,16 @@ export function readBranches(git: GitRunner, settings: BranchSettings): Branches
     if (typeof parsed === 'string') {
       return { ok: false, detail: parsed };
     }
-    if (!parsed.current && parsed.branch.name !== base && !isKept(parsed.branch.name, settings.keep)) {
+    if (!parsed.current && !isBaseBranch(parsed.branch.name, base, remoteHead) && !isKept(parsed.branch.name, settings.keep)) {
       branches.push(parsed.branch);
     }
   }
   return { ok: true, base, branches };
+}
+
+/** True when `name` is the base branch or the branch `origin`'s `HEAD` names. */
+function isBaseBranch(name: string, base: string, remoteHead: string | null): boolean {
+  return name === base || name === remoteHead;
 }
 
 /** One line of {@link BRANCH_FORMAT} output, and whether it is the current branch. */
