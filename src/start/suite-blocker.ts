@@ -8,7 +8,10 @@
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
- * named, the inherited ones included.
+ * named, the inherited ones included. Each path in a `bun test` command
+ * is written as {@link runnablePath} spells it, `./` before a relative
+ * one: bun reads an argument without `./` or `/` as a substring filter,
+ * so a bare `x.test.ts` would also run `a/x.test.ts`.
  *
  * {@link writeRepairTask} puts that text on a repair task. A red task or
  * stage step inserts one through `insertTrackerTask` (`utils/tracker.ts`)
@@ -89,6 +92,16 @@ function unhandledFiles(errors: readonly UnhandledError[]): readonly string[] {
     : [error.file]))];
 }
 
+/**
+ * `path` as a `bun test` argument naming that file alone: `./` before a
+ * relative path, an absolute one or one already `./`-led as it is.
+ */
+export function runnablePath(path: string): string {
+  return path.startsWith('/') || path.startsWith('./')
+    ? path
+    : `./${path}`;
+}
+
 /** The blocker's sentences on errors outside any test: their count over the baseline, and each named. */
 function errorsText(newErrors: number, errors: readonly UnhandledError[]): string {
   const counted = `${newErrors} more error(s) outside any test than the baseline`;
@@ -96,7 +109,7 @@ function errorsText(newErrors: number, errors: readonly UnhandledError[]): strin
   const files = unhandledFiles(errors);
   const run = files.length === 0
     ? ''
-    : ` Run bun test ${files.join(' ')} and make each load.`;
+    : ` Run bun test ${files.map(runnablePath).join(' ')} and make each load.`;
   return `${counted}; Bun's stderr named them as ${unhandledNames(errors)}.${run}`;
 }
 
@@ -113,7 +126,7 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' 
     const named = files.map(([file, count]) => `${file} (${count} ${count === 1
       ? 'test'
       : 'tests'})`);
-    parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => file).join(' ')} and make them pass.`);
+    parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => runnablePath(file)).join(' ')} and make them pass.`);
   }
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);

@@ -296,7 +296,7 @@ describe('runTaskStep', () => {
     expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(next?.blocker).toContain('src/new.test.ts (2 tests)');
-    expect(next?.blocker).toContain('bun test src/new.test.ts');
+    expect(next?.blocker).toContain('bun test ./src/new.test.ts');
     expect(next?.blocker).not.toContain(KNOWN.file);
   });
 
@@ -718,7 +718,7 @@ describe('runTaskStep linting the task\'s diff', () => {
     expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(outcome.blocker?.startsWith('The runner\'s task step after "second task" found failures')).toBe(true);
-    expect(outcome.blocker).toContain('bun test src/new.test.ts');
+    expect(outcome.blocker).toContain('bun test ./src/new.test.ts');
     expect(outcome.blocker).toContain('Run bunx eslint --no-warn-ignored a.json');
   });
 
@@ -1013,7 +1013,7 @@ describe('blockerText', () => {
   it('names each new file once with its count and the command running them', () => {
     const text = blockerText('task step', { exitCode: 1, unhandled: [] }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
     expect(text).toContain('src/new.test.ts (2 tests), src/old.test.ts (1 test)');
-    expect(text).toContain('Run bun test src/new.test.ts src/old.test.ts');
+    expect(text).toContain('Run bun test ./src/new.test.ts ./src/old.test.ts');
     expect(text).not.toContain('\n');
   });
 });
