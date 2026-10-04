@@ -39,7 +39,7 @@ import { readSessions } from '../loop/sessions.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
 
@@ -193,7 +193,7 @@ describe('rafa loop start sent SIGINT during its suite step', () => {
     const ended = await run.result;
     const output = `${ended.stdout}${ended.stderr}`;
 
-    expect(ended.exitCode).toBe(0);
+    expectExit(ended, 0, scratch);
     expect(output).toContain('Stopping here, as rafa loop stop does: no task is marked blocked.');
     expect(output).not.toContain('Task marked as blocked');
 

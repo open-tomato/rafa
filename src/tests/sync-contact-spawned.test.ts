@@ -47,7 +47,7 @@ import { hubUnreachableLine } from '../effort/sync/contact.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { BASE, NEXT_ISSUE, NEXT_TITLE, ROADMAP_ISSUE, writeStandInGh } from './next-chain-fixtures.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
@@ -239,7 +239,7 @@ describe('rafa effort collect under a service whose hub is down', () => {
     const run = runRafa(scratch, scratch.repo, ['effort', 'collect', '--no-sessions']);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('+1 rows');
     expect(linesEqualTo(output, UNREACHABLE_LINE)).toBe(1);
     expect(syncLines(output)).toBe(1);
@@ -251,7 +251,7 @@ describe('rafa effort collect under a service whose hub is down', () => {
       const control = plantProject(strategy);
       const passed = runRafa(control, control.repo, ['effort', 'collect', '--no-sessions']);
       const controlOutput = `${passed.stdout}${passed.stderr}`;
-      expect(passed.exitCode).toBe(0);
+      expectExit(passed, 0, control);
       expect(passed.stdout).toContain('+1 rows');
       expect(syncLines(controlOutput)).toBe(0);
       expect(syncCalls(control)).toEqual([]);
@@ -265,7 +265,7 @@ describe('rafa loop start under a service whose hub is down', () => {
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(tracker(scratch)).toContain('- [x] First task');
     expect(tracker(scratch)).toContain('- [x] Second task');
     // One push per task, each skipping its pull, and one line for the whole run.
@@ -279,7 +279,7 @@ describe('rafa loop start under a service whose hub is down', () => {
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(tracker(scratch)).toContain('- [x] Second task');
     expect(syncCalls(scratch)).toEqual([]);
     expect(syncLines(output)).toBe(0);
@@ -295,7 +295,7 @@ describe.each([
     const run = runRafa(scratch, scratch.repo, words);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(linesEqualTo(output, PULL_UNREACHABLE_LINE)).toBe(1);
     expect(syncLines(output)).toBe(1);
     expect(syncCalls(scratch)).toEqual(['pull']);
@@ -304,7 +304,7 @@ describe.each([
     for (const strategy of ['local', 'file'] as const) {
       const control = plantProject(strategy);
       const passed = runRafa(control, control.repo, words);
-      expect(passed.exitCode).toBe(0);
+      expectExit(passed, 0, control);
       expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
       expect(syncCalls(control)).toEqual([]);
     }
@@ -317,7 +317,7 @@ describe('rafa next --dry-run under a service whose hub is down', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(linesEqualTo(output, PULL_UNREACHABLE_LINE)).toBe(1);
     expect(syncLines(output)).toBe(1);
     expect(syncCalls(scratch)).toEqual(['pull']);
@@ -326,7 +326,7 @@ describe('rafa next --dry-run under a service whose hub is down', () => {
     for (const strategy of ['local', 'file'] as const) {
       const control = plantNextProject(strategy);
       const passed = runRafa(control, control.repo, ['next', '--dry-run']);
-      expect(passed.exitCode).toBe(0);
+      expectExit(passed, 0, control);
       expect(syncLines(`${passed.stdout}${passed.stderr}`)).toBe(0);
       expect(syncCalls(control)).toEqual([]);
     }
