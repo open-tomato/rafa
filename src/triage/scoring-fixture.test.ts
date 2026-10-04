@@ -142,6 +142,20 @@ describe('filingsOf', () => {
     ]);
   });
 
+  it('leaves out every issue after the one the judgement reads through, still following a link to one', () => {
+    const later = issue(5, '2026-01-03T00:00:00Z', 'later bug');
+    const linked = issue(2, '2026-01-02T00:00:00Z', 'linked bug', [note('Duplicate of #5', '2026-01-04T00:00:00Z')]);
+    const first = issue(1, '2026-01-01T00:00:00Z', 'first bug');
+    const judgement: CauseJudgement = { ...NO_JUDGEMENT, through: 2 };
+    const filings = filingsOf([first, linked, later], keep, judgement);
+    expect(filings.map(({ issue: number, cause }) => [number, cause])).toEqual([[1, 1], [2, 5]]);
+  });
+
+  it('reads every issue when the judgement names no last issue, the control', () => {
+    const issues = [issue(1, '2026-01-01T00:00:00Z', 'first bug'), issue(5, '2026-01-03T00:00:00Z', 'later bug')];
+    expect(filingsOf(issues, keep, NO_JUDGEMENT).map(({ issue: number }) => number)).toEqual([1, 5]);
+  });
+
   it('takes local paths and secrets out through the redactor', () => {
     const leaky = issue(1, '2026-01-01T00:00:00Z', 'fails in /home/bob/repo');
     const [filing] = filingsOf([leaky], (text) => text.replace('/home/bob', '~'), NO_JUDGEMENT);

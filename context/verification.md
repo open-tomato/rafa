@@ -28,10 +28,14 @@ suite at defined stages.** A task line declares `tests=affected` (the
 default), `tests=module`, or `tests=full` to control what its session checks.
 
 **Task session gates** (read one exit code from each):
-- `bun test --changed=<base>` (affected), `bun test --changed=<base>
-  --reporter=junit --reporter-outfile=<file>` to read failures via JUnit
+- `bun test --changed=<base>` (affected tests), then `bun test
+  <tests.alwaysRun paths>` (content sweeps) as a second run, with
+  `--reporter=junit --reporter-outfile=<file>` on both to read failures
+  via JUnit. The prompt names both gate names: `affected tests gate` and
+  `always-run sweeps gate`
 - `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
-- `bunx eslint <changed files>` (ESLint on changed files only)
+- `bunx eslint <changed files>` (ESLint on changed files only; read below
+  for the blocker when changed files are all ignored)
 
 All three redirect to a file and read `$?` immediately after with
 `exit=$?` on the next line — never pipe through `tail` or poll with
@@ -66,7 +70,11 @@ will run:
 - `tests=full`: Entire suite when the task changes a config file or a
   globally-used module
 
-**Config keys for when a task triggers `tests=full` or `tests=module`:**
+**Config keys for test selection and running:**
+- `tests.alwaysRun` (glob list, defaults to `src/**/*.sweep.test.ts`) —
+  content sweeps that always run alongside scoped tests in every task's
+  gates, since they read files at run time and `--changed` follows only
+  the import graph
 - `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
   `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
   named in `[test] preload` of `bunfig.toml`)
@@ -159,13 +167,28 @@ already provides the records. If you are writing a test that spawns a
 gate, write the exit code to a marker file or read it from the process's
 recorded step.
 
-**The summary line is what the runner reads.** Bun writes a line like
-`Ran 390 tests, 385 pass, 5 fail (~175s)` after all tests complete. The
-runner parses Bun's summary to extract the counts. Two gates run on the
-same tree produce identical counts unless a case reads an input the tree
-does not own — which a few cases do, documented below. When debugging,
-reproduce the same test run to verify: two identical runs produce identical
-output, so once-only variation points to the input, not the gate.
+### ESLint gate and ignored-file blocker
+
+**An ESLint run that touches only ignored files prints "File ignored"
+warnings and must not read as red.** The root `eslint.config.mjs` ignores
+`packages/**`, and a diff touching only files under that tree produces
+warnings on stdout, but the exit code is still 0. Both the warnings and
+the pass are correct: the files are ignored (no error), and the tool's
+success is not blocked. When reading the exit code immediately with `$?`,
+capture both stdout and stderr to a file first, so the task step captures
+the warnings in the gate output without reading them as a failure.
+
+### The summary line is what the runner reads
+
+**Bun writes a line like `Ran 390 tests, 385 pass, 5 fail (~175s)` after
+all tests complete.** The runner parses Bun's summary to extract the
+counts. Two gates run on the same tree produce identical counts unless a
+case reads an input the tree does not own — which a few cases do,
+documented below. When debugging, reproduce the same test run to verify:
+two identical runs produce identical output, so once-only variation points
+to the input, not the gate. The always-run sweeps gate produces a separate
+summary from the affected tests gate, named in both its own output and the
+task session record.
 
 ### Known failures by cause
 
@@ -322,3 +345,37 @@ the reference example. This section replaces nothing.
   to temporary files with `RAFA_ENTRY`'s URL swapped to
   `../../dist/cli.js` and the import pointed at the copy, run them after
   `bun run build`, and delete them. This replaces nothing.
+
+### Fixture scrub, guard, and path rules
+
+**Every committed fixture is scrubbed of machine identity before it ships.**
+Fixtures are test data read as input: real text copied from the board or
+the store, quoted in a test to show what it held when the test was made,
+or patterns planted by a test to verify how code reads them. Real text
+names the machine it came from — home directory paths, email addresses,
+host names, and secrets in the environment. Before a fixture is written to
+disk and committed, `src/fixtures/scrub.ts` (`fixtureScrubber`) redacts
+each kind in turn: secret names (reported by name, never by value),
+localhost paths, home paths (`/home/<name>`, `/Users/<name>`,
+`C:\Users\<name>`), email addresses (version pins like `pkg@1.2.3` left
+out), and the running host name (with word-boundary guards so `sandbox`
+does not match `box`). Once redacted, `findLeaks` reads the text again; if
+any leak is found, `ScrubRefusal` is thrown and the fixture is not written.
+
+**The fixture guard (`src/fixtures/fixture-guard.sweep.test.ts`) is a
+content sweep that runs on every task session and verifies no leak is left
+in any committed fixture.** It reads every file `git ls-files` lists in a
+fixture folder (not a directory walk, so only what a commit would ship),
+and fails if any machine identity is found. The guard plants control files
+(`src/fixtures/testdata/leak-controls/`) with one leak each plus a version
+pin with none, and must fail on the three leaks and pass the pin, proving
+the check is working. The host token `{{HOST}}` in the control files is
+filled with the running host name at read time.
+
+**Fixture paths are identified by `isFixturePath`.** A repository-relative
+path is a fixture path when one of its folder segments is exactly
+`testdata` at any depth, or when it starts with `src/tests/fixtures/`.
+The function lives in `src/fixtures/fixture-path.ts`. A path is relative
+to the repository root, with `/` between segments. A file named `testdata`
+is not a fixture path by name alone; only folders segment a path. This
+replaces nothing.

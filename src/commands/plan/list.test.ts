@@ -7,7 +7,7 @@
  *
  * The plans are planted twice over: under the `.rafa/plans` default, and
  * under the `docs/plans` a config names on purpose, which is the
- * exemption `default-plan-dirs.test.ts` carves out for a test. The
+ * exemption `default-plan-dirs.sweep.test.ts` carves out for a test. The
  * configured case is what tells reading `plan.dir` apart from reading a
  * constant: the default directory holds nothing there.
  *

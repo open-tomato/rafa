@@ -1,6 +1,6 @@
 /**
- * Tests for the `tests` section: `tests.fullSuiteTriggers` and
- * `tests.integration`.
+ * Tests for the `tests` section: `tests.fullSuiteTriggers`,
+ * `tests.integration` and `tests.alwaysRun`.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
  * is proved is the reader the schema wires to the key, not a reader of
@@ -11,6 +11,8 @@
  * agreeing with itself.
  */
 import type { ConfigSetting } from './config-schema.js';
+
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -26,11 +28,14 @@ import {
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';
 
+/** The repository root, which the glob scans below run from. */
+const ROOT = join(import.meta.dir, '..');
+
 /** What a refused entry is expected to be. */
 const EXPECTED_GLOB = 'expected a glob pattern relative to the repository root';
 
-/** The two settings, their file keys and their defaults, in schema order. */
-const TWO: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
+/** The three settings, their file keys and their defaults, in schema order. */
+const THREE: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
   [
     'testsFullSuiteTriggers',
     'tests.fullSuiteTriggers',
@@ -46,6 +51,7 @@ const TWO: readonly (readonly [ConfigSetting, string, readonly string[]])[] = [
       '**/*-cli.test.ts',
     ],
   ],
+  ['testsAlwaysRun', 'tests.alwaysRun', ['src/**/*.sweep.test.ts']],
 ];
 
 /** Reads `raw` through the spec `SETTINGS` holds for `setting`. */
@@ -65,23 +71,24 @@ function refusal(run: () => unknown): ConfigError {
   throw new Error('expected a ConfigError, and nothing was thrown');
 }
 
-describe('the two keys', () => {
-  it.each(TWO)('spells %s as %s, file-only, read through globList', (setting, key) => {
+describe('the three keys', () => {
+  it.each(THREE)('spells %s as %s, file-only, read through globList', (setting, key) => {
     expect(SETTINGS[setting].key).toBe(key);
     expect(SETTINGS[setting].cli).toBe(false);
     expect(SETTINGS[setting].read).toBe(globList);
   });
 
-  it.each(TWO)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
+  it.each(THREE)('resolves %s (%s) to its default when no layer names it', (setting, _key, value) => {
     expect(CONFIG_DEFAULTS[setting]).toEqual(value);
     expect(resolveConfig().config[setting]).toEqual(value);
     expect(resolveConfig().sources[setting]).toBe('default');
   });
 
-  it('keeps both defaults in the section object, frozen, each list too', () => {
+  it('keeps every default in the section object, frozen, each list too', () => {
     expect(Object.isFrozen(TESTS_DEFAULTS)).toBe(true);
     expect(Object.isFrozen(TESTS_DEFAULTS.testsFullSuiteTriggers)).toBe(true);
     expect(Object.isFrozen(TESTS_DEFAULTS.testsIntegration)).toBe(true);
+    expect(Object.isFrozen(TESTS_DEFAULTS.testsAlwaysRun)).toBe(true);
   });
 
   it('names no preload file in the trigger default, which is read off bunfig.toml at run time', () => {
@@ -89,7 +96,7 @@ describe('the two keys', () => {
   });
 });
 
-describe.each(TWO)('%s', (setting, key) => {
+describe.each(THREE)('%s', (setting, key) => {
   it('accepts a list of relative globs, frozen, in the order written', () => {
     const reading = readAs(setting, ['src/**/*.ts', 'bunfig.toml']);
 
@@ -125,17 +132,57 @@ describe.each(TWO)('%s', (setting, key) => {
   });
 });
 
+describe('tests.alwaysRun', () => {
+  it('accepts a glob that matches no file, since the sweeps it names may not exist yet', () => {
+    const glob = 'src/no-such-folder/**/*.sweep.test.ts';
+
+    expect(Array.from(new Bun.Glob(glob).scanSync({ cwd: ROOT }))).toEqual([]);
+    expect(readAs('testsAlwaysRun', [glob])).toEqual({ value: [glob], problems: [], extras: [] });
+  });
+
+  it('finds this file through the same scan, so the empty scan above could fail', () => {
+    const scan = Array.from(new Bun.Glob('src/config-schema-tests.test.ts').scanSync({ cwd: ROOT }));
+
+    expect(scan).toEqual(['src/config-schema-tests.test.ts']);
+  });
+
+  it('matches a sweep\'s name with its default glob, and a plain test\'s not', () => {
+    const glob = new Bun.Glob('src/**/*.sweep.test.ts');
+
+    expect(glob.match('src/tests/sweep-suffix.sweep.test.ts')).toBe(true);
+    expect(glob.match('src/config-schema-tests.test.ts')).toBe(false);
+  });
+
+  it('keeps a file\'s [] as empty, outranking the default', () => {
+    const resolved = resolveConfig({ file: parseConfigText('tests:\n  alwaysRun: []\n', PATH) });
+
+    expect(resolved.config.testsAlwaysRun).toEqual([]);
+    expect(resolved.sources.testsAlwaysRun).toBe('file');
+  });
+
+  it('refuses an absolute pattern in a file, naming the file and the entry', () => {
+    const error = refusal(() => parseConfigText('tests:\n  alwaysRun: ["/src/**/*.sweep.test.ts"]\n', PATH));
+
+    expect(error.problems).toEqual([`${PATH}: tests.alwaysRun[0] is "/src/**/*.sweep.test.ts", ${EXPECTED_GLOB}`]);
+  });
+});
+
 describe('the tests section through a file', () => {
-  it('resolves both keys from the file, outranking the defaults', () => {
+  it('resolves every key from the file, outranking the defaults', () => {
     const file = parseConfigText(
-      'tests:\n  fullSuiteTriggers: ["*.toml", test/setup.ts]\n  integration: []\n',
+      'tests:\n  fullSuiteTriggers: ["*.toml", test/setup.ts]\n  integration: []\n  alwaysRun: ["e2e/*.sweep.ts"]\n',
       PATH,
     );
     const resolved = resolveConfig({ file });
 
     expect(resolved.config.testsFullSuiteTriggers).toEqual(['*.toml', 'test/setup.ts']);
     expect(resolved.config.testsIntegration).toEqual([]);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration]).toEqual(['file', 'file']);
+    expect(resolved.config.testsAlwaysRun).toEqual(['e2e/*.sweep.ts']);
+    expect([
+      resolved.sources.testsFullSuiteTriggers,
+      resolved.sources.testsIntegration,
+      resolved.sources.testsAlwaysRun,
+    ]).toEqual(['file', 'file', 'file']);
   });
 
   it('refuses a file carrying an absolute pattern, naming the file and the entry', () => {
@@ -144,8 +191,8 @@ describe('the tests section through a file', () => {
     expect(error.problems).toEqual([`${PATH}: tests.integration[0] is "/e2e/*.test.ts", ${EXPECTED_GLOB}`]);
   });
 
-  it('warns of no unknown key for either, so both sit in the known-key index', () => {
-    const file = parseConfigText('tests:\n  fullSuiteTriggers: []\n  integration: []\n', PATH);
+  it('warns of no unknown key for any of them, so all three sit in the known-key index', () => {
+    const file = parseConfigText('tests:\n  fullSuiteTriggers: []\n  integration: []\n  alwaysRun: []\n', PATH);
 
     expect(file.extras).toEqual([]);
     expect(resolveConfig({ file }).warnings).toEqual([]);

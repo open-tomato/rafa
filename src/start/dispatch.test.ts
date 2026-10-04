@@ -30,9 +30,11 @@
  *
  * Also for the task's base commit reaching the prompt: `buildTaskPrompt`
  * placing the line naming `bun test --changed=<base>` after the blocker
- * line and ahead of the sections, no line for a null base, and a base
- * that is not a commit name refused; and `dispatchTask` handing the
- * runner the prompt its `base` option put that line in.
+ * line and ahead of the sections, and no line for a null base; and
+ * `dispatchTask` handing the
+ * runner the prompt its `base` option put that line in. The line's own
+ * shape, an abbreviated base and a refused one, are driven in
+ * `task-gate-lines.test.ts`.
  *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
@@ -65,13 +67,13 @@ import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 
 import {
-  BASE_PROMPT_PREFIX,
   buildTaskPrompt,
   dispatchTask,
   NO_TASK_SECTIONS,
   renderProgressForDispatch,
   storeTaskReport,
 } from './dispatch.js';
+import { alwaysRunLines, BASE_PROMPT_PREFIX } from './task-gate-lines.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -1046,16 +1048,6 @@ describe('buildTaskPrompt and dispatchTask, handing the task its base commit', (
     expect(lines[5]).toBe('## Skills for this task');
   });
 
-  it('takes an abbreviated commit name', () => {
-    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, 'a5a383a')).toContain('--changed=a5a383a`');
-  });
-
-  it('refuses a base that is not a commit name, which the line would paste into a shell command', () => {
-    for (const base of ['', 'HEAD', 'origin/main', 'a5a383a; rm -rf .', 'A5A383A']) {
-      expect(() => buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, base)).toThrow('is not a commit name');
-    }
-  });
-
   it('hands the runner a prompt naming the base its dispatch was given', async () => {
     const root = freshRoot();
     const prompts: string[] = [];
@@ -1086,6 +1078,60 @@ describe('buildTaskPrompt and dispatchTask, handing the task its base commit', (
     expect(based.prompt).toBe(prompts[0] ?? '');
     expect(based.prompt).toContain(`\`bun test --changed=${BASE}\``);
     expect(unbased.prompt).not.toContain('--changed=');
+  });
+});
+
+describe('buildTaskPrompt and dispatchTask, naming the tests.alwaysRun files', () => {
+  const TASK = 'Make the widget round';
+  const PROMPT_MD = '# PROMPT.md\nDo the task.';
+  const PLAN = '# Plan\n- [ ] Make the widget round';
+  const BASE = 'a5a383a0c3f1e2d4b6a798011223344556677889';
+  const SWEEP = 'src/tests/repo-hygiene.sweep.test.ts';
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('places the always-run line right after the --changed line and ahead of the blank line', () => {
+    const lines = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP]).split('\n');
+
+    expect(lines[2]).toContain(`\`bun test --changed=${BASE}\``);
+    expect(lines[3]).toBe(alwaysRunLines([SWEEP])[0] ?? 'no line');
+    expect(lines[3]).toContain(`\`bun test ./${SWEEP}\``);
+    expect(lines[4]).toBe('');
+  });
+
+  it('holds the prompt unchanged for no file, against a file that changes it', () => {
+    const before = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE);
+
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [])).toBe(before);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP])).not.toBe(before);
+  });
+
+  it('hands the runner a prompt naming the files its dispatch was given', async () => {
+    const root = freshRoot();
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (alwaysRun?: readonly string[]): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      base: BASE,
+      ...(alwaysRun === undefined
+        ? {}
+        : { alwaysRun }),
+      run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
+      newSessionId: () => 'session-under-test',
+    });
+
+    expect((await dispatchWith([SWEEP])).prompt).toContain(`\`bun test ./${SWEEP}\``);
+    expect((await dispatchWith()).prompt).not.toContain('tests.alwaysRun');
   });
 });
 

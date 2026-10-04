@@ -80,7 +80,7 @@ derive which one you have rather than assuming it:
 - Every `context/` pointer in a map stays a PLAIN backticked path. The
   `@` import form is reserved for `CLAUDE.md` itself; an `@`-prefixed
   pointer pulls that page into every turn and undoes the whole saving of
-  the split. `src/tests/context-page-imports.test.ts` reads the live
+  the split. `src/tests/context-page-imports.sweep.test.ts` reads the live
   maps and is the guard.
 - The root `AGENTS.md` map is capped at 80 lines and nothing enforces
   the cap, so count before you finish. A promoted finding goes to the

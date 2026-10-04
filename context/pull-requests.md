@@ -382,7 +382,7 @@ rejected.
   wrap-up prompt's own, from one source (`src/pr/conflict-sentence.ts`),
   which is why THREE suites read `buildWrapUpPrompt` and a bullet moved in
   it can redden any of them: `src/start/wrap-up.test.ts`,
-  `src/pr/conflict-sentence.test.ts` and `src/tests/plan-injection.test.ts`,
+  `src/pr/conflict-sentence.sweep.test.ts` and `src/tests/plan-injection.test.ts`,
   the last because the prompt's FIRST line is the `wrap-up` classifier key
   `PROMPT_SHAPES` reads. Run the three together before the full suite.
 - Then the existing CI wait. A fresh assessment of class `green` OR

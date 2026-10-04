@@ -602,6 +602,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:✅ Task done: ${TASK}`,
       expect.stringMatching(COMMITTED_LINE),
       expect.stringMatching(NO_REPORT_WARNING),
+      expect.stringMatching(/^info:🧹 lint step after .+: no eslint\.config file at the checkout root; nothing to lint\.$/),
       expect.stringMatching(/^info:🧪 task step after .+ exited 1; no summary line$/),
       expect.stringMatching(/^info:🧪 pre-wrap-up step: .+ exited 1; no summary line$/),
       'info:\n✅ All tasks completed!',

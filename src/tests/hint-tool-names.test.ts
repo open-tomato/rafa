@@ -28,7 +28,7 @@
  * naming `bun` where a real proposal never does. The sweep is run twice:
  * once over the real lines alone, which must come back empty, and once
  * with {@link PLANTED} added, which must come back naming it — proving
- * the check is not vacuous, the way `user-facing-spelling.test.ts`
+ * the check is not vacuous, the way `user-facing-spelling.sweep.test.ts`
  * plants its own hit for the same reason.
  */
 import type { FollowUpReading } from '../commands/pr/merge-followups.js';

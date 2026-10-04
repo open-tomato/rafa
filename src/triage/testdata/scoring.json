@@ -5492,7 +5492,7 @@
     },
     {
       "issue": 400,
-      "cause": 400,
+      "cause": 344,
       "what": "context/verification.md says three skills-tier cases fail inside a git worktree of this repository. They passed in the rafa-370 worktree and failed only in a detached worktree under /var/folders, so the page's claim is not general.",
       "artifact": "this repository skills tier, checked with the PATH a CI runner provides > exits 0 with no --fix",
       "plan": "rafa-370-run-loop-own-worktree"
@@ -5924,7 +5924,7 @@
     },
     {
       "issue": 438,
-      "cause": 438,
+      "cause": 351,
       "what": "context/workflow.md's 'The next workflow' paragraph lists eight action ids (sync, plan, ready, start, commit, next-base, review, resume) and says only sync and plan run unasked; neither matches YES_ACTIONS or BARE_YES_ACTIONS, and this was already wrong before this change",
       "artifact": "The eight\naction ids are `sync`, `plan`, `ready`, `start`, `commit`, `next-base`,",
       "plan": "rafa-367-releases-settle-base-branch"
@@ -6410,7 +6410,7 @@
       "issue": 487,
       "cause": 334,
       "what": "`src/tests/next-roadmap-status-waiting-cli.test.ts`'s `plantWorld` fixture relies on the ambient global git identity (no explicit `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`user.name`/`user.email` set), so it fails with 'Author identity unknown' on a machine with no global git config — reproduced independent of this task's change",
-      "artifact": "fatal: unable to auto-detect email address (got 'markos@thor-x.(none)')",
+      "artifact": "fatal: unable to auto-detect email address (got 'markos@[redacted: HOST].(none)')",
       "plan": "rafa-324-claim-issue-so-two"
     },
     {
@@ -6995,7 +6995,7 @@
     },
     {
       "issue": 543,
-      "cause": 543,
+      "cause": 506,
       "what": "rafa epic show, epics, epic close and epic cancel never receive the configured relations in production (seams only), so they always run in labels mode",
       "artifact": "export default createEpicShowCommand();",
       "plan": "rafa-340-relationships-epics-blockers-github"
@@ -7676,7 +7676,7 @@
     },
     {
       "issue": 660,
-      "cause": 660,
+      "cause": 334,
       "what": "worktree-start-integration and checkout-guard-worktree-branch-switch-integration timed out (45s and 90s) during the changed-tests run, possibly from two suite runs overlapping; not re-run in isolation",
       "artifact": "(fail) the loop guard leaving the main checkout's own branch switches alone during a real --as-worktree run",
       "plan": "rafa-486-stop-refiling"
@@ -7706,9 +7706,9 @@
     },
     {
       "issue": 662,
-      "cause": 662,
+      "cause": 334,
       "what": "src/start/checkout-guard-worktree-branch-switch-integration.test.ts times out at 90s at base after a git rev-list fails",
-      "artifact": "Command failed: git -c user.email=loop@example.test -c user.name=Rafa Loop -c commit.gpgsign=false rev-list --count HEAD",
+      "artifact": "Command failed: git -c user.email=[redacted: EMAIL] -c user.name=Rafa Loop -c commit.gpgsign=false rev-list --count HEAD",
       "plan": "rafa-486-stop-refiling"
     },
     {

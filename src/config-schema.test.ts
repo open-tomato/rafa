@@ -95,6 +95,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['taskLessons', 'task.lessons'],
   ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
   ['testsIntegration', 'tests.integration'],
+  ['testsAlwaysRun', 'tests.alwaysRun'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */

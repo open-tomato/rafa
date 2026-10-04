@@ -24,7 +24,7 @@
  * `merge-scenarios.test.ts` runs the #322 scenarios through; it is not
  * imported from there because a `.test.ts` file plants SQL text and
  * `Database` opens on purpose and is not a production source
- * (`store-sources.test.ts`), so nothing outside a test file may import
+ * (`store-sources.sweep.test.ts`), so nothing outside a test file may import
  * from one.
  */
 import type { RuntimeIdentity } from '../../runtime/identity.js';

@@ -214,7 +214,7 @@ describe('the double against the declaration in src/pr/types.ts', () => {
   /**
    * The function-typed members the `PullRequests` interface declares in
    * `source`, in declaration order. Reads the AST the way
-   * `src/tests/user-facing-spelling.test.ts` reads source, rather than
+   * `src/tests/user-facing-spelling.sweep.test.ts` reads source, rather than
    * `Object.keys` on a value, so a member `pull-requests-double.ts` never
    * bound is missed by nothing here: `membersOf` above reads the double
    * itself, which cannot see a member it never grew.

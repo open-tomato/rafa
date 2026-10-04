@@ -688,7 +688,7 @@ against NULL there, and records the incoming row as JSON, both rows
 kept, when two filled values differ (`field` names the column) or the
 rows differ outside every edited field (`field` NULL). Each set-once
 field has its literal `UPDATE` in `SET_ONCE_FILLS`, so
-`merge-rules.test.ts` can read it. `commits.row_json` is edited under
+`merge-rules.sweep.test.ts` can read it. `commits.row_json` is edited under
 the rule `recomputed`: two rows of one commit that differ only in its
 `minutesSincePrevious` are skipped, the gap here kept, through the
 field's entry in `RECOMPUTED_COMPARISONS`. `recomputeCommitGaps`
@@ -778,7 +778,7 @@ commit:**
   changes after the insert, each with its rule; a merged table also
   carries `origin_store` and `origin_seq` with its partial unique index
   `<table>_by_origin`, and joins `ORIGIN_TABLES` (`store/origins.ts`)
-  with its inserts stamped. `merge-rules.test.ts` builds a store
+  with its inserts stamped. `merge-rules.sweep.test.ts` builds a store
   through every migration and fails on a table with no entry, an entry
   with no table, a merged table without both origin columns and that
   index, and an `UPDATE <table> SET <column>` in a production module

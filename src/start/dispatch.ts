@@ -29,11 +29,14 @@
  * session the text the task was blocked on. The line after that (or
  * after the second, with no blocker), when the loop names the task's base
  * commit, hands the session that commit as the `bun test --changed=<base>`
- * it runs for its scoped test gate. Its last lines, ahead of the
+ * it runs for its scoped test gate. The line after the base line, when
+ * the run's `tests.alwaysRun` resolved to any tracked file, tells the
+ * session to also run `bun test` over those files (`task-gate-lines.ts`).
+ * Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
- * when there are any. Between the base line (or the blocker line, or the
- * second line, with neither) and `PROMPT.md` go the task's `## Skills for this task` and
+ * when there are any. Between the always-run line (or the base line, or
+ * the blocker line, or the second line, with none of them) and `PROMPT.md` go the task's `## Skills for this task` and
  * `## Lessons from earlier tasks` sections (`task/sections.ts`), each
  * followed by a blank line, in that order, and each absent when it
  * rendered empty; with both absent the prompt is the one built before
@@ -107,6 +110,7 @@ import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
 import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
+import { alwaysRunLines, baseLines } from './task-gate-lines.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
 export const SESSION_ID_FLAG = '--session-id';
@@ -224,6 +228,13 @@ export interface TaskDispatchOptions {
    */
   inherited?: readonly SuiteFailure[];
   /**
+   * The tracked files the run's `tests.alwaysRun` resolved to
+   * (`readAlwaysRunFiles`, `task-gate-lines.ts`), which the prompt tells
+   * the session to run beside its scoped tests. None when left out, which
+   * leaves the prompt as it was.
+   */
+  alwaysRun?: readonly string[];
+  /**
    * What the session is served against (`start/serving.ts`): the run's
    * served directory is filled before the session spawns, and its flags
    * reach the spawn. Null serves nothing, which a test driving the
@@ -309,29 +320,6 @@ function blockerLines(blocker: string | null): string[] {
 }
 
 /**
- * What opens the prompt line handing a session its task's base commit.
- * The loop's words open it, as they open the blocker line.
- */
-export const BASE_PROMPT_PREFIX = 'The base commit of this task is ';
-
-/** A full or abbreviated git object name, the only shape a base may take. */
-const COMMIT_NAME = /^[0-9a-f]{7,64}$/;
-
-/**
- * The prompt line naming `base` and the `bun test --changed=<base>` the
- * session runs, or none for no base. Throws on a base that is not a
- * commit name: it is pasted into a shell command the session runs, and
- * the loop only ever hands it the HEAD git answered.
- */
-function baseLines(base: string | null): string[] {
-  if (base === null) return [];
-  if (!COMMIT_NAME.test(base)) {
-    throw new Error(`The task's base \`${base}\` is not a commit name; the prompt pastes it into \`bun test --changed=\`.`);
-  }
-  return [`${BASE_PROMPT_PREFIX}${base}: run \`bun test --changed=${base}\` for the tests your changes reach.`];
-}
-
-/**
  * The rendered sections a task is handed ahead of `PROMPT.md`: what
  * `renderSkillsSection` and `renderLessonsSection` (`task/sections.ts`)
  * answered for it. A blank section is absent from the prompt.
@@ -393,16 +381,23 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  * is the one built before blockers were carried.
  *
  * `base` is the task's base commit, {@link TaskDispatchOptions.base}.
- * With one, a line opening {@link BASE_PROMPT_PREFIX} follows the blocker
- * line (or the second line, with no blocker), naming the commit and the
- * `bun test --changed=<base>` the session's scoped test gate is. A base
+ * With one, a line opening `BASE_PROMPT_PREFIX` (`task-gate-lines.ts`)
+ * follows the blocker line (or the second line, with no blocker), naming
+ * the commit and the `bun test --changed=<base>` the session's scoped
+ * test gate is. A base
  * that is not a commit name throws: the line puts it in a shell command.
  * With none, the default, the prompt is the one built before bases were
  * carried.
  *
+ * `alwaysRun` is the resolved `tests.alwaysRun` files. With any, the
+ * line `alwaysRunLines` (`task-gate-lines.ts`) answers follows the base
+ * line, or the line the base line would follow when there is no base,
+ * telling the session to run them with `bun test`. With none, the
+ * default, the prompt is the one built before the setting existed.
+ *
  * `sections` is the task's rendered skills and lessons sections. Each
  * non-blank one goes after the blank line that closes the head (the
- * base line, the blocker line, or the second line without either) and before
+ * always-run line, the base line, the blocker line, or the second line without any) and before
  * `promptContent`, skills first, each followed by a blank line of its
  * own, so the head keeps its lines and the scoped-task line stays
  * first. A section is placed as it was rendered: which resolver chose
@@ -424,12 +419,14 @@ export function buildTaskPrompt(
   sections: TaskPromptSections = NO_TASK_SECTIONS,
   base: string | null = null,
   inherited: readonly SuiteFailure[] = [],
+  alwaysRun: readonly string[] = [],
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
     'Consider tasks listed above this one in the plan checklist as completed. Do not re-evaluate or re-do them. Focus only on the scoped task.',
     ...blockerLines(blocker),
     ...baseLines(base),
+    ...alwaysRunLines(alwaysRun),
     '',
     ...sectionLines({ ...sections, inherited: renderInheritedSection(inherited) }),
     promptContent,
@@ -557,6 +554,7 @@ export async function dispatchTask(
     { skills: renderSkillsSection(handed.skills), lessons: renderLessonsSection(handed.lessons) },
     options.base,
     options.inherited,
+    options.alwaysRun,
   ));
 
   const served = serveForSession(options.serving, resolution);

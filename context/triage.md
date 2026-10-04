@@ -115,10 +115,12 @@ its place: a security bug is commented on as found without a state read.
 Two keys in `.rafa/config.yaml` tune the nearest-open-bug step:
 
 - `triage.similarity.threshold`: `false` to turn the step off, or a number
-  from 0 to 1 naming the minimum score. Default is `0.3`, which on 667
-  filings gave 81% of repeats right and 6% of new causes wrong; `0.2` gave
-  87% and 9%. Lower matches more repeats and puts more new causes on the
-  wrong issue.
+  from 0 to 1 naming the minimum score. Default is `0.3`, which on the
+  1,013 filings of `src/triage/testdata/scoring.json` gave 84% of repeats
+  right (696 of 827) and 3% of new causes wrong (6 of 186); `0.2` gave 86%
+  and 20%. `src/triage/similarity-scoring.test.ts` holds the default to at
+  least 84% and at most 4%. Lower matches more repeats and puts more new
+  causes on the wrong issue.
 
 - `triage.similarity.candidates`: the count of nearest bugs listed in the
   `Possible duplicates` section when the step files a bug with no match at

@@ -38,11 +38,11 @@ import { nearestOpenBugs } from './similarity.js';
 /** The default of `triage.similarity.threshold`. */
 const THRESHOLD = 0.3;
 
-/** The share of repeats that must reach the issue owning their cause. */
-const MIN_REPEATS_RIGHT = 0.81;
+/** The share of repeats that must reach the issue owning their cause; measured 696 of 827, 84.2%. */
+const MIN_REPEATS_RIGHT = 0.84;
 
-/** The share of new causes that may land on an issue of another cause. */
-const MAX_NEW_CAUSES_WRONG = 0.06;
+/** The share of new causes that may land on an issue of another cause; measured 6 of 186, 3.2%. */
+const MAX_NEW_CAUSES_WRONG = 0.04;
 
 /** A threshold no score is under, which turns step 2 off. */
 const STEP_TWO_OFF = Number.POSITIVE_INFINITY;
@@ -143,12 +143,12 @@ describe('the scoring fixture', () => {
 describe('the nearest open bug at the default threshold', () => {
   const score = replay(fixture.filings, THRESHOLD);
 
-  it('reaches the issue owning the cause for at least 81% of repeats', () => {
+  it('reaches the issue owning the cause for at least 84% of repeats', () => {
     expect(score.repeats).toBeGreaterThan(0);
     expect(shareOf(score.repeatsRight, score.repeats)).toBeGreaterThanOrEqual(MIN_REPEATS_RIGHT);
   });
 
-  it('lands at most 6% of new causes on an issue of another cause', () => {
+  it('lands at most 4% of new causes on an issue of another cause', () => {
     expect(score.newCauses).toBeGreaterThan(0);
     expect(shareOf(score.newCausesWrong, score.newCauses)).toBeLessThanOrEqual(MAX_NEW_CAUSES_WRONG);
   });
