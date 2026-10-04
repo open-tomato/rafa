@@ -47,7 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeTrackingGitignore } from '../project/gitignore.js';
 import { positionAt, readPositionFile, writePositionFile } from '../project/position.js';
-import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from './hop-record.js';
@@ -273,7 +273,7 @@ describe('a hop record against a position a plain rafa switch rewrites', () => {
     });
 
     const moved = runRafa(scratch, scratch.repo, ['switch', String(BOARD)]);
-    expect(moved.exitCode).toBe(0);
+    expectExit(moved, 0, scratch);
 
     const position = readPositionFile(scratch.repo);
     expect(position.set).toBe(true);

@@ -34,7 +34,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -125,7 +125,7 @@ describe('rafa plan create spawned from a linked worktree', () => {
 
     const run = runRafa(scratch, beside, ['plan', 'create', '--spec=spec.md', '--stub=beside-probe', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('✅ Plan ready: .rafa/plans/PLAN-beside-probe.md');
     expect(existsSync(planPathUnder(scratch.repo, 'beside-probe'))).toBe(true);
     expect(existsSync(planPathUnder(beside, 'beside-probe'))).toBe(false);
@@ -137,7 +137,7 @@ describe('rafa plan create spawned from a linked worktree', () => {
 
     const run = runRafa(scratch, nested, ['plan', 'create', '--spec=spec.md', '--stub=nested-probe', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('✅ Plan ready: .rafa/plans/PLAN-nested-probe.md');
     expect(existsSync(planPathUnder(scratch.repo, 'nested-probe'))).toBe(true);
     // The nested worktree gets no second `.rafa/plans` of its own: the

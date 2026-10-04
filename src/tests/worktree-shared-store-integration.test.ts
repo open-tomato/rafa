@@ -43,7 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
@@ -317,7 +317,7 @@ describe('two rafa loop start --as-worktree runs, spawned at once over one proje
       // `rafa effort report` reads the same store through its own
       // dispatcher path, and its task-report tallies list both stubs.
       const reportRun = runRafa(scratch, scratch.repo, ['effort', 'report', '--output=json']);
-      expect(reportRun.exitCode).toBe(0);
+      expectExit(reportRun, 0, scratch);
       const answer = resultEvent(reportRun.stdout);
       expect(answer.ok).toBe(true);
       const report = answer.data as EffortReport;

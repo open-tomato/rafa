@@ -19,6 +19,8 @@
  * The planner fixture appends a line to a log on every session, so "no
  * session was spent" is read off a file, not a claim.
  */
+import type { CapturedRun } from './cli-capture.js';
+
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
@@ -36,7 +38,7 @@ import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ACCEPT_REFS_FLAG, acceptStaleRefsPassLine } from '../board/refs-gate.js';
 import { readRefsBlock } from '../refs/stamp.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
@@ -221,9 +223,8 @@ function namedIssue(design: string, state: 'OPEN' | 'CLOSED' = 'OPEN'): BoardIss
   return { number: NAMED_ISSUE, title: 'Named', body: `## Design\n\n${design}\n\n## Notes\n\nSame.\n`, state };
 }
 
-/** What one `plan create` run did. */
-interface Run {
-  readonly exitCode: number;
+/** What one `plan create` run did, with its two streams also read as one. */
+interface Run extends CapturedRun {
   readonly output: string;
 }
 
@@ -233,7 +234,9 @@ function runPlan(scratch: Scratch, ...extra: readonly string[]): Run {
     [process.execPath, scratch.probe, scratch.sessions, `--issue=${String(SPEC_ISSUE)}`, '--no-progress', ...extra],
     { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' } },
   );
-  return { exitCode: proc.exitCode, output: `${proc.stdout.toString()}\n${proc.stderr.toString()}` };
+  const stdout = proc.stdout.toString();
+  const stderr = proc.stderr.toString();
+  return { exitCode: proc.exitCode, stdout, stderr, output: `${stdout}\n${stderr}` };
 }
 
 /** How many planner sessions the scratch has spent. */
@@ -268,7 +271,7 @@ describe('check 4 through plan create --issue', () => {
 
     const run = runPlan(scratch);
 
-    expect(run.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expectExit(run, BOARD_REFUSAL_EXIT, { ...scratch });
     expect(run.output).toContain('dangling src/a.ts (line 12)');
     expect(run.output).toContain(ACCEPT_REFS_FLAG);
     expect(sessionsSpent(scratch)).toBe(0);
@@ -281,7 +284,7 @@ describe('check 4 through plan create --issue', () => {
       const scratch = plantScratch(config);
       writeGh(scratch.bin, [specIssue('It follows #7 for context.'), namedIssue('One.')]);
       const first = runPlan(scratch);
-      expect(first.exitCode).toBe(0);
+      expectExit(first, 0, { ...scratch });
       expect(sessionsSpent(scratch)).toBe(1);
       clearPlans(scratch);
       writeGh(scratch.bin, [specIssue('It follows #7 for context.'), namedIssue('Two.')]);
@@ -293,7 +296,7 @@ describe('check 4 through plan create --issue', () => {
 
       const run = runPlan(scratch);
 
-      expect(run.exitCode).toBe(BOARD_REFUSAL_EXIT);
+      expectExit(run, BOARD_REFUSAL_EXIT, { ...scratch });
       expect(run.output).toContain('suspect #7: heading "Design" changed');
       expect(sessionsSpent(scratch)).toBe(1);
       expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
@@ -305,7 +308,7 @@ describe('check 4 through plan create --issue', () => {
 
       const run = runPlan(scratch, ACCEPT_REFS_FLAG);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, { ...scratch });
       expect(sessionsSpent(scratch)).toBe(2);
       const stamped = readRefsBlock(copyOf(scratch)).stamps;
       expect(stamped).not.toEqual(stale);
@@ -314,7 +317,7 @@ describe('check 4 through plan create --issue', () => {
       // The stamps now describe the edited issue: the same board reads clean without the flag.
       clearPlans(scratch);
       const again = runPlan(scratch);
-      expect(again.exitCode).toBe(0);
+      expectExit(again, 0, { ...scratch });
       expect(again.output).not.toContain('suspect');
     });
 
@@ -323,7 +326,7 @@ describe('check 4 through plan create --issue', () => {
 
       const run = runPlan(scratch);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, { ...scratch });
       expect(run.output).toContain(acceptStaleRefsPassLine());
       expect(sessionsSpent(scratch)).toBe(2);
     });
@@ -332,13 +335,13 @@ describe('check 4 through plan create --issue', () => {
   it('prints `resolved #7 — rafa issue unblock 20` for a blocker closed since the stamp, and plans', () => {
     const scratch = plantScratch();
     writeGh(scratch.bin, [specIssue('Blocked by: #7'), namedIssue('One.')]);
-    expect(runPlan(scratch).exitCode).toBe(0);
+    expectExit(runPlan(scratch), 0, { ...scratch });
     clearPlans(scratch);
     writeGh(scratch.bin, [specIssue('Blocked by: #7'), namedIssue('One.', 'CLOSED')]);
 
     const run = runPlan(scratch);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.output).toContain(`resolved #7 — rafa issue unblock ${String(SPEC_ISSUE)}`);
     expect(sessionsSpent(scratch)).toBe(2);
   });
