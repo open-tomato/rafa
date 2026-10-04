@@ -59,6 +59,7 @@ import {
   blockerComment,
   escapeBlockerText,
   findNextTask,
+  insertTrackerTask,
   splitBlockerComment,
   unescapeBlockerText,
   updateTrackerLine,
@@ -329,6 +330,140 @@ describe('writeTrackerBlocker and findNextTask', () => {
     expect(modelled?.declaration?.raw).toBe(DECLARATION);
     expect(modelled?.status).toBe('blocked');
     expect(parsePlan(content).issues).toEqual(parsePlan(TRACKER).issues);
+  });
+});
+
+describe('insertTrackerTask', () => {
+  /** The repair task's sentence. */
+  const REPAIR_TEXT = 'Repair the suite step that went red at abc1234';
+
+  /** The entries its declaration carries. */
+  const REPAIR_ENTRIES = 'agent=build-error-resolver';
+
+  /** The repair line's text as `findNextTask` answers it, block included. */
+  const REPAIR_TASK = `${REPAIR_TEXT}${GAP}{${REPAIR_ENTRIES}}`;
+
+  /** The repair the cases insert, with a plain blocker. */
+  const REPAIR = { task: REPAIR_TEXT, declaration: REPAIR_ENTRIES, blocker: 'src/a.test.ts (2 tests)' };
+
+  /** A tracker whose first open task sits under the second stage heading, a stamp after the list. */
+  const STAGED = [
+    '# Plan: a staged plan',
+    '',
+    '# Stage: One',
+    '',
+    '- [x] Add the store',
+    '',
+    '# Stage: Two',
+    '',
+    '- [ ] Run the collector',
+    '- [ ] Report the rows',
+    '',
+    '## Notes',
+    '',
+    '<!-- ralph:plan=throwaway -->',
+    '',
+  ].join('\n');
+
+  /** Zero-indexed line of the first open task in {@link STAGED}. */
+  const FIRST_OPEN = 8;
+
+  /** Zero-indexed line of the last task in {@link STAGED}. */
+  const LAST_TASK = 9;
+
+  it('inserts the line directly above a task under a later stage heading, in that stage', () => {
+    const path = plant(STAGED);
+
+    const inserted = insertTrackerTask(path, REPAIR, FIRST_OPEN);
+
+    const content = read(path);
+    expect(inserted).toBe(FIRST_OPEN);
+    expect(lineOf(content, inserted))
+      .toBe(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- blocked: src/a.test.ts (2 tests) -->`);
+    expect(lineOf(content, inserted + 1)).toBe('- [ ] Run the collector');
+    expect(content.split('\n')).toHaveLength(STAGED.split('\n').length + 1);
+
+    const plan = parsePlan(content);
+    const repair = plan.tasks.find((task) => task.lineNum === inserted);
+    expect(repair).toMatchObject({ status: 'blocked', text: REPAIR_TEXT, stage: 1 });
+    expect(repair?.declaration?.agent).toBe('build-error-resolver');
+    expect(plan.issues).toEqual([]);
+
+    // Control: the done task above the heading reads as stage One, so the
+    // stage reading could have come out the other way.
+    expect(plan.tasks.find((task) => task.lineNum === 4)?.stage).toBe(0);
+  });
+
+  it('inserts the line after the last task when no line is given, above the prose that follows', () => {
+    const path = plant(STAGED);
+
+    const inserted = insertTrackerTask(path, REPAIR, null);
+
+    const content = read(path);
+    expect(inserted).toBe(LAST_TASK + 1);
+    expect(lineOf(content, LAST_TASK)).toBe('- [ ] Report the rows');
+    expect(lineOf(content, inserted)).toStartWith(`- [BLOCKED] ${REPAIR_TASK}`);
+    expect(content.endsWith('## Notes\n\n<!-- ralph:plan=throwaway -->\n')).toBe(true);
+    expect(parsePlan(content).tasks.at(-1)).toMatchObject({ lineNum: inserted, stage: 1 });
+  });
+
+  it('inserts a line findNextTask then answers first, ahead of the open tasks above it', () => {
+    const path = plant(TRACKER);
+    expect(nextTask(read(path))).toMatchObject({ lineNum: TASK_LINE, status: 'unchecked' });
+
+    const inserted = insertTrackerTask(path, REPAIR, null);
+
+    expect(nextTask(read(path))).toEqual({
+      task: REPAIR_TASK,
+      lineNum: inserted,
+      status: 'blocked',
+      blocker: REPAIR.blocker,
+    });
+  });
+
+  it('writes a blocker holding --> and line breaks inside one closed comment on the one line', () => {
+    const path = plant(STAGED);
+
+    const inserted = insertTrackerTask(path, { ...REPAIR, blocker: HOSTILE }, FIRST_OPEN);
+
+    const content = read(path);
+    expect(content.split('\n')).toHaveLength(STAGED.split('\n').length + 1);
+    expect(content).not.toContain('\n- [ ] Forged');
+    const resumed = nextTask(content);
+    expect(resumed).toEqual({ task: REPAIR_TASK, lineNum: inserted, status: 'blocked', blocker: HOSTILE });
+    expect(parseTaskDeclaration(resumed.task).declaration?.raw).toBe(`{${REPAIR_ENTRIES}}`);
+
+    // Control: the same blocker written raw closes the comment early and
+    // leaves the declaration buried in task text.
+    const raw = nextTask(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- blocked: ${HOSTILE} -->`);
+    expect(raw.blocker).toBeUndefined();
+    expect(parseTaskDeclaration(raw.task).declaration).toBeNull();
+  });
+
+  it('keeps the carriage return of a CRLF tracker on the inserted line', () => {
+    const path = plant(STAGED.replaceAll('\n', '\r\n'));
+
+    const inserted = insertTrackerTask(path, REPAIR, FIRST_OPEN);
+
+    const content = read(path);
+    expect(lineOf(content, inserted).endsWith(' -->\r')).toBe(true);
+    expect(nextTask(content)).toMatchObject({ task: REPAIR_TASK, blocker: REPAIR.blocker });
+  });
+
+  it.each([
+    ['a task text with a line break', { ...REPAIR, task: 'Repair\n- [ ] Forged' }, FIRST_OPEN],
+    ['a blank task text', { ...REPAIR, task: '  ' }, FIRST_OPEN],
+    ['a declaration holding a brace', { ...REPAIR, declaration: 'agent=x} {effort=high' }, FIRST_OPEN],
+    ['a line that is a stage heading', REPAIR, 6],
+    ['a line past the end', REPAIR, 99],
+  ])('throws on %s and leaves the file as it was', (_label, entry, line) => {
+    const path = plant(STAGED);
+
+    expect(() => insertTrackerTask(path, entry, line)).toThrow();
+    expect(read(path)).toBe(STAGED);
+
+    // Control: the valid repair above the same tracker's first open task.
+    expect(insertTrackerTask(plant(STAGED), REPAIR, FIRST_OPEN)).toBe(FIRST_OPEN);
   });
 });
 
