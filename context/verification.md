@@ -58,9 +58,16 @@ never linted.
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope (affected, module, full, or a
-file/folder list it ran on), the command, exit code, Bun's summary line,
-every failing test (file + full test name pairs), and which failures are
-new against the baseline (not present in `baseline`'s captured failures).
+file/folder list it ran on), its reason (`declared` for a task or stage
+step whose session declared `tests=module` or `tests=full`; `trigger` when
+changed files match `tests.fullSuiteTriggers` or `tests.integration` and
+escalate the scope; `fallback` for a stage step with no `Owns:` folder
+running `bun test --changed=<since>`; `no-module-tests` when a task
+names `tests=module` but the module has no test files; `stage` for a
+pre-wrap-up step, which is always full suite), the command, exit code,
+Bun's summary line, every failing test (file + full test name pairs), and
+which failures are new against the baseline (not present in `baseline`'s
+captured failures).
 
 **Declaration key `tests=` on a task line** sets what the task's session
 will run:
@@ -97,7 +104,12 @@ which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
 no open task left, the repair goes after the checklist's last task. A
 red task step after a repair task writes its blocker on that repair's
 line, marking it `[BLOCKED]` again, and inserts no second one
-(`src/start/suite-blocker.ts`).
+(`src/start/suite-blocker.ts`). A red pre-wrap-up step inserts a
+`[BLOCKED]` repair task (kind `pre-wrap-up`) after the checklist's last
+task, and `start.ts` dispatches it in the same run, running the
+pre-wrap-up again after the repair completes; a second red pre-wrap-up,
+finding the ticked pre-wrap-up repair on the tracker, writes its blocker
+on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
