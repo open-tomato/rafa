@@ -29,6 +29,9 @@
  * session's work onto whatever branch the switch left behind — which is
  * what this file spawns the whole command to show.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+import type { Subprocess } from 'bun';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -192,18 +195,30 @@ function plant(): Scratch {
   return scratch;
 }
 
-/** Spawns `rafa loop start` over {@link RUN_FLAGS} in the background, its streams ignored. */
-function spawnLoopStart(scratch: Scratch) {
+/** A background `rafa loop start`: the child, and what it answers once it ends. */
+interface RunningLoop {
+  readonly proc: Subprocess;
+  /** Resolves once the child has ended; exit code null when a signal ended it. */
+  readonly result: Promise<CapturedRun>;
+}
+
+/** Spawns `rafa loop start` over {@link RUN_FLAGS} in the background, collecting its streams. */
+function spawnLoopStart(scratch: Scratch): RunningLoop {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
+  const proc = Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
     env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
-    stdout: 'ignore',
-    stderr: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+  const result = Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+    .then(([stdout, stderr, exitCode]) => ({ exitCode: proc.signalCode === null
+      ? exitCode
+      : null, stdout, stderr }));
+  return { proc, result };
 }
 
 /** Polls `read` every `pollMs` until it answers other than null, or throws past `timeoutMs`. */
@@ -240,7 +255,7 @@ function waitForStopped(repo: string): Promise<true> {
 describe('the loop guard replaying the 2026-09-29 incident in a real run', () => {
   it('halts the first task at its commit when main is switched to mid-task, keeping its edit uncommitted on neither branch', async () => {
     const scratch = plant();
-    const proc = spawnLoopStart(scratch);
+    const { proc, result } = spawnLoopStart(scratch);
     try {
       // The first task dispatches, its stand-in session still draining its
       // prompt and about to sleep; this is the window to switch the
@@ -256,7 +271,7 @@ describe('the loop guard replaying the 2026-09-29 incident in a real run', () =>
       expect(gitOut(scratch.repo, scratch.home, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
 
       await waitForStopped(scratch.repo);
-      expect(await proc.exited).toBe(0);
+      expectExit(await result, 0, { ...scratch });
 
       // The session ran and wrote its edit before reporting done; the
       // guard is what caught the branch moved, ahead of `commitTaskWork`.
