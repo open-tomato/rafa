@@ -9,6 +9,29 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.35.0 — 2026-10-04, Run each stretch on its own operator copy, and lock the stretch 2 kickoff; A store keeps its id through rafa's own rebuilds; Content sweeps and ESLint run at every task's own gate; Remove the Claude usage percent; Bug sweep 4 — store identity under inode reuse, and two macOS spawn causes; Bug sweep 5 — integration-branch cleanup, loop worktrees at merge, restart order, and red steps that name their cause; A rebuild rotates the store's generation
+<!-- rafa:fragments stretch-operator-copies rafa-593-store-keeps-identity-through rafa-683-content-sweeps-lint-run rafa-726-remove-claude-usage-percent rafa-729-bug-sweep-4 rafa-730-bug-sweep-5 rafa-746-rebuild-rotates-store-generation -->
+
+- Stretch: each stretch runs on its own copy of the operators, made once under `.rafa/stretch/<n>/operators/` and loaded with `claude --plugin-dir` as the `rafa-operators` plugin, so nothing is linked into `~/.claude` and a pull or self-update never changes a running stretch. The launcher's `link` command is gone.
+- Stretch: the tmux session is `stretch-<project>-<n>`, reached by its exact name, and Claude sessions are named `<project> stretch <n> <role>`, so two projects' stretches on one machine never share one.
+- Stretch: the engineer writes the next stretch's opening message to `.rafa/stretch/engineer-prompt.md` at the wrap-up, halts before a `rafa self-update` while another project's stretch runs, and no longer runs `rafa usage` or stops on usage.
+- effort store: `rafa effort merge`, `migrate` and `fix-schema` now keep the store's id, so a device still owns its claims after a merge. The backup they leave is a copy written beside the store, which takes a new id if renamed back, and a failed swap leaves the store untouched and names both files.
+- effort store: a copy or `.bak` restored over the store now gets its own origin even when the filesystem reuses the old inode number, because every write rotates a generation kept both in the store (a new nullable `store_meta.generation` column, added by an additive migration) and in an `effort.sqlite.generation` file beside it; existing stores keep their origin on upgrade
+- sync: a store pulled through a strategy that merges keeps its origin after the merge.
+- documentation: the effort-store and effort-merge context pages describe how rafa's own rebuilds carry a store's identity, and why a restored backup mints a new one.
+- Configuration: new `tests.alwaysRun` glob list (default `src/**/*.sweep.test.ts`) names the content sweeps a task's gate runs beside its changed-file tests.
+- Loop: the task prompt tells the session to run the `tests.alwaysRun` files as well, and the runner's task step runs them beside an `affected` or `module` scope, runs ESLint over the task's changed files, and blocks the next task on a new sweep or lint failure; each sweep over 10 seconds is named in one line of the run output.
+- Fixtures: the scoring and merge fixture extracts share one scrub that redacts home paths, email addresses, the host name and named secrets, and refuses to write when one is left; the fixture guard checks every file under a `testdata/` folder and `src/tests/fixtures/`.
+- Triage: the scoring fixture is re-extracted through the scrub, limited to the issues its judgement covers, and the similarity bounds are re-measured at 84% of repeats right and 4% of new causes wrong.
+- Documentation: `context/verification.md` and `context/workflow.md` describe `tests.alwaysRun`, the `.sweep.test.ts` suffix, the ESLint task step and the fixture scrub.
+- cli: The `rafa usage` command is removed; `rafa usage` is now refused as an unknown subject or command.
+- loop: Loops no longer read `CLAUDE_USAGE_PERCENT`, so they no longer warn about Claude usage or pause between tasks when it is high.
+- loop: a red task or stage step inserts one blocked repair task above the next open task, naming the commit it ran at, and a restarted run gives that repair its session before any stage step runs; a red step's blocker names each file that threw outside any test with its first error line, and a step whose only red is extra such errors is retaken once and reported as intermittent when the retake is clean.
+- cleanup: `rafa cleanup` never lists the default branch `origin/HEAD` names, even when `pr.base` names an integration branch, and it now lists the loop's own worktrees under `loop.worktreeDir`, keeping dirty ones and ones a live loop holds.
+- pr: `rafa pr merge` frees a clean, ended loop worktree that holds the head branch, copying its close-out and tracker files into the main checkout first, instead of refusing the merge.
+- lint: the lint step says it could not run ESLint, with the exit code and first stderr line, when ESLint wrote no report, instead of reporting ESLint errors in the diff.
+- store: Every store rebuild (merge, migrate, fix-schema) now rotates the store's generation, so a backup or replaced file renamed back over the store takes a new store id on its first write, even on a filesystem that reuses inode numbers.
+
 ## 0.34.1 — 2026-10-03, rafa update current, and the stretch launcher for any project
 <!-- rafa:fragments rafa-714-update-current -->
 
