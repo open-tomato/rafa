@@ -1,12 +1,14 @@
 /**
  * Cases for the loop's events (`start/loop-events.ts`): each kind's one
  * line, a task text folded onto it, the event written through the active
- * output, where a task sits in its tracker, and a task's tokens read from
- * its session log, or null when the log cannot be read.
+ * output, the line appended to a bound events file in every output mode
+ * and the one warning on a failed append, where a task sits in its
+ * tracker, and a task's tokens read from its session log, or null when the
+ * log cannot be read.
  */
 import type { LoopEvent } from './loop-events.js';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,8 +19,18 @@ import { createEventsOutput } from '../adapters/output/events.js';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { createTextOutput } from '../adapters/output/text.js';
 import { sessionLogDir } from '../effort/collect.js';
+import { runsDir } from '../loop/sessions.js';
 
-import { emitLoopEvent, summaryOf, taskPosition, taskTokens, unlessText } from './loop-events.js';
+import {
+  bindEventsFile,
+  emitLoopEvent,
+  eventsFilePath,
+  summaryOf,
+  taskPosition,
+  taskTokens,
+  unbindEventsFile,
+  unlessText,
+} from './loop-events.js';
 
 /** The third task of nine. */
 const AT = { index: 3, total: 9 };
@@ -36,6 +48,11 @@ const SUMMARIES: readonly (readonly [LoopEvent, string])[] = [
   [
     { kind: 'inherited', file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' },
     'inherited        src/parse/parse.test.ts > parse > drops the last line',
+  ],
+  [{ kind: 'error', message: 'boom' }, 'error            boom'],
+  [
+    { kind: 'error', message: '\n  ❌ Task failed (exit 1). Marked as blocked.\n   Run again to retry.\n' },
+    'error            ❌ Task failed (exit 1). Marked as blocked.',
   ],
 ];
 
@@ -87,6 +104,133 @@ describe('emitLoopEvent', () => {
     expect(chunks.map((chunk) => JSON.parse(chunk) as unknown)).toEqual([
       { type: 'event', name: 'pr', summary: 'pr #612 opened', data: { number: 612 }, ts: '2026-10-01T12:00:00.000Z' },
     ]);
+  });
+});
+
+describe('the events file', () => {
+  const made: string[] = [];
+  const now = () => new Date('2026-10-01T12:00:00.000Z');
+  const SESSION = 'b12d026c-62a4-4bd7-96e7-c11d22909aa9';
+
+  afterEach(() => {
+    unbindEventsFile();
+    setActiveOutput(null);
+    for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** A scratch project root, removed after the case. */
+  function scratchRoot(): string {
+    const root = mkdtempSync(join(tmpdir(), 'rafa-loop-events-file-'));
+    made.push(root);
+    return root;
+  }
+
+  /** The events file's lines, each parsed. */
+  function linesOf(file: string): unknown[] {
+    return readFileSync(file, 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map((line) => JSON.parse(line) as unknown);
+  }
+
+  it('names the file beside the record under .rafa/runs', () => {
+    const root = scratchRoot();
+
+    expect(eventsFilePath(root, SESSION)).toBe(join(runsDir(root), `${SESSION}.events.ndjson`));
+    expect(() => eventsFilePath(root, '../x')).toThrow(/unusable session id/);
+  });
+
+  it('appends one line per event under text, which prints none of them', () => {
+    const root = scratchRoot();
+    const printed: string[] = [];
+    setActiveOutput(createTextOutput({ verbosity: 0, stream: { write: (chunk) => printed.push(chunk) } }), 'text');
+    const file = bindEventsFile(root, SESSION);
+
+    emitLoopEvent({ kind: 'pr', number: 612 }, now);
+    emitLoopEvent({ kind: 'error', message: 'boom\nstack' }, now);
+
+    expect(printed).toEqual([]);
+    expect(linesOf(file)).toEqual([
+      { name: 'pr', summary: 'pr #612 opened', data: { number: 612 }, ts: '2026-10-01T12:00:00.000Z' },
+      { name: 'error', summary: 'error            boom', data: { message: 'boom\nstack' }, ts: '2026-10-01T12:00:00.000Z' },
+    ]);
+  });
+
+  it('appends the same object the events output receives, minus type', () => {
+    const root = scratchRoot();
+    const printed: string[] = [];
+    setActiveOutput(createEventsOutput({ stream: { write: (chunk) => printed.push(chunk) } }), 'events');
+    const file = bindEventsFile(root, SESSION);
+
+    emitLoopEvent({ kind: 'halt', reason: 'checkout moved' }, now);
+
+    expect(printed).toEqual(['rafa· halt             checkout moved\n']);
+    expect(linesOf(file)).toEqual([
+      { name: 'halt', summary: 'halt             checkout moved', data: { reason: 'checkout moved' }, ts: '2026-10-01T12:00:00.000Z' },
+    ]);
+  });
+
+  it('appends nothing once unbound, and nothing before a bind', () => {
+    const root = scratchRoot();
+    setActiveOutput(createTextOutput({ verbosity: 0, stream: { write: () => true } }), 'text');
+    const file = eventsFilePath(root, SESSION);
+
+    emitLoopEvent({ kind: 'pr', number: 1 }, now);
+    expect(existsSync(file)).toBe(false);
+
+    bindEventsFile(root, SESSION);
+    emitLoopEvent({ kind: 'pr', number: 2 }, now);
+    unbindEventsFile();
+    emitLoopEvent({ kind: 'pr', number: 3 }, now);
+
+    expect(linesOf(file)).toEqual([expect.objectContaining({ data: { number: 2 } })]);
+  });
+
+  it('warns once on a failed write, never throws, and still emits every event', () => {
+    const root = scratchRoot();
+    // The runs folder is a file, so the folder cannot be made nor the line appended.
+    mkdirSync(join(runsDir(root), '..'), { recursive: true });
+    writeFileSync(runsDir(root), 'not a folder');
+    const printed: string[] = [];
+    const warnings: string[] = [];
+    setActiveOutput(createEventsOutput({ stream: { write: (chunk) => printed.push(chunk) } }), 'events');
+    const file = bindEventsFile(root, SESSION, (line) => warnings.push(line));
+
+    emitLoopEvent({ kind: 'pr', number: 1 }, now);
+    emitLoopEvent({ kind: 'halt', reason: 'x' }, now);
+
+    expect(printed).toHaveLength(2);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toStartWith(`rafa: cannot write the events file ${file}: `);
+    expect(warnings[0]).toEndWith('\n');
+    expect(warnings[0]?.trimEnd()).not.toContain('\n');
+  });
+
+  it('warns again on a new binding after a failed one', () => {
+    const root = scratchRoot();
+    mkdirSync(join(runsDir(root), '..'), { recursive: true });
+    writeFileSync(runsDir(root), 'not a folder');
+    const warnings: string[] = [];
+    setActiveOutput(createTextOutput({ verbosity: 0, stream: { write: () => true } }), 'text');
+
+    bindEventsFile(root, SESSION, (line) => warnings.push(line));
+    emitLoopEvent({ kind: 'pr', number: 1 }, now);
+    bindEventsFile(root, SESSION, (line) => warnings.push(line));
+    emitLoopEvent({ kind: 'pr', number: 2 }, now);
+
+    expect(warnings).toHaveLength(2);
+  });
+
+  it('appends successfully as a control for the failed-write case', () => {
+    const root = scratchRoot();
+    const warnings: string[] = [];
+    setActiveOutput(createTextOutput({ verbosity: 0, stream: { write: () => true } }), 'text');
+    const file = bindEventsFile(root, SESSION, (line) => warnings.push(line));
+
+    emitLoopEvent({ kind: 'pr', number: 1 }, now);
+
+    expect(warnings).toEqual([]);
+    expect(linesOf(file)).toHaveLength(1);
   });
 });
 

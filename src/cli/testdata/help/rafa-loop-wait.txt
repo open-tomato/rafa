@@ -1,0 +1,56 @@
+rafa loop wait — wait on a session until a reason --until names happens
+
+Usage:
+  rafa loop wait [-s|--session-id=<string>] [--until=<string>]
+    [--timeout=<string>]
+
+Description:
+  Follows a loop run until a reason `--until` asks for happens, then prints one
+  `rafa·` line naming it and exits with that reason's code. It reads the run's
+  events file, `.rafa/runs/<session-id>.events.ndjson`, from its first line, so
+  a run that has already ended still answers, and reads the run's record and
+  probes its pid every 5 seconds. The reasons: `pr`, event pr, exits 0; `no-pr`,
+  event no-pr, exits 10; `halt`, event halt, exits 11; `error`, event error,
+  exits 12; `blocked`, event task-blocked, exits 13; `exit`, the run's pid not
+  alive, or its record reading stopped or done, exits 14; `quiet:<minutes>`, no
+  event for <minutes> awake minutes, exits 15. `--timeout` reached exits 16, and
+  a session it cannot find exits 2. Without `--until` it waits for
+  `pr,no-pr,halt,error,exit`; `blocked` and `quiet` are never in that set. Quiet
+  minutes and the timeout count time the machine is awake, so a suspended laptop
+  never reads as a stuck loop; on macOS the clock keeps counting through sleep,
+  so there a long sleep can raise a false `quiet` or an early timeout. A run
+  with no events file, from an older rafa, is noted once, and only `exit`,
+  `quiet` and the timeout can answer for it. Without `--session-id` it waits on
+  the session running on the branch checked out at the project root, or the
+  newest one that ran there. With `--output=json` the reason, the event, the
+  session's state and the minutes are the data of a `wait` event, and of the
+  terminal result when it exits 0.
+
+Flags:
+  -s, --session-id   string
+      The session to wait on, by the id its record under `.rafa/runs/` is named
+      with. Without it, the session running on the branch checked out at the
+      project root.
+  --until            string
+      The reasons to wait for, a comma list of pr, no-pr, halt, error, blocked,
+      exit, quiet:<minutes>. `pr,no-pr,halt,error,exit` when it is left out.
+  --timeout          string
+      How many awake minutes to wait before giving up with exit code 16. No
+      limit when it is left out.
+
+Examples:
+  rafa loop wait
+      Waits on the session of the branch checked out here until it opens a PR,
+      ends without one, halts, fails or exits.
+  rafa loop wait --session-id=9185b41c-65f7-4dd6-a0c1-6494c4028f0f --until=blocked,exit,quiet:30
+      Wakes on a blocked task, the run's end, or 30 awake minutes with no event.
+  rafa loop wait --timeout=60 --output=json
+      Waits up to an hour awake, then writes the reason, the event and the
+      session's state as a wait event.
+
+Outputs:
+  text, json
+
+See also:
+  rafa loop start, rafa loop stop, rafa loop pause, rafa loop resume, rafa loop
+  status, rafa loop list

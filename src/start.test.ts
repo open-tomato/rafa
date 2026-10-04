@@ -396,6 +396,119 @@ describe('where start.ts takes the suite steps', () => {
   });
 });
 
+/** The statements around the run's session record, as `start.ts` writes them. */
+interface SessionStatements {
+  /** The statement straight after `const session = openRunSession(...)`, as written. */
+  readonly next: string;
+  /** The `try` the session record's statements open, or null when none follows. */
+  readonly run: ts.TryStatement | null;
+  /** The file, for each node's text. */
+  readonly file: ts.SourceFile;
+}
+
+/**
+ * The statement after `const session = openRunSession(...)` in `source`,
+ * and the first `try` after it in the same block: the run whose
+ * `finally` writes the session's end.
+ */
+function sessionStatements(source: string): SessionStatements {
+  const file = ts.createSourceFile('start.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let found: SessionStatements | null = null;
+  const visit = (node: ts.Node): void => {
+    if (found !== null) return;
+    if (ts.isBlock(node)) {
+      const index = node.statements.findIndex((statement) => statement.getText(file).startsWith('const session = openRunSession('));
+      if (index !== -1) {
+        const after = node.statements.slice(index + 1);
+        found = {
+          next: after[0]?.getText(file) ?? '',
+          run: after.find((statement) => ts.isTryStatement(statement)) ?? null,
+          file,
+        };
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  if (found === null) throw new Error('the source opens no session with `const session = openRunSession(...)`');
+  return found;
+}
+
+/** The run's `catch`: its variable's name and its statements as written, or null when it has none. */
+function catchOf(statements: SessionStatements): { readonly name: string; readonly body: readonly string[] } | null {
+  const clause = statements.run?.catchClause;
+  if (clause === undefined) return null;
+  const declaration = clause.variableDeclaration;
+  return {
+    name: declaration === undefined
+      ? ''
+      : declaration.name.getText(statements.file),
+    body: clause.block.statements.map((statement) => statement.getText(statements.file)),
+  };
+}
+
+/** The statements of the run's `finally`, as written, or none when it has none. */
+function finallyOf(statements: SessionStatements): readonly string[] {
+  return statements.run?.finallyBlock?.statements.map((statement) => statement.getText(statements.file)) ?? [];
+}
+
+/** A source opening a session and a run around `between` and `rest`, for a control to read. */
+function plantedRun(between: readonly string[], rest: readonly string[]): string {
+  return [
+    'async function start(): Promise<void> {',
+    '  const session = openRunSession({ repoRoot });',
+    ...between.map((line) => `  ${line}`),
+    ...rest.map((line) => `  ${line}`),
+    '}',
+  ].join('\n');
+}
+
+describe('the events file start.ts binds around the run', () => {
+  const STATEMENTS = sessionStatements(START);
+
+  it('binds the run\'s events file under the project root straight after opening the session record', () => {
+    expect(STATEMENTS.next).toBe('bindEventsFile(repoRoot, session.id);');
+    expect(importedFrom(START, './start/loop-events.js')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
+  });
+
+  it('unbinds it in the run\'s finally, beside the session\'s end', () => {
+    expect(finallyOf(STATEMENTS)).toEqual(['unbindEventsFile();', 'session.end();']);
+  });
+
+  it('emits an error event carrying what the run threw from its catch, then rethrows it', () => {
+    const caught = catchOf(STATEMENTS);
+
+    expect(caught).toEqual({
+      name: 'error',
+      body: ['emitLoopEvent({ kind: \'error\', message: messageOf(error) });', 'throw error;'],
+    });
+  });
+
+  it('reads a bind made after the run as no bind straight after the session record', () => {
+    const planted = sessionStatements(plantedRun(['try {', '  run();', '} finally {', '  session.end();', '}'], ['bindEventsFile(repoRoot, session.id);']));
+
+    expect(planted.next).not.toBe('bindEventsFile(repoRoot, session.id);');
+    expect(finallyOf(planted)).toEqual(['session.end();']);
+  });
+
+  it('reads a catch that swallows what the run threw as one without the rethrow', () => {
+    const planted = sessionStatements(plantedRun(
+      ['bindEventsFile(repoRoot, session.id);'],
+      ['try {', '  run();', '} catch (error) {', '  emitLoopEvent({ kind: \'error\', message: messageOf(error) });', '} finally {', '  unbindEventsFile();', '}'],
+    ));
+
+    expect(planted.next).toBe('bindEventsFile(repoRoot, session.id);');
+    expect(catchOf(planted)?.body).not.toContain('throw error;');
+  });
+
+  it('reads a run with no catch as one emitting no error event', () => {
+    const planted = sessionStatements(plantedRun(['bindEventsFile(repoRoot, session.id);'], ['try {', '  run();', '} finally {', '  unbindEventsFile();', '}']));
+
+    expect(catchOf(planted)).toBeNull();
+  });
+});
+
 /** The plan stub the driven run's scratch repository runs. */
 const STUB = 'start-red-task-step';
 

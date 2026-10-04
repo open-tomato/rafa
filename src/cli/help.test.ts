@@ -1,13 +1,14 @@
 /**
- * Tests for the help renderer (`src/cli/help.ts`): the four frozen
+ * Tests for the help renderer (`src/cli/help.ts`): the five frozen
  * snapshots over the core registry, and each rule of the module note over
  * a registry built here.
  *
  * ## The snapshots
  *
- * `testdata/help/rafa.txt`, `rafa-loop.txt`, `rafa-loop-start.txt` and
- * `rafa-next.txt` hold what `rafa --help`, `rafa loop --help`,
- * `rafa loop start --help` and `rafa next --help` print. Each case
+ * `testdata/help/rafa.txt`, `rafa-loop.txt`, `rafa-loop-start.txt`,
+ * `rafa-loop-wait.txt` and `rafa-next.txt` hold what `rafa --help`,
+ * `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`
+ * and `rafa next --help` print. Each case
  * dispatches its line through `dispatch` over `CORE_REGISTRY` with the
  * renderer handed in, an empty environment and streams of its own, so
  * what is compared is the dispatcher's stdout. One more case spawns
@@ -17,7 +18,7 @@
  *
  * Regenerating is opt-in, read as `src/tests/report-ask-live.test.ts`
  * reads its recapture flag. With `RAFA_UPDATE_HELP_SNAPSHOTS=1` this file
- * writes all four before any case reads them, so a run that regenerates
+ * writes all five before any case reads them, so a run that regenerates
  * compares against what it just wrote and is green by construction: the
  * change is read in the diff. With the variable unset, or set to anything
  * else, nothing is written, and a snapshot that no longer matches is red.
@@ -81,10 +82,10 @@ import { GLOBAL_FLAGS, HELP_WIDTH, renderHelp, SPENDS_LEGEND } from './help.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 
-/** Where the three frozen snapshots live. */
+/** Where the frozen snapshots live. */
 const SNAPSHOT_DIR = fileURLToPath(new URL('./testdata/help/', import.meta.url));
 
-/** Set to `1` to write the three snapshots afresh before the cases read them. */
+/** Set to `1` to write the snapshots afresh before the cases read them. */
 const UPDATE_ENV = 'RAFA_UPDATE_HELP_SNAPSHOTS';
 
 /** Each snapshot: the words after `rafa`, and its file under the snapshot directory. */
@@ -92,6 +93,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['--help', 'rafa.txt'],
   ['loop --help', 'rafa-loop.txt'],
   ['loop start --help', 'rafa-loop-start.txt'],
+  ['loop wait --help', 'rafa-loop-wait.txt'],
   ['next --help', 'rafa-next.txt'],
 ];
 
