@@ -55,17 +55,17 @@ Four sources, all on this machine:
 
 ## How you wait
 
-- **A Monitor on the loop log**, so each `rafa·` line, a `blocked` line, an
-  `error` line or a `halt` line reaches you as it is written. Match every
-  ending, not only the good ones:
+Watch the running loop's events from `.rafa/runs/<session-id>.events.ndjson`:
 
-  ```bash
-  tail -F .rafa/stretch/<n>/loop-<issue>.log | grep --line-buffered -E 'rafa· (task|wrap-up|pr|no pr|halt|error)'
-  ```
+```bash
+rafa loop wait --until=blocked,quiet:<minutes>,exit
+```
 
-  A Monitor stops after 30 minutes at most; restart it at every wake.
-- **`/loop`**, self-paced, every 10 to 30 minutes, for the slower checks:
-  the agent's status and the quiet-loop timing.
+The `<minutes>` is 2× the p90 task time from `rafa effort dashboard`. With
+no baseline yet, use 30 minutes and say so in the alert. The wait exits
+when a task blocks, when the loop is quiet for that long, or when the loop
+ends. Between waits, read the agent's session status and check the hook
+rule at every wake: `/loop`, self-paced, every 10 to 30 minutes.
 
 ## How you alert
 

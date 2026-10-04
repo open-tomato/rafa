@@ -130,10 +130,10 @@ One loop at a time; never two at once inside a stretch.
 
    `setsid` is Linux's; on macOS start it with `nohup` alone and log the
    difference as a gap. Detached loops are a gap of their own.
-3. Watch it: read the log's `rafa·` lines and `rafa loop status`. Wait
-   with a background check on the log, never a tight loop of reads. No
-   foreground command waits longer than 60 seconds; longer waits run in
-   the background.
+3. Watch it: `rafa loop wait --until=pr,no-pr,halt,error,exit` reads the
+   `.rafa/runs/<session-id>.events.ndjson` file your loop wrote, not the
+   log. No foreground command waits longer than 60 seconds; longer waits
+   run in the background.
 4. Merge its pull request:
    - Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`. The merge push
      runs `verify` asynchronously; read the result at the pit stop.
