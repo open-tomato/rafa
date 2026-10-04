@@ -341,8 +341,10 @@ describe('runTaskStep', () => {
     const atBaseline = contextWith([result({ exitCode: 1, errors: 1 })]);
     const same = await runTaskStep(atBaseline.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(same.red).toBe(false);
+    // As many as the baseline is no excess, so the step is not retaken.
+    expect(atBaseline.seen.runs).toHaveLength(1);
 
-    const more = contextWith([result({ exitCode: 1, errors: 2 })]);
+    const more = contextWith([result({ exitCode: 1, errors: 2 }), result({ exitCode: 1, errors: 2 })]);
     const outcome = await runTaskStep(more.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toContain('1 more error(s) outside any test');
@@ -378,6 +380,60 @@ describe('runTaskStep', () => {
     const after = readFileSync(trackerPath, 'utf8').split('\n');
     expect(after[11]?.startsWith(`- [BLOCKED] Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}  `)).toBe(true);
     expect([...after.slice(0, 11), ...after.slice(12)].join('\n')).toBe(done);
+  });
+});
+
+describe('a step with errors outside any test', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const thrown = { file: 'src/boom.test.ts', firstLine: 'TypeError: undefined is not an object (evaluating \'x.foo\')' };
+  /** A run whose only red is one error outside any test, which the baseline (0 errors) does not hold. */
+  const excess = (): SuiteResult => result({ exitCode: 1, errors: 1, unhandled: [thrown] });
+
+  it('names the throwing file and its first error line in the blocker, retaking nothing when a failure is red too', async () => {
+    const { context, seen } = contextWith([red([FRESH], { errors: 1, unhandled: [thrown] })]);
+    const outcome = await runTaskStep(context, input);
+    expect(outcome.red).toBe(true);
+    expect(seen.runs).toHaveLength(1);
+    expect(outcome.blocker).toContain('1 more error(s) outside any test');
+    expect(outcome.blocker).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toContain('src/boom.test.ts');
+  });
+
+  it('retakes a step whose only red is the excess and, the retake under the baseline count, prints the intermittent line and stops nothing', async () => {
+    const { context, seen } = contextWith([excess(), result()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[1]).toEqual(seen.runs[0] ?? {});
+    expect(outcome).toMatchObject({ kind: 'task', red: false, interrupted: false, blocker: null, blockedLine: null });
+    expect(seen.steps).toHaveLength(2);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    const intermittent = linesAt('warn').filter((line) => line.includes('Intermittent'));
+    expect(intermittent).toHaveLength(1);
+    expect(intermittent[0]).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('halts on a retake red again, naming the file in the blocker of the repair task it inserts', async () => {
+    const { context, seen } = contextWith([excess(), excess()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.steps).toHaveLength(2);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(outcome.blocker ?? '');
+    expect(linesAt('warn').some((line) => line.includes('Intermittent'))).toBe(false);
+  });
+
+  it('retakes a stage step over the same paths', async () => {
+    const { context, seen } = contextWith([excess(), result()], { owns: ['src/b', 'src/c'], git: gitAt({ [BASE]: ['src/b/x.ts'] }) });
+    const outcome = await runStageStep(context, { stage: 0, name: 'One' }, baselineWith());
+    expect(outcome.red).toBe(false);
+    expect(seen.runs.map((run) => run.paths)).toEqual([
+      ['src/b/b.test.ts', 'src/run-integration.test.ts'],
+      ['src/b/b.test.ts', 'src/run-integration.test.ts'],
+    ]);
   });
 });
 
@@ -806,7 +862,7 @@ describe('runPreWrapUpStep', () => {
 
 describe('blockerText', () => {
   it('names each new file once with its count and the command running them', () => {
-    const text = blockerText('task step', { exitCode: 1 }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
+    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
     expect(text).toContain('src/new.test.ts (2 tests), src/old.test.ts (1 test)');
     expect(text).toContain('Run bun test src/new.test.ts src/old.test.ts');
     expect(text).not.toContain('\n');

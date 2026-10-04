@@ -127,6 +127,21 @@ nested `describe` blocks). Two failures are identical when both match; a
 test name that changes counts as a different failure, so rewriting a test
 name can hide a failure without fixing it.
 
+**An error outside any test is counted, named from stderr, and retaken
+once.** A test file that throws while it loads is no failure in the
+JUnit file: Bun prints it to stderr under `# Unhandled error between
+tests` and counts it on the summary's `errors` line. The baseline keeps
+that count only, and a step counting more is red. Its blocker names each
+block's file and first error line, as `src/boom.test.ts threw "error:
+boom"` (`src/start/suite-blocker.ts`), and the blocks with the summary
+lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`. A task,
+stage or pre-wrap-up step whose only red is that excess is taken once
+more over the same run (`src/start/suite-step.ts`). A retake at or under
+the baseline's count prints an `Intermittent` warning naming the first
+run's files and lines, and the run goes on; a retake over it again is
+red, and the run halts as it does on any red step. Both runs are
+recorded, and the files on disk are the retake's.
+
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.
 The `newFailures` array in each step lists only the failures not present

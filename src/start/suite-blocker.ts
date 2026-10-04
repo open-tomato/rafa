@@ -4,7 +4,11 @@
  *
  * {@link blockerText} names each new failing test file with its count,
  * the command running them (`bun test <files>`), and the errors or the
- * missing summary when those made the step red.
+ * missing summary when those made the step red. Errors outside any test
+ * are named by file and first line, as Bun's stderr printed them
+ * ({@link unhandledNames}): the JUnit report holds no file for them.
+ * The baseline keeps only their count, so every block of the run is
+ * named, the inherited ones included.
  *
  * {@link writeRepairTask} puts that text on a repair task. A red task or
  * stage step inserts one through `insertTrackerTask` (`utils/tracker.ts`)
@@ -29,6 +33,7 @@
  * inserted as for any task.
  */
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
+import type { UnhandledError } from '../suite/unhandled.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -51,12 +56,57 @@ function failingFiles(failures: readonly SuiteFailure[]): readonly (readonly [st
   return [...counts.entries()];
 }
 
+/** How many errors outside any test {@link unhandledNames} names before it counts the rest. */
+const UNHANDLED_NAMED = 10;
+
+/** One error outside any test, as `<file> threw "<first line>"`. */
+function unhandledName(error: UnhandledError): string {
+  const file = error.file ?? 'a file Bun did not name';
+  return error.firstLine === null
+    ? `${file} threw an error Bun printed no line for`
+    : `${file} threw "${error.firstLine}"`;
+}
+
+/**
+ * The errors outside any test of a run, each by file and first line,
+ * `; ` apart, the first {@link UNHANDLED_NAMED} of them and a count of
+ * the rest; a sentence saying none was named when `errors` is empty.
+ */
+export function unhandledNames(errors: readonly UnhandledError[]): string {
+  if (errors.length === 0) return 'no block of Bun\'s stderr named a file';
+  const named = errors.slice(0, UNHANDLED_NAMED).map(unhandledName);
+  const left = errors.length - named.length;
+  const more = left > 0
+    ? [`and ${left} more`]
+    : [];
+  return [...named, ...more].join('; ');
+}
+
+/** The files `errors` name, each once, in first-seen order. */
+function unhandledFiles(errors: readonly UnhandledError[]): readonly string[] {
+  return [...new Set(errors.flatMap((error) => error.file === null
+    ? []
+    : [error.file]))];
+}
+
+/** The blocker's sentences on errors outside any test: their count over the baseline, and each named. */
+function errorsText(newErrors: number, errors: readonly UnhandledError[]): string {
+  const counted = `${newErrors} more error(s) outside any test than the baseline`;
+  if (errors.length === 0) return `${counted}: a test file that throws while it loads, which the JUnit report names no file for.`;
+  const files = unhandledFiles(errors);
+  const run = files.length === 0
+    ? ''
+    : ` Run bun test ${files.join(' ')} and make each load.`;
+  return `${counted}; Bun's stderr named them as ${unhandledNames(errors)}.${run}`;
+}
+
 /**
  * The blocker a red step writes: the new failing files with their
- * counts and the command running them, then the errors or the missing
- * summary when those made it red. `label` names the step.
+ * counts and the command running them, then the errors outside any test
+ * by file and first line, or the missing summary, when those made it
+ * red. `label` names the step.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode'>, verdict: StepVerdict): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   if (files.length > 0) {
@@ -65,9 +115,7 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode'>
       : 'tests'})`);
     parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => file).join(' ')} and make them pass.`);
   }
-  if (verdict.newErrors > 0) {
-    parts.push(`${verdict.newErrors} more error(s) outside any test than the baseline: a test file that throws while it loads, which the JUnit report names no file for.`);
-  }
+  if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
   return parts.join(' ');
 }
