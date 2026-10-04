@@ -17,7 +17,8 @@
  *     `sqlite.ts`'s row store, `bring-forward.ts`'s log insert).
  *   - No `new Database(` outside `sqlite.ts`, `fix-schema.ts`,
  *     `copy.ts`, `schema-report.ts`, `migrate.ts`, `merge-store.ts`,
- *     `fixture-extract.ts`, `testdata/merge-scenarios.ts` and
+ *     `store-meta.ts`, `fixture-extract.ts`,
+ *     `testdata/merge-scenarios.ts`, `testdata/store-rows.ts` and
  *     `src/effort/sync/wire.ts`.
  *     Every other opener of a SQLite
  *     handle is expected to go through `withSqliteStore` (`sqlite.ts`)
@@ -35,6 +36,11 @@
  *     `merge-store.ts` opens the other store `{ readonly: true }`,
  *     which no open through `withSqliteStore` is, and brings forward
  *     only files it built itself, with `builtAside`.
+ *     `store-meta.ts` carries the store's identity onto the file a
+ *     rebuild swaps in (`carryStoreIdentity`): it reads the live store
+ *     `{ readonly: true }` and writes the parallel file's own row, and a
+ *     writing open through `withSqliteStore` would settle either file's
+ *     identity first, rotating its generation or minting it a new origin.
  *     `fixture-extract.ts` opens the two stores it extracts
  *     `{ readonly: true }` too, and builds a fixture store from an
  *     extract at the migrations the extract holds, which an open
@@ -45,6 +51,9 @@
  *     through `withSqliteStore` would bring forward, and every other
  *     with a `store_meta` row it plants, where a writing open would
  *     mint one from the real host id; it runs the guard itself first.
+ *     `testdata/store-rows.ts` reads every table of a store file a test
+ *     names `{ readonly: true }`, so two files compare by rows, and an
+ *     open through `withSqliteStore` would bring that file forward.
  *     `src/effort/sync/wire.ts` opens the store it exports
  *     `{ readonly: true, safeIntegers: true }`, so a sync read never
  *     brings a store forward and never rounds an integer, and builds a
@@ -120,8 +129,10 @@ const DATABASE_OPENER_ALLOW_LIST: ReadonlySet<string> = new Set([
   'src/effort/store/schema-report.ts',
   'src/effort/store/migrate.ts',
   'src/effort/store/merge-store.ts',
+  'src/effort/store/store-meta.ts',
   'src/effort/store/fixture-extract.ts',
   'src/effort/store/testdata/merge-scenarios.ts',
+  'src/effort/store/testdata/store-rows.ts',
   'src/effort/sync/wire.ts',
 ]);
 

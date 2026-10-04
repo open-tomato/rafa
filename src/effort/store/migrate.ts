@@ -33,10 +33,19 @@
  * one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
  *
  * Under `dryRun` the parallel file is then deleted. Otherwise the live
- * file is renamed to `<store>.before-<id>-<stamp>.bak` and the parallel
- * file renamed into its place. `<id>` is the first migration applied, or
- * `schema_migrations` when the run only adopts the store. The backup is
- * the whole original; restoring it is renaming it back.
+ * store is written out to `<store>.before-<id>-<stamp>.bak` with
+ * `VACUUM INTO`, its identity is carried onto the parallel file
+ * (`carryStoreIdentity`, `store-meta.ts`), and the parallel file is
+ * renamed into its place. `<id>` is the first migration applied, or
+ * `schema_migrations` when the run only adopts the store.
+ *
+ * The migrated store keeps the live store's origin, so the rows it
+ * writes next carry the same store id; a store whose next write would
+ * have minted anyway is carried nothing and mints after the swap. The
+ * backup holds every row the original held, and restoring it is
+ * renaming it back. It is a copy with an inode of its own, so once
+ * renamed back over the store its first writing open mints a new
+ * origin (`store-identity.ts`).
  *
  * Those steps, from the in-flight refusal to the swap and the removal of
  * the parallel file on any failure, are `rebuild-aside.ts`'s, the same

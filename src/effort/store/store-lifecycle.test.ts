@@ -203,17 +203,33 @@ describe('one store driven through adoption, an applied tail, a clean read and a
   });
 });
 
-/** The identity seams every settle here passes: no git, no host read, ids and generations counted. */
-function seams(label: string): StoreIdentitySeams {
+/**
+ * The identity seams every settle here passes: no git, ids and
+ * generations counted, and the host id `host`, or this machine's when
+ * `host` is null.
+ */
+function seams(label: string, host: string | null = 'host-lifecycle'): StoreIdentitySeams {
   let minted = 0;
   let rotated = 0;
   return {
-    readHostId: () => 'host-lifecycle',
+    ...(host === null
+      ? {}
+      : { readHostId: () => host }),
     readProject: () => ({ rootCommit: 'a1b2c3d4', remote: null }),
     newStoreId: () => `${label}-origin-${String(++minted)}`,
     newGeneration: () => `${label}-generation-${String(++rotated)}`,
     now: () => new Date('2026-09-29T10:00:00.000Z'),
   };
+}
+
+/**
+ * {@link seams} with the host id left to this machine's. A rebuild's
+ * carry (`swapIn`, `rebuild-aside.ts`) reads the host id itself, since
+ * `fixStoreSchema` and `migrateStore` take no host seam, so a store a
+ * rebuild keeps the origin of is minted and written under the same one.
+ */
+function thisHost(label: string): StoreIdentitySeams {
+  return seams(label, null);
 }
 
 let casesMade = 0;
@@ -288,38 +304,42 @@ describe('the identity, generation and copy modules over one store', () => {
     expect(rowOf(sourcePath)?.storeId).toBe(original.storeId);
   });
 
-  it('mints a new origin and side record for the store fix-schema swaps in', () => {
+  it('keeps the origin of the store fix-schema swaps in, writing a new generation to the row and the side record', () => {
     const path = join(caseDir(), 'effort.sqlite');
-    const original = mintedStore(path, seams('fixed'));
+    const identity = thisHost('fixed');
+    const original = mintedStore(path, identity);
     withSqliteStore(path, 'write', false, (db) => {
       db.run(`INSERT INTO ${MIGRATION_LOG_TABLE} (id, sha256, breaks, applied_at, applied_by)`
         + ` VALUES ('future-readings', '${'a'.repeat(64)}', '["writers"]', '2026-10-01T09:00:00.000Z', '0.30.0')`);
-    }, seams('fixed'));
+    }, identity);
 
     const result = fixStoreSchema({ path, dryRun: false, stamp: STAMP, now: () => NOW, identity: INSTALLED_RUNTIME });
-    const rebuilt = writeOpen(path, seams('rebuilt'));
+    const rebuilt = writeOpen(path, identity);
 
     expect(result.status).toBe('rebuilt');
-    expect(rebuilt?.storeId).toBe('rebuilt-origin-1');
-    expect(rebuilt?.storeId).not.toBe(original.storeId);
-    expect(readStoreGeneration(path)).toBe(rebuilt?.generation ?? null);
+    expect(rebuilt?.storeId).toBe('fixed-origin-1');
+    expect(rebuilt?.storeId).toBe(original.storeId);
+    expect(rebuilt?.generation).toBe('fixed-generation-3');
+    expect(readStoreGeneration(path)).toBe('fixed-generation-3');
   });
 
-  it('mints a new origin and side record for the store migrate swaps in', () => {
+  it('keeps the origin of the store migrate swaps in, writing a new generation to the row and the side record', () => {
     const path = join(caseDir(), 'effort.sqlite');
-    const original = mintedStore(path, seams('migrated'));
+    const identity = thisHost('migrated');
+    const original = mintedStore(path, identity);
     const tail: SqliteMigration = { id: 'lifecycle-migrate-tail', breaks: [], sql: 'CREATE TABLE lifecycle_migrate (seq INTEGER PRIMARY KEY);' };
 
     const result = migrateStore({
       path, dryRun: false, stamp: STAMP, now: () => NOW, identity: INSTALLED_RUNTIME,
       migrations: [...SQLITE_MIGRATIONS, tail],
     });
-    const rebuilt = writeOpen(path, seams('after-migrate'));
+    const rebuilt = writeOpen(path, identity);
 
     expect(result.status).toBe('migrated');
-    expect(rebuilt?.storeId).toBe('after-migrate-origin-1');
-    expect(rebuilt?.storeId).not.toBe(original.storeId);
-    expect(readStoreGeneration(path)).toBe(rebuilt?.generation ?? null);
+    expect(rebuilt?.storeId).toBe('migrated-origin-1');
+    expect(rebuilt?.storeId).toBe(original.storeId);
+    expect(rebuilt?.generation).toBe('migrated-generation-2');
+    expect(readStoreGeneration(path)).toBe('migrated-generation-2');
   });
 
   it('mints for a store rebuilt aside and renamed over the original', () => {

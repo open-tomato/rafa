@@ -80,12 +80,13 @@ development build). It copies every table and column this rafa knows
 except the log, checks the row counts, `integrity_check` and that
 `planSchema` finds the rebuild current, and lists the unknown
 migrations, tables and columns only the newer schema holds, which stay
-in the backup alone. The original is then renamed to
-`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
-takes its place. `--dry-run` deletes the rebuild instead, so it can be
-repeated and runs beside a live loop and from a development build; the
-swap refuses while a loop session is running or paused, and from a
-development build before anything is built. A newer schema that dropped
+in the backup alone. The store is then copied with `VACUUM INTO` to
+`effort.sqlite.v<user_version>-<stamp>.bak`, every row of it, and the
+rebuild is renamed over the store. `--dry-run` deletes the rebuild
+instead, so it can be repeated and runs beside a live loop and from a
+development build; the swap refuses while a loop session is running or
+paused, and from a development build before anything is built. A newer
+schema that dropped
 a table or column this rafa writes is not additive, and the repair
 refuses it rather than copy around it. It refuses a store that never
 held one as well: since `row-origins` added `origin_store` and
@@ -99,11 +100,12 @@ store with an unknown additive migration `current`, and spawns
 `bun src/rafa.ts` over a store outside the child's temp directory:
 the swap is refused, the dry run runs. The steps around the build, from
 the in-flight journal refusal through the row-count check,
-`integrity_check` and the swap to removal on failure, are `rebuildAside`
+`integrity_check`, the backup and the swap, are `rebuildAside`
 (`src/effort/store/rebuild-aside.ts`), which takes the two file names
-and the build from its caller and opens no store itself;
-`SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
-`MigrateRefusal`.
+and the build from its caller. A failed build is removed; a failed swap
+leaves the store unchanged and the rebuild and the backup beside it,
+both named in its `SwapFailure`. `SchemaFixRefusal` is its
+`RebuildRefusal`, and so is `effort migrate`'s `MigrateRefusal`.
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,
@@ -149,7 +151,7 @@ store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
 `bringForward` with `builtAside`, checks the row count of every table
 both files hold against the live store (`checkedCounts`: a table rebuild
 that lost a row is refused), `integrity_check` and that `planSchema`
-finds it current, then renames the original to
+finds it current, then copies the store with `VACUUM INTO` to
 `effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
 applied or `schema_migrations` for an adoption alone, and swaps the new
 file in through `rebuildAside`. `--dry-run` deletes it instead and is
@@ -496,6 +498,27 @@ time with the detection flag, and it mints a new origin for this store.
 This is why a development build can write copies: it owns stores under
 `tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
 own `<root>/.rafa/effort/`.
+
+### Identity through rebuilds
+
+**When a store is rebuilt in place (by `fix-schema`, `migrate`, or
+`merge`), a swap operation preserves the store's identity if it would
+keep its id.** A rebuild writes a new file aside with a temporary name
+(`effort.sqlite.merge-<stamp>`, `effort.sqlite.migrate-<stamp>`, or
+`effort.sqlite.fix-<stamp>`), brings it forward through migrations,
+checks it, and backs it up with `VACUUM INTO` to `.before-*-<stamp>.bak`.
+Before the new file is renamed over the live store, `swapIn`
+(`src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
+whether the store would keep its id: if yes, it carries the device,
+inode, and generation from the live store to the new file, writes them to
+`store_meta` and its side record, and then renames the new file over the
+live store. This keeps the store's identity even though its inode may
+change during the rename, because the generation value carried from the
+old file is checked on the next write. The old file, now the backup,
+carries no identity after the rename. If the backup is ever restored
+(undoing the rebuild), its device and inode have changed during the swap,
+and its first write will detect it as a copy and mint a new origin with
+the reason `generation`.
 
 ### The schema history
 

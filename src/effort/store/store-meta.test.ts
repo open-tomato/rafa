@@ -18,10 +18,13 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { bringForward } from './bring-forward.js';
+import { vacuumInto } from './copy.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { swapIn } from './rebuild-aside.js';
 import { withSqliteStore } from './sqlite.js';
 import { readStoreGeneration, storeGenerationPath, writeStoreGeneration } from './store-generation.js';
 import {
+  carryStoreIdentity,
   fromStoredInteger,
   readStoreMeta,
   settleStoreIdentity,
@@ -466,5 +469,191 @@ describe('device and inode as SQLite integers', () => {
     } finally {
       db.close();
     }
+  });
+});
+
+/** The `VACUUM INTO` copy of the store at `path` beside it, as a rebuild writes its parallel file. */
+function parallelOf(path: string): string {
+  const parallel = `${path}.parallel`;
+  vacuumInto(path, parallel);
+  return parallel;
+}
+
+/** Renames the store at `path` aside and `parallel` into its place, answering where the store went. */
+function swapOver(path: string, parallel: string): string {
+  const aside = `${path}.swapped-out`;
+  renameSync(path, aside);
+  renameSync(parallel, path);
+  return aside;
+}
+
+/** Runs one `store_meta` update on the file at `path`, on a connection of its own and outside any open. */
+function editRow(path: string, sql: string, value: string | bigint): void {
+  const db = new Database(path, { readwrite: true });
+  try {
+    db.query(sql).run(value);
+  } finally {
+    db.close();
+  }
+}
+
+describe('carryStoreIdentity', () => {
+  it('writes nothing when the live file holds no store_meta table', () => {
+    const path = freshPath('carry-no-table');
+    const plain = new Database(path, { create: true, readwrite: true });
+    try {
+      plain.run('CREATE TABLE notes (body TEXT NOT NULL)');
+    } finally {
+      plain.close();
+    }
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seamsOf().seams)).toEqual({ action: 'no-table' });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+  });
+
+  it('writes nothing when the live store_meta holds no row, an unminted store', () => {
+    const { seams } = seamsOf('host-a', NO_PROJECT);
+    const path = freshPath('carry-no-row');
+    expect(openAs(path, 'write', seams, true)).toBeNull();
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seams)).toEqual({ action: 'no-row' });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+    expect(metaOf(parallel)).toBeNull();
+  });
+
+  it('records the parallel file\'s own device and inode and the live side record\'s generation when a live write would keep', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-keep', seams);
+    const parallel = parallelOf(path);
+    const own = statSync(parallel, { bigint: true });
+
+    const outcome = carryStoreIdentity(path, parallel, seams);
+
+    expect(outcome).toEqual({ action: 'carried', storeId: meta.storeId, generation: 'gen-1' });
+    expect(metaOf(parallel)).toEqual({ ...meta, fileDev: own.dev, fileIno: own.ino, generation: 'gen-1' });
+  });
+
+  it('writes the live side record\'s generation over another one in the parallel row', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-generation-source', seams);
+    const parallel = parallelOf(path);
+    editRow(parallel, 'UPDATE store_meta SET generation = ? WHERE id = 1', 'gen-parallel');
+
+    carryStoreIdentity(path, parallel, seams);
+
+    expect(readStoreGeneration(path)).toBe('gen-1');
+    expect(metaOf(parallel)?.generation).toBe(meta.generation);
+  });
+
+  it('keeps the origin on the first write after the carried file is renamed over the store', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-swap', seams);
+    const parallel = parallelOf(path);
+    carryStoreIdentity(path, parallel, seams);
+    swapOver(path, parallel);
+
+    expect(settleWrite(path, seams)).toEqual({ action: 'keep', storeId: meta.storeId });
+    expect(metaOf(path)?.fileIno).toBe(statSync(path, { bigint: true }).ino);
+  });
+
+  it('mints on the first write after the same swap without the carry, the control', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-swap-control', seams);
+    const parallel = parallelOf(path);
+    const aside = swapOver(path, parallel);
+    const sameFile = statSync(aside, { bigint: true }).ino === statSync(path, { bigint: true }).ino;
+    const reasons = sameFile
+      ? []
+      : ['file'];
+
+    expect(meta.storeId).toBe('host-a-store-1');
+    expect(settleWrite(path, seams)).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons });
+  });
+
+  it('mints on the first write after the backup of a swap is renamed back with no write between, with the reasons the inode numbers give', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-backup-renamed-back', seams);
+    const parallel = parallelOf(path);
+    const backup = `${path}.bak`;
+    swapIn(path, parallel, backup);
+    renameSync(backup, path);
+    const reasons = statSync(path, { bigint: true }).ino === meta.fileIno
+      ? []
+      : ['file'];
+
+    const outcome = settleWrite(path, seams);
+
+    expect(meta.storeId).toBe('host-a-store-1');
+    expect(outcome).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons });
+    expect(metaOf(path)?.storeId).toBe('host-a-store-2');
+  });
+
+  it('writes nothing when the live row names another inode, and the swapped-in file mints', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-other-inode', seams);
+    editRow(path, 'UPDATE store_meta SET file_ino = ? WHERE id = 1', toStoredInteger(meta.fileIno + 1n));
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seams)).toEqual({ action: 'mint', reasons: ['file'] });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+
+    swapOver(path, parallel);
+    expect(settleWrite(path, seams)).toMatchObject({ action: 'mint', storeId: 'host-a-store-2' });
+  });
+
+  it('writes nothing when the live row names another path', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('carry-other-path', seams);
+    editRow(path, 'UPDATE store_meta SET store_path = ? WHERE id = 1', join(scope, 'elsewhere', 'effort.sqlite'));
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seams)).toEqual({ action: 'mint', reasons: ['path'] });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+  });
+
+  it('writes nothing when the live row holds a generation its side record does not', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('carry-other-generation', seams);
+    writeStoreGeneration(path, 'gen-elsewhere');
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seams)).toEqual({ action: 'mint', reasons: ['generation'] });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+  });
+
+  it('writes nothing when the live store was minted on another host', () => {
+    const { path } = mintedStore('carry-other-host', seamsOf('host-a').seams);
+    const parallel = parallelOf(path);
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seamsOf('host-b').seams)).toEqual({ action: 'mint', reasons: ['host'] });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+  });
+
+  it('writes nothing when the parallel row is another store\'s', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('carry-other-row', seams);
+    const parallel = parallelOf(path);
+    editRow(parallel, 'UPDATE store_meta SET store_id = ? WHERE id = 1', 'another-store');
+    const before = readFileSync(parallel);
+
+    expect(carryStoreIdentity(path, parallel, seams)).toEqual({ action: 'other-row' });
+    expect(readFileSync(parallel).equals(before)).toBe(true);
+  });
+
+  it('throws the filesystem\'s error naming a parallel file that is not there', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('carry-missing', seams);
+    const missing = `${path}.parallel`;
+
+    expect(existsSync(missing)).toBe(false);
+    expect(() => carryStoreIdentity(path, missing, seams)).toThrow(missing);
   });
 });

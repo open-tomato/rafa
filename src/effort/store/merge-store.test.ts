@@ -10,6 +10,10 @@
  * unless it says otherwise, and reads no git: `readProject` answers no
  * project.
  *
+ * The backup a merge leaves is a `VACUUM INTO` snapshot of this store,
+ * not its bytes, so it is compared by every table's rows and its
+ * `user_version` (`storeRows`), `store_meta` among them.
+ *
  * Each refusal snapshots both directories before and after and finds
  * them byte-identical. Each has a control beside it, the same planting
  * less the one fault, which merges, and the merge case finds this
@@ -32,6 +36,7 @@ import { bringForward } from './bring-forward.js';
 import { DevelopmentBuildRefusedError } from './development-build.js';
 import { MergeRefusal, mergeStore, MOVE_TO_SQLITE } from './merge-store.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from './sqlite.js';
+import { storeRows } from './testdata/store-rows.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-merge-store-')));
 afterAll(() => {
@@ -212,7 +217,7 @@ describe('mergeStore', () => {
   it('swaps the union in behind a backup, recording the merge and recomputing the gaps around the commit brought in', () => {
     const testCase = freshCase();
     plantPair(testCase);
-    const original = readFileSync(testCase.path);
+    const original = storeRows(testCase.path);
     const [, thereBefore] = snapshotBoth(testCase);
 
     const result = mergeStore(mergeOptions(testCase));
@@ -224,7 +229,10 @@ describe('mergeStore', () => {
     });
     expect(result.otherBroughtForward).toEqual([]);
     expect(result.backupPath).toBe(`${testCase.path}.before-merge-${STAMP}.bak`);
-    expect(readFileSync(`${testCase.path}.before-merge-${STAMP}.bak`).equals(original)).toBe(true);
+    expect(storeRows(`${testCase.path}.before-merge-${STAMP}.bak`)).toEqual(original);
+    expect(storeRows(testCase.path)).not.toEqual(original);
+    expect(original.tables.findings).toHaveLength(2);
+    expect(original.tables.store_meta).toHaveLength(1);
     expect(readdirSync(dirname(testCase.path)).sort()).toEqual(['effort.sqlite', `effort.sqlite.before-merge-${STAMP}.bak`]);
     expect(readRows(testCase.path, 'SELECT id, origin_store, origin_seq FROM findings ORDER BY seq')).toEqual([
       { id: 'id-a1', origin_store: HERE, origin_seq: 1 },

@@ -30,8 +30,13 @@
  *     is caught; the host id alone would miss it.
  *
  * A store renamed away and back to its own path keeps all three, and
- * its origin. A store `fix-schema`, `migrate` or `rafa effort copy`
- * builds is a new file and gets a new origin, which is harmless.
+ * its origin. A store `rafa effort copy` builds is a new file and gets
+ * a new origin, which is harmless. The file `fix-schema`, `migrate` and
+ * `rafa effort merge` swap in is new as well, but the swap carries the
+ * store's identity onto it before the rename (`carryStoreIdentity`,
+ * `store-meta.ts`), so it keeps the origin. The backup the swap writes
+ * is the copy: it has an inode of its own and names the original's, so
+ * renamed back over the store it mints.
  *
  * Two copies these facts cannot see, measured on 2026-09-29 on tmpfs:
  * a `.bak` restored with `cp` over the existing file is written into

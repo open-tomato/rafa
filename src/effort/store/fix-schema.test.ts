@@ -37,6 +37,7 @@ import { fixStoreSchema, SchemaFixRefusal } from './fix-schema.js';
 import { LEGACY_GATE_OPEN } from './migrations.js';
 import { sqliteCatalogue } from './schema-plan.js';
 import { migrateSchema, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from './sqlite.js';
+import { storeRows } from './testdata/store-rows.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-fix-schema-'));
 afterAll(() => {
@@ -247,14 +248,14 @@ describe('fixStoreSchema on a pre-log store past this rafa', () => {
     const dir = caseDir();
     const path = join(dir, 'effort.sqlite');
     plantStore(path, NEWER, fillNewer);
-    const original = readFileSync(path);
+    const original = storeRows(path);
 
     const result = fixStoreSchema(fixOptions(path, false));
 
     const backup = join(dir, `effort.sqlite.v${String(SQLITE_SCHEMA_VERSION + 2)}-${STAMP}.bak`);
     expect(result.status).toBe('rebuilt');
     expect(result.backupPath).toBe(backup);
-    expect(readFileSync(backup).equals(original)).toBe(true);
+    expect(storeRows(backup)).toEqual(original);
     expect(versionOf(path)).toBe(LEGACY_GATE_OPEN);
     expect(countOf(path, 'SELECT count(*) AS n FROM sessions')).toBe(2);
     expect(countOf(path, 'SELECT count(*) AS n FROM commits')).toBe(1);
@@ -377,7 +378,7 @@ describe('fixStoreSchema on a logged store this rafa refuses', () => {
     const dir = caseDir();
     const path = join(dir, 'effort.sqlite');
     plantLogged(path, newerLogged(['writers']));
-    const original = readFileSync(path);
+    const original = storeRows(path);
 
     const result = fixStoreSchema(fixOptions(path, false));
 
@@ -390,7 +391,7 @@ describe('fixStoreSchema on a logged store this rafa refuses', () => {
     expect(countOf(path, 'SELECT count(*) AS n FROM sqlite_master WHERE name = \'future_readings\'')).toBe(0);
     expect(countOf(path, 'SELECT count(*) AS n FROM sessions')).toBe(2);
     const backup = join(dir, `effort.sqlite.v${String(LEGACY_GATE_OPEN)}-${STAMP}.bak`);
-    expect(readFileSync(backup).equals(original)).toBe(true);
+    expect(storeRows(backup)).toEqual(original);
     expect(countOf(backup, `SELECT count(*) AS n FROM ${MIGRATION_LOG_TABLE} WHERE id = 'future-readings'`)).toBe(1);
   });
 

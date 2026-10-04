@@ -79,11 +79,26 @@
  * file one this rafa uses as it is (`refuseUnusable`, `fix-schema.ts`).
  *
  * Under `dryRun` the parallel file is then deleted, and the answer says
- * what the merge would have done. Otherwise this store is renamed to
- * `<store>.before-merge-<stamp>.bak` and the parallel file renamed into
- * its place (`rebuildAside`). The backup is the whole original, and
- * restoring it is renaming it back. The merged file is a new file, so
- * its first writing open mints a new origin, which is harmless.
+ * what the merge would have done. Otherwise the parallel file is
+ * swapped in (`swapIn`, `rebuild-aside.ts`): this store is written out
+ * to `<store>.before-merge-<stamp>.bak` with `VACUUM INTO`, its identity
+ * is carried onto the parallel file (`carryStoreIdentity`,
+ * `store-meta.ts`), and the parallel file is renamed into its place.
+ *
+ * ## The store keeps its id
+ *
+ * `store_meta` is `local` in `MERGE_RULES`, so the parallel file holds
+ * this store's own row and never the other store's. The carry gives it
+ * the device, inode and generation the rename brings to this store's
+ * path, so the merged store keeps this store's origin, and the rows it
+ * writes next carry the same store id. A store whose next write would
+ * have minted anyway, being a copy already, is carried nothing and
+ * mints on its first write after the swap.
+ *
+ * The backup holds every row the original held, and restoring it is
+ * renaming it back. It is a copy with an inode of its own, so once
+ * renamed back over the store its first writing open mints a new
+ * origin, as any restored copy must (`store-identity.ts`).
  *
  * ## What the counts leave out
  *

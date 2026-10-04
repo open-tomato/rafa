@@ -74,18 +74,44 @@
  * complement explicitly, the row is read through `CAST(… AS TEXT)`,
  * and {@link fromStoredInteger} turns it back unsigned. Every value
  * below 2^63 is written and read as itself.
+ *
+ * ## Carrying the identity onto a file that replaces the store
+ *
+ * A rebuild beside the store (`rebuild-aside.ts`) builds a parallel file
+ * that holds the store's own `store_meta` row, since `store_meta` is
+ * `local` in `MERGE_RULES`, and then renames it over the store. The
+ * renamed file has the store's path and host and the parallel file's
+ * inode, so its next writing open would mint although it is the same
+ * store. {@link carryStoreIdentity} runs before that rename. It reads
+ * the live file's row and asks `decideStoreIdentity` what a write to the
+ * live file would do. Only on a keep does it write the parallel file's
+ * own device and inode, and the generation the live side record holds,
+ * into the parallel file's row. After the rename the parallel file
+ * sits at the live path beside that side record, so all three facts and
+ * the generation agree and the next writing open keeps the origin.
+ *
+ * Every other answer writes nothing, so the renamed file mints on its
+ * next write, which is the safe side. That covers a live file with no
+ * `store_meta` table or no row (an unminted store has no origin to
+ * carry), a live file that would mint itself (another host, path,
+ * device or inode, or a row generation its side record does not hold),
+ * and a parallel file whose row is not the live store's. A write to the
+ * live store between the carry and the rename rotates the side record
+ * past the generation carried, so the renamed file mints as well.
  */
 import type { StoreAccess } from './schema-plan.js';
 import type {
   MintReason,
   ProjectIdentity,
   RecordedIdentity,
+  StoreFileFacts,
   StoreIdentityFacts,
 } from './store-identity.js';
-import type { Database } from 'bun:sqlite';
 
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
+
+import { Database } from 'bun:sqlite';
 
 import { writeStoreGeneration } from './store-generation.js';
 import {
@@ -93,6 +119,7 @@ import {
   observeStore,
   readHostId,
   readProjectIdentity,
+  readStoreFileFacts,
 } from './store-identity.js';
 
 /** The width of the unsigned device and inode values. */
@@ -312,4 +339,109 @@ export function settleStoreIdentity(
 
   const underLock = db.transaction((): IdentityOutcome => settleUnderLock(db, observe, prefetched ?? undefined, seams));
   return underLock.immediate();
+}
+
+/**
+ * What {@link carryStoreIdentity} did. Every answer but `carried` left
+ * the parallel file unwritten.
+ */
+export type CarryOutcome =
+  /** The live file holds no `store_meta` table. */
+  | { readonly action: 'no-table' }
+  /** The live file's `store_meta` holds no row: an unminted store. */
+  | { readonly action: 'no-row' }
+  /** A write to the live file would mint, for `reasons`. */
+  | { readonly action: 'mint'; readonly reasons: readonly MintReason[] }
+  /** The parallel file holds no `store_meta` row of the live store's id. */
+  | { readonly action: 'other-row' }
+  /** The parallel file's row now records its own device and inode and `generation`. */
+  | { readonly action: 'carried'; readonly storeId: string; readonly generation: string | null };
+
+/** Whether `db` holds a `store_meta` table. */
+function hasStoreMetaTable(db: Database): boolean {
+  return db.query<{ n: number }, []>(
+    'SELECT count(*) AS n FROM sqlite_master WHERE type = \'table\' AND name = \'store_meta\'',
+  ).get()?.n === 1;
+}
+
+/** A write to the live file that would keep `storeId`, with the facts it observed. */
+interface LiveKeep {
+  readonly action: 'keep';
+  readonly storeId: string;
+  readonly facts: StoreIdentityFacts;
+}
+
+/**
+ * What a write to the live file at `livePath` would decide about its
+ * row, or the outcome that says it holds none. A decision other than
+ * keep or mint cannot come from a write; it is answered as a mint with
+ * no reasons, the safe side.
+ */
+function decideLiveWrite(livePath: string, readHost: () => string): CarryOutcome | LiveKeep {
+  const live = new Database(livePath, { readonly: true });
+  let recorded: StoreMeta | null;
+  try {
+    if (!hasStoreMetaTable(live)) return { action: 'no-table' };
+    recorded = readStoreMeta(live);
+  } finally {
+    live.close();
+  }
+  if (recorded === null) return { action: 'no-row' };
+
+  const facts = observeStore(livePath, readHost);
+  const decision = decideStoreIdentity('write', recorded, () => facts);
+  if (decision.action === 'keep') return { action: 'keep', storeId: decision.storeId, facts };
+  const reasons = decision.action === 'mint'
+    ? decision.reasons
+    : [];
+  return { action: 'mint', reasons };
+}
+
+/**
+ * Writes `parallel`'s device and inode and `generation` into the row of
+ * the parallel file `db` holds when that row is the store `storeId`'s,
+ * answering whether it was. The generation is left out for a file whose
+ * `store_meta` has no `generation` column.
+ */
+function writeCarried(db: Database, storeId: string, parallel: StoreFileFacts, generation: string | null): boolean {
+  if (!hasStoreMetaTable(db) || readStoreMeta(db)?.storeId !== storeId) return false;
+  const dev = toStoredInteger(parallel.fileDev);
+  const ino = toStoredInteger(parallel.fileIno);
+  if (hasGenerationColumn(db)) {
+    db.query('UPDATE store_meta SET file_dev = ?, file_ino = ?, generation = ? WHERE id = 1').run(dev, ino, generation);
+  } else {
+    db.query('UPDATE store_meta SET file_dev = ?, file_ino = ? WHERE id = 1').run(dev, ino);
+  }
+  return true;
+}
+
+/**
+ * Carries the identity of the live store at `livePath` onto the file at
+ * `parallelPath` that is about to be renamed over it. When
+ * `decideStoreIdentity('write', …)` answers keep for the live file, the
+ * parallel file's own device and inode and the live side record's
+ * generation are written into the parallel file's `store_meta` row, and
+ * its store id, path, host and every other column are kept. Nothing is
+ * written otherwise. The host id is read through `seams.readHostId`
+ * (`readHostId` when absent). Throws the filesystem's own error, which
+ * names the path, when either file does not exist. See the module note.
+ */
+export function carryStoreIdentity(
+  livePath: string,
+  parallelPath: string,
+  seams: StoreIdentitySeams = {},
+): CarryOutcome {
+  const parallel = readStoreFileFacts(parallelPath);
+  const live = decideLiveWrite(livePath, seams.readHostId ?? readHostId);
+  if (live.action !== 'keep') return live;
+
+  const db = new Database(parallelPath, { readwrite: true });
+  try {
+    const { generation } = live.facts;
+    return writeCarried(db, live.storeId, parallel, generation)
+      ? { action: 'carried', storeId: live.storeId, generation }
+      : { action: 'other-row' };
+  } finally {
+    db.close();
+  }
 }
