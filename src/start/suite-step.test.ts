@@ -813,7 +813,7 @@ describe('runStageStep', () => {
       seams: { listTestFiles: () => ['src/b/b.test.ts'] },
     });
     const outcome = await runStageStep(context, stage, baselineWith());
-    expect(outcome).toEqual({ kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null });
+    expect(outcome).toEqual({ kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false });
     expect(seen.runs).toHaveLength(0);
     expect(seen.steps).toHaveLength(0);
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
@@ -998,14 +998,48 @@ describe('the recorded step\'s reason', () => {
 });
 
 describe('runPreWrapUpStep', () => {
-  it('runs the full suite and, red, writes no blocker', async () => {
-    const { context, seen } = contextWith([red([FRESH])]);
+  /** {@link TRACKER} with every task ticked, and `extra` task lines after the last one. */
+  const finished = (extra: readonly string[] = []): string => TRACKER
+    .replace('- [ ] third task\n- [ ] fourth task', ['- [x] third task', '- [x] fourth task', ...extra].join('\n'));
+  const repairText = `Repair the red pre-wrap-up step at commit ${HEAD}`;
+
+  it('runs the full suite and, green, writes nothing', async () => {
+    writeFileSync(trackerPath, finished(), 'utf8');
+    const { context, seen } = contextWith([red([KNOWN])]);
     const outcome = await runPreWrapUpStep(context, baselineWith());
     expect(seen.runs[0]?.paths).toBeUndefined();
     expect(seen.runs[0]?.changedSince).toBeUndefined();
-    expect(outcome).toMatchObject({ kind: 'pre-wrap-up', red: true, blockedLine: null });
+    expect(outcome).toMatchObject({ kind: 'pre-wrap-up', red: false, blockedLine: null, repairInserted: false });
     expect(seen.steps[0]?.scope).toBe('full');
-    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(finished());
+  });
+
+  it('inserts a blocked pre-wrap-up repair after the last task on a red step, after the step is recorded', async () => {
+    writeFileSync(trackerPath, finished(), 'utf8');
+    const { context, seen } = contextWith([red([FRESH])]);
+    const outcome = await runPreWrapUpStep(context, baselineWith());
+
+    expect(outcome).toMatchObject({ kind: 'pre-wrap-up', red: true, blockedLine: 11, repairInserted: true });
+    expect(seen.trackerAtAppend[0]).toBe(finished());
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next).toMatchObject({ status: 'blocked', lineNum: 11, task: `${repairText}  {agent=build-error-resolver}` });
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(next?.blocker).toContain('The runner\'s pre-wrap-up step found failures');
+    expect(next?.blocker).toContain('bun test ./src/new.test.ts');
+    expect(linesAt('error').some((line) => line.includes('A repair task (line 12) is inserted'))).toBe(true);
+  });
+
+  it('blocks the ticked pre-wrap-up repair again on a second red, inserting nothing', async () => {
+    const repaired = finished([`- [x] ${repairText}  {agent=build-error-resolver}`]);
+    writeFileSync(trackerPath, repaired, 'utf8');
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runPreWrapUpStep(context, baselineWith());
+
+    expect(outcome).toMatchObject({ kind: 'pre-wrap-up', red: true, blockedLine: 11, repairInserted: false });
+    const content = readFileSync(trackerPath, 'utf8');
+    expect(parsePlan(content).tasks).toHaveLength(parsePlan(repaired).tasks.length);
+    expect(findNextTask(content)).toMatchObject({ status: 'blocked', lineNum: 11, blocker: outcome.blocker ?? '' });
+    expect(linesAt('error').some((line) => line.includes('The repair task (line 12) is marked blocked on it again'))).toBe(true);
   });
 });
 

@@ -98,7 +98,7 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   if (run.scope === 'paths' && run.paths.length === 0) {
     activeOutput().info(`🧪 ${label}: no test file under the Owns: folders it changed and no integration file; nothing to run.`);
     addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
-    return { kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null };
+    return { kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
   }
   const runs = stageRuns(context, seams, run);
   const result = await runWithAlwaysRun(context, seams, 'stage', runs);

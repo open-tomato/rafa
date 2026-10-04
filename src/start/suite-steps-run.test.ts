@@ -101,6 +101,7 @@ function outcome(kind: StepOutcome['kind'], red = false, blockedLine: number | n
       ? 'New failing test files: src/x.test.ts (1 test).'
       : null,
     blockedLine,
+    repairInserted: blockedLine !== null,
   };
 }
 

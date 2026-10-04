@@ -33,8 +33,10 @@
  * (`suite-blocker.ts`), so that repair is dispatched first on the next
  * run, handed the blocker text through `BLOCKER_PROMPT_PREFIX`
  * (`start/dispatch.ts`), exactly as a blocked task's own is. A red
- * pre-wrap-up step has no task to block: the run stops before the
- * wrap-up, and the next run takes that step again.
+ * pre-wrap-up step has inserted a `[BLOCKED]` repair after the
+ * checklist's last task, or written its blocker on the ticked
+ * pre-wrap-up repair an earlier red inserted: the run stops before the
+ * wrap-up, and the next run dispatches that repair first.
  *
  * ## A step stopped by SIGINT
  *

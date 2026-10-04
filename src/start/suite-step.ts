@@ -19,7 +19,7 @@
  * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing |
  * | task ({@link runTaskStep}) | `taskStepScope` (`suite/scope.ts`) over the task's diff | a repair task it inserts, or the repair it followed |
  * | stage ({@link runStageStep}) | `stageStepScope` over the stage's diff | a repair task it inserts |
- * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | nothing: there is no task left |
+ * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
  *
  * **The baseline** is read from `SUITE_BASELINE-<stub>.json` beside the
  * tracker (`suite/baseline.ts`) and reused on a resumed run, which then
@@ -77,9 +77,11 @@
  *
  * **The pre-wrap-up step** runs the full suite, and stands in for the
  * last stage's stage step, so {@link dueStages} never answers a stage
- * once no task is left open. A red one writes no blocker, having no
- * task to write it on; the caller stops before the wrap-up, and a rerun
- * takes the step again, since the tracker still has no open task.
+ * once no task is left open. A red one inserts a repair task after the
+ * checklist's last task, or, when the tracker holds a ticked pre-wrap-up
+ * repair already, writes its blocker on that line again and inserts
+ * nothing ({@link StepOutcome.repairInserted} false), so one repair
+ * session is the most it adds; the caller stops before the wrap-up.
  *
  * ## Red, and what a red step writes
  *
@@ -105,16 +107,18 @@
  * step does. The retake writes over the first run's JUnit and output
  * files, so those on disk are the settled run's.
  *
- * A red task or stage step inserts a `[BLOCKED]` repair task above the
- * first open plan task, through `insertTrackerTask` (`utils/tracker.ts`),
- * leaving that task as it was: its text names the commit the step ran
- * at, its declaration is `{agent=build-error-resolver}`, and its blocker
- * comment is the step's text. With no open task left, the repair goes
- * after the checklist's last task. A red task step that follows a repair
- * task writes its blocker on that repair's line instead, marking it
- * `[BLOCKED]` again, and inserts nothing. The text and the writes live
- * in `suite-blocker.ts`. The text names each new failing test file with
- * its count, the command running them (`bun test <files>`), and the
+ * A red task, stage or pre-wrap-up step inserts a `[BLOCKED]` repair
+ * task above the first open plan task, through `insertTrackerTask`
+ * (`utils/tracker.ts`), leaving that task as it was: its text names the
+ * commit the step ran at, its declaration is
+ * `{agent=build-error-resolver}`, and its blocker comment is the step's
+ * text. With no open task left, the repair goes after the checklist's
+ * last task. A red task step that follows a repair task, and a red
+ * pre-wrap-up step finding a ticked pre-wrap-up repair, write the
+ * blocker on that repair's line instead, marking it `[BLOCKED]` again,
+ * and insert nothing. The text and the writes live in
+ * `suite-blocker.ts`. The text names each new failing test file with its
+ * count, the command running them (`bun test <files>`), and the
  * errors outside any test, by file and first line, or the missing
  * summary when those made it red; the repair session is handed it
  * through `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`).
@@ -292,6 +296,8 @@ export interface StepOutcome {
   readonly blocker: string | null;
   /** The tracker line (from zero) the blocker was written on, or null. */
   readonly blockedLine: number | null;
+  /** True when that line is a repair inserted now; false when green, or written on an existing repair. */
+  readonly repairInserted: boolean;
 }
 
 /** What {@link ensureBaseline} answered. */
@@ -549,7 +555,7 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
   activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
-  return { kind, step, red: false, interrupted: true, blocker: null, blockedLine: null };
+  return { kind, step, red: false, interrupted: true, blocker: null, blockedLine: null, repairInserted: false };
 }
 
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
@@ -561,7 +567,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
   recordStep(seams, step);
   announce(label, result, verdict.known);
   const lintBlocker = settling.lint?.blocker ?? null;
-  if (!isRed(verdict) && lintBlocker === null) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null };
+  if (!isRed(verdict) && lintBlocker === null) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
 
   const tested = isRed(verdict)
     ? [blockerText(label, result, verdict)]
@@ -576,7 +582,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
   if (written !== null) activeOutput().error(written.inserted
     ? `   A repair task (line ${written.line + 1}) is inserted, blocked on it.`
     : `   The repair task (line ${written.line + 1}) is marked blocked on it again.`);
-  return { kind, step, red: true, interrupted: false, blocker, blockedLine: written?.line ?? null };
+  return { kind, step, red: true, interrupted: false, blocker, blockedLine: written?.line ?? null, repairInserted: written?.inserted ?? false };
 }
 
 /** True when a step's only red is errors outside any test over the baseline's count. */
@@ -736,11 +742,11 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   return outcome;
 }
 
-/** Runs the full suite before the wrap-up; a red one writes no blocker. See the module note. */
+/** Runs the full suite before the wrap-up; a red one writes its blocker on a pre-wrap-up repair. See the module note. */
 export async function runPreWrapUpStep(context: SuiteStepContext, baseline: SuiteBaseline | null): Promise<StepOutcome> {
   const seams = seamsOf(context);
   const result = await runOne(context, seams, 'pre-wrap-up', {});
-  const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: null };
+  const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
   return settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {})));
 }
 
