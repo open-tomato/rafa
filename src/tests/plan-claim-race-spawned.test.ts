@@ -39,7 +39,7 @@ import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { completeSpecBody } from './spec-bodies.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
@@ -217,7 +217,7 @@ describe('two clones of one bare remote plan create --issue for the same issue',
 
     const runA = runRafa(deviceA, deviceA.repo, ['plan', 'create', `--issue=${String(ISSUE)}`, '--no-progress']);
 
-    expect(runA.exitCode).toBe(0);
+    expectExit(runA, 0, deviceA);
     expect(runA.stdout).toContain(`🔒 Claimed #${String(ISSUE)} on ${BRANCH} for store store-a-2b6f19.`);
     expect(runA.stdout).toContain(`✅ Plan ready: .rafa/plans/PLAN-${STUB}.md`);
     expect(existsSync(planPathUnder(deviceA.repo))).toBe(true);
@@ -225,7 +225,7 @@ describe('two clones of one bare remote plan create --issue for the same issue',
 
     const runB = runRafa(deviceB, deviceB.repo, ['plan', 'create', `--issue=${String(ISSUE)}`, '--no-progress']);
 
-    expect(runB.exitCode).toBe(1);
+    expectExit(runB, 1, deviceB);
     expect(runB.stderr).toContain(`❌ Refusing to plan issue #${String(ISSUE)}:`);
     expect(runB.stderr).toContain(`#${String(ISSUE)} is claimed by store store-a-2b6f19 on ${BRANCH}`);
     expect(runB.stderr).toContain('No session was started.');

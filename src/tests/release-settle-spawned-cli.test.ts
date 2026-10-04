@@ -28,7 +28,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '../release/fragment.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own. */
@@ -163,7 +163,7 @@ describe('rafa release settle, spawned over a bare origin and two clones', () =>
 
       const dry = runRafa(w.scratch, w.scratch.repo, ['release', 'settle', '--dry-run']);
 
-      expect(dry.exitCode).toBe(0);
+      expectExit(dry, 0, w.scratch);
       expect(dry.stdout).toContain('Strategy: semver-by-level');
       expect(dry.stdout).toContain('Version: 0.4.0 → 0.5.0');
       expect(dry.stdout).toContain('Dry run: settle would commit "chore: release 0.5.0" on main; nothing was written.');
@@ -173,7 +173,7 @@ describe('rafa release settle, spawned over a bare origin and two clones', () =>
 
       const settled = runRafa(w.scratch, w.scratch.repo, ['release', 'settle']);
 
-      expect(settled.exitCode).toBe(0);
+      expectExit(settled, 0, w.scratch);
       expect(settled.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
       expect(originSubject(w)).toBe('chore: release 0.5.0');
       expect(originFragments(w)).toEqual([]);
@@ -189,7 +189,7 @@ describe('rafa release settle, spawned over a bare origin and two clones', () =>
 
       const second = runRafa(w.scratch, w.scratch.repo, ['release', 'settle']);
 
-      expect(second.exitCode).toBe(0);
+      expectExit(second, 0, w.scratch);
       expect(second.stdout).toContain('Nothing to settle');
       expect(second.stdout).not.toContain('Pushed');
       expect(w.git(w.origin, ['rev-parse', 'main'])).toBe(released);
