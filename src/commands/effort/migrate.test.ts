@@ -201,6 +201,8 @@ describe('rafa effort migrate', () => {
     const backup = `${path}.before-synthetic-notes-rebuild-${STAMP}.bak`;
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain(`✅ Migrated. The original is kept whole at ${backup}`);
+    expect(outcome.stdout).toContain('The migrated store keeps the store\'s id; the backup is a copy, so renamed back'
+      + ' it takes a new id on its next write.');
     expect(readdirSync(dirname(path)).sort()).toEqual(['effort.sqlite', `effort.sqlite.before-synthetic-notes-rebuild-${STAMP}.bak`]);
     expect(storeRows(backup)).toEqual(original);
     const { userVersion, log } = readLog(path);

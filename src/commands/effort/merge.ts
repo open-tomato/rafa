@@ -10,6 +10,8 @@
  * from, and is only ever read. The merged store is built beside this one
  * as `effort.sqlite.merge-<stamp>`, checked, and swapped in with the
  * original kept whole as `effort.sqlite.before-merge-<stamp>.bak`.
+ * The merged store keeps this store's id; the backup is a copy, so
+ * renamed back it takes a new id on its next write.
  * `--dry-run` builds and checks the same file, then deletes it.
  *
  * It prints, for each merged table, the rows added, skipped and in
@@ -46,7 +48,7 @@ import { RebuildRefusal } from '../../effort/store/rebuild-aside.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
 import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
-import { fileStamp } from './fix-schema.js';
+import { fileStamp, keepsIdLine } from './fix-schema.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort merge';
@@ -109,7 +111,8 @@ function closingLine(result: MergeResult, command: string): string {
       + ` schema plan) and deleted. Run \`${command} ${result.otherPath}\` to swap it in; the original would be`
       + ` kept whole at ${result.path}.before-merge-<stamp>.bak.`;
   }
-  return `✅ Merged. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`;
+  return `✅ Merged. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`
+    + ` ${keepsIdLine('merged store')}`;
 }
 
 /**
@@ -228,7 +231,8 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
       + ' of each commit brought in, and of the commit after it, is recomputed. The other file is only read.'
       + ' The merged store is built beside this one, checked (each table\'s count plus the rows added,'
       + ' integrity_check, the schema plan), and swapped in with the original kept whole as'
-      + ' `effort.sqlite.before-merge-<stamp>.bak`. It prints the rows added, skipped and in conflict per table'
+      + ' `effort.sqlite.before-merge-<stamp>.bak`. The merged store keeps this store\'s id; the backup is a copy,'
+      + ' so renamed back it takes a new id on its next write. It prints the rows added, skipped and in conflict per table'
       + ' and the backup\'s name. Exit code 2 for another project\'s store, and for a `store: ndjson` project,'
       + ' naming `rafa effort move --to=sqlite`; exit code 1, changing nothing, for a missing or damaged file,'
       + ' a write in flight, a loop session running or paused, and a development build over a store it does not'

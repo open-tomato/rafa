@@ -756,7 +756,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/store/migrate.js', ['migrateStore', 'MigrateRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
-    ['./fix-schema.js', ['fileStamp']],
+    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
   ]],
   ['./commands/effort/merge.js', [
     ['../../cli/command.js', ['CommandExit']],
@@ -768,7 +768,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/store/rebuild-aside.js', ['RebuildRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./fix-schema.js', ['fileStamp']],
+    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
   ]],
   ['./commands/effort/import.js', [
     ['../../effort/sync/file.js', ['createFileSync']],

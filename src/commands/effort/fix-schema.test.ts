@@ -139,6 +139,8 @@ describe('rafa effort fix-schema', () => {
     const backup = `${path}.v${String(SQLITE_SCHEMA_VERSION + 2)}-20260926T101500Z.bak`;
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain(`kept whole at ${backup}`);
+    expect(outcome.stdout).toContain('The rebuild keeps the store\'s id; the backup is a copy, so renamed back it takes'
+      + ' a new id on its next write.');
     expect(existsSync(backup)).toBe(true);
   });
 

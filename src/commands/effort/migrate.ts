@@ -11,7 +11,8 @@
  * `effort.sqlite.migrate-<stamp>` beside it, checked (the row count of
  * every table, `integrity_check`, this rafa's schema plan), and swapped in
  * with the original kept whole as `effort.sqlite.before-<id>-<stamp>.bak`.
- * `--dry-run` builds and checks the same file, then deletes it.
+ * The migrated store keeps the store's id; the backup is a copy, so
+ * renamed back it takes a new id on its next write. `--dry-run` builds and checks the same file, then deletes it.
  *
  * The swap is refused, before anything is built, from a development build
  * over a store it does not own, which is any store but a copy under
@@ -40,7 +41,7 @@ import { migrateStore, MigrateRefusal } from '../../effort/store/migrate.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
 import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
-import { fileStamp } from './fix-schema.js';
+import { fileStamp, keepsIdLine } from './fix-schema.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort migrate';
@@ -94,7 +95,8 @@ export function renderMigrate(result: MigrateResult): string[] {
     case 'migrated':
       return [
         ...builtLines(result),
-        `✅ Migrated. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`,
+        `✅ Migrated. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`
+          + ` ${keepsIdLine('migrated store')}`,
       ];
   }
 }
@@ -158,8 +160,10 @@ export function createMigrateCommand(seams: MigrateCommandSeams = {}): RafaComma
       + ' rafa knows, including one that breaks older runtimes, which no ordinary open applies. It writes the'
       + ' store to `effort.sqlite.migrate-<stamp>` beside it with `VACUUM INTO`, applies the pending migrations'
       + ' there with log rows naming this rafa, checks the row count of every table against the store,'
-      + ' SQLite\'s integrity_check and the schema plan, then renames the original to'
-      + ' `effort.sqlite.before-<id>-<stamp>.bak`, whole, and moves the migrated file into its place. A store'
+      + ' SQLite\'s integrity_check and the schema plan, then writes the original to'
+      + ' `effort.sqlite.before-<id>-<stamp>.bak`, whole, and moves the migrated file into its place. The'
+      + ' migrated store keeps the store\'s id; the backup is a copy, so renamed back it takes a new id on its'
+      + ' next write. A store'
       + ' with nothing pending, or no store, is left alone. It refuses, changing nothing, while a loop session'
       + ' under the project is running or paused, from a development build over any store but a copy under'
       + ' `RAFA_EFFORT_DIR`, while a journal beside the store shows a write in flight, when a row count'

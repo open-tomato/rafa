@@ -11,7 +11,9 @@
  * `gate-mismatch`, `edited` or either `unknown-breaks-*` is rebuilt with
  * a migration log whose rows name this runtime as applying them, and
  * what only the newer schema holds, unknown migrations included, is
- * kept in the backup alone. The other two refusals are passed on with
+ * kept in the backup alone. The rebuild keeps the store's id; the
+ * backup is a copy, so renamed back it takes a new id on its next
+ * write. The other two refusals are passed on with
  * the plan's own next step. Where a newer rafa that knows the store's
  * migrations can be installed, that comes first.
  *
@@ -58,6 +60,17 @@ export interface FixSchemaCommandSeams {
 export function fileStamp(date: Date): string {
   return date.toISOString().replace(/[-:]/g, '')
     .replace(/\.\d{3}Z$/, 'Z');
+}
+
+/**
+ * The done line's sentence on identity, shared by `effort fix-schema`,
+ * `effort migrate` and `effort merge`: the file `swapped` names keeps the
+ * store's id, and the backup, a copy, takes a new one once renamed back
+ * (`carryStoreIdentity`, `src/effort/store/store-meta.ts`).
+ */
+export function keepsIdLine(swapped: string): string {
+  return `The ${swapped} keeps the store's id; the backup is a copy, so renamed back it takes a new id on its`
+    + ' next write.';
 }
 
 /** Refuses while a loop session under `root` reads `running` or `paused`. */
@@ -142,7 +155,7 @@ export function renderFixSchema(result: FixSchemaResult): string[] {
       return [
         ...rebuildLines(result),
         `✅ Rebuilt at this rafa's migrations. The original is kept whole at ${String(result.backupPath)};`
-          + ' rename it back to undo.',
+          + ` rename it back to undo. ${keepsIdLine('rebuild')}`,
       ];
   }
 }
@@ -194,8 +207,9 @@ export function createFixSchemaCommand(seams: FixSchemaCommandSeams = {}): RafaC
       + ' comes first where one exists. It builds a parallel store beside it at this rafa\'s migrations, with a'
       + ' migration log naming this rafa, copies every table and column this rafa knows, checks the row counts,'
       + ' SQLite\'s integrity_check and the schema plan, and lists what only the newer schema holds, unknown'
-      + ' migrations included. Then it renames the original to `effort.sqlite.v<user_version>-<stamp>.bak`,'
-      + ' whole, and moves the rebuild into its place. A store this rafa uses, current or behind, or no store, is'
+      + ' migrations included. Then it writes the original to `effort.sqlite.v<user_version>-<stamp>.bak`,'
+      + ' whole, and moves the rebuild into its place. The rebuild keeps the store\'s id; the backup is a copy,'
+      + ' so renamed back it takes a new id on its next write. A store this rafa uses, current or behind, or no store, is'
       + ' left alone. It refuses, changing nothing, while a loop session under the project is running or paused,'
       + ' from a development build, while a journal beside the store shows a write in flight, when the newer'
       + ' schema lacks a table or column this rafa writes, and on a refusal a rebuild does not repair. With'
