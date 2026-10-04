@@ -17,9 +17,9 @@
  * which has no issue and so no saved copy holding stamps. `src/plan.ts`
  * calls it once the resolution has answered a spec — after checks 0–2
  * and the snapshot settle — and once the plan-already-there refusal has
- * passed, before `checkUsage` and the notices, so a refusal writes no
- * plan file and starts no session, and a line that would be refused for
- * free is not charged the `gh` reads check 4 spends first.
+ * passed, before the `progress.txt` read and the notices, so a refusal
+ * writes no plan file and starts no session, and a line that would be
+ * refused for free is not charged the `gh` reads check 4 spends first.
  *
  * `--dry-run` never reaches it: the resolution stops that run before a
  * spec is answered, so no snapshot is written and there is no copy to

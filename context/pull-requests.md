@@ -574,10 +574,10 @@ the session check 3 is part of, so a refusal from it spends no session:
    `src/refs/extract.ts`) — read against the stamp the copy keeps for it in its
    `<!-- rafa:refs` block. It runs on `--issue` and `--next` only, once
    checks 0–2 have passed and the snapshot has settled and once the
-   plan-already-there refusal has passed, and before `checkUsage`, the
-   notices and the session. `--spec` has no saved copy, `--dry-run` stops
-   before any snapshot is written and so before it, and neither
-   `plan needs --issue` nor `issue ready` runs it.
+   plan-already-there refusal has passed, and before the `progress.txt`
+   read, the notices and the session. `--spec` has no saved copy,
+   `--dry-run` stops before any snapshot is written and so before it,
+   and neither `plan needs --issue` nor `issue ready` runs it.
 
    A reference the copy keeps no stamp for is stamped on that reading
    and reads `ok`, except a target that does not exist, which is

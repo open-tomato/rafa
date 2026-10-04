@@ -755,16 +755,16 @@ New; it replaces no earlier text. What a row or an action added to
 - **Check 4, the references, runs in `src/plan.ts` once the resolution
   has answered a spec** (`src/commands/plan/refs-check.ts` over
   `src/board/refs-gate.ts`): after the snapshot settles and the
-  plan-already-there refusal passes, and before `checkUsage`, the
-  notices and the session, on `--issue` and `--next` alone. A dangling
+  plan-already-there refusal passes, and before the `progress.txt`
+  read, the notices and the session, on `--issue` and `--next` alone. A dangling
   or suspect reference refuses with exit 2; `--accept-refs`, or
   `dangerous.acceptStaleRefs: true`, re-stamps them all and plans. The
   setting's warn line is printed first thing in the run, before the
   resolution's first read. `context/pull-requests.md` holds the rules.
 - **The claim runs in `src/plan.ts` right after check 4**
   (`src/commands/plan/claim-route.ts` over `src/claims/plan-claim.ts`),
-  before `checkUsage`, the notices and the session, on a run that knows
-  its issue: `--issue`, `--next`, or a `--spec` whose name opens
+  before the `progress.txt` read, the notices and the session, on a run
+  that knows its issue: `--issue`, `--next`, or a `--spec` whose name opens
   `rafa-<n>-`. A claim another store holds refuses `--issue` and
   `--spec` with exit 1 naming the owner; under `--next` the pick is
   passed over and the spec resolved again with it handed in as

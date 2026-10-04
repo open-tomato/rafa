@@ -351,7 +351,7 @@ import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { runWrapUp } from './start/wrap-up-run.js';
-import { checkUsage, interruptClaudeSessions } from './utils/claude.js';
+import { interruptClaudeSessions } from './utils/claude.js';
 import { parseTaskDeclaration } from './utils/declaration.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
@@ -713,13 +713,6 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (!(await suiteSteps.afterTask(taskInfo, base))) {
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
-      }
-
-      const shouldPause = await checkUsage('task');
-      if (shouldPause) {
-        activeOutput().info('\n⚠️  Pausing task loop due to high Claude usage. Run again when usage is lower.');
-        emitLoopEvent({ kind: 'halt', reason: 'usage high' });
-        break;
       }
     }
   } finally {
