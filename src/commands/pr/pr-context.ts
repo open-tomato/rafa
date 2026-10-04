@@ -216,6 +216,8 @@ export interface PrContext {
   readonly relationships: BoardRelationshipMode;
   /** `plan.dir`, the plans a head branch's stub is resolved against when a checks reading is stored. */
   readonly planDir: string;
+  /** `loop.worktreeDir`, under which `pr merge` frees an ended loop worktree holding the head branch. */
+  readonly worktreeDir: string;
   /** The branch checked out at the project root; throws when git cannot read it. */
   readonly readBranch: () => string;
   /** The `release` settings the release guard reads, with `pr.versionCollision` and `dangerous.acceptVersionCollision`. */
@@ -247,6 +249,7 @@ type PrConfig = Pick<
   | 'roadmapIssue'
   | 'boardRelationships'
   | 'planDir'
+  | 'loopWorktreeDir'
   | keyof MergeGuardSettings
 >;
 
@@ -308,6 +311,7 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     roadmapIssue: config.roadmapIssue,
     relationships: config.boardRelationships,
     planDir: config.planDir,
+    worktreeDir: config.loopWorktreeDir,
     readBranch: () => readBranch(project.root),
     versionGuard: mergeGuardSettings(config),
   };

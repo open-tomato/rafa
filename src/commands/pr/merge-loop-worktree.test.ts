@@ -20,7 +20,9 @@ import { readMergeRefusal } from '../../pr/index.js';
 
 import {
   defaultLoopWorktreeSeams,
+  findLoopHolder,
   freeLoopHolder,
+  freeLoopHolderBeforeMerge,
   freeLoopWorktree,
   readLoopHolder,
 } from './merge-loop-worktree.js';
@@ -381,5 +383,83 @@ describe('freeLoopHolder', () => {
     const { seams } = scripted();
 
     expect(freeLoopHolder(seams, reading(main, join(scratch, 'elsewhere', STUB)))).toEqual({ kind: 'none' });
+  });
+});
+
+describe('findLoopHolder', () => {
+  it('names the loop worktree holding the branch, clean or not, sending no git call', () => {
+    const { main, holder } = freshRepo();
+    const { seams, log } = scripted();
+
+    expect(findLoopHolder(seams, reading(main, holder))).toEqual({ path: holder, stub: STUB });
+    expect(log).toEqual([]);
+  });
+
+  it('answers null for a holder outside loop.worktreeDir and for no holder', () => {
+    const { main, holder } = freshRepo();
+    const { seams } = scripted();
+
+    expect(findLoopHolder(seams, reading(main, join(scratch, 'elsewhere', STUB)))).toBeNull();
+    expect(findLoopHolder(seams, reading(main, holder, { worktrees: [entry(main, 'main')] }))).toBeNull();
+  });
+});
+
+describe('freeLoopHolderBeforeMerge reads the loop sessions from disk', () => {
+  /** The reading without its live loops, which the step reads itself. */
+  function place(main: string, holder: string): Omit<LoopWorktreeReading, 'liveLoops'> {
+    const { worktrees, branch, mainCheckout, worktreeDir, planDir } = reading(main, holder);
+    return { worktrees, branch, mainCheckout, worktreeDir, planDir };
+  }
+
+  /** A record file under `<main>/.rafa/runs/`, written as `text`. */
+  function plantRecord(main: string, name: string, text: string): void {
+    mkdirSync(join(main, '.rafa', 'runs'), { recursive: true });
+    writeFileSync(join(main, '.rafa', 'runs', name), text);
+  }
+
+  it('refuses a worktree whose loop record reads running with its pid alive', () => {
+    const { main, holder } = freshRepo();
+    plantRecord(main, 'sess-live.json', JSON.stringify(record('sess-live', BRANCH)));
+    const { seams, log } = scripted();
+
+    const outcome = freeLoopHolderBeforeMerge(seams, place(main, holder), { root: main, isAlive: () => true });
+
+    expect(outcome.kind).toBe('refused');
+    if (outcome.kind !== 'refused') return;
+    expect(outcome.message).toContain('loop session sess-live (pid 4242) is running in it');
+    expect(log.some((line) => line.startsWith('git worktree remove'))).toBe(false);
+  });
+
+  it('frees the same worktree once the record\'s pid is gone, the control for the case above', () => {
+    const { main, holder } = freshRepo();
+    plantRecord(main, 'sess-live.json', JSON.stringify(record('sess-live', BRANCH)));
+    const { seams, log } = scripted();
+
+    const outcome = freeLoopHolderBeforeMerge(seams, place(main, holder), { root: main, isAlive: () => false });
+
+    expect(outcome.kind).toBe('freed');
+    expect(log).toContain(`git worktree remove ${holder}`);
+  });
+
+  it('refuses when a loop worktree holds the branch and a session record cannot be read', () => {
+    const { main, holder } = freshRepo();
+    plantRecord(main, 'broken.json', '{ not json');
+    const { seams } = scripted();
+
+    const outcome = freeLoopHolderBeforeMerge(seams, place(main, holder), { root: main });
+
+    expect(outcome.kind).toBe('refused');
+    if (outcome.kind !== 'refused') return;
+    expect(outcome.message).toContain(`checked out in the loop worktree ${holder}, and whether a loop still runs in it could not be read`);
+  });
+
+  it('answers none over the same unreadable record when no loop worktree holds the branch', () => {
+    const { main } = freshRepo();
+    plantRecord(main, 'broken.json', '{ not json');
+    const { seams } = scripted();
+
+    const outcome = freeLoopHolderBeforeMerge(seams, place(main, join(scratch, 'elsewhere', STUB)), { root: main });
+
+    expect(outcome).toEqual({ kind: 'none' });
   });
 });

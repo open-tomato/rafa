@@ -45,6 +45,12 @@
  *   - a status git would not give, since a rule that cannot be read may
  *     hold.
  *
+ * `rafa pr merge` calls {@link freeLoopHolderBeforeMerge}, which reads
+ * the session records through `readSessions` only once
+ * {@link findLoopHolder} has named a loop worktree, so a record that
+ * cannot be read refuses that merge alone and leaves every other one
+ * to `readMergeRefusal`.
+ *
  * ## Copy, then remove
  *
  * {@link freeLoopWorktree} copies `CLOSEOUT-<stub>.md` and
@@ -76,7 +82,7 @@
  * the copies that were made, and the caller merges nothing after
  * either. Nothing here passes `--force`.
  */
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../../pr/index.js';
 
 import { copyFileSync, mkdirSync, realpathSync, statSync } from 'node:fs';
@@ -84,6 +90,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { countChanges, WORKTREE_STATUS } from '../../cleanup/worktrees.js';
 import { messageOf } from '../../config-sections.js';
+import { readSessions } from '../../loop/sessions.js';
 import { createGitRunner, gitSaid, worktreesHolding } from '../../pr/index.js';
 import { shellQuote } from '../../pr/preflight-items.js';
 import { worktreeDirAt } from '../../start/worktree-dir.js';
@@ -126,6 +133,9 @@ export interface LoopWorktreeReading {
   /** The loop session records; those reading `running` or `paused` count. */
   readonly liveLoops: readonly SessionRecord[];
 }
+
+/** What tells whether the head branch's holder is a loop worktree at all. */
+export type LoopHolderPlace = Pick<LoopWorktreeReading, 'worktrees' | 'branch' | 'mainCheckout' | 'worktreeDir'>;
 
 /** A loop worktree that may be freed. */
 export interface LoopHolder {
@@ -187,14 +197,11 @@ export function defaultLoopWorktreeSeams(mainCheckout: string): LoopWorktreeSeam
  * whether it is clean and ended; see the module note.
  */
 export function readLoopHolder(seams: LoopWorktreeSeams, reading: LoopWorktreeReading): LoopHolderAnswer {
-  const holders = worktreesHolding(reading.worktrees, reading.branch, reading.mainCheckout);
-  const holder = holders[0];
-  if (holders.length !== 1 || holder === undefined) return { kind: 'none' };
-  const stub = loopStubOf(seams, reading, holder.path);
-  if (stub === null) return { kind: 'none' };
+  const holder = findLoopHolder(seams, reading);
+  if (holder === null) return { kind: 'none' };
 
   const reasons = [...liveReasons(reading, holder.path), ...dirtyReasons(seams.gitAt(holder.path))];
-  if (reasons.length === 0) return { kind: 'freeable', path: holder.path, stub };
+  if (reasons.length === 0) return { kind: 'freeable', ...holder };
   return {
     kind: 'refused',
     path: holder.path,
@@ -263,13 +270,54 @@ export function freeLoopHolder(seams: LoopWorktreeSeams, reading: LoopWorktreeRe
     : { kind: 'refused', message: freed.message };
 }
 
+/**
+ * The head branch's holder when it is a loop worktree, clean or not,
+ * else null; reads nothing but the listing and the two paths.
+ */
+export function findLoopHolder(seams: LoopWorktreeSeams, reading: LoopHolderPlace): LoopHolder | null {
+  const holders = worktreesHolding(reading.worktrees, reading.branch, reading.mainCheckout);
+  const holder = holders[0];
+  if (holders.length !== 1 || holder === undefined) return null;
+  const stub = loopStubOf(seams, reading, holder.path);
+  return stub === null
+    ? null
+    : { path: holder.path, stub };
+}
+
+/**
+ * {@link freeLoopHolder} as `rafa pr merge` calls it, the loop
+ * sessions read only once a loop worktree holds the branch, so a
+ * session record that cannot be read refuses that merge alone. Read
+ * from `sessionsRoot` through `readSessions`, every record reading
+ * `running` or `paused` with its pid alive counts as live.
+ */
+export function freeLoopHolderBeforeMerge(
+  seams: LoopWorktreeSeams,
+  place: Omit<LoopWorktreeReading, 'liveLoops'>,
+  sessions: { readonly root: string; readonly isAlive?: PidProbe },
+): LoopHolderOutcome {
+  const holder = findLoopHolder(seams, place);
+  if (holder === null) return { kind: 'none' };
+  let liveLoops: readonly SessionRecord[];
+  try {
+    liveLoops = readSessions(sessions.root, { isAlive: sessions.isAlive });
+  } catch (error) {
+    return {
+      kind: 'refused',
+      message: `${REFUSAL_PREFIX}: branch ${place.branch} is checked out in the loop worktree ${holder.path}, `
+        + `and whether a loop still runs in it could not be read: ${messageOf(error)}`,
+    };
+  }
+  return freeLoopHolder(seams, { ...place, liveLoops });
+}
+
 /** `CLOSEOUT-<stub>.md` and `PLAN_TRACKER-<stub>.md`, in the order they are copied. */
 export function planFileNames(stub: string): readonly string[] {
   return [`CLOSEOUT-${stub}.md`, `PLAN_TRACKER-${stub}.md`];
 }
 
 /** The holder's stub when it sits one directory below `loop.worktreeDir`, else null. */
-function loopStubOf(seams: LoopWorktreeSeams, reading: LoopWorktreeReading, path: string): string | null {
+function loopStubOf(seams: LoopWorktreeSeams, reading: LoopHolderPlace, path: string): string | null {
   const dir = worktreeDirAt(reading.mainCheckout, reading.worktreeDir);
   const forms = [...new Set([dir, seams.realPath(dir)])];
   for (const form of forms) {
