@@ -355,10 +355,11 @@ describe('MERGE_RULES against every production edit under src/', () => {
     expect(files).toContain('rafa.ts');
   });
 
-  it('finds the edits production modules make, a filing, the two edits of a merge, the new generation a write rotates in and the identity and new generation a rebuild carries, and each has a rule', () => {
+  it('finds the edits production modules make, a filing, the two edits of a merge, the new generation a write rotates in, the identity and new generation a rebuild carries and the fresh generation it spoils a carry-less parallel row with, and each has a rule', () => {
     expect(scanned.edits).toEqual([
       { file: 'effort/store/merge-commit-gaps.ts', table: 'commits', column: 'row_json' },
       { file: 'effort/store/merge-conflicts.ts', table: 'findings', column: 'tracker_ref' },
+      { file: 'effort/store/store-meta.ts', table: 'store_meta', column: 'generation' },
       { file: 'effort/store/store-meta.ts', table: 'store_meta', column: 'generation' },
       { file: 'effort/store/store-meta.ts', table: 'store_meta', column: 'file_dev' },
       { file: 'effort/store/store-meta.ts', table: 'store_meta', column: 'file_ino' },

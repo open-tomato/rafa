@@ -308,7 +308,7 @@ describe('swapIn and the store\'s identity', () => {
     writeOnce(path, seams, true);
     vacuumInto(path, parallelPath);
 
-    swapIn(path, parallelPath, backupPath, { carry: () => ({ action: 'no-row' }) });
+    swapIn(path, parallelPath, backupPath, { carry: () => ({ action: 'no-row', spoiled: null }) });
     const reasons = expectedReasons(path, requiredMeta(path));
     const outcome = settleOnce(path, seams);
 
@@ -548,7 +548,7 @@ describe('swapIn failure points', () => {
     ]);
   });
 
-  it('fails at the rename for real when the built path is a directory, the store untouched and the whole backup kept', () => {
+  it('fails at the carry for real when the built path is a directory, which the carry opens on every answer, the store untouched and the whole backup kept', () => {
     const { dir, path, parallelPath, backupPath } = casePaths();
     plantFile(path, 2);
     const before = readFileSync(path);
@@ -563,7 +563,7 @@ describe('swapIn failure points', () => {
     }));
 
     expect(thrown).toBeInstanceOf(SwapFailure);
-    expect((thrown as SwapFailure).step).toBe('rename');
+    expect((thrown as SwapFailure).step).toBe('carry');
     expect(readFileSync(path).equals(before)).toBe(true);
     expect(storeRows(backupPath)).toEqual(original);
     expect(existsSync(parallelPath)).toBe(true);

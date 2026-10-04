@@ -33,8 +33,9 @@
  *       (`carryStoreIdentity`, `store-meta.ts`): when a write to the
  *       live store would keep its origin, the parallel file's row is
  *       given the parallel file's own device and inode and a new
- *       generation. Otherwise nothing is written, and the swapped-in
- *       store mints on its next write.
+ *       generation. Otherwise nothing is carried: the parallel file's
+ *       row is given only a fresh generation the side record does not
+ *       hold, and the swapped-in store mints on its next write.
  *    c. When the carry answered `carried` with a generation, that
  *       generation is written to the store's side record
  *       (`writeStoreGeneration`, `store-generation.ts`), immediately
