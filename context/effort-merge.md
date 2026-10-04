@@ -123,10 +123,11 @@ the new file in through `rebuildAside`.
 
 **The swap preserves the local store's identity when it stays the same
 store in the same place.** Before renaming the merged file over the live
-store, `swapIn` carries the device, inode, and generation from the live
-store to the new file, so the identity facts stay tied to that path,
-and the store keeps its origin even though its inode may change during
-the rename. The backup, left behind when the new file takes the live
+store, `swapIn` carries the device and inode onto the new file with a
+new generation, and writes that generation to the side record just
+before the rename, so the identity facts stay tied to that path, and
+the store keeps its origin even though its inode may change during the
+rename. The backup, left behind when the new file takes the live
 store's place, becomes a different file: if restored later, it will have
 a new device or inode and will mint a new origin on its first write.
 This is the complement to copy detection: a backup is like a photo of

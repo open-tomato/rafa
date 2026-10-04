@@ -1,7 +1,8 @@
 /**
  * The store's own identity row: reading what `store_meta` records,
  * minting a new origin into it on a writing open that needs one, and
- * rotating the store's generation on every writing open.
+ * rotating the store's generation on every writing open and on every
+ * rebuild that keeps the store's origin.
  *
  * ## What a writing open writes
  *
@@ -85,19 +86,53 @@
  * store. {@link carryStoreIdentity} runs before that rename. It reads
  * the live file's row and asks `decideStoreIdentity` what a write to the
  * live file would do. Only on a keep does it write the parallel file's
- * own device and inode, and the generation the live side record holds,
- * into the parallel file's row. After the rename the parallel file
- * sits at the live path beside that side record, so all three facts and
- * the generation agree and the next writing open keeps the origin.
+ * own device and inode, and a new generation (`newGeneration`), into the
+ * parallel file's row, and it answers that generation in `carried`.
+ * `swapIn` then writes it to the live store's side record immediately
+ * before the rename. After the rename the parallel file sits at the live
+ * path beside that side record, so all three facts and the generation
+ * agree and the next writing open keeps the origin.
  *
- * Every other answer writes nothing, so the renamed file mints on its
+ * The generation rotates on the carry, rather than staying the one the
+ * live side record held, so that nothing the rebuild leaves behind
+ * matches the side record afterwards. The backup and the replaced live
+ * file both hold the old generation in their rows: either renamed back
+ * over the store mints on its first write, even when it lands on an
+ * inode number the host reused. A rename that fails after the side
+ * record was written leaves the live file holding the old generation
+ * beside the new one, so it mints once on its next write, the safe
+ * side, and keeps on the write after. A parallel file whose
+ * `store_meta` has no `generation` column, as for a store written
+ * before `store-meta-generation`, is given its device and inode only;
+ * `carried` then holds a null generation and nothing is written to the
+ * side record, and the renamed file is judged by the three facts alone.
+ *
+ * Every other answer carries nothing, so the renamed file mints on its
  * next write, which is the safe side. That covers a live file with no
  * `store_meta` table or no row (an unminted store has no origin to
  * carry), a live file that would mint itself (another host, path,
  * device or inode, or a row generation its side record does not hold),
- * and a parallel file whose row is not the live store's. A write to the
- * live store between the carry and the rename rotates the side record
- * past the generation carried, so the renamed file mints as well.
+ * and a parallel file whose row is not the live store's. On each of
+ * them the parallel file's row is still given a fresh random generation
+ * (`newGeneration`), where it has a row and a `generation` column, and
+ * the answer reports it in `spoiled`; nothing else in the row changes
+ * and nothing is written to the side record. Without it, the renamed
+ * file would hold the generation the side record holds, since the
+ * parallel file is built from the live one, and would be judged by the
+ * three facts alone; a file that lands at the path on the inode number
+ * its row names, which a host that reuses a freed number can give it,
+ * would then keep an origin that was due a mint. With the fresh
+ * generation the side record does not hold it, and the renamed file
+ * mints however the inode numbers fall. The row is never given a null
+ * generation, which would be judged by the three facts alone as well. A
+ * parallel file with no row or no `generation` column is left
+ * untouched, and `spoiled` is null. A write to the
+ * live store between the side record's write and the rename rotates the
+ * side record past the generation carried, so the renamed file mints as
+ * well. A write between the carry and the side record's write is
+ * overwritten in the side record by the generation carried, so the
+ * renamed file keeps the origin; the rows such a write adds were never
+ * in the parallel file, as for any write after the rebuild began.
  */
 import type { StoreAccess } from './schema-plan.js';
 import type {
@@ -342,19 +377,25 @@ export function settleStoreIdentity(
 }
 
 /**
- * What {@link carryStoreIdentity} did. Every answer but `carried` left
- * the parallel file unwritten.
+ * What {@link carryStoreIdentity} did. Every answer but `carried` reports
+ * in `spoiled` the fresh generation it wrote into the parallel file's
+ * row, the only thing it wrote there, or null when that file holds no
+ * `store_meta` row with a `generation` column and nothing was written.
  */
 export type CarryOutcome =
   /** The live file holds no `store_meta` table. */
-  | { readonly action: 'no-table' }
+  | { readonly action: 'no-table'; readonly spoiled: string | null }
   /** The live file's `store_meta` holds no row: an unminted store. */
-  | { readonly action: 'no-row' }
+  | { readonly action: 'no-row'; readonly spoiled: string | null }
   /** A write to the live file would mint, for `reasons`. */
-  | { readonly action: 'mint'; readonly reasons: readonly MintReason[] }
+  | { readonly action: 'mint'; readonly reasons: readonly MintReason[]; readonly spoiled: string | null }
   /** The parallel file holds no `store_meta` row of the live store's id. */
-  | { readonly action: 'other-row' }
-  /** The parallel file's row now records its own device and inode and `generation`. */
+  | { readonly action: 'other-row'; readonly spoiled: string | null }
+  /**
+   * The parallel file's row now records its own device and inode and the
+   * new `generation`, which the side record has yet to be given; null when
+   * its `store_meta` has no `generation` column, so none was written.
+   */
   | { readonly action: 'carried'; readonly storeId: string; readonly generation: string | null };
 
 /** Whether `db` holds a `store_meta` table. */
@@ -364,20 +405,24 @@ function hasStoreMetaTable(db: Database): boolean {
   ).get()?.n === 1;
 }
 
-/** A write to the live file that would keep `storeId`, with the facts it observed. */
-interface LiveKeep {
-  readonly action: 'keep';
-  readonly storeId: string;
-  readonly facts: StoreIdentityFacts;
-}
+/**
+ * What a write to the live file would decide: keep `storeId`, or one of
+ * the answers that carry nothing, before anything is written to the
+ * parallel file.
+ */
+type LiveWrite =
+  | { readonly action: 'no-table' }
+  | { readonly action: 'no-row' }
+  | { readonly action: 'mint'; readonly reasons: readonly MintReason[] }
+  | { readonly action: 'keep'; readonly storeId: string };
 
 /**
  * What a write to the live file at `livePath` would decide about its
- * row, or the outcome that says it holds none. A decision other than
+ * row, or the answer that says it holds none. A decision other than
  * keep or mint cannot come from a write; it is answered as a mint with
  * no reasons, the safe side.
  */
-function decideLiveWrite(livePath: string, readHost: () => string): CarryOutcome | LiveKeep {
+function decideLiveWrite(livePath: string, readHost: () => string): LiveWrite {
   const live = new Database(livePath, { readonly: true });
   let recorded: StoreMeta | null;
   try {
@@ -390,41 +435,75 @@ function decideLiveWrite(livePath: string, readHost: () => string): CarryOutcome
 
   const facts = observeStore(livePath, readHost);
   const decision = decideStoreIdentity('write', recorded, () => facts);
-  if (decision.action === 'keep') return { action: 'keep', storeId: decision.storeId, facts };
+  if (decision.action === 'keep') return { action: 'keep', storeId: decision.storeId };
   const reasons = decision.action === 'mint'
     ? decision.reasons
     : [];
   return { action: 'mint', reasons };
 }
 
+/** Whether the file `db` holds a `store_meta` row of the store `storeId`. */
+function holdsRowOf(db: Database, storeId: string): boolean {
+  return hasStoreMetaTable(db) && readStoreMeta(db)?.storeId === storeId;
+}
+
 /**
- * Writes `parallel`'s device and inode and `generation` into the row of
- * the parallel file `db` holds when that row is the store `storeId`'s,
- * answering whether it was. The generation is left out for a file whose
- * `store_meta` has no `generation` column.
+ * Writes a generation from `newGeneration` into the `store_meta` row of
+ * the file `db` holds, and nothing else, answering it; or null, writing
+ * nothing and leaving `newGeneration` uncalled, when that file holds no
+ * `store_meta` table, no row, or no `generation` column.
  */
-function writeCarried(db: Database, storeId: string, parallel: StoreFileFacts, generation: string | null): boolean {
-  if (!hasStoreMetaTable(db) || readStoreMeta(db)?.storeId !== storeId) return false;
+function spoilGeneration(db: Database, newGeneration: () => string): string | null {
+  if (!hasStoreMetaTable(db) || !hasGenerationColumn(db)) return null;
+  const rows = db.query<{ n: number }, []>('SELECT count(*) AS n FROM store_meta WHERE id = 1').get()?.n;
+  if (rows !== 1) return null;
+  const generation = newGeneration();
+  db.query('UPDATE store_meta SET generation = ? WHERE id = 1').run(generation);
+  return generation;
+}
+
+/**
+ * Writes `parallel`'s device and inode and a generation from
+ * `newGeneration` into the row of the store `storeId` that the parallel
+ * file `db` holds, answering `carried` with that generation. The
+ * generation is left out, and answered null, for a file whose
+ * `store_meta` has no `generation` column; `newGeneration` is then not
+ * called.
+ */
+function writeCarried(
+  db: Database,
+  storeId: string,
+  parallel: StoreFileFacts,
+  newGeneration: () => string,
+): CarryOutcome {
   const dev = toStoredInteger(parallel.fileDev);
   const ino = toStoredInteger(parallel.fileIno);
   if (hasGenerationColumn(db)) {
+    const generation = newGeneration();
     db.query('UPDATE store_meta SET file_dev = ?, file_ino = ?, generation = ? WHERE id = 1').run(dev, ino, generation);
-  } else {
-    db.query('UPDATE store_meta SET file_dev = ?, file_ino = ? WHERE id = 1').run(dev, ino);
+    return { action: 'carried', storeId, generation };
   }
-  return true;
+  db.query('UPDATE store_meta SET file_dev = ?, file_ino = ? WHERE id = 1').run(dev, ino);
+  return { action: 'carried', storeId, generation: null };
 }
 
 /**
  * Carries the identity of the live store at `livePath` onto the file at
  * `parallelPath` that is about to be renamed over it. When
- * `decideStoreIdentity('write', …)` answers keep for the live file, the
- * parallel file's own device and inode and the live side record's
- * generation are written into the parallel file's `store_meta` row, and
- * its store id, path, host and every other column are kept. Nothing is
- * written otherwise. The host id is read through `seams.readHostId`
- * (`readHostId` when absent). Throws the filesystem's own error, which
- * names the path, when either file does not exist. See the module note.
+ * `decideStoreIdentity('write', …)` answers keep for the live file and
+ * the parallel file holds a row of the live store's id, the parallel
+ * file's own device and inode and a new generation from
+ * `seams.newGeneration` (`crypto.randomUUID` when absent) are written
+ * into that row, and its store id, path, host and every other column are
+ * kept. The answer `carried` holds that generation, which the caller
+ * writes to the live store's side record immediately before the rename
+ * (`swapIn`, `rebuild-aside.ts`); this function writes no side record.
+ * On every other answer a new generation from the same seam is written
+ * into the parallel file's row, where it has one with a `generation`
+ * column, and nothing else, and the answer reports it in `spoiled`. The
+ * host id is read through `seams.readHostId` (`readHostId` when absent).
+ * Throws the filesystem's own error, which names the path, when either
+ * file does not exist. See the module note.
  */
 export function carryStoreIdentity(
   livePath: string,
@@ -433,14 +512,17 @@ export function carryStoreIdentity(
 ): CarryOutcome {
   const parallel = readStoreFileFacts(parallelPath);
   const live = decideLiveWrite(livePath, seams.readHostId ?? readHostId);
-  if (live.action !== 'keep') return live;
+  const newGeneration = seams.newGeneration ?? randomUUID;
 
   const db = new Database(parallelPath, { readwrite: true });
   try {
-    const { generation } = live.facts;
-    return writeCarried(db, live.storeId, parallel, generation)
-      ? { action: 'carried', storeId: live.storeId, generation }
-      : { action: 'other-row' };
+    if (live.action === 'keep' && holdsRowOf(db, live.storeId)) {
+      return writeCarried(db, live.storeId, parallel, newGeneration);
+    }
+    const spoiled = spoilGeneration(db, newGeneration);
+    return live.action === 'keep'
+      ? { action: 'other-row', spoiled }
+      : { ...live, spoiled };
   } finally {
     db.close();
   }

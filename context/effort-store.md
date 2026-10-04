@@ -501,24 +501,29 @@ own `<root>/.rafa/effort/`.
 
 ### Identity through rebuilds
 
-**When a store is rebuilt in place (by `fix-schema`, `migrate`, or
-`merge`), a swap operation preserves the store's identity if it would
-keep its id.** A rebuild writes a new file aside with a temporary name
+**Every rebuild rotates the generation in `store_meta`, and a swap
+operation preserves the store's identity if it would keep its id.** A
+rebuild writes a new file aside with a temporary name
 (`effort.sqlite.merge-<stamp>`, `effort.sqlite.migrate-<stamp>`, or
 `effort.sqlite.fix-<stamp>`), brings it forward through migrations,
 checks it, and backs it up with `VACUUM INTO` to `.before-*-<stamp>.bak`.
 Before the new file is renamed over the live store, `swapIn`
 (`src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
-whether the store would keep its id: if yes, it carries the device,
-inode, and generation from the live store to the new file, writes them to
-`store_meta` and its side record, and then renames the new file over the
-live store. This keeps the store's identity even though its inode may
-change during the rename, because the generation value carried from the
-old file is checked on the next write. The old file, now the backup,
-carries no identity after the rename. If the backup is ever restored
-(undoing the rebuild), its device and inode have changed during the swap,
-and its first write will detect it as a copy and mint a new origin with
-the reason `generation`.
+whether the store would keep its id. When the answer is keep, `swapIn`
+writes a new generation into the new file's `store_meta` row and into the
+side record immediately before the rename, so both match after the store
+is renamed into place and subsequent opens find nothing to mint. When the
+answer is any other kind (copy detected, or minting for another reason),
+`swapIn` writes a random generation into the new file's `store_meta` row
+only, not the side record, so the next open to the renamed store mints
+because the row and side record will not match. The backup file, created
+with `VACUUM INTO` before the rename, holds the generation from before
+the rotation; if the backup is ever restored (undoing the rebuild), its
+device and inode have changed during the swap, and its first write detects
+it as a copy and mints a new origin with the reason `generation`. A rename
+that fails after the side record is written leaves the side record one
+rotation ahead of the live store, and the next write open to the live
+store mints once to synchronize them.
 
 ### The schema history
 

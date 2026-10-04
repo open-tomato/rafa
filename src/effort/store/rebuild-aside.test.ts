@@ -20,7 +20,9 @@
  * expects, and asserts the mint either way.
  *
  * Each failure point of the swap is failed through `swapIn`'s steps, and
- * each of the three is failed for real as well.
+ * the backup, the carry and the rename are failed for real as well. The
+ * side record step runs only after a carry onto a minted store, so its
+ * case mints one first.
  */
 import type { SwapStep, SwapSteps } from './rebuild-aside.js';
 import type { MintReason } from './store-identity.js';
@@ -56,7 +58,7 @@ import {
   swapIn,
 } from './rebuild-aside.js';
 import { withSqliteStore } from './sqlite.js';
-import { readStoreGeneration } from './store-generation.js';
+import { readStoreGeneration, writeStoreGeneration } from './store-generation.js';
 import { carryStoreIdentity, readStoreMeta, settleStoreIdentity } from './store-meta.js';
 import { storeRows } from './testdata/store-rows.js';
 
@@ -296,8 +298,8 @@ describe('swapIn and the store\'s identity', () => {
     expect(minted.storeId).toBe('kept-store-1');
     expect(written.storeId).toBe(minted.storeId);
     expect(written.mintedAt).toBe(minted.mintedAt);
-    expect(written.generation).toBe('kept-generation-2');
-    expect(readStoreGeneration(path)).toBe('kept-generation-2');
+    expect(written.generation).toBe('kept-generation-3');
+    expect(readStoreGeneration(path)).toBe('kept-generation-3');
   });
 
   it('mints on the first write after the same swap with the carry left out, the control', () => {
@@ -306,7 +308,7 @@ describe('swapIn and the store\'s identity', () => {
     writeOnce(path, seams, true);
     vacuumInto(path, parallelPath);
 
-    swapIn(path, parallelPath, backupPath, { carry: () => 'left out' });
+    swapIn(path, parallelPath, backupPath, { carry: () => ({ action: 'no-row', spoiled: null }) });
     const reasons = expectedReasons(path, requiredMeta(path));
     const outcome = settleOnce(path, seams);
 
@@ -387,6 +389,10 @@ describe('swapIn failure points', () => {
         ran.push('carry');
         return carryStoreIdentity(path, parallelPath);
       },
+      record: (path, generation) => {
+        ran.push('record');
+        writeStoreGeneration(path, generation);
+      },
       rename: (parallelPath, path) => {
         ran.push('rename');
         renameSync(parallelPath, path);
@@ -429,6 +435,69 @@ describe('swapIn failure points', () => {
       expect(readdirSync(dir).sort()).toEqual(['effort.sqlite', 'effort.sqlite.aside-1', 'effort.sqlite.before-1.bak']);
       expect(storeRows(backupPath)).toEqual(original);
     }
+  });
+
+  it('throws a SwapFailure naming both files when the side record step fails after a carry, keeping them, the store and its side record as they are', () => {
+    const { dir, path, parallelPath, backupPath } = casePaths();
+    const seams = identitySeams('record', 'host-a');
+    const minted = writeOnce(path, seams, true);
+    vacuumInto(path, parallelPath);
+    const before = readFileSync(path);
+    const ran: SwapStep[] = [];
+
+    const thrown = thrownBy(() => swapIn(path, parallelPath, backupPath, {
+      ...stepsFailing('record', ran),
+      carry: (live, aside) => {
+        ran.push('carry');
+        return carryStoreIdentity(live, aside, seams);
+      },
+    }));
+    const unchanged = readFileSync(path).equals(before);
+    const recordGeneration = readStoreGeneration(path);
+    const kept = writeOnce(path, seams);
+
+    expect(thrown).toBeInstanceOf(SwapFailure);
+    const failure = thrown as SwapFailure;
+    expect(failure.step).toBe('record');
+    expect(failure.message).toContain(`to the side record of ${path} failed (planted failure)`);
+    expect(failure.message).toContain(`${path} was not replaced and is unchanged`);
+    expect(failure.message).toContain(`The rebuilt store is left at ${parallelPath}`);
+    expect(ran).toEqual(['backup', 'carry', 'record']);
+    expect(requiredMeta(parallelPath).generation).toBe('record-generation-2');
+    expect(unchanged).toBe(true);
+    expect(recordGeneration).toBe(minted.generation);
+    expect(kept.storeId).toBe(minted.storeId);
+    expect(readdirSync(dir).sort()).toEqual([
+      'effort.sqlite',
+      'effort.sqlite.aside-1',
+      'effort.sqlite.before-1.bak',
+      'effort.sqlite.generation',
+    ]);
+  });
+
+  it('mints on the first write after an interrupted rename, keeps that id on the second, and leaves the side record on a generation the live row lacks', () => {
+    const { path, parallelPath, backupPath } = casePaths();
+    const seams = identitySeams('interrupted', 'host-a');
+    const minted = writeOnce(path, seams, true);
+    vacuumInto(path, parallelPath);
+    const interruptedRename = (): never => {
+      throw new Error('planted failure');
+    };
+
+    const thrown = thrownBy(() => swapIn(path, parallelPath, backupPath, {
+      carry: (live, aside) => carryStoreIdentity(live, aside, seams),
+      rename: interruptedRename,
+    }));
+    const rowGeneration = requiredMeta(path).generation;
+    const recordGeneration = readStoreGeneration(path);
+    const first = writeOnce(path, seams);
+    const second = writeOnce(path, seams);
+
+    expect((thrown as SwapFailure).step).toBe('rename');
+    expect(recordGeneration).not.toBeNull();
+    expect(recordGeneration).not.toBe(rowGeneration);
+    expect(first.storeId).not.toBe(minted.storeId);
+    expect(second.storeId).toBe(first.storeId);
   });
 
   it('fails at the backup for real when its directory is missing, the store untouched and the built file kept', () => {
@@ -479,7 +548,7 @@ describe('swapIn failure points', () => {
     ]);
   });
 
-  it('fails at the rename for real when the built path is a directory, the store untouched and the whole backup kept', () => {
+  it('fails at the carry for real when the built path is a directory, which the carry opens on every answer, the store untouched and the whole backup kept', () => {
     const { dir, path, parallelPath, backupPath } = casePaths();
     plantFile(path, 2);
     const before = readFileSync(path);
@@ -494,7 +563,7 @@ describe('swapIn failure points', () => {
     }));
 
     expect(thrown).toBeInstanceOf(SwapFailure);
-    expect((thrown as SwapFailure).step).toBe('rename');
+    expect((thrown as SwapFailure).step).toBe('carry');
     expect(readFileSync(path).equals(before)).toBe(true);
     expect(storeRows(backupPath)).toEqual(original);
     expect(existsSync(parallelPath)).toBe(true);

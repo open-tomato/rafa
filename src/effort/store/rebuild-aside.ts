@@ -24,7 +24,7 @@
  *    journal, and leaves the store untouched.
  * 5. Under a dry run the parallel file is then deleted, so the run can
  *    be repeated and leaves the directory as it found it. Otherwise the
- *    parallel file is swapped in ({@link swapIn}) in three steps:
+ *    parallel file is swapped in ({@link swapIn}) in four steps:
  *    a. The store is written out to the backup with `VACUUM INTO` on a
  *       read-only connection (`vacuumInto`, `copy.ts`), and the backup
  *       is flushed with `fsync`, since SQLite's documentation says
@@ -32,22 +32,36 @@
  *    b. The store's identity is carried onto the parallel file
  *       (`carryStoreIdentity`, `store-meta.ts`): when a write to the
  *       live store would keep its origin, the parallel file's row is
- *       given the parallel file's own device and inode and the
- *       generation the live side record holds. Otherwise nothing is
- *       written, and the swapped-in store mints on its next write.
- *    c. The parallel file is renamed over the store, which replaces it
+ *       given the parallel file's own device and inode and a new
+ *       generation. Otherwise nothing is carried: the parallel file's
+ *       row is given only a fresh generation the side record does not
+ *       hold, and the swapped-in store mints on its next write.
+ *    c. When the carry answered `carried` with a generation, that
+ *       generation is written to the store's side record
+ *       (`writeStoreGeneration`, `store-generation.ts`), immediately
+ *       before the rename. A carry onto a file with no `generation`
+ *       column answers none, and this step is skipped.
+ *    d. The parallel file is renamed over the store, which replaces it
  *       in one step.
  *
  * ## A failed swap
  *
- * The store is only read until the rename, and a rename that fails
- * replaces nothing, so a failure at any of the three steps leaves the
- * store as it was. The swap then deletes nothing: it throws a
+ * The store's file is only read until the rename, and a rename that
+ * fails replaces nothing, so a failure at any of the four steps leaves
+ * the store's file as it was. The swap then deletes nothing: it throws a
  * {@link SwapFailure} naming the step, the rebuilt file and the backup,
  * and leaves both beside the store. After a failed backup the backup
- * may be partial or absent; after a failed carry or rename it holds the
- * whole store. A run with another stamp names other files, so it never
- * overwrites either.
+ * may be partial or absent; after a failed carry, side record write or
+ * rename it holds the whole store. A run with another stamp names other
+ * files, so it never overwrites either.
+ *
+ * The side record is the one thing beside the store a swap writes
+ * before the rename. A side record write that fails leaves the record
+ * as it was (`writeStoreGeneration` replaces it whole or not at all), so
+ * the store keeps its origin on its next write. A rename that fails
+ * after it leaves the store's file holding the old generation beside a
+ * side record holding the new one, so the store mints once on its next
+ * write, which is the safe side, and keeps that id on the write after.
  *
  * ## The backup is a copy, and takes a new origin
  *
@@ -57,20 +71,25 @@
  * the original still existed. Its `store_meta` row still names the
  * original's inode, so a backup renamed back over the store mints a new
  * origin on its next writing open, as any restored copy must
- * (`store-identity.ts`). The swapped-in file keeps the store's origin,
- * since the carry recorded the inode the rename brings to the store's
- * path and the generation its side record holds.
+ * (`store-identity.ts`). It holds the generation the side record held
+ * before the swap, which the swap rotated past, so it mints even when
+ * the host gives it back the original's inode number. The swapped-in
+ * file keeps the store's origin, since the carry recorded the inode the
+ * rename brings to the store's path and the generation the swap wrote to
+ * its side record.
  *
  * The caller names both files, so each command keeps its own spelling
  * of them beside the store. The checks work over a handle the caller
  * opened; the swap opens the store read-only for the backup and the
  * parallel file for the carry.
  */
+import type { CarryOutcome } from './store-meta.js';
 import type { Database } from 'bun:sqlite';
 
 import { closeSync, existsSync, fsyncSync, openSync, renameSync, rmSync } from 'node:fs';
 
 import { vacuumInto } from './copy.js';
+import { writeStoreGeneration } from './store-generation.js';
 import { carryStoreIdentity } from './store-meta.js';
 
 /** A build-aside step refused before the live store was changed. */
@@ -148,7 +167,7 @@ function removeParallel(parallelPath: string): void {
 }
 
 /** A step of {@link swapIn}, in the order it runs them. */
-export type SwapStep = 'backup' | 'carry' | 'rename';
+export type SwapStep = 'backup' | 'carry' | 'record' | 'rename';
 
 /** The files one swap works with. */
 interface SwapFiles {
@@ -165,6 +184,10 @@ const STEP_TEXT: Readonly<Record<SwapStep, (files: SwapFiles) => { doing: string
   }),
   carry: ({ path, parallelPath, backupPath }) => ({
     doing: `carrying the store id of ${path} onto ${parallelPath}`,
+    backup: `the whole backup at ${backupPath}`,
+  }),
+  record: ({ path, parallelPath, backupPath }) => ({
+    doing: `writing the generation carried onto ${parallelPath} to the side record of ${path}`,
     backup: `the whole backup at ${backupPath}`,
   }),
   rename: ({ path, parallelPath, backupPath }) => ({
@@ -211,12 +234,14 @@ function writeBackup(path: string, backupPath: string): void {
   }
 }
 
-/** The three steps of a swap, which {@link swapIn} runs in this order. */
+/** The four steps of a swap, which {@link swapIn} runs in this order. */
 export interface SwapSteps {
   /** Writes the store at `path` out to `backupPath`. */
   readonly backup: (path: string, backupPath: string) => void;
-  /** Carries the identity of the store at `path` onto the file at `parallelPath`. */
-  readonly carry: (path: string, parallelPath: string) => unknown;
+  /** Carries the identity of the store at `path` onto the file at `parallelPath`, answering what it wrote. */
+  readonly carry: (path: string, parallelPath: string) => CarryOutcome;
+  /** Writes `generation` to the side record of the store at `path`. */
+  readonly record: (path: string, generation: string) => void;
   /** Renames `parallelPath` over `path`. */
   readonly rename: (parallelPath: string, path: string) => void;
 }
@@ -225,13 +250,14 @@ export interface SwapSteps {
 const SWAP_STEPS: SwapSteps = {
   backup: writeBackup,
   carry: (path, parallelPath) => carryStoreIdentity(path, parallelPath),
+  record: writeStoreGeneration,
   rename: renameSync,
 };
 
-/** Runs one step of a swap, throwing its failure as a {@link SwapFailure}. */
-function runStep(step: SwapStep, files: SwapFiles, act: () => unknown): void {
+/** Runs one step of a swap, answering what it answered and throwing its failure as a {@link SwapFailure}. */
+function runStep<Answer>(step: SwapStep, files: SwapFiles, act: () => Answer): Answer {
   try {
-    act();
+    return act();
   } catch (error) {
     throw new SwapFailure(step, files, error);
   }
@@ -239,17 +265,22 @@ function runStep(step: SwapStep, files: SwapFiles, act: () => unknown): void {
 
 /**
  * Swaps the parallel file in over the store at `path`: writes the
- * backup, carries the store's identity, and renames the parallel file
- * over the store. A failed step throws a {@link SwapFailure} and leaves
- * the store unchanged, and the backup and the parallel file where they
- * are. `steps` replaces any of the three, so a test can fail one. See
- * the module note.
+ * backup, carries the store's identity, writes the generation the carry
+ * answered to the store's side record when it answered `carried` with
+ * one, and renames the parallel file over the store. A failed step
+ * throws a {@link SwapFailure} and leaves the store's file unchanged, and
+ * the backup and the parallel file where they are. `steps` replaces any
+ * of the four, so a test can fail one. See the module note.
  */
 export function swapIn(path: string, parallelPath: string, backupPath: string, steps: Partial<SwapSteps> = {}): void {
-  const { backup, carry, rename } = { ...SWAP_STEPS, ...steps };
+  const { backup, carry, record, rename } = { ...SWAP_STEPS, ...steps };
   const files: SwapFiles = { path, parallelPath, backupPath };
   runStep('backup', files, () => backup(path, backupPath));
-  runStep('carry', files, () => carry(path, parallelPath));
+  const carried = runStep('carry', files, () => carry(path, parallelPath));
+  if (carried.action === 'carried' && carried.generation !== null) {
+    const { generation } = carried;
+    runStep('record', files, () => record(path, generation));
+  }
   runStep('rename', files, () => rename(parallelPath, path));
 }
 
