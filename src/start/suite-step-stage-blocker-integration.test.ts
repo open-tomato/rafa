@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readSessions } from '../loop/sessions.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
@@ -309,9 +310,9 @@ describe('a stage step after a task that broke a file outside its --changed sele
   it('inserts a repair task naming the file above the next task, and hands the repair its prompt', async () => {
     const scratch = plant();
 
-    // Run 1: the first task flips the flag, its own task step stays
-    // green, and the stage step that follows — the stage's only task is
-    // also its last — runs the whole suite, catches `shared.test.ts`
+    // Run 1: the second task flips the flag, its own task step stays
+    // green, and the stage step that follows — that task is the stage's
+    // last — runs `--changed=<since>`, catches `shared.test.ts`
     // fresh against the baseline, and inserts a blocked repair task
     // above the second task, which is never dispatched.
     const run1 = runLoopStart(scratch);
@@ -330,6 +331,12 @@ describe('a stage step after a task that broke a file outside its --changed sele
     expect(blockedTask?.task).toMatch(/^Repair the red stage step at commit [0-9a-f]{12} {2}\{agent=build-error-resolver\}$/);
     expect(blockedTask?.blocker).toContain(TEST_FILE);
     expect(blockedTask?.blocker).toContain('stage step');
+
+    // The stage step ran the no-`Owns:` fallback, and its record says so.
+    const [record] = readSessions(scratch.repo);
+    const stageStep = record?.steps?.find((step) => step.kind === 'stage');
+    expect(stageStep?.scope).toBe('affected');
+    expect(stageStep?.reason).toBe('fallback');
 
     // The first call's prompt carries no blocker: nothing had failed yet
     // when the first task was dispatched.
