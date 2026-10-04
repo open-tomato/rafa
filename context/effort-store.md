@@ -499,6 +499,27 @@ This is why a development build can write copies: it owns stores under
 `tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
 own `<root>/.rafa/effort/`.
 
+### Identity through rebuilds
+
+**When a store is rebuilt in place (by `fix-schema`, `migrate`, or
+`merge`), a swap operation preserves the store's identity if it would
+keep its id.** A rebuild writes a new file aside with a temporary name
+(`effort.sqlite.merge-<stamp>`, `effort.sqlite.migrate-<stamp>`, or
+`effort.sqlite.fix-<stamp>`), brings it forward through migrations,
+checks it, and backs it up with `VACUUM INTO` to `.before-*-<stamp>.bak`.
+Before the new file is renamed over the live store, `swapIn`
+(`src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
+whether the store would keep its id: if yes, it carries the device,
+inode, and generation from the live store to the new file, writes them to
+`store_meta` and its side record, and then renames the new file over the
+live store. This keeps the store's identity even though its inode may
+change during the rename, because the generation value carried from the
+old file is checked on the next write. The old file, now the backup,
+carries no identity after the rename. If the backup is ever restored
+(undoing the rebuild), its device and inode have changed during the swap,
+and its first write will detect it as a copy and mint a new origin with
+the reason `generation`.
+
 ### The schema history
 
 **SQLITE_MIGRATIONS is defined in `src/effort/store/migrations.ts` and

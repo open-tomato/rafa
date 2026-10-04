@@ -121,6 +121,24 @@ and that `planSchema` finds it current, then copies the store with
 `VACUUM INTO` to `effort.sqlite.before-merge-<stamp>.bak`, and swaps
 the new file in through `rebuildAside`.
 
+**The swap preserves the local store's identity when it stays the same
+store in the same place.** Before renaming the merged file over the live
+store, `swapIn` carries the device, inode, and generation from the live
+store to the new file, so the identity facts stay tied to that path,
+and the store keeps its origin even though its inode may change during
+the rename. The backup, left behind when the new file takes the live
+store's place, becomes a different file: if restored later, it will have
+a new device or inode and will mint a new origin on its first write.
+This is the complement to copy detection: a backup is like a photo of
+the house before renovation; moving back into the photo is moving into
+a different house. The decision to carry identity is the same as a write
+open's decision to keep an origin: it happens under `BEGIN IMMEDIATE`
+inside `swapIn`, before the rename, and the carried generation is checked
+on the next write to catch a restoration. Releasing claims made after the
+merge against this store's id before undoing the merge keeps them valid
+after restoration; undoing with unconfirmed claims in place orphans them
+until they are taken over with `rafa claim take <n> --stale`.
+
 ### Rafa effort move
 
 **`rafa effort move --to=sqlite` is the step to migrate from NDJSON to
