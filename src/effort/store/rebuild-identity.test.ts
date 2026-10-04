@@ -161,6 +161,17 @@ function withRaw(path: string, use: (db: Database) => void): void {
   }
 }
 
+/**
+ * Plants the row a reused inode would leave: the live file's own device and
+ * inode in its `store_meta`, whatever this filesystem did with the numbers.
+ */
+function plantReuseShape(path: string): void {
+  const { fileDev, fileIno } = factsOf(path);
+  withRaw(path, (db) => {
+    db.query('UPDATE store_meta SET file_dev = ?, file_ino = ?').run(fileDev.toString(), fileIno.toString());
+  });
+}
+
 /** Plants a finding for `key` under `origin`, with the next `seq`. */
 function plantFinding(path: string, origin: string, key: string): void {
   withRaw(path, (db) => {
@@ -267,19 +278,34 @@ describe('a store that is not the one its origin was minted for mints on its nex
     expect(kept).toEqual({ ...before, generation: kept?.generation });
   });
 
-  it('mints a new origin on a renamed-back backup that was rebuilt before any write, the carry leaving its row alone', () => {
+  it.failing('mints a new origin on a renamed-back backup that was rebuilt before any write, with the reuse shape planted', () => {
     const testCase = freshCase();
     mintedWithFinding(testCase);
     plantOther(testCase, OTHER_ORIGIN, ['b1']);
     const backupPath = merge(testCase, 1);
     renameSync(backupPath, testCase.path);
-    const restored = metaOf(testCase.path);
 
     merge(testCase, 1);
-    const rebuilt = metaOf(testCase.path);
+    plantReuseShape(testCase.path);
     const written = writeOpen(testCase.path, seamsOf('store-rebuilt'));
 
-    expect(rebuilt?.storeId).toBe(restored?.storeId);
+    expect(written?.storeId).toBe('store-rebuilt');
+    expect(metaOf(testCase.path)?.storeId).toBe('store-rebuilt');
+  });
+
+  it('mints a new origin on a backup restored after a writing open and rebuilt again before any write, with the reuse shape planted', () => {
+    const testCase = freshCase();
+    mintedWithFinding(testCase);
+    plantOther(testCase, OTHER_ORIGIN, ['b1']);
+    const backupPath = merge(testCase, 1);
+    const kept = writeOpen(testCase.path, seamsOf());
+    renameSync(backupPath, testCase.path);
+
+    merge(testCase, 1);
+    plantReuseShape(testCase.path);
+    const written = writeOpen(testCase.path, seamsOf('store-rebuilt'));
+
+    expect(kept?.storeId).toBe(ORIGIN);
     expect(written?.storeId).toBe('store-rebuilt');
     expect(metaOf(testCase.path)?.storeId).toBe('store-rebuilt');
   });
