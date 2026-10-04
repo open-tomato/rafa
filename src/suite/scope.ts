@@ -26,11 +26,13 @@
  *     the paths that matched, on every answer.
  *  3. For `tests=module`, the test files of every module the diff
  *     touches, where a module is an `Owns:` folder, as the spec defines
- *     it. With no `Owns:` folder at all, the module is the whole project:
- *     `full`, reason `no-owns`. When no touched folder holds a test file
- *     (the diff lies outside every folder, or its folders have none), the
- *     step falls back to `affected`, reason `no-module-tests`, so a
- *     `module` line never runs less than a default one.
+ *     it. With no `Owns:` folder at all there is no module to narrow
+ *     to, so the step falls back to `affected`, reason `fallback`: the
+ *     tests the change reaches, not the whole project. When no touched
+ *     folder holds a test file (the diff lies outside every folder, or
+ *     its folders have none), the step falls back to `affected`, reason
+ *     `no-module-tests`, so a `module` line never runs less than a
+ *     default one.
  *  4. `affected` otherwise: the runner's `bun test --changed=<base>`.
  *
  * A glob is matched with `Bun.Glob`, which anchors it at the repository
@@ -42,11 +44,13 @@
  *
  * ## A stage step
  *
- * {@link stageStepScope} answers `full`, reason `no-owns`, when the plan
- * has no `Owns:` folder (no `issue:`, no epic, no line, or a failed read:
- * the reader answers null or an empty list for each). Otherwise it
- * answers the test files under each `Owns:` folder the diff touched, plus
- * every test file a `tests.integration` glob matches, each once, sorted.
+ * {@link stageStepScope} answers `affected`, reason `fallback`, when the
+ * plan has no `Owns:` folder (no `issue:`, no epic, no line, or a failed
+ * read: the reader answers null or an empty list for each): the runner
+ * runs it as `bun test --changed=<since>`, from the stage's own diff
+ * base, as a task step's `affected` run is. Otherwise it answers the
+ * test files under each `Owns:` folder the diff touched, plus every test
+ * file a `tests.integration` glob matches, each once, sorted.
  * A path is touched in the DEEPEST `Owns:` folder holding it, the rule
  * `owningBoard` (`board/board-owns.ts`) applies, reused here: with `src`
  * and `src/board` both named, a change under `src/board` runs that
@@ -95,7 +99,10 @@ const TEST_FILE_NAME = /[._](?:test|spec)\.(?:tsx?|jsx?|[cm][jt]s)$/;
 const DEPENDENCY_FOLDER = 'node_modules';
 
 /** Why a task step runs the full suite. */
-export type FullSuiteReason = 'declared' | 'trigger' | 'no-owns';
+export type FullSuiteReason = 'declared' | 'trigger';
+
+/** Why a task step runs the affected files: the module note's rules 3 and 4. */
+export type AffectedReason = 'declared' | 'fallback' | 'no-module-tests';
 
 /** A task step's scope; the module note ranks the answers. */
 export type TaskStepScope =
@@ -118,13 +125,13 @@ export type TaskStepScope =
   | {
     readonly scope: 'affected';
     readonly declared: TestScope;
-    readonly reason: 'declared' | 'no-module-tests';
+    readonly reason: AffectedReason;
     readonly triggeredBy: readonly string[];
   };
 
 /** A stage step's scope; the module note says how its paths are chosen. */
 export type StageStepScope =
-  | { readonly scope: 'full'; readonly reason: 'no-owns' }
+  | { readonly scope: 'affected'; readonly reason: 'fallback' }
   | {
     readonly scope: 'paths';
     /** The `Owns:` folders the diff touched. */
@@ -232,7 +239,7 @@ export function taskStepScope(input: TaskScopeInput): TaskStepScope {
   if (triggeredBy.length > 0) return { scope: 'full', declared, reason: 'trigger', triggeredBy };
   if (declared === 'affected') return { scope: 'affected', declared, reason: 'declared', triggeredBy };
   const owns = ownsFolders(input.owns);
-  if (owns.length === 0) return { scope: 'full', declared, reason: 'no-owns', triggeredBy };
+  if (owns.length === 0) return { scope: 'affected', declared, reason: 'fallback', triggeredBy };
 
   const folders = touchedFolders(input.diff, owns);
   const paths = testFilesUnder(folders, input.testFiles);
@@ -244,7 +251,7 @@ export function taskStepScope(input: TaskScopeInput): TaskStepScope {
 /** A stage step's scope. The module note says how its paths are chosen. */
 export function stageStepScope(input: StageScopeInput): StageStepScope {
   const owns = ownsFolders(input.owns);
-  if (owns.length === 0) return { scope: 'full', reason: 'no-owns' };
+  if (owns.length === 0) return { scope: 'affected', reason: 'fallback' };
   const folders = touchedFolders(input.diff, owns);
   const integration = integrationFiles(input.integration, input.testFiles);
   const paths = sortedUnique([...testFilesUnder(folders, input.testFiles), ...integration]);

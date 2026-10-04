@@ -130,12 +130,16 @@ gate later anyway.
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — Full suite after each task's session ends and commits
-- `stage` — Full suite after a stage's last task completes
+- `stage` — After a stage's last task: the tests under `Owns:` folders
+  changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
+  files when the plan has no `Owns:` folder (reason `fallback`)
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
-Each recorded step names its scope, the command, exit code, Bun's summary
-line, every failing test (file + full test name pairs), and which failures
-are new against the baseline (not present in `baseline`'s captured failures).
+Each recorded step names its scope, its reason (`declared`, `trigger`,
+`fallback`, `no-module-tests`, or `stage`), the command, exit code, Bun's
+summary line, every failing test (file + full test name pairs), and which
+failures are new against the baseline (not present in `baseline`'s captured
+failures).
 
 **The baseline is the `baseline` step's recorded failures.** A failure is
 identified by its test file path and full test name. When a step reports
@@ -145,17 +149,19 @@ already present, a mismatch means it is new. Only new failures block the
 next task.
 
 **Declaration key `tests=` on a task line** sets what the task's session
-will run and influences what scope the runner uses for the stage step after
-that task's stage completes:
+will run; the stage step scope after that stage completes follows from the
+plan's `Owns:` folders (scope `full`) or falls back to `bun test
+--changed=<since>` (scope `affected`, reason `fallback`):
 - `tests=affected` (default): task session runs `bun test --changed=<base>`
-  plus types and lint on the changed files; stage step runs full suite
-  unless the changed files do not trigger one
+  plus types and lint on the changed files; stage step is determined by
+  the `Owns:` rule above
 - `tests=module`: task session skips to `bun test <module-files>` when the
   task touches files whose enclosing module is listed in
-  `tests.integration`, otherwise same as `tests=affected`; stage step runs
-  the tests for every module the diff touches
+  `tests.integration`, otherwise same as `tests=affected`; stage step is
+  determined by the `Owns:` rule above
 - `tests=full`: task session runs full suite when the task changes a config
-  file or a globally-used module; stage step always runs full suite
+  file or a globally-used module; stage step always runs full suite, not
+  a fallback
 
 **Config keys determine when a task triggers `tests=module` or `tests=full`
 automatically, and which tests always run:**
@@ -174,17 +180,21 @@ automatically, and which tests always run:**
   to `tests=module`
 
 **A stage-end step with new failures blocks the next task.** After a
-stage's last task, the stage step runs the full suite and captures
-failures. If any failure is new against the baseline, the runner inserts
-a `[BLOCKED]` repair task above the first open task
-(`src/start/suite-blocker.ts`), its blocker the failures, which the repair
-session receives through `BLOCKER_PROMPT_PREFIX` in its prompt, and the
-run stops. A restarted run dispatches that repair first and runs no stage
-step before it, or before any `[BLOCKED]` task, because a due step run
-there would meet the same failures and stop the run again before the
-repair got its session. The stage steps still due run before the first
-open task after it. The blocked task holds until its session completes or
-a human unblocks it with a `[BLOCKED]` mark on its line in the tracker.
+stage's last task, the stage step runs the tests under the `Owns:`
+folders the stage changed (scope `full`), or, with no `Owns:` folder,
+`bun test --changed=<since>` with the `tests.alwaysRun` files (scope
+`affected`, reason `fallback`), joining the always-run files so they still
+pass the slow-sweep share guard. The step captures failures. If any
+failure is new against the baseline, the runner inserts a `[BLOCKED]`
+repair task above the first open task (`src/start/suite-blocker.ts`), its
+blocker the failures, which the repair session receives through
+`BLOCKER_PROMPT_PREFIX` in its prompt, and the run stops. A restarted run
+dispatches that repair first and runs no stage step before it, or before
+any `[BLOCKED]` task, because a due step run there would meet the same
+failures and stop the run again before the repair got its session. The
+stage steps still due run before the first open task after it. The blocked
+task holds until its session completes or a human unblocks it with a
+`[BLOCKED]` mark on its line in the tracker.
 
 ### Skills and lessons at dispatch
 

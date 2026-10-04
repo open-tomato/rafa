@@ -65,6 +65,16 @@
  *   - `scope`: `affected`, `module` or `full` (`TEST_SCOPES`,
  *     `utils/declaration.ts`), or the list of files and folders run, which
  *     may be empty.
+ *   - `reason`: optional, why the step ran at that scope, one of
+ *     {@link SESSION_STEP_REASONS}: `declared` for the task's own `tests=`
+ *     declaration, `trigger` for a full-suite trigger, `fallback` for the
+ *     `--changed` run taken when no `Owns:` folder narrows it,
+ *     `no-module-tests` for a `tests=module` task whose module holds no
+ *     test file, and `stage` for a stage step's own scope. It is written
+ *     as its own key right after `scope`. A step written by rafa 0.35.0
+ *     or earlier carries no `reason` key and reads as having none; a
+ *     value outside the set is left out on read, never refused, as an
+ *     unknown `phase` is.
  *   - `command`: the argv spawned, `bun` first, never empty.
  *   - `exitCode`: the command's exit code, a whole number.
  *   - `summary`: Bun's `Ran N tests across M files.` line, or null when it
@@ -156,7 +166,12 @@
  * read. This module re-exports what a caller reads from there, so
  * `./sessions.js` stays the one import a record's reader needs.
  */
-import type { SessionPhase, SessionState, SessionStepKind } from './session-record-parse.js';
+import type {
+  SessionPhase,
+  SessionState,
+  SessionStepKind,
+  SessionStepReason,
+} from './session-record-parse.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 import type { TestScope } from '../utils/declaration.js';
@@ -187,13 +202,19 @@ import {
   stepProblems,
 } from './session-record-parse.js';
 
-export type { SessionPhase, SessionState, SessionStepKind } from './session-record-parse.js';
+export type {
+  SessionPhase,
+  SessionState,
+  SessionStepKind,
+  SessionStepReason,
+} from './session-record-parse.js';
 export {
   isSessionId,
   parseSessionRecord,
   SESSION_PHASES,
   SESSION_STATES,
   SESSION_STEP_KINDS,
+  SESSION_STEP_REASONS,
   SessionRecordError,
   sessionPhase,
   sessionSteps,
@@ -215,6 +236,8 @@ export interface SessionStep {
   readonly kind: SessionStepKind;
   /** A named scope, or the files and folders run. */
   readonly scope: TestScope | readonly string[];
+  /** Why the step ran at {@link SessionStep.scope}; left out of a step from rafa 0.35.0 or earlier. See the module note. */
+  readonly reason?: SessionStepReason;
   /** The argv spawned, `bun` first. */
   readonly command: readonly string[];
   readonly exitCode: number;
