@@ -15,7 +15,7 @@
  */
 
 import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep, SessionStepReason } from '../loop/sessions.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 
 import { readFileSync } from 'node:fs';
@@ -81,6 +81,14 @@ function recordedScope(run: StageRun): SessionStep['scope'] {
     : run.scope;
 }
 
+/** The reason the run record holds for `run`: none for the full suite no scope rule chose. See `suite-step.ts`'s module note. */
+function stageStepReason(run: StageRun): SessionStepReason | undefined {
+  if (run.scope === 'full') return undefined;
+  return run.scope === 'affected'
+    ? 'fallback'
+    : 'stage';
+}
+
 /** Runs the step of one stage and enters it in the ledger; see the module note. */
 export async function runStageStep(context: SuiteStepContext, stage: DueStage, baseline: SuiteBaseline | null): Promise<StepOutcome> {
   const seams = seamsOf(context);
@@ -94,7 +102,7 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   }
   const runs = stageRuns(context, seams, run);
   const result = await runWithAlwaysRun(context, seams, 'stage', runs);
-  const settling: Settling = { kind: 'stage', scope: recordedScope(run), label, result, baseline, repair: { kind: 'stage' } };
+  const settling: Settling = { kind: 'stage', scope: recordedScope(run), reason: stageStepReason(run), label, result, baseline, repair: { kind: 'stage' } };
   const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs)));
   if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;

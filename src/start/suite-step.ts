@@ -63,6 +63,18 @@
  * is never empty. With neither commit, or a diff git will not answer,
  * the full suite runs.
  *
+ * **The recorded reason.** A task or stage step's {@link SessionStep}
+ * carries `reason` beside `scope`, so a fallback reads apart from a wide
+ * change. A task step records its scope's own reason (`declared`,
+ * `trigger`, `fallback` or `no-module-tests`, `suite/scope.ts`), and
+ * `declared` for a `module` answer, which only its own `tests=module`
+ * line reaches. A stage step records `fallback` for its `--changed` run
+ * without `Owns:` folders and `stage` for its `Owns:` path list. A step
+ * whose diff git would not answer, or a stage step with no commit to
+ * take its diff from, runs the full suite by no scope rule and records
+ * no reason; nor do the baseline and the pre-wrap-up step, which always
+ * run the full suite.
+ *
  * **The pre-wrap-up step** runs the full suite, and stands in for the
  * last stage's stage step, so {@link dueStages} never answers a stage
  * once no task is left open. A red one writes no blocker, having no
@@ -177,7 +189,7 @@ import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { SessionStep, SessionStepKind } from '../loop/sessions.js';
+import type { SessionStep, SessionStepKind, SessionStepReason } from '../loop/sessions.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -477,11 +489,15 @@ function isRed(verdict: StepVerdict): boolean {
   return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
 }
 
-/** The step the run record holds for `result`. */
-function stepOf(kind: SessionStepKind, scope: SessionStep['scope'], result: SuiteResult, fresh: readonly SuiteFailure[]): SessionStep {
+/** The step the run record holds for `result`, its `reason` right after its scope when it has one; see the module note. */
+function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[]): SessionStep {
+  const { kind, scope, reason } = settling;
   return {
     kind,
     scope,
+    ...(reason === undefined
+      ? {}
+      : { reason }),
     command: [...result.command],
     exitCode: result.exitCode,
     summary: result.summary,
@@ -512,6 +528,8 @@ function announce(label: string, result: SuiteResult, known: readonly SuiteFailu
 export interface Settling {
   readonly kind: SessionStepKind;
   readonly scope: SessionStep['scope'];
+  /** Why the step ran at `scope`, recorded with it; left out where no scope rule chose it. See the module note. */
+  readonly reason?: SessionStepReason;
   readonly label: string;
   readonly result: SuiteResult;
   readonly baseline: SuiteBaseline | null;
@@ -527,7 +545,7 @@ export interface Settling {
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
 function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result } = settling;
-  const step: SessionStep = { ...stepOf(kind, settling.scope, result, []), interrupted: true };
+  const step: SessionStep = { ...stepOf(settling, result, []), interrupted: true };
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
   activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
@@ -539,7 +557,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
   const { kind, label, result, baseline } = settling;
   if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = verdictOf(result, baseline);
-  const step = stepOf(kind, settling.scope, result, verdict.fresh);
+  const step = stepOf(settling, result, verdict.fresh);
   recordStep(seams, step);
   announce(label, result, verdict.known);
   const lintBlocker = settling.lint?.blocker ?? null;
@@ -572,11 +590,11 @@ function isErrorsOnly(verdict: StepVerdict, lint: LintOutcome | undefined): bool
  * and printed before it. See the module note.
  */
 export async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
-  const { kind, label, result, baseline } = settling;
+  const { label, result, baseline } = settling;
   if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settling;
   const verdict = verdictOf(result, baseline);
   if (!isErrorsOnly(verdict, settling.lint)) return settling;
-  recordStep(seams, stepOf(kind, settling.scope, result, verdict.fresh));
+  recordStep(seams, stepOf(settling, result, verdict.fresh));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
   activeOutput().warn(`🔁 The ${label} counted ${verdict.newErrors} more error(s) outside any test than the baseline and nothing else red (${named}); taking it once more.`);
@@ -644,6 +662,18 @@ function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly s
   return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
 }
 
+/**
+ * The reason the run record holds for a task scope: the scope's own, or
+ * `declared` for a `module` answer, which only a `tests=module` line
+ * reaches; none for a diff that did not read. See the module note.
+ */
+function taskStepReason(scope: TaskStepScope | null): SessionStepReason | undefined {
+  if (scope === null) return undefined;
+  return scope.scope === 'module'
+    ? 'declared'
+    : scope.reason;
+}
+
 /** The preload files, with a warning when `bunfig.toml` does not read. */
 function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): readonly string[] {
   const reading = seams.readPreloadFiles(context.checkout);
@@ -697,7 +727,7 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const lint = isStepInterrupted(context, result)
     ? {}
     : { lint: await lintTask(context, seams, input) };
-  const settling: Settling = { kind: 'task', scope: recorded, label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...lint };
+  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...lint };
   const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs)));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)

@@ -909,6 +909,94 @@ describe('runDueStageSteps', () => {
   });
 });
 
+describe('the recorded step\'s reason', () => {
+  const task = { baseline: baselineWith(), base: BASE, task: 'second task' };
+  const stage = { stage: 0, name: 'One' };
+
+  it('records declared for a tests=affected line, right after the scope', async () => {
+    const { context, seen } = contextWith([result()]);
+    await runTaskStep(context, { ...task, declared: 'affected' });
+    expect(seen.steps[0]).toMatchObject({ scope: 'affected', reason: 'declared' });
+    expect(Object.keys(seen.steps[0] ?? {}).slice(0, 3)).toEqual(['kind', 'scope', 'reason']);
+  });
+
+  it('records declared for a tests=full line', async () => {
+    const { context, seen } = contextWith([result()]);
+    await runTaskStep(context, { ...task, declared: 'full' });
+    expect(seen.steps[0]).toMatchObject({ scope: 'full', reason: 'declared' });
+  });
+
+  it('records trigger for a diff touching a full-suite trigger, against declared for the same line without it', async () => {
+    const triggered = contextWith([result()], { git: gitAt({ [BASE]: ['package.json'] }) });
+    await runTaskStep(triggered.context, { ...task, declared: 'affected' });
+    expect(triggered.seen.steps[0]).toMatchObject({ scope: 'full', reason: 'trigger' });
+    const plain = contextWith([result()]);
+    await runTaskStep(plain.context, { ...task, declared: 'affected' });
+    expect(plain.seen.steps[0]?.reason).toBe('declared');
+  });
+
+  it('records fallback for a tests=module line with no Owns: folder', async () => {
+    const { context, seen } = contextWith([result()], { owns: null });
+    await runTaskStep(context, { ...task, declared: 'module' });
+    expect(seen.steps[0]).toMatchObject({ scope: 'affected', reason: 'fallback' });
+  });
+
+  it('records no-module-tests for a tests=module line whose touched folder holds no test file', async () => {
+    const { context, seen } = contextWith([result()], { owns: ['src/d'], git: gitAt({ [BASE]: ['src/d/x.ts'] }) });
+    await runTaskStep(context, { ...task, declared: 'module' });
+    expect(seen.steps[0]).toMatchObject({ scope: 'affected', reason: 'no-module-tests' });
+  });
+
+  it('records declared for a tests=module line run over its module\'s test files', async () => {
+    const { context, seen } = contextWith([result()], { owns: ['src/b'], git: gitAt({ [BASE]: ['src/b/x.ts'] }) });
+    await runTaskStep(context, { ...task, declared: 'module' });
+    expect(seen.steps[0]).toMatchObject({ scope: 'module', reason: 'declared' });
+  });
+
+  it('records no reason for a task step whose diff git will not answer', async () => {
+    const { context, seen } = contextWith([result()], { git: gitAt({}) });
+    await runTaskStep(context, { ...task, declared: 'affected' });
+    expect(seen.steps[0]?.scope).toBe('full');
+    expect(Object.keys(seen.steps[0] ?? {})).not.toContain('reason');
+  });
+
+  it('keeps the reason on a step stopped by SIGINT and on both runs of a retaken step', async () => {
+    const stopped = contextWith([killed()]);
+    await runTaskStep(stopped.context, { ...task, declared: 'affected' });
+    expect(stopped.seen.steps[0]).toMatchObject({ interrupted: true, reason: 'declared' });
+    const retaken = contextWith([result({ errors: 1 }), result()]);
+    await runTaskStep(retaken.context, { ...task, declared: 'affected' });
+    expect(retaken.seen.steps.map((step) => step.reason)).toEqual(['declared', 'declared']);
+  });
+
+  it('records fallback for a stage step without Owns: folders', async () => {
+    const { context, seen } = contextWith([result()]);
+    await runStageStep(context, stage, baselineWith());
+    expect(seen.steps[0]).toMatchObject({ scope: 'affected', reason: 'fallback' });
+  });
+
+  it('records stage for a stage step over its Owns: folders\' test files', async () => {
+    const { context, seen } = contextWith([result()], { owns: ['src/b'], git: gitAt({ [BASE]: ['src/b/x.ts'] }) });
+    await runStageStep(context, stage, baselineWith());
+    expect(seen.steps[0]).toMatchObject({ scope: ['src/b/b.test.ts', 'src/run-integration.test.ts'], reason: 'stage' });
+  });
+
+  it('records no reason for a stage step whose diff git will not answer', async () => {
+    const { context, seen } = contextWith([result()], { git: gitAt({}) });
+    await runStageStep(context, stage, baselineWith());
+    expect(seen.steps[0]?.scope).toBe('full');
+    expect(Object.keys(seen.steps[0] ?? {})).not.toContain('reason');
+  });
+
+  it('records no reason for the baseline and the pre-wrap-up step', async () => {
+    const { context, seen } = contextWith([result(), result()]);
+    await ensureBaseline(context);
+    await runPreWrapUpStep(context, baselineWith());
+    expect(seen.steps.map((step) => step.kind)).toEqual(['baseline', 'pre-wrap-up']);
+    expect(seen.steps.flatMap((step) => Object.keys(step))).not.toContain('reason');
+  });
+});
+
 describe('runPreWrapUpStep', () => {
   it('runs the full suite and, red, writes no blocker', async () => {
     const { context, seen } = contextWith([red([FRESH])]);
