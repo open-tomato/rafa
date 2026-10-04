@@ -146,6 +146,9 @@ included. `bindEventsFile` names the file (making the runs folder if it
 is missing) and `unbindEventsFile` ends the append; with none bound,
 nothing is written. The append is best-effort: a failed write prints one
 stderr line naming the path and the error, once per binding, and never
-throws into the loop. A test binds its own temp root and unbinds after.
+throws into the loop. `loop start` binds it right after opening the
+session record and unbinds it in the run's `finally` (`src/start.ts`);
+anything the run throws is first written as an `error` event, then
+rethrown. A test binds its own temp root and unbinds after.
 The record, `<session-id>.json`, stays the only `.json` file a run
 writes, so `loop list`, `status` and `stop` read it alone.

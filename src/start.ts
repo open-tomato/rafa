@@ -281,6 +281,13 @@
  * returning, which the dispatcher ends as a success, with exit code 0. A
  * triage failure stops nothing.
  *
+ * Every event the run emits is appended to its events file,
+ * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
+ * bound right after the session record is opened and unbound in the
+ * run's `finally`. Anything the run throws past that point, a
+ * `CommandExit` included, is first written there as an `error` event
+ * and then rethrown unchanged.
+ *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
@@ -305,6 +312,7 @@ import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
+import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -323,7 +331,14 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
-import { emitLoopEvent, taskPosition, taskTokens, unlessText } from './start/loop-events.js';
+import {
+  bindEventsFile,
+  emitLoopEvent,
+  taskPosition,
+  taskTokens,
+  unbindEventsFile,
+  unlessText,
+} from './start/loop-events.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
@@ -450,8 +465,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // Refuses a second run of the plan before anything else is printed or
   // checked; every way out of the `try` writes the run's end. Under
   // `--roadmap` the record carries the away hop, when there is one, and
-  // a run in a worktree carries the worktree's path.
+  // a run in a worktree carries the worktree's path. The run's events
+  // file, `<session-id>.events.ndjson` beside the record, is bound
+  // straight after and unbound in the `finally`; anything the run throws
+  // is written to it as an `error` event before it is rethrown
+  // (`start/loop-events.ts`).
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
+  bindEventsFile(repoRoot, session.id);
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');
@@ -715,7 +735,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         return;
       }
     }
+  } catch (error) {
+    emitLoopEvent({ kind: 'error', message: messageOf(error) });
+    throw error;
   } finally {
+    unbindEventsFile();
     session.end();
   }
 }
