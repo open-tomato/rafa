@@ -3,10 +3,10 @@
  * that a plan of two stages of two tasks each, with no `Owns:` folders
  * to read (its plan header names no issue, so `readPlanOwns` answers
  * `no-issue` without a `gh` call at all — `./suite-step.ts`'s module
- * note and `../suite/owns.ts`'s), runs the FULL suite exactly three
- * times over the whole run: the baseline, the first stage's stage step,
- * and the pre-wrap-up step standing in for the second (and last)
- * stage's own. No task step ever runs the full suite: every task line
+ * note and `../suite/owns.ts`'s), runs the FULL suite exactly twice
+ * over the whole run: the baseline and the pre-wrap-up step standing in
+ * for the second (and last) stage's own. The first stage's stage step
+ * falls back to `bun test --changed=<since>`, recorded `affected`. No task step ever runs the full suite: every task line
  * here carries no `tests=` of its own, so each defaults to `affected`
  * (`bun test --changed=<base>`), the scope `stepOf` (`./suite-step.ts`)
  * records for it.
@@ -23,7 +23,7 @@
  * last task's commit is also the stage's last), the second stage's two
  * task steps, and the pre-wrap-up step in place of the second stage's
  * own (`dueStages` never answers a stage once no task is left open) —
- * and checks that exactly the baseline, the stage step and the
+ * and checks that exactly the baseline and the
  * pre-wrap-up step carry `scope: 'full'`, in that order, while none of
  * the four task steps does. A second assertion reads the tracker once
  * the run has finished: all four tasks ticked `[x]`, and no line ever
@@ -79,7 +79,7 @@ const TASK4 = 'Add the second stage\'s second companion test';
  * block naming an issue at all — the plan header carries no `issue`
  * field, so `readPlanOwns` (`../suite/owns.ts`) answers `no-issue`
  * before it ever reaches for `gh`, and every stage step runs the whole
- * suite unnarrowed.
+ * suite narrowed by `--changed`.
  */
 const PLAN = [
   `# Plan: ${STUB}`,
@@ -303,7 +303,7 @@ function callCount(scratch: Scratch): number {
 }
 
 describe('a plan of two stages of two tasks each, with no Owns: folders to read', () => {
-  it('runs the full suite exactly three times: the baseline, the first stage step, and the pre-wrap-up step', () => {
+  it('runs the full suite only for the baseline and the pre-wrap-up step, the stage step falling back to --changed', () => {
     const scratch = plant();
     const run = runLoopStart(scratch);
 
@@ -340,11 +340,14 @@ describe('a plan of two stages of two tasks each, with no Owns: folders to read'
 
     for (const step of steps) expect(step.newFailures).toEqual([]);
 
-    // Exactly three full-suite runs — the baseline, the first (and only
-    // recorded) stage step, and the pre-wrap-up step — and none of them
-    // is a task session's own.
+    // Exactly two full-suite runs — the baseline and the pre-wrap-up step.
+    // With no `Owns:` folder the stage step falls back to
+    // `bun test --changed=<since>`, recorded `affected`.
     const fullSteps = steps.filter((step) => step.scope === 'full');
-    expect(fullSteps.map((step) => step.kind)).toEqual(['baseline', 'stage', 'pre-wrap-up']);
+    expect(fullSteps.map((step) => step.kind)).toEqual(['baseline', 'pre-wrap-up']);
+
+    const stageStep = steps.find((step) => step.kind === 'stage');
+    expect(stageStep?.scope).toBe('affected');
 
     const taskSteps = steps.filter((step) => step.kind === 'task');
     expect(taskSteps).toHaveLength(4);
