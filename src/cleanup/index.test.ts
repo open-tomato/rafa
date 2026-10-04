@@ -136,6 +136,7 @@ function settings(overrides: Partial<CleanupSettings> = {}): CleanupSettings {
     home: HOME,
     cwd: REPO,
     projectRoot: REPO,
+    worktreeDir: '.rafa/worktrees',
     ...overrides,
   };
 }

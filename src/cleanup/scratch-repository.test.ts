@@ -40,6 +40,7 @@ describe('readCleanup over a scratch repository', () => {
       home: repo.home,
       cwd: repo.clone,
       projectRoot: repo.clone,
+      worktreeDir: '.rafa/worktrees',
     });
     if (!reading.ok) throw new Error(reading.detail);
     read = reading;
