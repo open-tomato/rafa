@@ -250,6 +250,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'update')?.actions.find((action) => action.name === 'current')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
     expect(document.subjects.find((subject) => subject.name === 'claim')?.actions.map((action) => action.name)).toEqual(['release', 'hand', 'accept', 'take']);
+    expect(document.subjects.find((subject) => subject.name === 'loop')?.actions.map((action) => action.name)).toEqual(['start', 'stop', 'pause', 'resume', 'status', 'list', 'wait']);
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -260,6 +261,7 @@ describe('the document over the core registry', () => {
     expect(spendsOf('pr', 'triage')).toStrictEqual({ when: 'with', flag: '--resolve', what: 'runs a small fixed plan through the loop' });
     expect(spendsOf('skill', 'backfill')?.when).toBe('with');
     expect(spendsOf('loop', 'start')?.when).toBe('always');
+    expect(spendsOf('loop', 'wait')).toBeNull();
     expect(command('next')?.spends?.when).toBe('through');
     expect(command('describe')?.spends).toBeNull();
     expect(command('roadmap')?.spends).toBeNull();

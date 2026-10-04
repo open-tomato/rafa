@@ -1,7 +1,8 @@
 /**
- * What `rafa loop stop`, `pause`, `resume`, `status` and `list` share: the
- * session records they read, the session a line picks, a session's tasks
- * and rough ETA, a session written as a line, and their refusals.
+ * What `rafa loop stop`, `pause`, `resume`, `status`, `list` and `wait`
+ * share: the session records they read, the session a line picks, a
+ * session's tasks and rough ETA, a session written as a line, and their
+ * refusals.
  *
  * From the CLI surface spec, "Sessions": every `loop start` writes its
  * record to `.rafa/runs/<session-id>.json` (`loop/sessions.ts`), and these
@@ -49,6 +50,11 @@
  * record with that id, a branch that cannot be read, no session paired
  * with the branch or two of them, records that cannot be read, and a
  * session in a state the action does not act on.
+ *
+ * The two refusals finding no session to act on — no record with that
+ * id, and no session paired with the branch — are a
+ * {@link NoSessionRefusal}, still exit code 1, so `loop wait` can end
+ * them with its own code for no session without reading their words.
  *
  * ## Seams
  *
@@ -154,6 +160,14 @@ export function refusal(...lines: readonly string[]): CommandExit {
   return new CommandExit(1, `❌ ${lines.join('\n   ')}`);
 }
 
+/** The refusal of a line naming no session there is: exit code 1, as {@link refusal} gives. See the module note. */
+export class NoSessionRefusal extends CommandExit {
+  constructor(...lines: readonly string[]) {
+    super(1, `❌ ${lines.join('\n   ')}`);
+    this.name = 'NoSessionRefusal';
+  }
+}
+
 /** True for a record that reads `running` or `paused`: its run has not ended. */
 export function isLive(record: Pick<SessionRecord, 'state'>): boolean {
   return record.state === 'running' || record.state === 'paused';
@@ -242,7 +256,7 @@ function pairedSession(root: string, records: readonly SessionRecord[], pick: Se
     : undefined;
   const paired = live[0] ?? newest;
   if (paired !== undefined) return paired;
-  throw refusal(
+  throw new NoSessionRefusal(
     `No session is running on \`${branch}\`.`,
     `\`rafa loop list\` lists the running sessions, and --${SESSION_ID_FLAG} names one.`,
   );
@@ -261,7 +275,7 @@ export function pickSession(context: RafaContext, usage: string, pick: SessionPi
 
   const record = records.find((held) => held.sessionId === sessionId);
   if (record !== undefined) return { root, record };
-  throw refusal(
+  throw new NoSessionRefusal(
     `No session record under ${runsLabel(root)} is named ${sessionId}.`,
     '`rafa loop list` lists the running sessions.',
   );

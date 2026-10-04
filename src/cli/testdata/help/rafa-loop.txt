@@ -11,6 +11,7 @@ Actions:
   resume   resume a paused session from its next task
   status   show a session: its state, tasks done over total and a rough ETA
   list     list the running sessions, with the tasks done in each plan
+  wait     wait on a session until a reason --until names happens
 
 Examples:
   rafa loop start --plan=.rafa/plans/PLAN-my-feature.md
