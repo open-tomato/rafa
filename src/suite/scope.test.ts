@@ -141,10 +141,18 @@ describe('taskStepScope', () => {
     });
   });
 
-  it('runs the full suite for tests=module when the plan has no Owns: folder', () => {
-    expect(taskStepScope(task({ declared: 'module', owns: null }))).toMatchObject({ scope: 'full', reason: 'no-owns' });
-    expect(taskStepScope(task({ declared: 'module', owns: [] }))).toMatchObject({ scope: 'full', reason: 'no-owns' });
-    expect(taskStepScope(task({ declared: 'module', owns: ['./'] }))).toMatchObject({ scope: 'full', reason: 'no-owns' });
+  it('falls back to affected for tests=module when the plan has no Owns: folder', () => {
+    const fallback = { scope: 'affected', declared: 'module', reason: 'fallback', triggeredBy: [] };
+    expect(taskStepScope(task({ declared: 'module', owns: null }))).toEqual(fallback);
+    expect(taskStepScope(task({ declared: 'module', owns: [] }))).toEqual(fallback);
+    expect(taskStepScope(task({ declared: 'module', owns: ['./'] }))).toEqual(fallback);
+  });
+
+  it('keeps tests=full and a trigger full when the plan has no Owns: folder', () => {
+    const declared = taskStepScope(task({ declared: 'full', owns: null }));
+    expect(declared).toEqual({ scope: 'full', declared: 'full', reason: 'declared', triggeredBy: [] });
+    const triggered = taskStepScope(task({ declared: 'module', owns: null, diff: ['src/a/one.ts', 'package.json'] }));
+    expect(triggered).toEqual({ scope: 'full', declared: 'module', reason: 'trigger', triggeredBy: ['package.json'] });
   });
 
   it('falls back to affected when no touched Owns: folder holds a test file', () => {
@@ -195,9 +203,14 @@ describe('integrationFiles', () => {
 });
 
 describe('stageStepScope', () => {
-  it('runs the whole project when the plan has no Owns: folder', () => {
-    expect(stageStepScope(stage({ owns: null }))).toEqual({ scope: 'full', reason: 'no-owns' });
-    expect(stageStepScope(stage({ owns: [] }))).toEqual({ scope: 'full', reason: 'no-owns' });
+  it('falls back to affected when the plan has no Owns: folder', () => {
+    expect(stageStepScope(stage({ owns: null }))).toEqual({ scope: 'affected', reason: 'fallback' });
+    expect(stageStepScope(stage({ owns: [] }))).toEqual({ scope: 'affected', reason: 'fallback' });
+    expect(stageStepScope(stage({ owns: ['./'] }))).toEqual({ scope: 'affected', reason: 'fallback' });
+  });
+
+  it('falls back to affected without Owns: even for a diff touching a trigger', () => {
+    expect(stageStepScope(stage({ owns: null, diff: ['bunfig.toml'] }))).toEqual({ scope: 'affected', reason: 'fallback' });
   });
 
   it('runs the touched folder\'s tests and the integration tier, not the other folder\'s', () => {

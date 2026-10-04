@@ -51,11 +51,17 @@
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
- * baseline's commit, to HEAD. `stageStepScope` answers `full` without
- * `Owns:` folders, and otherwise the test files under the folders the
- * diff touched plus the integration tier. An empty list runs nothing and
- * records no step, since a step's command is never empty. With neither
- * commit, or a diff git will not answer, the full suite runs.
+ * baseline's commit, to HEAD. Without `Owns:` folders `stageStepScope`
+ * answers `affected`, reason `fallback`, run as `bun test
+ * --changed=<since>` from that same commit, with the `tests.alwaysRun`
+ * files joined as a task step's `affected` run joins them: a second run,
+ * its JUnit file {@link alwaysRunJunitFileFor} of `stage`, folded into
+ * the first before the step is settled and recorded as `affected`. With
+ * `Owns:` folders it answers the test files under the folders the diff
+ * touched plus the integration tier, and no always-run run is added. An
+ * empty list runs nothing and records no step, since a step's command
+ * is never empty. With neither commit, or a diff git will not answer,
+ * the full suite runs.
  *
  * **The pre-wrap-up step** runs the full suite, and stands in for the
  * last stage's stage step, so {@link dueStages} never answers a stage
@@ -163,8 +169,9 @@
  * The stage step's code is in `suite-stage-step.ts` and re-exported
  * here; this note stays its account. The helpers it shares with the
  * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
- * {@link addToLedger}, {@link runOne}, {@link settleStep},
- * {@link retakeOnErrors} and {@link Settling}) are exported for it alone.
+ * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
+ * {@link settleStep}, {@link retakeOnErrors}, {@link Settling} and
+ * {@link StepRuns}) are exported for it alone.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
@@ -335,9 +342,9 @@ export function junitFileFor(repoRoot: string, sessionId: string, kind: SessionS
   return join(runsDir(repoRoot), sessionId, 'suite', `${kind}.junit.xml`);
 }
 
-/** Where the task step's second run, over the `tests.alwaysRun` files, has Bun write its JUnit file. */
-export function alwaysRunJunitFileFor(repoRoot: string, sessionId: string): string {
-  return join(runsDir(repoRoot), sessionId, 'suite', 'task-always-run.junit.xml');
+/** Where a task step's, or a stage step's fallback's, second run over the `tests.alwaysRun` files has Bun write its JUnit file. */
+export function alwaysRunJunitFileFor(repoRoot: string, sessionId: string, kind: 'task' | 'stage' = 'task'): string {
+  return join(runsDir(repoRoot), sessionId, 'suite', `${kind}-always-run.junit.xml`);
 }
 
 /** The ledger beside the tracker (or plan) at `trackerPath`; throws as `baselinePathFor` does. */
@@ -622,8 +629,8 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   return { baseline, step: outcome.step, interrupted: false };
 }
 
-/** The runs a task step makes: its own, and the paths of a second run over the always-run files, or none. */
-interface TaskRuns {
+/** The runs a task step or a stage step's fallback makes: its own, and the paths of a second run over the always-run files, or none. */
+export interface StepRuns {
   readonly narrowing: Pick<SuiteRunOptions, 'paths' | 'changedSince'>;
   readonly alwaysRun: readonly string[];
   /** The always-run files either run holds, whose times the step reads (`sweep-timing.ts`). */
@@ -631,7 +638,7 @@ interface TaskRuns {
 }
 
 /** The runs a task scope asks for, with the `tests.alwaysRun` files `alwaysRun` added; see the module note. */
-function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): TaskRuns {
+function taskNarrowing(scope: TaskStepScope, base: string, alwaysRun: readonly string[]): StepRuns {
   if (scope.scope === 'full') return { narrowing: {}, alwaysRun: [], timed: [] };
   if (scope.scope === 'module') return { narrowing: { paths: withAlwaysRun(scope.paths, alwaysRun) }, alwaysRun: [], timed: alwaysRun };
   return { narrowing: { changedSince: base }, alwaysRun, timed: alwaysRun };
@@ -662,12 +669,12 @@ async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepS
   });
 }
 
-/** Runs the task step's own run, then its always-run run unless there is none or the first was a stop. */
-async function runTaskRuns(context: SuiteStepContext, seams: Required<SuiteStepSeams>, runs: TaskRuns): Promise<SuiteResult> {
-  const first = await runOne(context, seams, 'task', runs.narrowing);
+/** Runs the step's own run, then its always-run run unless there is none or the first was a stop, folded into one result. */
+export async function runWithAlwaysRun(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: 'task' | 'stage', runs: StepRuns): Promise<SuiteResult> {
+  const first = await runOne(context, seams, kind, runs.narrowing);
   if (runs.alwaysRun.length === 0 || isStepInterrupted(context, first)) return first;
-  const junitFile = alwaysRunJunitFileFor(context.repoRoot, context.sessionId);
-  const second = await runOne(context, seams, 'task', { paths: runs.alwaysRun }, junitFile);
+  const junitFile = alwaysRunJunitFileFor(context.repoRoot, context.sessionId, kind);
+  const second = await runOne(context, seams, kind, { paths: runs.alwaysRun }, junitFile);
   return foldResults(first, second, SIGINT_EXIT_CODE);
 }
 
@@ -685,13 +692,13 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
     ? { narrowing: {}, alwaysRun: [], timed: [] }
     : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
   const recorded = scope?.scope ?? 'full';
-  const result = await runTaskRuns(context, seams, runs);
+  const result = await runWithAlwaysRun(context, seams, 'task', runs);
   const label = `task step after "${input.task}"`;
   const lint = isStepInterrupted(context, result)
     ? {}
     : { lint: await lintTask(context, seams, input) };
   const settling: Settling = { kind: 'task', scope: recorded, label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...lint };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runTaskRuns(context, seams, runs)));
+  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs)));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
     : junitFileFor(context.repoRoot, context.sessionId, 'task');
@@ -724,7 +731,7 @@ export function planOwnsReader(options: PlanOwnsReaderOptions): () => Promise<re
   const read = async (): Promise<readonly string[] | null> => {
     const owns = await readPlanOwns({ issue: parsePlan(options.planContent).header.issue, gh: options.gh });
     if (owns.owns === null) {
-      activeOutput().info(`🗂  Stage steps run the full suite: ${owns.detail}.`);
+      activeOutput().info(`🗂  Stage steps fall back to bun test --changed=<since> with the tests.alwaysRun files: ${owns.detail}.`);
       return null;
     }
     activeOutput().info(`🗂  Stage steps run the tests under epic #${owns.epic}'s Owns: folders: ${owns.owns.join(', ')}.`);

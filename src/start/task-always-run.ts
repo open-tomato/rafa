@@ -1,8 +1,11 @@
 /**
  * The `tests.alwaysRun` files in the runner's task step (`runTaskStep`,
- * `suite-step.ts`): which tracked files the setting names, and how the
- * run over them joins the step's own run, so that one settling reads the
- * failures of both.
+ * `suite-step.ts`) and in a stage step's `affected` fallback, taken when
+ * the plan has no `Owns:` folder (`suite-stage-step.ts`): which tracked
+ * files the setting names, and how the run over them joins the step's
+ * own run, so that one settling reads the failures of both. The stage
+ * fallback takes them as the `affected` row below, over
+ * `--changed=<since>`.
  *
  * ## Why the step runs them
  *
@@ -64,14 +67,14 @@ export const FOLDED_COMMAND_JOINER = ';';
 
 /**
  * The `tests.alwaysRun` files tracked in the checkout `git` runs in. None
- * for no glob, without asking git; none with a warning when git does not
- * answer. See the module note.
+ * for no glob, without asking git; none with a warning naming the `step`
+ * reading them when git does not answer. See the module note.
  */
-export function readTaskAlwaysRun(git: GitRunner, globs: readonly string[]): readonly string[] {
+export function readTaskAlwaysRun(git: GitRunner, globs: readonly string[], step: 'task' | 'stage' = 'task'): readonly string[] {
   if (globs.length === 0) return [];
   const result = git(['ls-files', '-z']);
   if (!result.ok) {
-    activeOutput().warn(`⚠️  git ls-files did not answer (${gitSaid(result) || 'nothing said'}); the task step runs no tests.alwaysRun file.`);
+    activeOutput().warn(`⚠️  git ls-files did not answer (${gitSaid(result) || 'nothing said'}); the ${step} step runs no tests.alwaysRun file.`);
     return [];
   }
   return alwaysRunFiles(globs, result.stdout.split('\0').filter((path) => path !== ''));

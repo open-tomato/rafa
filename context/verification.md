@@ -52,7 +52,9 @@ never linted.
 **Runner recorded steps** (full suite, recorded at fixed points):
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — Full suite after each task's session ends and commits
-- `stage` — Full suite after a stage's last task
+- `stage` — After a stage's last task: the tests under the `Owns:`
+  folders it changed, or `bun test --changed=<since>` with the
+  `tests.alwaysRun` files when the plan has no `Owns:` folder
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope (affected, module, full, or a

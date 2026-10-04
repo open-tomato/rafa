@@ -8,13 +8,14 @@
  * stage step, the stage ledger and SIGINT), which stays the one account
  * of all four steps; this module only holds the stage step's code, and
  * `suite-step.ts` re-exports both functions so callers keep importing
- * them from there. The record, settle, retake and ledger helpers it
- * shares with the other steps live in `suite-step.ts`, imported back
+ * them from there. The run, record, settle, retake and ledger helpers
+ * it shares with the other steps live in `suite-step.ts`, imported back
  * here: the cycle is safe because neither module reads the other's
  * bindings at load, only inside the functions.
  */
 
-import type { DueStage, StepOutcome, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
+import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
+import type { SessionStep } from '../loop/sessions.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 
 import { readFileSync } from 'node:fs';
@@ -29,11 +30,18 @@ import {
   readHead,
   readStageLedger,
   retakeOnErrors,
-  runOne,
+  runWithAlwaysRun,
   seamsOf,
   settleStep,
   stageLedgerPathFor,
 } from './suite-step.js';
+import { readTaskAlwaysRun } from './task-always-run.js';
+
+/** What a stage step runs: the whole project, a path list, or the `--changed` fallback from `since`. */
+type StageRun =
+  | { readonly scope: 'full' }
+  | { readonly scope: 'paths'; readonly paths: readonly string[] }
+  | { readonly scope: 'affected'; readonly since: string };
 
 /** The commit a stage's diff is taken from: the last stage step's, else the baseline's. */
 function stageSince(trackerPath: string, baseline: SuiteBaseline | null): string | null {
@@ -41,41 +49,53 @@ function stageSince(trackerPath: string, baseline: SuiteBaseline | null): string
   return taken.at(-1)?.commit ?? baseline?.commit ?? null;
 }
 
-/** The stage step's run: its paths, or the whole project when unnarrowed. */
-async function stageNarrowing(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null): Promise<readonly string[] | null> {
+/** The stage step's run: its paths, the fallback without `Owns:`, or the whole project when its diff did not read. */
+async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null): Promise<StageRun> {
   const since = stageSince(context.trackerPath, baseline);
-  const diff = since === null
-    ? null
-    : readDiff(seams.git, since);
-  if (diff === null) return null;
+  if (since === null) return { scope: 'full' };
+  const diff = readDiff(seams.git, since);
+  if (diff === null) return { scope: 'full' };
   const scope = stageStepScope({
     diff,
     owns: await context.owns(),
     integration: context.settings.testsIntegration,
     testFiles: seams.listTestFiles(context.checkout),
   });
-  return scope.scope === 'full'
-    ? null
-    : scope.paths;
+  return scope.scope === 'affected'
+    ? { scope: 'affected', since }
+    : { scope: 'paths', paths: scope.paths };
+}
+
+/** The runs `run` asks for: the fallback joins the `tests.alwaysRun` files as a second run, the others none. */
+function stageRuns(context: SuiteStepContext, seams: Required<SuiteStepSeams>, run: StageRun): StepRuns {
+  if (run.scope === 'full') return { narrowing: {}, alwaysRun: [], timed: [] };
+  if (run.scope === 'paths') return { narrowing: { paths: run.paths }, alwaysRun: [], timed: [] };
+  const alwaysRun = readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun, 'stage');
+  return { narrowing: { changedSince: run.since }, alwaysRun, timed: [] };
+}
+
+/** The scope the run record holds for `run`. */
+function recordedScope(run: StageRun): SessionStep['scope'] {
+  return run.scope === 'paths'
+    ? run.paths
+    : run.scope;
 }
 
 /** Runs the step of one stage and enters it in the ledger; see the module note. */
 export async function runStageStep(context: SuiteStepContext, stage: DueStage, baseline: SuiteBaseline | null): Promise<StepOutcome> {
   const seams = seamsOf(context);
   const commit = readHead(seams.git);
-  const paths = await stageNarrowing(context, seams, baseline);
+  const run = await stageRunOf(context, seams, baseline);
   const label = `stage step for "${stage.name}"`;
-  if (paths !== null && paths.length === 0) {
+  if (run.scope === 'paths' && run.paths.length === 0) {
     activeOutput().info(`🧪 ${label}: no test file under the Owns: folders it changed and no integration file; nothing to run.`);
     addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
     return { kind: 'stage', step: null, red: false, interrupted: false, blocker: null, blockedLine: null };
   }
-  const narrowing = paths === null
-    ? {}
-    : { paths };
-  const result = await runOne(context, seams, 'stage', narrowing);
-  const settling: Settling = { kind: 'stage', scope: paths ?? 'full', label, result, baseline, repair: { kind: 'stage' } };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'stage', narrowing)));
+  const runs = stageRuns(context, seams, run);
+  const result = await runWithAlwaysRun(context, seams, 'stage', runs);
+  const settling: Settling = { kind: 'stage', scope: recordedScope(run), label, result, baseline, repair: { kind: 'stage' } };
+  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs)));
   if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;
 }

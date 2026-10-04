@@ -769,14 +769,24 @@ describe('dueStages', () => {
 describe('runStageStep', () => {
   const stage = { stage: 0, name: 'One' };
 
-  it('runs the full suite without Owns: folders, over the diff since the baseline, and enters the stage', async () => {
+  it('falls back to bun test --changed=<since> without Owns: folders, since the baseline, and enters the stage', async () => {
     const calls: string[] = [];
     const { context, seen } = contextWith([result()], { git: gitAt({ [BASE]: ['src/a.ts'] }, calls) });
     const outcome = await runStageStep(context, stage, baselineWith());
     expect(calls).toContain(`diff --name-only -z --no-renames ${BASE} HEAD`);
-    expect(seen.runs[0]?.paths).toBeUndefined();
-    expect(outcome.step?.scope).toBe('full');
+    expect(seen.runs).toEqual([{ cwd: dir, junitFile: junitFileFor(dir, SESSION, 'stage'), changedSince: BASE }]);
+    expect(outcome.step?.scope).toBe('affected');
+    expect(seen.steps).toHaveLength(1);
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toEqual([{ stage: 0, name: 'One', commit: HEAD, via: 'step' }]);
+  });
+
+  it('runs the full suite, with a warning, when git will not answer the stage\'s diff', async () => {
+    const { context, seen } = contextWith([result()], { git: gitAt({}) });
+    const outcome = await runStageStep(context, stage, baselineWith());
+    expect(seen.runs[0]?.paths).toBeUndefined();
+    expect(seen.runs[0]?.changedSince).toBeUndefined();
+    expect(outcome.step?.scope).toBe('full');
+    expect(linesAt('warn').some((line) => line.includes('runs the full suite'))).toBe(true);
   });
 
   it('runs the touched folder\'s tests and the integration tier, not the other folder\'s', async () => {
@@ -789,10 +799,11 @@ describe('runStageStep', () => {
   it('takes the next stage\'s diff from the commit the last stage step was taken at', async () => {
     writeFileSync(stageLedgerPathFor(trackerPath), `${JSON.stringify({ version: 1, stages: [{ stage: 0, name: 'One', commit: 'stage1', via: 'step' }] })}\n`);
     const calls: string[] = [];
-    const { context } = contextWith([result()], { git: gitAt({ stage1: ['src/a.ts'] }, calls) });
+    const { context, seen } = contextWith([result()], { git: gitAt({ stage1: ['src/a.ts'] }, calls) });
     await runStageStep(context, { stage: 1, name: 'Two' }, baselineWith());
     expect(calls).toContain('diff --name-only -z --no-renames stage1 HEAD');
     expect(calls).not.toContain(`diff --name-only -z --no-renames ${BASE} HEAD`);
+    expect(seen.runs[0]?.changedSince).toBe('stage1');
   });
 
   it('runs and records nothing for an empty path list, and still enters the stage', async () => {
@@ -815,6 +826,56 @@ describe('runStageStep', () => {
     expect(outcome.blocker).toContain('stage step for "One"');
     expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toContain('src/new.test.ts');
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
+  });
+});
+
+describe('runStageStep with tests.alwaysRun', () => {
+  const stage = { stage: 0, name: 'One' };
+  const glob = ['src/**/*.sweep.test.ts'];
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+  const swept: SuiteFailure = { file: sweep, name: 'leak > names a plan path' };
+
+  it('joins the always-run files to the fallback as a second run, settled as one affected step', async () => {
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runStageStep(context, stage, baselineWith());
+
+    expect(seen.runs).toEqual([
+      { cwd: dir, junitFile: junitFileFor(dir, SESSION, 'stage'), changedSince: BASE },
+      { cwd: dir, junitFile: alwaysRunJunitFileFor(dir, SESSION, 'stage'), paths: [sweep] },
+    ]);
+    expect(alwaysRunJunitFileFor(dir, SESSION, 'stage')).not.toBe(alwaysRunJunitFileFor(dir, SESSION));
+    expect(seen.steps).toHaveLength(1);
+    expect(seen.steps[0]?.scope).toBe('affected');
+    expect(seen.steps[0]?.command).toContain(FOLDED_COMMAND_JOINER);
+    expect(outcome).toMatchObject({ kind: 'stage', red: false, blocker: null });
+  });
+
+  it('inserts a blocked repair task on a failure only the fallback\'s always-run run found', async () => {
+    const { context, seen } = contextWith([result(), red([swept])], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runStageStep(context, stage, baselineWith());
+
+    expect(outcome.red).toBe(true);
+    expect(seen.steps[0]?.newFailures).toEqual([swept]);
+    expect(outcome.blocker).toContain(`${sweep} (1 test)`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.task).toStartWith('Repair the red stage step');
+  });
+
+  it('retakes both runs of the fallback when its only red is errors outside any test', async () => {
+    const excess = result({ errors: 1 });
+    const { context, seen } = contextWith([excess, result(), result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runStageStep(context, stage, baselineWith());
+
+    expect(outcome.red).toBe(false);
+    expect(seen.runs.map((run) => run.paths ?? run.changedSince)).toEqual([BASE, [sweep], BASE, [sweep]]);
+  });
+
+  it('adds no always-run run to a stage narrowed by Owns: folders', async () => {
+    const { context, seen } = contextWith([result()], { owns: ['src/b'], alwaysRun: glob, git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked) });
+    await runStageStep(context, stage, baselineWith());
+
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toEqual(['src/b/b.test.ts', 'src/run-integration.test.ts']);
   });
 });
 
@@ -892,7 +953,10 @@ describe('planOwnsReader', () => {
     expect(await withIssue()).toBeNull();
     expect(await withIssue()).toBeNull();
     expect(calls).toBe(1);
-    expect(linesAt('info').filter((line) => line.startsWith('🗂'))).toHaveLength(2);
+    const said = linesAt('info').filter((line) => line.startsWith('🗂'));
+    expect(said).toHaveLength(2);
+    expect(said.every((line) => line.includes('bun test --changed=<since>'))).toBe(true);
+    expect(said.some((line) => line.includes('full suite'))).toBe(false);
   });
 });
 

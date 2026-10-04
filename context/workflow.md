@@ -174,7 +174,9 @@ automatically, and which tests always run:**
   to `tests=module`
 
 **A stage-end step with new failures blocks the next task.** After a
-stage's last task, the stage step runs the full suite and captures
+stage's last task, the stage step runs the tests under the `Owns:`
+folders the stage changed, or, with no `Owns:` folder, `bun test
+--changed=<since>` with the `tests.alwaysRun` files, and captures
 failures. If any failure is new against the baseline, the runner inserts
 a `[BLOCKED]` repair task above the first open task
 (`src/start/suite-blocker.ts`), its blocker the failures, which the repair
