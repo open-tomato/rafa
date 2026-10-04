@@ -48,6 +48,7 @@ import { fixStoreSchema } from './fix-schema.js';
 import { mergeStore } from './merge-store.js';
 import { migrateStore } from './migrate.js';
 import { SQLITE_MIGRATIONS, withSqliteStore } from './sqlite.js';
+import { readStoreGeneration } from './store-generation.js';
 import { readHostId } from './store-identity.js';
 import { readStoreMeta } from './store-meta.js';
 
@@ -384,5 +385,98 @@ describe('a store rebuilt beside itself keeps its origin on the first write afte
 
     expect(result.status).toBe('rebuilt');
     expectOriginKept(testCase.path, before);
+  });
+});
+
+/**
+ * After a rebuild at `path` that left `backupPath` behind: the backup's
+ * generation differs from the live row's and from the side record's, one
+ * write keeps the `store_id`, and the backup renamed back over the store
+ * mints on its first write. `makeRestorable` readies a backup this build
+ * would refuse to write (the schema repair's holds an unknown migration).
+ */
+function expectRotation(
+  path: string,
+  backupPath: string,
+  before: StoreMeta,
+  makeRestorable: (backupPath: string) => void = () => undefined,
+): void {
+  const backupGeneration = metaOf(backupPath)?.generation;
+  const liveGeneration = metaOf(path)?.generation;
+  const sideRecord = readStoreGeneration(path);
+
+  expect(backupGeneration).toBeDefined();
+  expect(backupGeneration).not.toBeNull();
+  expect(liveGeneration).not.toBe(backupGeneration);
+  expect(sideRecord).not.toBe(backupGeneration);
+
+  const kept = writeOpen(path, seamsOf());
+  expect(kept?.storeId).toBe(before.storeId);
+  expect(metaOf(path)?.storeId).toBe(before.storeId);
+
+  makeRestorable(backupPath);
+  renameSync(backupPath, path);
+  const written = writeOpen(path, seamsOf('store-restored'));
+  expect(written?.storeId).toBe('store-restored');
+  expect(metaOf(path)?.storeId).toBe('store-restored');
+}
+
+describe('a rebuild rotates the generation, so its backup renamed back mints', () => {
+  it('rotates through a merge', () => {
+    const testCase = freshCase();
+    const before = mintedWithFinding(testCase);
+    plantOther(testCase, OTHER_ORIGIN, ['b1']);
+
+    const backupPath = merge(testCase, 1);
+
+    expectRotation(testCase.path, backupPath, before);
+  });
+
+  it('rotates through a migration', () => {
+    const testCase = freshCase();
+    const before = mintedWithFinding(testCase);
+
+    const result = migrateStore({
+      path: testCase.path,
+      dryRun: false,
+      stamp: nextStamp(),
+      migrations: [...SQLITE_MIGRATIONS, ADDITIVE_TAIL],
+      now: () => NOW,
+      identity: INSTALLED,
+      isAlive: () => false,
+    });
+
+    expect(result.status).toBe('migrated');
+    if (result.backupPath === null) throw new Error('the migration swapped in and named no backup');
+    expectRotation(testCase.path, result.backupPath, before);
+  });
+
+  it('rotates through a schema repair', () => {
+    const testCase = freshCase();
+    const before = mintedWithFinding(testCase);
+    withRaw(testCase.path, (db) => {
+      db.run('CREATE TABLE future_readings (seq INTEGER PRIMARY KEY, session_id TEXT NOT NULL)');
+      db.run(
+        `INSERT INTO ${MIGRATION_LOG_TABLE} (id, sha256, breaks, applied_at, applied_by)`
+          + ` VALUES ('future-readings', '${'a'.repeat(64)}', '["writers"]', '2026-10-01T09:00:00.000Z', '0.30.0')`,
+      );
+    });
+
+    const result = fixStoreSchema({
+      path: testCase.path,
+      dryRun: false,
+      stamp: nextStamp(),
+      now: () => NOW,
+      identity: INSTALLED,
+    });
+
+    expect(result.status).toBe('rebuilt');
+    if (result.backupPath === null) throw new Error('the repair swapped in and named no backup');
+    expectRotation(testCase.path, result.backupPath, before, (backupPath) => {
+      withRaw(backupPath, (db) => {
+        db.run(`DELETE FROM ${MIGRATION_LOG_TABLE} WHERE id = 'future-readings'`);
+        db.run('DROP TABLE future_readings');
+      });
+    });
   });
 });
