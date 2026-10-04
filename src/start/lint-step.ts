@@ -51,7 +51,7 @@
  * ## Red, and the blocker
  *
  * A nonzero exit is red. Its blocker has the shape a test failure's has
- * (`blockerText`, `suite-step.ts`): what the step found, the files with
+ * (`blockerText`, `suite-blocker.ts`): what the step found, the files with
  * their counts, and the command running them, as in `The runner's lint
  * step after "<task>" found ESLint errors in the task's diff. Files with
  * errors: a.json (1 error). Run bunx eslint --no-warn-ignored a.json and

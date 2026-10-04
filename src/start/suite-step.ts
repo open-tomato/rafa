@@ -76,7 +76,8 @@
  *
  * A red task or stage step writes a blocker on the next open task, the
  * line `findNextTask` answers after the commit (`utils/tracker.ts`),
- * through `writeTrackerBlocker`, which marks it `[BLOCKED]`. The text
+ * through `writeTrackerBlocker`, which marks it `[BLOCKED]`; the text
+ * and the write live in `suite-blocker.ts`. The text
  * names each new failing test file with its count, the command running
  * them (`bun test <files>`), and the errors or missing summary when
  * those made it red; the retry session is handed it through
@@ -141,6 +142,7 @@
  * (`adapters/output/active.ts`).
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
+import type { StepVerdict } from './suite-blocker.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { SessionStep, SessionStepKind } from '../loop/sessions.js';
@@ -175,11 +177,15 @@ import {
   stageStepScope,
   taskStepScope,
 } from '../suite/scope.js';
-import { findNextTask, writeTrackerBlocker } from '../utils/tracker.js';
+import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint, runLintStep } from './lint-step.js';
+import { blockerText, blockNextOpenTask } from './suite-blocker.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
+
+export { blockerText } from './suite-blocker.js';
+export type { StepVerdict } from './suite-blocker.js';
 
 /** The stage ledger's file name before its stub. */
 export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
@@ -281,15 +287,6 @@ export interface TaskStepInput {
   readonly declared: TestScope;
   /** The task's sentence, for the blocker text. */
   readonly task: string;
-}
-
-/** A step's failures split against the baseline, and what else can make it red. */
-export interface StepVerdict {
-  readonly fresh: readonly SuiteFailure[];
-  readonly known: readonly SuiteFailure[];
-  readonly newErrors: number;
-  /** True when Bun exited nonzero and printed no summary. */
-  readonly unreported: boolean;
 }
 
 /** The seams, each filled with the system's own. */
@@ -448,34 +445,6 @@ function isRed(verdict: StepVerdict): boolean {
   return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
 }
 
-/** Each file among `failures` and how many of its tests failed, in first-seen order. */
-function failingFiles(failures: readonly SuiteFailure[]): readonly (readonly [string, number])[] {
-  const counts = new Map<string, number>();
-  for (const failure of failures) counts.set(failure.file, (counts.get(failure.file) ?? 0) + 1);
-  return [...counts.entries()];
-}
-
-/**
- * The blocker a red step writes: the new failing files with their
- * counts and the command running them, then the errors or the missing
- * summary when those made it red. `label` names the step.
- */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode'>, verdict: StepVerdict): string {
-  const files = failingFiles(verdict.fresh);
-  const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
-  if (files.length > 0) {
-    const named = files.map(([file, count]) => `${file} (${count} ${count === 1
-      ? 'test'
-      : 'tests'})`);
-    parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => file).join(' ')} and make them pass.`);
-  }
-  if (verdict.newErrors > 0) {
-    parts.push(`${verdict.newErrors} more error(s) outside any test than the baseline: a test file that throws while it loads, which the JUnit report names no file for.`);
-  }
-  if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
-  return parts.join(' ');
-}
-
 /** The step the run record holds for `result`. */
 function stepOf(kind: SessionStepKind, scope: SessionStep['scope'], result: SuiteResult, fresh: readonly SuiteFailure[]): SessionStep {
   return {
@@ -505,15 +474,6 @@ function announce(label: string, result: SuiteResult, known: readonly SuiteFailu
   activeOutput().info(`   ${known.length} known failure(s), held by the suite baseline, block nothing:`);
   for (const failure of known.slice(0, KNOWN_LISTED)) activeOutput().info(`   known: ${failure.file} > ${failure.name}`);
   if (known.length > KNOWN_LISTED) activeOutput().info(`   ...and ${known.length - KNOWN_LISTED} more.`);
-}
-
-/** Writes `text` on the next open task, answering its line, or null when none is left. */
-function blockNextOpenTask(trackerPath: string, text: string): number | null {
-  const next = findNextTask(readFileSync(trackerPath, 'utf8'));
-  if (next === null) return null;
-  return writeTrackerBlocker(trackerPath, next.lineNum, text)
-    ? next.lineNum
-    : null;
 }
 
 /** What {@link settleStep} is handed about a run already made. */
