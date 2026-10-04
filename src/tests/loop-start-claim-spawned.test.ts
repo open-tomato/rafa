@@ -50,7 +50,7 @@ import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { REMOTE } from '../start/branch-decision.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-loop-start-claim-spawned-')));
@@ -259,7 +259,7 @@ describe('a plan written with no reachable remote, then loop start over its pend
     const planRun = runRafa(deviceA, deviceA.repo, ['plan', 'create', `--spec=${SPEC_FILE}`, '--no-progress']);
     const planOutput = `${planRun.stdout}${planRun.stderr}`;
 
-    expect(planRun.exitCode).toBe(0);
+    expectExit(planRun, 0, deviceA);
     expect(planOutput).toContain(`⚠️  Planning issue #${String(ISSUE)} unclaimed: the claim on #${String(ISSUE)} was not pushed:`);
     expect(planOutput).toContain(`It waits on the local ${BRANCH} for rafa loop start to push`);
     expect(planOutput).toContain(`✅ Plan ready: .rafa/plans/PLAN-${STUB}.md`);
@@ -280,7 +280,7 @@ describe('a plan written with no reachable remote, then loop start over its pend
     const loopRunA = runRafa(deviceA, deviceA.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
     const loopOutputA = `${loopRunA.stdout}${loopRunA.stderr}`;
 
-    expect(loopRunA.exitCode).toBe(0);
+    expectExit(loopRunA, 0, deviceA);
     expect(loopOutputA).toContain(`🔒 Pushed the claim on #${String(ISSUE)} to ${REMOTE}/${BRANCH} for store ${STORE_A}.`);
 
     const pushedTip = must(originGit, ['rev-parse', `refs/heads/${BRANCH}`]);
@@ -303,7 +303,7 @@ describe('a plan written with no reachable remote, then loop start over its pend
 
     const loopRunB = runRafa(deviceB, deviceB.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-    expect(loopRunB.exitCode).toBe(1);
+    expectExit(loopRunB, 1, deviceB);
     expect(loopRunB.stderr).toContain(`❌ Refusing to start: this device does not own the claim on #${String(ISSUE)}.`);
     expect(loopRunB.stderr).toContain(`#${String(ISSUE)} is claimed by store ${STORE_A} on ${BRANCH}`);
     expect(loopRunB.stderr).toContain(`not by this device (store ${STORE_B})`);

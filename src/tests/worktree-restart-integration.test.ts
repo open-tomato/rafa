@@ -47,7 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { describeRun, expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostGitDir } from './stand-in-gh.js';
@@ -295,7 +295,7 @@ function expectRefusedUntouched(
   const run = runRafa(scratch, scratch.repo, START_ARGS);
   const output = `${run.stdout}${run.stderr}`;
 
-  expect(run.exitCode).toBe(1);
+  expectExit(run, 1, scratch);
   expect(output).toContain(refusal);
   expect(output).toContain('The main checkout\'s branch and working tree were not touched.');
   expect(existsSync(scratch.callLog)).toBe(false);
@@ -353,7 +353,7 @@ describe('rafa loop start --as-worktree, started again over a stopped run\'s wor
     const worktreePath = worktreePathFor(scratch);
 
     const first = runRafa(scratch, scratch.repo, START_ARGS);
-    expect(`${first.stdout}${first.stderr}`).toContain('Task failed (exit 1). Marked as blocked.');
+    expect(`${first.stdout}${first.stderr}`, describeRun(first, scratch)).toContain('Task failed (exit 1). Marked as blocked.');
     expect(existsSync(join(worktreePath, 'probe-1.txt'))).toBe(true);
     expect(trackerTaskLines(scratch)[0]).toStartWith('- [x] ');
     expect(trackerTaskLines(scratch)[1]).not.toStartWith('- [x] ');
