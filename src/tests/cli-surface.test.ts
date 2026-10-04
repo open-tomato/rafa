@@ -15,6 +15,9 @@
  *     phase 0, each print their one deprecation line to stderr exactly
  *     once, whatever the command they alias goes on to do.
  *   - **An unknown subject** exits nonzero.
+ *   - **The removed `usage` subject**, bare and with `--output=json`, is
+ *     refused as unknown with an empty stdout, beside a kept command
+ *     exiting 0 in the same project.
  *   - **A command outside a project** exits 1 with the `rafa init` hint,
  *     where the same command runs in a scratch repository holding
  *     `.rafa/config.yaml`: the control for the file every other case's
@@ -140,6 +143,25 @@ describe('an unknown subject', () => {
 
     expect(run.exitCode).not.toBe(0);
     expect(run.stderr).toContain('rafa: unknown subject or command "not-a-real-subject"');
+  }, RUN_TIMEOUT);
+});
+
+describe('the removed usage subject', () => {
+  it('is refused as unknown in both output modes, where a kept command runs in the same project', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const plain = runRafa(scratch, scratch.repo, ['usage']);
+    const json = runRafa(scratch, scratch.repo, ['usage', '--output=json']);
+    const control = runRafa(scratch, scratch.repo, ['status']);
+
+    expect(plain.exitCode).not.toBe(0);
+    expect(plain.stderr).toContain('rafa: unknown subject or command "usage"');
+    expect(plain.stdout).toBe('');
+    // In json mode the refusal is the terminal result event on stdout, and stderr stays empty.
+    expect(json.exitCode).not.toBe(0);
+    expect(json.stderr).toBe('');
+    expect(json.stdout).toContain('"message":"unknown subject or command \\"usage\\""');
+    expect(control.exitCode).toBe(0);
   }, RUN_TIMEOUT);
 });
 
