@@ -15,10 +15,10 @@
  *
  *   - The CLI's commands, each under the name of the command line it
  *     answers: {@link startCommand} (`rafa loop start`, the loop),
- *     {@link planCommand} (`rafa plan create`), {@link usageCommand}
- *     (`rafa usage`), {@link effortCollectCommand} (`rafa effort collect`)
- *     and {@link effortReportCommand} (`rafa effort report`). These are
- *     the five functions the core commands in `src/commands/` wrap, each
+ *     {@link planCommand} (`rafa plan create`),
+ *     {@link effortCollectCommand} (`rafa effort collect`) and
+ *     {@link effortReportCommand} (`rafa effort report`). These are
+ *     the four functions the core commands in `src/commands/` wrap, each
  *     handed the words typed after its routing words and the root of the
  *     project the dispatcher resolved. The entry
  *     re-exports them as they are, so a service calling one runs exactly
@@ -325,4 +325,3 @@ export {
   selfAndAncestors,
 } from './project/scope.js';
 export { default as startCommand } from './start.js';
-export { default as usageCommand } from './usage.js';

@@ -6,7 +6,7 @@
  *
  * ## What is covered
  *
- *   - **`--output=json` over `describe`, `usage`, `plan validate`,
+ *   - **`--output=json` over `describe`, `status`, `plan validate`,
  *     `effort report` and a refused command** (`plan show` of a stub no
  *     plan carries): each run's stdout is NDJSON, every line parsing as
  *     JSON, with exactly one terminal `result` event among them, as
@@ -77,13 +77,13 @@ interface JsonCase {
 }
 
 /**
- * `describe`, `usage`, `plan validate` and `effort report`, each
+ * `describe`, `status`, `plan validate` and `effort report`, each
  * exiting 0, and a refused command (`plan show` of a stub no plan
  * carries), exiting 1: every one run over `--output=json`.
  */
 const JSON_CASES: readonly (readonly [string, JsonCase])[] = [
   ['describe', { words: ['describe', '--output=json'], exitCode: 0 }],
-  ['usage', { words: ['usage', '--output=json'], exitCode: 0 }],
+  ['status', { words: ['status', '--output=json'], exitCode: 0 }],
   ['plan validate', {
     words: ['plan', 'validate', 'plan.md', '--output=json'],
     exitCode: 0,
@@ -148,8 +148,8 @@ describe('a command outside a project', () => {
     const outside = plantScratchRepo(tempBase, { project: false });
     const inside = plantScratchRepo(tempBase);
 
-    const refused = runRafa(outside, outside.repo, ['usage']);
-    const ran = runRafa(inside, inside.repo, ['usage']);
+    const refused = runRafa(outside, outside.repo, ['status']);
+    const ran = runRafa(inside, inside.repo, ['status']);
 
     expect([refused.exitCode, refused.stdout]).toEqual([1, '']);
     expect(refused.stderr).toBe(`rafa: ${initHint(outside.repo)}\n`);

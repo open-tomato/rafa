@@ -198,7 +198,6 @@ import {
 } from './project/scope.js';
 import * as scopeModule from './project/scope.js';
 import start from './start.js';
-import usage from './usage.js';
 
 import * as entry from './index.js';
 
@@ -275,7 +274,6 @@ const RUNTIME_EXPORTS = [
   'selectEffortStore',
   'selfAndAncestors',
   'startCommand',
-  'usageCommand',
   'validateManifest',
 ];
 
@@ -352,7 +350,6 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['selectEffortStore', entry.selectEffortStore, selectEffortStore],
   ['selfAndAncestors', entry.selfAndAncestors, selfAndAncestors],
   ['startCommand', entry.startCommand, start],
-  ['usageCommand', entry.usageCommand, usage],
   ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
@@ -1291,7 +1288,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
-  ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
 

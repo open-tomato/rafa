@@ -320,7 +320,9 @@ New; it replaces no earlier text. What a row or an action added to
   2026-09-28); moving `epics` under the `epic` subject as `epic show`
   took it off that line, which moved `usage` back onto the first and
   left `describe` alone on the second, and both literals moved again
-  (measured on 2026-09-28). An action
+  (measured on 2026-09-28); removing `usage` brought `describe` back
+  onto the first, so the `Commands` block is one line again, and both
+  literals moved with it (measured on 2026-10-04). An action
   registered under a subject already there moves no snapshot: registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23); the `plan` summary rewritten beside it is what moved
@@ -357,7 +359,7 @@ New; it replaces no earlier text. What a row or an action added to
   stubs `update self`, `update project`, `update board`, `update next`,
   `update latest` and the hidden `update rafa` and `update port`,
   `roadmap`, `switch`, `next`, `init`,
-  `doctor`, `status`, `cleanup`, `self-update`, `usage` and
+  `doctor`, `status`, `cleanup`, `self-update` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board`, `epic`,
   `claim` and `update`: a
@@ -456,13 +458,12 @@ New; it replaces no earlier text. What a row or an action added to
   record's phase is read to resume at the right place; a record in `task` or
   `wrap-up` resumes the loop, a record in `pull-request` or `ci` waits for
   checks, and a record in `repair` retries the CI repair.
-- **Five wrap a phase 0 command** through `wrapPhaseZeroCommand`:
-  `plan create`, `loop start`, `effort collect`, `effort report` and
-  `usage`. The command is handed a fresh copy of `argv`
+- **Four wrap a phase 0 command** through `wrapPhaseZeroCommand`:
+  `plan create`, `loop start`, `effort collect` and `effort report`.
+  The command is handed a fresh copy of `argv`
   without the global `--output` flag, then the root of the project the
   dispatcher resolved, and nothing else, so it keeps its own parser and
-  acts on that root where it took the git root before; `usage` ignores
-  it. Each word `parseArgs` reads as `--output` ahead of a `--`
+  acts on that root where it took the git root before. Each word `parseArgs` reads as `--output` ahead of a `--`
   is dropped, a value typed as the next word included, so
   `rafa effort report --output=json` never reaches a parser refusing the
   words it does not read. A declared `default` or flag alias fills the
@@ -487,7 +488,7 @@ New; it replaces no earlier text. What a row or an action added to
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
   `commands/plan/plan-record.ts`,
-  `src/usage.ts`, `effort/collect.ts` and `effort/report.ts`, and for
+  `effort/collect.ts` and `effort/report.ts`, and for
   every command `loadConfig`'s default warning sink in
   `src/config-load.ts`. `console.log`'s and `console.info`'s lines go at
   `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
@@ -517,9 +518,8 @@ New; it replaces no earlier text. What a row or an action added to
   (`src/effort/report-trend.ts`), and
   writes no table line. `effort dashboard` gives the `Dashboard`
   (`src/effort/dashboard.ts`), one key per widget: `status`, `trend`,
-  `loops`, `skills` and `totals`, beside `generatedAt`. `plan create`, `effort collect` and
-  `usage` write each line as a `log` event of its level and give no
-  result.
+  `loops`, `skills` and `totals`, beside `generatedAt`. `plan create` and `effort collect`
+  write each line as a `log` event of its level and give no result.
 - **The plan readers start no session, and read the configured
   directory.** `plan list` and `plan show` read the directory
   `resolvePlansDir` (`src/commands/plan/plan-files.ts`) answers:
@@ -2225,8 +2225,8 @@ New; it replaces no earlier text. What a row or an action added to
 ### Commands
 
 - **A command is routed by `subject` and `action`.** One whose action is
-  its subject is top-level, reached by its one word: `usage` is subject
-  `usage` and action `usage`. `name` routes nothing.
+  its subject is top-level, reached by its one word: `status` is subject
+  `status` and action `status`. `name` routes nothing.
 - **`run` takes a `RafaContext`**: `CliContext` plus `argv`, the words
   after the last routing word as typed, for a phase 0 command to hand to
   its own parser. `args` and `flags` are the rest of the line read
