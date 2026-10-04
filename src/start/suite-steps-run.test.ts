@@ -202,6 +202,28 @@ describe('beforeSession', () => {
     expect(seen.baselines).toEqual([BASELINE]);
   });
 
+  it('runs no stage step before a blocked task, and runs the due one before the open task after it', async () => {
+    // A due stage step, red if it ran: before the blocked repair it must not.
+    const { calls, seen } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage', true, 9)]) });
+    const steps = stepsWith(calls);
+    const blocked: TaskInfo = { task: 'repair the suite', lineNum: 8, status: 'blocked', blocker: 'New failing test files.' };
+
+    expect(await steps.beforeSession(blocked)).toBe(true);
+    expect(seen.names).toEqual(['ensureBaseline']);
+    expect(linesAt('error')).toEqual([]);
+
+    expect(await steps.beforeSession(taskAt('third task', 9))).toBe(false);
+    expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
+  });
+
+  it('runs an open task\'s due stage steps before its session', async () => {
+    // The control for the case above: the same due step, an open task.
+    const { calls, seen } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage')]) });
+
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
+  });
+
   it('runs the pre-wrap-up step before the wrap-up, and no stage step', async () => {
     const { calls, seen } = scripted();
     const goesOn = await stepsWith(calls).beforeSession(null);
