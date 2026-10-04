@@ -61,10 +61,9 @@ your accounts.
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 
-  Everything else reads files, git and GitHub and spends nothing,
-  `rafa usage` included (it reads `CLAUDE_USAGE_PERCENT` and asks
-  nobody). `rafa loop resume` starts no session itself, but it lets a
-  paused run go on spending. rafa calls no model API directly: all of
+  Everything else reads files, git and GitHub and spends nothing.
+  `rafa loop resume` starts no session itself, but it lets a paused run
+  go on spending. rafa calls no model API directly: all of
   it goes through the `claude` command.
 - **Your machine may go to sleep in the middle of a run.** rafa does not
   keep it awake, so the operating system's power settings can suspend a
@@ -570,6 +569,12 @@ Three settings shape what `rafa cleanup` lists.
 | `cleanup.keep` | `[]` | glob patterns naming branches that are never listed |
 
 Both day counts take a whole number above zero.
+
+Besides the `cleanup.keep` matches, `rafa cleanup` never lists the
+branch checked out, the base branch (`pr.base`, else the branch
+`origin/HEAD` names, else `main`), and the branch `origin/HEAD` names
+even when `pr.base` names another, so a repository that merges into an
+integration branch never sees its default branch offered for deletion.
 
 ```yaml
 cleanup:

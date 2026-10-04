@@ -78,7 +78,9 @@ function plantWrapUpProject(): { readonly scratch: ScratchRepo } {
   return { scratch };
 }
 
-const zshMissing = Bun.which('zsh') === null;
+// Resolved once on the host PATH; the child runs under the scratch PATH, which has no zsh.
+const zshPath = Bun.which('zsh');
+const zshMissing = zshPath === null;
 
 describe('a run record in phase wrap-up with every task ticked', () => {
   it.skipIf(zshMissing)('reads 🍅 #579 wrap-up in the zsh header', RUN_TIMEOUT, async () => {
@@ -94,7 +96,7 @@ describe('a run record in phase wrap-up with every task ticked', () => {
       'print -r -- "${(S)right//$~zero/}"',
     ].join('\n');
 
-    const child = Bun.spawn(['zsh', '-f', '-c', script], {
+    const child = Bun.spawn([zshPath ?? 'zsh', '-f', '-c', script], {
       env: { PATH: path, HOME: home, ROOT: repo },
       stdout: 'pipe',
       stderr: 'pipe',

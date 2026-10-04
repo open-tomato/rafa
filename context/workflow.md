@@ -158,7 +158,11 @@ that task's stage completes:
   file or a globally-used module; stage step always runs full suite
 
 **Config keys determine when a task triggers `tests=module` or `tests=full`
-automatically:**
+automatically, and which tests always run:**
+- `tests.alwaysRun` (glob list; defaults to `src/**/*.sweep.test.ts`) —
+  content sweeps that always run alongside scoped tests in every task's
+  gates, since they read files at run time and `bun test --changed=<base>`
+  follows only the import graph
 - `tests.fullSuiteTriggers` (glob list; defaults include `bunfig.toml`,
   `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
   named in `[test] preload` of `bunfig.toml`) — when a task touches any
@@ -171,11 +175,16 @@ automatically:**
 
 **A stage-end step with new failures blocks the next task.** After a
 stage's last task, the stage step runs the full suite and captures
-failures. If any failure is new against the baseline, the runner adds them
-to the blocker text the retry session receives through
-`BLOCKER_PROMPT_PREFIX` in its prompt. The blocked task holds until its
-session completes or a human unblocks it with a `[BLOCKED]` mark on its
-line in the tracker.
+failures. If any failure is new against the baseline, the runner inserts
+a `[BLOCKED]` repair task above the first open task
+(`src/start/suite-blocker.ts`), its blocker the failures, which the repair
+session receives through `BLOCKER_PROMPT_PREFIX` in its prompt, and the
+run stops. A restarted run dispatches that repair first and runs no stage
+step before it, or before any `[BLOCKED]` task, because a due step run
+there would meet the same failures and stop the run again before the
+repair got its session. The stage steps still due run before the first
+open task after it. The blocked task holds until its session completes or
+a human unblocks it with a `[BLOCKED]` mark on its line in the tracker.
 
 ### Skills and lessons at dispatch
 

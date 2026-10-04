@@ -366,7 +366,7 @@ interface CommandRun {
 function run(scratch: Scratch, args: readonly string[]): CommandRun {
   const spawned = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, ...args],
-    { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: 60_000 },
+    { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: 60_000 },
   );
   return {
     exitCode: spawned.exitCode,

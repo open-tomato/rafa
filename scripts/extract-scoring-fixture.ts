@@ -7,27 +7,29 @@
  * labelled and what is taken out.
  *
  * The cause labels come from the board's closing comments and from
- * `src/triage/testdata/scoring-causes.json`, a reading kept by hand.
+ * `src/triage/testdata/scoring-causes.json`, a reading kept by hand, and
+ * an issue numbered after that reading's `through` gives no filing.
  *
  * Usage:
  *   bun scripts/extract-scoring-fixture.ts [--out=<file>]
  *
- * It needs `gh` signed in with read access to the board. Nothing is
- * written when a value still holds a home path or a token after
- * redaction. Run it from the repository checkout, and review the diff
- * before committing it: the board changes, and so does the fixture.
+ * It needs `gh` signed in with read access to the board. Every value goes
+ * through the fixture scrub of `src/fixtures/scrub.ts` (home paths, email
+ * addresses, the host name, named secrets), and nothing is written when a
+ * value still holds a leak after it. Run it from the repository checkout,
+ * and review the diff before committing it: the board changes, and so
+ * does the fixture.
  *
  * Exit codes: 0 written, 2 the extract could not run.
  */
-import type { BoardIssue, CauseJudgement, ScoringFixture } from '../src/triage/scoring-fixture.js';
+import type { ScrubContext } from '../src/fixtures/scrub.js';
+import type { BoardIssue, CauseJudgement, Filing, ScoringFixture } from '../src/triage/scoring-fixture.js';
 
-import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { messageOf } from '../src/config-sections.js';
-import { localPathRedactor } from '../src/triage/local-paths.js';
-import { FIXTURE_REPO, filingsOf, firstLeakIn } from '../src/triage/scoring-fixture.js';
-import { namedSecrets, redactSecrets } from '../src/triage/triage.js';
+import { fixtureScrubber, machineScrubContext } from '../src/fixtures/scrub.js';
+import { FIXTURE_REPO, filingsOf } from '../src/triage/scoring-fixture.js';
 
 /** Prefix on every line this script writes. */
 export const TAG = '[scoring-fixture]';
@@ -51,6 +53,19 @@ export function serializeFixture(value: unknown): string {
   return `${JSON.stringify(value, null, FIXTURE_INDENT)}\n`;
 }
 
+/**
+ * The filings of `issues`, each value through the fixture scrub built
+ * from `context`. Throws `ScrubRefusal` when a value still holds a leak
+ * after the scrub, so no fixture is written with one.
+ */
+export function scrubbedFilings(
+  issues: readonly BoardIssue[],
+  judgement: CauseJudgement,
+  context: ScrubContext,
+): Filing[] {
+  return filingsOf(issues, fixtureScrubber(context), judgement);
+}
+
 /** The bug issues of the board, open and closed, with their comments. */
 async function readBoard(): Promise<BoardIssue[]> {
   const run = Bun.spawnSync([
@@ -68,12 +83,8 @@ const CAUSES_FILE = 'src/triage/testdata/scoring-causes.json';
 async function main(argv: readonly string[]): Promise<number> {
   const outFlag = argv.find((word) => word.startsWith('--out='));
   const out = resolve(outFlag?.slice('--out='.length) ?? DEFAULT_OUT);
-  const local = localPathRedactor(process.cwd(), homedir());
-  const secrets = namedSecrets({ prerequisitesRequired: [], prerequisitesOptional: [] }, process.env);
   const judgement = await Bun.file(resolve(CAUSES_FILE)).json() as CauseJudgement;
-  const filings = filingsOf(await readBoard(), (text) => redactSecrets(local(text), secrets), judgement);
-  const leak = firstLeakIn(filings);
-  if (leak !== null) throw new Error(`refusing to write: ${leak} after redaction`);
+  const filings = scrubbedFilings(await readBoard(), judgement, machineScrubContext(process.cwd()));
   const fixture: ScoringFixture = { repo: FIXTURE_REPO, filings };
   await Bun.write(out, serializeFixture(fixture));
   console.log(`${TAG} wrote ${String(filings.length)} filings to ${out}`);

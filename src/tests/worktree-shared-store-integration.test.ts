@@ -268,7 +268,7 @@ function spawnLoopStart(scratch: ScratchRepo, run: PlantedRun) {
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${run.planRel}`, '--as-worktree', '--no-ci-wait'],
     {
       cwd: scratch.repo,
-      env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home), TMPDIR: tmpdir() },
+      env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
       stdout: 'ignore',
       stderr: 'ignore',
     },

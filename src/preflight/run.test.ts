@@ -66,11 +66,11 @@ function isUnderScratch(path: string): boolean {
   return rel !== '' && !rel.startsWith('..') && !rel.startsWith('/');
 }
 
-/** The case's environment: its `HOME`, and `PATH` holding its `bin/` first. */
+/** The case's environment: the suite's `TMPDIR`, its `HOME`, and `PATH` holding its `bin/` first. */
 function scratchEnv(path: string = [bin, SYSTEM_PATH].join(delimiter)): Record<string, string> {
   expect(isUnderScratch(home)).toBe(true);
   expect(isUnderScratch(path.split(delimiter)[0] ?? '')).toBe(true);
-  return { ...scratchHomeEnv(home), PATH: path };
+  return { TMPDIR: tmpdir(), ...scratchHomeEnv(home), PATH: path };
 }
 
 /** Writes an executable `/bin/sh` script named `name` into the case's `bin/`. */

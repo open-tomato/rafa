@@ -1,20 +1,41 @@
 /**
  * `store-identity.ts`: the three facts a writing open compares (host id,
- * the store file's absolute path, its device and inode), the project
- * identity, and the decision. Every file is a real one under `tmpdir()`,
- * so a copy, a restore and a rename are the filesystem's own; every host
- * id is injected, and no case reads this machine's.
+ * the store file's absolute path, its device and inode), the side
+ * record's generation, the project identity, and the decision. Every
+ * file is a real one under `tmpdir()`, so a copy, a restore and a
+ * rename are the filesystem's own; every host id is injected, and no
+ * case reads this machine's.
+ *
+ * Whether a freed inode number goes to the next file is the
+ * filesystem's choice, so the inode-reuse case takes the answer of its
+ * own `replaceWithCopy` to compute the `reasons` it expects, and asserts
+ * the mint either way.
  */
 import type { RecordedIdentity, StoreIdentityFacts } from './store-identity.js';
+import type { StoreIdentitySeams } from './store-meta.js';
 import type { GitResult, GitRunner } from '../../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { withSqliteStore } from './sqlite.js';
+import { writeStoreGeneration } from './store-generation.js';
 import {
   decideStoreIdentity,
   hostIdFrom,
@@ -24,6 +45,7 @@ import {
   readProjectIdentity,
   readStoreFileFacts,
 } from './store-identity.js';
+import { readStoreMeta } from './store-meta.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-store-identity-')));
 afterAll(() => {
@@ -33,6 +55,33 @@ afterAll(() => {
 /** A fresh directory of its own under the suite's scope. */
 function fresh(name: string): string {
   return realpathSync(mkdtempSync(join(scope, `${name}-`)));
+}
+
+/** The file at `path`'s inode number. */
+function inodeOf(path: string): bigint {
+  return statSync(path, { bigint: true }).ino;
+}
+
+/**
+ * Deletes the file at `path` and copies `source` to it, as a store
+ * deleted and replaced by a copy is, answering whether the new file got
+ * the deleted one's inode number.
+ */
+function replaceWithCopy(path: string, source: string): boolean {
+  const before = inodeOf(path);
+  rmSync(path);
+  copyFileSync(source, path);
+  return inodeOf(path) === before;
+}
+
+/** The `store_meta` row of the store at `path`, read on a connection of its own. */
+function recordedRowOf(path: string): RecordedIdentity | null {
+  const db = new Database(path, { readonly: true });
+  try {
+    return readStoreMeta(db);
+  } finally {
+    db.close();
+  }
 }
 
 /** A store file with some bytes in it, in a fresh directory. */
@@ -158,6 +207,100 @@ describe('decideStoreIdentity', () => {
     expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'keep', storeId: 'store-a' });
   });
 
+  it('keeps the origin on a write to the same file whose row and side record hold one generation', () => {
+    const path = plantStore('generation-match');
+    writeStoreGeneration(path, 'gen-1');
+    const minted = recorded(observeStore(path, () => 'host-a'));
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(minted.generation).toBe('gen-1');
+    expect(decision).toEqual({ action: 'keep', storeId: 'store-a' });
+  });
+
+  it.each([
+    ['the same inode', false, ['generation']],
+    ['a new inode', true, ['file', 'generation']],
+  ] as const)('mints on a write whose side record holds another generation than the row, with %s', (_title, restored, reasons) => {
+    const path = plantStore('generation-stale');
+    writeStoreGeneration(path, 'gen-1');
+    const minted = recorded(observeStore(path, () => 'host-a'));
+    if (restored) {
+      const backup = `${path}.bak`;
+      copyFileSync(path, backup);
+      renameSync(backup, path);
+    }
+    writeStoreGeneration(path, 'gen-2');
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(facts.fileIno === BigInt(minted.fileIno)).toBe(!restored);
+    expect(decision).toEqual({ action: 'mint', reasons: [...reasons], facts });
+  });
+
+  it('mints on a write whose row holds a generation and whose side record is absent, as a copy carries the row alone', () => {
+    const path = plantStore('generation-absent');
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: 'gen-1' };
+
+    const facts = observeStore(path, () => 'host-a');
+    const decision = decideStoreIdentity('write', minted, () => facts);
+
+    expect(facts.generation).toBeNull();
+    expect(decision).toEqual({ action: 'mint', reasons: ['generation'], facts });
+  });
+
+  it.each([
+    ['a side record', 'gen-1'],
+    ['no side record', null],
+  ] as const)('keeps the origin of a row written before the generation column, its three facts matching, with %s', (_title, side) => {
+    const path = plantStore('generation-null');
+    if (side !== null) writeStoreGeneration(path, side);
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: null };
+
+    const facts = observeStore(path, () => 'host-a');
+
+    expect(facts.generation).toBe(side);
+    expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'keep', storeId: 'store-a' });
+  });
+
+  it('judges a row written before the generation column by the three facts alone, so a moved file still mints', () => {
+    const path = plantStore('generation-null-moved');
+    writeStoreGeneration(path, 'gen-1');
+    const minted: RecordedIdentity = { ...recorded(observeStore(path, () => 'host-a')), generation: null };
+
+    const facts = observeStore(path, () => 'host-b');
+
+    expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'mint', reasons: ['host'], facts });
+  });
+
+  it('mints on a write to a store deleted and replaced by a copy of its state before the last write, whether or not the inode number repeated', () => {
+    const path = join(fresh('inode-reuse'), 'effort.sqlite');
+    const seams: StoreIdentitySeams = {
+      readHostId: () => 'host-a',
+      readProject: () => ({ rootCommit: 'a1b2c3d4', remote: null }),
+    };
+    withSqliteStore(path, 'write', true, () => undefined, seams);
+    const older = `${path}.copy`;
+    copyFileSync(path, older);
+    withSqliteStore(path, 'write', false, () => undefined, seams);
+
+    const repeated = replaceWithCopy(path, older);
+    const row = recordedRowOf(path);
+    const facts = observeStore(path, () => 'host-a');
+
+    expect(row?.generation).not.toBeNull();
+    expect(facts.generation).not.toBe(row?.generation);
+    expect(decideStoreIdentity('write', row, () => facts)).toEqual({
+      action: 'mint',
+      reasons: repeated
+        ? ['generation']
+        : ['file', 'generation'],
+      facts,
+    });
+  });
+
   it('decides nothing on a read, unminted or copied, and never observes the store', () => {
     const source = plantStore('read-source');
     const minted = recorded(observeStore(source, () => 'host-a'));
@@ -173,6 +316,22 @@ describe('decideStoreIdentity', () => {
 
     expect(decideStoreIdentity('write', minted, copied.observe).action).toBe('mint');
     expect(copied.calls()).toBe(1);
+  });
+});
+
+describe('observeStore', () => {
+  it('reads the side record beside the real path, so a symlinked spelling reads the store\'s own generation', () => {
+    const path = plantStore('observe-symlink');
+    writeStoreGeneration(path, 'gen-1');
+    const link = join(fresh('observe-symlink-dir'), 'linked.sqlite');
+    symlinkSync(path, link);
+
+    expect(observeStore(link, () => 'host-a')).toEqual(observeStore(path, () => 'host-a'));
+    expect(observeStore(link, () => 'host-a').generation).toBe('gen-1');
+  });
+
+  it('answers a null generation for a store with no side record', () => {
+    expect(observeStore(plantStore('observe-absent'), () => 'host-a').generation).toBeNull();
   });
 });
 

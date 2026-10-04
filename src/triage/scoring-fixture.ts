@@ -18,6 +18,10 @@
  *
  * ## The cause label
  *
+ * Only the issues the judgement was made over give filings: one numbered
+ * after its `through` was never read, so no grouping or exclusion covers
+ * it, and is left out. A link to such an issue is still followed.
+ *
  * Every filing carries the number of the issue that owns its cause, which
  * is how the fixture says which filings were one bug. A filing's cause is
  * its issue's, and an issue's is read in this order:
@@ -49,11 +53,12 @@
  *
  * ## Taken out
  *
- * Local paths ({@link localPathRedactor}) and named secrets
- * ({@link redactSecrets}) are taken out of every value as triage takes them
- * out of a filed text, then {@link leaksIn} refuses any value still holding
- * a home path or a token-shaped word, so a fixture is never written with
- * one.
+ * Every value goes through the redaction {@link filingsOf} is handed. The
+ * extract hands it the fixture scrub of `src/fixtures/scrub.ts`, which
+ * takes out home paths, email addresses, the host name and named secrets,
+ * and refuses any value still holding one, so a fixture is never written
+ * with one. {@link leaksIn} is the narrower check the committed fixture is
+ * read against: no home path and no token-shaped word.
  */
 import { COMMENT_OPENING, ISSUE_OPENING } from './issue-text.js';
 import { issueTextOf, sectionValueOf } from './similarity.js';
@@ -110,6 +115,11 @@ export interface CauseJudgement {
    * null for a comment naming several causes, which the fixture leaves out.
    */
   readonly filings: Readonly<Record<string, number | 'own' | null>>;
+  /**
+   * The last issue this reading was made over: a later issue, never
+   * judged, gives no filing. Absent reads every issue.
+   */
+  readonly through?: number;
 }
 
 /** What the cause of a bug no other report names starts from; added to its issue and comment numbers. */
@@ -241,7 +251,8 @@ export function filingsOf(
   judgement: CauseJudgement,
 ): Filing[] {
   const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
-  const all = issues.flatMap((issue) => filingsOn(issue, byNumber, redact, judgement));
+  const judged = issues.filter(({ number }) => number <= (judgement.through ?? Number.POSITIVE_INFINITY));
+  const all = judged.flatMap((issue) => filingsOn(issue, byNumber, redact, judgement));
   // Stable, so two filings in one second keep the issue-then-comment order.
   return [...all].sort((a, b) => writtenAt(a, byNumber).localeCompare(writtenAt(b, byNumber)));
 }

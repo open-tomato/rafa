@@ -550,7 +550,7 @@ describe('the core adapter registry', () => {
       'console.log(JSON.stringify((await learning.pullBlessed()).instincts.map((record) => record.id)));',
     ].join('\n');
     const pulled = (scratchHome: string): { exitCode: number; stdout: string } => {
-      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { ...process.env, ...scratchHomeEnv(scratchHome) } });
+      const child = Bun.spawnSync([process.execPath, '-e', script], { env: { TMPDIR: tmpdir(), ...process.env, ...scratchHomeEnv(scratchHome) } });
       return { exitCode: child.exitCode, stdout: child.stdout.toString() };
     };
 

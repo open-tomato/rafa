@@ -49,7 +49,7 @@
  * empty default, and `routing` as one line per row of
  * `tiers/routing.ts`'s `DEFAULT_ROUTES`, so the template cannot drift
  * from the defaults the schema answers. `task.skills` and `task.lessons`
- * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and both
+ * are written from `CONFIG_DEFAULTS`, at `planner` and `on`, and all three
  * `tests` lists from `CONFIG_DEFAULTS` too, each pattern double-quoted:
  * a flow-list entry opening with `*` would parse as a YAML alias.
  *
@@ -182,6 +182,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# tests:',
   `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
   `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
+  `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
 ]);
 
 /** The line every file opens its settings with. */

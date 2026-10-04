@@ -15,7 +15,9 @@
  * beside the clean pull, a context naming no `store` beside one naming
  * `ndjson`. A store's bytes are read as a sha256 before and after, so a
  * case holding them unchanged could have seen them move: the clean pull
- * moves them.
+ * moves them. The backup the clean pull leaves is a `VACUUM INTO` copy
+ * of the store, so it is compared with the store by rows (`storeRows`),
+ * never by bytes.
  */
 import type { FileSyncOptions } from './file.js';
 import type { AdapterContext } from '../../adapters/registry.js';
@@ -36,6 +38,7 @@ import { EffortCopyRefusal } from '../store/copy.js';
 import { writeDispatch } from '../store/dispatches.js';
 import { MergeRefusal, MOVE_TO_SQLITE } from '../store/merge-store.js';
 import { SQLITE_STORE_FILE_NAME, sqliteStorePath } from '../store/sqlite.js';
+import { storeRows } from '../store/testdata/store-rows.js';
 
 import { createFileSync, FileSyncRefusal } from './file.js';
 import { selectSync } from './select.js';
@@ -192,6 +195,7 @@ describe('pulling with the file strategy', () => {
       ? carried.path
       : null;
     const before = hashOf(sqliteStorePath(b.root));
+    const rowsBefore = storeRows(sqliteStorePath(b.root));
 
     const pulled = await fileSync(b.root).pull({ from, dryRun: false });
 
@@ -208,7 +212,8 @@ describe('pulling with the file strategy', () => {
     });
     expect(merge?.tables.find((entry) => entry.table === 'dispatches')).toMatchObject({ added: 1, skipped: 1 });
     expect(dispatched(sqliteStorePath(b.root))).toEqual(['s-1', 's-2']);
-    expect(hashOf(`${sqliteStorePath(b.root)}.before-merge-${STAMP}.bak`)).toBe(before);
+    expect(hashOf(sqliteStorePath(b.root))).not.toBe(before);
+    expect(storeRows(`${sqliteStorePath(b.root)}.before-merge-${STAMP}.bak`)).toEqual(rowsBefore);
   });
 
   it('reads a relative `from` against the repository root', async () => {

@@ -357,8 +357,8 @@ async function runCommand(device: Device, words: readonly string[]): Promise<Com
   const child = Bun.spawn([process.execPath, RAFA_ENTRY, ...words], {
     cwd: device.root,
     env: {
-      RAFA_TEST: '1',
       TMPDIR: tmpdir(),
+      RAFA_TEST: '1',
       PATH: [device.bin, GIT_DIR].join(delimiter),
       ...scratchHomeEnv(device.home),
       ...secretsEnv(),

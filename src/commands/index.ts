@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Five of the eighty-seven registered so far wrap a
+ * of each is its command. Four of the eighty-six registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -295,7 +295,6 @@
  *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
  *     `plan.dir` holds a task and while this version's runtime directory
  *     is already there, which `--force` replaces whole.
- *   - `usage`, top-level.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.
  *
@@ -399,7 +398,6 @@ import updatePort from './update/port.js';
 import updateProject from './update/project.js';
 import updateRafa from './update/rafa.js';
 import updateSelf from './update/self.js';
-import usage from './usage.js';
 
 /** The core subjects, in roster order. */
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
@@ -506,7 +504,6 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   doctor,
   cleanup,
   selfUpdate,
-  usage,
   describe,
 ]);
 

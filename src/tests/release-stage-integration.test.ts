@@ -307,7 +307,7 @@ function runFinishInSubprocess(
       branch,
       JSON.stringify(provider),
     ],
-    { env: { PATH: path, ...scratchHomeEnv(tempBase) } },
+    { env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(tempBase) } },
   );
   if (!run.success) {
     throw new Error(`the subprocess exited ${String(run.exitCode)}: ${run.stderr.toString()}`);

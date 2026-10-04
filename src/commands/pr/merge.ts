@@ -11,8 +11,11 @@
  * ## The order, and why everything is gathered before anything is asked
  *
  * The line first, then the config and the provider, then the pull
- * request, its checks and the three git readings, then ONE call to
- * `readMergeRefusal`, and only then the question. Two things follow:
+ * request, its checks and the three git readings, the loop worktree
+ * step, then ONE call to `readMergeRefusal`, and only then the question.
+ * That step (`./merge-loop-worktree.ts`) frees a clean, ended loop
+ * worktree holding the head branch, printing one line and listing the
+ * worktrees again, and refuses on one that is not. Two things follow:
  *
  *   - Nothing is asked and nothing is merged while any refusal stands,
  *     which is the spec's "refuse before it asks anything".
@@ -173,7 +176,8 @@
  * cannot be read, a detached HEAD, and a branch with no open pull
  * request. Its own, all exit 1: a `--method` that is none of the three;
  * a number the repository has no pull request for; a git reading that
- * failed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
+ * failed; a loop worktree holding the head branch that cannot be freed
+ * or removed; each of the refusals `readMergeRefusal` answers, `--skip-checks`
  * on a pull request that reports checks among them; no terminal to ask
  * on and no `--yes`; `--yes` beside `--skip-checks` where workflows exist
  * and one may run on pull requests into the base, or their count could
@@ -192,7 +196,7 @@ import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { ChecksReading, GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
+import type { ChecksReading, GitRunner, MergeMethod, PullRequestDetail, WorktreeEntry } from '../../pr/index.js';
 import type { UncheckedCase } from '../../pr/unchecked.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
@@ -216,6 +220,7 @@ import {
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
 import { freedAfterMerge } from './merge-freed.js';
 import { guardBeforeMerge } from './merge-guard.js';
+import { defaultLoopWorktreeSeams, freeLoopHolderBeforeMerge } from './merge-loop-worktree.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
@@ -341,11 +346,21 @@ export function summaryLine(detail: PullRequestDetail, method: MergeMethod): str
   return `${head} — ${detail.headRefName} → ${detail.baseRefName} — ${method}`;
 }
 
-/** Everything `readMergeRefusal` reads off git, gathered at the project root. */
-function refuseFromGit(git: GitRunner, detail: PullRequestDetail, checks: ChecksReading, skipChecks: boolean): void {
+/** Everything `readMergeRefusal` reads off git, gathered at the project root, the loop worktree step first. */
+function refuseFromGit(merge: MergeAt, detail: PullRequestDetail, checks: ChecksReading, skipChecks: boolean): void {
+  const { git, pr, seams } = merge;
   const tree = parseWorkingTree(gitOrRefuse(git, ['status', '--porcelain'], 'read the working tree'));
-  const worktrees = parseWorktrees(gitOrRefuse(git, ['worktree', 'list', '--porcelain'], 'list the worktrees'));
+  const listed = (): readonly WorktreeEntry[] => parseWorktrees(gitOrRefuse(git, ['worktree', 'list', '--porcelain'], 'list the worktrees'));
+  const held = listed();
   const at = gitOrRefuse(git, ['rev-parse', '--show-toplevel'], 'read the repository root').trim();
+  const place = { worktrees: held, branch: detail.headRefName, mainCheckout: at, worktreeDir: pr.worktreeDir, planDir: pr.planDir };
+  const loopSeams = { ...defaultLoopWorktreeSeams(at), git, gitAt: seams.git ?? createGitRunner };
+  const freed = freeLoopHolderBeforeMerge(loopSeams, place, { root: pr.project.root, isAlive: seams.isAlive });
+  if (freed.kind === 'refused') throw refusal([`❌ ${freed.message}`]);
+  if (freed.kind === 'freed') merge.info(freed.line);
+  const worktrees = freed.kind === 'freed'
+    ? listed()
+    : held;
   const found = readMergeRefusal({
     number: detail.number,
     branch: detail.headRefName,
@@ -360,6 +375,9 @@ function refuseFromGit(git: GitRunner, detail: PullRequestDetail, checks: Checks
   });
   if (found !== null) throw refusal([`❌ ${found.message}`]);
 }
+
+/** What {@link refuseFromGit} reaches git, the config and the output through. */
+interface MergeAt { readonly git: GitRunner; readonly pr: PrContext; readonly seams: MergeSeams; readonly info: (line: string) => void }
 
 /** True when a question can be answered: the seam's reading, or standard input being a TTY. */
 function terminalOf(seams: MergeSeams): () => boolean {
@@ -600,7 +618,7 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
       context.output.warn(message);
     },
   });
-  refuseFromGit(git, detail, checks, skipChecks);
+  refuseFromGit({ git, pr, seams, info: (message) => context.output.info(message) }, detail, checks, skipChecks);
   const guard = await guardBeforeMerge({
     pr,
     git,
@@ -697,7 +715,8 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' pulls it fast-forward only, deletes the head branch locally and on the remote where it is still there,'
       + ' and prunes, reporting each step; a head branch this checkout has no local branch for is reported as a'
       + ' skipped local delete, and the rest still run. Refuses before it asks anything on a dirty working tree, on a pull'
-      + ' request that is not green or does not merge, and on a head branch checked out in another worktree. It'
+      + ' request that is not green or does not merge, and on a head branch checked out in another worktree, except a'
+      + ' clean, ended loop worktree under `loop.worktreeDir`, which it removes after copying its two plan files out. It'
       + ' shows the pull request, its branches and the method and asks `Merge? [y/N]`; `--yes` skips the question,'
       + ' and without a terminal and without `--yes` it refuses. A pull request that reports no checks at all is'
       + ' refused unless `--skip-checks` is given, which is refused on any pull request that does report checks;'

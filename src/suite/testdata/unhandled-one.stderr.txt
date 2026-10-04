@@ -1,0 +1,33 @@
+
+ok.test.ts:
+(pass) passes [0.05ms]
+1 | import { expect, test } from 'bun:test';
+2 | test('passes', () => { expect(1).toBe(1); });
+3 | test('fails', () => { expect(1).toBe(2); });
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/tmp/scratch/ok.test.ts:3:33)
+(fail) fails [0.16ms]
+
+throwing.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+1 | import { test } from 'bun:test';
+2 | test('never runs', () => {});
+3 | throw new Error('config not loaded');
+              ^
+error: config not loaded
+      at /tmp/scratch/throwing.test.ts:3:11
+-------------------------------
+
+
+ 1 pass
+ 2 fail
+ 1 error
+ 2 expect() calls
+Ran 3 tests across 2 files. [5.00ms]

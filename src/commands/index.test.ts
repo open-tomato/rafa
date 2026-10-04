@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the eighty-seven commands it registers: what the registry
+ * declarations of the eighty-six commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -96,7 +96,6 @@ const READERS: Readonly<Record<string, readonly string[]>> = {
   'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts'],
   'effort collect': ['effort/collect.ts', 'effort/collect-args.ts'],
   'effort report': ['effort/report.ts', 'effort/report-args.ts'],
-  'usage': ['usage.ts'],
 };
 
 /** The outputs each command declares: text and json, each phase 0 command now writing through the active output. */
@@ -170,7 +169,6 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'doctor': ['text', 'json'],
   'cleanup': ['text', 'json'],
   'self-update': ['text', 'json'],
-  'usage': ['text', 'json'],
   'describe': ['text', 'json'],
   'release status': ['text', 'json'],
   'release settle': ['text', 'json'],
@@ -329,7 +327,6 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['pr merge 41 --yes --method=squash', 'pr merge', ['41', '--yes', '--method=squash'], ''],
   ['pr triage 41 --no-comment', 'pr triage', ['41', '--no-comment'], ''],
   ['pr wait 41 --timeout=5', 'pr wait', ['41', '--timeout=5'], ''],
-  ['usage', 'usage', [], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['module list', 'module list', [], ''],
@@ -482,7 +479,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update, usage and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its five session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -569,7 +566,6 @@ describe('the core roster', () => {
       'doctor',
       'cleanup',
       'self-update',
-      'usage',
       'describe',
     ]);
     expect(CORE_COMMANDS.filter((command) => command.hidden === true).map(commandSpelling)).toEqual(['update rafa', 'update port']);
@@ -603,7 +599,7 @@ describe('the core roster', () => {
 
 describe('the module note\'s count word', () => {
   it('names the roster at exactly CORE_COMMANDS.length', () => {
-    const match = INDEX_SOURCE.match(/Five of the ([a-z]+(?:-[a-z]+)?) registered so far/);
+    const match = INDEX_SOURCE.match(/Four of the ([a-z]+(?:-[a-z]+)?) registered so far/);
 
     expect(match).not.toBeNull();
     expect(numberWord(match?.[1] ?? '')).toBe(CORE_COMMANDS.length);

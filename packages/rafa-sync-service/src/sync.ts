@@ -68,13 +68,14 @@
  *
  * ## After a merge
  *
- * A merged file is a new file, so core mints the store a new origin at
- * its next writing open. `sync.test.ts` measures both sides: a store
- * records another origin after a pull merged and a write followed, and
- * keeps its origin across writes with no merge between them. The state
- * file keys its cursors by origin, so that store's next contact starts
- * both cursors from zero and resends what it holds; both sides skip
- * every row they hold, so this costs time and never a row.
+ * A merged store keeps its origin: core carries the `store_meta` row
+ * through the swap, so a pull that merged moves nothing. `sync.test.ts`
+ * measures both sides: a store records the same origin after a pull
+ * merged and a write followed, and a copy renamed over the store, which
+ * could be a second store, mints a new one. The state file keys its
+ * cursors by origin, so a minted store's next contact starts both
+ * cursors from zero and resends what it holds; both sides skip every
+ * row they hold, so this costs time and never a row.
  *
  * ## Errors
  *

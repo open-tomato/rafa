@@ -162,7 +162,7 @@ describe('rafa loop start, spawned with a recording stand-in claude', () => {
 
     const proc = Bun.spawnSync(
       [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'],
-      { cwd: scratch.repo, env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: SPAWN_KILL_MS },
+      { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: SPAWN_KILL_MS },
     );
     expect(proc.exitCode).toBe(0);
 

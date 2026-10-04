@@ -445,7 +445,7 @@ function plantScratch(options: ScratchOptions = {}): Scratch {
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
-  return { repo, record: join(root, 'record.json'), spawned, probe, home, env: { PATH: path, ...scratchHomeEnv(home) } };
+  return { repo, record: join(root, 'record.json'), spawned, probe, home, env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(home) } };
 }
 
 /** What one command run did. */

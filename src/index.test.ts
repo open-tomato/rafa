@@ -198,7 +198,6 @@ import {
 } from './project/scope.js';
 import * as scopeModule from './project/scope.js';
 import start from './start.js';
-import usage from './usage.js';
 
 import * as entry from './index.js';
 
@@ -275,7 +274,6 @@ const RUNTIME_EXPORTS = [
   'selectEffortStore',
   'selfAndAncestors',
   'startCommand',
-  'usageCommand',
   'validateManifest',
 ];
 
@@ -352,7 +350,6 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['selectEffortStore', entry.selectEffortStore, selectEffortStore],
   ['selfAndAncestors', entry.selfAndAncestors, selfAndAncestors],
   ['startCommand', entry.startCommand, start],
-  ['usageCommand', entry.usageCommand, usage],
   ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
@@ -677,6 +674,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge-cleanup.js', ['cleanUpAfterMerge', 'INDENT', 'reportFollowUps']],
     ['./merge-freed.js', ['freedAfterMerge']],
     ['./merge-guard.js', ['guardBeforeMerge']],
+    ['./merge-loop-worktree.js', ['defaultLoopWorktreeSeams', 'freeLoopHolderBeforeMerge']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
     ['./merge-unchecked.js', ['confirmUncheckedMerge', 'postUncheckedComment', 'readUncheckedMerge']],
@@ -756,7 +754,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/store/migrate.js', ['migrateStore', 'MigrateRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
-    ['./fix-schema.js', ['fileStamp']],
+    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
   ]],
   ['./commands/effort/merge.js', [
     ['../../cli/command.js', ['CommandExit']],
@@ -768,7 +766,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/store/rebuild-aside.js', ['RebuildRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./fix-schema.js', ['fileStamp']],
+    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
   ]],
   ['./commands/effort/import.js', [
     ['../../effort/sync/file.js', ['createFileSync']],
@@ -1290,7 +1288,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
-  ['./commands/usage.js', [['../usage.js', ['default']], ['./wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
 ];
 

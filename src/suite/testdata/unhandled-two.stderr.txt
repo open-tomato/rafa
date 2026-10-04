@@ -1,0 +1,29 @@
+
+boom.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+1 | const settings: { port?: { value: number } } = {};
+2 | export const port = settings.port!.value;
+                                 ^
+TypeError: undefined is not an object (evaluating 'settings.port.value')
+      at /tmp/scratch/boom.test.ts:2:30
+-------------------------------
+
+
+ok.test.ts:
+(pass) passes [0.03ms]
+
+sub/missing.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './gone.js' from '/tmp/scratch/sub/missing.test.ts'
+-------------------------------
+
+
+ 1 pass
+ 2 fail
+ 2 errors
+ 1 expect() calls
+Ran 3 tests across 3 files. [5.00ms]

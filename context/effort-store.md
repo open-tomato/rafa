@@ -80,12 +80,13 @@ development build). It copies every table and column this rafa knows
 except the log, checks the row counts, `integrity_check` and that
 `planSchema` finds the rebuild current, and lists the unknown
 migrations, tables and columns only the newer schema holds, which stay
-in the backup alone. The original is then renamed to
-`effort.sqlite.v<user_version>-<stamp>.bak`, whole, and the rebuild
-takes its place. `--dry-run` deletes the rebuild instead, so it can be
-repeated and runs beside a live loop and from a development build; the
-swap refuses while a loop session is running or paused, and from a
-development build before anything is built. A newer schema that dropped
+in the backup alone. The store is then copied with `VACUUM INTO` to
+`effort.sqlite.v<user_version>-<stamp>.bak`, every row of it, and the
+rebuild is renamed over the store. `--dry-run` deletes the rebuild
+instead, so it can be repeated and runs beside a live loop and from a
+development build; the swap refuses while a loop session is running or
+paused, and from a development build before anything is built. A newer
+schema that dropped
 a table or column this rafa writes is not additive, and the repair
 refuses it rather than copy around it. It refuses a store that never
 held one as well: since `row-origins` added `origin_store` and
@@ -99,11 +100,12 @@ store with an unknown additive migration `current`, and spawns
 `bun src/rafa.ts` over a store outside the child's temp directory:
 the swap is refused, the dry run runs. The steps around the build, from
 the in-flight journal refusal through the row-count check,
-`integrity_check` and the swap to removal on failure, are `rebuildAside`
+`integrity_check`, the backup and the swap, are `rebuildAside`
 (`src/effort/store/rebuild-aside.ts`), which takes the two file names
-and the build from its caller and opens no store itself;
-`SchemaFixRefusal` is its `RebuildRefusal`, and so is `effort migrate`'s
-`MigrateRefusal`.
+and the build from its caller. A failed build is removed; a failed swap
+leaves the store unchanged and the rebuild and the backup beside it,
+both named in its `SwapFailure`. `SchemaFixRefusal` is its
+`RebuildRefusal`, and so is `effort migrate`'s `MigrateRefusal`.
 
 **`rafa effort copy [--to=<dir>]` is how branch code gets real data**
 (`src/commands/effort/copy.ts` over `copyEffortStore`,
@@ -149,7 +151,7 @@ store `effortStoreDir` answers to `effort.sqlite.migrate-<stamp>` with
 `bringForward` with `builtAside`, checks the row count of every table
 both files hold against the live store (`checkedCounts`: a table rebuild
 that lost a row is refused), `integrity_check` and that `planSchema`
-finds it current, then renames the original to
+finds it current, then copies the store with `VACUUM INTO` to
 `effort.sqlite.before-<id>-<stamp>.bak`, `<id>` being the first migration
 applied or `schema_migrations` for an adoption alone, and swaps the new
 file in through `rebuildAside`. `--dry-run` deletes it instead and is
@@ -401,10 +403,13 @@ today and in the future.
 store.** The row holds the origin the store stamps (`origin_store`, a
 UUID), the project git reads in the store's directory (or the one the
 row already names when git finds no root commit there), and the host,
-path and file identity the store was minted under. It is written on a
-write open, at most once per store, behind the first migration named
-`store-meta`; a write open that keeps the existing origin asks git
-nothing. The row is unminted if it has no value in `origin_store` (the
+path and file identity the store was minted under. The origin is
+minted on a write open, at most once per store file, behind the first
+migration named `store-meta`; a write open that keeps the existing
+origin asks git nothing. Every write open also rotates the store's
+generation (`store_meta.generation`, added by `store-meta-generation`),
+as **Every write open rotates the generation** below says. The row is
+unminted if it has no value in `origin_store` (the
 column is `NOT NULL` for every runtime, but minting is skipped when git
 finds no project or repository). A read open never reads or writes the
 `store_meta` row, which is why `rafa effort schema` leaves an unminted
@@ -416,21 +421,40 @@ asks for a keyed hash and a store travels between machines.** The path is
 the real path, so a symlinked spelling does not trigger a copy-detection
 mint. The device and inode are bigints: when a `.bak` file is renamed
 over the store, it has a new inode and triggers a copy-detection mint,
-but one restored with `cp` over the existing file keeps the old inode
-and does not (measured on tmpfs). The merge's collision check is what
-catches a missed `.bak` restore. SQLite's INTEGER is signed and bun binds
+but one restored with `cp` over the existing file keeps the old inode,
+so those three facts match (measured on tmpfs). The generation catches
+that restore once the store has been written since the `.bak` was
+taken, as the next paragraph says, and the merge's collision check
+catches whatever the open misses. SQLite's INTEGER is signed and bun binds
 a bigint past 2^63 by wrapping without warning, so the device and inode
 are written as their two's complement and read back through `CAST(… AS TEXT)`
 as unsigned.
 
+**Every write open rotates the generation, under `BEGIN IMMEDIATE`.**
+`settleStoreIdentity` (`store-meta.ts`) takes the write lock, reads the
+row, decides again under the lock (`decideStoreIdentity`,
+`store-identity.ts`), and writes a new random generation in that
+transaction: into the row it keeps, or into the new row it mints. It
+writes the same value to the **side record**, the file
+`<real path of the store file>.generation` beside the store
+(`store-generation.ts`), then commits. A write open mints when the row
+is absent, any of the three facts moved, or the row holds a generation
+the side record does not; a NULL generation, written by a runtime that
+did not know the column, is judged by the three facts alone, so such a
+store keeps its id on its first write and holds a generation after it.
+The row is written before the side record and both before the commit:
+a crash between the side record's rename and the commit leaves the side
+record one rotation ahead, and the next write open mints once and keeps
+on the write after. A read open neither reads the side record nor
+writes it. Measured in `store-meta.test.ts` and `store-identity.test.ts`.
+
 **A test passes its fifth argument to `withSqliteStore` to inject the
-host and project, so test stores can be minted independently.** The store
-module reads these values from `settleStoreIdentity`
-(`src/effort/store/store-identity.ts`) on a write, and `store-meta.ts`
-reads and writes the row. `withSqliteStore` calls `settleStoreIdentity`
-after `bringForward`, so a write open mints when the row is absent or a
-fact moved (the filesystem identity changed), under `BEGIN IMMEDIATE`
-with a second decision.
+host, the project, the store id and the generation, so test stores can
+be minted independently.** `store-identity.ts` observes the facts and
+decides, `store-generation.ts` reads and writes the side record, and
+`store-meta.ts` reads and writes the row. `withSqliteStore` calls
+`settleStoreIdentity` after `bringForward`, so the `generation` column
+exists on every write open.
 
 ### Copy detection
 
@@ -446,6 +470,25 @@ filesystem identity (device, inode, path) is found in the local store's
 `origin_store`. When a copy is detected and merged, the merge refusal
 entry names the copy's origin and what copied it.
 
+**The generation catches a copy of the store file at the open, on the
+copy's first write.** A copy carries `store_meta.generation` and leaves
+the side record, which sits beside the original's real path as
+`<store file>.generation`, behind. So a copy at another path finds no
+side record, and a store deleted and replaced by a copy taken before
+its last write, or a `.bak` renamed or `cp`'d back over it after a
+write, finds a side record one rotation or more ahead of its row, and
+mints
+with the reason `generation` whether or not the host handed the copy
+the freed inode number. It does not catch a restore of the whole
+directory, the store file and its side record together: the two agree,
+and when the file comes back at its old inode, as `cp` over the existing
+file writes it, the three facts match too and nothing mints (measured
+on tmpfs). A store deleted and replaced by a copy taken after its last
+write holds the generation its side record holds, so only a new inode
+number mints it; with the original gone there is one store again, and
+no origin pair can collide. The merge's collision check above is what
+catches the copies the open misses.
+
 **A development build mints on the first write after copy detection.**
 Between the first plan and the lock in `bringForward`, an open with
 anything to adopt or apply asks `refuseUnownedDevelopmentWrite` for a
@@ -455,6 +498,32 @@ time with the detection flag, and it mints a new origin for this store.
 This is why a development build can write copies: it owns stores under
 `tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
 own `<root>/.rafa/effort/`.
+
+### Identity through rebuilds
+
+**Every rebuild rotates the generation in `store_meta`, and a swap
+operation preserves the store's identity if it would keep its id.** A
+rebuild writes a new file aside with a temporary name
+(`effort.sqlite.merge-<stamp>`, `effort.sqlite.migrate-<stamp>`, or
+`effort.sqlite.fix-<stamp>`), brings it forward through migrations,
+checks it, and backs it up with `VACUUM INTO` to `.before-*-<stamp>.bak`.
+Before the new file is renamed over the live store, `swapIn`
+(`src/effort/store/rebuild-aside.ts`) calls `decideStoreIdentity` to ask
+whether the store would keep its id. When the answer is keep, `swapIn`
+writes a new generation into the new file's `store_meta` row and into the
+side record immediately before the rename, so both match after the store
+is renamed into place and subsequent opens find nothing to mint. When the
+answer is any other kind (copy detected, or minting for another reason),
+`swapIn` writes a random generation into the new file's `store_meta` row
+only, not the side record, so the next open to the renamed store mints
+because the row and side record will not match. The backup file, created
+with `VACUUM INTO` before the rename, holds the generation from before
+the rotation; if the backup is ever restored (undoing the rebuild), its
+device and inode have changed during the swap, and its first write detects
+it as a copy and mints a new origin with the reason `generation`. A rename
+that fails after the side record is written leaves the side record one
+rotation ahead of the live store, and the next write open to the live
+store mints once to synchronize them.
 
 ### The schema history
 
@@ -629,7 +698,10 @@ The last three, which migration `store-meta` creates, are the store's
 own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and
-`merge_conflicts` each incoming row one could not settle. `mergeStore`
+`merge_conflicts` each incoming row one could not settle. Migration
+`store-meta-generation` adds `store_meta.generation`, a nullable
+non-empty text column; NULL there means a runtime that did not know the
+column wrote the row. `mergeStore`
 (`store/merge-store.ts`) writes one `merges` row per merge into the
 build it swaps in through `rebuildAside`, behind
 `effort.sqlite.before-merge-<stamp>.bak`; its refusals, the forwarded
@@ -644,7 +716,7 @@ against NULL there, and records the incoming row as JSON, both rows
 kept, when two filled values differ (`field` names the column) or the
 rows differ outside every edited field (`field` NULL). Each set-once
 field has its literal `UPDATE` in `SET_ONCE_FILLS`, so
-`merge-rules.test.ts` can read it. `commits.row_json` is edited under
+`merge-rules.sweep.test.ts` can read it. `commits.row_json` is edited under
 the rule `recomputed`: two rows of one commit that differ only in its
 `minutesSincePrevious` are skipped, the gap here kept, through the
 field's entry in `RECOMPUTED_COMPARISONS`. `recomputeCommitGaps`
@@ -734,7 +806,7 @@ commit:**
   changes after the insert, each with its rule; a merged table also
   carries `origin_store` and `origin_seq` with its partial unique index
   `<table>_by_origin`, and joins `ORIGIN_TABLES` (`store/origins.ts`)
-  with its inserts stamped. `merge-rules.test.ts` builds a store
+  with its inserts stamped. `merge-rules.sweep.test.ts` builds a store
   through every migration and fails on a table with no entry, an entry
   with no table, a merged table without both origin columns and that
   index, and an `UPDATE <table> SET <column>` in a production module

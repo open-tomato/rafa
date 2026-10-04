@@ -157,6 +157,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'taskLessons',
   'testsFullSuiteTriggers',
   'testsIntegration',
+  'testsAlwaysRun',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -235,6 +236,7 @@ const DEFAULTS: RafaConfig = {
     '**/*-spawned*.test.ts',
     '**/*-cli.test.ts',
   ],
+  testsAlwaysRun: ['src/**/*.sweep.test.ts'],
 };
 
 /**
@@ -341,6 +343,7 @@ const FULL = [
   'tests:',
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
+  '  alwaysRun: [src/sweeps/*.test.ts]',
   '',
 ].join('\n');
 
@@ -426,6 +429,7 @@ const FULL_VALUES: RafaConfig = {
   taskLessons: 'off',
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
+  testsAlwaysRun: ['src/sweeps/*.test.ts'],
 };
 
 /**
@@ -490,7 +494,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(10);
+    expect(lists).toHaveLength(11);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -967,6 +971,11 @@ describe('parseConfigText', () => {
         'tests.integration', 'tests:\n  integration: ["/abs/*.test.ts"]',
         'tests.integration[0] is "/abs/*.test.ts", expected a glob pattern relative to the repository root',
         'tests:\n  integration: ["e2e/**"]', 'testsIntegration', ['e2e/**'],
+      ],
+      [
+        'tests.alwaysRun', 'tests:\n  alwaysRun: { sweeps: true }',
+        'tests.alwaysRun is a mapping, expected a list of glob patterns',
+        'tests:\n  alwaysRun: ["**/*.sweep.test.ts"]', 'testsAlwaysRun', ['**/*.sweep.test.ts'],
       ],
     ];
 

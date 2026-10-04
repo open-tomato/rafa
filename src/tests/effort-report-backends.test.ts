@@ -225,7 +225,7 @@ interface CommandRun {
 function runReportJson(root: string, home: string): CommandRun {
   const run = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, 'effort', 'report', '--output=json'],
-    { cwd: root, env: { ...process.env, ...scratchHomeEnv(home) } },
+    { cwd: root, env: { TMPDIR: tmpdir(), ...process.env, ...scratchHomeEnv(home) } },
   );
   return {
     exitCode: run.exitCode,

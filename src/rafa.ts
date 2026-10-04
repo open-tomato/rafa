@@ -10,7 +10,6 @@
  *   rafa loop start [--plan=.rafa/plans/PLAN-<stub>.md] [--start-at=HH:MM] [--inject=<mode>]
  *   rafa init [--root=<path>] [--yes]
  *   rafa doctor [--plan=<file>]
- *   rafa usage
  *   rafa describe [--output=json]
  *   rafa effort collect|report [flags]
  *   rafa module list | exec <module> <action>

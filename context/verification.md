@@ -28,10 +28,14 @@ suite at defined stages.** A task line declares `tests=affected` (the
 default), `tests=module`, or `tests=full` to control what its session checks.
 
 **Task session gates** (read one exit code from each):
-- `bun test --changed=<base>` (affected), `bun test --changed=<base>
-  --reporter=junit --reporter-outfile=<file>` to read failures via JUnit
+- `bun test --changed=<base>` (affected tests), then `bun test
+  <tests.alwaysRun paths>` (content sweeps) as a second run, with
+  `--reporter=junit --reporter-outfile=<file>` on both to read failures
+  via JUnit. The prompt names both gate names: `affected tests gate` and
+  `always-run sweeps gate`
 - `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
-- `bunx eslint <changed files>` (ESLint on changed files only)
+- `bunx eslint <changed files>` (ESLint on changed files only; read below
+  for the blocker when changed files are all ignored)
 
 All three redirect to a file and read `$?` immediately after with
 `exit=$?` on the next line — never pipe through `tail` or poll with
@@ -66,7 +70,11 @@ will run:
 - `tests=full`: Entire suite when the task changes a config file or a
   globally-used module
 
-**Config keys for when a task triggers `tests=full` or `tests=module`:**
+**Config keys for test selection and running:**
+- `tests.alwaysRun` (glob list, defaults to `src/**/*.sweep.test.ts`) —
+  content sweeps that always run alongside scoped tests in every task's
+  gates, since they read files at run time and `--changed` follows only
+  the import graph
 - `tests.fullSuiteTriggers` (glob list, defaults include `bunfig.toml`,
   `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`, and files
   named in `[test] preload` of `bunfig.toml`)
@@ -78,9 +86,16 @@ is identified by its test file path and full test name (the pair the
 JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
-means it is new. Only new failures block the next task. A stage-end step
-with new failures names them in the blocker text the retry session
-receives through `BLOCKER_PROMPT_PREFIX`.
+means it is new. Only new failures make a step red. A red task or stage
+step inserts a `[BLOCKED]` repair task above the first open plan task,
+which it leaves as it was: the repair's text names the commit the step
+ran at (`Repair the red task step at commit <sha>`), its declaration is
+`{agent=build-error-resolver}`, and its blocker names the new failures,
+which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
+no open task left, the repair goes after the checklist's last task. A
+red task step after a repair task writes its blocker on that repair's
+line, marking it `[BLOCKED]` again, and inserts no second one
+(`src/start/suite-blocker.ts`).
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
@@ -111,6 +126,21 @@ failure by its test file path and the test's full name (including any
 nested `describe` blocks). Two failures are identical when both match; a
 test name that changes counts as a different failure, so rewriting a test
 name can hide a failure without fixing it.
+
+**An error outside any test is counted, named from stderr, and retaken
+once.** A test file that throws while it loads is no failure in the
+JUnit file: Bun prints it to stderr under `# Unhandled error between
+tests` and counts it on the summary's `errors` line. The baseline keeps
+that count only, and a step counting more is red. Its blocker names each
+block's file and first error line, as `src/boom.test.ts threw "error:
+boom"` (`src/start/suite-blocker.ts`), and the blocks with the summary
+lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`. A task,
+stage or pre-wrap-up step whose only red is that excess is taken once
+more over the same run (`src/start/suite-step.ts`). A retake at or under
+the baseline's count prints an `Intermittent` warning naming the first
+run's files and lines, and the run goes on; a retake over it again is
+red, and the run halts as it does on any red step. Both runs are
+recorded, and the files on disk are the retake's.
 
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.
@@ -159,13 +189,41 @@ already provides the records. If you are writing a test that spawns a
 gate, write the exit code to a marker file or read it from the process's
 recorded step.
 
-**The summary line is what the runner reads.** Bun writes a line like
-`Ran 390 tests, 385 pass, 5 fail (~175s)` after all tests complete. The
-runner parses Bun's summary to extract the counts. Two gates run on the
-same tree produce identical counts unless a case reads an input the tree
-does not own — which a few cases do, documented below. When debugging,
-reproduce the same test run to verify: two identical runs produce identical
-output, so once-only variation points to the input, not the gate.
+### ESLint gate and ignored-file blocker
+
+**An ESLint run that touches only ignored files prints "File ignored"
+warnings and must not read as red.** The root `eslint.config.mjs` ignores
+`packages/**`, and a diff touching only files under that tree produces
+warnings on stdout, but the exit code is still 0. Both the warnings and
+the pass are correct: the files are ignored (no error), and the tool's
+success is not blocked. When reading the exit code immediately with `$?`,
+capture both stdout and stderr to a file first, so the task step captures
+the warnings in the gate output without reading them as a failure.
+
+**The runner's lint step tells "could not run ESLint" from "found ESLint
+errors" by the JSON report** (`src/start/lint-step.ts`). A nonzero exit
+whose stdout is ESLint's JSON report names the files with errors and
+the command to run: `found ESLint errors in the task's diff`. A nonzero
+exit with no report is a step that could not run ESLint, and its blocker
+gives the exit code and the first stderr line under the crash banner, as
+in `could not run ESLint: bunx eslint exited 2 and printed no report:
+ResolveMessage {}`. Exit 2 with no report is a config ESLint could not
+load (a config that throws `boom` prints `Error: boom`, measured on
+ESLint 9.39.5) or no ESLint for `bunx` to resolve (`ResolveMessage {}`).
+Neither is a rule the task broke, so read that blocker as a setup
+problem in the checkout, not as lint errors to fix in the diff.
+
+### The summary line is what the runner reads
+
+**Bun writes a line like `Ran 390 tests, 385 pass, 5 fail (~175s)` after
+all tests complete.** The runner parses Bun's summary to extract the
+counts. Two gates run on the same tree produce identical counts unless a
+case reads an input the tree does not own — which a few cases do,
+documented below. When debugging, reproduce the same test run to verify:
+two identical runs produce identical output, so once-only variation points
+to the input, not the gate. The always-run sweeps gate produces a separate
+summary from the affected tests gate, named in both its own output and the
+task session record.
 
 ### Known failures by cause
 
@@ -322,3 +380,37 @@ the reference example. This section replaces nothing.
   to temporary files with `RAFA_ENTRY`'s URL swapped to
   `../../dist/cli.js` and the import pointed at the copy, run them after
   `bun run build`, and delete them. This replaces nothing.
+
+### Fixture scrub, guard, and path rules
+
+**Every committed fixture is scrubbed of machine identity before it ships.**
+Fixtures are test data read as input: real text copied from the board or
+the store, quoted in a test to show what it held when the test was made,
+or patterns planted by a test to verify how code reads them. Real text
+names the machine it came from — home directory paths, email addresses,
+host names, and secrets in the environment. Before a fixture is written to
+disk and committed, `src/fixtures/scrub.ts` (`fixtureScrubber`) redacts
+each kind in turn: secret names (reported by name, never by value),
+localhost paths, home paths (`/home/<name>`, `/Users/<name>`,
+`C:\Users\<name>`), email addresses (version pins like `pkg@1.2.3` left
+out), and the running host name (with word-boundary guards so `sandbox`
+does not match `box`). Once redacted, `findLeaks` reads the text again; if
+any leak is found, `ScrubRefusal` is thrown and the fixture is not written.
+
+**The fixture guard (`src/fixtures/fixture-guard.sweep.test.ts`) is a
+content sweep that runs on every task session and verifies no leak is left
+in any committed fixture.** It reads every file `git ls-files` lists in a
+fixture folder (not a directory walk, so only what a commit would ship),
+and fails if any machine identity is found. The guard plants control files
+(`src/fixtures/testdata/leak-controls/`) with one leak each plus a version
+pin with none, and must fail on the three leaks and pass the pin, proving
+the check is working. The host token `{{HOST}}` in the control files is
+filled with the running host name at read time.
+
+**Fixture paths are identified by `isFixturePath`.** A repository-relative
+path is a fixture path when one of its folder segments is exactly
+`testdata` at any depth, or when it starts with `src/tests/fixtures/`.
+The function lives in `src/fixtures/fixture-path.ts`. A path is relative
+to the repository root, with `/` between segments. A file named `testdata`
+is not a fixture path by name alone; only folders segment a path. This
+replaces nothing.

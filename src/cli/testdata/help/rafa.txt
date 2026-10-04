@@ -28,7 +28,6 @@ Quick start:
   rafa doctor
   rafa cleanup
   rafa self-update
-  rafa usage
   rafa describe --output=json
 
 Subjects:
@@ -62,8 +61,7 @@ Subjects:
              development
 
 Commands:
-  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, usage,
-  describe
+  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe
 
 Global flags:
   --output=json     NDJSON events instead of text (also RAFA_OUTPUT=json)

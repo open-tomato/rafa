@@ -137,7 +137,7 @@ interface SpawnRun {
 function runRafa(scratch: Scratch, words: readonly string[]): SpawnRun {
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: KILL_AFTER_MS,
   });
   return { exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() };

@@ -22,11 +22,13 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { parsePlan } from '../plan/parse.js';
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import {
+  alwaysRunJunitFileFor,
   blockerText,
   dueStages,
   ensureBaseline,
@@ -41,6 +43,7 @@ import {
   SIGINT_EXIT_CODE,
   stageLedgerPathFor,
 } from './suite-step.js';
+import { FOLDED_COMMAND_JOINER } from './task-always-run.js';
 
 const BASE = 'base0000';
 const HEAD = 'head1111';
@@ -97,6 +100,7 @@ function result(overrides: Partial<SuiteResult> = {}): SuiteResult {
     failures: [],
     errors: 0,
     junit: 'read',
+    unhandled: [],
     ...overrides,
   };
 }
@@ -120,11 +124,12 @@ function scriptedGit(answers: Readonly<Record<string, GitResult>>, calls: string
   };
 }
 
-/** The git answers of a checkout at {@link HEAD} whose diff from `from` is `paths`. */
-function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = []): GitRunner {
+/** The git answers of a checkout at {@link HEAD} whose diff from `from` is `paths`, tracking `tracked` when handed. */
+function gitAt(diffs: Readonly<Record<string, readonly string[]>>, calls: string[] = [], tracked?: readonly string[]): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
   };
+  if (tracked !== undefined) answers['ls-files -z'] = { ok: true, stdout: tracked.map((path) => `${path}\0`).join(''), stderr: '' };
   for (const [from, paths] of Object.entries(diffs)) {
     answers[`diff --name-only -z --no-renames ${from} HEAD`] = { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' };
   }
@@ -143,7 +148,12 @@ interface Seen {
 /** A context over the temporary tracker, its runs answered in turn from `results`. */
 function contextWith(
   results: readonly SuiteResult[],
-  options: { readonly git?: GitRunner; readonly owns?: readonly string[] | null; readonly seams?: SuiteStepSeams } = {},
+  options: {
+    readonly git?: GitRunner;
+    readonly owns?: readonly string[] | null;
+    readonly alwaysRun?: readonly string[];
+    readonly seams?: SuiteStepSeams;
+  } = {},
 ): { readonly context: SuiteStepContext; readonly seen: Seen } {
   const seen: Seen = { runs: [], steps: [], trackerAtAppend: [], ownsReads: 0 };
   const queue = [...results];
@@ -155,6 +165,7 @@ function contextWith(
     settings: {
       testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json'],
       testsIntegration: ['**/*-integration.test.ts'],
+      testsAlwaysRun: options.alwaysRun ?? [],
     },
     owns: () => {
       seen.ownsReads += 1;
@@ -271,7 +282,7 @@ describe('runTaskStep', () => {
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
   });
 
-  it('blocks the next open task on a new failure, naming its file, after the step is recorded', async () => {
+  it('inserts a blocked repair task on a new failure, naming its file, after the step is recorded', async () => {
     const { context, seen } = contextWith([red([KNOWN, FRESH, FRESH_TWO])]);
     const outcome = await runTaskStep(context, input);
 
@@ -282,7 +293,7 @@ describe('runTaskStep', () => {
     expect(seen.trackerAtAppend[0]).toBe(TRACKER);
     const next = findNextTask(readFileSync(trackerPath, 'utf8'));
     expect(next?.status).toBe('blocked');
-    expect(next?.task).toBe('third task');
+    expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(next?.blocker).toContain('src/new.test.ts (2 tests)');
     expect(next?.blocker).toContain('bun test src/new.test.ts');
@@ -330,8 +341,10 @@ describe('runTaskStep', () => {
     const atBaseline = contextWith([result({ exitCode: 1, errors: 1 })]);
     const same = await runTaskStep(atBaseline.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(same.red).toBe(false);
+    // As many as the baseline is no excess, so the step is not retaken.
+    expect(atBaseline.seen.runs).toHaveLength(1);
 
-    const more = contextWith([result({ exitCode: 1, errors: 2 })]);
+    const more = contextWith([result({ exitCode: 1, errors: 2 }), result({ exitCode: 1, errors: 2 })]);
     const outcome = await runTaskStep(more.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toContain('1 more error(s) outside any test');
@@ -357,14 +370,380 @@ describe('runTaskStep', () => {
     expect(seen.steps[0]?.newFailures).toEqual([KNOWN]);
   });
 
-  it('writes nothing on a red step when no open task is left, and still answers the text', async () => {
+  it('inserts its repair task after the checklist\'s last task when no open task is left', async () => {
     const done = TRACKER.replaceAll('- [ ]', '- [x]');
     writeFileSync(trackerPath, done, 'utf8');
     const { context } = contextWith([red([FRESH])]);
     const outcome = await runTaskStep(context, input);
-    expect(outcome).toMatchObject({ red: true, blockedLine: null });
+    expect(outcome).toMatchObject({ red: true, blockedLine: 11 });
     expect(outcome.blocker).toContain('src/new.test.ts');
-    expect(readFileSync(trackerPath, 'utf8')).toBe(done);
+    const after = readFileSync(trackerPath, 'utf8').split('\n');
+    expect(after[11]?.startsWith(`- [BLOCKED] Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}  `)).toBe(true);
+    expect([...after.slice(0, 11), ...after.slice(12)].join('\n')).toBe(done);
+  });
+});
+
+describe('a step with errors outside any test', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const thrown = { file: 'src/boom.test.ts', firstLine: 'TypeError: undefined is not an object (evaluating \'x.foo\')' };
+  /** A run whose only red is one error outside any test, which the baseline (0 errors) does not hold. */
+  const excess = (): SuiteResult => result({ exitCode: 1, errors: 1, unhandled: [thrown] });
+
+  it('names the throwing file and its first error line in the blocker, retaking nothing when a failure is red too', async () => {
+    const { context, seen } = contextWith([red([FRESH], { errors: 1, unhandled: [thrown] })]);
+    const outcome = await runTaskStep(context, input);
+    expect(outcome.red).toBe(true);
+    expect(seen.runs).toHaveLength(1);
+    expect(outcome.blocker).toContain('1 more error(s) outside any test');
+    expect(outcome.blocker).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toContain('src/boom.test.ts');
+  });
+
+  it('retakes a step whose only red is the excess and, the retake under the baseline count, prints the intermittent line and stops nothing', async () => {
+    const { context, seen } = contextWith([excess(), result()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[1]).toEqual(seen.runs[0] ?? {});
+    expect(outcome).toMatchObject({ kind: 'task', red: false, interrupted: false, blocker: null, blockedLine: null });
+    expect(seen.steps).toHaveLength(2);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    const intermittent = linesAt('warn').filter((line) => line.includes('Intermittent'));
+    expect(intermittent).toHaveLength(1);
+    expect(intermittent[0]).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('halts on a retake red again, naming the file in the blocker of the repair task it inserts', async () => {
+    const { context, seen } = contextWith([excess(), excess()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.steps).toHaveLength(2);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(outcome.blocker ?? '');
+    expect(linesAt('warn').some((line) => line.includes('Intermittent'))).toBe(false);
+  });
+
+  it('retakes a stage step over the same paths', async () => {
+    const { context, seen } = contextWith([excess(), result()], { owns: ['src/b', 'src/c'], git: gitAt({ [BASE]: ['src/b/x.ts'] }) });
+    const outcome = await runStageStep(context, { stage: 0, name: 'One' }, baselineWith());
+    expect(outcome.red).toBe(false);
+    expect(seen.runs.map((run) => run.paths)).toEqual([
+      ['src/b/b.test.ts', 'src/run-integration.test.ts'],
+      ['src/b/b.test.ts', 'src/run-integration.test.ts'],
+    ]);
+  });
+});
+
+describe('a red step\'s repair task', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const stage = { stage: 0, name: 'One' };
+
+  /** The task lines of `text` that are repair tasks; a blocker quoting one is no line of its own. */
+  function repairLines(text: string): readonly string[] {
+    return text.split('\n').filter((line) => /^- \[(?: |x|BLOCKED)\] Repair the red /.test(line));
+  }
+
+  /** The tracker's lines with line `at` taken out. */
+  function without(text: string, at: number): string {
+    const all = text.split('\n');
+    return [...all.slice(0, at), ...all.slice(at + 1)].join('\n');
+  }
+
+  it('is inserted above the first open task by a red task step, naming the commit, declared for the repair agent', async () => {
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.blockedLine).toBe(9);
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(without(after, 9)).toBe(TRACKER);
+    const next = findNextTask(after);
+    expect(next).toMatchObject({ lineNum: 9, status: 'blocked', task: `Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}` });
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(parsePlan(after).tasks.find((task) => task.lineNum === 9)).toMatchObject({ stage: 1, declaration: { agent: 'build-error-resolver' } });
+  });
+
+  it('is inserted above the first open task by a red stage step, which leaves that task untouched', async () => {
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runStageStep(context, stage, baselineWith());
+
+    expect(outcome).toMatchObject({ red: true, blockedLine: 9 });
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(after.split('\n')[10]).toBe('- [ ] third task');
+    expect(without(after, 9)).toBe(TRACKER);
+    expect(repairLines(after)).toHaveLength(1);
+    const next = findNextTask(after);
+    expect(next?.task).toBe(`Repair the red stage step at commit ${HEAD}  {agent=build-error-resolver}`);
+    expect(next?.blocker).toContain('stage step for "One"');
+  });
+
+  it('takes the blocker of its own red task step on its line, inserting no second line', async () => {
+    const repair = 'Repair the red task step at commit base0000';
+    const ticked = TRACKER.replace('- [ ] third task', `- [x] ${repair}  {agent=build-error-resolver}\n- [ ] third task`);
+    writeFileSync(trackerPath, ticked, 'utf8');
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runTaskStep(context, { ...input, task: repair });
+
+    expect(outcome).toMatchObject({ red: true, blockedLine: 9 });
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(after.split('\n')).toHaveLength(ticked.split('\n').length);
+    expect(repairLines(after)).toHaveLength(1);
+    expect(after.split('\n')[10]).toBe('- [ ] third task');
+    const next = findNextTask(after);
+    expect(next).toMatchObject({ lineNum: 9, status: 'blocked', task: `${repair}  {agent=build-error-resolver}` });
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+  });
+});
+
+describe('runTaskStep with tests.alwaysRun', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const glob = ['src/**/*.sweep.test.ts'];
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+  const swept: SuiteFailure = { file: sweep, name: 'leak > names a plan path' };
+  const lsFiles = 'ls-files -z';
+
+  it('runs an affected step\'s always-run files as a second run, settled as one step', async () => {
+    const { context, seen } = contextWith([result(), result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.runs[0]).toMatchObject({ changedSince: BASE, junitFile: junitFileFor(dir, SESSION, 'task') });
+    expect(seen.runs[0]?.paths).toBeUndefined();
+    expect(seen.runs[1]).toMatchObject({ paths: [sweep], junitFile: alwaysRunJunitFileFor(dir, SESSION) });
+    expect(seen.runs[1]?.changedSince).toBeUndefined();
+    expect(seen.steps).toHaveLength(1);
+    expect(seen.steps[0]?.scope).toBe('affected');
+    expect(seen.steps[0]?.command).toContain(FOLDED_COMMAND_JOINER);
+    expect(outcome).toMatchObject({ red: false, blocker: null });
+  });
+
+  it('inserts a blocked repair task on a failure only the always-run run found, naming the sweep', async () => {
+    const { context, seen } = contextWith([result(), red([swept])], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.blockedLine).toBe(9);
+    expect(seen.steps[0]?.newFailures).toEqual([swept]);
+    expect(outcome.blocker).toContain(`${sweep} (1 test)`);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.status).toBe('blocked');
+  });
+
+  it('runs a module step\'s always-run files in its own path list, in one run', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], {
+      alwaysRun: glob,
+      owns: ['src/b', 'src/c'],
+      git: gitAt({ [BASE]: ['src/b/x.ts'] }, calls, tracked),
+    });
+    await runTaskStep(context, { ...input, declared: 'module' });
+
+    expect(calls).toContain(lsFiles);
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toEqual(['src/b/b.test.ts', sweep]);
+    expect(seen.steps[0]?.scope).toBe('module');
+  });
+
+  it('adds nothing to a full step, which already runs every file, and does not ask git for them', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked) });
+    await runTaskStep(context, { ...input, declared: 'full' });
+
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.paths).toBeUndefined();
+    expect(calls).not.toContain(lsFiles);
+  });
+
+  it('adds nothing to the full suite a diff git will not answer runs', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: glob, git: gitAt({}, calls, tracked) });
+    await runTaskStep(context, input);
+
+    expect(seen.steps[0]?.scope).toBe('full');
+    expect(seen.runs).toHaveLength(1);
+    expect(calls).not.toContain(lsFiles);
+  });
+
+  it('runs one run and asks git nothing for [], where the same checkout with the default glob runs two', async () => {
+    const calls: string[] = [];
+    const { context, seen } = contextWith([result()], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, calls, tracked) });
+    await runTaskStep(context, input);
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.runs[0]?.changedSince).toBe(BASE);
+    expect(calls).not.toContain(lsFiles);
+
+    const module = contextWith([result()], { alwaysRun: [], owns: ['src/b'], git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked) });
+    await runTaskStep(module.context, { ...input, declared: 'module' });
+    expect(module.seen.runs[0]?.paths).toEqual(['src/b/b.test.ts']);
+  });
+
+  it('runs one run for a glob matching no tracked file, saying nothing', async () => {
+    const { context, seen } = contextWith([result()], { alwaysRun: ['e2e/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    await runTaskStep(context, input);
+    expect(seen.runs).toHaveLength(1);
+    expect(linesAt('warn')).toEqual([]);
+  });
+
+  it('takes no second run after a first run ended on SIGINT, and reads a SIGINT in the second as a stop', async () => {
+    const first = contextWith([killed()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const stoppedFirst = await runTaskStep(first.context, input);
+    expect(first.seen.runs).toHaveLength(1);
+    expect(stoppedFirst).toMatchObject({ red: false, interrupted: true, blocker: null });
+
+    const second = contextWith([red([FRESH]), killed()], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
+    const stoppedSecond = await runTaskStep(second.context, input);
+    expect(second.seen.runs).toHaveLength(2);
+    expect(stoppedSecond).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+});
+
+describe('runTaskStep timing the always-run files', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const sweep = 'src/tests/leak.sweep.test.ts';
+  const tracked = ['src/a.ts', 'src/a.test.ts', 'src/b/x.ts', 'src/b/b.test.ts', sweep];
+
+  /** A `runSuite` writing a JUnit file timing {@link sweep} at `seconds`, in each run, and recording the files written. */
+  function timedRuns(seconds: number, written: string[] = []): SuiteStepSeams {
+    return {
+      runSuite: (runOptions) => {
+        mkdirSync(join(runOptions.junitFile, '..'), { recursive: true });
+        writeFileSync(runOptions.junitFile, `<testsuites>\n  <testsuite name="${sweep}" file="${sweep}" time="${seconds}">\n  </testsuite>\n</testsuites>\n`, 'utf8');
+        written.push(runOptions.junitFile);
+        return Promise.resolve(result());
+      },
+    };
+  }
+
+  /** The slow-sweep lines printed. */
+  function slowLines(): readonly string[] {
+    return linesAt('info').filter((line) => line.startsWith('🐢'));
+  }
+
+  it('names an affected step\'s sweep over the limit, read off the second run\'s JUnit file', async () => {
+    const written: string[] = [];
+    const { context } = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12, written) });
+    await runTaskStep(context, input);
+
+    expect(written).toEqual([junitFileFor(dir, SESSION, 'task'), alwaysRunJunitFileFor(dir, SESSION)]);
+    expect(slowLines()).toEqual([`🐢 1 tests.alwaysRun file(s) took over 10s in the task step: ${sweep} (12.0s).`]);
+  });
+
+  it('prints no line for the same step with its sweep under the limit', async () => {
+    const { context } = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(3) });
+    await runTaskStep(context, input);
+    expect(linesAt('info').some((line) => line.startsWith('🧪'))).toBe(true);
+    expect(slowLines()).toEqual([]);
+  });
+
+  it('names a module step\'s sweep over the limit, read off the step\'s own JUnit file', async () => {
+    const written: string[] = [];
+    const { context } = contextWith([], {
+      alwaysRun: ['src/**/*.sweep.test.ts'],
+      owns: ['src/b'],
+      git: gitAt({ [BASE]: ['src/b/x.ts'] }, [], tracked),
+      seams: timedRuns(12, written),
+    });
+    await runTaskStep(context, { ...input, declared: 'module' });
+
+    expect(written).toEqual([junitFileFor(dir, SESSION, 'task')]);
+    expect(slowLines()).toHaveLength(1);
+  });
+
+  it('times nothing for [], where the same slow report under the default glob prints a line', async () => {
+    const { context } = contextWith([], { alwaysRun: [], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12) });
+    await runTaskStep(context, input);
+    expect(slowLines()).toEqual([]);
+
+    const control = contextWith([], { alwaysRun: ['src/**/*.sweep.test.ts'], git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked), seams: timedRuns(12) });
+    await runTaskStep(control.context, input);
+    expect(slowLines()).toHaveLength(1);
+  });
+});
+
+describe('runTaskStep linting the task\'s diff', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const lintKey = `diff --name-only -z --no-renames --diff-filter=d ${BASE} HEAD`;
+  const lintRed = { exitCode: 1, stdout: JSON.stringify([{ filePath: 'x', messages: [], errorCount: 1 }]), stderr: '' };
+
+  /** A git answering the task step's diff and the lint step's filtered one, each `paths`. */
+  function gitLinting(paths: readonly string[]): GitRunner {
+    const tests = gitAt({ [BASE]: paths });
+    return (args) => args.join(' ') === lintKey
+      ? { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' }
+      : tests(args);
+  }
+
+  /** Seams linting with `answer`, recording each argv. */
+  function linting(answer: { exitCode: number; stdout: string; stderr: string }, argvs: (readonly string[])[] = []): SuiteStepSeams {
+    return {
+      git: gitLinting(['src/a.ts', 'a.json']),
+      runLint: (options) => {
+        argvs.push(options.argv);
+        return Promise.resolve({ ...answer, stdout: answer.stdout.replace('"x"', JSON.stringify(join(dir, 'a.json'))) });
+      },
+    };
+  }
+
+  beforeEach(() => {
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+  });
+
+  it('lints the task\'s diff after a green test run and stays green on a green lint', async () => {
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([result()], { seams: linting({ exitCode: 0, stdout: '[]', stderr: '' }, argvs) });
+    const outcome = await runTaskStep(context, input);
+    expect(argvs).toEqual([['bunx', 'eslint', '--no-warn-ignored', '--format', 'json', 'src/a.ts', 'a.json']]);
+    expect(outcome).toMatchObject({ red: false, blocker: null, blockedLine: null });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('is red on a red lint under green tests, inserting a repair task blocked on the lint\'s text', async () => {
+    const { context, seen } = contextWith([result()], { seams: linting(lintRed) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: true, interrupted: false, blockedLine: 9 });
+    expect(seen.steps[0]?.newFailures).toEqual([]);
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.status).toBe('blocked');
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(next?.blocker).toBe('The runner\'s lint step after "second task" found ESLint errors in the task\'s diff. Files with errors: a.json (1 error). Run bunx eslint --no-warn-ignored a.json and make them pass.');
+  });
+
+  it('writes one blocker holding both texts, the tests\' first, when both are red', async () => {
+    const { context } = contextWith([red([FRESH])], { seams: linting(lintRed) });
+    const outcome = await runTaskStep(context, input);
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(outcome.blocker?.startsWith('The runner\'s task step after "second task" found failures')).toBe(true);
+    expect(outcome.blocker).toContain('bun test src/new.test.ts');
+    expect(outcome.blocker).toContain('Run bunx eslint --no-warn-ignored a.json');
+  });
+
+  it('reads a lint ended by SIGINT as a stop, blocking nothing', async () => {
+    const { context, seen } = contextWith([result()], { seams: linting({ ...lintRed, exitCode: SIGINT_EXIT_CODE }) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(seen.steps[0]?.interrupted).toBe(true);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('does not lint after a test run read as a stop', async () => {
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([killed()], { seams: linting(lintRed, argvs) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome.interrupted).toBe(true);
+    expect(argvs).toEqual([]);
+  });
+
+  it('runs no lint in a checkout with no eslint.config file, where the same red lint blocks with one', async () => {
+    rmSync(join(dir, 'eslint.config.mjs'));
+    const argvs: (readonly string[])[] = [];
+    const { context } = contextWith([result()], { seams: linting(lintRed, argvs) });
+    expect((await runTaskStep(context, input)).red).toBe(false);
+    expect(argvs).toEqual([]);
   });
 });
 
@@ -429,7 +808,7 @@ describe('runStageStep', () => {
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
   });
 
-  it('blocks the next open task on a new failure and still enters the stage as taken', async () => {
+  it('inserts a blocked repair task on a new failure and still enters the stage as taken', async () => {
     const { context } = contextWith([red([FRESH])]);
     const outcome = await runStageStep(context, stage, baselineWith());
     expect(outcome.red).toBe(true);
@@ -483,7 +862,7 @@ describe('runPreWrapUpStep', () => {
 
 describe('blockerText', () => {
   it('names each new file once with its count and the command running them', () => {
-    const text = blockerText('task step', { exitCode: 1 }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
+    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
     expect(text).toContain('src/new.test.ts (2 tests), src/old.test.ts (1 test)');
     expect(text).toContain('Run bun test src/new.test.ts src/old.test.ts');
     expect(text).not.toContain('\n');
@@ -542,7 +921,7 @@ describe('a step stopped by SIGINT', () => {
     expect(linesAt('info').some((line) => line.includes('interrupted by SIGINT'))).toBe(true);
   });
 
-  it('blocks the next task on the same run ended by exit 1, the control that the step could have blocked', async () => {
+  it('inserts a blocked repair task on the same run ended by exit 1, the control that the step could have written', async () => {
     const { context, seen } = contextWith([killed({ exitCode: 1 })]);
     const outcome = await runTaskStep(context, input);
 

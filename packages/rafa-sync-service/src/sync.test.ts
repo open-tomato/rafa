@@ -13,7 +13,7 @@ import type { StandInHub } from './testdata/stand-in-hub.js';
 import type { SyncPortVersion } from '@open-tomato/rafa/ports';
 import type { CommitEffortRow, SqliteEffortStore } from '@open-tomato/rafa/store';
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -414,22 +414,39 @@ describe('pull', () => {
 });
 
 describe('keyed by origin_store', () => {
-  it('starts a store re-minted after a merge from zero, keeping only its new origin', async () => {
+  it('keeps a merged store\'s origin across the pull and one write, so its cursors carry on', async () => {
     const over = hub();
     const a = device(1);
     const b = device(1);
     await serviceOf(a, over).push({ to: null });
     await serviceOf(b, over).push({ to: null });
+    const before = originOf(b);
     await serviceOf(b, over).pull({ from: null, dryRun: false });
-    const merged = originOf(b);
 
     b.store.append('commits', [commitRow()]);
-    const reminted = originOf(b);
     await serviceOf(b, over).push({ to: null });
 
-    expect(reminted).not.toBe(merged);
-    expect(over.requests.at(-1)).toMatchObject({ device: reminted, rows: 3 });
-    expect(Object.keys(stateOf(b).stores)).toEqual([reminted]);
+    expect(originOf(b)).toBe(before);
+    expect(over.requests.at(-1)).toMatchObject({ device: before });
+    expect(Object.keys(stateOf(b).stores)).toEqual([before]);
+  });
+
+  it('mints a new origin for a copy renamed over the store, which the cursors then start from zero', async () => {
+    const over = hub();
+    const b = device(1);
+    await serviceOf(b, over).push({ to: null });
+    const before = originOf(b);
+    const copy = `${b.path}.copy`;
+    copyFileSync(b.path, copy);
+    renameSync(copy, b.path);
+
+    openSqliteStore(b.root).append('commits', [commitRow()]);
+    const minted = originOf(b);
+    await serviceOf(b, over).push({ to: null });
+
+    expect(minted).not.toBe(before);
+    expect(over.requests.at(-1)).toMatchObject({ device: minted });
+    expect(Object.keys(stateOf(b).stores)).toEqual([minted]);
   });
 
   it('keeps a store\'s cursors across write opens that mint nothing', async () => {

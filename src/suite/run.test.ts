@@ -35,7 +35,7 @@
  */
 import type { SuiteSpawner, SuiteSpawnOptions } from './run.js';
 
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -96,6 +96,51 @@ function recordedSpawner(name: string, exitCode: number, seen: SeenSpawn[]): Sui
     return { exitCode, stderr: fixture(`${name}.stderr.txt`) };
   };
 }
+
+/** Stderr of a run where `sub/f.test.ts` throws while it loads and `a.test.ts` passes. */
+const UNHANDLED_STDERR = [
+  'bun test v1.4.2',
+  '',
+  'a.test.ts:',
+  '(pass) passes [0.10ms]',
+  '',
+  'sub/f.test.ts:',
+  '',
+  '# Unhandled error between tests',
+  '-------------------------------',
+  ' 9 | const x: any = undefined;',
+  '10 | x.foo();',
+  '       ^',
+  'TypeError: undefined is not an object (evaluating \'(void 0).foo\')',
+  '      at /tmp/scratch/sub/f.test.ts:10:3',
+  '-------------------------------',
+  '',
+  '',
+  ' 1 pass',
+  ' 1 fail',
+  ' 1 error',
+  'Ran 1 test across 2 files. [12.00ms]',
+  '',
+].join('\n');
+
+/** The text {@link UNHANDLED_STDERR} leaves beside the JUnit file: the block and the summary lines. */
+const UNHANDLED_TEXT = [
+  'sub/f.test.ts:',
+  '# Unhandled error between tests',
+  '-------------------------------',
+  ' 9 | const x: any = undefined;',
+  '10 | x.foo();',
+  '       ^',
+  'TypeError: undefined is not an object (evaluating \'(void 0).foo\')',
+  '      at /tmp/scratch/sub/f.test.ts:10:3',
+  '-------------------------------',
+  '',
+  ' 1 pass',
+  ' 1 fail',
+  ' 1 error',
+  'Ran 1 test across 2 files. [12.00ms]',
+  '',
+].join('\n');
 
 let dir = '';
 
@@ -293,6 +338,7 @@ describe('runSuite', () => {
       ],
       errors: 1,
       junit: 'read',
+      unhandled: [{ file: 'c.test.ts', firstLine: 'error: Cannot find module \'./nope.js\' from \'/tmp/scratch/c.test.ts\'' }],
     });
     expect(seen[0]?.options).toEqual({ cwd: dir, env: { PATH: '/bin' } });
   });
@@ -343,6 +389,32 @@ describe('runSuite', () => {
     const run = runSuite({ cwd: dir, paths: [], junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('clean', 0, seen) });
     expect(run).rejects.toThrow(RangeError);
     expect(seen).toHaveLength(0);
+  });
+
+  it('answers the file and first line of an error outside a test, and writes the block and summary beside the JUnit file', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    const outputFile = join(dir, 'suite', 'task.output.txt');
+    let outputPresent = true;
+    const spawn: SuiteSpawner = async () => {
+      outputPresent = existsSync(outputFile);
+      writeFileSync(junitFile, '<testsuites><testsuite name="a.test.ts" file="a.test.ts"><testcase name="passes" file="a.test.ts"/></testsuite></testsuites>');
+      return { exitCode: 1, stderr: UNHANDLED_STDERR };
+    };
+    mkdirSync(join(dir, 'suite'));
+    writeFileSync(outputFile, 'stale output from the last run\n');
+    const result = await runSuite({ cwd: dir, junitFile, spawn });
+    // Control: the stale text sat there before the run, so its absence at the spawn is the removal.
+    expect(outputPresent).toBe(false);
+    expect(result.unhandled).toEqual([{ file: 'sub/f.test.ts', firstLine: 'TypeError: undefined is not an object (evaluating \'(void 0).foo\')' }]);
+    expect(result).toMatchObject({ exitCode: 1, failures: [], errors: 1, junit: 'read' });
+    expect(readFileSync(outputFile, 'utf8')).toBe(UNHANDLED_TEXT);
+  });
+
+  it('answers no unhandled error and writes the summary alone for a clean run', async () => {
+    const junitFile = join(dir, 'clean.junit.xml');
+    const result = await runSuite({ cwd: dir, junitFile, spawn: recordedSpawner('clean', 0, []) });
+    expect(result.unhandled).toEqual([]);
+    expect(readFileSync(join(dir, 'clean.output.txt'), 'utf8')).toBe(' 1 pass\n 0 fail\nRan 1 test across 1 file. [1.00ms]\n');
   });
 
   it('reads process.env when no environment is handed, without CLAUDECODE', async () => {

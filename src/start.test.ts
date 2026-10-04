@@ -15,7 +15,7 @@
  * whole file, answers each call's arguments as written, and a planted
  * source that hands a dispatch no checkout is its control.
  *
- * `start()` itself is not driven, for the reason
+ * `start()` is not driven in process, for the reason
  * `tests/plan-injection.test.ts` gives for not driving it either: it
  * spawns the real CLI with no seam, and reaching its wrap-up branch
  * means a real config, a real session record, a real preflight and a
@@ -24,6 +24,18 @@
  * `if (!taskInfo)` branch is located, and every call inside it is
  * collected in source order with its arguments as written.
  *
+ * ## The one driven run
+ *
+ * The last describe spawns the CLI instead, twice over one scratch
+ * repository, to prove what the structural reading cannot: the order a
+ * red task step and a restart leave behind. Run 1's first task breaks a
+ * test its own diff reaches, so its task step is red; the run halts with
+ * one `[BLOCKED]` repair line inserted above the first open plan task,
+ * under that task's stage heading. Run 2 finds the first stage's own
+ * step still due, since the halt came before it, and must still start a
+ * task session for the repair ahead of it: no suite step runs before
+ * that session, so none is recorded and the stand-in is called once more.
+ *
  * ## The controls
  *
  * A reader that found nothing would pass a "calls nothing else" claim on
@@ -31,10 +43,21 @@
  * on any. So a PLANTED branch that still makes a release call of its own
  * beside the hand-over is read as making both.
  */
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
+
+import { readSessions } from './loop/sessions.js';
+import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
+import { plantProjectConfig } from './tests/cli-capture.js';
+import { gitIdentityEnv } from './tests/git-identity.js';
+import { scratchHomeEnv } from './tests/scratch-home-env.js';
+import { findNextTask } from './utils/tracker.js';
 
 /** One call inside the branch, as the source writes it. */
 interface BranchCall {
@@ -342,12 +365,11 @@ describe('where start.ts takes the suite steps', () => {
     );
   });
 
-  it('takes the task step from the task\'s base once its commit is stored, before the usage check', () => {
+  it('takes the task step from the task\'s base once its commit is stored', () => {
     expect(callTo(EVERY, 'afterTask').args).toEqual(['taskInfo', 'base']);
     const after = indexOf(EVERY, 'afterTask');
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
-    expect(after).toBeLessThan(indexOf(EVERY, 'checkUsage'));
     expect(START).toContain(
       'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
     );
@@ -372,4 +394,240 @@ describe('where start.ts takes the suite steps', () => {
     expect(NAMES).not.toContain('beforeSession');
     expect(NAMES).not.toContain('runPreWrapUpStep');
   });
+});
+
+/** The plan stub the driven run's scratch repository runs. */
+const STUB = 'start-red-task-step';
+
+/** The branch the scratch repository is checked out on. */
+const BRANCH = `feat/${STUB}`;
+
+/** The tracker's file name, beside the plan under `.plans/`. */
+const TRACKER_NAME = `PLAN_TRACKER-${STUB}.md`;
+
+/** The first stage's only task: breaks a test its own diff reaches, so its task step is red. */
+const BREAKING_TASK = 'Change the greeting, breaking the test that reads it';
+
+/** The second stage's only task: the first open plan task once the first is done. */
+const LATER_TASK = 'Use the greeting somewhere else';
+
+/** The second stage's heading, which the repair line must sit under. */
+const LATER_HEADING = '# Stage: second';
+
+/** The plan: one task per stage, so the first stage's own step is due the moment its task is done. */
+const PLAN = [
+  `# Plan: ${STUB}`,
+  '',
+  '# Stage: first',
+  '',
+  `- [ ] ${BREAKING_TASK}`,
+  '',
+  LATER_HEADING,
+  '',
+  `- [ ] ${LATER_TASK}`,
+  '',
+].join('\n');
+
+/** The module the first task changes, and the test importing it. */
+const GREETING_FILE = 'greeting.ts';
+const GREETING_TEST_FILE = 'greeting.test.ts';
+
+/** How long one spawned `loop start` run may take: a few real `bun test` runs of a tiny project. */
+const RUN_TIMEOUT_MS = 90_000;
+
+/** This describe's own test timeout: two spawned runs. */
+const CASE_TIMEOUT_MS = 150_000;
+
+/** A fence, kept out of the shell script template below. */
+const FENCE = '```';
+
+const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-start-red-task-step-')));
+afterAll(() => {
+  rmSync(tempRoot, { recursive: true, force: true });
+});
+
+/** A scratch repository, and what a spawned run reads under it. */
+interface Scratch {
+  readonly repo: string;
+  readonly home: string;
+  /** Where the stand-in keeps each call's count, arguments and prompt. */
+  readonly calls: string;
+  /** The PATH a spawned run gets: the stand-in's `bin/`, git's own directory, then bun's own. */
+  readonly path: string;
+}
+
+/** Runs git in `cwd` under `home`'s isolated identity, no gpg signing. */
+function git(cwd: string, home: string, ...args: string[]): void {
+  execFileSync('git', args, {
+    cwd,
+    stdio: 'pipe',
+    env: { ...process.env, HOME: home, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1' },
+  });
+}
+
+/** `printf '%s\n' <line>` for each of `lines`, one per shell statement, each a single-quoted word. */
+function printLines(lines: readonly string[]): readonly string[] {
+  return lines.map((line) => `printf '%s\\n' '${line.replace(/'/g, '\'\\\'\'')}'`);
+}
+
+/** The `rafa:report` block a call answers with, `status` and `feedback` its own. */
+function reportLines(status: 'done' | 'blocked', feedback: string): readonly string[] {
+  return [
+    `${feedback}.`,
+    '',
+    `${FENCE}rafa:report`,
+    `status: ${status}`,
+    `feedback: "${feedback}"`,
+    'findings: []',
+    'skills_used: []',
+    'blockers: []',
+    'out_of_scope_bugs: []',
+    FENCE,
+    '',
+  ];
+}
+
+/**
+ * The stand-in `claude`: keeps each call's count, its arguments and its
+ * whole prompt outside the repository, then answers by call number.
+ * Call 1 rewrites {@link GREETING_FILE} so {@link GREETING_TEST_FILE}
+ * fails, and answers `done`. Every later call touches nothing and answers
+ * `blocked`, so the repair session of run 2 ends the run at once and no
+ * step after it muddies what ran before it.
+ */
+function standInScript(calls: string): string {
+  return [
+    '#!/bin/sh',
+    `calls='${calls}'`,
+    'n=$(/bin/cat "$calls/count" 2>/dev/null || echo 0)',
+    'n=$((n + 1))',
+    'echo "$n" > "$calls/count"',
+    'for arg in "$@"; do printf \'%s\\n\' "$arg"; done > "$calls/$n.args"',
+    '/bin/cat > "$calls/$n.prompt"',
+    'if [ "$n" -eq 1 ]; then',
+    `  printf '%s\\n' 'export function greeting(): string { return "goodbye"; }' > ${GREETING_FILE}`,
+    ...printLines(reportLines('done', 'changed the greeting')),
+    'else',
+    ...printLines(reportLines('blocked', 'read the blocker the repair prompt carried')),
+    'fi',
+    'exit 0',
+    '',
+  ].join('\n');
+}
+
+/**
+ * A scratch git repository on {@link BRANCH} holding {@link PLAN}, and in
+ * its seed commit a green {@link GREETING_TEST_FILE} over
+ * {@link GREETING_FILE}. `.plans/`, `.rafa/` and `progress.txt` are
+ * gitignored, as a real project's are.
+ */
+function plant(): Scratch {
+  const root = mkdtempSync(join(tempRoot, 'run-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  const calls = join(root, 'calls');
+  for (const dir of [repo, bin, home, calls]) mkdirSync(dir, { recursive: true });
+
+  const gitBinary = Bun.which('git');
+  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
+  const bunBinary = Bun.which('bun');
+  if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
+
+  const claude = join(bin, 'claude');
+  writeFileSync(claude, standInScript(calls), 'utf8');
+  chmodSync(claude, 0o755);
+
+  git(repo, home, 'init', '-q', '.');
+  git(repo, home, 'config', 'user.email', 'loop@example.test');
+  git(repo, home, 'config', 'user.name', 'Rafa Loop');
+  git(repo, home, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, GREETING_FILE), 'export function greeting(): string { return \'hello\'; }\n', 'utf8');
+  writeFileSync(join(repo, GREETING_TEST_FILE), [
+    'import { expect, test } from \'bun:test\';',
+    'import { greeting } from \'./greeting\';',
+    '',
+    'test(\'greets\', () => {',
+    '  expect(greeting()).toBe(\'hello\');',
+    '});',
+    '',
+  ].join('\n'), 'utf8');
+  writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
+  git(repo, home, 'add', '-A');
+  git(repo, home, 'commit', '-q', '--no-verify', '-m', 'seed');
+  git(repo, home, 'checkout', '-q', '-B', BRANCH);
+
+  mkdirSync(join(repo, '.plans'));
+  writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
+  plantProjectConfig(repo);
+
+  return { repo, home, calls, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
+}
+
+/** Runs `rafa loop start` over the planted plan in `scratch`'s repository, waiting for it to finish. */
+function runLoopStart(scratch: Scratch): number | null {
+  const entry = fileURLToPath(new URL('./rafa.ts', import.meta.url));
+  const run = Bun.spawnSync([process.execPath, entry, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'], {
+    cwd: scratch.repo,
+    env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
+    timeout: RUN_TIMEOUT_MS,
+  });
+  return run.exitCode;
+}
+
+/** The call count the stand-in has recorded so far, or `0` before any call. */
+function callCount(scratch: Scratch): number {
+  try {
+    return Number(readFileSync(join(scratch.calls, 'count'), 'utf8').trim());
+  } catch {
+    return 0;
+  }
+}
+
+/** The kinds of every suite step recorded for the scratch repository's runs, in order. */
+function stepKinds(scratch: Scratch): readonly string[] {
+  return readSessions(scratch.repo).flatMap((record) => (record.steps ?? []).map((step) => step.kind));
+}
+
+describe('a run whose task step goes red, over a real bun test', () => {
+  it('halts with one repair line above the first open task, and restarts on a session for it before any suite step', () => {
+    const scratch = plant();
+    const trackerPath = join(scratch.repo, '.plans', TRACKER_NAME);
+
+    // Run 1: the first task breaks the test its diff reaches, so its task
+    // step is red and the run halts before the second task is dispatched.
+    expect(runLoopStart(scratch)).toBe(0);
+    expect(callCount(scratch)).toBe(1);
+    expect(stepKinds(scratch)).toEqual(['baseline', 'task']);
+
+    const tracker = readFileSync(trackerPath, 'utf8');
+    const lines = tracker.split('\n');
+    expect(lines.filter((line) => line.startsWith('- [BLOCKED] '))).toHaveLength(1);
+    expect(tracker).toContain(`- [x] ${BREAKING_TASK}`);
+    expect(tracker).toContain(`- [ ] ${LATER_TASK}`);
+
+    // The repair sits directly above the first open task, under that
+    // task's own stage heading, and the task itself is left as it was.
+    const repairLine = lines.findIndex((line) => line.startsWith('- [BLOCKED] '));
+    const laterLine = lines.indexOf(`- [ ] ${LATER_TASK}`);
+    expect(lines.indexOf(LATER_HEADING)).toBeLessThan(repairLine);
+    expect(repairLine).toBeLessThan(laterLine);
+
+    const repair = findNextTask(tracker);
+    expect(repair?.status).toBe('blocked');
+    expect(repair?.task).toMatch(/^Repair the red task step at commit [0-9a-f]{12} {2}\{agent=build-error-resolver\}$/);
+    expect(repair?.blocker).toContain(GREETING_TEST_FILE);
+
+    // Run 2: the first stage's step is due now (its task is done and the
+    // ledger holds nothing for it), yet the repair gets its session first.
+    // The stand-in is called a second time, with the blocker in its prompt
+    // and the repair's agent in its arguments, and no step is recorded
+    // after run 1's: none ran before that session.
+    expect(runLoopStart(scratch)).toBe(0);
+    expect(callCount(scratch)).toBe(2);
+    expect(readFileSync(join(scratch.calls, '2.prompt'), 'utf8')).toContain(`${BLOCKER_PROMPT_PREFIX}${repair?.blocker ?? ''}`);
+    expect(readFileSync(join(scratch.calls, '2.args'), 'utf8')).toContain('--agent\nbuild-error-resolver\n');
+    expect(stepKinds(scratch)).not.toContain('stage');
+    expect(stepKinds(scratch).filter((kind) => kind === 'task')).toHaveLength(1);
+  }, CASE_TIMEOUT_MS);
 });

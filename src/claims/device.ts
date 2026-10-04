@@ -12,7 +12,7 @@
  * for the id writes nothing, and a store whose id is unminted stays
  * unminted. A store file that does not exist is not opened at all,
  * since an open with SQLite's create flag would make it. No `Database`
- * is opened here: `store-sources.test.ts` refuses one outside its
+ * is opened here: `store-sources.sweep.test.ts` refuses one outside its
  * allow-list.
  *
  * ## When there is no id

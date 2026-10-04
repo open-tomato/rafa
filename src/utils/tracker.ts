@@ -372,6 +372,98 @@ export function writeTrackerBlocker(
   return true;
 }
 
+/** Any task line's checkbox, ticked included, as `plan/parse.ts` reads the checklist. */
+const ANY_TASK_PREFIX = /^- \[(?: |x|BLOCKED)\] /;
+
+/** A character that ends a line for a tracker reader or for JavaScript's `.`. */
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
+
+/** A task line {@link insertTrackerTask} writes. */
+export interface InsertedTask {
+  /** The task's sentence: one line, not blank. */
+  readonly task: string;
+  /**
+   * The declaration's entries, without the braces, such as
+   * `agent=build-error-resolver`: one line, holding neither brace.
+   */
+  readonly declaration: string;
+  /** The text of its blocker comment, escaped as {@link writeTrackerBlocker} escapes it. */
+  readonly blocker: string;
+}
+
+/** Throws unless `entry` writes one task line whose declaration is the last brace group. */
+function assertInsertable(entry: InsertedTask): void {
+  if (entry.task.trim().length === 0 || LINE_TERMINATOR.test(entry.task)) {
+    throw new Error('insertTrackerTask: the task text must be one line and not blank');
+  }
+  if (entry.declaration.trim().length === 0 || /[{}]/.test(entry.declaration) || LINE_TERMINATOR.test(entry.declaration)) {
+    throw new Error('insertTrackerTask: the declaration must be one line of entries holding no brace');
+  }
+}
+
+/** The index after the last task line outside a closed block, or the end of the text. */
+function endOfChecklist(lines: readonly string[], inBlock: ReadonlySet<number>): number {
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (!inBlock.has(i) && ANY_TASK_PREFIX.test(lines[i]!)) return i + 1;
+  }
+  const last = lines.length - 1;
+  return lines[last] === ''
+    ? last
+    : lines.length;
+}
+
+/**
+ * Inserts a `[BLOCKED]` task line into the tracker and answers its line,
+ * counting from zero.
+ *
+ * The line is `- [BLOCKED] <task>  {<declaration>}  <!-- blocked: ... -->`,
+ * read by the parser as any plan task: it starts at column 0, its
+ * declaration is the last brace group of its text, and its blocker
+ * comment follows that, escaped as {@link writeTrackerBlocker} escapes
+ * one, so a `-->` or a line break in the blocker stays inside the one
+ * comment on the one line. Being blocked, it is the line `findNextTask`
+ * answers first, wherever it sits.
+ *
+ * With `beforeLine` it goes directly above that task line, so it sits
+ * under the stage heading of the task it precedes and the task moves
+ * down one line. With null it goes directly after the checklist's last
+ * task line, ticked lines included, under the last task's heading and
+ * above whatever prose or stamp follows the list; a tracker with no task
+ * line takes it at its end. Lines inside a closed `rafa:*` block are no
+ * tasks here, as they are none to `findNextTask`.
+ *
+ * It throws, with the file left as it was, on a task text that is blank
+ * or spans lines, a declaration that is blank, spans lines or holds a
+ * brace, and a `beforeLine` that is no task line outside a block: each
+ * would write a line that reads back as something else. A CRLF tracker,
+ * read off its first line, gets a carriage return on the inserted line.
+ */
+export function insertTrackerTask(
+  trackerPath: string,
+  entry: InsertedTask,
+  beforeLine: number | null,
+): number {
+  assertInsertable(entry);
+  const content = fs.readFileSync(trackerPath, 'utf8');
+  const lines = content.split('\n');
+  const inBlock = closedBlockLines(content);
+
+  if (beforeLine !== null) {
+    const target = lines[beforeLine];
+    if (target === undefined || inBlock.has(beforeLine) || !ANY_TASK_PREFIX.test(target)) {
+      throw new Error(`insertTrackerTask: line ${beforeLine} is no task line`);
+    }
+  }
+
+  const at = beforeLine ?? endOfChecklist(lines, inBlock);
+  const { cr } = splitCarriageReturn(lines[0] ?? '');
+  const line = `- [BLOCKED] ${entry.task.trim()}${BLOCKER_GAP}{${entry.declaration.trim()}}`
+    + `${BLOCKER_GAP}${blockerComment(entry.blocker)}${cr}`;
+  const written = [...lines.slice(0, at), line, ...lines.slice(at)];
+  fs.writeFileSync(trackerPath, written.join('\n'), 'utf8');
+  return at;
+}
+
 /**
  * Derives the tracker path for a plan file: `PLAN.md` → `PLAN_TRACKER.md`,
  * `PLAN-foo.md` → `PLAN_TRACKER-foo.md`. Keeping one tracker per plan lets

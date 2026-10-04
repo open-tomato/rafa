@@ -10,7 +10,7 @@ migrates from NDJSON storage to SQLite.
 columns can change, and what happens when they cannot.** The rules are
 in `src/effort/store/merge-rules.ts` in a `MERGE_RULES` registry, keyed
 by table name. A new table must declare its rule in the same commit as
-its migration entry, or `merge-rules.test.ts` will fail.
+its migration entry, or `merge-rules.sweep.test.ts` will fail.
 
 **A table's scope is either `merged` or `local`.** Merged tables travel
 between stores and their rows combine; local tables stay on their
@@ -32,7 +32,7 @@ from the other store when NULL), `skipped` (a field written only by one
 store and never merged), or `unchanged` (a field that must be equal in
 both rows, or one is a conflict).
 
-**Every writer of a merged table must be checked.** `merge-rules.test.ts`
+**Every writer of a merged table must be checked.** `merge-rules.sweep.test.ts`
 reads every `UPDATE <table> SET <column>` in every module under `src/`
 (not tests or `store/`) whose column is not in the table's rule, and
 fails, so a new edit of an existing table's column needs its rule
@@ -117,9 +117,28 @@ It writes to `effort.sqlite.merge-<stamp>`, brings the file forward
 (adopting and applying any migrations the incoming store has and the
 local one does not), checks the row count of every table in both files
 against the live store (the merge cannot lose rows), `integrity_check`
-and that `planSchema` finds it current, then renames the original to
-`effort.sqlite.before-merge-<stamp>.bak`, and swaps the new file in
-through `rebuildAside`.
+and that `planSchema` finds it current, then copies the store with
+`VACUUM INTO` to `effort.sqlite.before-merge-<stamp>.bak`, and swaps
+the new file in through `rebuildAside`.
+
+**The swap preserves the local store's identity when it stays the same
+store in the same place.** Before renaming the merged file over the live
+store, `swapIn` carries the device and inode onto the new file with a
+new generation, and writes that generation to the side record just
+before the rename, so the identity facts stay tied to that path, and
+the store keeps its origin even though its inode may change during the
+rename. The backup, left behind when the new file takes the live
+store's place, becomes a different file: if restored later, it will have
+a new device or inode and will mint a new origin on its first write.
+This is the complement to copy detection: a backup is like a photo of
+the house before renovation; moving back into the photo is moving into
+a different house. The decision to carry identity is the same as a write
+open's decision to keep an origin: it happens under `BEGIN IMMEDIATE`
+inside `swapIn`, before the rename, and the carried generation is checked
+on the next write to catch a restoration. Releasing claims made after the
+merge against this store's id before undoing the merge keeps them valid
+after restoration; undoing with unconfirmed claims in place orphans them
+until they are taken over with `rafa claim take <n> --stale`.
 
 ### Rafa effort move
 

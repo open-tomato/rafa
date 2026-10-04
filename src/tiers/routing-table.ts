@@ -15,7 +15,7 @@
  * ## What a row carries
  *
  * Three columns, the header the page has always used and
- * `src/tests/routing-table-agents.test.ts` looks for:
+ * `src/tests/routing-table-agents.sweep.test.ts` looks for:
  *
  *   - **Task shape**: the setting's key as a code span, then the
  *     reader's gloss from {@link SHAPE_GLOSSES}. The key is what a

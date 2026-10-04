@@ -1,13 +1,13 @@
 /**
  * The phase 0 commands besides `loop start` writing through the active
- * output: `effort collect`, `effort report` and `usage` spawned in both
- * modes, and the source of every module those commands and `plan create`
- * write from.
+ * output: `effort collect` and `effort report` spawned in both modes,
+ * and the source of every module those commands and `plan create` write
+ * from.
  *
  * ## The source cases
  *
  * `src/plan.ts`, `src/effort/collect.ts`, `src/effort/report.ts`,
- * `src/usage.ts`, `src/config.ts` and `src/config-load.ts` hold no
+ * `src/config.ts` and `src/config-load.ts` hold no
  * `console` member and no `process.exit` in their code, read with the
  * walk in `source-uses.ts`, whose control is `loop-output.test.ts`'s.
  * Each but `config.ts` calls `activeOutput()`; `config.ts` writes nothing,
@@ -26,7 +26,6 @@
  * run in text mode beside it, and the json run's `info` messages are the
  * lines the text run printed, in order.
  *
- *   - `usage` with no reading, and with `CLAUDE_USAGE_PERCENT` set.
  *   - `effort collect --no-sessions` over a repository one commit deep,
  *     its json run beside a text run over the store a first run filled,
  *     and its refusal of a `--since` that is no date: on stderr in text
@@ -80,7 +79,6 @@ const ROUTED_MODULES: readonly (readonly [string, boolean])[] = [
   ['plan.ts', true],
   ['effort/collect.ts', true],
   ['effort/report.ts', true],
-  ['usage.ts', true],
   ['config.ts', false],
   ['config-load.ts', true],
 ];
@@ -149,7 +147,7 @@ function rafa(scratch: Scratch, words: readonly string[], env: Readonly<Record<s
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
+    env: { TMPDIR: tmpdir(), PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
 }
@@ -178,34 +176,6 @@ function infoMessages(events: readonly CliEvent[]): string[] {
 function linesOf(stream: string): string[] {
   return stream.replace(/\n$/, '').split('\n');
 }
-
-describe('rafa usage', () => {
-  it('writes the unavailable reading as info events in json mode, the lines text mode prints', () => {
-    const scratch = plant();
-
-    const text = rafa(scratch, ['usage']);
-    const json = rafa(scratch, ['usage', '--output=json']);
-
-    expect([text.exitCode, text.stderr]).toEqual([0, '']);
-    expect(text.stdout).toBe('Claude usage: unavailable\n'
-      + 'Tip: set CLAUDE_USAGE_PERCENT=<0-100> to override until a live source is available.\n');
-    expect([json.exitCode, json.stderr]).toEqual([0, '']);
-    const events = eventsOf(json);
-    expect(events).toHaveLength(4);
-    expect(infoMessages(events)).toEqual(linesOf(text.stdout));
-    expect(events.at(-1)).toMatchObject({ ok: true });
-  }, RUN_TIMEOUT);
-
-  it('writes a reading the environment sets as one info event', () => {
-    const scratch = plant();
-
-    const json = rafa(scratch, ['usage', '--output=json'], { CLAUDE_USAGE_PERCENT: '85' });
-
-    expect(json.exitCode).toBe(0);
-    expect(infoMessages(eventsOf(json)))
-      .toEqual([`Claude usage: 85.0%  [${'█'.repeat(17)}${'░'.repeat(3)}]  HIGH — monitor closely`]);
-  }, RUN_TIMEOUT);
-});
 
 describe('rafa effort collect', () => {
   it('writes its summary as info events in json mode, the lines text mode prints over the same store', () => {

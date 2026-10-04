@@ -1,6 +1,7 @@
 /**
  * Which store a row came from: the facts a writing open compares to
  * tell whether this file is still the store its origin was minted for,
+ * the generation that tells it whether this is the file last written,
  * and the decision whether to mint a new one.
  *
  * ## The origin is the store, never the machine
@@ -29,15 +30,40 @@
  *     is caught; the host id alone would miss it.
  *
  * A store renamed away and back to its own path keeps all three, and
- * its origin. A store `fix-schema`, `migrate` or `rafa effort copy`
- * builds is a new file and gets a new origin, which is harmless.
+ * its origin. A store `rafa effort copy` builds is a new file and gets
+ * a new origin, which is harmless. The file `fix-schema`, `migrate` and
+ * `rafa effort merge` swap in is new as well, but the swap carries the
+ * store's identity onto it before the rename (`carryStoreIdentity`,
+ * `store-meta.ts`), so it keeps the origin. The backup the swap writes
+ * is the copy: it has an inode of its own and names the original's, so
+ * renamed back over the store it mints.
  *
  * Two copies these facts cannot see, measured on 2026-09-29 on tmpfs:
  * a `.bak` restored with `cp` over the existing file is written into
  * the old inode, so all three facts match; and a disk cloned whole
- * matches all three as well. The merge catches both afterwards, since
- * one origin pair holding two contents can only come from a missed
- * copy.
+ * matches all three as well. The generation below catches the first
+ * once the store was written after the `.bak` was taken. The merge
+ * catches what is left afterwards, since one origin pair holding two
+ * contents can only come from a missed copy.
+ *
+ * ## The generation
+ *
+ * `store_meta.generation` holds a generation, and the side record
+ * beside the store's real path (`store-generation.ts`) holds one too.
+ * A copy of the store file carries the row and leaves the side record
+ * behind, so {@link observeStore} reads the side record with the three
+ * facts, and {@link decideStoreIdentity} mints with the reason
+ * `generation` when the row holds a generation and the side record
+ * holds another or none. That holds whatever the inode, so it reaches
+ * a file the three facts call the same: a row one generation behind
+ * its side record mints with the host, path, device and inode all
+ * unchanged.
+ *
+ * A row whose generation is NULL was written by a runtime that did not
+ * know the column, or minted before any open wrote one. Its generation
+ * proves nothing, so the three facts alone judge it, and a side record
+ * beside it changes nothing. This module only decides: writing a new
+ * generation to the row and the side record is the caller's.
  *
  * ## The host id is a keyed hash
  *
@@ -75,6 +101,8 @@ import { hostname, platform as currentPlatform } from 'node:os';
 
 import { createGitRunner } from '../../pr/git.js';
 import { normalizeRemote } from '../../schema/project-id.js';
+
+import { readStoreGeneration } from './store-generation.js';
 
 /**
  * The application-specific key `machine-id(5)` asks for. Changing it
@@ -180,18 +208,22 @@ export function readStoreFileFacts(path: string): StoreFileFacts {
   return { storePath, fileDev: stats.dev, fileIno: stats.ino };
 }
 
-/** The three facts a writing open compares. */
+/** What a writing open observes: the three facts and the side record's generation. */
 export interface StoreIdentityFacts extends StoreFileFacts {
   /** {@link readHostId}'s answer. */
   readonly hostId: string;
+  /** The generation in the side record beside the store's real path, or null when it has none. */
+  readonly generation: string | null;
 }
 
 /**
  * The facts of the store file at `path`, with the host id `readHost`
- * answers ({@link readHostId} when absent).
+ * answers ({@link readHostId} when absent) and the generation the side
+ * record beside its real path holds.
  */
 export function observeStore(path: string, readHost: () => string = readHostId): StoreIdentityFacts {
-  return { hostId: readHost(), ...readStoreFileFacts(path) };
+  const fileFacts = readStoreFileFacts(path);
+  return { hostId: readHost(), ...fileFacts, generation: readStoreGeneration(fileFacts.storePath) };
 }
 
 /**
@@ -209,14 +241,20 @@ export interface RecordedIdentity {
   readonly fileDev: bigint | number;
   /** Its file's inode. */
   readonly fileIno: bigint | number;
+  /**
+   * The generation last written into the row, or null for a row written
+   * by a runtime before the `generation` column, which only the three
+   * facts judge.
+   */
+  readonly generation: string | null;
 }
 
 /**
- * Why a writing open mints: the store holds no identity yet, or the
- * host, the path or the file (device or inode) differs from the one
- * recorded.
+ * Why a writing open mints: the store holds no identity yet, the host,
+ * the path or the file (device or inode) differs from the one recorded,
+ * or the row holds a generation the side record does not.
  */
-export type MintReason = 'unminted' | 'host' | 'path' | 'file';
+export type MintReason = 'unminted' | 'host' | 'path' | 'file' | 'generation';
 
 /** What a store open does about its identity. */
 export type IdentityDecision =
@@ -227,13 +265,23 @@ export type IdentityDecision =
   /** A write that must mint a new origin and record `facts`. */
   | { readonly action: 'mint'; readonly reasons: readonly MintReason[]; readonly facts: StoreIdentityFacts };
 
-/** Each fact of `facts` that differs from `recorded`, in host, path, file order. */
+/**
+ * Whether the row's generation says this is another file than the one
+ * it was last written into: the row holds one, and the side record holds
+ * another or none. A row without one decides nothing.
+ */
+function staleGeneration(recorded: RecordedIdentity, facts: StoreIdentityFacts): boolean {
+  return recorded.generation !== null && recorded.generation !== facts.generation;
+}
+
+/** Each fact of `facts` that differs from `recorded`, in host, path, file, generation order. */
 function movedFacts(recorded: RecordedIdentity, facts: StoreIdentityFacts): MintReason[] {
   const sameFile = BigInt(recorded.fileDev) === facts.fileDev && BigInt(recorded.fileIno) === facts.fileIno;
   const moved: [MintReason, boolean][] = [
     ['host', recorded.hostId !== facts.hostId],
     ['path', recorded.storePath !== facts.storePath],
     ['file', !sameFile],
+    ['generation', staleGeneration(recorded, facts)],
   ];
   return moved.filter(([, differs]) => differs).map(([reason]) => reason);
 }
@@ -242,8 +290,9 @@ function movedFacts(recorded: RecordedIdentity, facts: StoreIdentityFacts): Mint
  * What an open with `access` does about the store's identity, given the
  * identity it `recorded` (null when it holds none). A read answers
  * `none` without calling `observe`. A write observes the store once and
- * mints when nothing is recorded or any of the three facts moved, and
- * keeps the recorded origin otherwise.
+ * mints when nothing is recorded, any of the three facts moved, or the
+ * row holds a generation the side record does not; it keeps the
+ * recorded origin otherwise.
  */
 export function decideStoreIdentity(
   access: StoreAccess,

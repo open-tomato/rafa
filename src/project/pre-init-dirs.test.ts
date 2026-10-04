@@ -5,7 +5,7 @@
  * finding prints.
  *
  * Every case plants its own config values — `.plans` and `.specs` appear
- * here on purpose, which is the exemption `src/tests/default-plan-dirs.test.ts`
+ * here on purpose, which is the exemption `src/tests/default-plan-dirs.sweep.test.ts`
  * carves out for `*.test.ts` files. Nothing is read from disk and no
  * project config is loaded: the check is a function of two strings, and
  * each case hands it the two it means.

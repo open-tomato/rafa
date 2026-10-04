@@ -58,7 +58,7 @@ const TRACKER = [
 ].join('\n');
 
 const BASELINE: SuiteBaseline = baselineOf(
-  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read' },
+  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read', unhandled: [] },
   new Date('2026-10-01T00:00:00Z'),
   BASE,
 );
@@ -155,7 +155,7 @@ function stepsWith(
     checkout: dir,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [] },
+    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [] },
     planContent: TRACKER,
     gh: () => Promise.reject(new Error('gh is not read by these cases')),
     calls,
@@ -200,6 +200,28 @@ describe('beforeSession', () => {
     expect(goesOn).toBe(true);
     expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
     expect(seen.baselines).toEqual([BASELINE]);
+  });
+
+  it('runs no stage step before a blocked task, and runs the due one before the open task after it', async () => {
+    // A due stage step, red if it ran: before the blocked repair it must not.
+    const { calls, seen } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage', true, 9)]) });
+    const steps = stepsWith(calls);
+    const blocked: TaskInfo = { task: 'repair the suite', lineNum: 8, status: 'blocked', blocker: 'New failing test files.' };
+
+    expect(await steps.beforeSession(blocked)).toBe(true);
+    expect(seen.names).toEqual(['ensureBaseline']);
+    expect(linesAt('error')).toEqual([]);
+
+    expect(await steps.beforeSession(taskAt('third task', 9))).toBe(false);
+    expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
+  });
+
+  it('runs an open task\'s due stage steps before its session', async () => {
+    // The control for the case above: the same due step, an open task.
+    const { calls, seen } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage')]) });
+
+    expect(await stepsWith(calls).beforeSession(taskAt('second task', 8))).toBe(true);
+    expect(seen.names).toEqual(['ensureBaseline', 'runDueStageSteps']);
   });
 
   it('runs the pre-wrap-up step before the wrap-up, and no stage step', async () => {
@@ -364,6 +386,7 @@ function suiteResult(failures: SuiteResult['failures'] = []): SuiteResult {
     failures,
     errors: 0,
     junit: 'read',
+    unhandled: [],
   };
 }
 

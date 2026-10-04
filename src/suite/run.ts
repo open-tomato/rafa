@@ -65,6 +65,17 @@
  * by `failures` alone. A file holding no test gets no `<testsuite>`
  * either, so the absence of a file is no reading of anything.
  *
+ * Stderr is the one place that names such an error, so a result also
+ * carries {@link SuiteResult.unhandled}: each block's file and the
+ * error's first line, read by `parseUnhandled` (`./unhandled.ts`). And
+ * the run writes `unhandledText` of its stderr, the blocks and the
+ * summary lines only, capped, beside the JUnit file as
+ * `<name>.output.txt` ({@link outputFileFor}); a step's text is
+ * `.rafa/runs/<session>/suite/<kind>.output.txt`. It is removed before
+ * the spawn, as the JUnit file is, and written after every run, empty
+ * when stderr held neither a block nor a summary, so the file on disk is
+ * always this run's.
+ *
  * ## How a test is named
  *
  * A `<testsuite>` directly under `<testsuites>` is a test file; each one
@@ -97,10 +108,13 @@
  * other JUnit writers. A repeated pair keeps the message of the testcase
  * the JUnit file names first.
  */
+import type { UnhandledError } from './unhandled.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, isAbsolute, join } from 'node:path';
+
+import { parseUnhandled, unhandledText } from './unhandled.js';
 
 /** The variable removed from the environment `bun test` runs in. */
 export const CLAUDE_CODE_ENV = 'CLAUDECODE';
@@ -141,6 +155,12 @@ export interface SuiteResult {
   readonly errors: number | null;
   readonly junit: JunitReading;
   /**
+   * Each `# Unhandled error between tests` block of stderr, with the file
+   * it names and the error's first line, in the order Bun printed them;
+   * none when stderr held no block. See the module note.
+   */
+  readonly unhandled: readonly UnhandledError[];
+  /**
    * True when Bun found no test file to run at all (a project with none,
    * which it reports as an error and exit code 1); absent otherwise.
    */
@@ -179,7 +199,10 @@ export interface SuiteRunOptions {
    * selection is made.
    */
   readonly changedSince?: string;
-  /** Where Bun writes its JUnit report; its directory is created. */
+  /**
+   * Where Bun writes its JUnit report; its directory is created, and the
+   * capped stderr text is written beside it ({@link outputFileFor}).
+   */
   readonly junitFile: string;
   /** The environment to start from; `process.env` when left out. */
   readonly env?: Readonly<SpawnEnv>;
@@ -222,6 +245,25 @@ export function suiteCommand(junitFile: string, paths?: readonly string[], chang
     ? []
     : [`--changed=${changedSince}`];
   return ['bun', 'test', ...changedArgs, ...pathArgs, '--reporter=junit', `--reporter-outfile=${junitFile}`];
+}
+
+/** The suffix a JUnit file name ends in, which {@link outputFileFor} replaces. */
+const JUNIT_SUFFIX = '.junit.xml';
+
+/** The suffix of the capped stderr text written beside a JUnit file. */
+export const OUTPUT_SUFFIX = '.output.txt';
+
+/**
+ * Where the capped stderr text of the run reporting to `junitFile` goes:
+ * beside it, `<name>.output.txt` for `<name>.junit.xml`, or for any other
+ * name the name without its extension and with that suffix.
+ */
+export function outputFileFor(junitFile: string): string {
+  const name = basename(junitFile);
+  const stem = name.endsWith(JUNIT_SUFFIX)
+    ? name.slice(0, -JUNIT_SUFFIX.length)
+    : name.slice(0, name.length - extname(name).length);
+  return join(dirname(junitFile), `${stem}${OUTPUT_SUFFIX}`);
 }
 
 /** `base` without `CLAUDECODE`, as a new object. */
@@ -269,7 +311,7 @@ function unescapeXml(value: string): string {
 }
 
 /** The attributes of one tag, their values unescaped. */
-function attributesOf(text: string): Readonly<Record<string, string>> {
+export function attributesOf(text: string): Readonly<Record<string, string>> {
   const found: Record<string, string> = {};
   for (const match of text.matchAll(/([\w:-]+)="([^"]*)"/g)) {
     found[match[1] ?? ''] = unescapeXml(match[2] ?? '');
@@ -404,14 +446,18 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
     throw new RangeError('runSuite: an empty path list would run the whole project; leave paths out for that');
   }
   const command = suiteCommand(options.junitFile, options.paths, options.changedSince);
+  const outputFile = outputFileFor(options.junitFile);
   mkdirSync(dirname(options.junitFile), { recursive: true });
   rmSync(options.junitFile, { force: true });
+  rmSync(outputFile, { force: true });
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
   const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
+  writeFileSync(outputFile, unhandledText(stderr));
   const { summary, errors } = readSummary(stderr);
   const { junit, failures } = readJunit(options.junitFile);
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit };
+  const unhandled = parseUnhandled(stderr);
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

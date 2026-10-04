@@ -8,7 +8,7 @@
  * The directory cases plant a project of their own and read `plan.dir`
  * back off it: one whose config sets none, which is the `.rafa/plans`
  * default, and one whose config names `docs/plans` on purpose, which is
- * the exemption `default-plan-dirs.test.ts` carves out for a test. The
+ * the exemption `default-plan-dirs.sweep.test.ts` carves out for a test. The
  * refusal case plants a config the loader cannot use at all.
  */
 import type { ProjectFound } from '../../project/scope.js';

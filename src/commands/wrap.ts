@@ -5,7 +5,7 @@
  *
  * ## What a wrapper hands over
  *
- * The phase 0 commands (`src/plan.ts`, `src/start.ts`, `src/usage.ts`,
+ * The phase 0 commands (`src/plan.ts`, `src/start.ts`,
  * `src/effort/collect.ts` and `src/effort/report.ts`) read their own
  * command lines. A wrapper hands the function it runs the context's
  * `argv`, the words after the routing words as they were typed, copied
@@ -26,8 +26,8 @@
  * The function is also handed, after the words, the root of the project
  * the dispatcher resolved for the command (`RafaContext.project`): the
  * directory `start`, `plan`, `effort collect` and `effort report` act
- * on, in place of the git root of the working directory each took before,
- * and which `usage` ignores. A wrapped command runs inside a project, so
+ * on, in place of the git root of the working directory each took before.
+ * A wrapped command runs inside a project, so
  * its declaration leaves `needsProject` unset. Run with a context holding
  * no project, it rejects before the function is called.
  *

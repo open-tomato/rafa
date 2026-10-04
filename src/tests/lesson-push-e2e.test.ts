@@ -104,7 +104,7 @@ function plant(): { repo: string; env: Record<string, string> } {
   for (const name of ['claude', 'gh']) {
     if (Bun.which(name, { PATH: path }) !== join(bin, name)) throw new Error(`${name} is not the stand-in`);
   }
-  return { repo, env: { PATH: path, ...scratchHomeEnv(home) } };
+  return { repo, env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(home) } };
 }
 
 describe('a finding with a resolution, through rafa start', () => {
