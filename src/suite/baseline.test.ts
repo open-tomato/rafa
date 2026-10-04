@@ -21,7 +21,8 @@ import {
   writeBaseline,
 } from './baseline.js';
 
-const RESULT: SuiteResult = {
+/** {@link RESULT} as a baseline holds it: without its `unhandled` list. */
+const STORED: Omit<SuiteResult, 'unhandled'> = {
   command: ['bun', 'test', '--reporter=junit', '--reporter-outfile=/tmp/x.xml'],
   exitCode: 1,
   summary: 'Ran 3 tests across 2 files. [12.00ms]',
@@ -32,6 +33,8 @@ const RESULT: SuiteResult = {
   errors: 0,
   junit: 'read',
 };
+
+const RESULT: SuiteResult = { ...STORED, unhandled: [{ file: 'c.test.ts', firstLine: 'error: boom' }] };
 
 const RECORDED_AT = new Date('2026-09-30T10:00:00.000Z');
 
@@ -69,11 +72,12 @@ describe('baselineOf', () => {
     const baseline = baselineOf(RESULT, RECORDED_AT, 'abc123');
 
     expect(baseline).toEqual({
-      ...RESULT,
+      ...STORED,
       version: BASELINE_VERSION,
       recordedAt: '2026-09-30T10:00:00.000Z',
       commit: 'abc123',
     });
+    expect('unhandled' in baseline).toBe(false);
     expect(baseline.failures).not.toBe(RESULT.failures);
     expect(baseline.failures[0]).not.toBe(RESULT.failures[0]);
     // A failure without a message gains no `message` key, not even an undefined one.

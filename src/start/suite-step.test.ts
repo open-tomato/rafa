@@ -100,6 +100,7 @@ function result(overrides: Partial<SuiteResult> = {}): SuiteResult {
     failures: [],
     errors: 0,
     junit: 'read',
+    unhandled: [],
     ...overrides,
   };
 }
