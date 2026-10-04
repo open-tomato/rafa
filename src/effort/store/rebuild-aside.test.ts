@@ -431,6 +431,33 @@ describe('swapIn failure points', () => {
     }
   });
 
+  // Fails until the carry rotates the generation: today the carry writes the generation the live record holds, so
+  // the live store keeps its id after an interrupted rename.
+  it.failing('mints on the first write after an interrupted rename, keeps that id on the second, and leaves the side record on a generation the live row lacks', () => {
+    const { path, parallelPath, backupPath } = casePaths();
+    const seams = identitySeams('interrupted', 'host-a');
+    const minted = writeOnce(path, seams, true);
+    vacuumInto(path, parallelPath);
+    const interruptedRename = (): never => {
+      throw new Error('planted failure');
+    };
+
+    const thrown = thrownBy(() => swapIn(path, parallelPath, backupPath, {
+      carry: (live, aside) => carryStoreIdentity(live, aside, seams),
+      rename: interruptedRename,
+    }));
+    const rowGeneration = requiredMeta(path).generation;
+    const recordGeneration = readStoreGeneration(path);
+    const first = writeOnce(path, seams);
+    const second = writeOnce(path, seams);
+
+    expect((thrown as SwapFailure).step).toBe('rename');
+    expect(recordGeneration).not.toBeNull();
+    expect(recordGeneration).not.toBe(rowGeneration);
+    expect(first.storeId).not.toBe(minted.storeId);
+    expect(second.storeId).toBe(first.storeId);
+  });
+
   it('fails at the backup for real when its directory is missing, the store untouched and the built file kept', () => {
     const { dir, path, parallelPath } = casePaths();
     plantFile(path, 2);
