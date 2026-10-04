@@ -7,10 +7,9 @@
  * case reads this machine's.
  *
  * Whether a freed inode number goes to the next file is the
- * filesystem's choice, so {@link INODE_NUMBER_REPEATS} is probed when
- * this file loads, and the case that depends on it is titled by the
- * answer and runs either way. On 2026-10-03 the tmpfs `tmpdir()` of the
- * Linux host this was written on gave a new number every time.
+ * filesystem's choice, so the inode-reuse case takes the answer of its
+ * own `replaceWithCopy` to compute the `reasons` it expects, and asserts
+ * the mint either way.
  */
 import type { RecordedIdentity, StoreIdentityFacts } from './store-identity.js';
 import type { StoreIdentitySeams } from './store-meta.js';
@@ -75,19 +74,6 @@ function replaceWithCopy(path: string, source: string): boolean {
   return inodeOf(path) === before;
 }
 
-/**
- * Whether this host's `tmpdir()` hands a deleted file's inode number to
- * a copy made at its path, probed once when this file loads with the
- * steps the inode-reuse case takes.
- */
-function probeInodeNumberRepeats(): boolean {
-  const path = join(fresh('inode-probe'), 'effort.sqlite');
-  writeFileSync(path, 'probe bytes', 'utf8');
-  const copy = `${path}.copy`;
-  copyFileSync(path, copy);
-  return replaceWithCopy(path, copy);
-}
-
 /** The `store_meta` row of the store at `path`, read on a connection of its own. */
 function recordedRowOf(path: string): RecordedIdentity | null {
   const db = new Database(path, { readonly: true });
@@ -97,9 +83,6 @@ function recordedRowOf(path: string): RecordedIdentity | null {
     db.close();
   }
 }
-
-/** {@link probeInodeNumberRepeats}'s answer. */
-const INODE_NUMBER_REPEATS = probeInodeNumberRepeats();
 
 /** A store file with some bytes in it, in a fresh directory. */
 function plantStore(name: string): string {
@@ -292,11 +275,7 @@ describe('decideStoreIdentity', () => {
     expect(decideStoreIdentity('write', minted, () => facts)).toEqual({ action: 'mint', reasons: ['host'], facts });
   });
 
-  it.each([
-    [INODE_NUMBER_REPEATS
-      ? 'repeated'
-      : 'did not repeat', INODE_NUMBER_REPEATS],
-  ] as const)('mints on a write to a store deleted and replaced by a copy of its state before the last write, whose inode number %s', (_title, repeats) => {
+  it('mints on a write to a store deleted and replaced by a copy of its state before the last write, whether or not the inode number repeated', () => {
     const path = join(fresh('inode-reuse'), 'effort.sqlite');
     const seams: StoreIdentitySeams = {
       readHostId: () => 'host-a',
@@ -311,12 +290,11 @@ describe('decideStoreIdentity', () => {
     const row = recordedRowOf(path);
     const facts = observeStore(path, () => 'host-a');
 
-    expect(repeated).toBe(repeats);
     expect(row?.generation).not.toBeNull();
     expect(facts.generation).not.toBe(row?.generation);
     expect(decideStoreIdentity('write', row, () => facts)).toEqual({
       action: 'mint',
-      reasons: repeats
+      reasons: repeated
         ? ['generation']
         : ['file', 'generation'],
       facts,
