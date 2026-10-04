@@ -20,6 +20,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bringForward } from './bring-forward.js';
 import { vacuumInto } from './copy.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
+import { swapIn } from './rebuild-aside.js';
 import { withSqliteStore } from './sqlite.js';
 import { readStoreGeneration, storeGenerationPath, writeStoreGeneration } from './store-generation.js';
 import {
@@ -571,6 +572,24 @@ describe('carryStoreIdentity', () => {
 
     expect(meta.storeId).toBe('host-a-store-1');
     expect(settleWrite(path, seams)).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons });
+  });
+
+  it('mints on the first write after the backup of a swap is renamed back with no write between, with the reasons the inode numbers give', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('carry-backup-renamed-back', seams);
+    const parallel = parallelOf(path);
+    const backup = `${path}.bak`;
+    swapIn(path, parallel, backup);
+    renameSync(backup, path);
+    const reasons = statSync(path, { bigint: true }).ino === meta.fileIno
+      ? []
+      : ['file'];
+
+    const outcome = settleWrite(path, seams);
+
+    expect(meta.storeId).toBe('host-a-store-1');
+    expect(outcome).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons });
+    expect(metaOf(path)?.storeId).toBe('host-a-store-2');
   });
 
   it('writes nothing when the live row names another inode, and the swapped-in file mints', () => {
