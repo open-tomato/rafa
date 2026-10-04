@@ -278,7 +278,7 @@ describe('a store that is not the one its origin was minted for mints on its nex
     expect(kept).toEqual({ ...before, generation: kept?.generation });
   });
 
-  it.failing('mints a new origin on a renamed-back backup that was rebuilt before any write, with the reuse shape planted', () => {
+  it('mints a new origin on a renamed-back backup that was rebuilt before any write, with the reuse shape planted', () => {
     const testCase = freshCase();
     mintedWithFinding(testCase);
     plantOther(testCase, OTHER_ORIGIN, ['b1']);
