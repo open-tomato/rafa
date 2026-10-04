@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { parsePlan } from '../plan/parse.js';
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -280,7 +281,7 @@ describe('runTaskStep', () => {
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
   });
 
-  it('blocks the next open task on a new failure, naming its file, after the step is recorded', async () => {
+  it('inserts a blocked repair task on a new failure, naming its file, after the step is recorded', async () => {
     const { context, seen } = contextWith([red([KNOWN, FRESH, FRESH_TWO])]);
     const outcome = await runTaskStep(context, input);
 
@@ -291,7 +292,7 @@ describe('runTaskStep', () => {
     expect(seen.trackerAtAppend[0]).toBe(TRACKER);
     const next = findNextTask(readFileSync(trackerPath, 'utf8'));
     expect(next?.status).toBe('blocked');
-    expect(next?.task).toBe('third task');
+    expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(next?.blocker).toContain('src/new.test.ts (2 tests)');
     expect(next?.blocker).toContain('bun test src/new.test.ts');
@@ -366,14 +367,76 @@ describe('runTaskStep', () => {
     expect(seen.steps[0]?.newFailures).toEqual([KNOWN]);
   });
 
-  it('writes nothing on a red step when no open task is left, and still answers the text', async () => {
+  it('inserts its repair task after the checklist\'s last task when no open task is left', async () => {
     const done = TRACKER.replaceAll('- [ ]', '- [x]');
     writeFileSync(trackerPath, done, 'utf8');
     const { context } = contextWith([red([FRESH])]);
     const outcome = await runTaskStep(context, input);
-    expect(outcome).toMatchObject({ red: true, blockedLine: null });
+    expect(outcome).toMatchObject({ red: true, blockedLine: 11 });
     expect(outcome.blocker).toContain('src/new.test.ts');
-    expect(readFileSync(trackerPath, 'utf8')).toBe(done);
+    const after = readFileSync(trackerPath, 'utf8').split('\n');
+    expect(after[11]?.startsWith(`- [BLOCKED] Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}  `)).toBe(true);
+    expect([...after.slice(0, 11), ...after.slice(12)].join('\n')).toBe(done);
+  });
+});
+
+describe('a red step\'s repair task', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const stage = { stage: 0, name: 'One' };
+
+  /** The task lines of `text` that are repair tasks; a blocker quoting one is no line of its own. */
+  function repairLines(text: string): readonly string[] {
+    return text.split('\n').filter((line) => /^- \[(?: |x|BLOCKED)\] Repair the red /.test(line));
+  }
+
+  /** The tracker's lines with line `at` taken out. */
+  function without(text: string, at: number): string {
+    const all = text.split('\n');
+    return [...all.slice(0, at), ...all.slice(at + 1)].join('\n');
+  }
+
+  it('is inserted above the first open task by a red task step, naming the commit, declared for the repair agent', async () => {
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.blockedLine).toBe(9);
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(without(after, 9)).toBe(TRACKER);
+    const next = findNextTask(after);
+    expect(next).toMatchObject({ lineNum: 9, status: 'blocked', task: `Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}` });
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    expect(parsePlan(after).tasks.find((task) => task.lineNum === 9)).toMatchObject({ stage: 1, declaration: { agent: 'build-error-resolver' } });
+  });
+
+  it('is inserted above the first open task by a red stage step, which leaves that task untouched', async () => {
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runStageStep(context, stage, baselineWith());
+
+    expect(outcome).toMatchObject({ red: true, blockedLine: 9 });
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(after.split('\n')[10]).toBe('- [ ] third task');
+    expect(without(after, 9)).toBe(TRACKER);
+    expect(repairLines(after)).toHaveLength(1);
+    const next = findNextTask(after);
+    expect(next?.task).toBe(`Repair the red stage step at commit ${HEAD}  {agent=build-error-resolver}`);
+    expect(next?.blocker).toContain('stage step for "One"');
+  });
+
+  it('takes the blocker of its own red task step on its line, inserting no second line', async () => {
+    const repair = 'Repair the red task step at commit base0000';
+    const ticked = TRACKER.replace('- [ ] third task', `- [x] ${repair}  {agent=build-error-resolver}\n- [ ] third task`);
+    writeFileSync(trackerPath, ticked, 'utf8');
+    const { context } = contextWith([red([FRESH])]);
+    const outcome = await runTaskStep(context, { ...input, task: repair });
+
+    expect(outcome).toMatchObject({ red: true, blockedLine: 9 });
+    const after = readFileSync(trackerPath, 'utf8');
+    expect(after.split('\n')).toHaveLength(ticked.split('\n').length);
+    expect(repairLines(after)).toHaveLength(1);
+    expect(after.split('\n')[10]).toBe('- [ ] third task');
+    const next = findNextTask(after);
+    expect(next).toMatchObject({ lineNum: 9, status: 'blocked', task: `${repair}  {agent=build-error-resolver}` });
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
   });
 });
 
@@ -400,7 +463,7 @@ describe('runTaskStep with tests.alwaysRun', () => {
     expect(outcome).toMatchObject({ red: false, blocker: null });
   });
 
-  it('blocks the next open task on a failure only the always-run run found, naming the sweep', async () => {
+  it('inserts a blocked repair task on a failure only the always-run run found, naming the sweep', async () => {
     const { context, seen } = contextWith([result(), red([swept])], { alwaysRun: glob, git: gitAt({ [BASE]: ['src/a.ts'] }, [], tracked) });
     const outcome = await runTaskStep(context, input);
 
@@ -580,7 +643,7 @@ describe('runTaskStep linting the task\'s diff', () => {
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
   });
 
-  it('is red on a red lint under green tests, blocking the next open task with the lint\'s text', async () => {
+  it('is red on a red lint under green tests, inserting a repair task blocked on the lint\'s text', async () => {
     const { context, seen } = contextWith([result()], { seams: linting(lintRed) });
     const outcome = await runTaskStep(context, input);
     expect(outcome).toMatchObject({ red: true, interrupted: false, blockedLine: 9 });
@@ -595,7 +658,7 @@ describe('runTaskStep linting the task\'s diff', () => {
     const { context } = contextWith([red([FRESH])], { seams: linting(lintRed) });
     const outcome = await runTaskStep(context, input);
     const next = findNextTask(readFileSync(trackerPath, 'utf8'));
-    expect(next?.task).toBe('third task');
+    expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toBe(outcome.blocker ?? '');
     expect(outcome.blocker?.startsWith('The runner\'s task step after "second task" found failures')).toBe(true);
     expect(outcome.blocker).toContain('bun test src/new.test.ts');
@@ -688,7 +751,7 @@ describe('runStageStep', () => {
     expect(readStageLedger(stageLedgerPathFor(trackerPath))).toHaveLength(1);
   });
 
-  it('blocks the next open task on a new failure and still enters the stage as taken', async () => {
+  it('inserts a blocked repair task on a new failure and still enters the stage as taken', async () => {
     const { context } = contextWith([red([FRESH])]);
     const outcome = await runStageStep(context, stage, baselineWith());
     expect(outcome.red).toBe(true);
@@ -801,7 +864,7 @@ describe('a step stopped by SIGINT', () => {
     expect(linesAt('info').some((line) => line.includes('interrupted by SIGINT'))).toBe(true);
   });
 
-  it('blocks the next task on the same run ended by exit 1, the control that the step could have blocked', async () => {
+  it('inserts a blocked repair task on the same run ended by exit 1, the control that the step could have written', async () => {
     const { context, seen } = contextWith([killed({ exitCode: 1 })]);
     const outcome = await runTaskStep(context, input);
 

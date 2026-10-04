@@ -17,17 +17,20 @@
  * that follows has no `Owns:` folders to narrow it (`stageStepScope`'s
  * `no-owns` answer), so it runs the WHOLE suite regardless of what
  * changed, catches `shared.test.ts` failing fresh against the baseline,
- * and is red. It writes its blocker on the next open task — the second
- * stage's only task — before that task is ever dispatched: the first
- * run's one assertion is that tracker line reading `[BLOCKED]`, naming
- * `shared.test.ts`, and the stand-in never called a second time.
+ * and is red. It inserts a `[BLOCKED]` repair task carrying its blocker
+ * above the next open task — the second stage's only task — which it
+ * leaves open and never dispatched (`./suite-blocker.ts`): the first
+ * run's assertions are that repair line, naming `shared.test.ts` and
+ * declared for `build-error-resolver`, the second task still `[ ]`, and
+ * the stand-in never called a second time.
  *
- * A second `loop start` over the same repository retries that task: the
- * stage's step is already in the ledger, so nothing runs before the
- * dispatch, and the task is handed the blocker text through
+ * A second `loop start` over the same repository dispatches the repair:
+ * the stage's step is already in the ledger, so nothing runs before the
+ * dispatch, and the repair is handed the blocker text through
  * `BLOCKER_PROMPT_PREFIX` (`./dispatch.ts`). The second run's assertion
  * reads the stand-in's second captured prompt for that same text and
- * file name, proving the retry actually carries what blocked it.
+ * file name, and its arguments for the repair's agent, proving the
+ * repair actually carries what blocked it.
  */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -71,7 +74,7 @@ const TRACKER_NAME = `PLAN_TRACKER-${STUB}.md`;
 /** The first stage's only task: breaks `shared.test.ts` outside its own `--changed` selection. */
 const TASK1 = 'Flip the shared flag, outside this task\'s own diff selection';
 
-/** The second stage's only task: never dispatched until the stage step's blocker is resolved. */
+/** The second stage's only task: never dispatched until the stage step's repair is done. */
 const TASK2 = 'Read the shared flag back, after the flip';
 
 /** The plan: one task per stage, so the first task's commit is its stage's last. */
@@ -284,15 +287,15 @@ function promptOf(scratch: Scratch, n: number): string {
   return readFileSync(join(scratch.calls, `${n}.prompt`), 'utf8');
 }
 
-describe('a stage step blocking the task after the one that broke a file outside its --changed selection', () => {
-  it('blocks the next task naming the file, and hands the retry its prompt', async () => {
+describe('a stage step after a task that broke a file outside its --changed selection', () => {
+  it('inserts a repair task naming the file above the next task, and hands the repair its prompt', async () => {
     const scratch = plant();
 
     // Run 1: the first task flips the flag, its own task step stays
     // green, and the stage step that follows — the stage's only task is
     // also its last — runs the whole suite, catches `shared.test.ts`
-    // fresh against the baseline, and blocks the second task before it
-    // is ever dispatched.
+    // fresh against the baseline, and inserts a blocked repair task
+    // above the second task, which is never dispatched.
     const run1 = runLoopStart(scratch);
     expect(run1.exitCode).toBe(0);
     expect(callCount(scratch)).toBe(1);
@@ -301,9 +304,11 @@ describe('a stage step blocking the task after the one that broke a file outside
     const trackerAfterRun1 = readFileSync(trackerPath, 'utf8');
     expect(trackerAfterRun1).toContain(`- [x] ${TASK1}`);
 
+    expect(trackerAfterRun1).toContain(`- [ ] ${TASK2}`);
+
     const blockedTask = findNextTask(trackerAfterRun1);
     expect(blockedTask?.status).toBe('blocked');
-    expect(blockedTask?.task).toBe(TASK2);
+    expect(blockedTask?.task).toMatch(/^Repair the red stage step at commit [0-9a-f]{12} {2}\{agent=build-error-resolver\}$/);
     expect(blockedTask?.blocker).toContain(TEST_FILE);
     expect(blockedTask?.blocker).toContain('stage step');
 
@@ -312,8 +317,8 @@ describe('a stage step blocking the task after the one that broke a file outside
     expect(promptOf(scratch, 1)).not.toContain(BLOCKER_PROMPT_PREFIX);
 
     // Run 2: the stage's step is already in the ledger, so nothing runs
-    // ahead of the retry, and the second task is dispatched straight
-    // away, handed the blocker text the stage step wrote.
+    // ahead of the repair, which is dispatched straight away under its
+    // declared agent, handed the blocker text the stage step wrote.
     const run2 = runLoopStart(scratch);
     expect(run2.exitCode).toBe(0);
     expect(callCount(scratch)).toBe(2);
@@ -322,5 +327,6 @@ describe('a stage step blocking the task after the one that broke a file outside
     expect(retryPrompt).toContain(BLOCKER_PROMPT_PREFIX);
     expect(retryPrompt).toContain(TEST_FILE);
     expect(retryPrompt).toContain(blockedTask?.blocker ?? '');
+    expect(readFileSync(join(scratch.calls, '2.args'), 'utf8')).toContain('--agent\nbuild-error-resolver\n');
   }, CASE_TIMEOUT_MS);
 });

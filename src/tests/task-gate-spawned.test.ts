@@ -23,8 +23,9 @@
  *     lint, with every test green;
  *   - clean files leave the step green, lint included.
  *
- * With one task there is no next open task for a blocker, so what a red
- * step wrote reads from the run output and the run record's task step.
+ * With one task there is no open task to insert a repair above, so a red
+ * step's repair goes after it (`start/suite-blocker.ts`); what the step
+ * wrote reads from the run output and the run record's task step.
  */
 import type { Scratch } from './loop-scratch.js';
 

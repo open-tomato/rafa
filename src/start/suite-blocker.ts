@@ -1,20 +1,39 @@
 /**
  * What a red suite step writes on the tracker (`suite-step.ts`): the
- * blocker text and the write itself.
+ * blocker text, and the repair task that carries it.
  *
  * {@link blockerText} names each new failing test file with its count,
  * the command running them (`bun test <files>`), and the errors or the
- * missing summary when those made the step red. {@link blockNextOpenTask}
- * writes that text on the next open task, the line `findNextTask`
- * answers after the commit (`utils/tracker.ts`), through
- * `writeTrackerBlocker`, which marks it `[BLOCKED]`; with no open task
- * left it writes nothing and answers null.
+ * missing summary when those made the step red.
+ *
+ * {@link writeRepairTask} puts that text on a repair task. A red task or
+ * stage step inserts one through `insertTrackerTask` (`utils/tracker.ts`)
+ * directly above the first open plan task, in document order, `[ ]` or
+ * `[BLOCKED]`, so it sits under that task's stage heading and the task
+ * itself is left as it was. Its line reads
+ * `- [BLOCKED] Repair the red <kind> step at commit <sha>  {agent=build-error-resolver}`
+ * with the blocker as its comment: the text names the commit the step
+ * ran at (twelve characters of it, or `(unread)` when git did not answer
+ * HEAD), and {@link REPAIR_AGENT} is the declared agent. Being blocked,
+ * it is the line `findNextTask` answers first, so the next run dispatches
+ * the repair before anything else, handed the blocker. With no open task
+ * left the line goes after the checklist's last task.
+ *
+ * A red task step that follows a repair task, its task text one
+ * {@link isRepairTask} reads, writes its blocker on that repair's own line
+ * instead and inserts nothing: the line, ticked by the repair's commit,
+ * is opened and marked `[BLOCKED]` again through `writeTrackerBlocker`,
+ * its text and the commit it names kept. So a repair that leaves the
+ * suite red is retried on its own line, and the tracker never holds two
+ * repairs for one red step. Should no line carry that text, a repair is
+ * inserted as for any task.
  */
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
-import { findNextTask, writeTrackerBlocker } from '../utils/tracker.js';
+import { parsePlan } from '../plan/parse.js';
+import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 
 /** A step's failures split against the baseline, and what else can make it red. */
 export interface StepVerdict {
@@ -53,11 +72,84 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode'>
   return parts.join(' ');
 }
 
-/** Writes `text` on the next open task, answering its line, or null when none is left. */
-export function blockNextOpenTask(trackerPath: string, text: string): number | null {
-  const next = findNextTask(readFileSync(trackerPath, 'utf8'));
-  if (next === null) return null;
-  return writeTrackerBlocker(trackerPath, next.lineNum, text)
-    ? next.lineNum
+/** The agent a repair task is declared for. */
+export const REPAIR_AGENT = 'build-error-resolver';
+
+/** How a repair task's text opens; see the module note. */
+const REPAIR_TASK = /^Repair the red (?:task|stage) step at commit \S+$/;
+
+/** How many characters of the commit a repair task's text names. */
+const COMMIT_SHOWN = 12;
+
+/** A ticked task line's checkbox. */
+const TICKED_PREFIX = '- [x] ';
+
+/** The steps that write a repair task. */
+export type RepairStepKind = 'task' | 'stage';
+
+/** Where {@link writeRepairTask} puts a red step's blocker. */
+export interface RepairSite {
+  readonly kind: RepairStepKind;
+  /** HEAD when the step ran, or null when git did not answer. */
+  readonly commit: string | null;
+  /** The task step's task text, its declaration taken off; absent for a stage step. */
+  readonly task?: string;
+}
+
+/** What {@link writeRepairTask} wrote. */
+export interface RepairWritten {
+  /** The repair task's line, counting from zero. */
+  readonly line: number;
+  /** True when the line was inserted, false when an existing repair was blocked again. */
+  readonly inserted: boolean;
+}
+
+/** The text of the repair task a red `kind` step at `commit` inserts. */
+export function repairTaskText(kind: RepairStepKind, commit: string | null): string {
+  const shown = commit === null
+    ? '(unread)'
+    : commit.slice(0, COMMIT_SHOWN);
+  return `Repair the red ${kind} step at commit ${shown}`;
+}
+
+/** True when `text`, a task's sentence without its declaration, is a repair task's. */
+export function isRepairTask(text: string): boolean {
+  return REPAIR_TASK.test(text.trim());
+}
+
+/** The line of the last task whose sentence is `text`, or null. */
+function lineOfTask(content: string, text: string): number | null {
+  const found = parsePlan(content).tasks.filter((task) => task.text === text.trim());
+  return found.at(-1)?.lineNum ?? null;
+}
+
+/** Writes `blocker` on the repair task at `line`, opening it first when ticked. */
+function blockRepairAgain(trackerPath: string, content: string, line: number, blocker: string): RepairWritten | null {
+  const lines = content.split('\n');
+  const current = lines[line] ?? '';
+  if (current.startsWith(TICKED_PREFIX)) {
+    const reopened = [...lines.slice(0, line), `- [ ] ${current.slice(TICKED_PREFIX.length)}`, ...lines.slice(line + 1)];
+    writeFileSync(trackerPath, reopened.join('\n'), 'utf8');
+  }
+  return writeTrackerBlocker(trackerPath, line, blocker)
+    ? { line, inserted: false }
     : null;
+}
+
+/**
+ * Writes `blocker` on a repair task: the repair `site.task` names when
+ * the step follows one, else one inserted above the first open plan task.
+ * Answers the line written, or null when an existing repair's line would
+ * not take it. See the module note.
+ */
+export function writeRepairTask(trackerPath: string, blocker: string, site: RepairSite): RepairWritten | null {
+  const content = readFileSync(trackerPath, 'utf8');
+  const repaired = site.task !== undefined && isRepairTask(site.task)
+    ? lineOfTask(content, site.task)
+    : null;
+  if (repaired !== null) return blockRepairAgain(trackerPath, content, repaired, blocker);
+
+  const firstOpen = parsePlan(content).tasks.find((task) => task.status !== 'done')?.lineNum ?? null;
+  const entry = { task: repairTaskText(site.kind, site.commit), declaration: `agent=${REPAIR_AGENT}`, blocker };
+  return { line: insertTrackerTask(trackerPath, entry, firstOpen), inserted: true };
 }

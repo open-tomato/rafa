@@ -36,7 +36,7 @@
  *
  * {@link foldResults} makes the two runs one `SuiteResult`, which the step
  * settles as it settles any run: one recorded step, one verdict, one
- * blocker on the next open task. The folded result holds both commands,
+ * blocker on its repair task. The folded result holds both commands,
  * joined by `;`, the failures of both with each test file and name pair
  * once (a changed sweep can run in both), the errors of both summed, and
  * both summary lines. Its exit code is the stop code when either run

@@ -22,12 +22,13 @@
  *     `affected` default for a line with none).
  *
  * Each answers true when the run goes on and false when it stops. A red
- * step has already written its blocker on the next open task, when one
- * is left (`suite-step.ts`), so the task that stop leaves `[BLOCKED]` is
- * retried first on the next run, handed the blocker text through
- * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`), exactly as a blocked
- * task's own is. A red pre-wrap-up step has no task to block: the run
- * stops before the wrap-up, and the next run takes that step again.
+ * task or stage step has already inserted a `[BLOCKED]` repair task
+ * carrying its blocker, or written it on the repair it followed
+ * (`suite-blocker.ts`), so that repair is dispatched first on the next
+ * run, handed the blocker text through `BLOCKER_PROMPT_PREFIX`
+ * (`start/dispatch.ts`), exactly as a blocked task's own is. A red
+ * pre-wrap-up step has no task to block: the run stops before the
+ * wrap-up, and the next run takes that step again.
  *
  * ## A step stopped by SIGINT
  *

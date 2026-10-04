@@ -59,8 +59,8 @@
  * with an error (a config that throws, exit 2), the blocker says the
  * exit code and the first line ESLint wrote to stderr instead. The task
  * step joins this text after its own, when both are red, and writes the
- * one blocker on the next open task; the run record holds the test run
- * alone.
+ * one blocker on its repair task (`suite-blocker.ts`); the run record
+ * holds the test run alone.
  *
  * A run that ends on the stop code, or while the runner has received
  * SIGINT, is {@link LintOutcome.interrupted}: never red, as an

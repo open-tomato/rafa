@@ -86,9 +86,16 @@ is identified by its test file path and full test name (the pair the
 JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
-means it is new. Only new failures block the next task. A stage-end step
-with new failures names them in the blocker text the retry session
-receives through `BLOCKER_PROMPT_PREFIX`.
+means it is new. Only new failures make a step red. A red task or stage
+step inserts a `[BLOCKED]` repair task above the first open plan task,
+which it leaves as it was: the repair's text names the commit the step
+ran at (`Repair the red task step at commit <sha>`), its declaration is
+`{agent=build-error-resolver}`, and its blocker names the new failures,
+which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
+no open task left, the repair goes after the checklist's last task. A
+red task step after a repair task writes its blocker on that repair's
+line, marking it `[BLOCKED]` again, and inserts no second one
+(`src/start/suite-blocker.ts`).
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
