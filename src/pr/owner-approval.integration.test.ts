@@ -164,7 +164,7 @@ function requestFor(world: ScratchWorld, pullRequest: number): OwnerApprovalRequ
 }
 
 describe('readOwnerApproval, unresolved, over a real 404 from gh api', () => {
-  it('answers unresolved for #21, whose owner @org/ghost is a team gh knows nothing of', RUN_TIMEOUT, async () => {
+  it('answers unresolved for #21, whose owner @org/ghost is a team gh knows nothing of', async () => {
     const world = plantWorld();
 
     const approval = await readOwnerApproval(requestFor(world, 21), seamsOf(world));
@@ -174,11 +174,11 @@ describe('readOwnerApproval, unresolved, over a real 404 from gh api', () => {
       expect(approval.reason).toContain('@org/ghost');
       expect(approval.reason).toContain('does not resolve');
     }
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('readOwnerApproval, unknown, over a real failed review read', () => {
-  it('answers unknown for #22, whose owner @org/flaky resolves but whose reviews cannot be read', RUN_TIMEOUT, async () => {
+  it('answers unknown for #22, whose owner @org/flaky resolves but whose reviews cannot be read', async () => {
     const world = plantWorld();
 
     const approval = await readOwnerApproval(requestFor(world, 22), seamsOf(world));
@@ -187,11 +187,11 @@ describe('readOwnerApproval, unknown, over a real failed review read', () => {
     if (approval.state === 'unknown') {
       expect(approval.reason).toContain('could not read the reviews of #22');
     }
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('readOwnerApproval, waiting, over a real comment-only review', () => {
-  it('answers waiting for #23, whose owner @alice only commented', RUN_TIMEOUT, async () => {
+  it('answers waiting for #23, whose owner @alice only commented', async () => {
     const world = plantWorld();
 
     const approval = await readOwnerApproval(requestFor(world, 23), seamsOf(world));
@@ -200,15 +200,15 @@ describe('readOwnerApproval, waiting, over a real comment-only review', () => {
     if (approval.state === 'waiting') {
       expect(approval.reason).toBe('owner @alice of board #40 has not approved #23');
     }
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('readOwnerApproval, approved, over a real active team membership', () => {
-  it('answers approved for #24, whose approver bob is an active member of @org/web', RUN_TIMEOUT, async () => {
+  it('answers approved for #24, whose approver bob is an active member of @org/web', async () => {
     const world = plantWorld();
 
     const approval = await readOwnerApproval(requestFor(world, 24), seamsOf(world));
 
     expect(approval).toEqual({ state: 'approved', owners: [{ handle: '@org/web', boards: [50], approvedBy: 'bob' }] });
-  });
+  }, RUN_TIMEOUT);
 });
