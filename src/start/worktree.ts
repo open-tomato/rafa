@@ -17,8 +17,8 @@
  *    that is behind or has diverged therefore does not matter here.
  *  - `switch-local` adds the worktree on the existing local branch, and
  *    `switch-remote` on a new local branch tracking `origin/feat/<stub>`.
- *    Neither fetches: a branch that already exists is never fetched over,
- *    the decision module's rule.
+ *    Neither fetches the branch: a branch that already exists is never
+ *    fetched over, the decision module's rule. Both then catch up (below).
  *
  * ## A worktree already there
  *
@@ -27,8 +27,8 @@
  * one left ({@link readExisting}):
  *
  *  - a worktree at `loop.worktreeDir/<stub>` holding `feat/<stub>` is
- *    reused as it stands: one line says so, nothing is fetched or added,
- *    and the outcome's route is `reuse` with no steps;
+ *    reused: one line says so, nothing is added, the outcome's route is
+ *    `reuse` with no steps, and it catches up (below);
  *  - that path holding another branch, or a detached HEAD, is refused,
  *    naming the path and what it holds;
  *  - `feat/<stub>` held by a checkout at any other path, the main one
@@ -38,6 +38,38 @@
  * lists them resolved (see below); a path that is gone is compared as
  * written. A listing git could not give reads as no worktree at all, and
  * the add then refuses as it did before this reading existed.
+ *
+ * ## Catching a claim branch up
+ *
+ * Every route that takes an existing branch (`switch-local`,
+ * `switch-remote` and `reuse`) catches it up before the first task
+ * ({@link catchUpExisting}), since a branch `rafa plan create` claimed
+ * days earlier was cut from a base that has moved since. It fetches
+ * `origin/<base>` — the base, never the branch — reads the branch with
+ * `./claim-catch-up.ts`, and answers the reading:
+ *
+ *  - `catch-up`, every commit past `origin/<base>` a claim: `git merge
+ *    --no-edit origin/<base>` in the run's worktree, a merge and never a
+ *    rewrite of a pushed branch, and one line naming the commits taken,
+ *    their count and the `<merge base>..<base tip>` range;
+ *  - `behind`, the branch holding any other commit: never merged, one
+ *    warning line saying how far behind it is, and the run goes on;
+ *  - `current`, at or ahead of `origin/<base>`: nothing printed;
+ *  - `unreadable`: one warning line naming why, and the run goes on.
+ *
+ * A failed fetch is a warning, and the branch is read against
+ * `origin/<base>` as it stood: before the catch-up existed these routes
+ * fetched nothing, and a run that could start offline still does. A
+ * failed merge is refused: `git merge --abort` runs in the worktree
+ * first, its answer unread, so a merge git left half done is not what
+ * the next start finds. Measured on git 2.53.0 under Linux with
+ * `LC_ALL=C` (2026-10-05): a merge an untracked file in the worktree
+ * would overwrite exited 1 with `error: The following untracked working
+ * tree files would be overwritten by merge:` and started nothing, and
+ * `git merge --abort` with no merge under way exited 128 with `fatal:
+ * There is no merge to abort (MERGE_HEAD missing).`, touching nothing.
+ * The outcome carries what was read as `catchUp`, on those three routes
+ * alone.
  *
  * Nothing here asks a question: the worktree is asked for by a flag, and
  * the flag is the answer. Git runs in the PROJECT ROOT (`./checkout.ts`),
@@ -86,6 +118,7 @@
  * was left alone, which the last reading above is the ground for.
  */
 import type { BranchPlan, BranchRoute } from './branch-decision.js';
+import type { ClaimCatchUpReading } from './claim-catch-up.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
 
 import { realpathSync } from 'node:fs';
@@ -96,6 +129,7 @@ import { CommandExit } from '../cli/command.js';
 import { createGitRunner, gitSaid, parseWorktrees } from '../pr/index.js';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';
+import { readClaimCatchUp } from './claim-catch-up.js';
 import { worktreeDirAt } from './worktree-dir.js';
 
 /** The indent a quoted git line carries, as `./branch.ts` indents its own. */
@@ -153,6 +187,16 @@ export interface WorktreeOutcome {
   readonly route: WorktreeRoute;
   /** The steps that ran, in order, all of them having succeeded; none on `reuse`. */
   readonly steps: readonly WorktreeStep[];
+  /** The catch-up of a route that takes an existing branch; absent on `create`. See the module note. */
+  readonly catchUp?: WorktreeCatchUp;
+}
+
+/** What the catch-up of an existing branch fetched and read; see the module note. */
+export interface WorktreeCatchUp {
+  /** Whether `git fetch origin <base>` succeeded; when it did not, the reading is against `origin/<base>` as it stood. */
+  readonly fetched: boolean;
+  /** What `./claim-catch-up.ts` read before any merge; a `catch-up` reading is one that was merged. */
+  readonly reading: ClaimCatchUpReading;
 }
 
 /** The directory the worktree for `stub` is added at. */
@@ -365,31 +409,118 @@ function reuseExisting(git: GitRunner, branch: string, path: string): WorktreeOu
   return Object.freeze({ branch, path, route: 'reuse', steps: Object.freeze([]) });
 }
 
+/** How many characters of a commit the catch-up line names, as this repository's own notes do. */
+const SHORT_SHA = 12;
+
+/** `count` commits, worded for a line. */
+function commitCount(count: number): string {
+  return count === 1
+    ? '1 commit'
+    : `${count} commits`;
+}
+
+/** The one line a merged catch-up prints: the commits taken, counted, and their range. */
+export function caughtUpLine(reading: Extract<ClaimCatchUpReading, { kind: 'catch-up' }>): string {
+  const range = `${reading.mergeBase.slice(0, SHORT_SHA)}..${reading.baseTip.slice(0, SHORT_SHA)}`;
+  return `${INDENT}Merged ${commitCount(reading.behind)} of ${REMOTE}/${reading.base} (${range}) `
+    + `into ${reading.branch}, which held only claim commits.`;
+}
+
+/** The one line a branch with work on it prints when it is behind: never merged. */
+export function behindLine(reading: Extract<ClaimCatchUpReading, { kind: 'behind' }>): string {
+  const work = reading.workCommits === 1
+    ? 'is not a claim'
+    : 'are not claims';
+  return `${INDENT}⚠️  ${reading.branch} is ${commitCount(reading.behind)} behind ${REMOTE}/${reading.base} `
+    + `and was not merged: ${reading.workCommits} of its ${commitCount(reading.ahead)} past it ${work}.`;
+}
+
+/** The refusal a failed catch-up merge answers, after `git merge --abort` ran. */
+export function mergeRefusal(
+  reading: Extract<ClaimCatchUpReading, { kind: 'catch-up' }>,
+  path: string,
+  result: GitResult,
+): string {
+  return [
+    `❌ Could not merge ${REMOTE}/${reading.base} into ${reading.branch} in ${path}.`,
+    ...quotedLines(gitSaid(result)),
+    `${INDENT}${reading.branch} holds only claim commits and is ${commitCount(reading.behind)} behind; `
+    + 'any merge git started there was aborted.',
+    `${INDENT}Clear what git names in that worktree, then run again.`,
+    UNTOUCHED,
+  ].join('\n');
+}
+
+/**
+ * Catches the existing `branch` up with `origin/<base>` before the first
+ * task: fetches the base, reads the branch through `git` (the project
+ * root), merges in `worktreeGit` (the run's worktree at `path`) when it
+ * holds only claim commits, and says what it found. See the module note.
+ */
+export function catchUpExisting(
+  git: GitRunner,
+  worktreeGit: () => GitRunner,
+  plan: BranchPlan,
+  path: string,
+): WorktreeCatchUp {
+  const fetch = git(['fetch', REMOTE, plan.base]);
+  if (!fetch.ok) {
+    activeOutput().warn([
+      `${INDENT}⚠️  Could not fetch ${REMOTE} ${plan.base}; reading ${plan.branch} against ${REMOTE}/${plan.base} as it stands.`,
+      ...quotedLines(gitSaid(fetch)),
+    ].join('\n'));
+  }
+  const reading = readClaimCatchUp(git, plan.branch, plan.base);
+  const caughtUp = Object.freeze({ fetched: fetch.ok, reading });
+  if (reading.kind === 'behind') activeOutput().warn(behindLine(reading));
+  if (reading.kind === 'unreadable') {
+    activeOutput().warn(`${INDENT}⚠️  Could not read whether ${plan.branch} can catch up: ${reading.reason}. It was left as it stands.`);
+  }
+  if (reading.kind !== 'catch-up') return caughtUp;
+
+  const inWorktree = worktreeGit();
+  const merged = inWorktree(['merge', '--no-edit', `${REMOTE}/${plan.base}`]);
+  if (!merged.ok) {
+    inWorktree(['merge', '--abort']);
+    throw new CommandExit(1, `\n${mergeRefusal(reading, path, merged)}`);
+  }
+  activeOutput().info(caughtUpLine(reading));
+  return caughtUp;
+}
+
 /**
  * Adds the worktree for the plan's branch: `feat/<stub>` created from
  * the freshly fetched `origin/<base>`, or the existing branch when git
  * already has it, checked out at `loop.worktreeDir/<stub>`. A worktree
  * an earlier start left there on that branch is reused instead. The main
- * checkout's branch and working tree are never touched.
+ * checkout's branch and working tree are never touched. A branch that
+ * already existed is caught up before the answer: merged with
+ * `origin/<base>` when it holds only claim commits, reported when it is
+ * behind with other work on it.
  *
  * Answers the worktree the run now has. A plan with no stub, a worktree
- * already there that cannot be reused, a failed fetch, and an add git
- * refused — a branch checked out elsewhere, named by that checkout's
- * path, above all — are each a `CommandExit` with exit code 1; see the
- * module note.
+ * already there that cannot be reused, a failed fetch on `create`, an
+ * add git refused — a branch checked out elsewhere, named by that
+ * checkout's path, above all — and a catch-up merge git refused are each
+ * a `CommandExit` with exit code 1; see the module note.
  */
 export function addRunWorktree(
   request: WorktreeRequest,
   seams: WorktreeSeams = DEFAULT_WORKTREE_SEAMS,
 ): WorktreeOutcome {
-  const git = (seams.git ?? createGitRunner)(request.projectRoot);
+  const gitIn = seams.git ?? createGitRunner;
+  const git = gitIn(request.projectRoot);
   const stub = request.planStub?.trim() ?? '';
   if (stub === '') {
     throw new CommandExit(1, '\n❌ Cannot add a worktree for a plan with no stub: its branch would be feat/ alone.');
   }
   const path = worktreePathFor(request.projectRoot, request.worktreeDir, stub);
+  const worktreeGit = (): GitRunner => gitIn(path);
   const reused = reuseExisting(git, branchNameFor(stub), path);
-  if (reused !== null) return reused;
+  if (reused !== null) {
+    const catchUp = catchUpExisting(git, worktreeGit, { branch: reused.branch, base: request.base }, path);
+    return Object.freeze({ ...reused, catchUp });
+  }
   const offer = readBranchOffer({
     planStub: stub,
     base: request.base,
@@ -415,6 +546,12 @@ export function addRunWorktree(
       : [];
     throw new CommandExit(1, `\n${stepRefusal(step, result, plan, listing)}`);
   }
+  const outcome = { branch: plan.branch, path, route: offer.route, steps };
+  if (offer.route === 'create') {
+    activeOutput().info(`${INDENT}The run is on ${plan.branch} in ${path}.`);
+    return Object.freeze(outcome);
+  }
+  const catchUp = catchUpExisting(git, worktreeGit, plan, path);
   activeOutput().info(`${INDENT}The run is on ${plan.branch} in ${path}.`);
-  return Object.freeze({ branch: plan.branch, path, route: offer.route, steps });
+  return Object.freeze({ ...outcome, catchUp });
 }

@@ -295,6 +295,24 @@ existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**An existing branch under `--as-worktree` catches up with its base when it
+holds only claims.** `rafa plan create` claims a plan by pushing
+`feat/<stub>` at the base's tip, so a run started later finds a branch cut
+from a base that has moved since. When `--as-worktree` takes a branch that
+already exists (local, remote-only, or held by the worktree an earlier
+start left), it fetches `origin/<base>` (the base, never the branch) and
+reads the branch's commits past it (`src/start/claim-catch-up.ts`). A
+branch holding only `claim(rafa-<n>): …` commits is merged with
+`git merge origin/<base>` in the run's worktree before the first task, a
+merge and never a rewrite of the pushed branch, and one line names the
+commits taken and their range. A branch holding any other commit is never
+merged: one warning says how many commits behind `origin/<base>` it is, and
+the run goes on. A branch at or ahead of `origin/<base>` prints nothing
+new. A failed fetch is a warning, the branch then read against
+`origin/<base>` as it stood; a failed merge is aborted and refuses the run.
+`--create-branch` without `--as-worktree` switches to an existing branch as
+it is, with no catch-up.
+
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
 another terminal (or pull changes that move `main`), the guard compares
