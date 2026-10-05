@@ -333,6 +333,7 @@ const DETAIL: PullRequestDetail = Object.freeze({
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],
+  closes: [],
 });
 
 /** What one call of a recording command was handed. */

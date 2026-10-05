@@ -122,7 +122,9 @@
  * and remembers each label it made for the tracker's life. A null
  * priority is sent as `needs-triage` and any other as `priority:<value>`,
  * never both, and `blockedBy` as `blocked-by:OPT-<number>` labels, the
- * port still naming those OPT numbers. `get` answers `code` for a
+ * port still naming those OPT numbers. rafa's own `specBlocked`, absent
+ * from the source, is sent as the board's `spec:blocked` label when true
+ * and as nothing otherwise; `get` does not read it back. `get` answers `code` for a
  * missing or foreign type label, null for a priority label, and
  * `unassigned` for a module label. `find` refuses any state, naming the
  * states that share its open or closed bucket, and lists `--state all`,
@@ -200,6 +202,8 @@ export const GITHUB_LABELS = Object.freeze({
   priorityPrefix: 'priority:',
   needsTriage: 'needs-triage',
   blockedByPrefix: 'blocked-by:OPT-',
+  /** The board's `SPEC_BLOCKED_LABEL`, spelled here because this adapter imports nothing from `src/board/`. */
+  specBlocked: 'spec:blocked',
 });
 
 /** The fields `get` asks `gh issue view` for. */
@@ -400,6 +404,7 @@ const DRAFT_CHECKS: readonly DraftCheck[] = [
     (value) => Array.isArray(value) && value.every((item) => Number.isSafeInteger(item) && item > 0),
     'a list of positive whole numbers',
   ],
+  ['specBlocked', (value) => value === undefined || typeof value === 'boolean', 'absent or a boolean'],
 ];
 
 /** The first thing wrong with a draft, or null when nothing is. */
@@ -420,6 +425,9 @@ function labelsFor(draft: IssueDraft): string[] {
     `${GITHUB_LABELS.modulePrefix}${draft.module}`,
     `${GITHUB_LABELS.typePrefix}${draft.type}`,
     ...draft.blockedBy.map((opt) => `${GITHUB_LABELS.blockedByPrefix}${opt}`),
+    ...(draft.specBlocked === true
+      ? [GITHUB_LABELS.specBlocked]
+      : []),
     priority,
   ];
 }

@@ -48,7 +48,7 @@ const PORTS_ENTRY = fileURLToPath(new URL(PORTS_IMPORT, import.meta.url));
 
 /** A member line of the types record, and what each plant puts in its place. */
 const ADR_LINE = '  \'adr\': true,\n';
-const LAST_TYPE_LINE = '  \'epic\': true,\n';
+const LAST_TYPE_LINE = '  \'spec\': true,\n';
 
 /** TS1360: an expression does not satisfy the type it names, here by missing a member. */
 const MISSING_MEMBER = 1360;
@@ -96,7 +96,7 @@ afterAll(() => {
 
 describe('the issue value lists', () => {
   it.each([
-    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic']],
+    ['ISSUE_TYPES', ISSUE_TYPES, ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec']],
     ['ISSUE_PRIORITIES', ISSUE_PRIORITIES, ['urgent', 'high', 'medium', 'low']],
     [
       'ISSUE_STATES',
@@ -116,6 +116,7 @@ describe('a list drifting from its port union', () => {
     const unchanged = readFileSync(copies.unchanged, 'utf8');
 
     expect(unchanged).toContain(ADR_LINE);
+    expect(unchanged).toContain(LAST_TYPE_LINE);
     expect(unchanged).toContain(PORTS_ENTRY.replace(/\.ts$/, '.js'));
     expect(readFileSync(copies.dropped, 'utf8')).not.toBe(unchanged);
     expect(readFileSync(copies.added, 'utf8')).not.toBe(unchanged);

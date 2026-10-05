@@ -26,8 +26,9 @@
  * before the port existed, so labels-mode output stays byte-identical
  * (the hard rule the baseline captures below exist to police). A few
  * more modules (`setup.ts`, `epic/new.ts`, `pr/merge-tick.ts`,
- * `issue/unblock.ts`, `issue/roadmap-epic-table.ts`) write or format a
- * labels-mode-only concern that has no native counterpart yet.
+ * `issue/unblock.ts`, `issue/roadmap-epic-table.ts`,
+ * `issue/create-blocked.ts`) write or format a labels-mode-only concern
+ * that has no native counterpart yet.
  *
  * So the real invariant is: nothing OUTSIDE this known, closed set of
  * files reads these four names. {@link ALLOWED_IMPORTERS} is that set,
@@ -94,6 +95,7 @@ const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'commands/pr/merge-tick.ts': 'pr merge\'s epic-tick, matching a member against its epic: label',
   'commands/issue/roadmap-epic-table.ts': 'the roadmap epic table\'s labels-mode branch',
   'commands/issue/unblock.ts': 'rafa issue unblock, a labels-mode-only command',
+  'commands/issue/create-blocked.ts': 'rafa issue create\'s spec:blocked mark from a spec\'s Blocked by: line, a labels-mode write #467 moves behind the port',
   'suite/owns.ts': 'the stage step\'s Owns: lookup, finding a spec\'s epic by its epic: label the way epic-context.ts does; a failed read only widens the step to the whole suite',
 });
 

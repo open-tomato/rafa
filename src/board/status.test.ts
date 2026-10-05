@@ -174,6 +174,7 @@ describe('readLabelRows', () => {
         'spec:needs-work',
         'spec:blocked',
         'module:unassigned',
+        'module:cli-gap',
         'type:epic',
         'horizon:now',
         'horizon:next',
@@ -346,7 +347,7 @@ describe('readBoardStatus', () => {
     expect(snapshot(root)).toEqual(before);
   });
 
-  it('answers all seventeen rows missing over a bare repository and writes nothing', async () => {
+  it('answers all eighteen rows missing over a bare repository and writes nothing', async () => {
     const root = freshRoot('whole-bare');
     const gh = fakeBoard();
     const before = snapshot(root);
@@ -354,7 +355,7 @@ describe('readBoardStatus', () => {
     const status = await readBoardStatus({ gh: gh.run, root });
 
     expect(outcomes(status.rows)).toEqual(status.rows.map(() => 'missing'));
-    expect(boardGaps(status)).toHaveLength(17);
+    expect(boardGaps(status)).toHaveLength(18);
     expect(status.roadmapIssue).toBe(null);
     expect(gh.calls().map((args) => args.slice(0, 2).join(' '))).toEqual(['label list', 'issue list']);
     expect(snapshot(root)).toEqual(before);
@@ -374,6 +375,7 @@ describe('readBoardStatus', () => {
         'type:bug',
         'needs-triage',
         'module:unassigned',
+        'module:cli-gap',
         'type:epic',
         'horizon:now',
         'horizon:next',

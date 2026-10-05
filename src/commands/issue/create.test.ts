@@ -1,6 +1,8 @@
 /**
  * Tests for `rafa issue create` (`create.ts`): the draft its flags make
- * and the refusal of each flag, the lines text mode writes, the issue
+ * and the refusal of each flag, the body `--body-file` reads from a file
+ * under this file's temporary directory or, for `-`, from a planted
+ * `stdin` seam, the lines text mode writes, the issue
  * filed on a `local` tracker, on the recorded `gh` fake and on `local`
  * once `github` fails its preflight, and the registered command spawned.
  *
@@ -10,7 +12,17 @@
  * `.rafa/issues/`, parsed as the `local` adapter parses it, or the fake's
  * repository. A line refused for its words is held to leave no
  * `.rafa/issues/` and to run no `gh`, beside the same project taking a
- * line the command accepts, which makes both.
+ * line the command accepts, which makes both; a line naming `--body`
+ * beside `--body-file` and one naming an unreadable body file are held to
+ * the same. A seam that rejects when read stands in for standard input
+ * wherever a case must not read it.
+ *
+ * A spec's `Blocked by:` line is driven on the fake and on `local` over
+ * a board whose first issue a case files itself: a line naming it files
+ * the spec marked blocked, beside a bug with the same line filed
+ * unmarked, and a line naming the issue being filed, an issue the board
+ * lacks or no issue at all is refused with the issue count unchanged,
+ * the last before any `gh` runs.
  *
  * The spawned case runs `bun src/rafa.ts issue create` in a scratch
  * repository whose config names `github` first, under a PATH holding a
@@ -31,6 +43,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
+import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { SPEC_LABEL } from '../../board/issue.js';
 import { CommandExit } from '../../cli/command.js';
 import {
   dispatchInProject,
@@ -41,7 +55,16 @@ import {
   runRafa,
 } from '../../tests/cli-capture.js';
 
-import { createIssueCreateCommand, readIssueDraft, renderCreated } from './create.js';
+import { KNOWN_LIST_LIMIT } from './create-blocked.js';
+import {
+  createIssueCreateCommand,
+  readBodyFile,
+  readBodyFileFlag,
+  readIssueDraft,
+  readIssueLine,
+  renderCreated,
+  STDIN_PATH,
+} from './create.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-create-')));
@@ -54,10 +77,13 @@ afterAll(() => {
 const SPAWN_TIMEOUT = 30_000;
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue create --title=<text> [--body=<text>] [--type=<type>] [--module=<name>] [--priority=<priority>]';
+const USAGE = 'rafa issue create --title=<text> [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]';
 
 /** The subject the dispatched cases route under. */
 const SUBJECTS = [{ name: 'issue', summary: 'issues' }];
+
+/** What a refused `Blocked by:` line tells the author to do. */
+const BLOCKED_REMEDY = 'name the issues it waits on as "Blocked by: #24 #26", or take the line out';
 
 /** A config naming `local` first. */
 const LOCAL_CONFIG = 'tracker:\n  default: local\n';
@@ -75,11 +101,54 @@ const BUG_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=bu
 const DRAFT_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{}, '--title is required: --title=<value>'],
   [{ title: '  ' }, '--title cannot be blank: --title=<value>'],
-  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
   [{ title: 'x', priority: 'p1' }, '--priority is "p1", expected one of: urgent, high, medium, low'],
   [{ title: 'x', module: '' }, '--module cannot be blank: --module=<value>'],
   [{ title: 'x', body: true }, '--body needs a value: --body=<value>'],
+  [{ title: 'x', body: 'Seen twice.', 'body-file': 'body.md' }, '--body and --body-file cannot be used together: name the body one way'],
+  [{ title: 'x', body: '', 'body-file': '-' }, '--body and --body-file cannot be used together: name the body one way'],
+  [{ title: 'x', 'body-file': ' ' }, '--body-file cannot be blank: --body-file=<value>'],
+  [{ title: 'x', 'body-file': true }, '--body-file needs a value: --body-file=<value>'],
 ];
+
+/** A body with the bytes a trim or a re-encoding would lose: a leading blank line, a tab, non-ASCII and a trailing newline pair. */
+const FILE_BODY = '\nBlocked by: #20\n\n\tSpec — café.\n\n';
+
+/** A stdin seam answering `text`, counting how often it is read. */
+function plantStdin(text: string): { readonly stdin: () => Promise<string>; readonly reads: () => number } {
+  let reads = 0;
+  return {
+    stdin: () => {
+      reads += 1;
+      return Promise.resolve(text);
+    },
+    reads: () => reads,
+  };
+}
+
+/** A stdin seam that is never meant to be read: it fails the case when it is. */
+function unreadStdin(): Promise<string> {
+  return Promise.reject(new Error('standard input was read'));
+}
+
+/** A file under this file's temporary directory holding `text`, by its absolute path. */
+function plantBodyFile(text: string): string {
+  const path = join(mkdtempSync(join(tempBase, 'body-')), 'body.md');
+  writeFileSync(path, text, 'utf8');
+  return path;
+}
+
+/** What `read` rejected with, as its exit code and message for a `CommandExit`, or undefined when it resolved. */
+async function asyncExitOf(read: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await read();
+  } catch (error) {
+    return error instanceof CommandExit
+      ? { exitCode: error.exitCode, message: error.message }
+      : error;
+  }
+  return undefined;
+}
 
 /** A fresh project holding `config`. */
 function plantCase(config: string): PlantedProject {
@@ -132,6 +201,10 @@ describe('the draft rafa issue create makes', () => {
     expect(readIssueDraft({ title: 'Epics', type: 'epic' })).toMatchObject({ title: 'Epics', type: 'epic' });
   });
 
+  it('takes --type spec', () => {
+    expect(readIssueDraft({ title: 'A spec', type: 'spec' })).toMatchObject({ title: 'A spec', type: 'spec' });
+  });
+
   it.each(DRAFT_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
     expect(exitOf(() => readIssueDraft(flags))).toEqual({ exitCode: 1, message: `❌ ${problem}\nUsage: ${USAGE}` });
   });
@@ -142,6 +215,81 @@ describe('the draft rafa issue create makes', () => {
       'Created github issue 7.',
       'URL: https://github.com/open-tomato/rafa/issues/7',
     ]);
+  });
+});
+
+describe('the body rafa issue create reads from --body-file', () => {
+  it('names no path when the line leaves --body-file out, and the path typed when it names one', () => {
+    expect(readBodyFileFlag({ title: 'x', body: 'Seen twice.' })).toBeUndefined();
+    expect(readBodyFileFlag({ title: 'x', 'body-file': 'spec.md' })).toBe('spec.md');
+    expect(readBodyFileFlag({ title: 'x', 'body-file': STDIN_PATH })).toBe('-');
+  });
+
+  it('reads a file\'s bytes whole, nothing trimmed, and leaves standard input unread', async () => {
+    const path = plantBodyFile(FILE_BODY);
+
+    expect(await readBodyFile(path, { stdin: unreadStdin })).toBe(FILE_BODY);
+  });
+
+  it('reads standard input through the seam for -, once', async () => {
+    const seam = plantStdin(FILE_BODY);
+
+    expect(await readBodyFile(STDIN_PATH, seam)).toBe(FILE_BODY);
+    expect(seam.reads()).toBe(1);
+  });
+
+  it('takes an empty standard input as an empty body', async () => {
+    expect(await readBodyFile(STDIN_PATH, plantStdin(''))).toBe('');
+  });
+
+  it('refuses a path holding no file with exit code 1, naming the path and the reason', async () => {
+    const path = join(tempBase, 'no-such-dir', 'body.md');
+
+    expect(await asyncExitOf(() => readBodyFile(path, { stdin: unreadStdin }))).toEqual({
+      exitCode: 1,
+      message: `❌ --body-file cannot read "${path}": ENOENT: no such file or directory, open '${path}'\nUsage: ${USAGE}`,
+    });
+  });
+
+  it('refuses a directory with exit code 1, naming the path', async () => {
+    const path = mkdtempSync(join(tempBase, 'dir-'));
+
+    expect(await asyncExitOf(() => readBodyFile(path, { stdin: unreadStdin }))).toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining(`❌ --body-file cannot read "${path}": `),
+    });
+  });
+
+  it('refuses standard input that fails to read with exit code 1, naming standard input', async () => {
+    const stdin = (): Promise<string> => Promise.reject(new Error('stream closed'));
+
+    expect(await asyncExitOf(() => readBodyFile(STDIN_PATH, { stdin }))).toEqual({
+      exitCode: 1,
+      message: `❌ --body-file cannot read standard input: stream closed\nUsage: ${USAGE}`,
+    });
+  });
+
+  it('fills the draft\'s body from the file, every other field as the flags make it', async () => {
+    const path = plantBodyFile(FILE_BODY);
+    const flags = { title: 'A spec', type: 'spec', 'body-file': path };
+
+    expect(await readIssueLine(flags, { stdin: unreadStdin })).toEqual({ ...readIssueDraft(flags), body: FILE_BODY });
+  });
+
+  it('keeps --body as the draft\'s body and reads nothing when the line names no body file', async () => {
+    expect(await readIssueLine({ title: 'x', body: 'Seen twice.' }, { stdin: unreadStdin })).toMatchObject({ body: 'Seen twice.' });
+  });
+
+  it('refuses --body beside --body-file before reading standard input', async () => {
+    const seam = plantStdin(FILE_BODY);
+
+    const refused = await asyncExitOf(() => readIssueLine({ title: 'x', body: 'Seen twice.', 'body-file': STDIN_PATH }, seam));
+
+    expect(refused).toEqual({
+      exitCode: 1,
+      message: `❌ --body and --body-file cannot be used together: name the body one way\nUsage: ${USAGE}`,
+    });
+    expect(seam.reads()).toBe(0);
   });
 });
 
@@ -204,6 +352,28 @@ describe('rafa issue create, dispatched', () => {
     expect(existsSync(localIssuesDir(project.root))).toBe(false);
   });
 
+  it('files --type=spec on the gh fake under the board\'s spec label', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const line = ['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'];
+
+    const outcome = await dispatchInProject(line, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fake.issue('1')?.labels).toContain(SPEC_LABEL);
+    expect(fake.issue('1')?.labels).not.toContain('type:code');
+  });
+
+  it('files --type=spec on local as a spec issue', async () => {
+    const project = plantCase(LOCAL_CONFIG);
+    const line = ['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'];
+
+    const outcome = await dispatchInProject(line, SUBJECTS, [createIssueCreateCommand()], project);
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
+    expect(localIssue(project, 1).draft.type).toBe('spec');
+  });
+
   it('files on local once github fails its preflight, warning first and recording why in the issue', async () => {
     const fake = createFakeGh({ authOk: false });
     const project = plantCase(GITHUB_CONFIG);
@@ -217,6 +387,56 @@ describe('rafa issue create, dispatched', () => {
     });
     expect(localIssue(project, 1).fallbackReason).toBe(`github: ${NOT_LOGGED_IN}`);
     expect(fake.issueCount()).toBe(0);
+  });
+
+  it('files a body file\'s bytes on the gh fake, and standard input\'s for --body-file=-', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const seam = plantStdin('From standard input.\n');
+    const command = createIssueCreateCommand({ gh: fake.run, stdin: seam.stdin });
+    const path = plantBodyFile(FILE_BODY);
+
+    const fromFile = await dispatchInProject(['issue', 'create', '--title=A spec', `--body-file=${path}`], SUBJECTS, [command], project);
+    const fromStdin = await dispatchInProject(['issue', 'create', '--title=Piped', '--body-file=-'], SUBJECTS, [command], project);
+
+    expect([fromFile.exitCode, fromStdin.exitCode]).toEqual([0, 0]);
+    expect(fake.issue('1')).toMatchObject({ title: 'A spec', body: FILE_BODY });
+    expect(fake.issue('2')).toMatchObject({ title: 'Piped', body: 'From standard input.\n' });
+    expect(seam.reads()).toBe(1);
+  });
+
+  it('files a body file\'s bytes on local', async () => {
+    const project = plantCase(LOCAL_CONFIG);
+    const path = plantBodyFile(FILE_BODY);
+
+    const outcome = await dispatchInProject(['issue', 'create', '--title=A spec', `--body-file=${path}`], SUBJECTS, [createIssueCreateCommand({ stdin: unreadStdin })], project);
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
+    expect(localIssue(project, 1).draft.body).toBe(FILE_BODY);
+  });
+
+  it('refuses --body beside --body-file and an unreadable body file before resolving the tracker, where a readable one files', async () => {
+    const fake = createFakeGh({ authOk: false });
+    const project = plantCase(GITHUB_CONFIG);
+    const command = createIssueCreateCommand({ gh: fake.run, stdin: unreadStdin });
+    const missing = join(tempBase, 'no-such-dir', 'body.md');
+
+    const both = await dispatchInProject(['issue', 'create', '--title=x', '--body=Seen.', '--body-file=-'], SUBJECTS, [command], project);
+    const unreadable = await dispatchInProject(['issue', 'create', '--title=x', `--body-file=${missing}`], SUBJECTS, [command], project);
+    const refusedState = [fake.calls().length, existsSync(localIssuesDir(project.root))];
+    const taken = await dispatchInProject(['issue', 'create', '--title=x', `--body-file=${plantBodyFile(FILE_BODY)}`], SUBJECTS, [command], project);
+
+    expect(both).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ --body and --body-file cannot be used together: name the body one way\nUsage: ${USAGE}\n`,
+    });
+    expect([unreadable.exitCode, unreadable.stdout]).toEqual([1, '']);
+    expect(unreadable.stderr).toStartWith(`❌ --body-file cannot read "${missing}": ENOENT`);
+    expect(refusedState).toEqual([0, false]);
+    expect(taken.exitCode).toBe(0);
+    expect([fake.calls().length > 0, existsSync(localIssuesDir(project.root))]).toEqual([true, true]);
+    expect(localIssue(project, 1).draft.body).toBe(FILE_BODY);
   });
 
   it('refuses a line before resolving the tracker, filing nothing and running no gh, where a line it takes files', async () => {
@@ -233,13 +453,98 @@ describe('rafa issue create, dispatched', () => {
     expect(refused).toEqual({
       exitCode: 1,
       stdout: '',
-      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic\nUsage: ${USAGE}\n`,
+      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec\nUsage: ${USAGE}\n`,
     });
     expect(untitled.stderr).toBe(`❌ --title is required: --title=<value>\nUsage: ${USAGE}\n`);
     expect(argument.stderr).toBe(`❌ Expected no argument, got 1: bug\nUsage: ${USAGE}\n`);
     expect(refusedState).toEqual([0, false]);
     expect(taken.exitCode).toBe(0);
     expect([fake.calls().length > 0, existsSync(localIssuesDir(project.root))]).toEqual([true, true]);
+  });
+});
+
+describe('rafa issue create, a spec\'s Blocked by: line', () => {
+  it('files a spec naming an issue the gh fake holds with spec:blocked, and a bug with the same line without it', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const command = createIssueCreateCommand({ gh: fake.run });
+
+    const first = await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+    const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1\n\nThe spec.'], SUBJECTS, [command], project);
+    const bug = await dispatchInProject(['issue', 'create', '--title=A bug', '--type=bug', '--body=Blocked by: #1'], SUBJECTS, [command], project);
+
+    expect([first.exitCode, spec, bug.exitCode]).toEqual([
+      0,
+      { exitCode: 0, stdout: 'Created github issue 2.\nURL: https://github.com/open-tomato/rafa/issues/2\n', stderr: '' },
+      0,
+    ]);
+    expect(fake.issue('2')?.labels).toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.issue('2')?.labels).toContain(SPEC_LABEL);
+    expect(fake.issue('3')?.labels).not.toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.calls()).toContainEqual(['issue', 'list', '--state', 'all', '--json', 'number,url,labels', '--limit', String(KNOWN_LIST_LIMIT)]);
+  });
+
+  it('files a spec with no line unmarked and lists no board for it', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+
+    const outcome = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'], SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fake.issue('1')?.labels).not.toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.calls().some((call) => call[0] === 'issue' && call[1] === 'list')).toBe(false);
+  });
+
+  it('refuses a line naming the issue being filed and one naming an issue the board lacks, filing nothing', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const command = createIssueCreateCommand({ gh: fake.run });
+    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+
+    const itself = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #2'], SUBJECTS, [command], project);
+    const unknown = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #7'], SUBJECTS, [command], project);
+
+    expect(itself).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names #2, the number this issue would be filed as: ${BLOCKED_REMEDY}\n`,
+    });
+    expect(unknown).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names #7, which the board has no issue for: ${BLOCKED_REMEDY}\n`,
+    });
+    expect(fake.issueCount()).toBe(1);
+  });
+
+  it('refuses a line naming no issue before resolving the tracker, running no gh and filing nothing', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const path = plantBodyFile('Blocked by: the API work\n');
+
+    const outcome = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', `--body-file=${path}`], SUBJECTS, [createIssueCreateCommand({ gh: fake.run, stdin: unreadStdin })], project);
+
+    expect(outcome).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names no issue: "the API work": ${BLOCKED_REMEDY}\n`,
+    });
+    expect([fake.calls().length, fake.issueCount(), existsSync(localIssuesDir(project.root))]).toEqual([0, 0, false]);
+  });
+
+  it('records specBlocked in the local issue file for a line naming a local issue, and refuses one naming itself', async () => {
+    const project = plantCase(LOCAL_CONFIG);
+    const command = createIssueCreateCommand();
+    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+
+    const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1'], SUBJECTS, [command], project);
+    const itself = await dispatchInProject(['issue', 'create', '--title=Another', '--type=spec', '--body=Blocked by: #3'], SUBJECTS, [command], project);
+
+    expect(spec).toEqual({ exitCode: 0, stdout: 'Created local issue 2.\n', stderr: '' });
+    expect(localIssue(project, 2).draft.specBlocked).toBe(true);
+    expect(localIssue(project, 1).draft.specBlocked).toBeUndefined();
+    expect([itself.exitCode, itself.stderr]).toEqual([1, expect.stringContaining('names #3, the number this issue would be filed as')]);
+    expect(existsSync(join(localIssuesDir(project.root), '3.md'))).toBe(false);
   });
 });
 

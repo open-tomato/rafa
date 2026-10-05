@@ -86,7 +86,7 @@ import { createGhPullRequests, ghAuthOk, ghPullRequestsIn } from './gh.js';
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
 
 /** The fields a detail read asks for. */
-const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable`;
+const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
 
 /** The branch the planted pull request is from. */
 const BRANCH = 'feat/rafa-20';
@@ -292,8 +292,21 @@ describe('get', () => {
       mergeable: 'mergeable',
       mergeStateStatus: 'BLOCKED',
       labels: ['type:spec'],
+      closes: [],
     });
     expect(fake.calls()).toEqual([['pr', 'view', '7', '--json', DETAIL_FIELDS]]);
+  });
+
+  it('answers the issues it closes, one of another repository named under that repository', async () => {
+    const { fake, pr } = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, closes: [{ number: 20 }, { number: 765, repository: 'ptone/scion' }] }));
+
+    const detail = await pr.get(7);
+
+    expect(detail?.closes).toEqual([
+      { number: 20, repository: 'open-tomato/rafa', url: 'https://github.com/open-tomato/rafa/issues/20' },
+      { number: 765, repository: 'ptone/scion', url: 'https://github.com/ptone/scion/issues/765' },
+    ]);
   });
 
   it('answers merged for a merged pull request, whose merge fields read UNKNOWN', async () => {
@@ -722,6 +735,7 @@ describe('what the adapter refuses in a payload', () => {
       labels: [{ name: 'type:spec' }],
       mergeStateStatus: 'DIRTY',
       mergeable: 'COMPUTING',
+      closingIssuesReferences: [],
     }).get(7);
 
     expect(detail).toMatchObject({ mergeable: 'unknown', mergeStateStatus: 'DIRTY', labels: ['type:spec'] });
@@ -733,6 +747,23 @@ describe('what the adapter refuses in a payload', () => {
     await expect(pr.get(7)).rejects.toThrow(
       'gh pull requests: gh pr view 7 answered the pull request.labels[0] is "type:spec", expected a mapping',
     );
+  });
+
+  it.each([
+    ['no closing references at all', undefined, 'closingIssuesReferences is undefined, expected a list'],
+    ['a closing reference with no number', [{ repository: { name: 'rafa', owner: { login: 'open-tomato' } }, url: 'u' }], 'closingIssuesReferences[0].number is undefined, expected a positive whole number'],
+  ])('refuses a detail carrying %s, rather than answering a short closes list', async (_label, references, problem) => {
+    const pr = writing({
+      ...ROW,
+      body: '',
+      headRefOid: 'x',
+      mergeStateStatus: 'CLEAN',
+      mergeable: 'MERGEABLE',
+      labels: [],
+      closingIssuesReferences: references,
+    });
+
+    await expect(pr.get(7)).rejects.toThrow(`gh pull requests: gh pr view 7 answered the pull request.${problem}`);
   });
 
   it('refuses output that is not JSON, naming the command that wrote it', async () => {

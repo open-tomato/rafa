@@ -10,8 +10,10 @@ Seven actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
-- `pr show [<n>]` — details: title, author, branch → base, mergeable, each
-  check with its state and link, last triage comment
+- `pr show [<n>]` — details: title, author, branch → base, mergeable, the
+  issues it closes (an issue the provider links that the body does not name,
+  and one the body names by keyword that the provider does not link, are
+  marked), each check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
   and where the release is on the forecast its body carries, marked
@@ -697,7 +699,8 @@ refuses a body matching a home path or a token shape, naming the line.
 
 `rafa init --board` sets up the board: labels `type:spec`, `spec:ready`,
 `spec:needs-work`, and the ones triage already files under (`type:bug`,
-`needs-triage`, `module:unassigned`); `.github/ISSUE_TEMPLATE/spec.md` when
+`needs-triage`, `module:unassigned`) and `module:cli-gap`, the module a
+session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it
