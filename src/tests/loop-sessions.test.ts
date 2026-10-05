@@ -305,7 +305,7 @@ function spawnLoopStart(scratch: Scratch) {
 function soleSession(repo: string): SessionRecord | null {
   const sessions = readSessions(repo);
   return sessions.length === 1
-    ? sessions[0]
+    ? sessions[0] ?? null
     : null;
 }
 
