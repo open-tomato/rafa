@@ -271,7 +271,8 @@ export type PullRequestEventPlace = 'session' | 'delivery';
  * output mode. Text emits it at the `delivery` place, other modes at
  * the `session` place; each mode ignores the other place. The number is
  * `known` when the delivery holds it, and only then is `lookup`, a read
- * of the branch's open pull request over the provider, skipped. A `lookup` answering a string gives the `no-pr` reason as is. Text
+ * of the branch's open pull request over the provider, skipped. A
+ * `lookup` answering a string gives the `no-pr` reason as is. Text
  * prints nothing for the event: the events output decides what reaches
  * stdout, and the run's events file holds it whatever the mode
  * (`start/loop-events.ts`).

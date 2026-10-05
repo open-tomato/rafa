@@ -46,12 +46,12 @@
  *
  * A run that MARKED the issue, under `--yes` or on a typed yes, and
  * one that found it marked already, ends by naming the one step that
- * follows — for a roadmap line that is ready and unblocked, the plan (`src/next/ending.ts`, `--no-hint` to
- * turn it off). The declined run and the one with no terminal end
- * without it: no label moved, so the state still reads as an issue
- * carrying no `spec:ready`, and the hint would put the very question
- * that was just answered no, or name this command to the run that has
- * nobody to answer it.
+ * follows — for a roadmap line that is ready and unblocked, the plan
+ * (`src/next/ending.ts`, `--no-hint` to turn it off). The declined run
+ * and the one with no terminal end without it: no label moved, so the
+ * state still reads as an issue carrying no `spec:ready`, and the hint
+ * would put the very question that was just answered no, or name this
+ * command to the run that has nobody to answer it.
  *
  * `--no-hint` skips no question of this command's: it turns off the
  * ENDING, and the marking question is put whether or not it is typed.
