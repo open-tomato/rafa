@@ -19,7 +19,7 @@
  * | `path` | a backticked token with a slash or a file extension | code spans |
  * | `symbol` | a backticked code-shaped name | code spans |
  * | `command` | `rafa <subject> <action>` | code spans |
- * | `flag` | `--name` | running text and code spans |
+ * | `flag` | `--name` | a code span opening with `rafa` |
  * | `key` | `section.key` | code spans |
  *
  * Each {@link Ref} holds its kind, its text and the 1-based line it was
@@ -45,15 +45,23 @@
  * "rafa keeps a saved copy", `e.g.`, "and/or" — and a spec that means a
  * file or a command writes it in backticks.
  *
+ * A FLAG is read from a code span whose first word is `rafa` and from
+ * nowhere else: not from running text, not from a span holding the flag
+ * alone (`` `--accept-refs` ``), and not from a span opening with a bare
+ * subject (`plan create --issue`) or another program
+ * (`gh issue create --body-file`, `claude --setting-sources`). In each
+ * of those nothing says whose flag it is, and reading it against rafa's
+ * roster refused the other programs' flags as missing (#172).
+ *
  * ## What a backticked token is read as
  *
- * A span holding whitespace is a COMMAND when its first word is `rafa`,
- * and is otherwise read for flags alone — unless its first word is one
- * of {@link FOREIGN_PROGRAMS}, whose flags are that program's and not
- * rafa's. A span of one token is read in this order, and the first rule
- * that matches answers:
+ * A span holding whitespace whose first word is `rafa` is read for a
+ * COMMAND and for every flag it holds; any other such span is not a
+ * reference. A
+ * span of one token is read in this order, and the first rule that
+ * matches answers:
  *
- *  1. a FLAG, when it opens with `--`;
+ *  1. nothing, when it opens with `--`: a flag alone names no program;
  *  2. a PATH, when it has a slash or a stem and one of
  *     {@link FILE_EXTENSIONS}, is spelled from path characters only, and
  *     does not start with `/`, `~` or `http`;
@@ -89,12 +97,12 @@
  * Of the multi-word spans holding a flag, 63 opened with `rafa`, 37
  * with a subject written without it (`plan create --issue`), and 23
  * with `git`, `bun`, `claude`, `gh` or `bunx`, whose `--write-tree`
- * and `--force-with-lease` rafa has never had; skipping those took the
- * distinct flags from 83 to 75. A subject spelled bare cannot be told
- * from a program without the command roster, which is `./verify.ts`'s,
- * so the closed list names the programs instead. A flag in running
- * text is still read, program or not: nothing on its line says whose
- * it is.
+ * and `--force-with-lease` rafa has never had. The rule first read
+ * from that kept the subject-first spans and running text and skipped
+ * a closed list of programs; #172 found correct names still refused
+ * under it, so a flag is now read only where its span names `rafa`
+ * itself, and a spec that means rafa's flag writes the command it
+ * belongs to.
  *
  * ## Duplicates and blockers
  *
@@ -161,12 +169,6 @@ export interface Ref {
 export const FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   'cjs', 'css', 'db', 'html', 'js', 'json', 'jsonl', 'jsx', 'lock', 'md', 'mdx',
   'mjs', 'sh', 'sql', 'sqlite', 'toml', 'ts', 'tsx', 'txt', 'yaml', 'yml',
-]);
-
-/** The programs whose flags a span opening with them names; never rafa's. */
-export const FOREIGN_PROGRAMS: ReadonlySet<string> = new Set([
-  'bun', 'bunx', 'claude', 'eslint', 'gh', 'git', 'node', 'npm', 'npx', 'pnpm', 'ts-symbols',
-  'tsc', 'yarn',
 ]);
 
 /** Every config section `SETTINGS` holds a dotted key under. */
@@ -327,7 +329,7 @@ function symbolOf(token: string): string | null {
 
 /** What a one-token span is read as, by the order in the module note. */
 function tokenRef(token: string): readonly Found[] {
-  if (token.startsWith('--')) return flagsIn(token);
+  if (token.startsWith('--')) return [];
   if (isPath(token)) return [{ kind: 'path', text: token }];
   if (isKey(token)) return [{ kind: 'key', text: token }];
 
@@ -341,17 +343,14 @@ function spanRefs(content: string): readonly Found[] {
   const words = content.trim().split(/\s+/u);
   if (words.length === 1) return tokenRef(words[0] ?? '');
 
-  const first = words[0] ?? '';
-  if (FOREIGN_PROGRAMS.has(first)) return [];
+  if (words[0] !== 'rafa') return [];
 
-  const command = first === 'rafa'
-    ? commandOf(words)
-    : null;
+  const command = commandOf(words);
   if (command === null) return flagsIn(content);
   return [command, ...flagsIn(content)];
 }
 
-/** Every issue, cross-repository issue and flag in running text, in line order. */
+/** Every issue and cross-repository issue in running text, in line order. */
 function proseRefs(text: string): readonly Found[] {
   const hits: { at: number; found: Found }[] = [];
 
@@ -365,10 +364,6 @@ function proseRefs(text: string): readonly Found[] {
   for (const match of local.matchAll(RAFA_ISSUE)) {
     hits.push({ at: match.index, found: { kind: 'issue', text: match[0] } });
   }
-  for (const match of text.matchAll(FLAG)) {
-    hits.push({ at: match.index, found: { kind: 'flag', text: match[0] } });
-  }
-
   return [...hits].sort((a, b) => a.at - b.at).map((hit) => hit.found);
 }
 

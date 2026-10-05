@@ -572,7 +572,8 @@ the session check 3 is part of, so a refusal from it spends no session:
    `src/commands/plan/refs-check.ts`): every reference the saved copy's
    body names — an issue `#<n>`, `rafa-<n>` or `owner/repo#<n>`, and in
    backticks a path, a code-shaped symbol, a `rafa <subject> <action>`
-   command and a config key, and a flag either way (the seven kinds of
+   command and a config key, and a flag only inside a span opening with
+   `rafa` (the seven kinds of
    `src/refs/extract.ts`) — read against the stamp the copy keeps for it in its
    `<!-- rafa:refs` block. It runs on `--issue` and `--next` only, once
    checks 0–2 have passed and the snapshot has settled and once the

@@ -107,7 +107,7 @@ const BODY = [
   '', // 2
   'The reader lives in `src/a.ts`, and #7 describes it.', // 3
   '', // 4
-  'Run `rafa plan create` with `--issue`, which reads `specs.dir`.', // 5
+  'Run `rafa plan create --issue`, which reads `specs.dir`.', // 5
   '',
 ].join('\n');
 
