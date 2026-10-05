@@ -34,6 +34,9 @@ default), `tests=module`, or `tests=full` to control what its session checks.
   via JUnit. The prompt names both gate names: `affected tests gate` and
   `always-run sweeps gate`
 - `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
+- `bunx tsc` on touched test files against their base (same `tsconfig.json`
+  with `typeRoots` held absolutely, read below for the scratch recipe and
+  backlog)
 - `bunx eslint <changed files>` (ESLint on changed files only; read below
   for the blocker when changed files are all ignored)
 
@@ -282,24 +285,37 @@ session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`
 line and no name for a file without a failure; the counts and the exit
 code do not change. `env -u CLAUDECODE bun test` prints every case.
 
-**`check-types` never reads a test file.** `tsconfig.json` excludes
-`**/*.test.ts`, and `bun test` strips types without checking them, so a type
-error in a test is green on every gate. To check one by hand, point a
+**The runner now checks touched test files against their base.** The task
+session's type gate runs `tsc` on files matching `**/*.test.ts` in the diff
+against their base commit. `tsconfig.json` excludes `**/*.test.ts` from the
+main gate, so `bun test` strips types without checking them. A test file
+type error that exists on the base branch is not new and does not block;
+one that first appears in the diff is red. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
 by absolute path (a bare `tsconfig.json` is looked up as a package, the
 repo's options are never applied, and hundreds of TS2802 errors follow),
 never `tsconfig.base.json`, which leaves `module` unset and fails
 `src/plan.ts` and `src/start.ts` on `import.meta` (TS1343), `files` holding
-the test's absolute path, `include` empty, `typeRoots` naming
-`<repo>/node_modules/@types` absolutely (left out, every file reports
-`Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc -p`
-on it. Test files already carry errors no gate ever reported, so compare
-against the base before attributing one to the diff: TS2769 where a
+the test's absolute path, `include` empty, `compilerOptions.typeRoots`
+naming `<repo>/node_modules/@types` absolutely (left out, every file
+reports `Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc
+-p` on it. Test files already carry errors no gate ever reported, so
+compare against the base before attributing one to the diff: TS2769 where a
 `readonly` array reaches `toEqual` (`src/config-schema.test.ts`,
 `src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
 `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in
 `src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
+
+**Test-file type-error backlog:** A scratch tsconfig over every `*.test.ts`
+with the recipe above reported 460 errors in 144 files at commit
+a64ab15c2756104ae685421cbfe063efa2f845a6. The command was:
+`./node_modules/.bin/tsc -p <scratch-dir>/tsconfig.json --noEmit --pretty
+false`, with the scratch `tsconfig.json` holding `"extends":
+"<repo>/tsconfig.json"` (absolute path), `"files"` listing every `.test.ts`
+by absolute path, `"include": []`, and `"compilerOptions": { "typeRoots":
+["<repo>/node_modules/@types"] }`. This baseline lets later sweeps compare
+against it and measure progress on the backlog.
 
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each
