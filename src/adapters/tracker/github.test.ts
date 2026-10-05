@@ -216,6 +216,15 @@ describe('creating an issue', () => {
     expect((await tracker.get(ref)).type).toBe('epic');
   });
 
+  it('labels a spec type:spec, and get reads the label back as spec', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'spec', priority: 'low' }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:spec', 'priority:low']);
+    expect((await tracker.get(ref)).type).toBe('spec');
+  });
+
   it('sends needs-triage for a null priority, and no priority label', async () => {
     const { tracker, fake } = overFake();
 
@@ -295,7 +304,7 @@ describe('creating an issue', () => {
   });
 
   it.each([
-    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
     ['priority', { priority: 'critical' }, 'priority is "critical", expected null or one of: urgent, high, medium, low'],
     ['module', { module: 'auth,billing' }, 'module is "auth,billing", expected a string holding no comma'],
     ['blockedBy', { blockedBy: [1.5] }, 'blockedBy is a list, expected a list of positive whole numbers'],
@@ -663,7 +672,7 @@ describe('reading open issues', () => {
 
     // A cast: the refusal is of a value the port's type would not let through.
     await expect(openIssues('bug,chore' as 'bug')).rejects.toThrow(
-      'github tracker: openIssues refused type "bug,chore", expected one of: code, bug, spike, adr, chore, package-api, epic',
+      'github tracker: openIssues refused type "bug,chore", expected one of: code, bug, spike, adr, chore, package-api, epic, spec',
     );
     expect(fake.calls()).toEqual([]);
     expect(await openIssues('chore')).toEqual([]);

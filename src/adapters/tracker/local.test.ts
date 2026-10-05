@@ -99,7 +99,7 @@ const LATER = '2026-07-28T09:00:00Z';
 const REASON = 'github: gh auth status exited 1 (network)';
 
 /** The members each refusal lists. */
-const TYPES = 'code, bug, spike, adr, chore, package-api, epic';
+const TYPES = 'code, bug, spike, adr, chore, package-api, epic, spec';
 const STATES = 'backlog, todo, in-progress, in-review, done, released, cancelled';
 
 /** What an external id that is not an issue number is refused with, after the id. */
@@ -537,6 +537,15 @@ describe('createLocalTracker', () => {
 
     expect((await tracker.get(ref)).type).toBe('epic');
     expect(ids(await tracker.find({ type: 'epic' }))).toEqual([ref.externalId]);
+  });
+
+  it('writes a spec draft that get reads back as type spec', async () => {
+    const tracker = localTracker(freshDir('spec'));
+
+    const ref = await tracker.create(draftFixture({ title: 'A spec', type: 'spec' }));
+
+    expect((await tracker.get(ref)).type).toBe('spec');
+    expect(ids(await tracker.find({ type: 'spec' }))).toEqual([ref.externalId]);
   });
 
   it('refuses a draft no read would accept, creating no file and no directory', async () => {

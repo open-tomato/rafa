@@ -31,6 +31,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
+import { SPEC_LABEL } from '../../board/issue.js';
 import { CommandExit } from '../../cli/command.js';
 import {
   dispatchInProject,
@@ -75,7 +76,7 @@ const BUG_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=bu
 const DRAFT_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{}, '--title is required: --title=<value>'],
   [{ title: '  ' }, '--title cannot be blank: --title=<value>'],
-  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+  [{ title: 'x', type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
   [{ title: 'x', priority: 'p1' }, '--priority is "p1", expected one of: urgent, high, medium, low'],
   [{ title: 'x', module: '' }, '--module cannot be blank: --module=<value>'],
   [{ title: 'x', body: true }, '--body needs a value: --body=<value>'],
@@ -130,6 +131,10 @@ describe('the draft rafa issue create makes', () => {
 
   it('takes --type epic', () => {
     expect(readIssueDraft({ title: 'Epics', type: 'epic' })).toMatchObject({ title: 'Epics', type: 'epic' });
+  });
+
+  it('takes --type spec', () => {
+    expect(readIssueDraft({ title: 'A spec', type: 'spec' })).toMatchObject({ title: 'A spec', type: 'spec' });
   });
 
   it.each(DRAFT_REFUSALS)('refuses the flags %j with exit code 1', (flags, problem) => {
@@ -204,6 +209,28 @@ describe('rafa issue create, dispatched', () => {
     expect(existsSync(localIssuesDir(project.root))).toBe(false);
   });
 
+  it('files --type=spec on the gh fake under the board\'s spec label', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const line = ['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'];
+
+    const outcome = await dispatchInProject(line, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fake.issue('1')?.labels).toContain(SPEC_LABEL);
+    expect(fake.issue('1')?.labels).not.toContain('type:code');
+  });
+
+  it('files --type=spec on local as a spec issue', async () => {
+    const project = plantCase(LOCAL_CONFIG);
+    const line = ['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'];
+
+    const outcome = await dispatchInProject(line, SUBJECTS, [createIssueCreateCommand()], project);
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
+    expect(localIssue(project, 1).draft.type).toBe('spec');
+  });
+
   it('files on local once github fails its preflight, warning first and recording why in the issue', async () => {
     const fake = createFakeGh({ authOk: false });
     const project = plantCase(GITHUB_CONFIG);
@@ -233,7 +260,7 @@ describe('rafa issue create, dispatched', () => {
     expect(refused).toEqual({
       exitCode: 1,
       stdout: '',
-      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic\nUsage: ${USAGE}\n`,
+      stderr: `❌ --type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec\nUsage: ${USAGE}\n`,
     });
     expect(untitled.stderr).toBe(`❌ --title is required: --title=<value>\nUsage: ${USAGE}\n`);
     expect(argument.stderr).toBe(`❌ Expected no argument, got 1: bug\nUsage: ${USAGE}\n`);
