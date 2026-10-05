@@ -174,7 +174,7 @@ import {
 import { readBinPath } from '../project/bin-path.js';
 import { writePositionFile } from '../project/position.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
-import { ABSENT, PRESENT } from '../refs/stamp.js';
+import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
@@ -1649,7 +1649,7 @@ describe('the references row', () => {
     const world = plantWorld();
     const bare = plantWorld();
     plant(world.root, join('.rafa', 'specs', 'rafa-4-clean-spec.md'), 'Reads `src/here.ts`.\n');
-    plant(world.root, join('.rafa', 'specs', 'rafa-5-gone-spec.md'), 'Reads `src/gone.ts`.\n');
+    plant(world.root, join('.rafa', 'specs', 'rafa-5-gone-spec.md'), writeRefsBlock('Reads `src/gone.ts`.\n', [{ kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT }]));
     const copy = join('.rafa', 'specs', 'rafa-5-gone-spec.md');
 
     const text = await doctor(world, [], { seams: refsSeams(STILL_CLOCK) });

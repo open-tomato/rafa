@@ -20,7 +20,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { createGitRunner } from '../pr/git.js';
-import { issueFingerprint, writeRefsBlock } from '../refs/stamp.js';
+import { issueFingerprint, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 
 import { readDoctorRefs, renderDoctorRefs, roadmapRefsCells } from './doctor-refs.js';
@@ -64,7 +64,10 @@ function plantProject(): string {
   plant(
     root,
     join(SPECS, 'rafa-2-suspect-copy.md'),
-    writeRefsBlock('Builds on #7 and adds `src/missing.ts`.\n', [{ kind: 'issue', text: '#7', fingerprint: stamp }]),
+    writeRefsBlock('Builds on #7 and adds `src/missing.ts`.\n', [
+      { kind: 'issue', text: '#7', fingerprint: stamp },
+      { kind: 'path', text: 'src/missing.ts', fingerprint: PRESENT },
+    ]),
   );
   return root;
 }

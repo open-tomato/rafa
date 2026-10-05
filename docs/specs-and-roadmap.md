@@ -154,15 +154,18 @@ issue:
 ```
 
 For an issue it names which `##` sections changed, so you know what to
-reread. A reference to a file that does not exist yet is dangling too,
-even the first time: a spec that plans to create `src/a.ts` says so, and
-you accept it once.
+reread. A file, symbol, command, flag or key that does not exist yet
+the first time it is read is recorded as **new** rather than dangling:
+a spec that plans to create `src/a.ts` says so, and once the file
+exists rafa records it as fine without asking. An issue number that
+does not exist is dangling even the first time.
 
 There are two ways past the refusal. Edit the issue so the spec names
 what is there now, or, once you have looked and the spec still holds,
 run again with `--accept-refs`: rafa records every reference as reviewed
-and plans. A file you accepted as missing then reads as fine until it
-appears, and reads as changed from then on. A blocker named under
+and plans. A file you accepted as missing then reads as fine, and is
+recorded as fine when it appears; an issue you accepted as missing
+reads as changed once it exists. A blocker named under
 `Blocked by:` that has closed does not refuse; rafa prints
 `resolved #7 — rafa issue unblock 42` so you can take the spec off its
 blocked line. An issue in another repository that rafa cannot read is

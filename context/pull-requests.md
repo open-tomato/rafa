@@ -583,12 +583,17 @@ the session check 3 is part of, so a refusal from it spends no session:
    and neither `plan needs --issue` nor `issue ready` runs it.
 
    A reference the copy keeps no stamp for is stamped on that reading
-   and reads `ok`, except a target that does not exist, which is
-   `dangling` on its first read. What each state does:
+   and reads `ok`, except a target that does not exist: an issue is
+   `dangling` on its first read and stamped nothing, and any other kind
+   is stamped `new` and reads `new`. A target stamped `new`, or stamped
+   `absent` on any kind but an issue, that exists now is restamped with
+   its live fingerprint on the reading and reads `ok`; an issue stamped
+   `absent` that exists now reads `suspect` (`src/refs/reading.ts`).
+   What each state does:
 
    | State | What check 4 does |
    |---|---|
-   | `ok` | nothing |
+   | `ok`, `new` | nothing |
    | `dangling`, `suspect` | refuses, exit 2, every such row on its own line |
    | `resolved` | prints `resolved #<n> — rafa issue unblock <spec>` and goes on |
    | `unknown` | lists the row (a repository `gh` could not read) and goes on |

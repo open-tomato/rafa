@@ -212,14 +212,14 @@ describe('enforceRefsGate, with no acceptance', () => {
     ].join('\n'));
   });
 
-  it('refuses a target that does not exist on its first read, and stamps nothing for it', async () => {
+  it('refuses an issue that does not exist on its first read, and stamps nothing for it', async () => {
     const path = plantCopy('dangling-first', SPEC_LINES, null);
-    const { verify } = fakeVerifier({ 'path src/a.ts': ABSENT, 'issue #7': issue(ISSUE_7_BEFORE) });
+    const { verify } = fakeVerifier({ 'path src/a.ts': blobFingerprint(BLOB_BEFORE), 'issue #7': ABSENT });
 
     const exit = await refusal(enforceRefsGate({ path, issue: SPEC, source: SOURCE, verify, acceptance: 'none', output: capture().output }));
 
-    expect(exit.message).toContain('   • dangling src/a.ts (line 5)');
-    expect(readRefsBlock(readFileSync(path, 'utf8')).stamps?.map((stamp) => stamp.text)).toEqual(['#7']);
+    expect(exit.message).toContain('   • dangling #7 (line 7)');
+    expect(readRefsBlock(readFileSync(path, 'utf8')).stamps?.map((stamp) => stamp.text)).toEqual(['src/a.ts']);
   });
 
   it('refuses a suspect issue naming the heading whose text changed', async () => {
@@ -280,7 +280,10 @@ describe('enforceRefsGate, with no acceptance', () => {
 
   it('prints the resolved and unknown rows before a refusal the other rows make', async () => {
     const lines = ['# Spec', '', 'Blocked by: #9', '', 'Touches `src/a.ts` and acme/tools#3.'];
-    const stamps: RefStamp[] = [{ kind: 'issue', text: '#9', fingerprint: issueFingerprint({ title: 'Issue', body: 'x', state: 'open' }) }];
+    const stamps: RefStamp[] = [
+      { kind: 'issue', text: '#9', fingerprint: issueFingerprint({ title: 'Issue', body: 'x', state: 'open' }) },
+      { kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint(BLOB_BEFORE) },
+    ];
     const path = plantCopy('mixed', lines, stamps);
     const { verify } = fakeVerifier({ 'issue #9': issue('x', 'closed'), 'path src/a.ts': ABSENT, 'cross-issue acme/tools#3': UNREADABLE });
     const captured = capture();

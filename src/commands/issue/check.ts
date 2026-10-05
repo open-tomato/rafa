@@ -22,10 +22,11 @@
  *
  * Without `--stamp` it is `readCopyRefs` (`src/refs/reading.ts`): each
  * reference read against the stamp the copy keeps, and a reference it
- * keeps none for stamped on this read and reported `ok` — a copy
- * written before stamps existed reads all `ok` on its first check. That
- * first stamp is written back into the copy, which is the one write a
- * plain check makes.
+ * keeps none for stamped on this read — reported `ok` when its target
+ * exists and `new` when it is missing and not an issue — while a `new`
+ * stamp, or a non-issue `absent` one, whose target now exists is
+ * restamped and reported `ok`. Those stamps are written back into the
+ * copy, which is the one write a plain check makes.
  *
  * With `--stamp` every reference is re-stamped with its live
  * fingerprint (`restampCopyRefs`), `absent` for a missing target, so the

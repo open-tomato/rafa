@@ -44,7 +44,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { describeRegistry } from '../cli/describe.js';
 import { createGitRunner } from '../pr/git.js';
 import { readRefsText } from '../refs/reading.js';
-import { issueFingerprint, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
+import { issueFingerprint, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -137,10 +137,13 @@ const OLD_SEVEN: FakeIssue = { title: 'Seven', body: '## Design\n\nThe old desig
 /** Issue #7 as the board holds it now: its Design section changed. */
 const NEW_SEVEN: FakeIssue = { title: 'Seven', body: '## Design\n\nA new design.\n', state: 'OPEN' };
 
-/** A copy of issue 2 stamped with #7 as it was, naming a file that is not there. */
+/** A copy of issue 2 stamped with #7 as it was, naming a file stamped present and not there now. */
 function suspectCopy(): string {
   const stamp = issueFingerprint({ title: OLD_SEVEN.title, body: OLD_SEVEN.body, state: 'open' });
-  return writeRefsBlock('Builds on #7 and adds `src/missing.ts`.\n', [{ kind: 'issue', text: '#7', fingerprint: stamp }]);
+  return writeRefsBlock('Builds on #7 and adds `src/missing.ts`.\n', [
+    { kind: 'issue', text: '#7', fingerprint: stamp },
+    { kind: 'path', text: 'src/missing.ts', fingerprint: PRESENT },
+  ]);
 }
 
 /** The ok reading of `copies`, or a failure. */
@@ -221,7 +224,7 @@ describe('readDoctorRefs', () => {
   it('fails one copy whose refs block will not read, and still counts the others', async () => {
     const root = plantRepository('broken-block');
     plantCopy(root, 'rafa-1-broken-copy.md', '<!-- rafa:refs\n: not yaml [\n-->\nReads `src/a.ts`.\n');
-    plantCopy(root, 'rafa-2-fine-copy.md', 'Names `src/missing.ts`.\n');
+    plantCopy(root, 'rafa-2-fine-copy.md', writeRefsBlock('Names `src/missing.ts`.\n', [{ kind: 'path', text: 'src/missing.ts', fingerprint: PRESENT }]));
 
     const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS));
 
@@ -438,11 +441,17 @@ function warnings(): { lines: string[]; output: Output } {
   };
 }
 
+/** The stamps of a copy that read `rafa widget spin --spin-fast` present: dangling against a roster without them. */
+const WIDGET_STAMPS = [
+  { kind: 'command', text: 'rafa widget spin', fingerprint: PRESENT },
+  { kind: 'flag', text: '--spin-fast', fingerprint: PRESENT },
+] as const;
+
 /** The row read by the default verifier over two copies naming `rafa widget spin --spin-fast`, the checkout's roster answering `read`. */
 async function readWithCheckoutRoster(name: string, read: CheckoutRosterRead): Promise<{ reading: Extract<DoctorRefsReading, { ok: true }>; warned: string[]; asked: number }> {
   const root = plantRepository(name);
-  plantCopy(root, 'rafa-1-first-copy.md', 'Adds `rafa widget spin --spin-fast`.\n');
-  plantCopy(root, 'rafa-2-second-copy.md', 'Reads `rafa widget spin --spin-fast` again.\n');
+  plantCopy(root, 'rafa-1-first-copy.md', writeRefsBlock('Adds `rafa widget spin --spin-fast`.\n', WIDGET_STAMPS));
+  plantCopy(root, 'rafa-2-second-copy.md', writeRefsBlock('Reads `rafa widget spin --spin-fast` again.\n', WIDGET_STAMPS));
   const { lines, output } = warnings();
   let asked = 0;
 

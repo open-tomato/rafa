@@ -54,7 +54,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { BOARD_REFUSAL_EXIT } from '../../board/plan-spec.js';
 import { acceptStaleRefsPassLine } from '../../board/refs-gate.js';
 import { CommandExit } from '../../cli/command.js';
-import { ABSENT, PRESENT, readRefsBlock } from '../../refs/stamp.js';
+import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import {
@@ -73,8 +73,11 @@ afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
 
-/** A saved copy naming one file on line 5, which the fake verifier reads as gone. */
-const COPY = ['# Spec', '', '## Scope', '', 'Touches `src/gone.ts`.', ''].join('\n');
+/** A saved copy naming one file on line 5, stamped present, which the fake verifier reads as gone. */
+const COPY = writeRefsBlock(
+  ['# Spec', '', '## Scope', '', 'Touches `src/gone.ts`.', ''].join('\n'),
+  [{ kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT }],
+);
 
 /** The lines a run wrote, by level. */
 interface Lines {

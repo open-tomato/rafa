@@ -301,7 +301,7 @@ const STAMPS_BY_KIND: Readonly<Record<RefKind, readonly Fingerprint['kind'][]>> 
 };
 
 /** The kinds a target absent on its first reading reads `dangling` for rather than `new`. */
-const ISSUE_KINDS: ReadonlySet<RefKind> = new Set(['issue', 'cross-issue']);
+export const ISSUE_KINDS: ReadonlySet<RefKind> = new Set(['issue', 'cross-issue']);
 
 /** `text` with LF line breaks and no trailing whitespace on any line or at its end. */
 export function normaliseIssueText(text: string): string {

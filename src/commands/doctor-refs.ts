@@ -20,8 +20,9 @@
  *
  * Each copy is read by `readRefsText` (`../refs/reading.ts`) over its
  * text, and the copy it answers is thrown away: `doctor` reports and
- * writes nothing, so a reference a copy keeps no stamp for reads `ok`
- * here without being stamped. `rafa issue check <n>` is the reading
+ * writes nothing, so a reference a copy keeps no stamp for reads `ok`,
+ * or `new` for a missing target but an issue, here without being
+ * stamped. `rafa issue check <n>` is the reading
  * that writes that first stamp.
  *
  * ## Issue reads, once per run
