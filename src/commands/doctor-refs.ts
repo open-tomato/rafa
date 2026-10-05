@@ -79,7 +79,11 @@
  * holding a suspect or dangling reference, or one that could not be
  * read, then gets a line naming `rafa issue check <n>`; a copy holding
  * only unknown references gets a line saying why they were not
- * checked. Nothing here changes `doctor`'s exit code.
+ * checked. A `new` reference — a target the spec is to add, missing on
+ * its first reading or still missing under a `new` stamp — is counted
+ * in none of them, so a copy holding only `new` and `ok` references
+ * reads clean: it is not drift, and check 4 does not refuse it either.
+ * Nothing here changes `doctor`'s exit code.
  *
  * ## The roadmap's refs column
  *

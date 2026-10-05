@@ -1,7 +1,8 @@
 /**
  * Tests for `rafa issue check` (`check.ts`): a saved copy holding a
  * reference in each of the five states, read in text and json mode;
- * `--stamp` and the check after it; a copy's first check; the missing
+ * `--stamp` and the check after it; a copy's first check, its missing
+ * file printed, counted and given in json mode as `new`; the missing
  * copy and the line refusals.
  *
  * Every dispatched case runs from a project of its own under this
@@ -142,6 +143,9 @@ function resultOf(stdout: string): IssueCheckResult {
   return result.data as IssueCheckResult;
 }
 
+/** What follows a new row's text: the target is not there yet, and is not refused. */
+const NEW_NOTE = ' — not there yet, read as a target the spec is to add';
+
 /** The text-mode lines of the five-state copy read against its stamps. */
 const FIVE_STATE_LINES = [
   `Issue #${String(ISSUE)}: ${COPY_PATH}`,
@@ -278,6 +282,45 @@ describe('a copy checked for the first time', () => {
       .toEqual(['ok', 'ok', 'new', 'ok', 'ok', 'unknown']);
     expect(readRefsBlock(copyOf(project)).stamps?.map((stamp) => [stamp.text, stamp.fingerprint.kind]))
       .toEqual([['#7', 'issue'], ['src/a.ts', 'blob'], ['src/gone.ts', 'new'], ['alphaValue', 'present'], ['#8', 'issue']]);
+  });
+
+  it('prints the missing file as a new row with its note and counts it in the count line', async () => {
+    const project = plantCopyProject(BODY);
+
+    const outcome = await dispatchInProject(
+      ['issue', 'check', String(ISSUE)],
+      SUBJECTS,
+      [command(tableVerifier().verify)],
+      project,
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.trimEnd().split('\n')).toEqual([
+      `Issue #${String(ISSUE)}: ${COPY_PATH}`,
+      'ok issue #7 (line 3)',
+      'ok path src/a.ts (line 7)',
+      `new path src/gone.ts (line 7)${NEW_NOTE}`,
+      'ok symbol alphaValue (line 7)',
+      'ok issue #8 (line 7)',
+      'unknown cross-issue open-tomato/other#9 (line 9) — its repository could not be read, so it is not checked',
+      '6 references: 4 ok, 1 new, 1 unknown',
+    ]);
+  });
+
+  it('gives the missing file in json mode as state new, read absent and stamped new', async () => {
+    const project = plantCopyProject(BODY);
+
+    const outcome = await dispatchInProject(
+      ['issue', 'check', String(ISSUE), '--output=json'],
+      SUBJECTS,
+      [command(tableVerifier().verify)],
+      project,
+    );
+
+    const gone = resultOf(outcome.stdout).references.find((ref) => ref.text === 'src/gone.ts');
+    expect(gone === undefined
+      ? null
+      : [gone.state, gone.fingerprint, gone.stamp]).toEqual(['new', 'absent', 'new']);
   });
 });
 

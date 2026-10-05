@@ -44,7 +44,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { describeRegistry } from '../cli/describe.js';
 import { createGitRunner } from '../pr/git.js';
 import { readRefsText } from '../refs/reading.js';
-import { issueFingerprint, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
+import { issueFingerprint, NEW, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -169,6 +169,20 @@ describe('readDoctorRefs', () => {
       { issue: 2, path: join(SPECS, 'rafa-2-suspect-copy.md'), suspect: 1, dangling: 1, unknown: 0, error: null },
     ]);
     expect([reading.suspect, reading.dangling, reading.unknown]).toEqual([1, 1, 0]);
+  });
+
+  it('counts a new reference in no state, where a path stamped present and now missing reads dangling', async () => {
+    const root = plantRepository('new-refs');
+    plantCopy(root, 'rafa-1-first-copy.md', 'Adds `src/planned.ts` beside `src/a.ts`.\n');
+    plantCopy(root, 'rafa-2-new-copy.md', writeRefsBlock('Adds `src/planned.ts`.\n', [{ kind: 'path', text: 'src/planned.ts', fingerprint: NEW }]));
+    plantCopy(root, 'rafa-3-drift-copy.md', writeRefsBlock('Adds `src/planned.ts`.\n', [{ kind: 'path', text: 'src/planned.ts', fingerprint: PRESENT }]));
+
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS));
+    const clean = { ...reading, copies: reading.copies.slice(0, 2), dangling: 0 };
+
+    expect(reading.copies.map((copy) => [copy.issue, copy.suspect, copy.dangling, copy.unknown, copy.error]))
+      .toEqual([[1, 0, 0, 0, null], [2, 0, 0, 0, null], [3, 0, 1, 0, null]]);
+    expect(renderDoctorRefs(clean)).toEqual(['References: 2 saved copies, none suspect or dangling.']);
   });
 
   it('reads each issue once per run, across copies and across its two spellings', async () => {
