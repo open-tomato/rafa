@@ -2,7 +2,8 @@
  * Tests for check 4 of the readiness gate (`src/board/refs-gate.ts`):
  * the flag read off a command line, the acceptance a run holds, the
  * start-of-run pass line, and what each reference state does to a run —
- * refused, listed, or let through — with and without an acceptance.
+ * refused, listed, noted, or let through — with and without an
+ * acceptance.
  *
  * The targets are read through a fake verifier answering from a table
  * each case fills, and the copies are files under the temp directory,
@@ -15,7 +16,9 @@
  * and not a gate that refuses everything, and the stamps an acceptance
  * writes are the ones the next plain run reads. The pass line is paired
  * with the setting off printing nothing, and the memoised verifier with
- * a count of reads that a double reading would have doubled.
+ * a count of reads that a double reading would have doubled. A copy of
+ * `new` rows passing is paired with a stamped path deleted beside one,
+ * refused by the deleted path's name alone.
  */
 import type { Output } from '../ports/index.js';
 import type { LiveReading, RefStamp } from '../refs/stamp.js';
@@ -29,7 +32,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
 import { SETTINGS } from '../config-schema.js';
-import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
+import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -40,6 +43,7 @@ import {
   acceptStaleRefsPassLine,
   announceAcceptStaleRefs,
   enforceRefsGate,
+  newRowLine,
   readAcceptRefsFlag,
   refsAcceptance,
   refsRefusalMessage,
@@ -297,6 +301,96 @@ describe('enforceRefsGate, with no acceptance', () => {
     expect(exit.message).toContain('   • dangling src/a.ts (line 5)');
     expect(exit.message).not.toContain('#9');
     expect(exit.message).not.toContain('acme/tools#3');
+  });
+});
+
+describe('enforceRefsGate, over new rows', () => {
+  /** A spec naming two files the plan is to add, on lines 5 and 7. */
+  const NEW_LINES = ['# Spec', '', '## Scope', '', 'Adds `src/b.ts`.', '', 'Adds `src/c.ts` beside it.'];
+
+  /** The note each of {@link NEW_LINES}' files prints while it is absent. */
+  const NEW_NOTES = [
+    'new src/b.ts (line 5) — not there yet, read as a target the spec is to add, so it is not refused',
+    'new src/c.ts (line 7) — not there yet, read as a target the spec is to add, so it is not refused',
+  ];
+
+  it('lets a copy of new rows through with no acceptance, printing each as a note and stamping it new', async () => {
+    const path = plantCopy('new-rows', NEW_LINES, null);
+    const table = { 'path src/b.ts': ABSENT, 'path src/c.ts': ABSENT };
+    const captured = capture();
+
+    const answer = await enforceRefsGate({ path, issue: SPEC, source: SOURCE, verify: fakeVerifier(table).verify, acceptance: 'none', output: captured.output });
+
+    expect(answer.rows.map((row) => row.state)).toEqual(['new', 'new']);
+    expect(answer.accepted).toEqual([]);
+    expect(answer.restamped).toBe(false);
+    expect(captured.lines).toEqual({ info: NEW_NOTES, warn: [] });
+    expect(readRefsBlock(readFileSync(path, 'utf8')).stamps).toEqual([
+      { kind: 'path', text: 'src/b.ts', fingerprint: NEW },
+      { kind: 'path', text: 'src/c.ts', fingerprint: NEW },
+    ]);
+
+    const again = capture();
+    const second = await enforceRefsGate({ path, issue: SPEC, source: SOURCE, verify: fakeVerifier(table).verify, acceptance: 'none', output: again.output });
+    expect(second.rows.map((row) => row.state)).toEqual(['new', 'new']);
+    expect(again.lines.info).toEqual(NEW_NOTES);
+  });
+
+  it('prints a new row as a note beside the refusal a deleted stamped path makes, naming only the deleted path', async () => {
+    const lines = ['# Spec', '', 'Touches `src/a.ts`.', '', 'Adds `src/b.ts`.'];
+    const path = plantCopy('new-and-deleted', lines, null);
+    const firstRead = await enforceRefsGate({
+      path, issue: SPEC, source: SOURCE, acceptance: 'none', output: capture().output,
+      verify: fakeVerifier({ 'path src/a.ts': blobFingerprint(BLOB_BEFORE), 'path src/b.ts': ABSENT }).verify,
+    });
+    expect(firstRead.rows.map((row) => row.state)).toEqual(['ok', 'new']);
+    const captured = capture();
+
+    const exit = await refusal(enforceRefsGate({
+      path, issue: SPEC, source: SOURCE, acceptance: 'none', output: captured.output,
+      verify: fakeVerifier({ 'path src/a.ts': ABSENT, 'path src/b.ts': ABSENT }).verify,
+    }));
+
+    expect(exit.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(exit.message.split('\n').filter((line) => line.startsWith('   • '))).toEqual(['   • dangling src/a.ts (line 3)']);
+    expect(exit.message).not.toContain('src/b.ts');
+    expect(captured.lines.info).toEqual([
+      'new src/b.ts (line 5) — not there yet, read as a target the spec is to add, so it is not refused',
+    ]);
+  });
+
+  it('prints nothing for a new stamp whose target has arrived, which reads ok', async () => {
+    const path = plantCopy('new-arrived', NEW_LINES, [
+      { kind: 'path', text: 'src/b.ts', fingerprint: NEW },
+      { kind: 'path', text: 'src/c.ts', fingerprint: NEW },
+    ]);
+    const captured = capture();
+
+    const answer = await enforceRefsGate({ path, issue: SPEC, source: SOURCE, verify: fakeVerifier({}).verify, acceptance: 'none', output: captured.output });
+
+    expect(answer.rows.map((row) => row.state)).toEqual(['ok', 'ok']);
+    expect(captured.lines).toEqual({ info: [], warn: [] });
+  });
+
+  it('still prints the new rows under an acceptance, and accepts none of them', async () => {
+    const path = plantCopy('new-accepted', NEW_LINES, null);
+    const captured = capture();
+
+    const answer = await enforceRefsGate({
+      path, issue: SPEC, source: SOURCE, acceptance: 'flag', output: captured.output,
+      verify: fakeVerifier({ 'path src/b.ts': ABSENT, 'path src/c.ts': ABSENT }).verify,
+    });
+
+    expect(answer.accepted).toEqual([]);
+    expect(captured.lines.info).toEqual([...NEW_NOTES, '🔖 --accept-refs: re-stamped 2 references of issue #20 as reviewed.']);
+  });
+});
+
+describe('newRowLine', () => {
+  it('names the reference and its line', () => {
+    const row = { kind: 'flag', text: 'rafa plan create --fast', line: 12, state: 'new', fingerprint: ABSENT, stamp: NEW, changedHeadings: [], unblock: null } as const;
+
+    expect(newRowLine(row)).toBe('new rafa plan create --fast (line 12) — not there yet, read as a target the spec is to add, so it is not refused');
   });
 });
 

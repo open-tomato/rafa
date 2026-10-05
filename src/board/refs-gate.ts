@@ -5,15 +5,26 @@
  * (`.rafa/specs/rafa-151-references-specs-bugs-are.md`).
  *
  * The reading is `src/refs/reading.ts`'s: one {@link RefRow} per
- * reference, each in one of five states. This module holds what the
+ * reference, each in one of six states. This module holds what the
  * gate DOES with them, which is one of three things per state:
  *
  * | State | What check 4 does |
  * |---|---|
  * | `ok` | nothing |
+ * | `new` | prints the row as a note and goes on |
  * | `dangling`, `suspect` | refuses, with exit {@link BOARD_REFUSAL_EXIT}, naming every such row |
  * | `resolved` | prints `resolved #<n> — rafa issue unblock <n>` and goes on |
  * | `unknown` | prints the row and goes on |
+ *
+ * Only drift refuses: a target stamped present, a blob or an issue and
+ * now absent (`dangling`, and an issue number that does not exist on
+ * its first read), or one whose blob or issue text changed
+ * (`suspect`). A `new` row is a path, symbol, command, flag or key
+ * absent since the spec was first read — what the plan is to add — so
+ * it reads `new <text> (line <n>) — not there yet, read as a target
+ * the spec is to add, so it is not refused`, on every run until the
+ * target exists and the reading restamps it `ok`; see the state rules
+ * in `src/refs/stamp.ts`.
  *
  * A refused row reads `dangling <text> (line <n>)`, or `suspect
  * <text>: heading "<h>" changed (line <n>)` for an issue whose `##`
@@ -32,7 +43,7 @@
  * for every run, do the same thing: every reference of the spec is
  * re-stamped as reviewed (`restampCopyRefs`) and the run goes on to
  * plan. The rows are still read against the stamps the copy held
- * first, so the resolved and unknown lines are printed as on any run
+ * first, so the new, resolved and unknown lines are printed as on any run
  * and every dangling and suspect row is named as accepted, not passed
  * over in silence. The two readings share one memoised verifier, so
  * each target is read once: a `gh issue view` per issue, not two.
@@ -211,9 +222,15 @@ export function restampedLine(acceptance: Exclude<RefsAcceptance, 'none'>, sourc
   return `🔖 ${acceptedBy(acceptance)}: re-stamped ${String(count)} ${noun} of ${source} as reviewed.`;
 }
 
-/** Prints the resolved and unknown rows, which never refuse. */
+/** A new row: a note naming a target the spec is to add, and never refused. */
+export function newRowLine(row: RefRow): string {
+  return `new ${row.text} (line ${String(row.line)}) — not there yet, read as a target the spec is to add, so it is not refused`;
+}
+
+/** Prints the new, resolved and unknown rows, which never refuse. */
 function listPassingRows(rows: readonly RefRow[], output: Output): void {
   for (const row of rows) {
+    if (row.state === 'new') output.info(newRowLine(row));
     if (row.state === 'resolved') output.info(resolvedRowLine(row));
     if (row.state === 'unknown') output.info(unknownRowLine(row));
   }
@@ -258,7 +275,7 @@ async function refuseStale(options: RefsGateOptions, output: Output): Promise<Re
 
 /**
  * Runs check 4 over the saved copy at `options.path`, by the rules in
- * the module note: prints the resolved and unknown rows, and either
+ * the module note: prints the new, resolved and unknown rows, and either
  * re-stamps every reference when the run accepts them or refuses a
  * dangling or suspect one.
  *

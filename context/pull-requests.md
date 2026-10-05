@@ -593,7 +593,8 @@ the session check 3 is part of, so a refusal from it spends no session:
 
    | State | What check 4 does |
    |---|---|
-   | `ok`, `new` | nothing |
+   | `ok` | nothing |
+   | `new` | prints `new <text> (line <n>) — not there yet, …` as a note and goes on |
    | `dangling`, `suspect` | refuses, exit 2, every such row on its own line |
    | `resolved` | prints `resolved #<n> — rafa issue unblock <spec>` and goes on |
    | `unknown` | lists the row (a repository `gh` could not read) and goes on |

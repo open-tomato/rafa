@@ -156,8 +156,9 @@ issue:
 For an issue it names which `##` sections changed, so you know what to
 reread. A file, symbol, command, flag or key that does not exist yet
 the first time it is read is recorded as **new** rather than dangling:
-a spec that plans to create `src/a.ts` says so, and once the file
-exists rafa records it as fine without asking. An issue number that
+a spec that plans to create `src/a.ts` says so. rafa prints it as a
+note (`new src/a.ts (line 12) — not there yet, …`) on each run and plans
+anyway, and once the file exists records it as fine without asking. An issue number that
 does not exist is dangling even the first time.
 
 There are two ways past the refusal. Edit the issue so the spec names
