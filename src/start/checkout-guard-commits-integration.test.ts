@@ -252,8 +252,8 @@ function waitForPausedIdle(repo: string): Promise<true> {
     const sessions = readSessions(repo);
     const session = sessions.length === 1
       ? sessions[0]
-      : null;
-    return session !== null && session.state === 'paused' && session.task === null
+      : undefined;
+    return session !== undefined && session.state === 'paused' && session.task === null
       ? true
       : null;
   }, RUN_TIMEOUT);
