@@ -85,7 +85,7 @@ function plantStandIns(scratch: ScratchRepo): void {
   chmodSync(gh, 0o755);
 }
 
-function plantScratch(): ScratchRepo {
+function plantScratch(provider: string): ScratchRepo {
   const scratch = plantScratchRepo(tempBase);
   plantStandIns(scratch);
   writeDismissed(scratch.home, NOTICE_IDS);
@@ -95,13 +95,13 @@ function plantScratch(): ScratchRepo {
   git(scratch, 'checkout', '-q', '-b', 'feat/store');
   mkdirSync(join(scratch.repo, '.plans'));
   writeFileSync(join(scratch.repo, '.plans', 'PLAN-store.md'), '# Plan: store\n\n- [ ] A task\n', 'utf8');
-  plantProjectConfig(scratch.repo, 'pr:\n  provider: none\n');
+  plantProjectConfig(scratch.repo, `pr:\n  provider: ${provider}\n`);
   return scratch;
 }
 
 describe('the pr event of a wrap-up under RAFA_OUTPUT=text', () => {
   it('writes the pr line to the run\'s events file though text prints none', () => {
-    const scratch = plantScratch();
+    const scratch = plantScratch('gh');
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], { RAFA_OUTPUT: 'text' });
 
@@ -115,5 +115,19 @@ describe('the pr event of a wrap-up under RAFA_OUTPUT=text', () => {
     expect(pr[0]?.data.number).toBe(PULL_NUMBER);
     expect(lines.some((line) => line.name === 'no-pr')).toBe(false);
     expect(run.stdout).not.toContain('"name":"pr"');
+  }, RUN_TIMEOUT);
+
+  it('writes the no-pr line to the events file under pr.provider none, never asking gh', () => {
+    const scratch = plantScratch('none');
+
+    runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], { RAFA_OUTPUT: 'text' });
+
+    const files = readdirSync(runsDir(scratch.repo)).filter((name) => name.endsWith(EVENTS_EXTENSION));
+    expect(files).toHaveLength(1);
+    const text = readFileSync(join(runsDir(scratch.repo), files[0] ?? ''), 'utf8');
+    const lines: Array<{ name: string }> = text.split('\n').filter((line) => line !== '')
+      .map((line) => JSON.parse(line));
+    expect(lines.filter((line) => line.name === 'no-pr')).toHaveLength(1);
+    expect(lines.some((line) => line.name === 'pr')).toBe(false);
   }, RUN_TIMEOUT);
 });
