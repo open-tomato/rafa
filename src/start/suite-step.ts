@@ -190,6 +190,15 @@
  * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
  * {@link settleStep}, {@link retakeOnErrors}, {@link Settling} and
  * {@link StepRuns}) are exported for it alone.
+ *
+ * ## Where the task step's diff checks live
+ *
+ * The checks a task step takes over its diff after its test run, the
+ * lint above, are in `task-step-checks.ts` (`taskDiffChecks`); this note
+ * stays their account too. {@link SuiteStepSeams},
+ * {@link SuiteStepContext}, {@link TaskStepInput}, {@link Settling},
+ * {@link isStepInterrupted} and {@link SIGINT_EXIT_CODE} are what that
+ * module imports back from here.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
@@ -228,10 +237,11 @@ import {
 } from '../suite/scope.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { runEslint, runLintStep } from './lint-step.js';
+import { runEslint } from './lint-step.js';
 import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
+import { taskDiffChecks } from './task-step-checks.js';
 
 export { blockerText } from './suite-blocker.js';
 export { runDueStageSteps, runStageStep } from './suite-stage-step.js';
@@ -716,12 +726,6 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
   return foldResults(first, second, SIGINT_EXIT_CODE);
 }
 
-/** Lints the task's diff (`lint-step.ts`). */
-function lintTask(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput): Promise<LintOutcome> {
-  const isInterrupted = context.isInterrupted ?? (() => false);
-  return runLintStep({ checkout: context.checkout, base: input.base, task: input.task, git: seams.git, runLint: seams.runLint, stopCode: SIGINT_EXIT_CODE, isInterrupted });
-}
-
 /** Runs the task step after a task commits; see the module note. */
 export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
   const seams = seamsOf(context);
@@ -732,10 +736,8 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const recorded = scope?.scope ?? 'full';
   const result = await runWithAlwaysRun(context, seams, 'task', runs);
   const label = `task step after "${input.task}"`;
-  const lint = isStepInterrupted(context, result)
-    ? {}
-    : { lint: await lintTask(context, seams, input) };
-  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...lint };
+  const checks = await taskDiffChecks(context, seams, input, result);
+  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
   const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs)));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
