@@ -155,7 +155,8 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   });
   // The run's base, resolved ONCE here and handed to every reader of
   // it: the wrap-up's and each retry's `gh pr create --base` bullet,
-  // the runner's own open, and the retarget of a delivered pull request.
+  // the runner's own open, the retarget of a delivered pull request,
+  // and the CI gate's repair prompts, which name `origin/<base>`.
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
   const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
@@ -215,6 +216,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
       Math.max(1, ciTimeoutMin) * 60_000,
       Math.max(0, ciAttempts),
       settingSources,
+      base,
       // The gate takes its own path when this reads `none`: the
       // branch pushed, the compare URL printed and no CI wait
       // (`start/pr-lifecycle.ts`). The reading is made here
