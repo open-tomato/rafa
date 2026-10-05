@@ -747,6 +747,143 @@ describe('runTaskStep linting the task\'s diff', () => {
   });
 });
 
+describe('runTaskStep type-checking the task\'s test files', () => {
+  const input = { baseline: baselineWith(), base: BASE, declared: 'affected' as const, task: 'second task' };
+  const lintKey = `diff --name-only -z --no-renames --diff-filter=d ${BASE} HEAD`;
+  const typeKey = `diff --name-status -z --find-renames --diff-filter=d ${BASE} HEAD`;
+  const typeError = 'src/a.test.ts(3,7): error TS2322: Type \'string\' is not assignable to type \'number\'.';
+  const typeRed = { exitCode: 2, stdout: `${typeError}\n`, stderr: '' };
+  const typeGreen = { exitCode: 0, stdout: '', stderr: '' };
+  const typeBlocker = 'The runner\'s type step after "second task" found type errors in the task\'s test files that base0000 did not hold. '
+    + 'New errors: src/a.test.ts:3:7 TS2322 Type \'string\' is not assignable to type \'number\'.. '
+    + 'Fix them, then check src/a.test.ts with tsc --noEmit --pretty false -p over a tsconfig outside the checkout '
+    + 'that extends its tsconfig.json by absolute path and lists them under files.';
+
+  /** A git answering the task step's diff, the lint step's and the type step's, the test file added since {@link BASE}. */
+  function gitTyping(): GitRunner {
+    const paths = ['src/a.ts', 'src/a.test.ts'];
+    const tests = gitAt({ [BASE]: paths });
+    return (args) => {
+      const key = args.join(' ');
+      if (key === lintKey) return { ok: true, stdout: paths.map((path) => `${path}\0`).join(''), stderr: '' };
+      if (key === typeKey) return { ok: true, stdout: 'M\0src/a.ts\0A\0src/a.test.ts\0', stderr: '' };
+      return tests(args);
+    };
+  }
+
+  /** Seams type-checking with `answer`, recording each tsc spawn; `during` runs inside the spawn. */
+  function typing(answer: { exitCode: number; stdout: string; stderr: string }, spawns: { cwd: string; argv: readonly string[] }[] = [], during: () => void = () => {}): SuiteStepSeams {
+    return {
+      git: gitTyping(),
+      runLint: () => Promise.resolve({ exitCode: 0, stdout: '[]', stderr: '' }),
+      runTypes: (options) => {
+        spawns.push({ cwd: options.cwd, argv: options.argv });
+        during();
+        return Promise.resolve(answer);
+      },
+    };
+  }
+
+  beforeEach(() => {
+    writeFileSync(join(dir, 'tsconfig.json'), '{}\n', 'utf8');
+  });
+
+  it('type-checks the task\'s test file after a green test run and stays green on no type error', async () => {
+    const spawns: { cwd: string; argv: readonly string[] }[] = [];
+    const { context } = contextWith([result()], { seams: typing(typeGreen, spawns) });
+    const outcome = await runTaskStep(context, input);
+    expect(spawns).toHaveLength(1);
+    expect(spawns[0]?.cwd).toBe(dir);
+    expect(spawns[0]?.argv[0]).toBe(join(dir, 'node_modules', '.bin', 'tsc'));
+    expect(spawns[0]?.argv.slice(3)).toEqual(['--noEmit', '--pretty', 'false']);
+    expect(outcome).toMatchObject({ red: false, interrupted: false, blocker: null, blockedLine: null });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('is red on a new type error under green tests and a green lint, inserting a repair task blocked on the type step\'s text', async () => {
+    const { context, seen } = contextWith([result()], { seams: typing(typeRed) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: true, interrupted: false, blockedLine: 9, blocker: typeBlocker });
+    expect(seen.steps[0]?.newFailures).toEqual([]);
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.status).toBe('blocked');
+    expect(next?.blocker).toBe(typeBlocker);
+  });
+
+  it('runs no type step in a checkout with no tsconfig.json, where the same new error blocks with one', async () => {
+    rmSync(join(dir, 'tsconfig.json'));
+    const spawns: { cwd: string; argv: readonly string[] }[] = [];
+    const { context } = contextWith([result()], { seams: typing(typeRed, spawns) });
+    expect(await runTaskStep(context, input)).toMatchObject({ red: false, blocker: null });
+    expect(spawns).toEqual([]);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('writes one blocker holding the tests\' text, then the lint\'s, then the type step\'s, when all three are red', async () => {
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+    const lintReport = JSON.stringify([{ filePath: join(dir, 'src/a.ts'), messages: [], errorCount: 1 }]);
+    const seams: SuiteStepSeams = { ...typing(typeRed), runLint: () => Promise.resolve({ exitCode: 1, stdout: lintReport, stderr: '' }) };
+    const { context } = contextWith([red([FRESH])], { seams });
+    const outcome = await runTaskStep(context, input);
+    const blocker = outcome.blocker ?? '';
+    const tested = blocker.indexOf('The runner\'s task step after "second task" found failures');
+    const linted = blocker.indexOf('The runner\'s lint step after "second task" found ESLint errors');
+    const typed = blocker.indexOf(typeBlocker);
+    expect(tested).toBe(0);
+    expect(linted).toBeGreaterThan(tested);
+    expect(typed).toBeGreaterThan(linted);
+    expect(blocker.endsWith(typeBlocker)).toBe(true);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(blocker);
+  });
+
+  it('retakes nothing when the type step is red beside an excess of errors outside any test', async () => {
+    const excess = result({ exitCode: 1, errors: 1, unhandled: [{ file: 'src/boom.test.ts', firstLine: 'TypeError: boom' }] });
+    const { context, seen } = contextWith([excess, result()], { seams: typing(typeRed) });
+    const outcome = await runTaskStep(context, input);
+    expect(seen.runs).toHaveLength(1);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker?.endsWith(typeBlocker)).toBe(true);
+  });
+
+  it('reads a type step ended on the stop code as a stop, blocking nothing', async () => {
+    const { context, seen } = contextWith([result()], { seams: typing({ ...typeRed, exitCode: SIGINT_EXIT_CODE }) });
+    const outcome = await runTaskStep(context, input);
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null, blockedLine: null });
+    expect(seen.steps).toHaveLength(1);
+    expect(seen.steps[0]?.interrupted).toBe(true);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('reads a SIGINT the runner received while tsc ran as a stop, though tsc printed a new error', async () => {
+    let sigint = false;
+    const spawns: { cwd: string; argv: readonly string[] }[] = [];
+    const { context, seen } = contextWith([result()], { seams: typing(typeRed, spawns, () => {
+      sigint = true;
+    }) });
+    const outcome = await runTaskStep({ ...context, isInterrupted: () => sigint }, input);
+    expect(spawns).toHaveLength(1);
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(seen.steps[0]?.interrupted).toBe(true);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('runs no type step after a lint read as a stop', async () => {
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n', 'utf8');
+    const spawns: { cwd: string; argv: readonly string[] }[] = [];
+    const seams: SuiteStepSeams = { ...typing(typeRed, spawns), runLint: () => Promise.resolve({ exitCode: SIGINT_EXIT_CODE, stdout: '', stderr: '' }) };
+    const { context } = contextWith([result()], { seams });
+    expect((await runTaskStep(context, input)).interrupted).toBe(true);
+    expect(spawns).toEqual([]);
+  });
+
+  it('runs no type step after a test run read as a stop', async () => {
+    const spawns: { cwd: string; argv: readonly string[] }[] = [];
+    const { context } = contextWith([killed()], { seams: typing(typeRed, spawns) });
+    expect((await runTaskStep(context, input)).interrupted).toBe(true);
+    expect(spawns).toEqual([]);
+  });
+});
+
 describe('dueStages', () => {
   it('answers a finished stage while a task is open, and nothing once the ledger names it', () => {
     expect(dueStages(TRACKER, [])).toEqual([{ stage: 0, name: 'One' }]);

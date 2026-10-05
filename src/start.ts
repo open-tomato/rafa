@@ -160,10 +160,13 @@
  * for the next open task; before the wrap-up, the full suite runs as the
  * pre-wrap-up step. Once a task is committed `done` and its
  * report stored, the task step runs over what it changed since the
- * commit it was dispatched on, the base its prompt names, and lints the
- * files it changed (`start/lint-step.ts`). A step with failures the
- * baseline does not hold, or a task step with ESLint errors, is red: it
- * inserts a `[BLOCKED]` repair task above the first open task, or blocks
+ * commit it was dispatched on, the base its prompt names, lints the
+ * files it changed (`start/lint-step.ts`), and type-checks the test
+ * files it changed against the same files at that base
+ * (`start/type-step.ts`). A step with failures the baseline does not
+ * hold, or a task step with ESLint errors or a type error its base did
+ * not hold, is red: it inserts a `[BLOCKED]` repair task above the first
+ * open task, or blocks
  * the repair it followed (`start/suite-blocker.ts`), and the run stops as
  * it does after a blocked task, so the next run dispatches that repair
  * handed the failing files. A red pre-wrap-up step inserts its repair
