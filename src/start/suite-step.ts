@@ -46,8 +46,12 @@
  *
  * Unless its test run was a stop, a task step then lints the task's diff
  * (`lint-step.ts`: `bunx eslint --no-warn-ignored`, red on a nonzero
- * exit). A red lint makes the step red: its text follows the tests' own
- * in the one blocker, and a lint ended by SIGINT makes the step a stop.
+ * exit) and, unless the lint was a stop, type-checks the `*.test.ts`
+ * files of that diff against the same files at the task's base
+ * (`type-step.ts`: red on an error the base did not hold). A red lint or
+ * a red type step makes the step red: their texts follow the tests' own
+ * in the one blocker, the lint's before the type step's, and either one
+ * ended by SIGINT makes the step a stop.
  *
  * **A stage step** runs over the stage's diff: from the commit the last
  * stage step was taken at (the stage ledger, below) or, before any, the
@@ -91,14 +95,16 @@
  * file and full test name, compared as a pair: `splitFailures`), when it
  * counts more errors outside any test than the baseline counted, or when
  * it exited nonzero with no summary line, so that Bun reported nothing
- * this module could read; a task step is also red on a red lint (above).
+ * this module could read; a task step is also red on a red lint or a red
+ * type step (above).
  * Known failures are printed as known and never make a step red. The
  * error rule compares a scoped run's count against the FULL baseline's,
  * so an inherited load error outside the scope can hide a new one inside
  * it; the pre-wrap-up step, a full run, catches it.
  *
  * A task, stage or pre-wrap-up step whose only red is that excess of
- * errors outside any test (no new failure, a summary read, no red lint)
+ * errors outside any test (no new failure, a summary read, no red lint
+ * and no red type step)
  * is retaken once over the same run ({@link retakeOnErrors}), since such
  * an error can come from a file that throws on one load and not the
  * next. The first run is recorded and printed with the file and first
@@ -190,9 +196,20 @@
  * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
  * {@link settleStep}, {@link retakeOnErrors}, {@link Settling} and
  * {@link StepRuns}) are exported for it alone.
+ *
+ * ## Where the task step's diff checks live
+ *
+ * The checks a task step takes over its diff after its test run, the
+ * lint and the type step above, are in `task-step-checks.ts`
+ * (`taskDiffChecks`); this note stays their account too.
+ * {@link SuiteStepSeams},
+ * {@link SuiteStepContext}, {@link TaskStepInput}, {@link Settling},
+ * {@link isStepInterrupted} and {@link SIGINT_EXIT_CODE} are what that
+ * module imports back from here.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
+import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
 import type { SessionStep, SessionStepKind, SessionStepReason } from '../loop/sessions.js';
@@ -228,10 +245,12 @@ import {
 } from '../suite/scope.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { runEslint, runLintStep } from './lint-step.js';
+import { runEslint } from './lint-step.js';
 import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
+import { taskDiffChecks } from './task-step-checks.js';
+import { runTsc } from './type-step.js';
 
 export { blockerText } from './suite-blocker.js';
 export { runDueStageSteps, runStageStep } from './suite-stage-step.js';
@@ -265,6 +284,8 @@ export interface SuiteStepSeams {
   readonly now?: () => Date;
   /** Spawns the task step's ESLint run; `runEslint` (`lint-step.ts`) when left out. */
   readonly runLint?: LintRunner;
+  /** Spawns the task step's tsc runs; `runTsc` (`type-step.ts`) when left out. */
+  readonly runTypes?: TypeRunner;
 }
 
 /** What every step runs against, as `start()` settles it. */
@@ -354,6 +375,7 @@ export function seamsOf(context: SuiteStepContext): Required<SuiteStepSeams> {
     readPreloadFiles: seams.readPreloadFiles ?? readPreloadFiles,
     now: seams.now ?? (() => new Date()),
     runLint: seams.runLint ?? runEslint,
+    runTypes: seams.runTypes ?? runTsc,
   };
 }
 
@@ -548,6 +570,25 @@ export interface Settling {
   readonly repair: { readonly kind: RepairStepKind; readonly task?: string } | null;
   /** The task step's lint, when it ran; see the module note. */
   readonly lint?: LintOutcome;
+  /** The task step's type step, when it ran; see the module note. */
+  readonly types?: TypeOutcome;
+}
+
+/** The task step's diff checks `settling` carries, in the order their blockers are written. */
+function checksOf(settling: Pick<Settling, 'lint' | 'types'>): readonly (LintOutcome | TypeOutcome)[] {
+  return [settling.lint, settling.types].filter((check) => check !== undefined);
+}
+
+/** True when one of `settling`'s diff checks was read as a stop on SIGINT. */
+function isCheckInterrupted(settling: Pick<Settling, 'lint' | 'types'>): boolean {
+  return checksOf(settling).some((check) => check.interrupted);
+}
+
+/** The blockers of `settling`'s red diff checks, the lint's first. */
+function checkBlockers(settling: Pick<Settling, 'lint' | 'types'>): readonly string[] {
+  return checksOf(settling).flatMap((check) => check.blocker === null
+    ? []
+    : [check.blocker]);
 }
 
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
@@ -563,20 +604,18 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
 export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result, baseline } = settling;
-  if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settleInterrupted(seams, settling);
+  if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settleInterrupted(seams, settling);
   const verdict = verdictOf(result, baseline);
   const step = stepOf(settling, result, verdict.fresh);
   recordStep(seams, step);
   announce(label, result, verdict.known);
-  const lintBlocker = settling.lint?.blocker ?? null;
-  if (!isRed(verdict) && lintBlocker === null) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
+  const checked = checkBlockers(settling);
+  if (!isRed(verdict) && checked.length === 0) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
 
   const tested = isRed(verdict)
     ? [blockerText(label, result, verdict)]
     : [];
-  const blocker = [...tested, ...(lintBlocker === null
-    ? []
-    : [lintBlocker])].join(' ');
+  const blocker = [...tested, ...checked].join(' ');
   activeOutput().error(`❌ ${blocker}`);
   const written = settling.repair === null
     ? null
@@ -588,8 +627,8 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
 }
 
 /** True when a step's only red is errors outside any test over the baseline's count. */
-function isErrorsOnly(verdict: StepVerdict, lint: LintOutcome | undefined): boolean {
-  return verdict.newErrors > 0 && verdict.fresh.length === 0 && !verdict.unreported && (lint?.blocker ?? null) === null;
+function isErrorsOnly(verdict: StepVerdict, settling: Pick<Settling, 'lint' | 'types'>): boolean {
+  return verdict.newErrors > 0 && verdict.fresh.length === 0 && !verdict.unreported && checkBlockers(settling).length === 0;
 }
 
 /**
@@ -599,9 +638,9 @@ function isErrorsOnly(verdict: StepVerdict, lint: LintOutcome | undefined): bool
  */
 export async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
   const { label, result, baseline } = settling;
-  if (isStepInterrupted(context, result) || settling.lint?.interrupted === true) return settling;
+  if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settling;
   const verdict = verdictOf(result, baseline);
-  if (!isErrorsOnly(verdict, settling.lint)) return settling;
+  if (!isErrorsOnly(verdict, settling)) return settling;
   recordStep(seams, stepOf(settling, result, verdict.fresh));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
@@ -716,12 +755,6 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
   return foldResults(first, second, SIGINT_EXIT_CODE);
 }
 
-/** Lints the task's diff (`lint-step.ts`). */
-function lintTask(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput): Promise<LintOutcome> {
-  const isInterrupted = context.isInterrupted ?? (() => false);
-  return runLintStep({ checkout: context.checkout, base: input.base, task: input.task, git: seams.git, runLint: seams.runLint, stopCode: SIGINT_EXIT_CODE, isInterrupted });
-}
-
 /** Runs the task step after a task commits; see the module note. */
 export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
   const seams = seamsOf(context);
@@ -732,10 +765,8 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const recorded = scope?.scope ?? 'full';
   const result = await runWithAlwaysRun(context, seams, 'task', runs);
   const label = `task step after "${input.task}"`;
-  const lint = isStepInterrupted(context, result)
-    ? {}
-    : { lint: await lintTask(context, seams, input) };
-  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...lint };
+  const checks = await taskDiffChecks(context, seams, input, result);
+  const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
   const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs)));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)

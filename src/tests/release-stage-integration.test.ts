@@ -28,6 +28,7 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { GitRunner, PrProviderReading } from '../pr/index.js';
+import type { ReleaseLevelSource } from '../release/level.js';
 import type { ReleasePreparation } from '../release/prepare.js';
 import type { ReportChange } from '../report/parse.js';
 import type { ReleaseFinish, ReleaseStageSettings } from '../start/release-stage.js';
@@ -380,7 +381,7 @@ describe('the release stage over a scratch repository', () => {
 
       // Pushed to the bare origin, not merely committed locally.
       const remoteTip = createGitRunner(scratch.origin)(['rev-parse', BRANCH]).stdout.trim();
-      expect(remoteTip).toBe(finish.sha);
+      expect(remoteTip).toBe(finish.sha as string);
 
       // The body gained the forecast, folded over the real base version,
       // and the level report, since the notes reach major.
@@ -436,7 +437,7 @@ describe('the release stage over a scratch repository', () => {
       throw new Error(`expected a prepared release, got ${JSON.stringify(preparation)}`);
     }
     expect(preparation.level).toBe('none');
-    expect(preparation.levelSource).toBe(source);
+    expect(preparation.levelSource).toBe(source as ReleaseLevelSource);
 
     const finish = await finishRelease(
       { repoRoot: scratch.repo, branch: BRANCH, settings: SETTINGS, preparation },

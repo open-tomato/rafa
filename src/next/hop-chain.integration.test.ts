@@ -53,7 +53,7 @@ const RUN_TIMEOUT = { timeout: 30_000 };
 const HOME: Place = { board: 10, epic: 20 };
 
 /** Where `#40 far` sits, across boards from home. */
-const FAR: Place = { board: 11, epic: 40 };
+const FAR = { board: 11, epic: 40 } satisfies Place;
 
 /** H: the issue every `decideHop` case here blocks, not itself on the listing. */
 const BLOCKED = 900;
@@ -156,7 +156,7 @@ async function boardView(gh: ReturnType<typeof createGhRunner>): Promise<BoardVi
 }
 
 describe('locateBlockerEpic, over a real board listing spanning two boards', () => {
-  it('places #101 in epic #40 on board #11, across boards from home', RUN_TIMEOUT, async () => {
+  it('places #101 in epic #40 on board #11, across boards from home', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -164,11 +164,11 @@ describe('locateBlockerEpic, over a real board listing spanning two boards', () 
     const located = await locateBlockerEpic({ blocker: 101, home: HOME, view });
 
     expect(located).toEqual({ kind: 'located', blocker: 101, epic: FAR.epic, slug: 'far', board: FAR.board });
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('decideHop, halt, over a real board listing', () => {
-  it('halts with the chain when C (#102) has an open blocker B (#103)', RUN_TIMEOUT, async () => {
+  it('halts with the chain when C (#102) has an open blocker B (#103)', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -184,9 +184,9 @@ describe('decideHop, halt, over a real board listing', () => {
       to: FAR,
       fault: null,
     });
-  });
+  }, RUN_TIMEOUT);
 
-  it('halts on the mutual block when C (#104) is blocked by H itself', RUN_TIMEOUT, async () => {
+  it('halts on the mutual block when C (#104) is blocked by H itself', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -202,11 +202,11 @@ describe('decideHop, halt, over a real board listing', () => {
       to: FAR,
       fault: null,
     });
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('decideHop, wait, over a real open pull request list', () => {
-  it('waits when an open pull request (#55) closes C (#106)', RUN_TIMEOUT, async () => {
+  it('waits when an open pull request (#55) closes C (#106)', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -227,5 +227,5 @@ describe('decideHop, wait, over a real open pull request list', () => {
       board: FAR.board,
       taken: { by: 'pull-request', pullRequest: 55 },
     });
-  });
+  }, RUN_TIMEOUT);
 });

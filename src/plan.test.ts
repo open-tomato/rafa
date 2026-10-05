@@ -277,6 +277,8 @@ type Outcome =
   | 'not-ready-rejection'
   /** Rejects with a failed session whose output held no review block. */
   | 'absent-review'
+  /** Rejects as the adapter does on a session that returned no review block. */
+  | 'missing-review'
   /** Writes the plan, holding a header to stamp, and answers it with no review. */
   | 'plan-written';
 

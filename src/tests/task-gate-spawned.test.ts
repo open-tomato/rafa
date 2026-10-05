@@ -253,7 +253,7 @@ interface Observed {
   readonly prompt: string;
   /** The run's session id, which names its `.rafa/runs/<session>/` directory; null when no record was written. */
   readonly sessionId: string | null;
-  readonly taskStep: { readonly newFailures: readonly { readonly file: string }[]; readonly scope: string } | undefined;
+  readonly taskStep: { readonly newFailures: readonly { readonly file: string }[]; readonly scope: string | readonly string[] } | undefined;
 }
 
 /** Runs the loop over `scratch` in text mode, with `env` added, and reads what the cases assert on. */

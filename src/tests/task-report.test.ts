@@ -808,8 +808,10 @@ describe('rafa start, over a stand-in claude', () => {
 
     expect(run).toMatchObject({ exitCode: 0 });
     expect(callCount(scratch)).toBe(4);
-    const ids = [1, 2, 3].map((n) => requireSessionId(scratch, n));
-    const [reporting, silent, late] = ids;
+    const reporting = requireSessionId(scratch, 1);
+    const silent = requireSessionId(scratch, 2);
+    const late = requireSessionId(scratch, 3);
+    const ids = [reporting, silent, late];
     for (const id of ids) expect(id).toMatch(UUID);
     expect(new Set(ids).size).toBe(3);
     expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', reporting]);
