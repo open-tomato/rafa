@@ -141,8 +141,9 @@
  * ## Commands and flags
  *
  * Both are read against the `describe` roster ({@link DescribeDocument}),
- * handed in rather than built here so that the roster is the one the
- * invocation was routed through, module actions included.
+ * handed in rather than built here so that the caller picks it:
+ * `src/commands/plan/refs-check.ts` hands in the checkout's own roster
+ * when the project root is rafa itself, and the core roster otherwise.
  *
  * A command `rafa <word> [<word>]` is `present` when some spelling the
  * roster holds opens with those words: a subject and its plural, a

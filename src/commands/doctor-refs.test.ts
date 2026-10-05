@@ -12,6 +12,9 @@
  * `gh issue view` from a table each case fills and recording every call.
  * The verifier is `createRefVerifier` over those two, handed in through
  * the `refsVerifier` seam with no `ts-symbols` and the core roster.
+ * The roster cases alone read through the row's default verifier, with
+ * no `ts-symbols` on the `PATH` they hand it, no board, and the
+ * checkout's own roster answered through the `checkoutRoster` seam.
  *
  * ## The controls
  *
@@ -20,9 +23,16 @@
  * `gh` calls, where a reader asked per reference would make two; the
  * read-nothing case holds that the same copy read by `readRefsText`
  * WOULD change, so the unchanged bytes on disk are the row's doing.
+ * The roster read from the checkout is paired with a checkout that is
+ * not rafa and one whose roster failed, over the same copies, which
+ * read the command and flag only the checkout's roster holds as
+ * dangling.
  */
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { DescribeDocument } from '../cli/describe.js';
+import type { Output } from '../ports/index.js';
+import type { CheckoutRosterRead } from './plan/refs-check.js';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,6 +46,7 @@ import { createGitRunner } from '../pr/git.js';
 import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
   issueCheckCommand,
@@ -46,6 +57,7 @@ import {
   renderDoctorRefs,
   roadmapRefsCells,
 } from './doctor-refs.js';
+import { checkoutRosterWarning } from './plan/refs-check.js';
 
 import { CORE_REGISTRY } from './index.js';
 
@@ -385,5 +397,91 @@ describe('listedIssueReader', () => {
     await read(7);
 
     expect(asked).toEqual(['#7']);
+  });
+});
+
+/** A roster holding only `rafa widget spin --spin-fast`, which no core roster holds. */
+const CHECKOUT_ROSTER: DescribeDocument = {
+  schemaVersion: 2,
+  binary: 'rafa',
+  version: '9.9.9-planted',
+  subjects: [{
+    name: 'widget',
+    summary: 'widgets',
+    actions: [{
+      name: 'spin',
+      summary: 'spin a widget',
+      description: '',
+      args: [],
+      flags: [{ name: 'spin-fast', description: '', type: 'boolean', required: false, default: null, aliases: [] }],
+      examples: [],
+      outputs: ['text'],
+      aliases: [],
+      deprecated: null,
+      module: null,
+      spends: null,
+    }],
+  }],
+  commands: [],
+};
+
+/** An Output keeping the warning lines it is handed. */
+function warnings(): { lines: string[]; output: Output } {
+  const lines: string[] = [];
+  return {
+    lines,
+    output: sinkOutput({
+      warn: (message) => {
+        lines.push(message);
+      },
+    }),
+  };
+}
+
+/** The row read by the default verifier over two copies naming `rafa widget spin --spin-fast`, the checkout's roster answering `read`. */
+async function readWithCheckoutRoster(name: string, read: CheckoutRosterRead): Promise<{ reading: Extract<DoctorRefsReading, { ok: true }>; warned: string[]; asked: number }> {
+  const root = plantRepository(name);
+  plantCopy(root, 'rafa-1-first-copy.md', 'Adds `rafa widget spin --spin-fast`.\n');
+  plantCopy(root, 'rafa-2-second-copy.md', 'Reads `rafa widget spin --spin-fast` again.\n');
+  const { lines, output } = warnings();
+  let asked = 0;
+
+  const reading = okReading(await readDoctorRefs(
+    { root, specsDir: SPECS, gh: null, env: { PATH: '' }, output },
+    {
+      checkoutRoster: async () => {
+        asked += 1;
+        return read;
+      },
+    },
+  ));
+  return { reading, warned: lines, asked };
+}
+
+describe('the roster the row reads commands and flags against', () => {
+  it('is the checkout\'s own when the root is rafa, read once for every copy, with no warning', async () => {
+    const { reading, warned, asked } = await readWithCheckoutRoster('roster-read', { kind: 'read', roster: CHECKOUT_ROSTER });
+
+    expect([reading.suspect, reading.dangling, reading.unknown]).toEqual([0, 0, 0]);
+    expect(reading.copies.map((copy) => copy.error)).toEqual([null, null]);
+    expect(asked).toBe(1);
+    expect(warned).toEqual([]);
+  });
+
+  it('is the core roster for a root that is not rafa, with no warning', async () => {
+    const { reading, warned } = await readWithCheckoutRoster('roster-not-rafa', { kind: 'not-rafa' });
+
+    expect(reading.copies.map((copy) => copy.dangling)).toEqual([2, 2]);
+    expect(warned).toEqual([]);
+  });
+
+  it('falls back to the core roster with one warning line for the run when the checkout\'s cannot be read', async () => {
+    const detail = 'bun src/rafa.ts describe --output=json failed: boom';
+    const { reading, warned, asked } = await readWithCheckoutRoster('roster-failed', { kind: 'failed', detail });
+
+    expect(reading.copies.map((copy) => copy.dangling)).toEqual([2, 2]);
+    expect(reading.copies.map((copy) => copy.error)).toEqual([null, null]);
+    expect(asked).toBe(1);
+    expect(warned).toEqual([checkoutRosterWarning(detail)]);
   });
 });

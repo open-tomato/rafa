@@ -36,8 +36,10 @@
  * (`memoiseVerifier`), so a target is read once.
  *
  * The targets are read by the verifier `plan create`'s check 4 builds
- * (`createPlanRefsVerifier`, `gh`, `git`, `ts-symbols` and the core
- * roster at the project root), or by {@link IssueCheckSeams.verifier}.
+ * (`createPlanRefsVerifier`, `gh`, `git`, `ts-symbols` and the roster
+ * `planRoster` answers at the project root: the checkout's own when it
+ * is rafa itself, the core roster otherwise), or by
+ * {@link IssueCheckSeams.verifier}.
  * A board issue `gh` could not read and a refs block the codec will not
  * read are refused with exit code 1 and the error's own words.
  *

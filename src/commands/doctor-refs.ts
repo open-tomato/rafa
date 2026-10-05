@@ -49,6 +49,16 @@
  * since an earlier check answers its outline without starting
  * `ts-symbols` again.
  *
+ * ## The roster
+ *
+ * Commands and flags are read against the roster `plan create`'s check 4
+ * reads them against (`planRoster` in `./plan/refs-check.ts`): the
+ * checkout's own when the project root is rafa itself, the core roster
+ * otherwise. It is read once per run, on the first reference read, and a
+ * root that is rafa whose roster cannot be read gets its one warning line
+ * through {@link DoctorRefsInput.output} and is read against the core
+ * roster; the row is not failed for it.
+ *
  * ## An unreadable board is `unknown`
  *
  * A board issue `gh` could not read rejects `plan create`'s check 4,
@@ -81,8 +91,10 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
+import type { Output } from '../ports/index.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
+import type { CheckoutRosterReader } from './plan/refs-check.js';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -96,7 +108,7 @@ import { readRefsText } from '../refs/reading.js';
 import { UNREADABLE } from '../refs/stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner } from '../refs/verify.js';
 
-import { coreRoster } from './plan/refs-check.js';
+import { planRoster } from './plan/refs-check.js';
 
 /** The fix a copy holding a suspect or dangling reference is pointed at. */
 export function issueCheckCommand(issue: number): string {
@@ -114,9 +126,14 @@ export interface DoctorRefsSeams {
   /**
    * Makes the verifier for the project root over `issues`, the memoised
    * reader the row hands in. `createRefVerifier` over git in the root,
-   * `ts-symbols` and the core roster when left out.
+   * `ts-symbols` and the roster `planRoster` answers when left out.
    */
   readonly refsVerifier?: (root: string, issues: IssueReader) => RefVerifier | Promise<RefVerifier>;
+  /**
+   * Reads the checkout's own roster for the default verifier;
+   * `readCheckoutRoster` when left out. Unread with `refsVerifier` given.
+   */
+  readonly checkoutRoster?: CheckoutRosterReader;
 }
 
 /** What {@link readDoctorRefs} reads from. */
@@ -133,6 +150,8 @@ export interface DoctorRefsInput {
   readonly issues?: readonly number[];
   /** The board listing the caller read already; a board issue it holds is answered from it. See the module note. */
   readonly listing?: BoardListing;
+  /** Where the roster's warning line goes; the active output when left out. See the module note. */
+  readonly output?: Output;
 }
 
 /** One saved copy's counts. */
@@ -236,12 +255,12 @@ export function listedIssueReader(listing: BoardListing, fallback: IssueReader):
 }
 
 /** The verifier the row reads with by default; see {@link DoctorRefsSeams.refsVerifier}. */
-async function defaultVerifier(input: DoctorRefsInput, issues: IssueReader): Promise<RefVerifier> {
+async function defaultVerifier(input: DoctorRefsInput, issues: IssueReader, seams: DoctorRefsSeams): Promise<RefVerifier> {
   return createRefVerifier({
     issues,
     git: createGitRunner(input.root),
     outline: withOutlineCache(tsSymbolsOutliner({ cwd: input.root, env: input.env }), input.root),
-    roster: await coreRoster(),
+    roster: await planRoster(input.root, { checkoutRoster: seams.checkoutRoster, output: input.output }),
   });
 }
 
@@ -310,7 +329,7 @@ export async function readDoctorRefs(input: DoctorRefsInput, seams: DoctorRefsSe
   const issues = memoiseIssueReader(input.listing === undefined
     ? board
     : listedIssueReader(input.listing, board));
-  const make = seams.refsVerifier ?? ((root: string, reader: IssueReader) => defaultVerifier({ ...input, root }, reader));
+  const make = seams.refsVerifier ?? ((root: string, reader: IssueReader) => defaultVerifier({ ...input, root }, reader, seams));
   let made: Promise<RefVerifier> | null = null;
   const verify = async (): Promise<RefVerifier> => {
     made ??= Promise.resolve(make(input.root, issues)).then((verifier) => memoiseVerifier(boardUnknown(verifier)));
