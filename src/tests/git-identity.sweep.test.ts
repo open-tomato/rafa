@@ -88,6 +88,71 @@ function spreadsHomeWithoutTmpdir(source: string): boolean {
   return false;
 }
 
+/**
+ * The functions whose `git` seam is optional and falls back to
+ * `createGitRunner`, which spawns git under the host's own environment and
+ * so under the host's identity. Of them only `addRunWorktree` can reach a
+ * command that needs one: its catch-up runs `git merge --no-edit`.
+ */
+const OPTIONAL_GIT_SEAM_CALLS = ['addRunWorktree'];
+
+/** A `git` key in an object literal, written `git:` or as the shorthand `git,`. */
+const GIT_SEAM_KEY = /(^|[\s{,])git\s*[:,}]/;
+
+/** The text of a call's arguments from just after its `(`, up to the matching `)`. */
+function argumentsAt(source: string, openAt: number): string {
+  let depth = 0;
+  for (let index = openAt; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '(' || char === '{' || char === '[') depth += 1;
+    else if (char === ')' || char === '}' || char === ']') {
+      if (depth === 0) return source.slice(openAt, index);
+      depth -= 1;
+    }
+  }
+  return source.slice(openAt);
+}
+
+/** The top-level arguments of a call, split at commas outside any bracket. */
+function splitArguments(args: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of args) {
+    if (char === '(' || char === '{' || char === '[') depth += 1;
+    else if (char === ')' || char === '}' || char === ']') depth -= 1;
+    if (char === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else current += char;
+  }
+  if (current.trim() !== '') parts.push(current);
+  return parts;
+}
+
+/**
+ * True when the source sets `GIT_CONFIG_GLOBAL` and calls a function with an
+ * optional `git` seam without passing one: no second argument, or an object
+ * literal that names no `git`. A second argument that is not an object
+ * literal (a seams variable) is not read; what it holds is built elsewhere.
+ * Its declaration and an import of the name are not calls and are not read.
+ */
+function callsOptionalGitSeamWithoutIt(source: string): boolean {
+  if (!source.includes(SETTER)) return false;
+  for (const name of OPTIONAL_GIT_SEAM_CALLS) {
+    const call = new RegExp(`(?<![\\w.])${name}\\(`, 'g');
+    for (const match of source.matchAll(call)) {
+      const before = source.slice(Math.max(0, match.index - 10), match.index);
+      if (/function\s+$/.test(before)) continue;
+      const parts = splitArguments(argumentsAt(source, match.index + match[0].length));
+      const seams = parts[1]?.trim();
+      if (seams === undefined) return true;
+      if (seams.startsWith('{') && !GIT_SEAM_KEY.test(seams)) return true;
+    }
+  }
+  return false;
+}
+
 async function offendingFiles(
   offends: (source: string) => boolean,
   roots: readonly string[] = SWEEP_ROOTS,
@@ -171,6 +236,44 @@ describe('git identity sweep', () => {
 
   test('ignores a constant named HOME in a source that spawns', () => {
     expect(setsHomeWithoutHelper('const HOME = join(base, \'home\');\nBun.spawn([\'ls\']);\n')).toBe(false);
+  });
+});
+
+describe('optional git seam sweep', () => {
+  test('no source that sets GIT_CONFIG_GLOBAL calls an optional-seam function without its git seam', async () => {
+    expect(await offendingFiles(callsOptionalGitSeamWithoutIt)).toEqual([]);
+  });
+
+  test('flags a planted call that omits the seam', () => {
+    const planted = [
+      'const env = { GIT_CONFIG_GLOBAL: \'/dev/null\', ...gitIdentityEnv() };',
+      'const outcome = addRunWorktree({ projectRoot: project, worktreeDir, planStub: stub, base });',
+      '',
+    ].join('\n');
+
+    expect(callsOptionalGitSeamWithoutIt(planted)).toBe(true);
+  });
+
+  test('flags a planted call whose seams object names no git', () => {
+    const planted = 'const env = { GIT_CONFIG_GLOBAL: \'/dev/null\' };\naddRunWorktree(request(), { other: 1 });\n';
+
+    expect(callsOptionalGitSeamWithoutIt(planted)).toBe(true);
+  });
+
+  test('accepts a planted call that passes { git: ... }', () => {
+    const planted = [
+      'const env = { GIT_CONFIG_GLOBAL: \'/dev/null\', ...gitIdentityEnv() };',
+      'const outcome = addRunWorktree({ projectRoot: project, planStub: stub }, { git: isolatedGitRunner });',
+      '',
+    ].join('\n');
+
+    expect(callsOptionalGitSeamWithoutIt(planted)).toBe(false);
+  });
+
+  test('ignores a planted call in a source that never sets GIT_CONFIG_GLOBAL', () => {
+    const planted = 'const outcome = addRunWorktree({ projectRoot: project, planStub: stub });\n';
+
+    expect(callsOptionalGitSeamWithoutIt(planted)).toBe(false);
   });
 });
 
