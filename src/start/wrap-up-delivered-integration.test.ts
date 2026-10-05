@@ -28,7 +28,7 @@
  * `gh` is asked only what that session's own prompt asks, and the run ends `done`.
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -432,5 +432,23 @@ describe('the same run under pr.provider: none', () => {
     const [record] = readSessions(scratch.repo);
     if (record === undefined) throw new Error('the run wrote no session record at all');
     expect(record.state).toBe('done');
+  }, CASE_TIMEOUT_MS);
+
+  it('writes a no-pr line saying no provider is configured to the events file of a text-mode run', () => {
+    const scratch = plant({ config: CONFIG_NONE, refusePush: false, ghOpens: true });
+    const run = runLoopStart(scratch);
+    expect(run.exitCode).toBe(0);
+
+    const runsDir = join(scratch.repo, '.rafa', 'runs');
+    const eventsFile = readdirSync(runsDir).find((name) => name.endsWith('.events.ndjson'));
+    if (eventsFile === undefined) throw new Error('the run wrote no events file');
+    const events = readFileSync(join(runsDir, eventsFile), 'utf8').split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as { name?: string; data?: { reason?: string } });
+    const noPr = events.filter((event) => event.name === 'no-pr');
+
+    expect(noPr).toHaveLength(1);
+    expect(noPr[0]?.data?.reason).toContain('no pull request provider is configured');
+    expect(ghCalls(scratch).filter((call) => call.startsWith('pr list'))).toHaveLength(1);
   }, CASE_TIMEOUT_MS);
 });

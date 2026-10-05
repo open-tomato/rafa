@@ -66,7 +66,8 @@
  * Text emits it at the delivery's place, over the delivered number with
  * no lookup, or over a lookup on the paths with no number: a moved
  * checkout, a blocked or interrupted delivery, or a `none` provider, which
- * makes no delivery.
+ * makes no delivery and whose `no-pr` reason says no provider is configured,
+ * with no lookup.
  *
  * Every line written here goes through the active output
  * (`adapters/output/active.ts`), as the rest of `loop start` does.
@@ -174,7 +175,15 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // The `pr` or `no-pr` event, in every output mode: here in all but
   // text, and in text at the delivery's place below, over the number the
   // delivery holds when it holds one (see `emitPullRequestEvent`).
-  const lookup = () => openPullRequestNumber(checkout, expected.branch);
+  // A `none` provider has no pull request to ask: its lookup answers the
+  // reason and never runs `gh pr list`.
+  const readProvider = () => resolvePrProvider({
+    configured: settings.prProvider ?? null,
+    dir: checkout,
+  });
+  const lookup = (): Promise<number | string | null> => readProvider().provider === 'none'
+    ? Promise.resolve(NO_PROVIDER_REASON)
+    : openPullRequestNumber(checkout, expected.branch);
   await emitPullRequestEvent('session', expected.branch, null, lookup);
   // The loop guard before the loop's own release commit, against the
   // HEAD the wrap-up session's commits left on the run's branch: a
@@ -195,10 +204,6 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // reason: the run's `pr.provider` lives in this config, and a
   // repository resolving to `none` has no pull request to carry it
   // (`start/release-stage.ts`).
-  const readProvider = () => resolvePrProvider({
-    configured: settings.prProvider ?? null,
-    dir: checkout,
-  });
   emitLoopEvent({ kind: 'wrap-up', phase: 'release' });
   const finish = await finishRelease(
     { repoRoot: checkout, branch: expected.branch, settings, preparation: release },
@@ -223,7 +228,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     // edit is a warning and the run carries on (`start/pr-retarget.ts`).
     await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
   } else {
-    // A `none` provider delivers nothing: the event reads the open pull request.
+    // A `none` provider delivers nothing: the event carries its reason, with no lookup.
     await emitPullRequestEvent('delivery', expected.branch, null, lookup);
   }
   if (ciWait) {
@@ -251,6 +256,9 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   session.finished();
 }
 
+/** The `no-pr` reason of a run whose `pr.provider` is `none`. */
+const NO_PROVIDER_REASON = 'no pull request provider is configured';
+
 /**
  * Where {@link runWrapUp} offers the pull request's event: right after
  * the wrap-up session, or at the delivery's place, which a moved
@@ -263,7 +271,7 @@ export type PullRequestEventPlace = 'session' | 'delivery';
  * output mode. Text emits it at the `delivery` place, other modes at
  * the `session` place; each mode ignores the other place. The number is
  * `known` when the delivery holds it, and only then is `lookup`, a read
- * of the branch's open pull request over the provider, skipped. Text
+ * of the branch's open pull request over the provider, skipped. A `lookup` answering a string gives the `no-pr` reason as is. Text
  * prints nothing for the event: the events output decides what reaches
  * stdout, and the run's events file holds it whatever the mode
  * (`start/loop-events.ts`).
@@ -272,7 +280,7 @@ export async function emitPullRequestEvent(
   place: PullRequestEventPlace,
   branch: string,
   known: number | null,
-  lookup: () => Promise<number | null>,
+  lookup: () => Promise<number | string | null>,
 ): Promise<void> {
   const textPlace: PullRequestEventPlace = 'delivery';
   const ownPlace = activeOutputMode() === 'text'
@@ -280,6 +288,10 @@ export async function emitPullRequestEvent(
     : 'session';
   if (place !== ownPlace) return;
   const number = known ?? await lookup();
+  if (typeof number === 'string') {
+    emitLoopEvent({ kind: 'no-pr', reason: number });
+    return;
+  }
   emitLoopEvent(number === null
     ? { kind: 'no-pr', reason: `no open pull request for ${branch}` }
     : { kind: 'pr', number });
