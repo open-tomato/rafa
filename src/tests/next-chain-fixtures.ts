@@ -11,6 +11,7 @@
  * here, so the two suites never share a temporary directory or an
  * `afterAll`.
  */
+import type { CapturedRun } from './cli-capture.js';
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 
 import { spawnSync } from 'node:child_process';
@@ -22,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 
+import { describeRun, expectExit } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
@@ -215,13 +217,12 @@ export function runProbe(scratch: Scratch, words: readonly string[], name = 'rec
     cwd: scratch.work,
     env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
   });
-  const stdout = proc.stdout.toString();
-  const stderr = proc.stderr.toString();
-  if (proc.exitCode !== 0 || !existsSync(recordPath)) {
-    throw new Error(`the probe exited ${String(proc.exitCode)}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
-  }
+  const run: CapturedRun = { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
+  const paths = { root: scratch.root, work: scratch.work, home: scratch.home };
+  expectExit(run, 0, paths);
+  if (!existsSync(recordPath)) throw new Error(`the probe wrote no record at ${recordPath}\n${describeRun(run, paths)}`);
   const record = JSON.parse(readFileSync(recordPath, 'utf8')) as ProbeRecord;
-  return { record, stdout, stderr };
+  return { record, stdout: run.stdout, stderr: run.stderr };
 }
 
 /** A fresh temporary directory a suite's own scratch repositories sit under; the caller owns its clean-up. */

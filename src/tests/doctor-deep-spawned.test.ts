@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { eventsOf, plantScratchRepo, runRafa } from './cli-capture.js';
+import { describeRun, eventsOf, expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
 
@@ -108,8 +108,8 @@ describe('rafa doctor --deep, spawned', () => {
     expect(settings[hidden + 1]).toContain('fix: add user to loop.settingSources in .rafa/config.yaml');
     expect(sectionLines(deep, 'Stack tools').join('\n')).toContain('skill ts-symbols visible to a run');
     expect(plain.stdout).not.toContain('Settings:');
-    expect(deep.exitCode).toBe(plain.exitCode);
-    expect(deep.exitCode).toBe(0);
+    expectExit(plain, 0, scratch);
+    expectExit(deep, 0, scratch);
   });
 
   it('prints gh logged out only under the session\'s environment as a warn provider row', RUN_TIMEOUT, () => {
@@ -124,7 +124,7 @@ describe('rafa doctor --deep, spawned', () => {
     expect(auth).toBeGreaterThanOrEqual(0);
     expect(providers[auth + 1]).toContain('fix: gh is not authenticated for github.com');
     expect(sectionLines(deep, 'Environment').join('\n')).toContain('GH_CONFIG_DIR: added by the project settings file');
-    expect(deep.exitCode).toBe(plain.exitCode);
+    expect(deep.exitCode, describeRun(deep, scratch)).toBe(plain.exitCode);
   });
 
   it('prints a PATH the session loses a directory of as a warn row, and gh gone with it', RUN_TIMEOUT, () => {
@@ -141,7 +141,7 @@ describe('rafa doctor --deep, spawned', () => {
     expect(environment.some((line) => line.startsWith('  warn  PATH: loses ') && line.includes(withoutBin.bin))).toBe(true);
     expect(environment.join('\n')).toContain('fix: add the lost directories to env.PATH in ');
     expect(sectionLines(differs, 'Providers').some((line) => line.startsWith('  warn  gh: not found on the session\'s PATH'))).toBe(true);
-    expect(differs.exitCode).toBe(plain.exitCode);
+    expect(differs.exitCode, describeRun(differs, withoutBin)).toBe(plain.exitCode);
   });
 
   it('adds the plan-needs rows for --plan, and none without it', RUN_TIMEOUT, () => {

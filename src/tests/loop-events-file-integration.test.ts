@@ -27,7 +27,7 @@ import { runsDir, readSessions } from '../loop/sessions.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { EVENTS_EXTENSION } from '../start/loop-events.js';
 
-import { plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -87,12 +87,12 @@ function expectRecordReadAlone(scratch: ScratchRepo, id: string): void {
   writeFileSync(recordFile, JSON.stringify({ ...record, state: 'running', pid: process.pid }), 'utf8');
 
   const list = runRafa(scratch, scratch.repo, ['loop', 'list'], TEXT);
-  expect(list.exitCode).toBe(0);
+  expectExit(list, 0, scratch);
   expect(list.stdout.split(id).length - 1).toBe(1);
   expect(`${list.stdout}${list.stderr}`).not.toContain('ndjson');
 
   const status = runRafa(scratch, scratch.repo, ['loop', 'status'], TEXT);
-  expect(status.exitCode).toBe(0);
+  expectExit(status, 0, scratch);
   expect(status.stdout).toContain(id);
   expect(`${status.stdout}${status.stderr}`).not.toContain('ndjson');
 }
@@ -101,7 +101,7 @@ describe('the events file of a loop start run under RAFA_OUTPUT=text', () => {
   it('holds one parsable line per emitted event, which text itself printed none of', () => {
     const scratch = plantLoopScratch('pr:\n  provider: none\n');
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], TEXT);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
 
     const { id, lines } = eventLines(scratch);
     expect(lines.map((line) => line.name)).toEqual(['task-start', 'task-blocked']);
@@ -117,7 +117,7 @@ describe('the events file of a loop start run under RAFA_OUTPUT=text', () => {
   it('ends on an error line when the run throws', () => {
     const scratch = plantLoopScratch('pr:\n  provider: none\neffort:\n  sync: p2p\n');
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], TEXT);
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
 
     const { id, lines } = eventLines(scratch);
     const last = lines[lines.length - 1];

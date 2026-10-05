@@ -56,7 +56,7 @@ import { readHopRecord, writeHopRecord } from '../next/hop-record.js';
 import { positionFilePath, writePositionFile } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, eventsOf, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, eventsOf, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -193,9 +193,7 @@ function plantFixture(issues: readonly object[], pulls: readonly object[] = []):
 /** Runs `rafa` with `words` and `--output=json`, answering its parsed events. Fails loudly on a non-zero exit. */
 function run(scratch: ScratchRepo, words: readonly string[]): readonly CliEvent[] {
   const captured = runRafa(scratch, scratch.repo, [...words, '--output=json'], { GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' });
-  if (captured.exitCode !== 0) {
-    throw new Error(`rafa ${words.join(' ')} exited ${String(captured.exitCode)}\nstdout:\n${captured.stdout}\nstderr:\n${captured.stderr}`);
-  }
+  expectExit(captured, 0, scratch);
   return eventsOf(captured.stdout);
 }
 

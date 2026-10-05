@@ -61,6 +61,28 @@ function readStore(path: string): { version: number; migrations: string[]; sessi
   }
 }
 
+/**
+ * SQLite's refusal of a write under a held read. Which of the two messages a
+ * locked-out writer sees depends on the SQLite build: macOS Bun links the
+ * system SQLite, and #397 saw `disk I/O error` on Linux in a worktree. Any
+ * other message, or none, is not that refusal.
+ */
+const LOCKED_OUT_WRITE = /\b(?:database is locked|disk I\/O error)\b/;
+
+/** Whether `message` is SQLite refusing a write because another connection holds a read. */
+function isLockedOutWrite(message: string): boolean {
+  return LOCKED_OUT_WRITE.test(message);
+}
+
+describe('the locked-out writer matcher', () => {
+  it('accepts both refusal messages and rejects any other SQLite message or none', () => {
+    expect(isLockedOutWrite('SQLiteError: database is locked')).toBe(true);
+    expect(isLockedOutWrite('SQLiteError: disk I/O error')).toBe(true);
+    expect(isLockedOutWrite('SQLiteError: attempt to write a readonly database')).toBe(false);
+    expect(isLockedOutWrite('')).toBe(false);
+  });
+});
+
 describe('rafa effort copy over a live store', () => {
   it('copies while another connection holds a read transaction, keeping user_version, schema_migrations and every row', () => {
     const scratch = plantScratchRepo(tempBase);
@@ -90,7 +112,8 @@ describe('rafa effort copy over a live store', () => {
       reader.close();
     }
 
-    expect(lockedOut).toContain('database is locked');
+    // Either refusal message, by SQLite build; see LOCKED_OUT_WRITE.
+    expect(isLockedOutWrite(lockedOut), `writer was not locked out: ${JSON.stringify(lockedOut)}`).toBe(true);
     expect(run.stderr).toBe('');
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain(`✅ Copied effort.sqlite, sessions.ndjson from ${liveDir(scratch.repo)} to ${target}.`);

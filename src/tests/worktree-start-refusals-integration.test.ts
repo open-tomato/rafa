@@ -33,7 +33,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -91,7 +91,7 @@ describe('rafa loop start --as-worktree beside --create-branch', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', '--as-worktree', '--create-branch']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('❌ Refusing --as-worktree beside --create-branch:');
     expect(run.stderr).toContain('--as-worktree alone');
     expect(run.stderr).toContain('--create-branch alone');
@@ -115,7 +115,7 @@ describe('rafa loop start --as-worktree while a tracking setting is on', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', '--as-worktree']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(`❌ Refusing --as-worktree while \`${key}\` is on:`);
     expect(run.stderr).toContain('Nothing was checked and nothing was dispatched.');
     expect(existsSync(scratch.callLog)).toBe(false);
@@ -138,7 +138,7 @@ describe('rafa loop start --as-worktree on a plan branch checked out elsewhere',
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', '--plan=PLAN-held.md', '--as-worktree']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('❌ Refusing to add a worktree for feat/held: it is checked out in another worktree');
     expect(run.stderr).toContain(`at ${elsewhere}.`);
     expect(run.stderr).toContain('The main checkout\'s branch and working tree were not touched.');

@@ -14,7 +14,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { WAIT_NO_SESSION_EXIT, waitExitCode } from '../loop/wait-reasons.js';
 import { eventsFilePath } from '../start/loop-events.js';
 
-import { plantScratchRepo, runRafa, startRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa, startRafa } from './cli-capture.js';
 import { plantSession, sessionRecord } from './loop-session-fixtures.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -58,8 +58,8 @@ describe('rafa loop wait, spawned', () => {
     const run = await running.result;
 
     // Assert
-    expect(run.exitCode).toBe(waitExitCode('pr'));
-    expect(run.exitCode).toBe(0);
+    expectExit(run, waitExitCode('pr'), scratch);
+    expectExit(run, 0, scratch);
     expect(run.stdout + run.stderr).toContain(`rafa· ${PR_SUMMARY}`);
   }, RUN_TIMEOUT);
 
@@ -77,7 +77,7 @@ describe('rafa loop wait, spawned', () => {
     const run = await running.result;
 
     // Assert
-    expect(run.exitCode).toBe(14);
+    expectExit(run, 14, scratch);
     expect(run.stdout + run.stderr).toContain('rafa· exit');
   }, RUN_TIMEOUT);
 
@@ -89,7 +89,7 @@ describe('rafa loop wait, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['loop', 'wait', '--session-id=no-such-session']);
 
     // Assert
-    expect(run.exitCode).toBe(WAIT_NO_SESSION_EXIT);
-    expect(run.exitCode).toBe(2);
+    expectExit(run, WAIT_NO_SESSION_EXIT, scratch);
+    expectExit(run, 2, scratch);
   }, RUN_TIMEOUT);
 });

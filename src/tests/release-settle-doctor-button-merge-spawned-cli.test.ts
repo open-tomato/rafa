@@ -27,7 +27,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '../release/fragment.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own. */
@@ -189,7 +189,7 @@ describe('a button-style merge leaves a fragment waiting; doctor warns it, a lat
 
     const doctored = runRafa(w.watcher, w.watcher.repo, ['doctor']);
 
-    expect(doctored.exitCode).toBe(0);
+    expectExit(doctored, 0, w.watcher);
     const releaseLine = doctored.stdout
       .split('\n')
       .find((line) => line.startsWith('warn: Release: '));
@@ -204,7 +204,7 @@ describe('a button-style merge leaves a fragment waiting; doctor warns it, a lat
 
     const settled = runRafa(w.settler, w.settler.repo, ['release', 'settle']);
 
-    expect(settled.exitCode).toBe(0);
+    expectExit(settled, 0, w.settler);
     expect(settled.stdout).toContain('✅ Pushed "chore: release 0.4.1"');
     expect(originSubject(w)).toBe('chore: release 0.4.1');
     expect(originFragments(w)).toEqual([]);

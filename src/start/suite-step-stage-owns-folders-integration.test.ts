@@ -44,6 +44,8 @@
  * `beta/mod.test.ts`. Every step's `newFailures` stays empty throughout:
  * all three test files are, and stay, green.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -405,15 +407,8 @@ function plant(): Scratch {
   return scratch;
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const resolvedClaude = Bun.which('claude', { PATH: scratch.path });
   if (resolvedClaude !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolvedClaude)}, not the stand-in`);
@@ -454,7 +449,7 @@ describe('a stage step over a plan whose epic Owns: two folders', () => {
     const scratch = plant();
     const run = runLoopStart(scratch);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     // Two task sessions and the wrap-up's own: three real Claude calls,
     // none of them retried.
     expect(callCount(scratch)).toBe(3);

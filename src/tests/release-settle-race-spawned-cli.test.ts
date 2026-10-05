@@ -43,7 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '../release/fragment.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
@@ -305,7 +305,7 @@ describe('rafa release settle, two real spawns racing for the same push', () => 
 
       const won = runRafa(winner, winner.repo, ['release', 'settle']);
 
-      expect(won.exitCode).toBe(0);
+      expectExit(won, 0, winner);
       expect(won.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
       expect(originSubject(w)).toBe('chore: release 0.5.0');
       expect(originFragments(w)).toEqual([]);
@@ -314,7 +314,7 @@ describe('rafa release settle, two real spawns racing for the same push', () => 
       letThrough(control, 1);
       const lost = await losing;
 
-      expect(lost.exitCode).toBe(0);
+      expectExit(lost, 0, loser);
       expect(lost.stdout).toContain(`every fragment this settle folded is gone from origin/main: ${winningCommit.slice(0, 12)} "chore: release 0.5.0" released them first`);
       expect(lost.stdout).not.toContain('Pushed');
       // The winner's push is the only one that changed `main`.
@@ -352,7 +352,7 @@ describe('rafa release settle, spawned with its base moving between its own two 
 
       const settled = await running;
 
-      expect(settled.exitCode).toBe(1);
+      expectExit(settled, 1, settling);
       expect(settled.stderr).toContain('origin main moved again while settle rebuilt, and the retried push of chore: release 0.5.0 was refused too');
       expect(settled.stderr).toContain('[rejected]');
       // Settle retries once, so a third push never ran: `rafa-5` stayed the

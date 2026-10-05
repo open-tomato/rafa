@@ -66,7 +66,7 @@ import { SPEC_LABEL } from '../board/issue.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -241,9 +241,7 @@ function readIfExists(path: string): string | undefined {
 function captureRun(scratch: ScratchRepo, logPath: string, words: readonly string[], name: string): Capture {
   rmSync(logPath, { force: true });
   const run = runRafa(scratch, scratch.repo, words);
-  if (run.exitCode !== 0) {
-    throw new Error(`${words.join(' ')} exited ${String(run.exitCode)}\nstdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
-  }
+  expectExit(run, 0, scratch);
   const ghCalls = existsSync(logPath)
     ? readFileSync(logPath, 'utf8').split('\n')
       .filter((line) => line !== '')

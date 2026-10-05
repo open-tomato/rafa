@@ -17,6 +17,8 @@
  *   - nothing is written under the project's `.claude/`, nor under the
  *     `HOME` given the run.
  */
+import type { CapturedRun } from './cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
@@ -39,7 +41,7 @@ import { readSessions } from '../loop/sessions.js';
 import { SKILL_DELIVERY } from '../tiers/delivery.js';
 import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
@@ -164,7 +166,8 @@ describe('rafa loop start, spawned with a recording stand-in claude', () => {
       [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'],
       { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: SPAWN_KILL_MS },
     );
-    expect(proc.exitCode).toBe(0);
+    const run: CapturedRun = { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
+    expectExit(run, 0, { ...scratch });
 
     const sessions = readSessions(scratch.repo);
     expect(sessions).toHaveLength(1);

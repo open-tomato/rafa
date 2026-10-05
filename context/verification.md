@@ -395,6 +395,33 @@ the reference example. This section replaces nothing.
   `../../dist/cli.js` and the import pointed at the copy, run them after
   `bun run build`, and delete them. This replaces nothing.
 
+### Spawned failure helpers
+
+**When a spawned case fails, `expectExit` and `expectEvent` print the
+child's exit code, the last 80 lines of each stream, and the scratch
+paths the case names.** A case spawned with `runRafa` that asserts the
+result uses these helpers:
+
+- `expectExit(run, code, scratch?)` — Passes silently when `run` exited
+  with `code`. Otherwise throws an `Error` naming the expected and actual
+  codes, with the child's full failure message below: exit code, last 80
+  lines of stderr (cut if longer), last 80 lines of stdout (cut if
+  longer), and each path in the `scratch` argument (a `ScratchRepo` or a
+  case-named `Record<string, string>`).
+- `expectEvent(run, name, scratch?)` — Answers the first named event
+  (`type: 'event'`) called `name` on the run's json stdout. Throws an
+  `Error` with the same failure message when no such event is there, or
+  when a stdout line is not JSON.
+- `describeRun(run, scratch?)` — Answers the failure message text alone,
+  used by the helpers above and by a case asserting something else of a
+  run's output; passes it as its own error message.
+
+A new spawned case passes its run result to `expectExit` or `expectEvent`,
+with the `scratch` argument naming the `ScratchRepo` the case built, so
+all failure output lands in one place a reader can find: the test itself
+names the assertion that failed, and the error message names the scratch
+directory, the exit code, and the streams the child wrote.
+
 ### Fixture scrub, guard, and path rules
 
 **Every committed fixture is scrubbed of machine identity before it ships.**

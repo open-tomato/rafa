@@ -28,7 +28,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '../release/fragment.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own. */
@@ -184,7 +184,7 @@ describe('rafa release settle, a fragment a squash merge carried to main', () =>
 
     const firstSettle = runRafa(w.scratch, w.scratch.repo, ['release', 'settle']);
 
-    expect(firstSettle.exitCode).toBe(0);
+    expectExit(firstSettle, 0, w.scratch);
     expect(firstSettle.stdout).toContain('1. .changes/rafa-19.md — minor, "title of rafa-19"');
     expect(firstSettle.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
     expect(originSubject(w)).toBe('chore: release 0.5.0');
@@ -199,7 +199,7 @@ describe('rafa release settle, a fragment a squash merge carried to main', () =>
 
     // Nothing is waiting a second time: the fold ran exactly once across
     // the two runs, and the second neither writes nor pushes anything.
-    expect(secondSettle.exitCode).toBe(0);
+    expectExit(secondSettle, 0, w.scratch);
     expect(secondSettle.stdout).toContain('Fragments: none waiting');
     expect(secondSettle.stdout).toContain('Nothing to settle: no fragment waits that ships a release.');
     expect(secondSettle.stdout).not.toContain('Pushed');

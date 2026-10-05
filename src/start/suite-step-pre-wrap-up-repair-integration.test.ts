@@ -33,6 +33,8 @@
  * wrote, and halts on a red pre-wrap-up step once more, still holding
  * the one repair line.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -261,15 +263,8 @@ function plant(repairFixes: boolean): Scratch {
   return scratch;
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
@@ -312,7 +307,7 @@ describe('a pre-wrap-up step red on a task\'s breakage outside its --changed sel
     const scratch = plant(true);
     const run = runLoopStart(scratch);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     // The task, the pre-wrap-up repair, and the wrap-up's own session.
     expect(callCount(scratch)).toBe(3);
 
@@ -349,7 +344,7 @@ describe('a pre-wrap-up step red on a task\'s breakage outside its --changed sel
     // as it is. The step runs a second time, red again, and blocks the
     // ticked repair rather than inserting another.
     const run1 = runLoopStart(scratch);
-    expect(run1.exitCode).toBe(0);
+    expectExit(run1, 0, { ...scratch });
     expect(callCount(scratch)).toBe(2);
     expect(run1.stdout + run1.stderr).toContain('the pre-wrap-up step is red again after its repair');
 
@@ -370,7 +365,7 @@ describe('a pre-wrap-up step red on a task\'s breakage outside its --changed sel
     // the second red wrote, and the step is red a third time: the same
     // line is blocked again and the tracker still holds one repair.
     const run2 = runLoopStart(scratch);
-    expect(run2.exitCode).toBe(0);
+    expectExit(run2, 0, { ...scratch });
     expect(callCount(scratch)).toBe(3);
 
     const retryPrompt = promptOf(scratch, 3);

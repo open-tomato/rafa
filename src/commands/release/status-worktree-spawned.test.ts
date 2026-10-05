@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-status-worktree-')));
@@ -65,7 +65,7 @@ describe('rafa release status in a linked worktree under a parent project', () =
     const run = runRafa(scratch, worktree, ['release', 'status']);
 
     // Assert
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`package.json: ${PROJECT_VERSION}`);
     expect(run.stdout).not.toContain(PARENT_VERSION);
   });

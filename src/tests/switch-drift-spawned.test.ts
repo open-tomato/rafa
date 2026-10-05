@@ -29,7 +29,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once the case has run. */
@@ -144,7 +144,7 @@ describe('rafa switch over a stand-in board with one drifted line, spawned', () 
 
     const run = runRafa(scratch, scratch.repo, ['switch', String(BOARD)]);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(DRIFT_LINE);
     expect(run.stdout).toContain(PLACE_LINE);
     expect(run.stdout.split('\n').filter((line) => line.startsWith('warn: claim drift'))).toEqual([DRIFT_LINE]);
