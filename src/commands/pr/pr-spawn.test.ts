@@ -210,6 +210,7 @@ describe('rafa pr current, show, view and list, spawned', () => {
       '#7 Stand-in show',
       `open${SEPARATOR}octocat${SEPARATOR}${BRANCH} → main${SEPARATOR}mergeable (CLEAN)`,
       'https://github.com/o/r/pull/7',
+      'closes none',
       '',
       'checks green',
       '   pass    build — SUCCESS (https://example.invalid/run/1)',
