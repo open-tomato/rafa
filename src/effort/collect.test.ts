@@ -98,6 +98,12 @@
  * issue its branch does not. Three were also run against `check-types`:
  * each field dropped fails with TS2741, and `remote` with TS2322, so
  * the mode is held at `local` by the compiler as well as by this suite.
+ *
+ * The worktree cases plant a HOME holding the main checkout's folder,
+ * two worktree folders, one log in two folders and another project's
+ * folder whose name extends this one's, and run with no `logDir`, so the
+ * folder set is the collector's own derivation. Their control is the
+ * same HOME read under a `logDir` override, which takes one folder.
  */
 import type { CollectOptions } from './collect.js';
 import type { CommitLogParseResult, CommitStats } from './commits.js';
@@ -135,7 +141,7 @@ import {
   selectCommits,
   selectSessionLogs,
 } from './collect.js';
-import { listSessionLogs } from './session-log-dirs.js';
+import { listSessionLogs, projectLogDirName, sessionLogDir } from './session-log-dirs.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
 
 /** The task prompt's prefix, taken from the shape that declares it. */
@@ -1150,6 +1156,212 @@ describe('formatCollectSummary', () => {
     expect(lines.join('\n')).toContain('--no-sessions');
     expect(lines.join('\n')).toContain('--no-git');
     expect(lines.at(-1)).toBe('  skills    skipped (--no-sessions)');
+  });
+});
+
+/** The worktree directory the config defaults to, spelled here and not imported. */
+const DEFAULT_WORKTREE_DIR = join('.rafa', 'worktrees');
+
+/** A planted HOME with a project's main and worktree folders. */
+interface WorktreeHome {
+  home: string;
+  root: string;
+  plansDir: string;
+  /** The main checkout's folder. */
+  mainDir: string;
+  /** The worktree path each worktree folder's sessions ran in. */
+  worktrees: { a: string; b: string };
+}
+
+/**
+ * A HOME whose projects root holds the main checkout's folder (`s-main`
+ * and `shared`), the folders of worktrees `a` (`s-a` and `shared` again)
+ * and `b` (`s-b`) under `worktreeDir`, and the folder of a project at
+ * `<root>-other` (`s-other`).
+ */
+function plantWorktreeHome(worktreeDir: string = DEFAULT_WORKTREE_DIR): WorktreeHome {
+  const root = makeScratch();
+  const home = makeScratch();
+  const plansDir = join(root, 'plans');
+  mkdirSync(plansDir);
+  const worktrees = { a: join(root, worktreeDir, 'a'), b: join(root, worktreeDir, 'b') };
+  const mainDir = sessionLogDir(root, home);
+  const folderOf = (path: string): string => {
+    const dir = sessionLogDir(path, home);
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+  mkdirSync(mainDir, { recursive: true });
+  taskLog(mainDir, 's-main', 'feat/q19-loop-economics');
+  taskLog(mainDir, 'shared', 'feat/q19-loop-economics');
+  taskLog(folderOf(worktrees.a), 's-a', 'feat/q19-loop-economics');
+  taskLog(folderOf(worktrees.a), 'shared', 'feat/q19-loop-economics');
+  taskLog(folderOf(worktrees.b), 's-b', 'feat/q19-loop-economics');
+  taskLog(folderOf(`${root}-other`), 's-other', 'feat/q19-loop-economics');
+  return { home, root, plansDir, mainDir, worktrees };
+}
+
+/** Each stored session's id and worktree, by id. */
+function worktreeById(store: EffortStore): [string, string | null][] {
+  return store.read('sessions')
+    .map((row): [string, string | null] => [row.sessionId, row.worktree])
+    .sort(([a], [b]) => a.localeCompare(b));
+}
+
+describe('collectSessionRow and the worktree', () => {
+  it('records the worktree the candidate was listed under', async () => {
+    const dir = makeScratch();
+    taskLog(dir, 'sess-w', 'feat/x');
+    const entry = listSessionLogs(dir, '/srv/repo/.rafa/worktrees/w')[0];
+    if (entry === undefined) throw new Error('no candidate');
+
+    expect((await collectSessionRow(entry, [])).worktree).toBe('/srv/repo/.rafa/worktrees/w');
+  });
+
+  it('records null for a candidate that names none', async () => {
+    const dir = makeScratch();
+    const path = taskLog(dir, 'sess-n', 'feat/x');
+
+    const row = await collectSessionRow({ path, sessionId: 'sess-n', sizeBytes: 1, modifiedAtMs: 1 }, []);
+
+    expect(row.worktree).toBeNull();
+  });
+});
+
+describe.each(BACKENDS)('collecting the worktree folders through the %s store', (_name, open) => {
+  /** A quiet run over a planted HOME with no `logDir`, through this backend. */
+  function runOn(planted: WorktreeHome, store: EffortStore): CollectOptions {
+    return {
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      store,
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    };
+  }
+
+  it('reads the main folder and both worktree folders, storing the shared log once', async () => {
+    const planted = plantWorktreeHome();
+    const store = open(planted.root);
+
+    const result = await collectEffort(runOn(planted, store));
+
+    expect(result.sessions?.logDirs).toEqual([
+      planted.mainDir,
+      sessionLogDir(planted.worktrees.a, planted.home),
+      sessionLogDir(planted.worktrees.b, planted.home),
+    ]);
+    expect(result.sessions?.logDir).toBe(planted.mainDir);
+    expect(result.sessions?.duplicates).toBe(1);
+    expect(result.sessions?.candidates).toBe(4);
+    expect(result.sessions?.appended).toBe(4);
+    expect(worktreeById(store)).toEqual([
+      ['s-a', planted.worktrees.a],
+      ['s-b', planted.worktrees.b],
+      ['s-main', null],
+      ['shared', null],
+    ]);
+  });
+
+  it('appends nothing on a second run over the same folders', async () => {
+    const planted = plantWorktreeHome();
+    const store = open(planted.root);
+    await collectEffort(runOn(planted, store));
+
+    const second = await collectEffort(runOn(planted, store));
+
+    expect(second.sessions?.alreadyCollected).toBe(4);
+    expect(second.sessions?.appended).toBe(0);
+    expect(store.read('sessions')).toHaveLength(4);
+  });
+
+  it('reads one folder alone under a logDir override, every row null in worktree', async () => {
+    // The control of the case above: the same HOME, the main folder named.
+    const planted = plantWorktreeHome();
+    const store = open(planted.root);
+
+    const result = await collectEffort({ ...runOn(planted, store), logDir: planted.mainDir });
+
+    expect(result.sessions?.logDirs).toEqual([planted.mainDir]);
+    expect(result.sessions?.duplicates).toBe(0);
+    expect(worktreeById(store)).toEqual([['s-main', null], ['shared', null]]);
+  });
+});
+
+describe('the worktree folders a run reads', () => {
+  it('takes the worktree directory from loop.worktreeDir in the config', async () => {
+    const planted = plantWorktreeHome('trees');
+    writeConfig(planted.root, 'store: ndjson\nloop:\n  worktreeDir: trees\n');
+
+    const result = await collectEffort({
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    });
+
+    expect(result.sessions?.logDirs).toHaveLength(3);
+    expect(worktreeById(openNdjsonStore(planted.root)).map(([, worktree]) => worktree))
+      .toEqual([planted.worktrees.a, planted.worktrees.b, null, null]);
+  });
+
+  it('reads no worktree folder under a directory the config does not name', async () => {
+    // The control of the case above: the folders are planted under
+    // `trees`, and the config leaves loop.worktreeDir at its default.
+    const planted = plantWorktreeHome('trees');
+    writeConfig(planted.root, 'store: ndjson\n');
+
+    const result = await collectEffort({
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    });
+
+    expect(result.sessions?.logDirs).toEqual([planted.mainDir]);
+    expect(projectLogDirName(planted.worktrees.a)).toContain('-trees-a');
+  });
+
+  it('hands the skill half under held every stored session of every folder, once', async () => {
+    const planted = plantWorktreeHome();
+    const store = openNdjsonStore(planted.root);
+    const quiet = {
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      store,
+      collectCommits: false,
+      log: () => undefined,
+    };
+    await collectEffort({ ...quiet, skills: null });
+
+    const held = await collectEffort({ ...quiet, collectSessions: false, skills: 'held' });
+
+    expect(held.skills?.candidates).toBe(4);
+  });
+
+  it('prints how many folders it read and how many logs were held twice', async () => {
+    const planted = plantWorktreeHome();
+
+    const result = await collectEffort({
+      home: planted.home,
+      repoRoot: planted.root,
+      plansDir: planted.plansDir,
+      store: openNdjsonStore(planted.root),
+      collectCommits: false,
+      skills: null,
+      log: () => undefined,
+    });
+
+    expect(formatCollectSummary(result)).toContain('  sessions  3 folders, 2 worktrees, 1 log held twice');
+    expect(formatCollectSummary({ ...result, sessions: result.sessions && { ...result.sessions, logDirs: ['/one'], duplicates: 0 } }))
+      .toContain('  sessions  1 folder, 0 worktrees, 0 logs held twice');
   });
 });
 
