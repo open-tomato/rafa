@@ -86,7 +86,12 @@ import { withStamp } from './stamp.js';
  * (`start/wrap-up-run.ts`): `pr.base`, else `origin/HEAD`'s target,
  * else `main`. The create bullet names it as `gh pr create --base
  * <base>`, since a bare `gh pr create` opens against the repository's
- * default branch whatever the run's base is. It is required, with no
+ * default branch whatever the run's base is. The sync bullet fetches
+ * and merges `origin/<base>`, and the lockfile bullet restores
+ * `bun.lock` from `origin/<base>`: a run on `pr.base: integration`
+ * that merged `origin/main` would open a pull request against
+ * `integration` carrying main's commits, and its lockfile would match
+ * neither branch. It is required, with no
  * default: a default of `main` would be the same mistake for every
  * caller that left it out. The already-open bullet names no base: it
  * asks for a push and a `gh pr edit` of the body, and this session is
@@ -131,9 +136,9 @@ export function buildWrapUpPrompt(
     `* If the plan carries no \`issue:\` field, read the number from the branch name (${branch}), which is spelled \`feat/rafa-<n>-<slug>\`.`,
     '* Title the PR `rafa-<n>: <title>`, taking `<title>` from the plan title, e.g. "rafa-20: Add pull-request commands". Open the PR body with `Closes #<n>` — the GitHub issue number on its own, never `#rafa-<n>`, since the `rafa-` prefix is this project\'s naming convention and not a GitHub alias. If no number was found, title the PR with the plan title alone and write no closing line rather than inventing one.',
     '* Create a concise yet descriptive PR description that summarizes the overall work done based on the completed plan and progress notes.',
-    '* BEFORE pushing, bring the branch up to date with the base: `git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets NO CI run at all — GitHub cannot build `refs/pull/<n>/merge` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan\'s context is still loaded, is the cheapest place it will ever be.',
+    `* BEFORE pushing, bring the branch up to date with the base: \`git fetch origin ${base}\` then \`git merge origin/${base}\`. A branch that conflicts with ${base} gets NO CI run at all — GitHub cannot build \`refs/pull/<n>/merge\` for it — so a conflicted PR is a plan reported finished whose code was never once checked. Resolving here, where the plan's context is still loaded, is the cheapest place it will ever be.`,
     mechanicalConflictBullet(),
-    '* If the merge touched `bun.lock` or any `package.json`, run `bun install --frozen-lockfile` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base\'s copy (`git checkout origin/main -- bun.lock`), run a plain `bun install` so this branch\'s own dependencies are re-added, and confirm the frozen run then passes.',
+    `* If the merge touched \`bun.lock\` or any \`package.json\`, run \`bun install --frozen-lockfile\` and require it to pass BEFORE pushing. It is the one-second local reproduction of the CI install step, and it catches a lockfile that no longer matches the merged manifests — the failure mode where every CI job dies at its first step and nothing downstream runs. When it fails, do NOT hand-edit the lockfile: restore the base's copy (\`git checkout origin/${base} -- bun.lock\`), run a plain \`bun install\` so this branch's own dependencies are re-added, and confirm the frozen run then passes.`,
     ...releaseBullets(release),
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     pullRequestStep(branch, base, openPullRequest),
