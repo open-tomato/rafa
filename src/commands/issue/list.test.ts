@@ -49,7 +49,7 @@ import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
-import { ABSENT, PRESENT, UNREADABLE } from '../../refs/stamp.js';
+import { ABSENT, PRESENT, UNREADABLE, writeRefsBlock } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 import { createRoadmapCommand } from '../roadmap.js';
@@ -703,7 +703,10 @@ describe('rafa issue list --roadmap', () => {
     const project = plantRoadmapCase();
     const specs = join(project.root, '.rafa', 'specs');
     mkdirSync(specs, { recursive: true });
-    writeFileSync(join(specs, 'rafa-13-blocked-bug.md'), '# Blocked bug\n\nTouches `src/here.ts`, `src/gone.ts` and `src/far.ts`.\n');
+    writeFileSync(join(specs, 'rafa-13-blocked-bug.md'), writeRefsBlock(
+      '# Blocked bug\n\nTouches `src/here.ts`, `src/gone.ts` and `src/far.ts`.\n',
+      [{ kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT }],
+    ));
     writeFileSync(join(specs, 'rafa-11-ready-spec.md'), '# Ready spec\n\nTouches `src/here.ts`.\n');
     writeFileSync(join(specs, 'rafa-30-off-roadmap.md'), '# Off the Roadmap\n\nTouches `src/off.ts`.\n');
     const live: Readonly<Record<string, LiveReading>> = { 'src/here.ts': PRESENT, 'src/far.ts': UNREADABLE };

@@ -18,9 +18,12 @@
  * A blob sha is pinned against `git hash-object`, a second command, so
  * a verifier answering some other object's sha fails here. A path on
  * disk but untracked reads `absent`, which proves the reading is git's
- * and not the filesystem's. A symbol a grep finds and an outline does
- * not reads `absent` under the outline, which proves the outline can
- * refuse what the grep alone would pass.
+ * and not the filesystem's. A declaration at the start of its line that
+ * the grep finds and the outline does not list — one inside a template
+ * literal — reads `absent` under the outline, which proves the outline
+ * can refuse what the grep alone would pass. A word in a comment, a
+ * call and a name standing only in a type read `absent` beside the
+ * declarations that read `present` from the same planted file.
  */
 import type { RefVerifySeams, SymbolOutliner } from './verify.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -70,6 +73,32 @@ const COMMITTED: Readonly<Record<string, string>> = {
     '}',
     'interface AlphaShape {}',
     '// export const commentedName = 1;',
+    '',
+  ].join('\n'),
+  'src/shapes.ts': [
+    'interface LocalShape {',
+    '  memberName: number;',
+    '  methodMember(input: string): void;',
+    '}',
+    'const TABLE = {',
+    '  objectField: 1,',
+    '  \'quotedField\': 2,',
+    '};',
+    'const INLINE = { inlineField: 1 };',
+    'const typedValue: ForeignType = TABLE;',
+    'function localHelper(): LocalShape {',
+    '  const nestedLocal = 1;',
+    '  return { memberName: nestedLocal } as LocalShape;',
+    '}',
+    '// see commentWord for the reason',
+    '/**',
+    ' * docWord: a word in a doc comment',
+    ' */',
+    'const FIXTURE = `',
+    'const plantedInString = 1;',
+    '`;',
+    'localHelper();',
+    'callOnly(INLINE, typedValue, FIXTURE);',
     '',
   ].join('\n'),
   'src/report/record.ts': 'export const RECORD_KIND = \'record\';\n',
@@ -357,7 +386,7 @@ describe('a symbol', () => {
     return { outline, asked };
   }
 
-  it('reads a name an export line names as present, with no ts-symbols', async () => {
+  it('reads a name an export declares as present, with no ts-symbols', async () => {
     const verify = createRefVerifier(seams());
 
     expect(await verify({ kind: 'symbol', text: 'alphaValue' })).toEqual(PRESENT);
@@ -365,7 +394,38 @@ describe('a symbol', () => {
     expect(await verify({ kind: 'symbol', text: 'freshName' })).toEqual(PRESENT);
   });
 
-  it('reads a name no export line names as absent: missing, commented out, or a prefix of an export', async () => {
+  it('reads an interface member, a property or a method, as present', async () => {
+    const verify = createRefVerifier(seams());
+
+    expect(await verify({ kind: 'symbol', text: 'memberName' })).toEqual(PRESENT);
+    expect(await verify({ kind: 'symbol', text: 'methodMember' })).toEqual(PRESENT);
+  });
+
+  it('reads an object field, on its own line, quoted or inline, as present', async () => {
+    const verify = createRefVerifier(seams());
+
+    expect(await verify({ kind: 'symbol', text: 'objectField' })).toEqual(PRESENT);
+    expect(await verify({ kind: 'symbol', text: 'quotedField' })).toEqual(PRESENT);
+    expect(await verify({ kind: 'symbol', text: 'inlineField' })).toEqual(PRESENT);
+  });
+
+  it('reads a module-local function, interface and const, and a local in a body, as present', async () => {
+    const verify = createRefVerifier(seams());
+
+    for (const text of ['localHelper', 'LocalShape', 'TABLE', 'AlphaShape', 'nestedLocal']) {
+      expect(await verify({ kind: 'symbol', text })).toEqual(PRESENT);
+    }
+  });
+
+  it('reads a word in a comment or a doc comment, a name only called and one only a type as absent', async () => {
+    const verify = createRefVerifier(seams());
+
+    for (const text of ['commentWord', 'docWord', 'callOnly', 'ForeignType']) {
+      expect(await verify({ kind: 'symbol', text })).toEqual(ABSENT);
+    }
+  });
+
+  it('reads a name nothing declares as absent: missing, commented out, or a prefix of a declaration', async () => {
     const verify = createRefVerifier(seams());
 
     expect(await verify({ kind: 'symbol', text: 'missingName' })).toEqual(ABSENT);
@@ -373,27 +433,34 @@ describe('a symbol', () => {
     expect(await verify({ kind: 'symbol', text: 'alphaVal' })).toEqual(ABSENT);
   });
 
-  it('reads a name only an export line\'s type names as present by the grep alone', async () => {
-    expect(await verifyRef({ kind: 'symbol', text: 'AlphaShape' }, seams())).toEqual(PRESENT);
+  it('confirms a declaration at the start of its line through the outline, outlining only the candidate files', async () => {
+    const fake = fakeOutline({ 'src/shapes.ts': ['LocalShape', 'memberName', 'methodMember', 'TABLE', 'localHelper'] });
+
+    expect(await verifyRef({ kind: 'symbol', text: 'localHelper' }, seams({ outline: fake.outline }))).toEqual(PRESENT);
+    expect(fake.asked).toEqual(['src/shapes.ts']);
   });
 
-  it('confirms a grep hit through the outline, outlining only the candidate files', async () => {
-    const fake = fakeOutline({ 'src/alpha.ts': ['alphaValue', 'makeThing'] });
+  it('reads a declaration at the start of its line the outline does not list as absent: a declaration in a string', async () => {
+    const fake = fakeOutline({ 'src/shapes.ts': ['LocalShape', 'TABLE', 'INLINE', 'typedValue', 'localHelper', 'FIXTURE'] });
 
-    expect(await verifyRef({ kind: 'symbol', text: 'alphaValue' }, seams({ outline: fake.outline }))).toEqual(PRESENT);
-    expect(fake.asked).toEqual(['src/alpha.ts']);
+    expect(await verifyRef({ kind: 'symbol', text: 'plantedInString' }, seams())).toEqual(PRESENT);
+    expect(await verifyRef({ kind: 'symbol', text: 'plantedInString' }, seams({ outline: fake.outline }))).toEqual(ABSENT);
   });
 
-  it('reads a grep hit the outline does not list as exported as absent', async () => {
-    const fake = fakeOutline({ 'src/alpha.ts': ['alphaValue', 'makeThing'] });
+  it('reads an indented declaration by the grep alone, outlining nothing', async () => {
+    const fake = fakeOutline({});
+    const verify = createRefVerifier(seams({ outline: fake.outline }));
 
-    expect(await verifyRef({ kind: 'symbol', text: 'AlphaShape' }, seams({ outline: fake.outline }))).toEqual(ABSENT);
+    for (const text of ['memberName', 'objectField', 'nestedLocal']) {
+      expect(await verify({ kind: 'symbol', text })).toEqual(PRESENT);
+    }
+    expect(fake.asked).toEqual([]);
   });
 
   it('counts a candidate ts-symbols could not outline as the grep found it', async () => {
-    const fake = fakeOutline({ 'src/alpha.ts': null });
+    const fake = fakeOutline({ 'src/shapes.ts': null });
 
-    expect(await verifyRef({ kind: 'symbol', text: 'AlphaShape' }, seams({ outline: fake.outline }))).toEqual(PRESENT);
+    expect(await verifyRef({ kind: 'symbol', text: 'plantedInString' }, seams({ outline: fake.outline }))).toEqual(PRESENT);
   });
 
   it('reads a name that is no identifier as absent, grepping nothing', async () => {
@@ -430,13 +497,13 @@ describe('the ts-symbols outliner', () => {
     expect(tsSymbolsOutliner({ cwd: repo, env: {} })).toBeNull();
   });
 
-  it('answers the exported top-level names outline --json lists', async () => {
+  it('answers every top-level name outline --json lists and each one\'s members, exported or not', async () => {
     const payload = JSON.stringify({
       file: 'src/alpha.ts',
       symbols: [
         { name: 'alphaValue', exported: true },
         { name: 'AlphaShape', exported: false },
-        { name: 'makeThing', exported: true, children: [{ name: 'inner', exported: true }] },
+        { name: 'makeThing', exported: true, children: [{ name: 'inner', exported: false }] },
       ],
     });
     const bin = plantTsSymbols('bin-ok', [
@@ -447,7 +514,7 @@ describe('the ts-symbols outliner', () => {
     const outline = tsSymbolsOutliner({ cwd: repo, env: { PATH: bin } });
 
     expect(outline).not.toBeNull();
-    expect(await outline?.('src/alpha.ts')).toEqual(['alphaValue', 'makeThing']);
+    expect(await outline?.('src/alpha.ts')).toEqual(['alphaValue', 'AlphaShape', 'makeThing', 'inner']);
     expect(await outline?.('src/other.ts')).toBeNull();
   });
 

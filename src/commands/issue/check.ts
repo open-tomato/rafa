@@ -22,10 +22,11 @@
  *
  * Without `--stamp` it is `readCopyRefs` (`src/refs/reading.ts`): each
  * reference read against the stamp the copy keeps, and a reference it
- * keeps none for stamped on this read and reported `ok` — a copy
- * written before stamps existed reads all `ok` on its first check. That
- * first stamp is written back into the copy, which is the one write a
- * plain check makes.
+ * keeps none for stamped on this read — reported `ok` when its target
+ * exists and `new` when it is missing and not an issue — while a `new`
+ * stamp, or a non-issue `absent` one, whose target now exists is
+ * restamped and reported `ok`. Those stamps are written back into the
+ * copy, which is the one write a plain check makes.
  *
  * With `--stamp` every reference is re-stamped with its live
  * fingerprint (`restampCopyRefs`), `absent` for a missing target, so the
@@ -36,8 +37,10 @@
  * (`memoiseVerifier`), so a target is read once.
  *
  * The targets are read by the verifier `plan create`'s check 4 builds
- * (`createPlanRefsVerifier`, `gh`, `git`, `ts-symbols` and the core
- * roster at the project root), or by {@link IssueCheckSeams.verifier}.
+ * (`createPlanRefsVerifier`, `gh`, `git`, `ts-symbols` and the roster
+ * `planRoster` answers at the project root: the checkout's own when it
+ * is rafa itself, the core roster otherwise), or by
+ * {@link IssueCheckSeams.verifier}.
  * A board issue `gh` could not read and a refs block the codec will not
  * read are refused with exit code 1 and the error's own words.
  *
@@ -45,12 +48,16 @@
  *
  * Text mode: the copy's path, one line per reference, `<state> <kind>
  * <text> (line <n>)`, with the changed headings of a suspect or resolved
- * issue, a resolved one's `rafa issue unblock <n>` and why an unknown
- * one is not checked, then the count per state and, under `--stamp`,
- * the re-stamp line. Json mode: an {@link IssueCheckResult} as the
- * terminal result's `data`, each reference carrying `kind`, `text`,
- * `line`, `state`, `fingerprint` and `stamp` as one word each
- * (`fingerprintText`, `unreadable` for a target that could not be read).
+ * issue, a resolved one's `rafa issue unblock <n>`, a new one's note
+ * that its target is not there yet and is read as one the spec is to
+ * add, and why an unknown one is not checked, then the count per state
+ * (`ok`, `new`, `dangling`, `suspect`, `resolved`, `unknown`, naming
+ * only those some reference reads) and, under `--stamp`, the re-stamp
+ * line. Json mode: an {@link IssueCheckResult} as the terminal result's
+ * `data`, each reference carrying `kind`, `text`, `line`, `state`,
+ * `fingerprint` and `stamp` as one word each (`fingerprintText`,
+ * `unreadable` for a target that could not be read): a new reference
+ * reads `state: new`, `fingerprint: absent` and `stamp: new`.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RefRow } from '../../refs/reading.js';
@@ -82,7 +89,13 @@ export const STAMP_FLAG = 'stamp';
 const ISSUE_NUMBER = /^[1-9]\d*$/u;
 
 /** The states in the order the count line names them. */
-const STATE_ORDER: readonly RefState[] = ['ok', 'dangling', 'suspect', 'resolved', 'unknown'];
+const STATE_ORDER: readonly RefState[] = ['ok', 'new', 'dangling', 'suspect', 'resolved', 'unknown'];
+
+/** What follows the row of a state that is not checked or not refused. */
+const NOTES: ReadonlyMap<RefState, string> = new Map<RefState, string>([
+  ['new', ' — not there yet, read as a target the spec is to add'],
+  ['unknown', ' — its repository could not be read, so it is not checked'],
+]);
 
 /** One reference as json mode gives it. */
 export interface CheckedRef {
@@ -193,7 +206,7 @@ function checkedRef(row: RefRow, stamp: RefRow['stamp']): CheckedRef {
   });
 }
 
-/** What follows a row's text: its changed headings, its unblock command, or why it is not checked. */
+/** What follows a row's text: its changed headings, its unblock command, or the note of a new or unknown row. */
 function rowSuffix(ref: CheckedRef): string {
   const noun = ref.changedHeadings.length === 1
     ? 'heading'
@@ -204,10 +217,8 @@ function rowSuffix(ref: CheckedRef): string {
   const after = ref.unblock === null
     ? ''
     : ` — ${ref.unblock}`;
-  const unknown = ref.state === 'unknown'
-    ? ' — its repository could not be read, so it is not checked'
-    : '';
-  return `${headings} (line ${String(ref.line)})${after}${unknown}`;
+  const note = NOTES.get(ref.state) ?? '';
+  return `${headings} (line ${String(ref.line)})${after}${note}`;
 }
 
 /** The line text mode prints for one reference. */
@@ -286,8 +297,8 @@ export function createIssueCheckCommand(seams: IssueCheckSeams = {}): RafaComman
     action: 'check',
     summary: 'read the references a spec\'s saved copy names, each with its state',
     description: 'Reads the saved copy of issue <n> under `specs.dir` and prints every reference it names — an'
-      + ' issue, a file, an exported symbol, a command, a flag, a config key — with its state against the'
-      + ' stamp the copy keeps: ok, dangling, suspect, resolved or unknown. A reference the copy keeps no'
+      + ' issue, a file, a declared symbol, a command, a flag, a config key — with its state against the'
+      + ' stamp the copy keeps: ok, new, dangling, suspect, resolved or unknown. A reference the copy keeps no'
       + ' stamp for is stamped on this read. Exits 0 whatever the states are, and plans nothing. A missing'
       + ' saved copy is refused, naming the `rafa plan create --issue=<n>` that writes one. With'
       + ' `--output=json` every reference, with its kind, line, state and fingerprint, is the data of the'

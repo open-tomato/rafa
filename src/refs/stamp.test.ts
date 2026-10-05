@@ -20,7 +20,8 @@
  * The characters the block escapes are built with
  * `String.fromCodePoint` rather than written as escapes in this file.
  */
-import type { Fingerprint, IssueFingerprint, RefStamp } from './stamp.js';
+import type { RefKind } from './extract.js';
+import type { Fingerprint, IssueFingerprint, LiveReading, RefStamp } from './stamp.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -33,6 +34,7 @@ import {
   findStamp,
   fingerprintText,
   issueFingerprint,
+  NEW,
   normaliseIssueText,
   PRESENT,
   readRefsBlock,
@@ -182,26 +184,32 @@ describe('blobFingerprint and fingerprintText', () => {
     }
   });
 
-  it('writes an issue as sha256:<digest> and the two words as themselves', () => {
+  it('writes an issue as sha256:<digest> and the three words as themselves', () => {
     const fingerprint = issue(BODY);
 
     expect(fingerprintText(fingerprint)).toBe(`sha256:${fingerprint.digest}`);
-    expect([fingerprintText(PRESENT), fingerprintText(ABSENT)]).toEqual(['present', 'absent']);
+    expect([fingerprintText(PRESENT), fingerprintText(ABSENT), fingerprintText(NEW)]).toEqual(['present', 'absent', 'new']);
   });
 
   it('reads two fingerprints as the same by their text, never by an issue\'s state', () => {
     expect(sameFingerprint(issue(BODY, 'open'), issue(BODY, 'closed'))).toBe(true);
     expect(sameFingerprint(blobFingerprint(SHA1), blobFingerprint(OTHER_SHA1))).toBe(false);
     expect(sameFingerprint(PRESENT, ABSENT)).toBe(false);
+    expect(sameFingerprint(NEW, ABSENT)).toBe(false);
   });
 });
 
 describe('compareToStamp: each state', () => {
-  /** The state and changed headings, as one pair. */
-  function read(live: Fingerprint | typeof UNREADABLE, stamp: Fingerprint | null, blocker = false): readonly unknown[] {
-    const answer = compareToStamp({ live, stamp, blocker });
+  /** The state and changed headings, as one pair; `kind` left out when it is undefined. */
+  function read(live: LiveReading, stamp: Fingerprint | null, blocker = false, kind?: RefKind): readonly unknown[] {
+    const answer = compareToStamp(kind === undefined
+      ? { live, stamp, blocker }
+      : { live, stamp, blocker, kind });
     return [answer.state, answer.changedHeadings];
   }
+
+  /** Every kind but an issue's, the kinds a first reading can answer `new` for. */
+  const NON_ISSUE_KINDS: readonly RefKind[] = ['path', 'symbol', 'command', 'flag', 'key'];
 
   it('answers unknown for an unreadable target, stamped or not', () => {
     expect(read(UNREADABLE, null)).toEqual(['unknown', []]);
@@ -214,9 +222,33 @@ describe('compareToStamp: each state', () => {
     expect(read(ABSENT, null)).toEqual(['dangling', []]);
   });
 
+  it('answers new for a non-issue target absent on its first reading, and ok for one that exists', () => {
+    for (const kind of NON_ISSUE_KINDS) {
+      expect(read(ABSENT, null, false, kind)).toEqual(['new', []]);
+      expect(read(PRESENT, null, false, kind)).toEqual(['ok', []]);
+    }
+  });
+
+  it('answers dangling, never new, for an issue absent on its first reading, and for a reading with no kind', () => {
+    expect(read(ABSENT, null, false, 'issue')).toEqual(['dangling', []]);
+    expect(read(ABSENT, null, true, 'cross-issue')).toEqual(['dangling', []]);
+    expect(read(ABSENT, null)).toEqual(['dangling', []]);
+  });
+
+  it('answers new for a target stamped new and still absent, and ok once it exists', () => {
+    for (const kind of NON_ISSUE_KINDS) expect(read(ABSENT, NEW, false, kind)).toEqual(['new', []]);
+    expect(read(PRESENT, NEW, false, 'symbol')).toEqual(['ok', []]);
+    expect(read(blobFingerprint(SHA1), NEW, false, 'path')).toEqual(['ok', []]);
+  });
+
   it('answers dangling when a stamped target is gone', () => {
     expect(read(ABSENT, blobFingerprint(SHA1))).toEqual(['dangling', []]);
     expect(read(ABSENT, PRESENT)).toEqual(['dangling', []]);
+  });
+
+  it('answers dangling, not new, for a non-issue target stamped present or a blob and now absent', () => {
+    for (const kind of NON_ISSUE_KINDS) expect(read(ABSENT, PRESENT, false, kind)).toEqual(['dangling', []]);
+    expect(read(ABSENT, blobFingerprint(SHA1), false, 'path')).toEqual(['dangling', []]);
   });
 
   it('answers ok for a target stamped absent and still missing, suspect once it appears', () => {
@@ -270,10 +302,15 @@ describe('the refs block codec', () => {
     { kind: 'cross-issue', text: 'open-tomato/rafa#31', fingerprint: issue('', 'closed') },
     { kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint(SHA1) },
     { kind: 'path', text: 'src/gone.ts', fingerprint: ABSENT },
+    { kind: 'path', text: 'src/to-come.ts', fingerprint: NEW },
     { kind: 'symbol', text: 'readSnapshotChange', fingerprint: PRESENT },
+    { kind: 'symbol', text: 'toCome', fingerprint: NEW },
     { kind: 'command', text: 'rafa issue check', fingerprint: PRESENT },
+    { kind: 'command', text: 'rafa to come', fingerprint: NEW },
     { kind: 'flag', text: '--accept-refs', fingerprint: PRESENT },
+    { kind: 'flag', text: '--to-come', fingerprint: NEW },
     { kind: 'key', text: 'specs.dir', fingerprint: PRESENT },
+    { kind: 'key', text: 'specs.toCome', fingerprint: NEW },
   ];
   const body = '# Spec\n\nSee `src/a.ts` and #7.\n';
 
@@ -309,6 +346,22 @@ describe('the refs block codec', () => {
       '',
       'body\n',
     ].join('\n'));
+  });
+
+  it('writes a new stamp as the word new and reads it back as NEW', () => {
+    const copy = writeRefsBlock('body\n', [{ kind: 'path', text: 'src/to-come.ts', fingerprint: NEW }]);
+
+    expect(copy).toBe([
+      REFS_BLOCK_OPEN,
+      'refs:',
+      '  - kind: path',
+      '    text: "src/to-come.ts"',
+      '    stamp: "new"',
+      REFS_BLOCK_CLOSE,
+      '',
+      'body\n',
+    ].join('\n'));
+    expect(readRefsBlock(copy).stamps?.[0]?.fingerprint).toBe(NEW);
   });
 
   it('answers null stamps and the copy untouched when there is no block, and writes it back so', () => {
@@ -404,6 +457,11 @@ describe('the refs block codec: what it refuses', () => {
 
   it('refuses a stamp the kind is never given', () => {
     expect(refusal(copyWith('refs:', '  - kind: symbol', '    text: "X"', `    stamp: "blob:${SHA1}"`))).toContain('a symbol is not stamped blob:');
+  });
+
+  it('refuses a new stamp on an issue, here or on another repository', () => {
+    expect(refusal(copyWith('refs:', '  - kind: issue', '    text: "#7"', '    stamp: new'))).toContain('entry 1: a issue is not stamped new');
+    expect(refusal(copyWith('refs:', '  - kind: cross-issue', '    text: "o/r#7"', '    stamp: new'))).toContain('entry 1: a cross-issue is not stamped new');
   });
 
   it('refuses an issue stamp with no state or a heading that is not a pair', () => {

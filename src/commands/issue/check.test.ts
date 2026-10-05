@@ -1,7 +1,8 @@
 /**
  * Tests for `rafa issue check` (`check.ts`): a saved copy holding a
  * reference in each of the five states, read in text and json mode;
- * `--stamp` and the check after it; a copy's first check; the missing
+ * `--stamp` and the check after it; a copy's first check, its missing
+ * file printed, counted and given in json mode as `new`; the missing
  * copy and the line refusals.
  *
  * Every dispatched case runs from a project of its own under this
@@ -15,7 +16,7 @@
  * where a first check of a copy with no block writes one: the copy is
  * written only when a stamp is added. `--stamp` is followed by a second
  * check that reads every row `ok` but the unknown one, over the same
- * table that read four of them otherwise. The missing copy is refused
+ * table that read three of them otherwise. The missing copy is refused
  * beside a local notes file of the same issue and a copy of another
  * issue, so the notes file and a neighbour are not read as the copy.
  */
@@ -54,6 +55,9 @@ const COPY_PATH = '.rafa/specs/rafa-151-references-specs.md';
 /** A blob sha, for a file that did not change. */
 const SHA_A = 'a'.repeat(40);
 
+/** The blob `src/gone.ts` was stamped with, before it was deleted. */
+const SHA_GONE = 'b'.repeat(40);
+
 /** Issue #8 as the copy was stamped, and as it reads now: its Design section rewritten. */
 const EIGHT_THEN = issueFingerprint({ title: 'Eight', body: '## Design\n\nThe first design.\n', state: 'open' });
 const EIGHT_NOW = issueFingerprint({ title: 'Eight', body: '## Design\n\nThe second design.\n', state: 'open' });
@@ -70,17 +74,18 @@ const BODY = [
   '', // 4
   '## Design', // 5
   '', // 6
-  'Reads `src/a.ts` and `src/gone.ts`, calls `alphaValue()`, and #8.', // 7  ok, dangling, suspect, suspect
+  'Reads `src/a.ts` and `src/gone.ts`, calls `alphaValue()`, and #8.', // 7  ok, dangling, ok, suspect
   '', // 8
   'See open-tomato/other#9.', // 9  unknown
   '',
 ].join('\n');
 
-/** The stamps the copy keeps: none for the missing file or the unreadable issue. */
+/** The stamps the copy keeps: the deleted file's blob, and none for the unreadable issue. */
 const STAMPS: readonly RefStamp[] = [
   { kind: 'issue', text: '#7', fingerprint: SEVEN_THEN },
   { kind: 'path', text: 'src/a.ts', fingerprint: blobFingerprint(SHA_A) },
-  { kind: 'symbol', text: 'alphaValue', fingerprint: ABSENT },
+  { kind: 'path', text: 'src/gone.ts', fingerprint: blobFingerprint(SHA_GONE) },
+  { kind: 'symbol', text: 'alphaValue', fingerprint: PRESENT },
   { kind: 'issue', text: '#8', fingerprint: EIGHT_THEN },
 ];
 
@@ -138,16 +143,19 @@ function resultOf(stdout: string): IssueCheckResult {
   return result.data as IssueCheckResult;
 }
 
+/** What follows a new row's text: the target is not there yet, and is not refused. */
+const NEW_NOTE = ' — not there yet, read as a target the spec is to add';
+
 /** The text-mode lines of the five-state copy read against its stamps. */
 const FIVE_STATE_LINES = [
   `Issue #${String(ISSUE)}: ${COPY_PATH}`,
   `resolved issue #7 (line 3) — rafa issue unblock ${String(ISSUE)}`,
   'ok path src/a.ts (line 7)',
   'dangling path src/gone.ts (line 7)',
-  'suspect symbol alphaValue (line 7)',
+  'ok symbol alphaValue (line 7)',
   'suspect issue #8: heading "Design" changed (line 7)',
   'unknown cross-issue open-tomato/other#9 (line 9) — its repository could not be read, so it is not checked',
-  '6 references: 1 ok, 1 dangling, 2 suspect, 1 resolved, 1 unknown',
+  '6 references: 2 ok, 1 dangling, 1 suspect, 1 resolved, 1 unknown',
 ];
 
 describe('rafa issue check over a copy with a reference in each state', () => {
@@ -177,8 +185,8 @@ describe('rafa issue check over a copy with a reference in each state', () => {
     expect(result.references.map((ref) => [ref.kind, ref.text, ref.line, ref.state, ref.fingerprint, ref.stamp])).toEqual([
       ['issue', '#7', 3, 'resolved', `sha256:${SEVEN_NOW.digest}`, `sha256:${SEVEN_THEN.digest}`],
       ['path', 'src/a.ts', 7, 'ok', `blob:${SHA_A}`, `blob:${SHA_A}`],
-      ['path', 'src/gone.ts', 7, 'dangling', 'absent', null],
-      ['symbol', 'alphaValue', 7, 'suspect', 'present', 'absent'],
+      ['path', 'src/gone.ts', 7, 'dangling', 'absent', `blob:${SHA_GONE}`],
+      ['symbol', 'alphaValue', 7, 'ok', 'present', 'present'],
       ['issue', '#8', 7, 'suspect', `sha256:${EIGHT_NOW.digest}`, `sha256:${EIGHT_THEN.digest}`],
       ['cross-issue', 'open-tomato/other#9', 9, 'unknown', 'unreadable', null],
     ]);
@@ -260,7 +268,7 @@ describe('rafa issue check --stamp', () => {
 });
 
 describe('a copy checked for the first time', () => {
-  it('stamps every reference whose target is there, reads it ok, and writes the block into the copy', async () => {
+  it('stamps every reference whose target is there ok and the missing file new, and writes the block into the copy', async () => {
     const project = plantCopyProject(BODY);
 
     const outcome = await dispatchInProject(
@@ -271,8 +279,48 @@ describe('a copy checked for the first time', () => {
     );
 
     expect(resultOf(outcome.stdout).references.map((ref) => ref.state))
-      .toEqual(['ok', 'ok', 'dangling', 'ok', 'ok', 'unknown']);
-    expect(readRefsBlock(copyOf(project)).stamps?.map((stamp) => stamp.text)).toEqual(['#7', 'src/a.ts', 'alphaValue', '#8']);
+      .toEqual(['ok', 'ok', 'new', 'ok', 'ok', 'unknown']);
+    expect(readRefsBlock(copyOf(project)).stamps?.map((stamp) => [stamp.text, stamp.fingerprint.kind]))
+      .toEqual([['#7', 'issue'], ['src/a.ts', 'blob'], ['src/gone.ts', 'new'], ['alphaValue', 'present'], ['#8', 'issue']]);
+  });
+
+  it('prints the missing file as a new row with its note and counts it in the count line', async () => {
+    const project = plantCopyProject(BODY);
+
+    const outcome = await dispatchInProject(
+      ['issue', 'check', String(ISSUE)],
+      SUBJECTS,
+      [command(tableVerifier().verify)],
+      project,
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout.trimEnd().split('\n')).toEqual([
+      `Issue #${String(ISSUE)}: ${COPY_PATH}`,
+      'ok issue #7 (line 3)',
+      'ok path src/a.ts (line 7)',
+      `new path src/gone.ts (line 7)${NEW_NOTE}`,
+      'ok symbol alphaValue (line 7)',
+      'ok issue #8 (line 7)',
+      'unknown cross-issue open-tomato/other#9 (line 9) — its repository could not be read, so it is not checked',
+      '6 references: 4 ok, 1 new, 1 unknown',
+    ]);
+  });
+
+  it('gives the missing file in json mode as state new, read absent and stamped new', async () => {
+    const project = plantCopyProject(BODY);
+
+    const outcome = await dispatchInProject(
+      ['issue', 'check', String(ISSUE), '--output=json'],
+      SUBJECTS,
+      [command(tableVerifier().verify)],
+      project,
+    );
+
+    const gone = resultOf(outcome.stdout).references.find((ref) => ref.text === 'src/gone.ts');
+    expect(gone === undefined
+      ? null
+      : [gone.state, gone.fingerprint, gone.stamp]).toEqual(['new', 'absent', 'new']);
   });
 });
 

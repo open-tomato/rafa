@@ -263,18 +263,22 @@ function proseWithAt12(text: string): readonly string[] {
 }
 
 describe('check 4 through plan create --issue', () => {
-  it('refuses a spec naming a deleted src/a.ts as `dangling src/a.ts (line 12)`, spending no session and writing no plan', () => {
+  it('refuses a spec naming a src/a.ts stamped and since deleted as `dangling src/a.ts (line 12)`, spending no session and writing no plan', () => {
     const scratch = plantScratch();
+    writeGh(scratch.bin, [specIssue(...proseWithAt12('It reads `src/a.ts` first.'))]);
+    const first = runPlan(scratch);
+    expectExit(first, 0, { ...scratch });
+    expect(sessionsSpent(scratch)).toBe(1);
+    clearPlans(scratch);
     git(scratch, scratch.repo, 'rm', '-q', 'src/a.ts');
     git(scratch, scratch.repo, 'commit', '-q', '-m', 'delete a');
-    writeGh(scratch.bin, [specIssue(...proseWithAt12('It reads `src/a.ts` first.'))]);
 
     const run = runPlan(scratch);
 
     expectExit(run, BOARD_REFUSAL_EXIT, { ...scratch });
     expect(run.output).toContain('dangling src/a.ts (line 12)');
     expect(run.output).toContain(ACCEPT_REFS_FLAG);
-    expect(sessionsSpent(scratch)).toBe(0);
+    expect(sessionsSpent(scratch)).toBe(1);
     expect(existsSync(join(scratch.repo, '.rafa', 'plans'))).toBe(false);
   });
 

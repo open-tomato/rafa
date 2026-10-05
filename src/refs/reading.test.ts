@@ -33,7 +33,7 @@ import { CORE_REGISTRY } from '../commands/index.js';
 import { createGitRunner } from '../pr/git.js';
 
 import { readCopyRefs, readRefsText, restampCopyRefs, restampRefsText, unblockCommand } from './reading.js';
-import { ABSENT, issueFingerprint, PRESENT, readRefsBlock, RefsBlockError, writeRefsBlock } from './stamp.js';
+import { ABSENT, issueFingerprint, NEW, PRESENT, readRefsBlock, RefsBlockError, writeRefsBlock } from './stamp.js';
 import { createRefVerifier, RefVerifyError } from './verify.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-reading-')));
@@ -107,7 +107,7 @@ const BODY = [
   '', // 2
   'The reader lives in `src/a.ts`, and #7 describes it.', // 3
   '', // 4
-  'Run `rafa plan create` with `--issue`, which reads `specs.dir`.', // 5
+  'Run `rafa plan create --issue`, which reads `specs.dir`.', // 5
   '',
 ].join('\n');
 
@@ -153,17 +153,30 @@ describe('a copy with no block', () => {
     expect(readFileSync(path, 'utf8')).toBe(written);
   });
 
-  it('reads a missing target dangling on its first read and does not stamp it', async () => {
-    const root = plantRepository('first-dangling');
-    const path = plantCopy('first-dangling', 'See `src/gone.ts`.\n');
+  it('reads a missing non-issue target new on its first read and writes it stamped new', async () => {
+    const root = plantRepository('first-new');
+    const path = plantCopy('first-new', 'See `src/gone.ts`.\n');
 
     const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
 
     expect(reading.rows).toHaveLength(1);
-    expect(reading.rows[0]).toMatchObject({ kind: 'path', text: 'src/gone.ts', line: 1, state: 'dangling', stamp: null });
+    expect(reading.rows[0]).toMatchObject({ kind: 'path', text: 'src/gone.ts', line: 1, state: 'new', stamp: NEW });
     expect(reading.rows[0]?.fingerprint).toEqual(ABSENT);
+    expect(reading.changed).toBe(true);
+    const onDisk = readFileSync(path, 'utf8');
+    expect(onDisk).toBe(reading.copy);
+    expect(onDisk).toBe('<!-- rafa:refs\nrefs:\n  - kind: path\n    text: "src/gone.ts"\n    stamp: "new"\n-->\n\nSee `src/gone.ts`.\n');
+  });
+
+  it('reads a missing issue dangling on its first read and does not stamp it', async () => {
+    const root = plantRepository('first-dangling');
+    const path = plantCopy('first-dangling', 'After #9.\n');
+
+    const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
+
+    expect(reading.rows.map((row) => [row.kind, row.text, row.state, row.stamp])).toEqual([['issue', '#9', 'dangling', null]]);
     expect(reading.changed).toBe(false);
-    expect(readFileSync(path, 'utf8')).toBe('See `src/gone.ts`.\n');
+    expect(readFileSync(path, 'utf8')).toBe('After #9.\n');
   });
 
   it('leaves a copy that names nothing without a block', async () => {
@@ -283,6 +296,78 @@ describe('a copy with a block', () => {
   });
 });
 
+describe('a stamp of a target that did not exist', () => {
+  it('leaves a new stamp whose target is still missing reading new, and the file as it is', async () => {
+    const root = plantRepository('new-still-missing');
+    const copy = writeRefsBlock('See `src/c.ts`.\n', [{ kind: 'path', text: 'src/c.ts', fingerprint: NEW }]);
+    const path = plantCopy('new-still-missing', copy);
+
+    const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
+
+    expect(reading.rows.map((row) => [row.text, row.state, row.stamp])).toEqual([['src/c.ts', 'new', NEW]]);
+    expect(reading.changed).toBe(false);
+    expect(readFileSync(path, 'utf8')).toBe(copy);
+  });
+
+  it('restamps a new stamp whose target now exists with its live fingerprint, in place, and reads it ok', async () => {
+    const root = plantRepository('new-arrived');
+    const path = plantCopy('new-arrived', writeRefsBlock('See `src/c.ts`, then `src/a.ts`.\n', [
+      { kind: 'key', text: 'plan.dir', fingerprint: PRESENT },
+      { kind: 'path', text: 'src/c.ts', fingerprint: NEW },
+    ]));
+    plant(root, 'src/c.ts', 'export const gammaValue = 3;\n');
+    commitAll(root, 'added c');
+
+    const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
+
+    expect(reading.rows.map((row) => [row.text, row.state])).toEqual([['src/c.ts', 'ok'], ['src/a.ts', 'ok']]);
+    expect(reading.rows[0]?.stamp?.kind).toBe('blob');
+    expect(reading.rows[0]?.stamp).toEqual(reading.rows[0]?.fingerprint ?? null);
+    expect(reading.changed).toBe(true);
+    const onDisk = readRefsBlock(readFileSync(path, 'utf8'));
+    expect(onDisk.stamps?.map((stamp) => [stamp.text, stamp.fingerprint.kind])).toEqual([['plan.dir', 'present'], ['src/c.ts', 'blob'], ['src/a.ts', 'blob']]);
+    const again = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
+    expect(again.changed).toBe(false);
+    expect(again.rows.every((row) => row.state === 'ok')).toBe(true);
+  });
+
+  it('restamps a legacy absent stamp on a path whose target now exists, and reads it ok rather than suspect', async () => {
+    const root = plantRepository('absent-arrived');
+    const path = plantCopy('absent-arrived', writeRefsBlock('See `src/c.ts`.\n', [{ kind: 'path', text: 'src/c.ts', fingerprint: ABSENT }]));
+    plant(root, 'src/c.ts', 'export const gammaValue = 3;\n');
+    commitAll(root, 'added c');
+
+    const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map()) });
+
+    expect(reading.rows.map((row) => [row.text, row.state, row.stamp?.kind])).toEqual([['src/c.ts', 'ok', 'blob']]);
+    expect(reading.changed).toBe(true);
+    expect(readRefsBlock(readFileSync(path, 'utf8')).stamps?.map((stamp) => stamp.fingerprint.kind)).toEqual(['blob']);
+  });
+
+  it('restamps a legacy absent stamp on a command that exists as present', async () => {
+    const root = plantRepository('absent-command');
+    const copy = writeRefsBlock('Run `rafa plan create`.\n', [{ kind: 'command', text: 'rafa plan create', fingerprint: ABSENT }]);
+
+    const reading = await readRefsText({ copy, issue: SPEC, verify: verifierOver(root, new Map()) });
+
+    expect(reading.rows.map((row) => [row.text, row.state, row.stamp])).toEqual([['rafa plan create', 'ok', PRESENT]]);
+    expect(reading.stamps).toEqual([{ kind: 'command', text: 'rafa plan create', fingerprint: PRESENT }]);
+    expect(reading.changed).toBe(true);
+  });
+
+  it('leaves an issue stamped absent that now exists reading suspect, and the file as it is', async () => {
+    const root = plantRepository('absent-issue');
+    const copy = writeRefsBlock('After #7.\n', [{ kind: 'issue', text: '#7', fingerprint: ABSENT }]);
+    const path = plantCopy('absent-issue', copy);
+
+    const reading = await readCopyRefs({ path, issue: SPEC, verify: verifierOver(root, new Map([['#7', found('open')]])) });
+
+    expect(reading.rows.map((row) => [row.text, row.state, row.stamp])).toEqual([['#7', 'suspect', ABSENT]]);
+    expect(reading.changed).toBe(false);
+    expect(readFileSync(path, 'utf8')).toBe(copy);
+  });
+});
+
 describe('re-stamping', () => {
   it('writes every live fingerprint back, absent for a missing target, and turns suspect and dangling rows ok', async () => {
     const root = plantRepository('restamp');
@@ -291,6 +376,7 @@ describe('re-stamping', () => {
     const path = plantCopy('restamp', writeRefsBlock(body, [
       { kind: 'issue', text: '#7', fingerprint: stale },
       { kind: 'key', text: 'plan.dir', fingerprint: PRESENT },
+      { kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT },
     ]));
     const verify = verifierOver(root, new Map([['#7', found('open', '## Design\n\nNew.\n')]]));
     const before = await readCopyRefs({ path, issue: SPEC, verify });
