@@ -1,6 +1,10 @@
-import { describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { commandsOf, judgeLine } from './rafa-hookify/files/rafa-tooling-hook';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+
+import { commandsOf, judgeLine, repoFlagOf, repoOf } from './rafa-hookify/files/rafa-tooling-hook';
 
 const HOOK = `${import.meta.dir}/rafa-hookify/files/rafa-tooling-hook.ts`;
 
@@ -101,9 +105,85 @@ describe('judgeLine: gh commands rafa replaces', () => {
   });
 });
 
+describe('repoOf and repoFlagOf', () => {
+  test.each([
+    ['open-tomato/rafa', 'open-tomato/rafa'],
+    ['Open-Tomato/Rafa', 'open-tomato/rafa'],
+    ['github.com/open-tomato/rafa', 'open-tomato/rafa'],
+    ['git@github.com:open-tomato/rafa.git', 'open-tomato/rafa'],
+    ['https://github.com/open-tomato/rafa.git\n', 'open-tomato/rafa'],
+    ['ssh://git@github.com/open-tomato/rafa', 'open-tomato/rafa'],
+  ])('reads %s as %s', (named, repo) => {
+    expect(repoOf(named)).toBe(repo);
+  });
+
+  test.each(['rafa', '', '""'])('reads %p as no repository', (named) => {
+    expect(repoOf(named)).toBeNull();
+  });
+
+  test.each([
+    [['issue', 'list', '-R', 'a/b'], 'a/b'],
+    [['issue', 'list', '-Ra/b'], 'a/b'],
+    [['pr', 'view', '3', '--repo', 'a/b'], 'a/b'],
+    [['pr', 'view', '3', '--repo=a/b'], 'a/b'],
+    [['pr', 'view', '3'], undefined],
+  ])('finds the repository in %p', (words, repo) => {
+    expect(repoFlagOf(words)).toBe(repo);
+  });
+});
+
+describe('judgeLine: gh naming a repository', () => {
+  const OWN = 'open-tomato/rafa';
+
+  test.each([
+    'gh issue list -R other/repo',
+    'gh issue view 12 --repo other/repo',
+    'gh issue create -Rother/repo --title x',
+    'gh pr view 3 --repo other/repo',
+    'gh pr checks 3 --repo=github.com/other/repo',
+    'gh pr list -R other/repo',
+    'gh pr merge 3 -R other/repo',
+  ])('lets %s through, which rafa cannot answer', (line) => {
+    expect(judgeLine(line, OWN)).toBeNull();
+  });
+
+  test.each([
+    ['gh issue list -R open-tomato/rafa', 'rafa issue list'],
+    ['gh issue view 12 --repo Open-Tomato/Rafa', 'rafa issue show 12'],
+    ['gh pr view 3 --repo=github.com/open-tomato/rafa', 'rafa pr show 3'],
+    ['gh pr checks 3 -Ropen-tomato/rafa', 'rafa pr show 3'],
+  ])('denies %s, naming the project\'s own repository, with %s', (line, rafa) => {
+    const verdict = judgeLine(line, OWN);
+    expect(verdict?.decision).toBe('deny');
+    expect(verdict?.reason).toContain(rafa);
+  });
+
+  test('hands gh pr merge on the project\'s own repository over', () => {
+    expect(judgeLine('gh pr merge 41 -R open-tomato/rafa', OWN)?.reason).toContain('`rafa pr merge 41` is the user\'s to run');
+  });
+
+  test('denies a gh line naming no repository with the project\'s repository known', () => {
+    expect(judgeLine('gh issue list', OWN)?.reason).toContain('rafa issue list');
+  });
+
+  test('denies a gh line naming no repository with the project\'s repository unread', () => {
+    expect(judgeLine('gh pr view 3', null)?.reason).toContain('rafa pr show 3');
+  });
+
+  test('lets a named repository through when the project\'s repository is unread', () => {
+    expect(judgeLine('gh issue list -R open-tomato/rafa', null)).toBeNull();
+  });
+
+  test('lets a repository named in quotes through, its name unreadable', () => {
+    expect(judgeLine('gh issue list --repo "open-tomato/rafa"', OWN)).toBeNull();
+  });
+});
+
 describe('the hook process', () => {
-  const run = async (input: string): Promise<string> => {
-    const proc = Bun.spawn(['bun', HOOK], { stdin: new Blob([input]), stdout: 'pipe', stderr: 'pipe' });
+  const run = async (input: string, cwd?: string): Promise<string> => {
+    const env = { ...process.env };
+    delete env.CLAUDE_PROJECT_DIR;
+    const proc = Bun.spawn(['bun', HOOK], { stdin: new Blob([input]), stdout: 'pipe', stderr: 'pipe', cwd, env });
     const out = await new Response(proc.stdout).text();
     expect(await proc.exited).toBe(0);
     return out;
@@ -121,5 +201,30 @@ describe('the hook process', () => {
 
   test('prints nothing for input that is not JSON, and still exits 0', async () => {
     expect(await run('not json')).toBe('');
+  });
+
+  describe('with the project\'s repository read from origin', () => {
+    let dir = '';
+    const bash = (command: string): string => JSON.stringify({ tool_name: 'Bash', tool_input: { command } });
+
+    beforeAll(async () => {
+      dir = await mkdtemp(join(tmpdir(), 'rafa-hook-repo-'));
+      await Bun.$`git init -q ${dir}`.quiet();
+      await Bun.$`git -C ${dir} remote add origin git@github.com:open-tomato/rafa.git`.quiet();
+    });
+
+    afterAll(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    test('denies a gh line naming the origin repository', async () => {
+      const out = JSON.parse(await run(bash('gh pr view 3 --repo open-tomato/rafa'), dir));
+      expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+      expect(out.hookSpecificOutput.permissionDecisionReason).toContain('rafa pr show 3');
+    });
+
+    test('prints nothing for a gh line naming another repository', async () => {
+      expect(await run(bash('gh pr view 3 --repo other/repo'), dir)).toBe('');
+    });
   });
 });

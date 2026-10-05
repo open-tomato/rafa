@@ -58,8 +58,12 @@ a comment body cannot trigger it, and answers one of three ways.
 
 Everything else passes: `gh pr list` with a filter or a closed state,
 since `rafa pr list` shows open pull requests only, and `gh pr create`,
-`gh pr checkout`, `gh run view` and `gh api`. To turn the hook off in a
-project, remove its entry from `.claude/settings.json`.
+`gh pr checkout`, `gh run view` and `gh api`. A `gh pr` or `gh issue`
+naming another repository with `-R`/`--repo` passes too, since rafa reads
+only the project's own: the hook reads that from `git remote get-url
+origin`, and when it cannot, any named repository counts as another one.
+To turn the hook off in a project, remove its entry from
+`.claude/settings.json`.
 
 ## What the pack cannot reach
 

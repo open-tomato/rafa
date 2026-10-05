@@ -12,6 +12,11 @@
  * - **deny, use rafa**: a `gh` command one rafa line replaces, with that line.
  * - **ask**: a rafa command that starts a Claude session (🪙).
  *
+ * A `gh pr` or `gh issue` naming another repository with `-R`/`--repo`
+ * passes, since rafa reads only the project's own; the project's
+ * repository is `git remote get-url origin`, and when that cannot be read
+ * a named repository counts as another one.
+ *
  * Anything else passes with no output. `/rafa-hookify` copies it to
  * `.claude/hooks/` and wires it in `.claude/settings.json`:
  *
@@ -29,6 +34,10 @@ const QUOTED = /'[^']*'|"(?:\\.|[^"\\])*"/g;
 const SEPARATORS = /&&|\|\||[;|\n]/;
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const ISSUE_NUMBER = /^#?\d+$/;
+const REPO_FLAG = /^(?:-R|--repo)(?:=(.*))?$/;
+const SHORT_REPO_FLAG = /^-R(.+)$/;
+// Only a line that may name a repository spends a `git` call on reading the project's own.
+const NAMES_A_REPO = /(?:^|\s)(?:-R|--repo)/;
 const NEXT_SAFE_IDS = new Set(['sync', 'wait', 'unblock', 'home', 'resume']);
 // `rafa pr list` shows the open pull requests and takes no filter, so a
 // `gh pr list` that filters, or reads closed and merged ones, passes.
@@ -66,6 +75,41 @@ const flagValue = (words: string[], name: string): string | undefined => words
   ?.slice(name.length + 3);
 
 const numberIn = (words: string[]): string => words.find((word) => ISSUE_NUMBER.test(word))?.replace('#', '') ?? '<n>';
+
+/**
+ * A repository named as a URL, `HOST/OWNER/REPO` or `OWNER/REPO`, as its
+ * lower-cased `owner/repo`; null when it names no owner and repository.
+ */
+export const repoOf = (named: string): string | null => {
+  const path = named.trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+\//i, '')
+    .replace(/^[^@/]+@[^:/]+:/, '')
+    .replace(/\.git$/, '')
+    .replace(/\/+$/, '');
+  const parts = path.split('/').filter((part) => part !== '');
+  if (parts.length < 2) return null;
+  return parts.slice(-2).join('/')
+    .toLowerCase();
+};
+
+/** The repository a gh command names with `-R`/`--repo`, or undefined when it names none. */
+export const repoFlagOf = (words: string[]): string | undefined => {
+  for (const [i, word] of words.entries()) {
+    const long = REPO_FLAG.exec(word);
+    if (long !== null) return long[1] ?? words[i + 1] ?? '';
+    const short = SHORT_REPO_FLAG.exec(word);
+    if (short?.[1] !== undefined) return short[1];
+  }
+  return undefined;
+};
+
+/** Whether a gh command names a repository other than the project's own, `ownRepo` as `owner/repo` or null when unread. */
+const namesOtherRepo = (words: string[], ownRepo: string | null): boolean => {
+  const named = repoFlagOf(words);
+  if (named === undefined) return false;
+  const repo = repoOf(named);
+  return ownRepo === null || repo === null || repo !== ownRepo;
+};
 
 const prListFilters = (words: string[]): boolean => {
   const openOnly = words.includes('--state=open') || words.join(' ').includes('--state open') || words.join(' ').includes('-s open');
@@ -132,8 +176,12 @@ const judgeGhIssue = (words: string[]): Verdict | null => {
   return null;
 };
 
-/** The verdict on one gh command, its words after `gh`. */
-export const judgeGh = (words: string[]): Verdict | null => {
+/**
+ * The verdict on one gh command, its words after `gh`. `ownRepo` is the
+ * project's repository as `owner/repo`, or null when it could not be read.
+ */
+export const judgeGh = (words: string[], ownRepo: string | null = null): Verdict | null => {
+  if ((words[0] === 'pr' || words[0] === 'issue') && namesOtherRepo(words, ownRepo)) return null;
   if (words[0] === 'pr') return judgeGhPr(words);
   if (words[0] === 'issue') return judgeGhIssue(words);
   return null;
@@ -141,14 +189,18 @@ export const judgeGh = (words: string[]): Verdict | null => {
 
 const isRafa = (word: string | undefined): boolean => word === 'rafa' || (word?.endsWith('/rafa') ?? false);
 
-/** The first verdict over every command in a Bash line, or null when all pass. */
-export const judgeLine = (line: string): Verdict | null => {
+/**
+ * The first verdict over every command in a Bash line, or null when all
+ * pass. `ownRepo` is the project's repository as `owner/repo`, or null when
+ * it could not be read.
+ */
+export const judgeLine = (line: string, ownRepo: string | null = null): Verdict | null => {
   for (const words of commandsOf(line)) {
     const [program, ...rest] = words;
     const verdict = isRafa(program)
       ? judgeRafa(rest)
       : program === 'gh'
-        ? judgeGh(rest)
+        ? judgeGh(rest, ownRepo)
         : null;
     if (verdict !== null) return verdict;
   }
@@ -168,11 +220,25 @@ const readCommand = (input: string): string | null => {
   }
 };
 
+/** The project's repository from `git remote get-url origin`, or null when git cannot read it. */
+const readOwnRepo = (): string | null => {
+  const read = Bun.spawnSync(['git', 'remote', 'get-url', 'origin'], {
+    cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
+    stdout: 'pipe',
+    stderr: 'ignore',
+  });
+  return read.exitCode === 0
+    ? repoOf(read.stdout.toString())
+    : null;
+};
+
 if (import.meta.main) {
   const command = readCommand(await Bun.stdin.text());
   const verdict = command === null
     ? null
-    : judgeLine(command);
+    : judgeLine(command, NAMES_A_REPO.test(command)
+      ? readOwnRepo()
+      : null);
   if (verdict !== null) {
     console.log(JSON.stringify({
       hookSpecificOutput: {
