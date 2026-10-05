@@ -220,6 +220,16 @@ describe('the issue file format', () => {
     expect(rendered.endsWith(`\n---\n${draftFixture().body}`)).toBe(true);
   });
 
+  it('writes specBlocked after blockedBy when the draft sets it, and no such key when it does not', () => {
+    const rendered = renderLocalIssue(record({ draft: draftFixture({ specBlocked: true }) }));
+
+    const keys = [...rendered.matchAll(/^(\w+):/gm)].map((match) => match[1]);
+
+    expect(keys.slice(keys.indexOf('blockedBy'), keys.indexOf('blockedBy') + 3)).toEqual(['blockedBy', 'specBlocked', 'state']);
+    expect(rendered).toContain('\nspecBlocked: true\n');
+    expect(renderLocalIssue(record())).not.toContain('specBlocked');
+  });
+
   it('throws when the frontmatter is missing', () => {
     expect(() => parseLocalIssue('## Context\n\nno frontmatter\n'))
       .toThrow('local tracker: the issue has no YAML frontmatter block');
@@ -230,6 +240,8 @@ describe('the issue file format', () => {
     'a null project': { draft: draftFixture({ project: null }) },
     'no blockers': { draft: draftFixture({ blockedBy: [] }) },
     'several blockers': { draft: draftFixture({ blockedBy: [100, 200, 300] }) },
+    'a spec:blocked mark': { draft: draftFixture({ specBlocked: true }) },
+    'a specBlocked written false': { draft: draftFixture({ specBlocked: false }) },
     'a body whose first line is ---': { draft: draftFixture({ body: '---\nEdge case body\n' }) },
     'a body holding --- mid-document': {
       draft: draftFixture({ body: 'Intro paragraph.\n\n---\n\nMore text follows.\n' }),
@@ -284,6 +296,16 @@ describe('reading an issue file', () => {
       .toThrow(`local tracker: invalid issue at /tmp/1.md: ${problem}`);
   });
 
+  it('throws a located error for a specBlocked that is not a boolean', () => {
+    const marked = renderLocalIssue(record({ draft: draftFixture({ specBlocked: true }) }));
+    const planted = marked.replace('specBlocked: true', 'specBlocked: "yes"');
+
+    expect(parseLocalIssue(marked, '/tmp/1.md').draft.specBlocked).toBe(true);
+    expect(planted).not.toBe(marked);
+    expect(() => parseLocalIssue(planted, '/tmp/1.md'))
+      .toThrow('local tracker: invalid issue at /tmp/1.md: specBlocked is "yes", expected absent or a boolean');
+  });
+
   it('throws a located error for frontmatter that is a list', () => {
     expect(() => parseLocalIssue('---\n- a\n- b\n---\nbody', '/tmp/1.md'))
       .toThrow('local tracker: invalid issue at /tmp/1.md: the frontmatter is a list, expected a mapping');
@@ -312,6 +334,11 @@ describe('writing an issue file', () => {
       `type is "feature", expected one of: ${TYPES}`,
     ],
     ['a clock reading', record({ capturedAt: 42 as unknown as string }), 'capturedAt is 42, expected a string'],
+    [
+      'a draft specBlocked',
+      record({ draft: draftFixture({ specBlocked: 'yes' as unknown as boolean }) }),
+      'specBlocked is "yes", expected absent or a boolean',
+    ],
     [
       'a body',
       record({ draft: { ...draftFixture(), body: undefined as unknown as string } }),
@@ -546,6 +573,19 @@ describe('createLocalTracker', () => {
 
     expect((await tracker.get(ref)).type).toBe('spec');
     expect(ids(await tracker.find({ type: 'spec' }))).toEqual([ref.externalId]);
+  });
+
+  it('records a specBlocked draft in the issue file, and get reads it back', async () => {
+    const dir = freshDir('spec-blocked');
+    const tracker = localTracker(dir);
+
+    const blocked = await tracker.create(draftFixture({ title: 'A blocked spec', type: 'spec', specBlocked: true }));
+    const free = await tracker.create(draftFixture({ title: 'A free spec', type: 'spec' }));
+
+    expect(readFileSync(join(dir, `${blocked.externalId}.md`), 'utf8')).toContain('\nspecBlocked: true\n');
+    expect(readFileSync(join(dir, `${free.externalId}.md`), 'utf8')).not.toContain('specBlocked');
+    expect((await tracker.get(blocked)).specBlocked).toBe(true);
+    expect((await tracker.get(free)).specBlocked).toBeUndefined();
   });
 
   it('refuses a draft no read would accept, creating no file and no directory', async () => {

@@ -267,6 +267,15 @@ export interface IssueDraft {
   project: string | null;
   /** OPT numbers this issue is blocked by. */
   blockedBy: readonly number[];
+  /**
+   * rafa's own field, absent from the source: true when the issue waits
+   * on other issues of the board, which the `github` adapter files as
+   * the board's `spec:blocked` label (`SPEC_BLOCKED_LABEL` in
+   * `src/board/blocked.ts`) and the `local` adapter records in the issue
+   * file. Absent or false files no such mark. Not {@link blockedBy},
+   * which names OPT ledger numbers.
+   */
+  specBlocked?: boolean;
 }
 
 /** An issue as a tracker holds it: the draft, where it lives, its state. */
