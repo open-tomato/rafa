@@ -65,7 +65,8 @@
  * after the wrap-up session over a lookup of the open pull request.
  * Text emits it at the delivery's place, over the delivered number with
  * no lookup, or over a lookup on the paths with no number: a moved
- * checkout, a blocked or interrupted delivery, a `none` provider.
+ * checkout or a blocked or interrupted delivery. A `none` provider has
+ * no pull request to read, so it emits `no-pr` with no lookup.
  *
  * Every line written here goes through the active output
  * (`adapters/output/active.ts`), as the rest of `loop start` does.
@@ -222,7 +223,8 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     // edit is a warning and the run carries on (`start/pr-retarget.ts`).
     await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
   } else {
-    await emitPullRequestEvent('delivery', expected.branch, null, lookup);
+    // A `none` provider has no pull request to read: no lookup is made.
+    await emitPullRequestEvent('delivery', expected.branch, null, () => Promise.resolve(null));
   }
   if (ciWait) {
     emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });
