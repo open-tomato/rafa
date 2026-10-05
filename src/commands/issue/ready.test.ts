@@ -1,7 +1,8 @@
 /**
  * Tests for `rafa issue ready` (`ready.ts`): the two readings it
  * prints, the order they run in, the question it puts, the one label
- * swap, the run without a terminal, and the line refusals.
+ * swap, the run without a terminal, `--yes`, the line refusals, the
+ * declared flags and the `describe` entry.
  *
  * Every case drives a fake of its own — a recorded `gh` runner, a
  * scripted answer, a recording board — so no case reaches GitHub,
@@ -21,7 +22,7 @@
  *
  * ## The controls
  *
- * Six readings here could pass while wrong, and each is paired:
+ * Seven readings here could pass while wrong, and each is paired:
  *
  *  - The swap case runs one issue twice, answering the question yes and
  *    then no, and holds the write against no write. Without the pair, a
@@ -46,6 +47,11 @@
  *  - The dispatched no-terminal case holds that no prompter was opened
  *    and no `gh issue edit` was sent, against the dispatched case above
  *    it, which opens one and sends one over the same planted board.
+ *  - Each `--yes` refusal (outsider, body with gaps) is held against the
+ *    same run with the check passing, which writes over the same
+ *    recording board, so "nothing written under `--yes`" cannot pass on
+ *    a run that never writes. Those refusals passed before `--yes`
+ *    existed; the passing halves were what failed first.
  */
 import type { ReadyAsk, ReadySeams } from './ready.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -65,9 +71,11 @@ import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { CommandExit } from '../../cli/command.js';
+import { describeRegistry } from '../../cli/describe.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, endingProbe } from '../../tests/ending-probe.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
+import { CORE_REGISTRY } from '../index.js';
 
 import {
   completeLine,
@@ -464,6 +472,94 @@ describe('the completeness check', () => {
   });
 });
 
+describe('yes, which marks with no question once both checks pass', () => {
+  it('marks with no terminal and asks nothing where there is one, against the run without it', async () => {
+    const bare = recordingBoard();
+    const headless = recordingBoard();
+    const asking = recordingBoard();
+    const ask = scriptedAsk(false);
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, readIssue: fakeReader().read };
+
+    const unasked = await runIssueReady({ ...options, ask: null, board: bare.board });
+    const marked = await runIssueReady({ ...options, ask: null, board: headless.board, yes: true });
+    const unprompted = await runIssueReady({ ...options, ask: ask.ask, board: asking.board, yes: true });
+
+    expect([unasked.status, bare.swapped()]).toEqual(['unasked', []]);
+    expect(marked).toMatchObject({
+      status: 'marked',
+      message: 'Marked #57 spec:ready, and took spec:needs-work off it',
+    });
+    expect(headless.swapped()).toEqual(['#57 -spec:needs-work +spec:ready']);
+    expect([unprompted.status, ask.asked(), asking.swapped()])
+      .toEqual(['marked', [], ['#57 -spec:needs-work +spec:ready']]);
+  });
+
+  it('still refuses an outsider, writing nothing, and marks the same issue for a write-holder', async () => {
+    const board = recordingBoard();
+    const options = { gh: unusedGh().run, issue: 57, ask: null, board: board.board, readIssue: fakeReader().read, yes: true };
+
+    const exit = await refusal(() => runIssueReady({ ...options, trust: fakeTrust({ permission: 'read' }).trust }));
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toBe(`issue #57 was opened by maintainer, who has no write access to ${REPO};`
+      + ' a member must open the spec');
+    expect(board.swapped()).toEqual([]);
+
+    const passed = await runIssueReady({ ...options, trust: fakeTrust({ permission: 'write' }).trust });
+
+    expect([passed.status, board.swapped()]).toEqual(['marked', ['#57 -spec:needs-work +spec:ready']]);
+  });
+
+  it('still refuses a lookup that failed, writing nothing', async () => {
+    const board = recordingBoard();
+
+    const exit = await refusal(() => runIssueReady({
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust({ detail: 'gh api failed: 404' }).trust,
+      ask: null,
+      board: board.board,
+      readIssue: fakeReader().read,
+      yes: true,
+    }));
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toContain('could not be read');
+    expect(board.swapped()).toEqual([]);
+  });
+
+  it('still refuses a body with gaps, writing nothing, and marks the complete body', async () => {
+    const board = recordingBoard();
+    const options = { gh: unusedGh().run, issue: 57, trust: fakeTrust().trust, ask: null, board: board.board, yes: true };
+
+    const exit = await refusal(() => runIssueReady({ ...options, readIssue: fakeReader({ body: THIN }).read }));
+
+    expect(exit.exitCode).toBe(2);
+    expect(exit.message).toContain('"Tasks the plan must carry" is missing');
+    expect(board.swapped()).toEqual([]);
+
+    const passed = await runIssueReady({ ...options, readIssue: fakeReader().read });
+
+    expect([passed.status, board.swapped()]).toEqual(['marked', ['#57 -spec:needs-work +spec:ready']]);
+  });
+
+  it('writes nothing for an issue that already carries the label', async () => {
+    const board = recordingBoard();
+
+    const report = await runIssueReady({
+      gh: unusedGh().run,
+      issue: 57,
+      trust: fakeTrust().trust,
+      ask: null,
+      board: board.board,
+      readIssue: fakeReader({ labels: [SPEC_LABEL, SPEC_READY_LABEL] }).read,
+      yes: true,
+    });
+
+    expect([report.status, board.swapped()]).toEqual(['already', []]);
+  });
+});
+
 /** Two `epic:` labels on one spec, the fault the epic label check refuses. */
 const TWO_EPICS = [SPEC_LABEL, 'epic:board', 'epic:views'];
 
@@ -736,6 +832,64 @@ describe('rafa issue ready, dispatched', () => {
     });
   });
 
+  /** A command over `gh` where standard input is no terminal and no prompter may be opened. */
+  function headless(gh: ReturnType<typeof dispatchedGh>): RafaCommand {
+    return createIssueReadyCommand({
+      openGh: () => gh.run,
+      openGit: () => fakeGit,
+      isTerminal: () => false,
+      openPrompter: () => {
+        throw new Error('the run opened a prompter under --yes');
+      },
+    });
+  }
+
+  it('marks under --yes with no terminal, opening no prompter and sending one edit', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--yes', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome).toEqual({
+      exitCode: 0,
+      stdout: `#57 was opened by maintainer, who has write access to ${REPO}\n`
+        + '#57 fills every heading the spec template asks for, with no placeholder left\n'
+        + 'Marked #57 spec:ready, and took spec:needs-work off it\n',
+      stderr: '',
+    });
+    expect(gh.calls().at(-1)).toEqual([
+      'issue', 'edit', '57', '--remove-label', SPEC_NEEDS_WORK_LABEL, '--add-label', SPEC_READY_LABEL,
+    ]);
+  });
+
+  it('refuses an outsider and a body with gaps under --yes with exit 2, sending no edit', async () => {
+    const outsider = dispatchedGh({ permission: 'read', author: 'outsider' });
+    const thin = dispatchedGh({ body: THIN });
+
+    const untrusted = await dispatchInProject(['issue', 'ready', '57', '--yes', NO_HINT], SUBJECTS, [headless(outsider)], plant());
+    const gaps = await dispatchInProject(['issue', 'ready', '57', '--yes', NO_HINT], SUBJECTS, [headless(thin)], plant());
+
+    expect(untrusted).toEqual({
+      exitCode: 2,
+      stdout: '',
+      stderr: `issue #57 was opened by outsider, who has no write access to ${REPO}; a member must open the spec\n`,
+    });
+    expect(gaps.exitCode).toBe(2);
+    expect(gaps.stderr).toContain('issue #57 is not ready to plan from:');
+    const edits = [...outsider.calls(), ...thin.calls()].filter((args) => args[0] === 'issue' && args[1] === 'edit');
+
+    expect(edits).toEqual([]);
+  });
+
+  it('refuses a value given to --yes with exit 1, sending no command', async () => {
+    const gh = dispatchedGh();
+
+    const outcome = await dispatchInProject(['issue', 'ready', '57', '--yes=maybe', NO_HINT], SUBJECTS, [headless(gh)], plant());
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toBe(`❌ --yes takes no value, and read "maybe" as one\nUsage: ${READY_USAGE}\n`);
+    expect(gh.calls()).toEqual([]);
+  });
+
   it('refuses a line naming no issue, a second word and a word that is no number, sending no command', async () => {
     const gh = dispatchedGh();
     const command = createIssueReadyCommand({
@@ -834,9 +988,27 @@ describe('the ending it names the next step with', () => {
     expect([probe.reads(), outcome.stdout.includes('Next:')]).toEqual([0, false]);
   });
 
-  it('declares the flag that turns it off, and no flag that skips the marking question', () => {
+  it('declares the flag that turns it off beside --yes, which skips the marking question alone', () => {
     const command = createIssueReadyCommand();
 
-    expect(command.flags.map((flag) => [flag.name, flag.type, flag.default])).toEqual([['hint', 'boolean', true]]);
+    expect(command.flags.map((flag) => [flag.name, flag.type, flag.default]))
+      .toEqual([['yes', 'boolean', undefined], ['hint', 'boolean', true]]);
+  });
+});
+
+describe('the describe entry', () => {
+  it('lists --yes as a boolean that is not required and has no default', () => {
+    const ready = describeRegistry(CORE_REGISTRY, '0.0.0').subjects
+      .find((subject) => subject.name === 'issue')
+      ?.actions
+      .find((action) => action.name === 'ready');
+
+    expect(ready?.flags.find((flag) => flag.name === 'yes')).toMatchObject({
+      type: 'boolean',
+      required: false,
+      default: null,
+      aliases: [],
+    });
+    expect(ready?.examples.map((example) => example.cmd)).toContain('rafa issue ready 57 --yes');
   });
 });

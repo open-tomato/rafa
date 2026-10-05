@@ -429,6 +429,12 @@ trusted in config), the body must fill the spec template completely, and
 in `labels` mode only, the issue must carry at most one `epic:` label
 (in `native` mode an epic is the one sub-issue parent, so the check is
 skipped).
+Once all three pass it asks `Mark #<n> spec:ready? [y/N]`. Typed with
+`--yes` it marks the issue with no question, with or without a terminal,
+so a script or an agent can run it. `--yes` skips the question only: an
+issue whose author has no write access, whose body leaves a gap, or that
+carries two `epic:` labels is still refused with exit code 2, and
+nothing is written. `rafa next` never passes `--yes` to this step.
 The command is offered automatically by `plan create --issue` and
 `plan create --next` in a terminal, where a yes labels the issue with
 `spec:ready` and proceeds to plan it, or a no exits with the check result.

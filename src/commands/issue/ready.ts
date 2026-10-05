@@ -1,7 +1,8 @@
 /**
- * `rafa issue ready <n>`: the two checks a person would otherwise make
- * by eye before a `gh issue edit`, printed, and the one label swap that
- * marks the spec ready, made only on a typed yes.
+ * `rafa issue ready <n> [--yes]`: the two checks a person would
+ * otherwise make by eye before a `gh issue edit`, printed, and the one
+ * label swap that marks the spec ready, made on a typed yes or under
+ * `--yes`.
  *
  * Adding `spec:ready` is the decision the readiness gate's check 1
  * waits on (`src/board/readiness.ts`, `context/pull-requests.md`), and
@@ -12,38 +13,49 @@
  * at all, and whether the body fills the spec template
  * (`.rafa/specs/rafa-63-one-command-next-step.md`).
  *
- * ## It always asks
+ * ## It asks, unless the line says `--yes`
  *
- * There is no `--yes` and no flag that skips the question: marking an
- * issue ready is a person's decision, and the spec keeps `ready` out of
- * `rafa next`'s `--yes` list for the same reason. The question is
+ * The question is
  * {@link readyQuestion}, `Mark #<n> spec:ready? [y/N] `, put through the
  * {@link Prompter} `rafa init`, `pr merge` and `issue unblock` read an
  * answer with, so a json-mode stdout stays NDJSON. An answer that is
  * not `y` or `yes` declines, the empty answer and an input that ended
  * included ({@link answeredYes}): the question is spelled `[y/N]`.
  *
- * Without a terminal nothing is asked and nothing is written. The two
- * readings are printed anyway and the run reports `unasked`, with the
- * line naming the command to run where an answer can be typed —
- * printing the result and refusing to label is what the spec asks for,
- * and refusing the whole command would make it fail inside a script
- * over a label a person has to choose to add.
+ * Without a terminal and without `--yes` nothing is asked and nothing
+ * is written. The two readings are printed anyway and the run reports
+ * `unasked`, with the line naming the command to run where an answer
+ * can be typed — printing the result and refusing to label is what the
+ * spec asks for, and refusing the whole command would make it fail
+ * inside a script over a label a person has to choose to add.
+ *
+ * `--yes` ({@link ReadyOptions.yes}) is the answer typed on the line
+ * instead: the run makes every check below in the same order and, once
+ * all pass, swaps the labels with no question, terminal or not. It
+ * answers the QUESTION only. An outsider's issue, a body with gaps and
+ * two `epic:` labels are refused exactly as without it, with nothing
+ * written, so the flag lets through only an issue an account with write
+ * access could have labelled by hand (#752). It exists for a script or
+ * an agent driving the command where no answer can be typed. `rafa
+ * next` never passes it (`src/next/actions.ts`), and its ceiling still
+ * refuses `--yes=ready` (`src/next/ceiling.ts`): a chain reaching this
+ * step asks. A value given to it (`--yes=maybe`) is a line refusal with
+ * exit code 1, read before anything is opened.
  *
  * ## The ending, on a label that is on
  *
- * A run that MARKED the issue, and one that found it marked already,
- * ends by naming the one step that follows — for a roadmap line that is
- * ready and unblocked, the plan (`src/next/ending.ts`, `--no-hint` to
+ * A run that MARKED the issue, under `--yes` or on a typed yes, and
+ * one that found it marked already, ends by naming the one step that
+ * follows — for a roadmap line that is ready and unblocked, the plan (`src/next/ending.ts`, `--no-hint` to
  * turn it off). The declined run and the one with no terminal end
  * without it: no label moved, so the state still reads as an issue
  * carrying no `spec:ready`, and the hint would put the very question
  * that was just answered no, or name this command to the run that has
  * nobody to answer it.
  *
- * `--no-hint` is the one flag declared here, and it skips no question
- * of this command's: it turns off the ENDING, and the marking question
- * is put whether or not it is typed.
+ * `--no-hint` skips no question of this command's: it turns off the
+ * ENDING, and the marking question is put whether or not it is typed.
+ * `--yes` is the one flag that skips the marking question.
  *
  * ## The other place this run is made
  *
@@ -101,7 +113,8 @@
  *
  * `swapLabels` ({@link IssueBoard}): one
  * `gh issue edit <n> --remove-label spec:needs-work --add-label spec:ready`,
- * the swap the spec asks for, made after the yes and never before it.
+ * the swap the spec asks for, made after the yes, or after the last
+ * check under `--yes`, and never before either.
  * Both labels are the board's own, created by `rafa init --board`
  * (`src/board/setup.ts`), and a swap `gh` refuses is a refusal with
  * exit code {@link READY_WRITE_EXIT} naming what it said — nothing is
@@ -154,7 +167,10 @@ import { answeredYes } from '../../start/branch-decision.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
 /** The usage line a refusal names. */
-export const READY_USAGE = 'rafa issue ready <n>';
+export const READY_USAGE = 'rafa issue ready <n> [--yes]';
+
+/** The flag that marks the issue with no question once every check passes. */
+const YES_FLAG = 'yes';
 
 /** The exit code a label swap `gh` refused ends with. */
 export const READY_WRITE_EXIT = 1;
@@ -164,7 +180,7 @@ const ISSUE_NUMBER = /^[1-9]\d*$/u;
 
 /** What one run came to. */
 export type ReadyStatus =
-  /** The question was answered yes and the labels were swapped. */
+  /** The question was answered yes, or `--yes` answered it, and the labels were swapped. */
   | 'marked'
   /** The question was answered no, so nothing was written. */
   | 'declined'
@@ -203,6 +219,12 @@ export interface ReadyOptions {
   readonly trust: BoardTrust;
   /** Asks the one question, or null when there is nobody to ask. */
   readonly ask: ReadyAsk | null;
+  /**
+   * Marks the issue with no question once every check passes, so `ask`
+   * is never called and a null `ask` does not stop the write. Every
+   * check refuses as it does without it. False when left out.
+   */
+  readonly yes?: boolean;
   /** Makes the label swap. Made over `gh` when left out. */
   readonly board?: IssueBoard;
   /** Reads the issue by number. Made over `gh` when left out. */
@@ -304,7 +326,8 @@ function readyReport(
 
 /**
  * The issue `options` names, read off the board, checked, asked about
- * and labelled on a yes. See the module note for the order of the
+ * and labelled on a yes, or labelled with no question under
+ * {@link ReadyOptions.yes}. See the module note for the order of the
  * checks, what each costs and the one write.
  *
  * Throws the `CommandExit` of every refusal: exit 2 for an untrusted
@@ -329,14 +352,16 @@ export async function runIssueReady(options: ReadyOptions): Promise<ReadyReport>
       message: `#${String(issue)} is already marked ${SPEC_READY_LABEL}`,
     });
   }
-  if (ask === null) {
-    return readyReport(issue, 'unasked', reading, { ...lines, message: unaskedMessage(issue) });
-  }
-  if (!await ask(readyQuestion(issue))) {
-    return readyReport(issue, 'declined', reading, {
-      ...lines,
-      message: `#${String(issue)} was left unmarked`,
-    });
+  if (options.yes !== true) {
+    if (ask === null) {
+      return readyReport(issue, 'unasked', reading, { ...lines, message: unaskedMessage(issue) });
+    }
+    if (!await ask(readyQuestion(issue))) {
+      return readyReport(issue, 'declined', reading, {
+        ...lines,
+        message: `#${String(issue)} was left unmarked`,
+      });
+    }
   }
 
   try {
@@ -375,6 +400,18 @@ export function readReadyIssue(context: RafaContext): number {
     throw lineRefusal(`"${word}" is no issue number, which is a whole number from 1`, READY_USAGE);
   }
   return Number(word);
+}
+
+/**
+ * Whether the line typed `--yes`, or a refusal with exit code 1 naming
+ * the usage for a value given to it. Read before anything is opened.
+ */
+export function readReadyYes(context: RafaContext): boolean {
+  const value = context.flags[YES_FLAG];
+  if (value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true' || value === 'false') return value === 'true';
+  throw lineRefusal(`--${YES_FLAG} takes no value, and read "${value}" as one`, READY_USAGE);
 }
 
 /** How the board, the terminal and the question are reached; each left out is the system's own. */
@@ -421,10 +458,12 @@ export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () =
 /**
  * Runs the marking a line asks for: the line, the project's
  * `board.trustedAuthors`, the repository label off `origin`, and the
- * question through the prompter when there is a terminal.
+ * question through the prompter when there is a terminal and the line
+ * did not type `--yes`.
  */
 export async function markIssueReady(context: RafaContext, seams: ReadySeams): Promise<ReadyReport> {
   const issue = readReadyIssue(context);
+  const yes = readReadyYes(context);
   const project = issueProject(context);
   const config = issueSubjectConfig(project, (message: string) => {
     context.output.warn(message);
@@ -447,6 +486,7 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
       issue,
       trust,
       relationships: config.boardRelationships,
+      yes,
       ask: isTerminal()
         ? prompter.ask
         : null,
@@ -474,8 +514,9 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
       + ' the repository, refuses a body that does not fill the spec template, refuses an issue carrying two'
       + ' `epic:` labels (with board.relationships set to labels, the default), and then asks whether to mark it'
       + ` ${SPEC_READY_LABEL}. On a yes it swaps the labels in one write, adding ${SPEC_READY_LABEL} and`
-      + ` removing ${SPEC_NEEDS_WORK_LABEL}. It always asks and declares no flag that skips the question;`
-      + ' without a terminal it prints both readings and adds no label. A run that marks the issue, or finds'
+      + ` removing ${SPEC_NEEDS_WORK_LABEL}. \`--yes\` makes the swap with no question once every check passes,`
+      + ' with or without a terminal, and refuses everything the checks refuse without it; without a terminal and'
+      + ' without `--yes` it prints both readings and adds no label. A run that marks the issue, or finds'
       + ' it marked already, ends by naming the one step that follows, which `--no-hint` turns off. With'
       + ' `--output=json` the report is the data of the terminal result event.',
     args: [
@@ -486,11 +527,23 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
         required: true,
       },
     ],
-    flags: [HINT_FLAG_SPEC],
+    flags: [
+      {
+        name: YES_FLAG,
+        description: `Marks the issue ${SPEC_READY_LABEL} without asking, once its author and its body check out;`
+          + ' a check that refuses still refuses. Needed where standard input is no terminal.',
+        type: 'boolean',
+      },
+      HINT_FLAG_SPEC,
+    ],
     examples: [
       {
         cmd: 'rafa issue ready 57',
         note: `Checks #57 and asks whether to mark it ${SPEC_READY_LABEL}.`,
+      },
+      {
+        cmd: 'rafa issue ready 57 --yes',
+        note: `Checks #57 and marks it ${SPEC_READY_LABEL} with no question, from a script or an agent.`,
       },
     ],
     outputs: ['text', 'json'],

@@ -20,7 +20,7 @@ module's note is the long form.
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
-| `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help` and `rafa next --help` |
+| `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help` and `rafa issue ready --help` |
 | `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
@@ -49,7 +49,7 @@ module's note is the long form.
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/plan/claim-route.ts` | the claim `plan create` makes on its issue before its session: `resolveAndClaim` resolves the spec, runs the cheap refusals, claims through `src/claims/plan-claim.ts` and prints the answer; a refused `--issue` or `--spec` exits 1 naming the owner, a refused `--next` pick is passed over and the walk resolved again, and an unclaimed run warns and plans; a claim ahead report (`src/claims/ahead.ts`) is printed after the claim. `createPlanClaimContext` builds the seams: `git`, the `gh` issue board or none, the store id, `claims.staleAfter`, `claims.ahead` |
 | `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: the `dangerous.acceptStaleRefs` warn line printed first thing in the run, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and the core roster, the last imported dynamically since a static import is a load-order cycle through `src/plan.ts`; never under `--dry-run` or `--spec` |
-| `src/commands/issue/ready.ts` | `rafa issue ready <n>`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), made under `board.relationships: labels` only (in `native` mode an epic is the one sub-issue parent, and the check is skipped), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes. Exit code 0 for the normal completion; 1 for an unusable config or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The four status values are `marked`, `declined` (question answered no), `unasked` (no terminal), and `already` (label already on). There is no `--yes` flag; the question is always asked where there is a terminal. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
+| `src/commands/issue/ready.ts` | `rafa issue ready <n> [--yes]`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), made under `board.relationships: labels` only (in `native` mode an epic is the one sub-issue parent, and the check is skipped), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes, or under `--yes` with no question once every check has passed, terminal or not. Exit code 0 for the normal completion; 1 for an unusable config, a value given to `--yes` or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The four status values are `marked` (a typed yes or `--yes`), `declined` (question answered no), `unasked` (no terminal and no `--yes`), and `already` (label already on). `--yes` answers the question alone: the write-access, template and `epic:` checks refuse under it as they do without it, writing nothing. `rafa next` never passes it, and its ceiling still refuses `--yes=ready`. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. With `board.relationships: native` it reads the line, then prints that GitHub clears a blocker when the blocking issue closes, sends no `gh` call and exits 0 (`src/commands/issue/unblock-native.ts`). |
 | `src/commands/issue/check.ts` | `rafa issue check <n> [--stamp]`: the references issue `<n>`'s saved copy names, each with its state, read by the verifier check 4 builds (`createPlanRefsVerifier`) and starting no session, so it declares no `spends`. The copy is found by number, the one `rafa-<n>-<slug>.md` under `specs.dir` beside the notes file; none is refused naming `rafa plan create --issue=<n>`, two naming both, each with exit code 1, as are a line it refuses, a config refused, a board issue `gh` could not read and a refs block the codec will not read. A plain check is `readCopyRefs`, which writes the first stamps of a reference it has none for; `--stamp` prints the rows read against the old stamps, then re-stamps every reference (`restampCopyRefs`) over one memoised verifier. Exit code 0 whatever the states are. Json mode gives the issue, the copy's path, `stamped` and every reference with its `kind`, `text`, `line`, `state`, `fingerprint` and `stamp` as one word each |
 | `src/commands/issue/issue-tracker.ts` | what the eight `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
@@ -324,7 +324,8 @@ New; it replaces no earlier text. What a row or an action added to
   (measured on 2026-09-28); removing `usage` brought `describe` back
   onto the first, so the `Commands` block is one line again, and both
   literals moved with it (measured on 2026-10-04). An action
-  registered under a subject already there moves no snapshot but under `loop`: registering `plan risk` left all four byte-identical
+  registered under a subject already there moves no snapshot but under `loop` and `issue`
+  (`rafa-issue-ready.txt`'s See also names the `issue` actions): registering `plan risk` left all four byte-identical
   and `src/cli/help.test.ts` green before the updater ran (measured on
   2026-09-23), while registering `loop wait` moved `rafa-loop.txt`, whose
   Actions block lists the subject's actions, and `rafa-loop-start.txt`,
@@ -2535,18 +2536,19 @@ message naming the command as typed after `rafa` and saying to declare
   default reads, runs
   `RAFA_UPDATE_HELP_SNAPSHOTS=1 bun test src/cli/help.test.ts`, reads the
   diff, and keeps this page true.
-- **The frozen set is four files** — `rafa.txt`, `rafa-loop.txt`,
-  `rafa-loop-start.txt` and `rafa-next.txt`, the list `SNAPSHOTS` in
+- **The frozen set is six files** — `rafa.txt`, `rafa-loop.txt`,
+  `rafa-loop-start.txt`, `rafa-loop-wait.txt`, `rafa-next.txt` and
+  `rafa-issue-ready.txt`, the list `SNAPSHOTS` in
   `src/cli/help.test.ts` spells — and none of them renders another
   command's flag list. A flag added to `init`, to `plan create` or to a
   `pr` action shows only in that command's own `--help`, which is not
-  snapshotted, so the updater legitimately writes all four back
+  snapshotted, so the updater legitimately writes all six back
   BYTE-IDENTICAL. That is the expected reading and not a writer that
   never fired; the control that tells them apart is dirtying one snapshot
   with an extra line and re-running the updater, which returns the file
   to its original sha.
 - **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
-  one of the four that lists subjects; the other three render a single
+  one of the six that lists subjects; the other five render a single
   command or subtree and are untouched. Read which files actually differ
   off `git status`, never off the assumption that they all move
   together — registering a subject or a top-level command reddens
@@ -2554,8 +2556,10 @@ message naming the command as typed after `rafa` and saying to declare
   `rafa.txt`. So does rewriting a subject's summary alone: the `plan`
   summary changed with `plan risk` reddened those three and no other
   (measured on 2026-09-23). An action under an existing subject reddens
-  none, and its summary shows only in its subject's roster, which is not
-  snapshotted. Registering the `board` subject with `board list`
+  none but under `loop` and `issue`, and its summary shows only in its
+  subject's roster, which is not snapshotted; `rafa-issue-ready.txt`'s
+  See also names every other `issue` action, so registering one moves
+  that file. Registering the `board` subject with `board list`
   reddened the same three and moved `rafa.txt` alone, by one Quick start
   line and one Subjects entry (measured on 2026-09-28).
 

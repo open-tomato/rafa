@@ -86,9 +86,10 @@
  *
  * `ready` is refused rather than quietly dropped because dropping it
  * would read as allowed to the person who typed it. Marking an issue
- * ready is a claim about a spec that a person makes, and `issue ready`
- * itself declares no flag that skips its own question; a chain reaching
- * that step asks, `--yes=ready` or no `--yes` at all.
+ * ready is a claim about a spec that a person makes. `issue ready`'s own
+ * `--yes` skips its question only when it is typed on that command's
+ * line, and `rafa next` never passes it (`./actions.ts`); a chain
+ * reaching that step asks, `--yes=ready` or no `--yes` at all.
  *
  * `merge-unchecked` is refused for the same reason, with the question
  * held somewhere else: merging a pull request no check has reported on
