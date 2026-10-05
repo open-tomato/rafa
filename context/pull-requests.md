@@ -699,7 +699,8 @@ refuses a body matching a home path or a token shape, naming the line.
 
 `rafa init --board` sets up the board: labels `type:spec`, `spec:ready`,
 `spec:needs-work`, and the ones triage already files under (`type:bug`,
-`needs-triage`, `module:unassigned`); `.github/ISSUE_TEMPLATE/spec.md` when
+`needs-triage`, `module:unassigned`) and `module:cli-gap`, the module a
+session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it

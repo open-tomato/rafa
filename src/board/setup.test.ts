@@ -1,5 +1,5 @@
 /**
- * Tests for the board setup (`src/board/setup.ts`): the fourteen labels, the
+ * Tests for the board setup (`src/board/setup.ts`): the fifteen labels, the
  * spec issue template, the pinned Roadmap issue, the `roadmap.issue`
  * line written into the project config, and a second run that writes
  * nothing.
@@ -222,7 +222,7 @@ function partNamed(parts: readonly { name: string }[], name: string): { name: st
 }
 
 describe('BOARD_LABELS', () => {
-  it('names the fourteen labels the workflow files under, each with a description', () => {
+  it('names the fifteen labels the workflow files under, each with a description', () => {
     expect(BOARD_LABELS.map((label) => label.name)).toEqual([
       'type:spec',
       'spec:ready',
@@ -231,6 +231,7 @@ describe('BOARD_LABELS', () => {
       'type:bug',
       'needs-triage',
       'module:unassigned',
+      'module:cli-gap',
       'type:epic',
       'horizon:now',
       'horizon:next',
@@ -271,6 +272,7 @@ describe('setUpLabels', () => {
       ['type:bug', 'present'],
       ['needs-triage', 'present'],
       ['module:unassigned', 'created'],
+      ['module:cli-gap', 'created'],
       ['type:epic', 'created'],
       ['horizon:now', 'created'],
       ['horizon:next', 'created'],
@@ -286,6 +288,7 @@ describe('setUpLabels', () => {
       'spec:needs-work',
       'spec:blocked',
       'module:unassigned',
+      'module:cli-gap',
       'type:epic',
       'horizon:now',
       'horizon:next',
@@ -363,6 +366,7 @@ describe('missingBoardLabels', () => {
         'spec:blocked',
         'type:bug',
         'needs-triage',
+        'module:cli-gap',
         'type:epic',
         'horizon:now',
         'horizon:next',
