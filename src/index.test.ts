@@ -653,6 +653,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
   ]],
   ['./commands/pr/show.js', [
+    ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/index.js', ['formatRows']],
     ['./current.js', ['SEPARATOR']],

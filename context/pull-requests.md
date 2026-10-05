@@ -10,8 +10,10 @@ Seven actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
-- `pr show [<n>]` — details: title, author, branch → base, mergeable, each
-  check with its state and link, last triage comment
+- `pr show [<n>]` — details: title, author, branch → base, mergeable, the
+  issues it closes (an issue the provider links that the body does not name,
+  and one the body names by keyword that the provider does not link, are
+  marked), each check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
   and where the release is on the forecast its body carries, marked

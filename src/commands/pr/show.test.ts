@@ -50,7 +50,14 @@ import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-captu
 
 import { TRIAGE_MARKER } from './last-triage.js';
 import { PR_USAGE } from './pr-context.js';
-import { createPrShowCommand, renderShow } from './show.js';
+import {
+  createPrShowCommand,
+  KEYWORD_ONLY,
+  NOT_IN_BODY,
+  OTHER_REPOSITORY,
+  PR_SHOW_JSON_FIELDS,
+  renderShow,
+} from './show.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-show-')));
@@ -131,6 +138,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
 function reading(over: Partial<PrShowReading> = {}): PrShowReading {
   return {
     detail: detail(),
+    bodyCloses: [],
     checks: {
       rows: [{ name: 'gates', state: 'SUCCESS', link: 'https://github.com/open-tomato/rafa/runs/1', outcome: 'pass' }],
       verdict: 'green',
@@ -258,6 +266,7 @@ describe('the report', () => {
       '#41 rafa-20: pull request commands',
       'open — octo — feat/rafa-20-pr-commands → main — mergeable (CLEAN)',
       PULL_URL,
+      'closes none',
       '',
       'checks green',
       '   pass    gates — SUCCESS (https://github.com/open-tomato/rafa/runs/1)',
@@ -271,7 +280,8 @@ describe('the report', () => {
     const lines = linesOf(renderShow(reading({ detail: detail({ title: '  ', url: '' }) })));
 
     expect(lines[0]).toBe('#41');
-    expect(lines[2]).toBe('');
+    expect(lines[2]).toBe('closes none');
+    expect(lines[3]).toBe('');
   });
 
   it('marks a bot author, so a dependency bump reads as one', () => {
@@ -284,6 +294,57 @@ describe('the report', () => {
     const dirty = reading({ detail: detail({ mergeable: 'conflicting', mergeStateStatus: 'DIRTY' }) });
 
     expect(linesOf(renderShow(dirty))[1]).toEndWith('conflicting (DIRTY)');
+  });
+});
+
+/** An issue of the pull request's own repository, as the provider links it. */
+function own(number: number): PullRequestDetail['closes'][number] {
+  return { number, repository: 'open-tomato/rafa', url: `https://github.com/open-tomato/rafa/issues/${number}` };
+}
+
+/** The `closes` line of the report for a reading with `closes` linked and `bodyCloses` named. */
+function closesLineOf(closes: PullRequestDetail['closes'], bodyCloses: readonly number[], url = PULL_URL): string {
+  const lines = linesOf(renderShow(reading({ detail: detail({ closes, url }), bodyCloses })));
+  return lines.find((line) => line.startsWith('closes ')) ?? '(no closes line)';
+}
+
+describe('the closes line', () => {
+  it('says none where neither the provider nor the body names an issue', () => {
+    expect(closesLineOf([], [])).toBe('closes none');
+  });
+
+  it('writes an issue both readings name unmarked, once, however often the body names it', () => {
+    expect(closesLineOf([own(7)], [7, 7])).toBe('closes #7');
+  });
+
+  it('marks an issue the provider links that the body does not name', () => {
+    expect(closesLineOf([own(7), own(9)], [7])).toBe(`closes #7, #9 (${NOT_IN_BODY})`);
+  });
+
+  it('marks an issue the body names by keyword that the provider does not link, after the linked ones', () => {
+    expect(closesLineOf([own(9)], [12, 9])).toBe(`closes #9, #12 (${KEYWORD_ONLY})`);
+  });
+
+  it('marks every body issue keyword-only where the provider links none', () => {
+    expect(closesLineOf([], [3, 4])).toBe(`closes #3 (${KEYWORD_ONLY}), #4 (${KEYWORD_ONLY})`);
+  });
+
+  it('names a linked issue of another repository by its repository, never matching it to a bare #n', () => {
+    const fork = { number: 7, repository: 'ptone/scion', url: 'https://github.com/ptone/scion/issues/7' };
+
+    expect(closesLineOf([fork], [7])).toBe(`closes ptone/scion#7 (${OTHER_REPOSITORY}), #7 (${KEYWORD_ONLY})`);
+  });
+
+  it('takes every linked issue as the repository\'s own where the URL names no repository', () => {
+    const fork = { number: 7, repository: 'ptone/scion', url: 'https://github.com/ptone/scion/issues/7' };
+
+    expect(closesLineOf([fork], [7], '')).toBe('closes #7');
+  });
+
+  it('sits in the head section, after the URL and before the checks', () => {
+    const lines = linesOf(renderShow(reading({ detail: detail({ closes: [own(7)] }), bodyCloses: [7] })));
+
+    expect(lines.slice(2, 5)).toEqual([PULL_URL, 'closes #7', '']);
   });
 });
 
@@ -382,6 +443,7 @@ describe('the pull request of the branch, over the recorded gh', () => {
       '#41 rafa-20: pull request commands',
       'open — octo — feat/rafa-20-pr-commands → main — mergeable (CLEAN)',
       PULL_URL,
+      'closes none',
       '',
       'checks green',
       '   pass    gates — SUCCESS (https://github.com/open-tomato/rafa/runs/1)',
@@ -425,6 +487,48 @@ describe('the pull request of the branch, over the recorded gh', () => {
       triageProblem: null,
     });
     expect((dataOf(events) as { text: string }).text).toContain('triage conflict-lockfile');
+  });
+});
+
+describe('the body\'s closing keywords', () => {
+  it('reads them from the body into bodyCloses and sets them against the linked issues', async () => {
+    const body = 'Closes #7\nfixes: #12\nmentions #30 without a keyword';
+    const pulls = stubPulls({ get: () => Promise.resolve(detail({ body, closes: [own(7), own(9)] })) });
+    const { run, events } = await ran(caseSeams(pulls).seams, freshProject(), ['41', '--output=json']);
+    const data = dataOf(events) as { bodyCloses: unknown; text: string };
+
+    expect(run.exitCode).toBe(0);
+    expect(data.bodyCloses).toEqual([7, 12]);
+    expect(linesOf(data.text)).toContain(`closes #7, #9 (${NOT_IN_BODY}), #12 (${KEYWORD_ONLY})`);
+  });
+
+  it('reads none from a body with no keyword, so a linked issue is marked rather than passed', async () => {
+    const pulls = stubPulls({ get: () => Promise.resolve(detail({ body: '', closes: [own(9)] })) });
+    const { events } = await ran(caseSeams(pulls).seams, freshProject(), ['41', '--output=json']);
+    const data = dataOf(events) as { bodyCloses: unknown; text: string };
+
+    expect(data.bodyCloses).toEqual([]);
+    expect(linesOf(data.text)).toContain(`closes #9 (${NOT_IN_BODY})`);
+  });
+});
+
+describe('the json fields', () => {
+  it('are exactly the keys of the result data, in the order listed', async () => {
+    const { events } = await ran(caseSeams(stubPulls({})).seams, freshProject(), ['--output=json']);
+
+    expect(Object.keys(dataOf(events) as object).sort()).toEqual([...PR_SHOW_JSON_FIELDS].sort());
+  });
+
+  it('are each named in the command\'s description, in order', () => {
+    const description = createPrShowCommand().description;
+    const at = PR_SHOW_JSON_FIELDS.map((field) => description.indexOf(`\`${field}\``));
+
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+  });
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(PR_SHOW_JSON_FIELDS)).toBe(true);
   });
 });
 

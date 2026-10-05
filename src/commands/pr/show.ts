@@ -50,6 +50,31 @@
  * (`src/pr/checks.ts`), the one row format the wrap-up gate and a repair
  * prompt already print, so a check reads the same wherever it is shown.
  *
+ * ## What it closes, read twice
+ *
+ * The `closes` line sets two readings of one question side by side. The
+ * provider's, `detail.closes`, is the issues GitHub links the pull
+ * request to and closes on merge — the body's keywords and, by its
+ * documentation, issues linked by hand from the Development panel. The
+ * body's, {@link PrShowReading.bodyCloses}, is what `closedIssuesIn`
+ * (`src/board/roadmap.ts`) reads out of the body's own words, the
+ * reading `rafa pr merge` and the roadmap walk act on. Each issue is
+ * written once, in the provider's order and then the body's, and
+ * marked where the two disagree:
+ *
+ *   - {@link NOT_IN_BODY}, an issue the provider links that the body
+ *     does not name, so a reader of the body alone would not know the
+ *     merge closes it;
+ *   - {@link KEYWORD_ONLY}, an issue the body names by keyword that the
+ *     provider does not link, so the merge may not close it.
+ *
+ * `closedIssuesIn` reads a bare `#<n>`, which is an issue of the pull
+ * request's own repository; a linked issue of another repository is
+ * written `owner/name#<n>` and marked {@link OTHER_REPOSITORY} instead,
+ * since the body reading cannot say whether the body names it. The pull
+ * request's own repository is read from its URL; where the URL does not
+ * name one, every linked issue is taken as the repository's own.
+ *
  * ## Refusals
  *
  * `pr-context.ts`'s — exit 2 for a provider that is not `gh`, exit 1 for
@@ -62,8 +87,9 @@
 import type { LastTriage } from './last-triage.js';
 import type { PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ChecksReading, PullRequestDetail } from '../../pr/index.js';
+import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 
+import { closedIssuesIn } from '../../board/roadmap.js';
 import { messageOf } from '../../config-sections.js';
 import { formatRows } from '../../pr/index.js';
 
@@ -88,10 +114,43 @@ const INDENT = '   ';
 /** How many characters of a commit sha a line names it by. */
 const SHORT_SHA = 7;
 
+/** The mark on a linked issue the body does not name; see the module note. */
+export const NOT_IN_BODY = 'not named by the body';
+
+/** The mark on an issue the body names by keyword that the provider does not link. */
+export const KEYWORD_ONLY = 'keyword only, not linked';
+
+/** The mark on a linked issue of another repository, which the body reading cannot place. */
+export const OTHER_REPOSITORY = 'another repository';
+
+/** The `owner/name` a GitHub pull request URL is under. */
+const PULL_URL_REPOSITORY = /^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+\/?$/u;
+
+/**
+ * The keys of the json result's `data`, in the order the command's
+ * description names them: {@link PrShowResult}'s own keys, which
+ * `show.test.ts` holds this list to.
+ */
+export const PR_SHOW_JSON_FIELDS = Object.freeze([
+  'detail',
+  'bodyCloses',
+  'checks',
+  'checksProblem',
+  'triage',
+  'triageProblem',
+  'text',
+] as const);
+
 /** Everything the report is rendered from: what was read, and what could not be. */
 export interface PrShowReading {
   /** The pull request in full, which the report hangs off. */
   readonly detail: PullRequestDetail;
+  /**
+   * The issues the body closes by GitHub's keywords, read by
+   * `closedIssuesIn` from `detail.body`, in the order written; see the
+   * module note.
+   */
+  readonly bodyCloses: readonly number[];
   /** Its checks, or null when the provider could not be asked. */
   readonly checks: ChecksReading | null;
   /** What the checks read said when it failed, and null when it did not. */
@@ -139,6 +198,39 @@ function factsLine(detail: PullRequestDetail): string {
     `${detail.headRefName} → ${detail.baseRefName}`,
     mergeWord(detail),
   ].join(SEPARATOR);
+}
+
+/** The `owner/name` the pull request is under, or null when its URL names none. */
+function repositoryOf(detail: PullRequestDetail): string | null {
+  return PULL_URL_REPOSITORY.exec(detail.url.trim())?.[1] ?? null;
+}
+
+/** One linked issue, with its mark where the body reading disagrees. */
+function linkedWord(issue: ClosingIssue, own: string | null, named: ReadonlySet<number>): string {
+  if (own !== null && issue.repository !== own) {
+    return `${issue.repository}#${issue.number} (${OTHER_REPOSITORY})`;
+  }
+  return named.has(issue.number)
+    ? `#${issue.number}`
+    : `#${issue.number} (${NOT_IN_BODY})`;
+}
+
+/** The `closes` line: every issue either reading names, marked where they disagree. */
+function closesLine(reading: PrShowReading): string {
+  const own = repositoryOf(reading.detail);
+  const named = new Set(reading.bodyCloses);
+  const linked = new Set(reading.detail.closes
+    .filter((issue) => own === null || issue.repository === own)
+    .map((issue) => issue.number));
+  const words = [
+    ...reading.detail.closes.map((issue) => linkedWord(issue, own, named)),
+    ...[...named]
+      .filter((number) => !linked.has(number))
+      .map((number) => `#${number} (${KEYWORD_ONLY})`),
+  ];
+  return words.length === 0
+    ? 'closes none'
+    : `closes ${words.join(', ')}`;
 }
 
 /** The checks section: the verdict, then one line per check, or what kept it from being read. */
@@ -220,6 +312,7 @@ export function renderShow(reading: PrShowReading): string {
     ...url === ''
       ? []
       : [url],
+    closesLine(reading),
   ];
   return [
     head.join('\n'),
@@ -256,6 +349,7 @@ export async function readShow(context: RafaContext, seams: PrSeams): Promise<Pr
   const comments = await probe(() => pr.pulls.comments(pick.number));
   const reading: PrShowReading = {
     detail,
+    bodyCloses: closedIssuesIn(detail.body),
     checks: checks.value,
     checksProblem: checks.problem,
     triage: comments.value === null
@@ -274,12 +368,16 @@ export function createPrShowCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
     action: 'show',
     summary: 'show one pull request in detail, with its checks and its last triage',
     description: 'Reads one pull request in full and prints its number and title, its state, author, head branch,'
-      + ' base branch and mergeability, its URL, every check with its state and its link, and the last rafa triage'
-      + ' comment made on it. Without a number it reads the open pull request whose head is the branch checked out'
+      + ' base branch and mergeability, its URL, the issues it closes, every check with its state and its link, and'
+      + ' the last rafa triage comment made on it. The closes line marks an issue the provider links that the body'
+      + ' names by no closing keyword, and an issue the body names by keyword that the provider does not link.'
+      + ' Without a number it reads the open pull request whose head is the branch checked out'
       + ' at the project root. The checks and the triage comment are read separately, and one that cannot be read'
       + ' says so in its own section rather than refusing the command, where a pull request with no checks reads'
-      + ' `checks none`. With `--output=json` the pull request, the checks, the triage and the rendered text are'
-      + ' the data of the terminal result event. Refuses with exit code 2 where `pr.provider` is not `gh`.',
+      + ' `checks none`. With `--output=json` the data of the terminal result event holds the fields '
+      + PR_SHOW_JSON_FIELDS.map((field) => `\`${field}\``).join(', ')
+      + ': the pull request, the issues its body closes by keyword, the checks, the triage and the rendered text,'
+      + ' each read that failed carrying its problem. Refuses with exit code 2 where `pr.provider` is not `gh`.',
     args: [
       {
         name: 'n',
