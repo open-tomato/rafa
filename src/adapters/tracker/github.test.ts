@@ -85,11 +85,12 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 
 import { draftFixture, runTrackerContract } from './contract.js';
 import { createFakeGh } from './github-fake.js';
-import { createGhRunner, createGithubTracker, OPEN_ISSUES_LIMIT } from './github.js';
+import { createGhRunner, createGithubTracker, GITHUB_LABELS, OPEN_ISSUES_LIMIT } from './github.js';
 
 /** The URL of issue 1 in the fake's default repository. */
 const ISSUE_1_URL = 'https://github.com/open-tomato/rafa/issues/1';
@@ -216,6 +217,15 @@ describe('creating an issue', () => {
     expect((await tracker.get(ref)).type).toBe('epic');
   });
 
+  it('labels a spec type:spec, and get reads the label back as spec', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'spec', priority: 'low' }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:spec', 'priority:low']);
+    expect((await tracker.get(ref)).type).toBe('spec');
+  });
+
   it('sends needs-triage for a null priority, and no priority label', async () => {
     const { tracker, fake } = overFake();
 
@@ -233,6 +243,32 @@ describe('creating an issue', () => {
     expect(fake.issue(ref.externalId)?.labels).toContain('blocked-by:OPT-259');
     expect(fake.issue(ref.externalId)?.labels).toContain('blocked-by:OPT-258');
     expect((await tracker.get(ref)).blockedBy).toEqual([259, 258]);
+  });
+
+  it('spells the specBlocked label as the board\'s SPEC_BLOCKED_LABEL', () => {
+    expect(GITHUB_LABELS.specBlocked).toBe(SPEC_BLOCKED_LABEL);
+  });
+
+  it('files a specBlocked draft with the board\'s spec:blocked label, made before filing', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'spec', priority: 'low', specBlocked: true }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:spec', SPEC_BLOCKED_LABEL, 'priority:low']);
+    expect(fake.hasLabel(SPEC_BLOCKED_LABEL)).toBe(true);
+    expect(fake.calls()).toContainEqual(['label', 'create', SPEC_BLOCKED_LABEL, '--force']);
+  });
+
+  it.each([
+    ['false', { specBlocked: false }],
+    ['absent', {}],
+  ])('files no spec:blocked label when specBlocked is %s', async (_label, overrides) => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'spec', priority: 'low', ...overrides }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:spec', 'priority:low']);
+    expect(fake.hasLabel(SPEC_BLOCKED_LABEL)).toBe(false);
   });
 
   it('makes every label before filing, each once', async () => {
@@ -295,12 +331,13 @@ describe('creating an issue', () => {
   });
 
   it.each([
-    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+    ['type', { type: 'feature' }, 'type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
     ['priority', { priority: 'critical' }, 'priority is "critical", expected null or one of: urgent, high, medium, low'],
     ['module', { module: 'auth,billing' }, 'module is "auth,billing", expected a string holding no comma'],
     ['blockedBy', { blockedBy: [1.5] }, 'blockedBy is a list, expected a list of positive whole numbers'],
     ['title', { title: 42 }, 'title is 42, expected a string'],
     ['opt', { opt: '260' }, 'opt is "260", expected a number'],
+    ['specBlocked', { specBlocked: 'yes' }, 'specBlocked is "yes", expected absent or a boolean'],
   ])('refuses a draft whose %s no get could answer, sending nothing', async (_field, overrides, problem) => {
     const { tracker, fake } = overFake();
     const draft = { ...draftFixture(), ...overrides } as unknown as ReturnType<typeof draftFixture>;
@@ -663,7 +700,7 @@ describe('reading open issues', () => {
 
     // A cast: the refusal is of a value the port's type would not let through.
     await expect(openIssues('bug,chore' as 'bug')).rejects.toThrow(
-      'github tracker: openIssues refused type "bug,chore", expected one of: code, bug, spike, adr, chore, package-api, epic',
+      'github tracker: openIssues refused type "bug,chore", expected one of: code, bug, spike, adr, chore, package-api, epic, spec',
     );
     expect(fake.calls()).toEqual([]);
     expect(await openIssues('chore')).toEqual([]);

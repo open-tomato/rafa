@@ -8,7 +8,8 @@
  * The key's absence is asserted with `Object.keys` and on the file's text,
  * since bun's `toEqual` reads a key set to undefined as a key left out.
  * Each refusal sits beside a control: the same record with a well-formed
- * step is read.
+ * step is read. The `reason` case appends a step carrying one after a
+ * step without, as a run resumed from a 0.35.0 record does.
  */
 import type { SessionDraft, SessionRecord, SessionStep } from './sessions.js';
 
@@ -277,6 +278,22 @@ describe('parseSessionRecord and the steps field', () => {
     expect(Object.keys(stored.steps[0] ?? {})).not.toContain('interrupted');
     expect(Object.keys(stored.steps[1] ?? {}).at(-1)).toBe('interrupted');
     expect(sessionSteps(readSession(root, ID, { isAlive: ALIVE }))[1]?.interrupted).toBe(true);
+  });
+
+  it('writes reason as its own key right after scope, keeps it on later writes, and adds none to a step without', () => {
+    const root = freshRoot();
+    beginSession(root, draft(), { isAlive: ALIVE });
+    const fallback: SessionStep = { ...TASK_STEP, scope: 'affected', reason: 'fallback' };
+
+    updateSession(root, ID, { appendStep: BASELINE });
+    updateSession(root, ID, { appendStep: fallback });
+    const record = updateSession(root, ID, { phase: 'wrap-up' });
+    const stored = JSON.parse(readFileSync(sessionFilePath(root, ID), 'utf8')) as { steps: object[] };
+
+    expect(sessionSteps(record)).toEqual([BASELINE, fallback]);
+    expect(Object.keys(stored.steps[0] ?? {})).not.toContain('reason');
+    expect(Object.keys(stored.steps[1] ?? {}).slice(0, 3)).toEqual(['kind', 'scope', 'reason']);
+    expect(sessionSteps(readSession(root, ID, { isAlive: ALIVE }))[1]?.reason).toBe('fallback');
   });
 
   it('names the place of a bad step after good ones', () => {

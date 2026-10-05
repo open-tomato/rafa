@@ -143,6 +143,35 @@ export interface PullRequestSummary {
 }
 
 /**
+ * One issue a pull request closes when it merges, as the provider links
+ * the two.
+ *
+ * The provider's link, not the body's words: on GitHub it is
+ * `closingIssuesReferences`, which holds the issues a closing keyword in
+ * the body names (measured on `open-tomato/rafa#763`, whose sixteen
+ * `Closes #<n>` lines are its sixteen references) and, by GitHub's
+ * documentation, the ones linked by hand from the pull request's
+ * Development panel — so it can hold an issue the body never mentions.
+ * Reading the body's keywords is `closedIssuesIn` in
+ * `src/board/roadmap.ts`, a separate reading a caller compares this one
+ * with.
+ *
+ * An issue can live in another repository — `GoogleCloudPlatform/scion#2453`
+ * closes eight issues of the fork `ptone/scion` — so
+ * {@link ClosingIssue.repository} is always written, and a caller that
+ * matches on {@link ClosingIssue.number} alone checks the repository
+ * first.
+ */
+export interface ClosingIssue {
+  /** The issue's number in its own repository. */
+  readonly number: number;
+  /** The issue's repository, `owner/name`. */
+  readonly repository: string;
+  /** The issue's own URL. */
+  readonly url: string;
+}
+
+/**
  * One pull request in full: the summary widened with what only a
  * per-PR read answers.
  */
@@ -160,6 +189,12 @@ export interface PullRequestDetail extends PullRequestSummary {
   readonly mergeStateStatus: string;
   /** Label names, as the readiness gate and triage read them. */
   readonly labels: readonly string[];
+  /**
+   * The issues the PR closes on merge, in the provider's order — on
+   * `gh`, issue number ascending, not the order the body names them in
+   * (`open-tomato/rafa#763`). Empty when it closes none.
+   */
+  readonly closes: readonly ClosingIssue[];
 }
 
 /**

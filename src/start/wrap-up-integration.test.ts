@@ -240,6 +240,7 @@ describe('wrap-up release fragment over a scratch repository', () => {
         mergeable: 'mergeable',
         mergeStateStatus: 'CLEAN',
         labels: [],
+        closes: [],
       }),
       editBody: (_number, next) => {
         body = next;

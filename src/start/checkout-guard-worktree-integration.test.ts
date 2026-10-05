@@ -27,7 +27,8 @@
  * `worktree-start-integration.test.ts` already proves the success path this
  * file's plant is modeled on; it never removes the worktree.
  */
-import type { ScratchRepo } from '../tests/cli-capture.js';
+import type { CapturedRun, ScratchRepo } from '../tests/cli-capture.js';
+import type { Subprocess } from 'bun';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -39,7 +40,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CONFIG_DEFAULTS } from '../config-schema.js';
 import { readSessions } from '../loop/sessions.js';
-import { plantScratchRepo } from '../tests/cli-capture.js';
+import { expectExit, plantScratchRepo } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -186,21 +187,33 @@ function plant(): ScratchRepo {
   return scratch;
 }
 
-/** Spawns `rafa loop start --as-worktree` over the planted plan, in the background, its streams ignored. */
-function spawnLoopStart(scratch: ScratchRepo) {
+/** A background `rafa loop start`: the child, and what it answers once it ends. */
+interface RunningLoop {
+  readonly proc: Subprocess;
+  /** Resolves once the child has ended; exit code null when a signal ended it. */
+  readonly result: Promise<CapturedRun>;
+}
+
+/** Spawns `rafa loop start --as-worktree` over the planted plan, in the background, collecting its streams. */
+function spawnLoopStart(scratch: ScratchRepo): RunningLoop {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== join(scratch.bin, 'claude')) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  return Bun.spawn(
+  const proc = Bun.spawn(
     [process.execPath, RAFA_ENTRY, 'loop', 'start', `--plan=${PLAN_REL}`, '--as-worktree', '--no-ci-wait', '--inject=full'],
     {
       cwd: scratch.repo,
       env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
-      stdout: 'ignore',
-      stderr: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   );
+  const result = Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+    .then(([stdout, stderr, exitCode]) => ({ exitCode: proc.signalCode === null
+      ? exitCode
+      : null, stdout, stderr }));
+  return { proc, result };
 }
 
 /** Polls `read` every `pollMs` until it answers other than null, or throws past `timeoutMs`. */
@@ -241,7 +254,7 @@ describe('the loop guard replaying a removed worktree in a real --as-worktree ru
     const baseHead = git(scratch, scratch.repo, 'rev-parse', 'HEAD');
     const worktreePath = worktreePathFor(scratch);
 
-    const proc = spawnLoopStart(scratch);
+    const { proc, result } = spawnLoopStart(scratch);
     try {
       // The first task dispatches and its stand-in session starts, about to
       // sleep; wait for that session's start log, then remove the worktree
@@ -259,7 +272,7 @@ describe('the loop guard replaying a removed worktree in a real --as-worktree ru
       expect(existsSync(worktreePath)).toBe(false);
 
       await waitForStopped(scratch.repo);
-      expect(await proc.exited).toBe(0);
+      expectExit(await result, 0, scratch);
 
       // The session ran and logged its call before its write into the now
       // gone worktree failed; the guard is what caught the checkout

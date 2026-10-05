@@ -16,6 +16,13 @@
  * Driven against this file the same day, each restored sha256-identical:
  * that mutation reddened the in-process case alone, and the scratch
  * repository planting no config reddened the planting case alone.
+ *
+ * The failure helpers were driven against this file on 2026-10-04, the
+ * module restored sha256-identical after each: dropping the 80-line cap
+ * reddened the cut case alone; dropping stderr from `describeRun`
+ * reddened the planted exit code, both cut cases and the missing-event
+ * case; a `console.log` in `expectExit` on a match reddened its quiet
+ * case alone, and a stderr write in `expectEvent` on a match its own.
  */
 import type { RafaCommand } from '../cli/command.js';
 import type { ProjectFound } from '../project/scope.js';
@@ -30,7 +37,18 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { configFilePath } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { dispatchCaptured, dispatchInProject, plantProject, plantScratchRepo, runRafa, spawnedEnv } from './cli-capture.js';
+import {
+  describeRun,
+  dispatchCaptured,
+  dispatchInProject,
+  expectEvent,
+  expectExit,
+  plantProject,
+  plantScratchRepo,
+  RUN_TAIL_LINES,
+  runRafa,
+  spawnedEnv,
+} from './cli-capture.js';
 
 /** The CLI entry the control spawns by hand, as `runRafa` spawns it. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -148,5 +166,142 @@ describe('spawnedEnv', () => {
     const own = join(tempBase, 'case-tmpdir');
 
     expect(childTmpdir({ TMPDIR: own })).toBe(own);
+  });
+});
+
+/** The message `act` throws, or a failure when it throws none. */
+function thrownMessage(act: () => unknown): string {
+  try {
+    act();
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : String(error);
+  }
+  throw new Error('expected a throw, got none');
+}
+
+/** `count` lines named `<name> <n>`, in order. */
+function numbered(name: string, count: number): string[] {
+  return Array.from({ length: count }, (_, index) => `${name} ${index + 1}`);
+}
+
+/** `count` numbered lines as a stream's text, each ended by a newline. */
+function numberedLines(name: string, count: number): string {
+  return numbered(name, count).join('\n') + '\n';
+}
+
+/**
+ * Every write to this process's stdout, stderr or console while `act`
+ * runs, the originals restored afterwards.
+ */
+function writesDuring(act: () => void): string[] {
+  const writes: string[] = [];
+  const out = process.stdout.write;
+  const err = process.stderr.write;
+  const methods = ['log', 'info', 'warn', 'error', 'debug'] as const;
+  const saved = methods.map((method) => console[method]);
+  const record = (chunk: unknown): boolean => {
+    writes.push(String(chunk));
+    return true;
+  };
+  process.stdout.write = record as typeof process.stdout.write;
+  process.stderr.write = record as typeof process.stderr.write;
+  for (const method of methods) console[method] = (...args: unknown[]) => void record(args.join(' '));
+  try {
+    act();
+  } finally {
+    process.stdout.write = out;
+    process.stderr.write = err;
+    methods.forEach((method, index) => {
+      console[method] = saved[index] as (typeof console)[typeof method];
+    });
+  }
+  return writes;
+}
+
+describe('expectExit', () => {
+  it('fails a planted wrong exit code with the child\'s exit code, its stderr and the scratch paths in the message', () => {
+    const scratch = plantScratchRepo(tempBase);
+    const run = runRafa(scratch, scratch.repo, ['no-such-subject']);
+    const stderr = run.stderr.trim();
+
+    const message = thrownMessage(() => expectExit(run, 0, scratch));
+
+    expect(run.exitCode).not.toBe(0);
+    expect(stderr).not.toBe('');
+    expect(message).toContain(`expected exit code 0, got ${String(run.exitCode)}`);
+    expect(message).toContain(stderr);
+    expect(message).toContain(`repo: ${scratch.repo}`);
+    expect(message).toContain(`home: ${scratch.home}`);
+  });
+
+  it('passes a matching exit code and prints nothing, where a write during the same capture is caught', () => {
+    const run = { exitCode: 3, stdout: 'out\n', stderr: 'err\n' };
+
+    const quiet = writesDuring(() => expectExit(run, 3));
+    const control = writesDuring(() => console.log('control'));
+
+    expect(quiet).toEqual([]);
+    expect(control).toEqual(['control']);
+  });
+
+  it('names a killed run as having no exit code', () => {
+    const message = thrownMessage(() => expectExit({ exitCode: null, stdout: '', stderr: '' }, 0));
+
+    expect(message).toContain('exit code: killed (no exit code)');
+  });
+});
+
+describe('describeRun', () => {
+  it(`cuts a stream over ${RUN_TAIL_LINES} lines to its last ${RUN_TAIL_LINES}, saying how many were cut, and each stream on its own`, () => {
+    const run = { exitCode: 1, stdout: numberedLines('out', 10), stderr: numberedLines('err', RUN_TAIL_LINES + 40) };
+
+    const lines = describeRun(run).split('\n');
+    const stderrAt = lines.indexOf('stderr:');
+    const stdoutAt = lines.indexOf('stdout:');
+
+    expect(lines[stderrAt + 1]).toBe('[40 earlier lines cut]');
+    expect(lines.slice(stderrAt + 2, stdoutAt)).toEqual(numbered('err', RUN_TAIL_LINES + 40).slice(40));
+    expect(lines).not.toContain('err 40');
+    expect(lines.slice(stdoutAt + 1)).toEqual(numbered('out', 10));
+  });
+
+  it(`keeps a stream of exactly ${RUN_TAIL_LINES} lines whole, with no cut line`, () => {
+    const text = describeRun({ exitCode: 1, stdout: '', stderr: numberedLines('err', RUN_TAIL_LINES) });
+
+    expect(text).toContain('err 1\n');
+    expect(text).not.toContain('earlier lines cut');
+    expect(text).toContain('stdout: (empty)');
+  });
+});
+
+describe('expectEvent', () => {
+  const named = { type: 'event', name: 'task-end', summary: 'task ended', data: { task: 1 }, ts: '2026-10-04T00:00:00.000Z' };
+
+  it('answers the named event and prints nothing when the run emitted it', () => {
+    const run = { exitCode: 0, stdout: `${JSON.stringify({ type: 'start', command: 'loop start', ts: named.ts })}\n${JSON.stringify(named)}\n`, stderr: '' };
+    let found: unknown;
+
+    const writes = writesDuring(() => {
+      found = expectEvent(run, 'task-end');
+    });
+
+    expect(found).toEqual(named);
+    expect(writes).toEqual([]);
+  });
+
+  it('fails with the run described when no event of that name is there, or stdout is no json', () => {
+    const run = { exitCode: 1, stdout: `${JSON.stringify(named)}\n`, stderr: 'boom\n' };
+    const text = { exitCode: 1, stdout: 'plain text\n', stderr: 'boom\n' };
+
+    const missing = thrownMessage(() => expectEvent(run, 'loop-end', { repo: '/scratch/repo' }));
+    const notJson = thrownMessage(() => expectEvent(text, 'loop-end'));
+
+    expect(missing).toContain('expected event loop-end, found none');
+    expect(missing).toContain('boom');
+    expect(missing).toContain('repo: /scratch/repo');
+    expect(notJson).toContain('stdout is not json events');
+    expect(notJson).toContain('plain text');
   });
 });

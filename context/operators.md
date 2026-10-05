@@ -132,3 +132,23 @@ the run-start failure, by file and case, that a reported bug was read as
 cache creation and output from its session log, read as
 `rafa effort collect` reads it; the effort store is never opened. A
 session's own stdout goes to `info`, which the events adapter drops.
+
+An `error` event says the run ended on an uncaught error, and its line
+is the first non-blank line of the error's message.
+
+### The events file
+
+Every event `src/start/loop-events.ts` emits is also appended to the
+run's events file, `.rafa/runs/<session-id>.events.ndjson`, beside its
+record: one JSON line, `{ name, summary, data, ts }`, the object the
+output's `emit` receives minus `type`, in every output mode, text
+included. `bindEventsFile` names the file (making the runs folder if it
+is missing) and `unbindEventsFile` ends the append; with none bound,
+nothing is written. The append is best-effort: a failed write prints one
+stderr line naming the path and the error, once per binding, and never
+throws into the loop. `loop start` binds it right after opening the
+session record and unbinds it in the run's `finally` (`src/start.ts`);
+anything the run throws is first written as an `error` event, then
+rethrown. A test binds its own temp root and unbinds after.
+The record, `<session-id>.json`, stays the only `.json` file a run
+writes, so `loop list`, `status` and `stop` read it alone.

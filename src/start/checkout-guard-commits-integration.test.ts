@@ -22,6 +22,9 @@
  * expectation from one task's commit to the next guard check unmoved —
  * which is what this file spawns the whole command to show.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+import type { Subprocess } from 'bun';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -187,27 +190,39 @@ function plant(): Scratch {
 }
 
 /** Runs `bun src/rafa.ts` with `words` in `scratch`'s repository, waiting for it to finish. */
-function run(scratch: Scratch, words: readonly string[]): { readonly exitCode: number | null; readonly stdout: string } {
+function run(scratch: Scratch, words: readonly string[]): CapturedRun {
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
     env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: 30_000,
   });
-  return { exitCode: proc.exitCode, stdout: proc.stdout.toString() };
+  return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
 }
 
-/** Spawns `rafa loop start` over {@link RUN_FLAGS} in the background, its streams ignored. */
-function spawnLoopStart(scratch: Scratch) {
+/** A background `rafa loop start`: the child, and what it answers once it ends. */
+interface RunningLoop {
+  readonly proc: Subprocess;
+  /** Resolves once the child has ended; exit code null when a signal ended it. */
+  readonly result: Promise<CapturedRun>;
+}
+
+/** Spawns `rafa loop start` over {@link RUN_FLAGS} in the background, collecting its streams. */
+function spawnLoopStart(scratch: Scratch): RunningLoop {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
   }
-  return Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
+  const proc = Bun.spawn([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
     env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
-    stdout: 'ignore',
-    stderr: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+  const result = Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+    .then(([stdout, stderr, exitCode]) => ({ exitCode: proc.signalCode === null
+      ? exitCode
+      : null, stdout, stderr }));
+  return { proc, result };
 }
 
 /** Polls `read` every `pollMs` until it answers other than null, or throws past `timeoutMs`. */
@@ -257,13 +272,13 @@ function waitForStopped(repo: string): Promise<true> {
 describe('the loop guard across a real run\'s own commit and one made outside it', () => {
   it('holds across the loop\'s own first commit, then halts on a commit made outside it before the second task', async () => {
     const scratch = plant();
-    const proc = spawnLoopStart(scratch);
+    const { proc, result } = spawnLoopStart(scratch);
     try {
       // The first task dispatches, its stand-in session still sleeping;
       // pausing here lets the run hold right after that task's own
       // commit and before the second task's guard check.
       await waitForTask(scratch.repo, TASK1);
-      expect(run(scratch, ['loop', 'pause']).exitCode).toBe(0);
+      expectExit(run(scratch, ['loop', 'pause']), 0, { ...scratch });
       await waitForPausedIdle(scratch.repo);
 
       const trackerPath = join(scratch.repo, '.plans', TRACKER_NAME);
@@ -286,9 +301,9 @@ describe('the loop guard across a real run\'s own commit and one made outside it
       git(scratch.repo, scratch.home, 'commit', '-q', '-m', 'made in another terminal');
       const outsideHead = gitOut(scratch.repo, scratch.home, 'rev-parse', 'HEAD');
 
-      expect(run(scratch, ['loop', 'resume']).exitCode).toBe(0);
+      expectExit(run(scratch, ['loop', 'resume']), 0, { ...scratch });
       await waitForStopped(scratch.repo);
-      expect(await proc.exited).toBe(0);
+      expectExit(await result, 0, { ...scratch });
 
       // Only the outside commit halted the run: the second task was never
       // dispatched, so the stand-in was called exactly once.

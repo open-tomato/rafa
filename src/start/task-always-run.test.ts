@@ -85,6 +85,13 @@ describe('readTaskAlwaysRun', () => {
     expect(warnings[0]).toContain('not a git repository');
     expect(warnings[0]).toContain('the task step runs no tests.alwaysRun file');
   });
+
+  it('names the stage step in that warning when the stage step\'s fallback reads them', () => {
+    const files = readTaskAlwaysRun(lsFiles({ ok: false, stdout: '', stderr: 'not a git repository' }), ['src/**/*.sweep.test.ts'], 'stage');
+    expect(files).toEqual([]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('the stage step runs no tests.alwaysRun file');
+  });
 });
 
 describe('withAlwaysRun', () => {

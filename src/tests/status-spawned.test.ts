@@ -25,7 +25,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { STATUS_NETWORK_TIMEOUT_MS } from '../status/sections.js';
 
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -145,7 +145,7 @@ describe('rafa status, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['status']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const output = `${run.stdout}${run.stderr}`;
     expect(output).toContain(`Branch: \`${BRANCH}\`, plan \`${STUB}\``);
     expect(output).toContain('Loops: 0 running, 1 task blocked');
@@ -159,7 +159,7 @@ describe('rafa status, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['status', '--output=json']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const data = resultData(run);
     expect(data['branch']?.['read']).toBe(true);
     expect(data['branch']?.['branch']).toBe(BRANCH);
@@ -177,7 +177,7 @@ describe('rafa status, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['status']);
     const elapsed = Date.now() - started;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(elapsed).toBeLessThan(STATUS_NETWORK_TIMEOUT_MS + DEADLINE_MARGIN_MS);
     const output = `${run.stdout}${run.stderr}`;
     expect(output.match(/^.*Pull request: not read:.*$/gm)).toHaveLength(1);

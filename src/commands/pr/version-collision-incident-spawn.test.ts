@@ -251,6 +251,7 @@ function detailJson(branchHead: string): string {
     body: '',
     headRefOid: branchHead,
     labels: [],
+    closingIssuesReferences: [],
     mergeStateStatus: 'CLEAN',
     mergeable: 'MERGEABLE',
   });

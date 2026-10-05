@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { expect, test } from 'bun:test';
 
+import { expectExit } from './cli-capture.js';
 import { LIVE_PARITY_ENV, LIVE_PARITY_OFF_REASON } from './parity-fixture.js';
 
 const STAGE_TEST_FILES = [
@@ -39,7 +40,7 @@ test(
       const report = await readFile(reportPath, 'utf8');
 
       // Assert
-      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expectExit({ exitCode, stdout, stderr }, 0, { scratch });
       const failures = [...report.matchAll(/\bfailures="(\d+)"/g)].map((m) => Number(m[1]));
       expect(failures.length).toBeGreaterThan(0);
       expect(failures.every((count) => count === 0)).toBe(true);

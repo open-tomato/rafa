@@ -130,12 +130,16 @@ gate later anyway.
 baseline expectations and stage-end failures:
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — Full suite after each task's session ends and commits
-- `stage` — Full suite after a stage's last task completes
+- `stage` — After a stage's last task: the tests under `Owns:` folders
+  changed by the stage, or `bun test --changed=<since>` with `tests.alwaysRun`
+  files when the plan has no `Owns:` folder (reason `fallback`)
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
-Each recorded step names its scope, the command, exit code, Bun's summary
-line, every failing test (file + full test name pairs), and which failures
-are new against the baseline (not present in `baseline`'s captured failures).
+Each recorded step names its scope, its reason (`declared`, `trigger`,
+`fallback`, `no-module-tests`, or `stage`), the command, exit code, Bun's
+summary line, every failing test (file + full test name pairs), and which
+failures are new against the baseline (not present in `baseline`'s captured
+failures).
 
 **The baseline is the `baseline` step's recorded failures.** A failure is
 identified by its test file path and full test name. When a step reports
@@ -145,17 +149,19 @@ already present, a mismatch means it is new. Only new failures block the
 next task.
 
 **Declaration key `tests=` on a task line** sets what the task's session
-will run and influences what scope the runner uses for the stage step after
-that task's stage completes:
+will run; the stage step scope after that stage completes follows from the
+plan's `Owns:` folders (scope `full`) or falls back to `bun test
+--changed=<since>` (scope `affected`, reason `fallback`):
 - `tests=affected` (default): task session runs `bun test --changed=<base>`
-  plus types and lint on the changed files; stage step runs full suite
-  unless the changed files do not trigger one
+  plus types and lint on the changed files; stage step is determined by
+  the `Owns:` rule above
 - `tests=module`: task session skips to `bun test <module-files>` when the
   task touches files whose enclosing module is listed in
-  `tests.integration`, otherwise same as `tests=affected`; stage step runs
-  the tests for every module the diff touches
+  `tests.integration`, otherwise same as `tests=affected`; stage step is
+  determined by the `Owns:` rule above
 - `tests=full`: task session runs full suite when the task changes a config
-  file or a globally-used module; stage step always runs full suite
+  file or a globally-used module; stage step always runs full suite, not
+  a fallback
 
 **Config keys determine when a task triggers `tests=module` or `tests=full`
 automatically, and which tests always run:**
@@ -174,17 +180,21 @@ automatically, and which tests always run:**
   to `tests=module`
 
 **A stage-end step with new failures blocks the next task.** After a
-stage's last task, the stage step runs the full suite and captures
-failures. If any failure is new against the baseline, the runner inserts
-a `[BLOCKED]` repair task above the first open task
-(`src/start/suite-blocker.ts`), its blocker the failures, which the repair
-session receives through `BLOCKER_PROMPT_PREFIX` in its prompt, and the
-run stops. A restarted run dispatches that repair first and runs no stage
-step before it, or before any `[BLOCKED]` task, because a due step run
-there would meet the same failures and stop the run again before the
-repair got its session. The stage steps still due run before the first
-open task after it. The blocked task holds until its session completes or
-a human unblocks it with a `[BLOCKED]` mark on its line in the tracker.
+stage's last task, the stage step runs the tests under the `Owns:`
+folders the stage changed (scope `full`), or, with no `Owns:` folder,
+`bun test --changed=<since>` with the `tests.alwaysRun` files (scope
+`affected`, reason `fallback`), joining the always-run files so they still
+pass the slow-sweep share guard. The step captures failures. If any
+failure is new against the baseline, the runner inserts a `[BLOCKED]`
+repair task above the first open task (`src/start/suite-blocker.ts`), its
+blocker the failures, which the repair session receives through
+`BLOCKER_PROMPT_PREFIX` in its prompt, and the run stops. A restarted run
+dispatches that repair first and runs no stage step before it, or before
+any `[BLOCKED]` task, because a due step run there would meet the same
+failures and stop the run again before the repair got its session. The
+stage steps still due run before the first open task after it. The blocked
+task holds until its session completes or a human unblocks it with a
+`[BLOCKED]` mark on its line in the tracker.
 
 ### Skills and lessons at dispatch
 
@@ -284,6 +294,24 @@ requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
+
+**An existing branch under `--as-worktree` catches up with its base when it
+holds only claims.** `rafa plan create` claims a plan by pushing
+`feat/<stub>` at the base's tip, so a run started later finds a branch cut
+from a base that has moved since. When `--as-worktree` takes a branch that
+already exists (local, remote-only, or held by the worktree an earlier
+start left), it fetches `origin/<base>` (the base, never the branch) and
+reads the branch's commits past it (`src/start/claim-catch-up.ts`). A
+branch holding only `claim(rafa-<n>): …` commits is merged with
+`git merge origin/<base>` in the run's worktree before the first task, a
+merge and never a rewrite of the pushed branch, and one line names the
+commits taken and their range. A branch holding any other commit is never
+merged: one warning says how many commits behind `origin/<base>` it is, and
+the run goes on. A branch at or ahead of `origin/<base>` prints nothing
+new. A failed fetch is a warning, the branch then read against
+`origin/<base>` as it stood; a failed merge is aborted and refuses the run.
+`--create-branch` without `--as-worktree` switches to an existing branch as
+it is, with no catch-up.
 
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
@@ -401,6 +429,12 @@ trusted in config), the body must fill the spec template completely, and
 in `labels` mode only, the issue must carry at most one `epic:` label
 (in `native` mode an epic is the one sub-issue parent, so the check is
 skipped).
+Once all three pass it asks `Mark #<n> spec:ready? [y/N]`. Typed with
+`--yes` it marks the issue with no question, with or without a terminal,
+so a script or an agent can run it. `--yes` skips the question only: an
+issue whose author has no write access, whose body leaves a gap, or that
+carries two `epic:` labels is still refused with exit code 2, and
+nothing is written. `rafa next` never passes `--yes` to this step.
 The command is offered automatically by `plan create --issue` and
 `plan create --next` in a terminal, where a yes labels the issue with
 `spec:ready` and proceeds to plan it, or a no exits with the check result.
@@ -428,6 +462,22 @@ the prompt kit runs in raw mode on `stdio` and every session reads the
 API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
 loop's own machinery (`src/utils/claude.ts` for the session and
 `src/effort/store/` for the record) runs all the code.
+
+### Bug sweep convention
+
+**When a tooling phase completes, the first group of the bug sweep that
+follows is every open `module:cli-gap` issue.** As new rafa commands or
+fields are shipped, the hook denies `gh` equivalents with a gap report
+offering to file a bug for each missing capability. Those bugs are filed
+with the `module:cli-gap` label. When the feature that closed the gap
+completes and ships, `rafa next` or a manual `rafa issue list
+--module=cli-gap` sweeps those issues: each one names a `gh` command or
+flag the hook denied, matched against the rafa line that can now do the
+step. The person running the sweep confirms each equivalence or corrects
+the report, and closes the issue. This establishes a clear pipeline from
+tooling promise (the hook's denial) to tooling completion (the rafa
+command) to closure (the verification sweep), and leaves no gap report
+buried in a list of general bugs.
 
 ### Files beside the tree
 
@@ -486,6 +536,17 @@ fails (for instance, if the branch has not been merged into the base yet or
 was pushed while the working tree had conflicts), the run ends `blocked` with
 the step and branch named. With `pr.provider: none`, the pull-request check
 and creation are both skipped and the run advances directly to CI or closes.
+
+**The wrap-up emits `pr` or `no-pr` once, in every output mode.**
+`emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to
+the run's events file whatever the mode, so `rafa loop wait` ends a text
+run on it as it does a json or events run. Json and events emit it right
+after the first wrap-up session, over a fresh lookup of the branch's open
+pull request. Text emits it at the delivery's place instead: over the
+delivered pull request's number with no lookup, and over a lookup when the
+delivery holds no number (blocked or interrupted), when a moved checkout
+halts the run first, or under `pr.provider: none`. Text still prints no
+line for it; the output, not the emit, decides what reaches stdout.
 
 **The retry configuration is `loop.wrapUp.retries`.** This config key (in
 `.rafa/config.yaml`) controls how many times the runner will retry the

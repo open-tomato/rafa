@@ -72,10 +72,13 @@
  *
  * `--as-worktree` takes the place of that offer: no question is asked,
  * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
- * as it stands when it exists, and added as a linked worktree at
+ * when it exists, and added as a linked worktree at
  * `loop.worktreeDir/<stub>` (`start/worktree.ts`), which becomes the
- * run's checkout. The main checkout is never switched, and every session
- * is still served from its `.rafa/` (`start/serving.ts`).
+ * run's checkout. An existing branch holding only claim commits merges
+ * `origin/<base>` there before the first task, and one with other work
+ * that is behind it is reported (`start/claim-catch-up.ts`). The main
+ * checkout is never switched, and every session is still served from
+ * its `.rafa/` (`start/serving.ts`).
  *
  * Once the branch guard lets the run through, the run prints the plan's
  * risk total, the one line `rafa plan risk` ends its report with
@@ -163,8 +166,11 @@
  * inserts a `[BLOCKED]` repair task above the first open task, or blocks
  * the repair it followed (`start/suite-blocker.ts`), and the run stops as
  * it does after a blocked task, so the next run dispatches that repair
- * handed the failing files. A red pre-wrap-up step stops the run before
- * the wrap-up.
+ * handed the failing files. A red pre-wrap-up step inserts its repair
+ * after the checklist's last task and the loop turns back to dispatch
+ * it in the same run, then runs the pre-wrap-up step again; red a second
+ * time, it blocks that repair again and the run stops before the
+ * wrap-up.
  * Each task prompt lists the baseline's failures as inherited
  * (`start/inherited-notice.ts`), read again before each dispatch.
  *
@@ -281,6 +287,13 @@
  * returning, which the dispatcher ends as a success, with exit code 0. A
  * triage failure stops nothing.
  *
+ * Every event the run emits is appended to its events file,
+ * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
+ * bound right after the session record is opened and unbound in the
+ * run's `finally`. Anything the run throws past that point, a
+ * `CommandExit` included, is first written there as an `error` event
+ * and then rethrown unchanged.
+ *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
@@ -305,6 +318,7 @@ import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
+import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -323,7 +337,14 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './start/dispatch.js';
-import { emitLoopEvent, taskPosition, taskTokens, unlessText } from './start/loop-events.js';
+import {
+  bindEventsFile,
+  emitLoopEvent,
+  taskPosition,
+  taskTokens,
+  unbindEventsFile,
+  unlessText,
+} from './start/loop-events.js';
 import { holdWhilePaused } from './start/pause.js';
 import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
@@ -450,8 +471,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // Refuses a second run of the plan before anything else is printed or
   // checked; every way out of the `try` writes the run's end. Under
   // `--roadmap` the record carries the away hop, when there is one, and
-  // a run in a worktree carries the worktree's path.
+  // a run in a worktree carries the worktree's path. The run's events
+  // file, `<session-id>.events.ndjson` beside the record, is bound
+  // straight after and unbound in the `finally`; anything the run throws
+  // is written to it as an `error` event before it is rethrown
+  // (`start/loop-events.ts`).
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
+  bindEventsFile(repoRoot, session.id);
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');
@@ -581,12 +607,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // repair a red step left and runs first) or the pre-wrap-up step
       // before the wrap-up. A red stage step has inserted a blocked
       // repair task, and a red one stops the run as a blocked task does.
+      // A red pre-wrap-up step's first repair answers `repair` instead:
+      // back to `findNextTask`, which answers that repair, so it runs in
+      // this run and the pre-wrap-up step runs again after it.
       if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
-      if (!(await suiteSteps.beforeSession(taskInfo))) {
+      const suiteGate = await suiteSteps.beforeSession(taskInfo);
+      if (suiteGate === 'stop') {
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }
       if (interrupted) break;
+      if (suiteGate === 'repair') continue;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
@@ -715,7 +746,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         return;
       }
     }
+  } catch (error) {
+    emitLoopEvent({ kind: 'error', message: messageOf(error) });
+    throw error;
   } finally {
+    unbindEventsFile();
     session.end();
   }
 }

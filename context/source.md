@@ -79,12 +79,13 @@ spells out, and the shapes the lint config forces.
   path, a command) is extracted by pattern, verified against its
   target, and fingerprinted. The fingerprint at the time the spec was
   read is the reference's STAMP; it is kept in the saved copy under
-  `specs.dir` as an HTML comment, never on the forge. Four states:
-  `ok`; `dangling` (the target does not exist); `suspect` (the
-  target's fingerprint differs from its stamp); `resolved` (a
-  `Blocked by:` target closed since the stamp). A fifth, `unknown`,
-  is a cross-repository target the provider cannot read; it is listed
-  and never refuses. Nothing spawns a process: `gh`, `git` and
+  `specs.dir` as an HTML comment, never on the forge. Five states:
+  `ok`; `new` (a target but an issue that has not existed since its
+  first reading, stamped `new`); `dangling` (the target does not
+  exist); `suspect` (the target's fingerprint differs from its
+  stamp); `resolved` (a `Blocked by:` target closed since the
+  stamp). A sixth, `unknown`, is a cross-repository target the
+  provider cannot read; it is listed and never refuses. Nothing spawns a process: `gh`, `git` and
   `ts-symbols` arrive through seams (`GhRunner` from
   `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
   so unit cases drive fakes and planted repositories under `tmpdir`
@@ -109,7 +110,9 @@ for by rewrapping the prose the rule superseded. NO non-test file under
 `src/` is over the cap; the nearest is `src/check/references.ts` at
 that 800, with `src/demote/classify.ts` at 797 behind it. `src/effort/collect.ts`
 was at 798 until its argv parser moved to `collect-args.ts` and its
-skill half went to `collect-skills.ts`, which left it at 777.
+skill half went to `collect-skills.ts`, which left it at 777; it grew
+back to 795, and moving the session log location to
+`session-log-dirs.ts` took it to 685.
 
 **The cap is a rule about modules, not about their tests.** At `b2bebfe`
 exactly one non-test file under `src/` is over it, `src/check/references.ts`

@@ -319,6 +319,7 @@ describe('the question asked at the end of a merge that closes #A', () => {
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],
+      closes: [],
     };
   }
 

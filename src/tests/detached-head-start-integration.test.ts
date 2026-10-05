@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { describeRun, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -59,7 +59,7 @@ describe('rafa loop start --create-branch on a detached HEAD', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', '--create-branch']);
 
-    expect(run.exitCode).not.toBe(0);
+    expect(run.exitCode, describeRun(run, scratch)).not.toBe(0);
     expect(run.stderr).toContain('Refusing to run on a detached HEAD');
     expect(run.stderr).toContain('git switch <base>');
     expect(run.stderr).toContain('--as-worktree');

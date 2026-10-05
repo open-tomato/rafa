@@ -68,6 +68,9 @@
  * out, they are the chain's own: `CORE_ADAPTER_REGISTRY`, and a runner
  * spawning `gh` in the project root.
  *
+ * `issue create` takes one seam more: what reads standard input whole
+ * for `--body-file=-`, `Bun.stdin.text()` when left out.
+ *
  * `issue list --roadmap` reaches no tracker either (`./list.ts`), and
  * takes four seams more: the `git` its branch scan runs, spawning `git`
  * in the project root when left out; what reads the plan dir's file
@@ -116,6 +119,8 @@ export interface IssueSeams {
    * cache and a case planting `gh` sees exactly the commands it planted.
    */
   readonly boardCache?: boolean;
+  /** What `issue create --body-file=-` reads standard input through, whole. `Bun.stdin.text()` when left out. */
+  readonly stdin?: () => Promise<string>;
 }
 
 /** True when a roadmap reading over `seams` keeps its board listing; see {@link IssueSeams.boardCache}. */

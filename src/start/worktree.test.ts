@@ -14,6 +14,12 @@
  * beside the clean run it was varied from, so a runner that refused
  * everything and one that refused nothing both redden.
  *
+ * The catch-up of an existing branch (`./claim-catch-up.ts` read, then a
+ * merge or a line) is stubbed the same way, its readings answering a
+ * branch at the base's tip unless a case varies them; each command is
+ * recorded with the root it ran in, so a case can tell the merge in the
+ * worktree from a command in the main checkout.
+ *
  * The last block runs the same function against a real repository under
  * the temporary directory — a bare remote and its clone — so the argv
  * the table assumes is proven to be argv git accepts, and the path a
@@ -39,7 +45,17 @@ import { CONFIG_DEFAULTS } from '../config.js';
 import { parseWorktrees } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { addRunWorktree, existingRefusal, holderOf, readExisting, worktreePathFor, worktreeSteps } from './worktree.js';
+import {
+  addRunWorktree,
+  behindLine,
+  caughtUpLine,
+  existingRefusal,
+  holderOf,
+  mergeRefusal,
+  readExisting,
+  worktreePathFor,
+  worktreeSteps,
+} from './worktree.js';
 
 /** The plan every stubbed case runs. */
 const STUB = 'rafa-370';
@@ -87,6 +103,63 @@ const REMOTE_ADD = `worktree add --track -b ${BRANCH} ${PATH} origin/${BRANCH}`;
 /** The listing command a failed add reads. */
 const LIST = 'worktree list --porcelain';
 
+/** The fetch of the base, which `create` runs first and every other route runs to catch up. */
+const FETCH = `fetch origin ${BASE}`;
+
+/** The tip of `origin/<base>` in the stubbed history. */
+const BASE_TIP = 'b'.repeat(40);
+
+/** The tip of the plan's branch in the stubbed history. */
+const BRANCH_TIP = 'c'.repeat(40);
+
+/** Where the plan's branch left `origin/<base>` in the stubbed history. */
+const FORK = 'f'.repeat(40);
+
+/** The catch-up's reading of the base, then of the branch; see `./claim-catch-up.ts`. */
+const READ_BASE = `rev-parse --verify --quiet refs/remotes/origin/${BASE}^{commit}`;
+const READ_BRANCH = `rev-parse --verify --quiet refs/heads/${BRANCH}^{commit}`;
+
+/** How far behind the base the branch is counted. */
+const COUNT_BEHIND = `rev-list --count refs/heads/${BRANCH}..refs/remotes/origin/${BASE}`;
+
+/** Where the branch and the base meet. */
+const MERGE_BASE = `merge-base refs/heads/${BRANCH} refs/remotes/origin/${BASE}`;
+
+/** The branch's own commits past the base. */
+const OWN_COMMITS = `log --format=%H%x09%P%x09%s refs/remotes/origin/${BASE}..refs/heads/${BRANCH}`;
+
+/** The catch-up merge, run in the worktree. */
+const MERGE = `merge --no-edit origin/${BASE}`;
+
+/** What a failed catch-up merge is followed by, in the worktree. */
+const ABORT = 'merge --abort';
+
+/** Every command the catch-up of a branch at the base's tip runs, in order. */
+const CURRENT_READS = [FETCH, READ_BASE, READ_BRANCH, COUNT_BEHIND];
+
+/** Every command the catch-up of a branch behind the base runs before it merges or reports, in order. */
+const BEHIND_READS = [...CURRENT_READS, MERGE_BASE, OWN_COMMITS];
+
+/** One line of the own-commits capture: sha, parents, subject, tab-separated. */
+function own(sha: string, subject: string): string {
+  return `${sha}\t${FORK}\t${subject}\n`;
+}
+
+/** The readings of a branch two commits behind the base whose own commits are `log`. */
+function behindBy2(log: string): GitReplies {
+  return {
+    [COUNT_BEHIND]: ok('2\n'),
+    [MERGE_BASE]: ok(`${FORK}\n`),
+    [OWN_COMMITS]: ok(log),
+  };
+}
+
+/** A branch two behind holding one claim commit: it catches up. */
+const CLAIM_ONLY = behindBy2(own(BRANCH_TIP, 'claim(rafa-370): claimed'));
+
+/** A branch two behind holding a claim and a work commit: it is reported. */
+const WITH_WORK = behindBy2(own(BRANCH_TIP, 'feat: the first task') + own('d'.repeat(40), 'claim(rafa-370): claimed'));
+
 /** A listing in which the main checkout holds `main` and a second checkout holds the plan's branch. */
 const HELD_ELSEWHERE = [
   `worktree ${ROOT}`,
@@ -130,11 +203,16 @@ type GitReplies = Readonly<Record<string, GitResult | readonly GitResult[]>>;
 const CLEAN: GitReplies = {
   [LOCAL_READ]: failed(),
   [REMOTE_READ]: failed(),
-  'fetch origin main': ok(),
+  [FETCH]: ok(),
   [CREATE_ADD]: ok(),
   [LOCAL_ADD]: ok(),
   [REMOTE_ADD]: ok(),
   [LIST]: ok(MAIN_ONLY),
+  [READ_BASE]: ok(`${BASE_TIP}\n`),
+  [READ_BRANCH]: ok(`${BRANCH_TIP}\n`),
+  [COUNT_BEHIND]: ok('0\n'),
+  [MERGE]: ok(),
+  [ABORT]: failed('fatal: There is no merge to abort (MERGE_HEAD missing).'),
 };
 
 /** A stubbed git, the roots it was made for and the commands it was given. */
@@ -142,15 +220,19 @@ interface World {
   readonly git: (root: string) => GitRunner;
   readonly roots: readonly string[];
   readonly ran: readonly string[];
+  /** Every command of {@link ran}, prefixed with the root it ran in and a colon. */
+  readonly ranIn: readonly string[];
 }
 
 /** {@link CLEAN} with `over` laid over it; an unplanned command throws. See the file note. */
 function world(over: GitReplies = {}): World {
   const replies: GitReplies = { ...CLEAN, ...over };
   const ran: string[] = [];
+  const ranIn: string[] = [];
   const roots: string[] = [];
   return {
     ran,
+    ranIn,
     roots,
     git: (root) => {
       roots.push(root);
@@ -158,6 +240,7 @@ function world(over: GitReplies = {}): World {
         const key = args.join(' ');
         const asked = ran.filter((command) => command === key).length;
         ran.push(key);
+        ranIn.push(`${root}: ${key}`);
         const reply = replies[key];
         if (reply === undefined) throw new Error(`the stub has no reply for git ${key}`);
         if (!Array.isArray(reply)) return reply as GitResult;
@@ -191,14 +274,21 @@ function refusalOf(run: () => WorktreeOutcome): { exitCode: number; message: str
   }
 }
 
-/** The lines the case under way wrote through the active output. */
+/** The lines the case under way wrote through the active output's `info`. */
 let lines: string[] = [];
+
+/** The lines the case under way wrote through the active output's `warn`. */
+let warnings: string[] = [];
 
 beforeEach(() => {
   lines = [];
+  warnings = [];
   setActiveOutput(sinkOutput({
     info: (message) => {
       lines.push(message);
+    },
+    warn: (message) => {
+      warnings.push(message);
     },
   }));
 });
@@ -321,13 +411,20 @@ describe('existingRefusal', () => {
 });
 
 describe('addRunWorktree over a stubbed git', () => {
-  it('reuses the worktree at its path holding the plan\'s branch with one line, running nothing else', () => {
+  it('reuses the worktree at its path holding the plan\'s branch with one line, adding nothing, then catches up', () => {
     const git = world({ [LIST]: ok(AT_PATH) });
     const outcome = addRunWorktree(request(), { git: git.git });
 
-    expect(outcome).toEqual({ branch: BRANCH, path: PATH, route: 'reuse', steps: [] });
-    expect(git.ran).toEqual([LIST]);
+    expect(outcome).toEqual({
+      branch: BRANCH,
+      path: PATH,
+      route: 'reuse',
+      steps: [],
+      catchUp: { fetched: true, reading: { kind: 'current', branch: BRANCH, base: BASE } },
+    });
+    expect(git.ran).toEqual([LIST, ...CURRENT_READS]);
     expect(lines).toEqual([`\n🌿 Reusing the worktree at ${PATH}, which already holds ${BRANCH}.`]);
+    expect(warnings).toEqual([]);
   });
 
   it('refuses the run\'s path holding another branch before any step, naming both', () => {
@@ -392,20 +489,21 @@ describe('addRunWorktree over a stubbed git', () => {
     expect(moves).toEqual([]);
   });
 
-  it('adds the worktree on the existing local branch without fetching', () => {
+  it('adds the worktree on the existing local branch without fetching it, then catches it up', () => {
     const git = world({ [LOCAL_READ]: ok(), [REMOTE_READ]: ok() });
     const outcome = addRunWorktree(request(), { git: git.git });
 
     expect(outcome.route).toBe('switch-local');
-    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, LOCAL_ADD]);
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, LOCAL_ADD, ...CURRENT_READS]);
+    expect(git.ran.filter((command) => command.startsWith('fetch'))).toEqual([FETCH]);
   });
 
-  it('tracks a branch only the remote has, without fetching', () => {
+  it('tracks a branch only the remote has, without fetching it, then catches it up', () => {
     const git = world({ [REMOTE_READ]: ok() });
     const outcome = addRunWorktree(request(), { git: git.git });
 
     expect(outcome.route).toBe('switch-remote');
-    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, REMOTE_ADD]);
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, REMOTE_ADD, ...CURRENT_READS]);
   });
 
   it('trims the stub, as the branch offer does', () => {
@@ -466,6 +564,166 @@ describe('addRunWorktree over a stubbed git', () => {
   });
 });
 
+describe('addRunWorktree catching an existing branch up', () => {
+  /** The existing local branch, `over` laid over the world. */
+  const local = (over: GitReplies = {}): World => world({ [LOCAL_READ]: ok(), ...over });
+
+  it('merges origin/<base> in the worktree when the branch holds only claims, naming the commits taken', () => {
+    const git = local(CLAIM_ONLY);
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, LOCAL_ADD, ...BEHIND_READS, MERGE]);
+    expect(git.ranIn.at(-1)).toBe(`${PATH}: ${MERGE}`);
+    expect(outcome.catchUp?.reading.kind).toBe('catch-up');
+    expect(lines).toContain(
+      `   Merged 2 commits of origin/${BASE} (ffffffffffff..bbbbbbbbbbbb) into ${BRANCH}, which held only claim commits.`,
+    );
+    expect(warnings).toEqual([]);
+  });
+
+  it('prints the merge line before the line naming where the run is', () => {
+    const git = local(CLAIM_ONLY);
+    addRunWorktree(request(), { git: git.git });
+
+    const merged = lines.findIndex((line) => line.includes('which held only claim commits'));
+    expect(merged).toBeGreaterThan(-1);
+    expect(lines.at(-1)).toBe(`   The run is on ${BRANCH} in ${PATH}.`);
+    expect(merged).toBe(lines.length - 2);
+  });
+
+  it('runs no command that moves the main checkout, the merge running in the worktree alone', () => {
+    const git = local(CLAIM_ONLY);
+    addRunWorktree(request(), { git: git.git });
+
+    const moves = git.ranIn.filter((command) => /: (switch|checkout|merge|reset|pull)( |$)/.test(command));
+    expect(moves).toEqual([`${PATH}: ${MERGE}`]);
+  });
+
+  it('never merges a branch holding work, warning how far behind it is and going on', () => {
+    const git = local(WITH_WORK);
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, LOCAL_ADD, ...BEHIND_READS]);
+    expect(git.ran).not.toContain(MERGE);
+    expect(outcome.catchUp?.reading.kind).toBe('behind');
+    expect(warnings).toEqual([
+      `   ⚠️  ${BRANCH} is 2 commits behind origin/${BASE} and was not merged: 1 of its 2 commits past it is not a claim.`,
+    ]);
+    expect(lines.at(-1)).toBe(`   The run is on ${BRANCH} in ${PATH}.`);
+  });
+
+  it('prints nothing new for a branch at or ahead of origin/<base>', () => {
+    const git = local();
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.catchUp).toEqual({ fetched: true, reading: { kind: 'current', branch: BRANCH, base: BASE } });
+    expect(warnings).toEqual([]);
+    expect(lines).toEqual([
+      `\n🌿 Adding a worktree for the existing ${BRANCH}.`,
+      `   add the worktree for ${BRANCH} at ${PATH}: done`,
+      `   The run is on ${BRANCH} in ${PATH}.`,
+    ]);
+  });
+
+  it('catches up a branch only the remote has, as it does a local one', () => {
+    const git = world({ [REMOTE_READ]: ok(), ...CLAIM_ONLY });
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.route).toBe('switch-remote');
+    expect(git.ranIn.at(-1)).toBe(`${PATH}: ${MERGE}`);
+  });
+
+  it('catches up the branch of a reused worktree, in that worktree', () => {
+    const git = world({ [LIST]: ok(AT_PATH), ...CLAIM_ONLY });
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.route).toBe('reuse');
+    expect(git.ran).toEqual([LIST, ...BEHIND_READS, MERGE]);
+    expect(git.ranIn.at(-1)).toBe(`${PATH}: ${MERGE}`);
+    expect(lines.at(-1)).toContain('which held only claim commits.');
+  });
+
+  it('never catches up a branch the run created, which is cut from the fetched base', () => {
+    const git = world(CLAIM_ONLY);
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.route).toBe('create');
+    expect(outcome.catchUp).toBeUndefined();
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, FETCH, CREATE_ADD]);
+  });
+
+  it('warns on a failed fetch and still reads the branch against origin/<base> as it stands', () => {
+    const said = 'fatal: unable to access the remote';
+    const git = local({ [FETCH]: failed(said), ...CLAIM_ONLY });
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.catchUp?.fetched).toBe(false);
+    expect(warnings).toEqual([
+      `   ⚠️  Could not fetch origin ${BASE}; reading ${BRANCH} against origin/${BASE} as it stands.\n   ${said}`,
+    ]);
+    expect(git.ran.at(-1)).toBe(MERGE);
+  });
+
+  it('warns on a branch it cannot read and goes on, merging nothing', () => {
+    const git = local({ [READ_BASE]: failed() });
+    const outcome = addRunWorktree(request(), { git: git.git });
+
+    expect(outcome.catchUp?.reading.kind).toBe('unreadable');
+    expect(warnings).toEqual([
+      `   ⚠️  Could not read whether ${BRANCH} can catch up: origin/${BASE} is not known here. It was left as it stands.`,
+    ]);
+    expect(git.ran).not.toContain(MERGE);
+    expect(lines.at(-1)).toBe(`   The run is on ${BRANCH} in ${PATH}.`);
+  });
+
+  it('refuses a failed merge after aborting it in the worktree, quoting git', () => {
+    const said = 'error: Your local changes to the following files would be overwritten by merge:';
+    const git = local({ ...CLAIM_ONLY, [MERGE]: failed(said) });
+    const refusal = refusalOf(() => addRunWorktree(request(), { git: git.git }));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain(`❌ Could not merge origin/${BASE} into ${BRANCH} in ${PATH}.`);
+    expect(refusal.message).toContain(`   ${said}`);
+    expect(refusal.message).toContain('any merge git started there was aborted.');
+    expect(git.ranIn.slice(-2)).toEqual([`${PATH}: ${MERGE}`, `${PATH}: ${ABORT}`]);
+    expect(lines.some((line) => line.includes('The run is on'))).toBe(false);
+  });
+});
+
+describe('the catch-up lines', () => {
+  const standing = { branch: BRANCH, base: BASE, behind: 1, ahead: 1, mergeBase: FORK, baseTip: BASE_TIP };
+
+  it('words a single commit taken in the singular, the range cut to twelve characters', () => {
+    expect(caughtUpLine({ kind: 'catch-up', ...standing })).toBe(
+      `   Merged 1 commit of origin/${BASE} (ffffffffffff..bbbbbbbbbbbb) into ${BRANCH}, which held only claim commits.`,
+    );
+  });
+
+  it('words a single commit behind, and a single one of its own, in the singular', () => {
+    expect(behindLine({ kind: 'behind', ...standing, workCommits: 1 })).toBe(
+      `   ⚠️  ${BRANCH} is 1 commit behind origin/${BASE} and was not merged: 1 of its 1 commit past it is not a claim.`,
+    );
+  });
+
+  it('words several work commits in the plural', () => {
+    expect(behindLine({ kind: 'behind', ...standing, behind: 3, ahead: 4, workCommits: 2 })).toBe(
+      `   ⚠️  ${BRANCH} is 3 commits behind origin/${BASE} and was not merged: 2 of its 4 commits past it are not claims.`,
+    );
+  });
+
+  it('ends a merge refusal saying the main checkout was not touched', () => {
+    const refusal = mergeRefusal({ kind: 'catch-up', ...standing }, PATH, failed('fatal: no'));
+
+    expect(refusal.split('\n')).toEqual([
+      `❌ Could not merge origin/${BASE} into ${BRANCH} in ${PATH}.`,
+      '   fatal: no',
+      `   ${BRANCH} holds only claim commits and is 1 commit behind; any merge git started there was aborted.`,
+      '   Clear what git names in that worktree, then run again.',
+      '   The main checkout\'s branch and working tree were not touched.',
+    ]);
+  });
+});
+
 describe('addRunWorktree against a real repository', () => {
   let scratch = '';
   let project = '';
@@ -522,7 +780,13 @@ describe('addRunWorktree against a real repository', () => {
     const second = addRunWorktree(request({ projectRoot: project, planStub: 'again' }));
 
     expect(first.route).toBe('create');
-    expect(second).toEqual({ branch: 'feat/again', path: first.path, route: 'reuse', steps: [] });
+    expect(second).toEqual({
+      branch: 'feat/again',
+      path: first.path,
+      route: 'reuse',
+      steps: [],
+      catchUp: { fetched: true, reading: { kind: 'current', branch: 'feat/again', base: 'main' } },
+    });
     expect(run(project, ['worktree', 'list', '--porcelain'])).toBe(listed);
     expect(lines).toEqual([`\n🌿 Reusing the worktree at ${first.path}, which already holds feat/again.`]);
   });

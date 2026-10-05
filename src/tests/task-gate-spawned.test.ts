@@ -45,6 +45,7 @@
  * step's repair goes after it (`start/suite-blocker.ts`); what the step
  * wrote reads from the run output and the run record's task step.
  */
+import type { CapturedRun, ScratchPaths } from './cli-capture.js';
 import type { Scratch } from './loop-scratch.js';
 
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -54,6 +55,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
 
+import { expectExit } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import {
   PLAN_FLAG,
@@ -242,9 +244,11 @@ function firstLoadThrowsText(marker: string): string {
   ].join('\n');
 }
 
-/** What a run read: its output, both streams, and the run record's task step. */
+/** What a run read: the run itself, its output, both streams, and the run record's task step. */
 interface Observed {
-  readonly exitCode: number | null;
+  readonly run: CapturedRun;
+  /** The scratch paths a failing exit assertion names beside the run. */
+  readonly scratch: ScratchPaths;
   readonly output: string;
   readonly prompt: string;
   /** The run's session id, which names its `.rafa/runs/<session>/` directory; null when no record was written. */
@@ -257,7 +261,8 @@ function runAndObserve(scratch: Scratch, env: Readonly<Record<string, string>> =
   const run = runLoopStart(scratch, 'text', [PLAN_FLAG, ...SESSION_FLAGS.slice(1)], env);
   const [record] = readSessions(scratch.repo);
   return {
-    exitCode: run.exitCode,
+    run,
+    scratch: { ...scratch },
     output: `${run.stdout}${run.stderr}`,
     prompt: existsSync(promptFileOf(scratch))
       ? readFileSync(promptFileOf(scratch), 'utf8')
@@ -307,7 +312,7 @@ describe('rafa loop start over a one-task fixture plan whose task commits clean 
       'data.json': '{\n  "name": "probe"\n}\n',
     }));
 
-    expect(seen.exitCode).toBe(0);
+    expectExit(seen.run, 0, seen.scratch);
     expect(seen.output).toContain(`🧹 lint step after "${TASK}": bunx eslint --no-warn-ignored over 2 file(s) exited 0; 0 error(s) in 0 file(s).`);
     expect(seen.output).not.toContain('❌');
     expect(seen.taskStep?.newFailures).toEqual([]);
@@ -378,6 +383,6 @@ describe('rafa loop start over a one-task fixture plan whose task commits a test
     const seen = run();
 
     expect(seen.output).toContain('🧹 Wrap-up session starting');
-    expect(seen.exitCode).toBe(0);
+    expectExit(seen.run, 0, seen.scratch);
   }, RUN_TIMEOUT);
 });

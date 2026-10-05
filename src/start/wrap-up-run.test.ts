@@ -72,10 +72,13 @@
  * `gh` adapter on that fake, as `runWrapUp` hands it.
  */
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
+import type { CliEvent } from '../ports/index.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
@@ -85,8 +88,9 @@ import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { bindEventsFile, unbindEventsFile } from './loop-events.js';
 import { retargetPullRequest } from './pr-retarget.js';
-import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
+import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
 interface BodyCall {
@@ -680,5 +684,126 @@ describe('the runner\'s pull request input', () => {
 
   it('answers no input for a plan that names no issue number', () => {
     expect(runnerPrInputFor({ branch: 'feat/some-plan', base: 'main', planContent: plan(null), planStub: 'some-plan', notes: [] })).toBeNull();
+  });
+});
+
+describe('the pull request event in each output mode', () => {
+  /** The session the events file is bound under, a valid session id. */
+  const RUN_ID = 'c3a1e0d2-7b4f-4e8a-9d61-5f2b8c0e7a14';
+  const events: CliEvent[] = [];
+  let lookups = 0;
+  let root = '';
+
+  /** A lookup stand-in counting each reading and answering `number`. */
+  function lookup(number: number | null): () => Promise<number | null> {
+    return () => {
+      lookups += 1;
+      return Promise.resolve(number);
+    };
+  }
+
+  /** The `name` and `data` of each event emitted, in order. */
+  function emitted(): readonly unknown[] {
+    return events.map((event) => event.type === 'event'
+      ? { name: event.name, data: event.data }
+      : event.type);
+  }
+
+  beforeEach(() => {
+    events.length = 0;
+    lookups = 0;
+    root = mkdtempSync(join(tmpdir(), 'rafa-wrap-up-run-pr-event-'));
+  });
+
+  afterEach(() => {
+    unbindEventsFile();
+    setActiveOutput(null);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('emits nothing after the session in text mode, and reads no pull request there', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
+
+    await emitPullRequestEvent('session', BRANCH, null, lookup(612));
+
+    expect(emitted()).toEqual([]);
+    expect(lookups).toBe(0);
+  });
+
+  it('emits the delivered number after the delivery in text mode, with no lookup', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
+
+    await emitPullRequestEvent('delivery', BRANCH, 612, lookup(null));
+
+    expect(emitted()).toEqual([{ name: 'pr', data: { number: 612 } }]);
+    expect(lookups).toBe(0);
+  });
+
+  it('reads the pull request after the delivery in text mode when the delivery holds no number', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
+
+    await emitPullRequestEvent('delivery', BRANCH, null, lookup(null));
+    await emitPullRequestEvent('delivery', BRANCH, null, lookup(613));
+
+    expect(emitted()).toEqual([
+      { name: 'no-pr', data: { reason: `no open pull request for ${BRANCH}` } },
+      { name: 'pr', data: { number: 613 } },
+    ]);
+    expect(lookups).toBe(2);
+  });
+
+  it('emits after the session in json mode, read then, and not again after the delivery', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
+
+    await emitPullRequestEvent('session', BRANCH, null, lookup(614));
+    await emitPullRequestEvent('delivery', BRANCH, 614, lookup(614));
+
+    expect(emitted()).toEqual([{ name: 'pr', data: { number: 614 } }]);
+    expect(lookups).toBe(1);
+  });
+
+  it('writes a text run\'s pr line to its events file', async () => {
+    setActiveOutput(sinkOutput({}), 'text');
+    const file = bindEventsFile(root, RUN_ID);
+
+    await emitPullRequestEvent('session', BRANCH, null, lookup(615));
+    await emitPullRequestEvent('delivery', BRANCH, 615, lookup(null));
+
+    const lines = readFileSync(file, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { name: string; data: unknown });
+    expect(lines.map((line) => [line.name, line.data])).toEqual([['pr', { number: 615 }]]);
+  });
+
+  it('emits at both places in runWrapUp: after the session, and over the delivery\'s number', () => {
+    const emits = CALLS.filter((call) => call.name === 'emitPullRequestEvent');
+
+    expect(emits[0]?.args[0]).toBe('\'session\'');
+    expect(NAMES.indexOf('preserveProgress')).toBeLessThan(NAMES.indexOf('emitPullRequestEvent'));
+    expect(emits.slice(1).every((call) => call.args[0] === '\'delivery\'')).toBe(true);
+    expect(WRAP_UP_RUN).toMatch(/const delivery = await deliverPullRequest\([\s\S]*?\);\n\s*await emitPullRequestEvent\('delivery', expected\.branch, delivery\.kind === 'delivered'\n\s*\? delivery\.pull\.number\n\s*: null, lookup\);/);
+    // The text-only guard the events file could not see past is gone.
+    expect(WRAP_UP_RUN).not.toContain('activeOutputMode() !== \'text\'');
+  });
+
+  it('emits after the delivery on every path out of runWrapUp: a moved checkout, each delivery outcome and a none provider', () => {
+    const emits = CALLS.filter((call) => call.name === 'emitPullRequestEvent');
+    const halt = WRAP_UP_RUN.indexOf('emitLoopEvent({ kind: \'halt\', reason: \'checkout moved\' });');
+    const interrupted = WRAP_UP_RUN.indexOf('if (delivery.kind === \'interrupted\') return;');
+    const delivered = WRAP_UP_RUN.indexOf('await emitPullRequestEvent(\'delivery\', expected.branch, delivery.kind');
+
+    expect(emits).toHaveLength(4);
+    expect(WRAP_UP_RUN.lastIndexOf('await emitPullRequestEvent(\'delivery\', expected.branch, null, lookup);', halt)).toBeGreaterThan(-1);
+    expect(delivered).toBeGreaterThan(-1);
+    expect(delivered).toBeLessThan(interrupted);
+    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\('delivery', expected\.branch, null, lookup\);\n\s*\}\n\s*if \(ciWait\)/);
+  });
+
+  it('reads an emit planted before the session as being before it', () => {
+    // The control for the ordering above.
+    const names = planted(['await emitPullRequestEvent(\'session\', branch, null, lookup);', PREPARE, SESSION, FINISH, ...GATE]).map((call) => call.name);
+
+    expect(names.indexOf('emitPullRequestEvent')).toBeLessThan(names.indexOf('preserveProgress'));
   });
 });

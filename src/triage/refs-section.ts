@@ -1,5 +1,5 @@
 /**
- * The `## Refs` section of a filed bug: the files and exported names its
+ * The `## Refs` section of a filed bug: the files and declared names its
  * `## Artifact` text points at, each with its target's fingerprint at the
  * time the bug was filed.
  *
@@ -29,10 +29,11 @@
  * Each reference is read through a {@link RefVerifier}, the verifier of
  * `src/refs/verify.ts`, and stamped with the word `fingerprintText`
  * answers for it: `blob:<sha>` for a committed file, `present` for a
- * directory, a file not yet committed or an exported name, and `absent`
- * for a target the tree does not hold. {@link createArtifactRefsVerifier}
- * makes the one triage reads with by default: git in the repository
- * root, and `ts-symbols` when it is on `PATH`.
+ * directory, a file not yet committed or a name some file declares,
+ * and `absent` for a target the tree does not hold.
+ * {@link createArtifactRefsVerifier} makes the one triage reads with by
+ * default: git in the repository root, and `ts-symbols` when it is on
+ * `PATH`.
  *
  * ## What the section never does
  *

@@ -13,14 +13,15 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the eighty-six registered so far wrap a
+ * of each is its command. Four of the eighty-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, which read plan files
- * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status` and
- * `list`, which act on a run through its session record and share
- * `loop/loop-sessions.ts`, nor `init`, which sets up a project through
+ * with `parsePlan` and share `plan/plan-files.ts`, nor `loop stop`, `pause`, `resume`, `status`,
+ * `list` and `wait`, which act on a run through its session record and share
+ * `loop/loop-sessions.ts`, `wait` following the run's events file through
+ * `src/loop/events-file.ts` too, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
  * `src/preflight/` and starts no run, nor the eight `issue` actions,
  * five of which act on the tracker the chain resolves while `ready` and
@@ -100,15 +101,21 @@
  *   - `loop stop`, `loop pause`, `loop resume` and `loop status`, each
  *     `[-s|--session-id=<id>]`, and `loop list`, over the session records
  *     under `.rafa/runs/`.
+ *   - `loop wait [-s|--session-id=<id>] [--until=<reasons>]
+ *     [--timeout=<minutes>]`, a run followed through its events file and
+ *     its record until a reason asked for happens, one `rafa·` line
+ *     printed and the reason's exit code given: 2 for no session, 16 for
+ *     the timeout. It starts no session.
  *   - `issue list`, `issue show <id>`, `issue create --title=<text>`,
  *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
- *   - `issue ready <n> [--no-hint]`, an issue marked `spec:ready` once
- *     its author and its body check out, and
+ *   - `issue ready <n> [--yes] [--no-hint]`, an issue marked
+ *     `spec:ready` once its author and its body check out, and
  *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
  *     whose `Blocked by:` line names only closed issues. Both read the
- *     GitHub board rather than the tracker chain, and both always ask.
+ *     GitHub board rather than the tracker chain. `issue unblock` always
+ *     asks; `issue ready` asks unless `--yes` is typed.
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.
@@ -361,6 +368,7 @@ import loopResume from './loop/resume.js';
 import loopStart from './loop/start.js';
 import loopStatus from './loop/status.js';
 import loopStop from './loop/stop.js';
+import loopWait from './loop/wait.js';
 import moduleExec from './module/exec.js';
 import moduleList from './module/list.js';
 import next from './next.js';
@@ -431,6 +439,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   loopResume,
   loopStatus,
   loopList,
+  loopWait,
   issueList,
   issueShow,
   issueCreate,

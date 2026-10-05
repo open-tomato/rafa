@@ -44,7 +44,7 @@
  *     export and the port does not live twice. Member types and their
  *     TSDoc are carried over as written, so they speak of open-tomato's
  *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
- *     is opened, {@link IssueType} gains `epic`, and the note on
+ *     is opened, {@link IssueType} gains `epic` and `spec`, and the note on
  *     `IssueRef.externalId` names the `local` adapter's issue number
  *     where the source named a file path. One member is rafa's own and
  *     absent from the source: the optional `openIssues` reading, with
@@ -197,11 +197,12 @@ export type PortType = keyof PortVersions;
 export type TrackerKind = 'github' | 'linear' | 'local' | (string & {});
 
 /**
- * What an issue is for. `epic` is rafa's own member, absent from the
- * source: an issue labelled `type:epic` groups the issues carrying its
- * `epic:<slug>` label.
+ * What an issue is for. `epic` and `spec` are rafa's own members, absent
+ * from the source: an issue labelled `type:epic` groups the issues
+ * carrying its `epic:<slug>` label, and one labelled `type:spec` holds a
+ * spec on the board.
  */
-export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api' | 'epic';
+export type IssueType = 'code' | 'bug' | 'spike' | 'adr' | 'chore' | 'package-api' | 'epic' | 'spec';
 
 /** How urgent an issue is, once triage has set it. */
 export type IssuePriority = 'urgent' | 'high' | 'medium' | 'low';
@@ -266,6 +267,15 @@ export interface IssueDraft {
   project: string | null;
   /** OPT numbers this issue is blocked by. */
   blockedBy: readonly number[];
+  /**
+   * rafa's own field, absent from the source: true when the issue waits
+   * on other issues of the board, which the `github` adapter files as
+   * the board's `spec:blocked` label (`SPEC_BLOCKED_LABEL` in
+   * `src/board/blocked.ts`) and the `local` adapter records in the issue
+   * file. Absent or false files no such mark. Not {@link blockedBy},
+   * which names OPT ledger numbers.
+   */
+  specBlocked?: boolean;
 }
 
 /** An issue as a tracker holds it: the draft, where it lives, its state. */

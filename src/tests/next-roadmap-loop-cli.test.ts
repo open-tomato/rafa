@@ -57,7 +57,7 @@ import { hopFilePath, readHopRecord } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, eventsOf, type ScratchRepo } from './cli-capture.js';
+import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, eventsOf, type CapturedRun, type ScratchRepo } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { SRC_DIR } from './next-chain-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
@@ -360,13 +360,11 @@ function runProbe(loop: LoopScratch, words: readonly string[]): { readonly event
     cwd: loop.scratch.repo,
     env: { TMPDIR: tmpdir(), PATH: loop.scratch.path, ...scratchHomeEnv(loop.scratch.home), GIT_CONFIG_NOSYSTEM: '1', LC_ALL: 'C' },
   });
-  const stdout = proc.stdout.toString();
-  const stderr = proc.stderr.toString();
-  if (proc.exitCode !== 0 || !existsSync(recordPath)) {
-    throw new Error(`the probe exited ${String(proc.exitCode)}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
-  }
+  const run: CapturedRun = { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
+  expectExit(run, 0, loop.scratch);
+  if (!existsSync(recordPath)) throw new Error(`the probe wrote no record at ${recordPath}\n${describeRun(run, loop.scratch)}`);
   const record = JSON.parse(readFileSync(recordPath, 'utf8')) as { readonly events: readonly string[]; readonly outcome: { readonly ok: boolean } };
-  return { ...record, stdout };
+  return { ...record, stdout: run.stdout };
 }
 
 describe('rafa next --roadmap --yes=hop,plan,start,home, from a fresh hop to a started loop and back home, spawned', () => {

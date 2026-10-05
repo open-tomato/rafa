@@ -60,7 +60,7 @@ import { formatClaimMessage } from '../claims/record.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 
 /** This suite's own temporary directory, removed once its one case has run. */
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-loop-wrap-up-claim-lost-spawned-')));
@@ -272,7 +272,7 @@ describe('a loop whose claim is taken over mid-session, spawned', () => {
       expect(takeoverOutput).toContain(`this device (store ${STORE_B}) now owns the claim.`);
 
       // device-a's own run halts with the "claim lost" report instead of finishing.
-      expect(loopRun.exitCode).toBe(1);
+      expectExit(loopRun, 1, deviceA);
       expect(loopRun.stderr).toContain(
         `❌ Claim lost: #${String(ISSUE)} is claimed by store ${STORE_B} on ${BRANCH}, not by this device (store ${STORE_A}).`,
       );
@@ -294,14 +294,14 @@ describe('a loop whose claim is taken over mid-session, spawned', () => {
 
       // rafa status on device-a: its own refused push already fetched the remote, so no fetch is run here.
       const statusA = runRafa(deviceA, deviceA.repo, ['status']);
-      expect(statusA.exitCode).toBe(0);
+      expectExit(statusA, 0, deviceA);
       expect(`${statusA.stdout}${statusA.stderr}`).toContain(`#${String(ISSUE)} \`${BRANCH}\`: owned by store ${STORE_B}`);
 
       // rafa status on device-b, fetched once more as any clone would before reading its own claims.
       const deviceBGit = createGitRunner(deviceB.repo);
       must(deviceBGit, ['fetch', '--quiet', 'origin']);
       const statusB = runRafa(deviceB, deviceB.repo, ['status']);
-      expect(statusB.exitCode).toBe(0);
+      expectExit(statusB, 0, deviceB);
       expect(`${statusB.stdout}${statusB.stderr}`).toContain(`#${String(ISSUE)} \`${BRANCH}\`: owned by store ${STORE_B}`);
     },
     SPAWN_TIMEOUT_MS,

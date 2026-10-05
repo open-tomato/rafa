@@ -27,8 +27,10 @@
  * `pr.provider: none` the same `claude` is spawned once for the wrap-up,
  * `gh` is asked only what that session's own prompt asks, and the run ends `done`.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -311,15 +313,8 @@ function plant(options: PlantOptions = REFUSED): Scratch {
   return { repo, origin, home, calls, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, 'loop', 'start', ...RUN_FLAGS], {
     cwd: scratch.repo,
     env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
@@ -359,7 +354,7 @@ describe('a run whose wrap-up never opens a pull request and whose branch cannot
     const run = runLoopStart(scratch);
     const said = `${run.stdout}\n${run.stderr}`;
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { ...scratch });
     expect(said).toContain(`the loop could not open the pull request for ${BRANCH} at the push step`);
     expect(said).toContain('the stand-in origin refuses a push');
 
@@ -383,7 +378,7 @@ describe('a run whose wrap-up never opens a pull request and whose branch can be
     const run = runLoopStart(scratch);
     const said = `${run.stdout}\n${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
 
     // The task, the wrap-up and exactly one retry: a fourth session would be a second retry.
     expect(claudeCalls(scratch)).toBe(3);
@@ -419,7 +414,7 @@ describe('the same run under pr.provider: none', () => {
     const run = runLoopStart(scratch);
     const said = `${run.stdout}\n${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(claudeCalls(scratch)).toBe(2);
     expect(said).not.toContain('No open pull request');
     expect(said).not.toContain('retry wrap-up session');
@@ -432,5 +427,23 @@ describe('the same run under pr.provider: none', () => {
     const [record] = readSessions(scratch.repo);
     if (record === undefined) throw new Error('the run wrote no session record at all');
     expect(record.state).toBe('done');
+  }, CASE_TIMEOUT_MS);
+
+  it('writes a no-pr line saying no provider is configured to the events file of a text-mode run', () => {
+    const scratch = plant({ config: CONFIG_NONE, refusePush: false, ghOpens: true });
+    const run = runLoopStart(scratch);
+    expect(run.exitCode).toBe(0);
+
+    const runsDir = join(scratch.repo, '.rafa', 'runs');
+    const eventsFile = readdirSync(runsDir).find((name) => name.endsWith('.events.ndjson'));
+    if (eventsFile === undefined) throw new Error('the run wrote no events file');
+    const events = readFileSync(join(runsDir, eventsFile), 'utf8').split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as { name?: string; data?: { reason?: string } });
+    const noPr = events.filter((event) => event.name === 'no-pr');
+
+    expect(noPr).toHaveLength(1);
+    expect(noPr[0]?.data?.reason).toContain('no pull request provider is configured');
+    expect(ghCalls(scratch).filter((call) => call.startsWith('pr list'))).toHaveLength(1);
   }, CASE_TIMEOUT_MS);
 });

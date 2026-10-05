@@ -52,13 +52,22 @@ never linted.
 **Runner recorded steps** (full suite, recorded at fixed points):
 - `baseline` — Full suite once at plan start (first dispatch)
 - `task` — Full suite after each task's session ends and commits
-- `stage` — Full suite after a stage's last task
+- `stage` — After a stage's last task: the tests under the `Owns:`
+  folders it changed, or `bun test --changed=<since>` with the
+  `tests.alwaysRun` files when the plan has no `Owns:` folder
 - `pre-wrap-up` — Full suite before wrap-up session starts
 
 Each recorded step names its scope (affected, module, full, or a
-file/folder list it ran on), the command, exit code, Bun's summary line,
-every failing test (file + full test name pairs), and which failures are
-new against the baseline (not present in `baseline`'s captured failures).
+file/folder list it ran on), its reason (`declared` for a task or stage
+step whose session declared `tests=module` or `tests=full`; `trigger` when
+changed files match `tests.fullSuiteTriggers` or `tests.integration` and
+escalate the scope; `fallback` for a stage step with no `Owns:` folder
+running `bun test --changed=<since>`; `no-module-tests` when a task
+names `tests=module` but the module has no test files; `stage` for a
+pre-wrap-up step, which is always full suite), the command, exit code,
+Bun's summary line, every failing test (file + full test name pairs), and
+which failures are new against the baseline (not present in `baseline`'s
+captured failures).
 
 **Declaration key `tests=` on a task line** sets what the task's session
 will run:
@@ -95,7 +104,12 @@ which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
 no open task left, the repair goes after the checklist's last task. A
 red task step after a repair task writes its blocker on that repair's
 line, marking it `[BLOCKED]` again, and inserts no second one
-(`src/start/suite-blocker.ts`).
+(`src/start/suite-blocker.ts`). A red pre-wrap-up step inserts a
+`[BLOCKED]` repair task (kind `pre-wrap-up`) after the checklist's last
+task, and `start.ts` dispatches it in the same run, running the
+pre-wrap-up again after the repair completes; a second red pre-wrap-up,
+finding the ticked pre-wrap-up repair on the tracker, writes its blocker
+on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
@@ -380,6 +394,33 @@ the reference example. This section replaces nothing.
   to temporary files with `RAFA_ENTRY`'s URL swapped to
   `../../dist/cli.js` and the import pointed at the copy, run them after
   `bun run build`, and delete them. This replaces nothing.
+
+### Spawned failure helpers
+
+**When a spawned case fails, `expectExit` and `expectEvent` print the
+child's exit code, the last 80 lines of each stream, and the scratch
+paths the case names.** A case spawned with `runRafa` that asserts the
+result uses these helpers:
+
+- `expectExit(run, code, scratch?)` — Passes silently when `run` exited
+  with `code`. Otherwise throws an `Error` naming the expected and actual
+  codes, with the child's full failure message below: exit code, last 80
+  lines of stderr (cut if longer), last 80 lines of stdout (cut if
+  longer), and each path in the `scratch` argument (a `ScratchRepo` or a
+  case-named `Record<string, string>`).
+- `expectEvent(run, name, scratch?)` — Answers the first named event
+  (`type: 'event'`) called `name` on the run's json stdout. Throws an
+  `Error` with the same failure message when no such event is there, or
+  when a stdout line is not JSON.
+- `describeRun(run, scratch?)` — Answers the failure message text alone,
+  used by the helpers above and by a case asserting something else of a
+  run's output; passes it as its own error message.
+
+A new spawned case passes its run result to `expectExit` or `expectEvent`,
+with the `scratch` argument naming the `ScratchRepo` the case built, so
+all failure output lands in one place a reader can find: the test itself
+names the assertion that failed, and the error message names the scratch
+directory, the exit code, and the streams the child wrote.
 
 ### Fixture scrub, guard, and path rules
 

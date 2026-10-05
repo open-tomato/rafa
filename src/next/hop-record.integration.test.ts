@@ -47,7 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeTrackingGitignore } from '../project/gitignore.js';
 import { positionAt, readPositionFile, writePositionFile } from '../project/position.js';
-import { plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { hopFilePath, readHopRecord, staleAgainst, writeHopRecord } from './hop-record.js';
@@ -154,22 +154,18 @@ function racerSource(root: string, targetBoard: number, iterations: number): str
   ].join('\n');
 }
 
-/** Runs one racer as a real child process, rejecting on a non-zero exit. */
-function runRacer(root: string, targetBoard: number, iterations: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = Bun.spawn(['bun', '-e', racerSource(root, targetBoard, iterations)], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    void (async () => {
-      const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`racer for target board ${String(targetBoard)} exited ${String(code)}: ${stderr}`));
-    })();
+/** Runs one racer as a real child process, failing on a non-zero exit. */
+async function runRacer(root: string, targetBoard: number, iterations: number): Promise<void> {
+  const child = Bun.spawn(['bun', '-e', racerSource(root, targetBoard, iterations)], {
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  expectExit({ exitCode, stdout, stderr }, 0, { root });
 }
 
 describe('two writers racing over the hop record', () => {
@@ -273,7 +269,7 @@ describe('a hop record against a position a plain rafa switch rewrites', () => {
     });
 
     const moved = runRafa(scratch, scratch.repo, ['switch', String(BOARD)]);
-    expect(moved.exitCode).toBe(0);
+    expectExit(moved, 0, scratch);
 
     const position = readPositionFile(scratch.repo);
     expect(position.set).toBe(true);

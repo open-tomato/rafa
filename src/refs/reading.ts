@@ -31,32 +31,55 @@
  * ## Reading stamps what it has not seen
  *
  * {@link readRefsText} reads each live fingerprint against the stamp
- * the copy keeps (`compareToStamp`). A reference the copy keeps no
- * stamp for — every reference of a copy written before stamps existed,
- * and a reference a refresh added — is stamped with its live
- * fingerprint on that read, and reads `ok`. Two readings are NOT
- * stamped then: `absent`, since a target that does not exist is
- * `dangling` on its first read and only a re-stamp accepts it; and an
- * unreadable cross-repository issue, which has no fingerprint to stamp
- * and reads `unknown`. The new stamps are appended after the ones the
- * copy kept, and a stamp whose reference the body no longer names is
- * kept as it is: a reading drops nothing.
+ * the copy keeps (`compareToStamp`, passed the reference's kind). A
+ * reference the copy keeps no stamp for — every reference of a copy
+ * written before stamps existed, and a reference a refresh added — is
+ * stamped on that read:
+ *
+ * | Read as | Stamped | Reads |
+ * |---|---|---|
+ * | a target that exists | its live fingerprint | `ok` |
+ * | an absent path, symbol, command, flag or key | `new` | `new` |
+ * | an absent issue or cross-repository issue | nothing | `dangling` |
+ * | a cross-repository issue it cannot read | nothing | `unknown` |
+ *
+ * An absent target but an issue is what a spec names before it is
+ * made — a file or a flag the plan is to add — so its first reading
+ * is a note, not a refusal; an issue number that does not exist is a
+ * wrong number, and only a re-stamp accepts it. The new stamps are
+ * appended after the ones the copy kept, and a stamp whose reference
+ * the body no longer names is kept as it is: a reading drops nothing.
+ *
+ * ## Reading restamps what has arrived
+ *
+ * A stamp that says the target did not exist is replaced, in its place
+ * in the block, by the target's live fingerprint once the target
+ * exists, and the row reads `ok` against it: a `new` stamp on any
+ * kind, and an `absent` stamp — what a re-stamp below writes for a
+ * missing target, and every such stamp written before `new` existed —
+ * on any kind but an issue. Its arrival is no change to what the spec
+ * said, so it asks nothing. An issue stamped `absent` that now exists
+ * is NOT restamped and reads `suspect`: the number was accepted as
+ * missing, and whatever issue holds it now was never read. A `new`
+ * stamp whose target is still absent is kept, and reads `new`.
  *
  * Without a stamp written back, the next reading would stamp afresh
  * against whatever the target holds by then, and no change would ever
  * read `suspect`; so {@link readCopyRefs} writes the copy when the
- * reading stamped anything, and leaves the file untouched when it did
- * not. A copy with no block and no stamp to add stays without one.
+ * reading stamped or restamped anything, and leaves the file untouched
+ * when it did not. A copy with no block and no stamp to add stays
+ * without one.
  *
  * ## Re-stamping
  *
  * {@link restampRefsText} is what `--accept-refs` and `rafa issue check
  * --stamp` do: the block is rewritten to hold exactly the references
  * the body names, each stamped with its live fingerprint — `absent` for
- * a missing target, which then reads `ok` until it appears. An
- * unreadable target keeps the stamp it had, or none. The rows it
- * answers are read against the new stamps, so every row reads `ok`
- * except an `unknown` one. {@link restampCopyRefs} always writes the
+ * a missing target, which then reads `ok` until it appears; then a
+ * plain reading restamps it as above, or reads it `suspect` when it is
+ * an issue. An unreadable target keeps the stamp it had, or none. The
+ * rows it answers are read against the new stamps, so every row reads
+ * `ok` except an `unknown` one. {@link restampCopyRefs} always writes the
  * block, an empty one included, so a re-stamped copy is told apart
  * from one never checked.
  */
@@ -68,7 +91,7 @@ import type { BlockersReading } from '../board/relations/port.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { extractRefs } from './extract.js';
-import { compareToStamp, findStamp, readRefsBlock, writeRefsBlock } from './stamp.js';
+import { compareToStamp, findStamp, ISSUE_KINDS, NEW, readRefsBlock, writeRefsBlock } from './stamp.js';
 
 /** One reference of a saved copy, as {@link readRefsText} reads it. */
 export interface RefRow {
@@ -131,11 +154,30 @@ export function unblockCommand(issue: number): string {
   return `rafa issue unblock ${String(issue)}`;
 }
 
-/** A reading a stamp can hold: every fingerprint but `absent`, never an unreadable target. */
-function firstStamp(live: LiveReading): Fingerprint | null {
-  return live.kind === 'unreadable' || live.kind === 'absent'
+/**
+ * The stamp a first reading writes for `ref` read as `live`: the live
+ * fingerprint of a target that exists, `new` for an absent target but
+ * an issue, and null for an absent issue or an unreadable target.
+ */
+function firstStamp(ref: Ref, live: LiveReading): Fingerprint | null {
+  if (live.kind === 'unreadable') return null;
+  if (live.kind !== 'absent') return live;
+  return ISSUE_KINDS.has(ref.kind)
     ? null
-    : live;
+    : NEW;
+}
+
+/**
+ * The live fingerprint `stamp` is replaced with on a plain reading, or
+ * null when it is kept: a `new` stamp, or an `absent` one on any kind
+ * but an issue, whose target now exists.
+ */
+function arrivedStamp(ref: Ref, live: LiveReading, stamp: Fingerprint): Fingerprint | null {
+  if (live.kind === 'unreadable' || live.kind === 'absent') return null;
+  const arrives = stamp.kind === 'new' || (stamp.kind === 'absent' && !ISSUE_KINDS.has(ref.kind));
+  return arrives
+    ? live
+    : null;
 }
 
 /** Every reference the body names, each with its live reading; sequential, so `gh` is asked one at a time. */
@@ -147,7 +189,7 @@ async function liveReadings(body: string, options: RefsTextOptions): Promise<rea
 
 /** One row: `live` against `stamp`, reported as held to `heldTo`. */
 function rowOf(ref: Ref, live: LiveReading, stamp: Fingerprint | null, heldTo: Fingerprint | null, issue: number): RefRow {
-  const { state, changedHeadings } = compareToStamp({ live, stamp, blocker: ref.blocker });
+  const { state, changedHeadings } = compareToStamp({ live, stamp, blocker: ref.blocker, kind: ref.kind });
   return Object.freeze({
     kind: ref.kind,
     text: ref.text,
@@ -172,25 +214,31 @@ function answer(rows: readonly RefRow[], copy: string, body: string, stamps: rea
 
 /**
  * Reads every reference of the saved copy `options.copy` against the
- * stamps it keeps, stamping each it keeps none for, by the rules in the
- * module note. Throws `RefsBlockError` for a block the codec will not
+ * stamps it keeps, stamping each it keeps none for and restamping each
+ * whose target has arrived, by the rules in the module note. Throws `RefsBlockError` for a block the codec will not
  * read, and rejects as `options.verify` does.
  */
 export async function readRefsText(options: RefsTextOptions): Promise<RefsReading> {
   const { stamps, body } = readRefsBlock(options.copy);
   const added: RefStamp[] = [];
+  const replaced = new Map<RefStamp, RefStamp>();
   const rows = (await liveReadings(body, options)).map(([ref, live]) => {
-    const stamp = findStamp(stamps, ref);
-    const fresh = stamp === null
-      ? firstStamp(live)
-      : null;
-    if (fresh !== null) added.push(Object.freeze({ kind: ref.kind, text: ref.text, fingerprint: fresh }));
-    return rowOf(ref, live, stamp, stamp ?? fresh, options.issue);
+    const kept = stamps?.find((stamp) => stamp.kind === ref.kind && stamp.text === ref.text) ?? null;
+    if (kept === null) {
+      const fresh = firstStamp(ref, live);
+      if (fresh !== null) added.push(Object.freeze({ kind: ref.kind, text: ref.text, fingerprint: fresh }));
+      return rowOf(ref, live, null, fresh, options.issue);
+    }
+    const arrived = arrivedStamp(ref, live, kept.fingerprint);
+    if (arrived === null) return rowOf(ref, live, kept.fingerprint, kept.fingerprint, options.issue);
+    replaced.set(kept, Object.freeze({ kind: ref.kind, text: ref.text, fingerprint: arrived }));
+    return rowOf(ref, live, arrived, arrived, options.issue);
   });
-  const kept = added.length === 0
-    ? stamps
-    : Object.freeze([...stamps ?? [], ...added]);
-  return answer(rows, options.copy, body, kept, added.length > 0);
+  const write = added.length > 0 || replaced.size > 0;
+  const next = write
+    ? Object.freeze([...(stamps ?? []).map((stamp) => replaced.get(stamp) ?? stamp), ...added])
+    : stamps;
+  return answer(rows, options.copy, body, next, write);
 }
 
 /**

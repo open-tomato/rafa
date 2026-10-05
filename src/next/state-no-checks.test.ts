@@ -96,6 +96,7 @@ function detail(mergeable: Mergeability): PullRequestDetail {
     mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],
+    closes: [],
   };
 }
 

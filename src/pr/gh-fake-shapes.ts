@@ -126,6 +126,19 @@
  *     `feat/rafa-100-rafa-doctor-deep` nor
  *     `feat/rafa-123-rafa-issue-list-roadmap`.
  *
+ * Read the same way on 2026-10-05, off `gh` 2.102.0 with read-only
+ * commands, for the issues a pull request closes:
+ *
+ *   - `gh pr view <n> --json closingIssuesReferences` writes a list,
+ *     `[]` for a pull request that closes nothing (`cli/cli#14354`), and
+ *     each entry `{"id","number","repository","url"}` with the
+ *     repository `{"id","name","owner"}` and its owner `{"id","login"}`
+ *     (`cli/cli#14540`). An issue of another repository is the same
+ *     shape under that repository's names (`GoogleCloudPlatform/scion#2453`,
+ *     closing issues of `ptone/scion`), and the list came issue number
+ *     ascending, not in the order the body names them
+ *     (`open-tomato/rafa#763`).
+ *
  * NOT recorded, because reading one would write to a repository: what
  * `gh pr merge`, `gh pr edit`, a comment POST and a comment PATCH write
  * when they succeed, and what any of them writes when it fails. So the
@@ -153,6 +166,15 @@ export interface FakePrAuthor {
   readonly isBot: boolean;
   /** The display name a person carries. A bot has none, as recorded. */
   readonly name?: string;
+}
+
+/**
+ * One issue a pull request closes. `repository` is `owner/name`, and the
+ * fake's own repository when left out.
+ */
+export interface FakeClosingIssue {
+  readonly number: number;
+  readonly repository?: string;
 }
 
 /** Which rollup entry a check is written as; see the module note. */
@@ -204,6 +226,8 @@ export interface FakePullRequest {
   /** `CLEAN`, `BLOCKED`, `DIRTY`, `BEHIND` or `UNKNOWN`, verbatim. */
   readonly mergeStateStatus: string;
   readonly labels: readonly string[];
+  /** What `closingIssuesReferences` answers, in the order it is written. */
+  readonly closes: readonly FakeClosingIssue[];
   readonly updatedAt: string;
   readonly checks: readonly FakePrCheck[];
   readonly comments: readonly FakePrComment[];
@@ -219,6 +243,7 @@ export const PULL_FIELDS: ReadonlySet<string> = new Set([
   'author',
   'baseRefName',
   'body',
+  'closingIssuesReferences',
   'comments',
   'headRefName',
   'headRefOid',
@@ -276,6 +301,7 @@ const PULL_DEFAULTS = {
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
   labels: [],
+  closes: [],
   updatedAt: '2026-09-18T11:00:00Z',
   checks: [],
   comments: [],
@@ -428,6 +454,18 @@ function renderEmbeddedComment(comment: FakePrComment, url: string): Record<stri
   };
 }
 
+/** A closing reference as `--json closingIssuesReferences` writes it; see the module note. */
+function renderClosingIssue(issue: FakeClosingIssue, repo: string): Record<string, unknown> {
+  const repository = issue.repository ?? repo;
+  const [login = '', name = ''] = repository.split('/');
+  return {
+    id: `I_kwDOfake${issue.number}`,
+    number: issue.number,
+    repository: { id: `R_kgDOfake${name}`, name, owner: { id: `MDQ6VXNlcmZha2U${login}`, login } },
+    url: `https://github.com/${repository}/issues/${issue.number}`,
+  };
+}
+
 /** The fields asked for, in the code-unit order `gh` writes them in. */
 function pick(values: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
   return Object.fromEntries([...fields].sort().map((field) => [field, values[field]]));
@@ -444,6 +482,7 @@ export function renderPull(
     author: renderAuthor(pull.author),
     baseRefName: pull.baseRefName,
     body: pull.body,
+    closingIssuesReferences: pull.closes.map((issue) => renderClosingIssue(issue, repo)),
     comments: pull.comments.map((comment) => renderEmbeddedComment(comment, url)),
     headRefName: pull.headRefName,
     headRefOid: pull.headRefOid,

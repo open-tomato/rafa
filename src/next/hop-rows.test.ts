@@ -263,6 +263,7 @@ function detail(pull: PlantedPull): PullRequestDetail {
     mergeable: pull.mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],
+    closes: [],
   };
 }
 

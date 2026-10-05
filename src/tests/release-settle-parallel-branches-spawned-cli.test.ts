@@ -29,7 +29,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { serializeFragment } from '../release/fragment.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own. */
@@ -222,7 +222,7 @@ describe('rafa release settle, two branches wrapped up in parallel and merged in
 
     const settled = runRafa(w.scratch, w.scratch.repo, ['release', 'settle']);
 
-    expect(settled.exitCode).toBe(0);
+    expectExit(settled, 0, w.scratch);
     expect(settled.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
     expect(originSubject(w)).toBe('chore: release 0.5.0');
     expect(originFragments(w)).toEqual([]);
@@ -248,7 +248,7 @@ describe('rafa release settle, two branches wrapped up in parallel and merged in
 
     const settled = runRafa(w.scratch, w.scratch.repo, ['release', 'settle']);
 
-    expect(settled.exitCode).toBe(0);
+    expectExit(settled, 0, w.scratch);
     expect(settled.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
     expect(originSubject(w)).toBe('chore: release 0.5.0');
     expect(originFragments(w)).toEqual([]);

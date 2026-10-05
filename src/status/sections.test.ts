@@ -224,7 +224,7 @@ function summary(number: number): PullRequestSummary {
 
 /** Its detail, reading `mergeable`. */
 function detail(number: number, mergeable: PullRequestDetail['mergeable']): PullRequestDetail {
-  return { ...summary(number), body: '', headRefOid: 'abc123', mergeable, mergeStateStatus: 'DIRTY', labels: [] };
+  return { ...summary(number), body: '', headRefOid: 'abc123', mergeable, mergeStateStatus: 'DIRTY', labels: [], closes: [] };
 }
 
 /** A promise that never settles, as a provider waiting on a network that never answers gives. */

@@ -24,7 +24,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ADMIN_FILES, GIT_DIR } from '../cleanup/worktrees.js';
 
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -109,7 +109,7 @@ describe('rafa cleanup --dry-run, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['cleanup', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const lines = run.stdout.split('\n');
     expect(lines.filter((line) => /^\s+main\b/.test(line))).toEqual([]);
     const row = lines.find((line) => line.includes(`.rafa/worktrees/${STUB}`));

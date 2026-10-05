@@ -107,4 +107,4 @@ Outputs:
 
 See also:
   rafa loop stop, rafa loop pause, rafa loop resume, rafa loop status, rafa loop
-  list
+  list, rafa loop wait

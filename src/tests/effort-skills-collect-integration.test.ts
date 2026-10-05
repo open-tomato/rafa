@@ -43,6 +43,7 @@
  * for, and the lesson and plan-CI rows to the seams the codebase already
  * uses for them elsewhere.
  */
+import type { CapturedRun } from './cli-capture.js';
 import type { SkillsReport, SkillsReportArm } from '../effort/report-skills.js';
 
 import { execFileSync } from 'node:child_process';
@@ -67,7 +68,7 @@ import { writePlanCi } from '../effort/store/plan-ci.js';
 import { writeTaskReport } from '../effort/store/reports.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command every run executes. */
@@ -355,15 +356,8 @@ function plantScratch(): Scratch {
   return { repo, home, path: [bin, dirname(gitBinary)].join(delimiter) };
 }
 
-/** What one spawned run did. */
-interface CommandRun {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs one rafa command inside the scratch repository. */
-function run(scratch: Scratch, args: readonly string[]): CommandRun {
+function run(scratch: Scratch, args: readonly string[]): CapturedRun {
   const spawned = Bun.spawnSync(
     [process.execPath, RAFA_ENTRY, ...args],
     { cwd: scratch.repo, env: { TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) }, timeout: 60_000 },
@@ -419,17 +413,17 @@ describe('a fixture plan run under the stand-in claude, collected, then reported
     const scratch = plantScratch();
 
     const started = run(scratch, ['start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait']);
-    expect(started.exitCode, `${started.stdout}${started.stderr}`).toBe(0);
+    expectExit(started, 0, { ...scratch });
 
     const collected = run(scratch, ['effort', 'collect']);
-    expect(collected.exitCode, `${collected.stdout}${collected.stderr}`).toBe(0);
+    expectExit(collected, 0, { ...scratch });
     expect(collected.stdout).toContain('sessions  1 logs, 0 outside window, 0 already stored, 1 read, 0 failed, +1 rows');
     expect(collected.stdout).toContain('skills    1 appended sessions, 0 already counted, 1 read, 0 unknown, 0 failed, +3 rows');
 
     plantLessonRow(scratch.repo);
 
     const reported = run(scratch, ['effort', 'report', '--skills', `--plan=${STUB}`, '--output=json']);
-    expect(reported.exitCode, `${reported.stdout}${reported.stderr}`).toBe(0);
+    expectExit(reported, 0, { ...scratch });
     const report = resultDataOf(reported.stdout) as SkillsReport;
 
     expect(report.plans).toHaveLength(1);

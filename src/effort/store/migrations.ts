@@ -555,6 +555,19 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   ALTER TABLE store_meta ADD COLUMN generation TEXT CHECK (generation <> '');
   `,
   },
+  // The worktree a session ran in, beside the row the `sessions` table
+  // already holds whole in `row_json`. NULL for a session of the main
+  // checkout, for every row held before this entry ran and for every row
+  // a runtime that does not know the column inserts. No CHECK, because
+  // the NDJSON backend stores the same row with no such check, and a
+  // value one backend refuses and the other keeps would split the port.
+  {
+    id: 'session-worktree',
+    breaks: [],
+    sql: `
+  ALTER TABLE sessions ADD COLUMN worktree TEXT;
+  `,
+  },
 ];
 
 /**

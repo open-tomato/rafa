@@ -121,6 +121,14 @@ export interface SessionEffortRow extends SessionStats {
   sizeBytes: number;
   /** File mtime at collection, ISO 8601. */
   modifiedAt: string;
+  /**
+   * The worktree the session ran in, as an absolute path, or null for a
+   * session of the main checkout. A row collected before the field
+   * carries it ABSENT, as the module note says of `mode`; the SQLite
+   * backend's `worktree` column (migration `session-worktree`) reads
+   * NULL for both.
+   */
+  worktree: string | null;
 }
 
 /**

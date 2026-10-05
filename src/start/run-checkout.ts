@@ -37,8 +37,9 @@
  * `origin/main`. Unlike `--create-branch`, which acts on `main` and
  * `master` alone, the flag acts on any base: it switches nothing, so
  * there is no base it would be unsafe to leave. A branch that already
- * exists is taken as it stands, and the base, though read, cuts nothing
- * (`./worktree.ts`).
+ * exists is not cut again: the base is fetched and merged into it when
+ * it holds only claim commits, and a branch with other work on it that
+ * is behind the base is only reported (`./worktree.ts`).
  *
  * Every refusal on the way — a checkout git could not read, a branch
  * offer that could not be taken, a worktree git would not add — is the

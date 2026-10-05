@@ -27,8 +27,8 @@
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
  * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
- * `plan validate`, `plan risk` and `plan needs`, the five `loop` session actions, `loop stop`,
- * `loop pause`, `loop resume`, `loop status` and `loop list`, the five
+ * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
+ * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
  * modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each of the first
@@ -521,6 +521,28 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'sessionLine',
     ]],
   ]],
+  ['./commands/loop/wait.js', [
+    ['../../adapters/output/events.js', ['EVENT_PREFIX', 'oneLine', 'padKind']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../loop/awake-clock.js', ['createAwakeClock']],
+    ['../../loop/events-file.js', ['eventsFileOf', 'readEventsFrom']],
+    ['../../loop/sessions.js', ['readSession', 'SessionRecordError']],
+    ['../../loop/wait-reasons.js', [
+      'DEFAULT_WAIT_UNTIL',
+      'matchEvent',
+      'matchQuiet',
+      'matchRecord',
+      'parseWaitUntil',
+      'WAIT_NO_SESSION_EXIT',
+      'WAIT_REASONS',
+      'WAIT_TIMEOUT_EXIT',
+      'waitExitCode',
+      'WaitUntilError',
+    ]],
+    ['../plan/plan-files.js', ['expectNoArgument', 'plural']],
+    ['./loop-sessions.js', ['lineRefusal', 'NoSessionRefusal', 'pickSession', 'refusal', 'resolveLoopSeams', 'sessionIdFlag']],
+  ]],
   ['./commands/issue/list.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES', 'ISSUE_TYPES']],
@@ -559,11 +581,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/issue/create.js', [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
+      'lineRefusal',
       'onTracker',
       'readChoiceFlag',
       'readNonBlankFlag',
@@ -628,6 +653,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
   ]],
   ['./commands/pr/show.js', [
+    ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/index.js', ['formatRows']],
     ['./current.js', ['SEPARATOR']],
@@ -1454,6 +1480,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/loop/resume.js',
       './commands/loop/status.js',
       './commands/loop/list.js',
+      './commands/loop/wait.js',
       './commands/issue/list.js',
       './commands/issue/show.js',
       './commands/issue/create.js',

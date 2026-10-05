@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../pr/index.js';
+import { expectExit } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { readFragmentTree } from './fragment-tree.js';
@@ -135,25 +136,18 @@ function racerSource(root: string): string {
 }
 
 /** Runs one racer as a real, separate `bun` process; answers its whole stdout. */
-function runRacer(root: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = Bun.spawn(['bun', '-e', racerSource(root)], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    void (async () => {
-      const [code, stdout, stderr] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ]);
-      if (code === 0) {
-        resolve(stdout);
-        return;
-      }
-      reject(new Error(`racer over ${root} exited ${String(code)}: ${stderr}`));
-    })();
+async function runRacer(root: string): Promise<string> {
+  const child = Bun.spawn(['bun', '-e', racerSource(root)], {
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  expectExit({ exitCode, stdout, stderr }, 0, { root });
+  return stdout;
 }
 
 describe('two separate bun processes folding the same scratch tree', () => {

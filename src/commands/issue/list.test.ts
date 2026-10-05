@@ -49,7 +49,7 @@ import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
-import { ABSENT, PRESENT, UNREADABLE } from '../../refs/stamp.js';
+import { ABSENT, PRESENT, UNREADABLE, writeRefsBlock } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 import { createRoadmapCommand } from '../roadmap.js';
@@ -109,7 +109,7 @@ const LOCAL_ROWS = [
 /** Each set of flags the query refuses, and the problem its refusal names. */
 const QUERY_REFUSALS: readonly (readonly [LineFlags, string])[] = [
   [{ state: 'open' }, '--state is "open", expected one of: backlog, todo, in-progress, in-review, done, released, cancelled'],
-  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+  [{ type: 'feature' }, '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
   [{ limit: '0' }, '--limit is "0", expected a positive whole number'],
   [{ limit: '05' }, '--limit is "05", expected a positive whole number'],
   [{ limit: '2.5' }, '--limit is "2.5", expected a positive whole number'],
@@ -506,7 +506,7 @@ describe('rafa issue list --roadmap, refused', () => {
   it.each([
     [['--roadmap', '--state=open'], LINE_REFUSALS[0]?.[1]],
     [['--all'], LINE_REFUSALS[2]?.[1]],
-    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic'],
+    [['--roadmap', '--type=feature'], '--type is "feature", expected one of: code, bug, spike, adr, chore, package-api, epic, spec'],
     [['--roadmap', '--limit=0'], '--limit is "0", expected a positive whole number'],
   ])('refuses %j with exit code 1 before running any gh', async (flags, problem) => {
     const calls: string[][] = [];
@@ -703,7 +703,10 @@ describe('rafa issue list --roadmap', () => {
     const project = plantRoadmapCase();
     const specs = join(project.root, '.rafa', 'specs');
     mkdirSync(specs, { recursive: true });
-    writeFileSync(join(specs, 'rafa-13-blocked-bug.md'), '# Blocked bug\n\nTouches `src/here.ts`, `src/gone.ts` and `src/far.ts`.\n');
+    writeFileSync(join(specs, 'rafa-13-blocked-bug.md'), writeRefsBlock(
+      '# Blocked bug\n\nTouches `src/here.ts`, `src/gone.ts` and `src/far.ts`.\n',
+      [{ kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT }],
+    ));
     writeFileSync(join(specs, 'rafa-11-ready-spec.md'), '# Ready spec\n\nTouches `src/here.ts`.\n');
     writeFileSync(join(specs, 'rafa-30-off-roadmap.md'), '# Off the Roadmap\n\nTouches `src/off.ts`.\n');
     const live: Readonly<Record<string, LiveReading>> = { 'src/here.ts': PRESENT, 'src/far.ts': UNREADABLE };

@@ -57,7 +57,7 @@ import { formatClaimMessage, parseClaimMessage } from '../claims/record.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
@@ -199,7 +199,7 @@ describe('rafa claim release, spawned, refused by a device that does not own the
 
     const run = runRafa(deviceB, deviceB.repo, ['claim', 'release', String(issue)]);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, deviceB);
     expect(run.stderr).toContain(`❌ rafa claim release: this device does not own the claim on #${String(issue)}, so nothing was released:`);
     expect(run.stderr).toContain(`#${String(issue)} is claimed by store store-a on ${branch}, not by this device (store store-b)`);
     expect(remoteTip(createGitRunner(originPath), branch)).toBe(claimSha);
@@ -219,7 +219,7 @@ describe('rafa claim hand --to, then rafa claim accept, spawned', () => {
 
     const handRun = runRafa(deviceA, deviceA.repo, ['claim', 'hand', String(issue), '--to=store-b']);
 
-    expect(handRun.exitCode).toBe(0);
+    expectExit(handRun, 0, deviceA);
     expect(handRun.stdout).toContain(`Handed the claim on #${String(issue)} (store store-a) on ${branch} over to store store-b:`);
     expect(handRun.stdout).toContain(`This device stays the owner until store store-b runs rafa claim accept ${String(issue)}.`);
     const handTip = remoteTip(originGit, branch);
@@ -227,7 +227,7 @@ describe('rafa claim hand --to, then rafa claim accept, spawned', () => {
 
     const acceptRun = runRafa(deviceB, deviceB.repo, ['claim', 'accept', String(issue)]);
 
-    expect(acceptRun.exitCode).toBe(0);
+    expectExit(acceptRun, 0, deviceB);
     expect(acceptRun.stdout).toContain(`Accepted the handover of #${String(issue)} on ${branch} from store store-a:`);
     expect(acceptRun.stdout).toContain('this device (store store-b) now owns the claim.');
     const acceptTip = remoteTip(originGit, branch);
@@ -248,11 +248,11 @@ describe('rafa claim hand --withdraw, then rafa claim accept, spawned', () => {
     const originGit = createGitRunner(originPath);
 
     const handRun = runRafa(deviceA, deviceA.repo, ['claim', 'hand', String(issue), '--to=store-b']);
-    expect(handRun.exitCode).toBe(0);
+    expectExit(handRun, 0, deviceA);
 
     const withdrawRun = runRafa(deviceA, deviceA.repo, ['claim', 'hand', String(issue), '--withdraw']);
 
-    expect(withdrawRun.exitCode).toBe(0);
+    expectExit(withdrawRun, 0, deviceA);
     expect(withdrawRun.stdout).toContain(`Withdrew the handover of #${String(issue)} to store store-b on ${branch}:`);
     expect(withdrawRun.stdout).toContain('store store-a keeps the claim.');
     const withdrawTip = remoteTip(originGit, branch);
@@ -260,7 +260,7 @@ describe('rafa claim hand --withdraw, then rafa claim accept, spawned', () => {
 
     const acceptRun = runRafa(deviceB, deviceB.repo, ['claim', 'accept', String(issue)]);
 
-    expect(acceptRun.exitCode).toBe(1);
+    expectExit(acceptRun, 1, deviceB);
     expect(acceptRun.stderr).toContain(`❌ rafa claim accept: no handover of #${String(issue)} to this device (store store-b) is pending, so nothing was accepted:`);
     expect(acceptRun.stderr).toContain(`the handover to this device on ${branch} was withdrawn by store store-a (commit ${withdrawTip ?? ''})`);
     expect(remoteTip(originGit, branch)).toBe(withdrawTip);
@@ -279,7 +279,7 @@ describe('rafa claim take, spawned, refused on a fresh claim', () => {
 
     const run = runRafa(deviceB, deviceB.repo, ['claim', 'take', String(issue)]);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, deviceB);
     expect(run.stderr).toContain(`❌ rafa claim take: the claim on #${String(issue)} cannot be taken over, so nothing was taken:`);
     expect(run.stderr).toContain(`#${String(issue)} is claimed by store store-a on ${branch}, idle 0h: not stale until it has stood claims.staleAfter (3d)`);
     expect(remoteTip(createGitRunner(originPath), branch)).toBe(claimSha);
@@ -401,7 +401,7 @@ describe('rafa claim take --stale, spawned, racing the owner\'s own push', () =>
 
       const taken = await taking;
 
-      expect(taken.exitCode).toBe(1);
+      expectExit(taken, 1, deviceB);
       expect(taken.stderr).toContain(`❌ rafa claim take: ${branch} moved on origin while the claim on #${String(issue)} was being taken over; nothing was taken. Run it again to read the branch afresh`);
       expect(remoteTip(originGit, branch)).toBe(workSha);
       expect(tipRecord(originGit, branch)).toEqual({ kind: 'work' });
