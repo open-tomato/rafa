@@ -251,6 +251,7 @@ function detailOf(over: Readonly<Record<string, unknown>>): object {
     body: over.body,
     headRefOid: 'deadbeef',
     labels: [],
+    closingIssuesReferences: [],
     mergeStateStatus: 'CLEAN',
     mergeable: 'MERGEABLE',
     ...over,

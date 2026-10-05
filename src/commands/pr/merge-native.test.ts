@@ -178,6 +178,7 @@ function detail(body: string): PullRequestDetail {
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],
+    closes: [],
   };
 }
 

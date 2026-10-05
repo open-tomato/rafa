@@ -139,6 +139,7 @@ function pull(state: PullRequestState): PullRequestDetail {
     mergeable: 'mergeable',
     mergeStateStatus: 'BLOCKED',
     labels: [],
+    closes: [],
   };
 }
 

@@ -101,6 +101,7 @@ export const PR_DETAIL: PullRequestDetail = Object.freeze({
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],
+  closes: [],
 });
 
 /** A JSON payload quoted for a single-quoted shell string; `plan-board-integration.test.ts`'s own. */

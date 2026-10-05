@@ -410,6 +410,7 @@ describe('rafa pr merge in native mode, spawned', () => {
       body: `Closes #${String(CLOSED_ISSUE)}`,
       headRefOid: 'deadbeef',
       labels: [],
+      closingIssuesReferences: [],
       mergeStateStatus: 'CLEAN',
       mergeable: 'MERGEABLE',
     };

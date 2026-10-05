@@ -596,6 +596,7 @@ const DETAIL: PullRequestDetail = Object.freeze({
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],
+  closes: [],
 });
 
 /** What one call of the `pr triage` double was handed. */

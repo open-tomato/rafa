@@ -110,6 +110,32 @@ describe('the pull request a --json read answers', () => {
     expect(first).toMatchObject({ name: 'dependencies', description: '', color: 'ededed' });
   });
 
+  it('writes no closing reference for a pull request that closes nothing, as cli/cli#14354 answered', () => {
+    expect(renderPull(pull(), ['closingIssuesReferences'], REPO)).toEqual({ closingIssuesReferences: [] });
+  });
+
+  it('writes a closing reference as id, number, repository and url, under its own repository', () => {
+    const references = renderPull(
+      pull({ closes: [{ number: 20 }, { number: 765, repository: 'ptone/scion' }] }),
+      ['closingIssuesReferences'],
+      REPO,
+    )['closingIssuesReferences'];
+    const [own, other] = references as Record<string, unknown>[];
+
+    expect(Object.keys(own ?? {})).toEqual(['id', 'number', 'repository', 'url']);
+    expect(Object.keys((own?.['repository'] ?? {}) as object)).toEqual(['id', 'name', 'owner']);
+    expect(own).toMatchObject({
+      number: 20,
+      repository: { name: 'rafa', owner: { login: 'open-tomato' } },
+      url: 'https://github.com/open-tomato/rafa/issues/20',
+    });
+    expect(other).toMatchObject({
+      number: 765,
+      repository: { name: 'scion', owner: { login: 'ptone' } },
+      url: 'https://github.com/ptone/scion/issues/765',
+    });
+  });
+
   it('writes a finished CheckRun with its conclusion and a completed status', () => {
     const rollup = renderPull(
       pull({ checks: [check({ state: 'FAILURE', workflowName: 'gates' })] }),
@@ -366,6 +392,7 @@ describe('the pull request a seed fills out', () => {
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
       labels: [],
+      closes: [],
       updatedAt: '2026-09-18T11:00:00Z',
       mergedAt: '2026-09-18T11:00:00Z',
       checks: [],

@@ -122,6 +122,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],
+    closes: [],
     ...over,
   };
 }
