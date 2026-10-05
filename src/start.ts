@@ -72,10 +72,13 @@
  *
  * `--as-worktree` takes the place of that offer: no question is asked,
  * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
- * as it stands when it exists, and added as a linked worktree at
+ * when it exists, and added as a linked worktree at
  * `loop.worktreeDir/<stub>` (`start/worktree.ts`), which becomes the
- * run's checkout. The main checkout is never switched, and every session
- * is still served from its `.rafa/` (`start/serving.ts`).
+ * run's checkout. An existing branch holding only claim commits merges
+ * `origin/<base>` there before the first task, and one with other work
+ * that is behind it is reported (`start/claim-catch-up.ts`). The main
+ * checkout is never switched, and every session is still served from
+ * its `.rafa/` (`start/serving.ts`).
  *
  * Once the branch guard lets the run through, the run prints the plan's
  * risk total, the one line `rafa plan risk` ends its report with

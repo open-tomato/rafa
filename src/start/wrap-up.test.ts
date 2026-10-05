@@ -119,6 +119,43 @@ describe('the wrap-up prompt\'s pull-request base', () => {
   });
 });
 
+describe('the wrap-up prompt\'s sync and lockfile bullets', () => {
+  test('syncs with `origin/integration` under `pr.base: integration`', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
+
+    expect(prompt).toContain('* BEFORE pushing, bring the branch up to date with the base: `git fetch origin integration` then `git merge origin/integration`. A branch that conflicts with integration gets NO CI run at all');
+    expect(prompt).not.toContain('git fetch origin main');
+    expect(prompt).not.toContain('git merge origin/main');
+
+    // The control: the same bullet under a `main` base names `main`, so
+    // the base is read off the argument rather than written in.
+    const onMain = buildWrapUpPrompt(BRANCH, 'main', PLAN, null);
+    expect(onMain).toContain('`git fetch origin main` then `git merge origin/main`. A branch that conflicts with main gets');
+    expect(onMain).not.toContain('origin/integration');
+  });
+
+  test('restores the lockfile from `origin/integration` under `pr.base: integration`', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);
+
+    expect(prompt).toContain('restore the base\'s copy (`git checkout origin/integration -- bun.lock`)');
+    expect(prompt).not.toContain('git checkout origin/main');
+
+    // The control: a `main` base restores from `origin/main`.
+    expect(buildWrapUpPrompt(BRANCH, 'main', PLAN, null)).toContain('`git checkout origin/main -- bun.lock`');
+  });
+
+  test('names no `origin/main` anywhere under `pr.base: integration`', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, OPEN_PULL);
+
+    expect(prompt).not.toContain('origin/main');
+    expect(prompt).not.toContain('origin main');
+
+    // The control: the same call under a `main` base does name it, so the
+    // absence above is the base's and the check could have failed.
+    expect(buildWrapUpPrompt(BRANCH, 'main', PLAN, OPEN_PULL)).toContain('origin/main');
+  });
+});
+
 describe('the wrap-up prompt\'s pull-request naming', () => {
   test('spells the title `rafa-<n>: <title>` and closes the issue from the body', () => {
     const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null);

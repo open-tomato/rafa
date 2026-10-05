@@ -110,11 +110,12 @@
  *     `issue comment <id> --body=<text>` and `issue move <id> <state>`,
  *     over the Tracker port, on the tracker `tracker.default` and
  *     `tracker.fallback` resolve to through the chain.
- *   - `issue ready <n> [--no-hint]`, an issue marked `spec:ready` once
- *     its author and its body check out, and
+ *   - `issue ready <n> [--yes] [--no-hint]`, an issue marked
+ *     `spec:ready` once its author and its body check out, and
  *     `issue unblock [<n>] [--all]`, `spec:blocked` taken off an issue
  *     whose `Blocked by:` line names only closed issues. Both read the
- *     GitHub board rather than the tracker chain, and both always ask.
+ *     GitHub board rather than the tracker chain. `issue unblock` always
+ *     asks; `issue ready` asks unless `--yes` is typed.
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.

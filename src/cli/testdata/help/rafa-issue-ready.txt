@@ -1,0 +1,46 @@
+rafa issue ready — mark an issue spec:ready once its author and its body check
+  out
+
+Usage:
+  rafa issue ready <n> [--yes] [--no-hint]
+
+Description:
+  Reads the issue on the GitHub board, refuses one opened by an account without
+  write access to the repository, refuses a body that does not fill the spec
+  template, refuses an issue carrying two `epic:` labels (with
+  board.relationships set to labels, the default), and then asks whether to mark
+  it spec:ready. On a yes it swaps the labels in one write, adding spec:ready
+  and removing spec:needs-work. `--yes` makes the swap with no question once
+  every check passes, with or without a terminal, and refuses everything the
+  checks refuse without it; without a terminal and without `--yes` it prints
+  both readings and adds no label. A run that marks the issue, or finds it
+  marked already, ends by naming the one step that follows, which `--no-hint`
+  turns off. With `--output=json` the report is the data of the terminal result
+  event.
+
+Arguments:
+  n   string, required
+      The issue number on the GitHub board.
+
+Flags:
+  --yes    boolean
+      Marks the issue spec:ready without asking, once its author and its body
+      check out; a check that refuses still refuses. Needed where standard input
+      is no terminal.
+  --hint   boolean, default true
+      Ends by naming the one step that follows, asking it where there is a
+      terminal to answer on; `--no-hint` reads nothing and prints nothing.
+
+Examples:
+  rafa issue ready 57
+      Checks #57 and asks whether to mark it spec:ready.
+  rafa issue ready 57 --yes
+      Checks #57 and marks it spec:ready with no question, from a script or an
+      agent.
+
+Outputs:
+  text, json
+
+See also:
+  rafa issue list, rafa issue show, rafa issue create, rafa issue comment, rafa
+  issue move, rafa issue unblock, rafa issue check

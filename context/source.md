@@ -110,7 +110,9 @@ for by rewrapping the prose the rule superseded. NO non-test file under
 `src/` is over the cap; the nearest is `src/check/references.ts` at
 that 800, with `src/demote/classify.ts` at 797 behind it. `src/effort/collect.ts`
 was at 798 until its argv parser moved to `collect-args.ts` and its
-skill half went to `collect-skills.ts`, which left it at 777.
+skill half went to `collect-skills.ts`, which left it at 777; it grew
+back to 795, and moving the session log location to
+`session-log-dirs.ts` took it to 685.
 
 **The cap is a rule about modules, not about their tests.** At `b2bebfe`
 exactly one non-test file under `src/` is over it, `src/check/references.ts`

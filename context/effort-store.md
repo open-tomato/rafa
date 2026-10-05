@@ -8,9 +8,28 @@ from `store` in `.rafa/config.yaml`, `sqlite` by default.
 **One kind of session row is not collected.** The search runner
 (`src/inventory/search/index.ts`) stores the `search` row of its own
 session: Claude Code files that session's log under the scratch copy it
-ran in, never under the project's log directory `effort collect` walks.
+ran in, never under the project's log directories `effort collect` walks.
 The runner reads the log with `collectSessionRow` and appends it under
 `sessions` with `kind` set to `search`.
+
+**`effort collect` reads the main checkout's project folder and every
+worktree project folder of the project** (`src/effort/session-log-dirs.ts`).
+Claude Code files a session under its working directory's encoded path,
+so a loop task run in a worktree lands in
+`~/.claude/projects/<main>--rafa-worktrees-<stub>/`, never in the main
+checkout's folder; measured on 2026-10-05, this repo's main folder held 9
+logs and its six worktree folders 90. A worktree folder is one whose name
+is `projectLogDirName(<project root>/<loop.worktreeDir>)` followed by `-`
+and a name, live or removed, and its sessions' rows carry `worktree`, the
+worktree directory joined with that name; the main checkout's rows carry
+null. The `-` keeps out another project whose name only extends this
+one's (`…-rafa-other`). A session id in two folders is stored once, from
+the first folder (the main checkout's before any worktree's, then by
+name), and the summary counts the other copies as held twice. A `logDir`
+passed to `collectEffort` replaces the whole set with that one folder.
+`collectEffort` derives the set under its `home`, and takes
+`loop.worktreeDir` from the config, or `.rafa/worktrees` when it reads
+none (a store and `plansDir` both passed).
 
 ### Where it lives
 
@@ -52,6 +71,20 @@ fix:** TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
 **`collectSessionRow` (`collect.ts`) copies attribution fields one by
 one**, so a field added to the attribution reaches no stored row until it
 is copied there as well.
+
+**A port row field SQLite should query by gets a column of its own,
+filled through the kind's `fieldColumns` in `KIND_TABLES`
+(`store/sqlite.ts`).** `row_json` still holds the field and `read`
+answers from it, so both backends' rows stay byte-identical; the column
+only repeats it. `sessions.worktree`, added by migration
+`session-worktree`, is the one such column today: the row's `worktree`
+field, NULL for a session of the main checkout, for a row collected
+before the field and for a row an older runtime inserts. Such a column
+takes an additive, nullable migration with no CHECK the NDJSON backend
+would not also hold, its line in `migrations.lock.json`, the field's key
+in `row-fields.lock.json`, and its place in the column list
+`sqlite.test.ts` reads; `session-worktree.test.ts` holds the entry to a
+store an older runtime left.
 
 ### A store past this rafa
 
@@ -1074,7 +1107,8 @@ status into the column; a report's free-text `feedback` reaches no
 queryable table at all. To recover what a past task actually said — the
 exit codes it captured, the commands it ran — read `session_id` off its
 `task_reports` row and open the matching
-`~/.claude/projects/<project-slug>/<session-id>.jsonl`.
+`~/.claude/projects/<project-slug>/<session-id>.jsonl`, the slug being
+the worktree's when the session's row names one in `worktree`.
 
 **`task_reports.skills_used` arrived at schema version 12**, an `ADD
 COLUMN` holding the report's claim of skills used as a JSON array, in the

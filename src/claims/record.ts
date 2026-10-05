@@ -144,8 +144,11 @@ export type Ownership =
 /** A store id: one run of non-blank characters. */
 const STORE_ID = /^\S+$/;
 
-/** The subject every ownership commit carries. */
-const SUBJECT = /^claim\(rafa-([1-9]\d*)\): (\S+)$/;
+/**
+ * The subject every ownership commit carries, `claim(rafa-<n>): <action>`,
+ * the issue number captured first and the action second.
+ */
+export const CLAIM_SUBJECT = /^claim\(rafa-([1-9]\d*)\): (\S+)$/;
 
 /** One trailer line: a key of letters, digits and hyphens, a colon, a value. */
 const TRAILER_LINE = /^([A-Za-z0-9-]+):[ \t]*(.*)$/;
@@ -259,7 +262,7 @@ function recordFrom(subject: string, trailers: ReadonlyMap<string, readonly stri
   if (typeof store !== 'string') {
     return store.problem;
   }
-  const match = SUBJECT.exec(subject.trim());
+  const match = CLAIM_SUBJECT.exec(subject.trim());
   if (match?.[2] !== action) {
     return `the subject ${JSON.stringify(subject)} is not claim(rafa-<n>): ${action}`;
   }

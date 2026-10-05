@@ -74,6 +74,15 @@
  * that throws read as no id rather than `unknown`, 1; and the `unknown`
  * warning given to `not-lost` instead, 2.
  *
+ * The base cases run under `pr.base: integration`, resolved through
+ * `resolveBaseBranch` over a repository whose `origin/HEAD` names
+ * `main`, so a repair prompt naming the default branch reads `main` and
+ * fails. Three mutations were driven on 2026-10-05, one run each, with
+ * 48 pass either side and both modules restored sha256-identical: the
+ * conflict-repair line hard-coded to `origin/main`, 2 cases; the
+ * lockfile line hard-coded to `origin/main`, 2; and `runWrapUp` handing
+ * the gate `'main'` in place of its `base`, 1.
+ *
  * Every repair session records the setting sources it was handed beside
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
@@ -103,6 +112,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
+import { resolveBaseBranch } from '../cleanup/index.js';
 import { CommandExit } from '../cli/command.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
@@ -134,6 +144,13 @@ const JOB = 'https://github.com/o/r/actions/runs/1/job/2';
  * gate that bound the default in their place reddens.
  */
 const SOURCES: readonly ClaudeSettingSource[] = ['local', 'user'];
+
+/**
+ * The run's base under `pr.base: integration`, as `runWrapUp` resolves
+ * it, over a repository whose `origin/HEAD` names `main`: a prompt that
+ * named the default branch instead would read `main` and fail.
+ */
+const BASE = resolveBaseBranch(() => ({ ok: true, stdout: 'origin/main\n', stderr: '' }), 'integration');
 
 /** A timeout the first poll cannot reach, so only a verdict ends it. */
 const LONG_TIMEOUT_MS = 20 * 60_000;
@@ -399,7 +416,7 @@ describe('verifyPullRequest, before any poll', () => {
   it('skips the check when gh is unusable, looking for no PR', async () => {
     const run = stub({ ghUsable: false });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING]);
     expect(warnings.join('\n')).toContain('`gh` is not available or not authenticated');
@@ -409,7 +426,7 @@ describe('verifyPullRequest, before any poll', () => {
   it('stops when the branch has no open PR, polling nothing', async () => {
     const run = stub({ prNumber: null });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`]);
     expect(warnings.join('\n')).toContain(`No open PR found for ${BRANCH}. Nothing to verify.`);
@@ -430,7 +447,7 @@ describe('verifyPullRequest, before any poll', () => {
       },
     };
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, failing);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, failing);
 
     expect(errors).toEqual([
       `\n❌ Could not read the PR for ${BRANCH}: gh pr list exited non-zero: could not resolve host`,
@@ -444,7 +461,7 @@ describe('verifyPullRequest, on a settled poll', () => {
   it('reports green and spends no repair', async () => {
     const run = stub({ probes: [GREEN] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain(`CI green on PR #${PR}:`);
@@ -455,7 +472,7 @@ describe('verifyPullRequest, on a settled poll', () => {
   it('gives up at the deadline while checks still run, waiting 20 s between polls', async () => {
     const run = stub({ probes: [PENDING, PENDING, PENDING] });
 
-    await verifyPullRequest(60_000, 2, SOURCES, run.seams);
+    await verifyPullRequest(60_000, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([
       ...OPENING,
@@ -477,7 +494,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
   it('reports a merged PR as merged, repairing nothing', async () => {
     const run = stub({ probes: [NONE], merges: [MERGED] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`]);
     expect(logs.join('\n')).toContain(`PR #${PR} is already merged.`);
@@ -487,7 +504,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
   it('leaves a PR that is not conflicting alone, repairing nothing', async () => {
     const run = stub({ probes: [NONE], merges: [CLEAN] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`]);
     const warned = warnings.join('\n');
@@ -499,14 +516,14 @@ describe('verifyPullRequest, on a PR with no checks', () => {
   it('sends a conflicting PR to repair, then polls it again', async () => {
     const run = stub({ probes: [NONE, GREEN], merges: [DIRTY], exits: [0] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     expect(run.prompts).toHaveLength(1);
     expect(run.sources).toEqual([SOURCES]);
     const prompt = run.prompts[0] ?? '';
     expect(prompt.split('\n')[0]).toBe(`The pull request for branch \`${BRANCH}\` (#${PR}) is not mergeable: it conflicts with the base branch, so GitHub scheduled no CI run at all.`);
-    expect(prompt).toContain('Merge `origin/main` into this branch and resolve the conflicts');
+    expect(prompt).toContain('Merge `origin/integration` into this branch and resolve the conflicts');
     expect(classifyPromptContent(prompt)).toBe('ci-repair');
     expect(warnings.join('\n')).toContain(`PR #${PR} has no checks — it does not merge cleanly`);
     expect(logs.join('\n')).toContain(`CI green on PR #${PR}:`);
@@ -516,7 +533,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
   it('sends a PR whose merge state cannot be read to repair as a conflict', async () => {
     const run = stub({ probes: [NONE, GREEN], merges: [null], exits: [0] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     expect(run.prompts[0]).toContain('it conflicts with the base branch');
@@ -526,7 +543,7 @@ describe('verifyPullRequest, on a PR with no checks', () => {
   it('stops after a conflict-repair session that exits nonzero', async () => {
     const run = stub({ probes: [NONE], merges: [DIRTY], exits: [4] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair']);
     expect(errors).toEqual(['\n❌ Conflict-repair session failed (exit 4).']);
@@ -537,7 +554,7 @@ describe('verifyPullRequest, on a red PR', () => {
   it('sends it to repair with its failing checks only, then polls it again', async () => {
     const run = stub({ probes: [RED, GREEN], merges: [CLEAN], exits: [0] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair', ...POLL]);
     const prompt = run.prompts[0] ?? '';
@@ -552,7 +569,7 @@ describe('verifyPullRequest, on a red PR', () => {
   it('stops after a CI-repair session that exits nonzero', async () => {
     const run = stub({ probes: [RED], merges: [CLEAN], exits: [3] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL, `pr view ${PR}`, 'repair']);
     expect(errors).toEqual(['\n❌ CI-repair session failed (exit 3).']);
@@ -565,7 +582,7 @@ describe('verifyPullRequest, on a red PR', () => {
       exits: [0, 0],
     });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([
       ...OPENING,
@@ -589,8 +606,8 @@ describe('verifyPullRequest, on a red PR', () => {
     const red = stub({ probes: [RED, RED, RED], merges: [CLEAN, CLEAN], exits: [0, 0] });
     const conflicting = stub({ probes: [NONE], merges: [DIRTY], exits: [4] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, red.seams);
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, ['project'], conflicting.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, red.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, ['project'], BASE, conflicting.seams);
 
     expect(red.sources).toEqual([SOURCES, SOURCES]);
     expect(conflicting.sources).toEqual([['project']]);
@@ -600,7 +617,7 @@ describe('verifyPullRequest, on a red PR', () => {
     setActivePlanStub('phase-0b-cutover-readiness');
     const run = stub({ probes: [RED], merges: [CLEAN], exits: [3] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(planStubFromPrompt(run.prompts[0] ?? '')).toBe('phase-0b-cutover-readiness');
     expect(classifyPromptContent(run.prompts[0])).toBe('ci-repair');
@@ -611,7 +628,7 @@ describe('verifyPullRequest, with zero attempts', () => {
   it('reports a red verdict and escalates with no repair', async () => {
     const run = stub({ probes: [RED] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain('[0s] red — 2 check(s)');
@@ -622,11 +639,62 @@ describe('verifyPullRequest, with zero attempts', () => {
   it('reports no checks and escalates without reading the merge state', async () => {
     const run = stub({ probes: [NONE] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 0, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual([...OPENING, ...POLL]);
     expect(logs.join('\n')).toContain('[0s] none — 0 check(s)');
     expect(errors[0]).toBe(`\n❌ CI still not green after 0 repair attempt(s) on ${BRANCH}.`);
+  });
+});
+
+describe('verifyPullRequest, naming the run\'s base under pr.base: integration', () => {
+  /** The lockfile bullet as a repair prompt over `base` writes it. */
+  const lockfileLine = (base: string): string => `Restore the base copy with \`git checkout origin/${base} -- bun.lock\``;
+
+  it('resolves the base to integration, and to main with no pr.base', () => {
+    // The control for every case below: the same repository answers
+    // `main` with no `pr.base`, so a prompt reading the default branch
+    // would name `origin/main` there.
+    expect(BASE).toBe('integration');
+    expect(resolveBaseBranch(() => ({ ok: true, stdout: 'origin/main\n', stderr: '' }), null)).toBe('main');
+  });
+
+  it('names origin/integration in the conflict-repair line and the lockfile line', async () => {
+    const run = stub({ probes: [NONE, GREEN], merges: [DIRTY], exits: [0] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
+
+    const prompt = run.prompts[0] ?? '';
+    expect(prompt).toContain('Merge `origin/integration` into this branch and resolve the conflicts, then push.');
+    expect(prompt).toContain(lockfileLine('integration'));
+    expect(prompt).not.toContain('origin/main');
+  });
+
+  it('names origin/integration in a CI-repair prompt\'s lockfile line', async () => {
+    const run = stub({ probes: [RED], merges: [CLEAN], exits: [3] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
+
+    const prompt = run.prompts[0] ?? '';
+    expect(prompt).toContain(lockfileLine('integration'));
+    expect(prompt).not.toContain('Merge `origin/');
+    expect(prompt).not.toContain('origin/main');
+  });
+
+  it('reads the base off the argument, naming origin/main when handed main', async () => {
+    // The control: the same two prompts over `main` name `origin/main`
+    // and not `origin/integration`, so the lines are not a constant.
+    const conflicting = stub({ probes: [NONE], merges: [DIRTY], exits: [4] });
+    const red = stub({ probes: [RED], merges: [CLEAN], exits: [3] });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, 'main', conflicting.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, 'main', red.seams);
+
+    const conflict = conflicting.prompts[0] ?? '';
+    expect(conflict).toContain('Merge `origin/main` into this branch');
+    expect(conflict).toContain(lockfileLine('main'));
+    expect(red.prompts[0]).toContain(lockfileLine('main'));
+    expect([conflict, red.prompts[0]].join('\n')).not.toContain('origin/integration');
   });
 });
 
@@ -650,7 +718,7 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
   it('writes ci before each poll and repair before each repair session', async () => {
     const run = stub({ probes: [RED, GREEN], merges: [CLEAN], exits: [0] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams, phasesInto(run.calls));
 
     expect(run.calls).toEqual([
       ...OPENING,
@@ -669,7 +737,7 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
   it('writes repair before a conflict-repair session too', async () => {
     const run = stub({ probes: [NONE], merges: [DIRTY], exits: [4] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams, phasesInto(run.calls));
 
     expect(run.calls).toEqual([...OPENING, `pr list ${BRANCH}`, 'phase ci', `pr checks ${PR}`, `pr view ${PR}`, 'phase repair', 'repair']);
   });
@@ -677,7 +745,7 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
   it('writes ci once for a poll that waits between its probes', async () => {
     const run = stub({ probes: [PENDING, GREEN] });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams, phasesInto(run.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams, phasesInto(run.calls));
 
     expect(run.calls.filter((call) => call.startsWith('phase '))).toEqual(['phase ci']);
   });
@@ -687,9 +755,9 @@ describe('verifyPullRequest, writing the phase to the run record', () => {
     const missing = stub({ prNumber: null });
     const pushed = stub({ provider: NONE_BY_CONFIG });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, skipped.seams, phasesInto(skipped.calls));
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, missing.seams, phasesInto(missing.calls));
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, pushed.seams, phasesInto(pushed.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, skipped.seams, phasesInto(skipped.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, missing.seams, phasesInto(missing.calls));
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, pushed.seams, phasesInto(pushed.calls));
 
     expect(skipped.calls).toEqual([...OPENING]);
     expect(missing.calls).toEqual([...OPENING, `pr list ${BRANCH}`]);
@@ -707,7 +775,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('pushes the branch, prints the compare URL and asks gh nothing', async () => {
     const run = stub({ provider: NONE_BY_CONFIG });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     // The whole of the gate: the reading, the push, and nothing else.
     // No `gh auth status`, no PR looked for, no check polled and no
@@ -724,7 +792,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('says the CI wait was skipped, and why, at warn', async () => {
     const run = stub({ provider: NONE_BY_CONFIG });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     // The skip is a warning and the push is not: the first is something
     // the operator has to act on and the second is the loop working.
@@ -736,7 +804,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('names the origin rather than the config when the remote decided', async () => {
     const run = stub({ provider: NONE_BY_REMOTE });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
     expect(logs.join('\n')).toContain('origin is not a GitHub remote');
@@ -746,7 +814,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('pushes and says there is no compare URL when origin names no host', async () => {
     const run = stub({ provider: NONE_NO_REMOTE });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
     expect(logs.join('\n')).toContain(`Pushed ${BRANCH} to origin.`);
@@ -757,7 +825,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('reports a refused push with git\'s words and prints no URL', async () => {
     const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     // The claim is read, and says the refusal was not about it.
     expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`, `read claim ${BRANCH}`]);
@@ -774,7 +842,7 @@ describe('verifyPullRequest, under a none provider', () => {
   it('reads the provider before asking gh anything, under a gh provider too', async () => {
     const run = stub({ ghUsable: false });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     // The control on the order: an unusable `gh` still gets the `gh`
     // wording, and the reading came first.
@@ -789,7 +857,7 @@ describe('verifyPullRequest, on a refused push of a claim branch', () => {
     const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED, claim: LOST });
     const seams = { ...run.seams, currentBranch: () => CLAIM_BRANCH };
 
-    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams).then(
+    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, seams).then(
       () => null,
       (error: unknown) => error,
     );
@@ -813,7 +881,7 @@ describe('verifyPullRequest, on a refused push of a claim branch', () => {
     const run = stub({ provider: NONE_BY_CONFIG, push: REFUSED, claim: UNKNOWN });
     const seams = { ...run.seams, currentBranch: () => CLAIM_BRANCH };
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, seams);
 
     expect(run.calls).toEqual(['read provider', `git push ${CLAIM_BRANCH}`, `read claim ${CLAIM_BRANCH}`]);
     expect(errors).toEqual([
@@ -830,7 +898,7 @@ describe('verifyPullRequest, on a refused push of a claim branch', () => {
   it('reads no claim when the push worked', async () => {
     const run = stub({ provider: NONE_BY_CONFIG, claim: LOST });
 
-    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, run.seams);
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
 
     // The control on the halt: the same `lost` reading, never asked for.
     expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
@@ -908,7 +976,7 @@ describe('refusedPushReaderIn, over a bare remote and two clones', () => {
     };
 
     // The real branch reading, the real push and the real claim reading.
-    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, seams).then(
+    const halted = await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, seams).then(
       () => null,
       (error: unknown) => error,
     );
@@ -1056,6 +1124,8 @@ describe('the gate as start() calls it, through runWrapUp', () => {
     expect(source.split('await verifyPullRequest(').length - 1).toBe(1);
     expect(start.split('await verifyPullRequest(').length - 1).toBe(0);
     expect(gateCall(source)).toContain('settingSources,');
+    // The base `runWrapUp` resolved once, handed on beside the sources.
+    expect(gateCall(source)).toMatch(/settingSources,\n\s*base,\n/);
     expect(start).toContain('const { inject: injectMode, settingSources } = runConfig.config;');
     expect(start).toContain('await runWrapUp({');
   });

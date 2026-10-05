@@ -17,8 +17,9 @@
  *
  * A session's main thread is its loose log, `<dir>/<session>.jsonl`. Each
  * subagent it started has its own log at
- * `<dir>/<session>/subagents/agent-*.jsonl`, the population `collect.ts`
- * describes and deliberately leaves out of its session rows.
+ * `<dir>/<session>/subagents/agent-*.jsonl`, the population
+ * `session-log-dirs.ts` describes and `collect.ts` deliberately leaves out
+ * of its session rows.
  * {@link subagentLogPaths} lists them with one directory read. A call is a
  * sidechain call when its log is one of those or its record carries
  * `isSidechain: true`. Measured on 2026-09-26 over the 3,710 logs under

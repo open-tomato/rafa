@@ -13,7 +13,8 @@
  * neither is committed unless the project sets `tracking.all`.
  *
  * One table per kind, named for the kind and keyed by the key the
- * NDJSON rows are deduplicated by. Each table has five columns:
+ * NDJSON rows are deduplicated by. Each table has these five columns,
+ * and `sessions` a sixth:
  *
  *   - `seq`, the order the row was appended in.
  *   - The kind's key, filled from {@link EFFORT_KEY_PROJECTIONS}:
@@ -24,6 +25,9 @@
  *   - `origin_store` and `origin_seq`, the store's origin and the row's
  *     own `seq`, which the append stamps as every production insert
  *     does (`origins.ts`), NULL in both on a store with no origin.
+ *   - `worktree`, on `sessions` alone, the row's `worktree` field
+ *     repeated from `row_json` (migration `session-worktree`), NULL for
+ *     a session of the main checkout and for a row without the field.
  *
  * The row is stored whole, as the JSON text the NDJSON backend writes
  * as a line, and read back through `JSON.parse` as that backend reads
@@ -36,6 +40,9 @@
  * columns would have to reproduce the collector's field order to come
  * out byte-identical. The key is the one field SQLite has to see,
  * because the uniqueness constraint on it is what deduplicates.
+ * `worktree` is repeated beside it only so a query can read it; `read`
+ * still answers the row from `row_json`, so both backends' rows stay
+ * byte-identical.
  *
  * `seq` is an `INTEGER PRIMARY KEY`, SQLite's alias for the rowid, so
  * the append order is a column the schema declares rather than an
@@ -246,25 +253,51 @@ export function sqliteStorePath(repoRoot: string): string {
   return join(effortStoreDir(repoRoot), SQLITE_STORE_FILE_NAME);
 }
 
-/** Where one kind's rows live in the schema. */
-interface KindTable {
+/** A column filled from one field of the row, beside the key and `row_json`. */
+interface FieldColumn<R> {
+  /** The column, as a migration adds it. */
+  readonly column: string;
+  /** The field's value, NULL for a row that carries none. */
+  readonly value: (row: R) => string | null;
+}
+
+/** The names an insert into one kind's table spells, whatever its row. */
+interface KindTableNames {
   /** The table, named for the kind. */
   readonly name: OriginTable;
   /** The column the kind's key is stored in, and deduplicated by. */
   readonly keyColumn: string;
+  /** The columns filled from a field of the row, in insert order. */
+  readonly fieldColumns: readonly { readonly column: string }[];
+}
+
+/** Where one kind's rows live in the schema, and how its field columns are read. */
+interface KindTable<R> extends KindTableNames {
+  readonly fieldColumns: readonly FieldColumn<R>[];
 }
 
 /**
- * Each kind's table and key column, as the migrations create them.
+ * Each kind's table, key column and field columns, as the migrations
+ * create them.
  *
  * Closed over the port's row map, as the NDJSON backend's file names
  * are: a kind added there fails to compile here until this record
- * names its table. Both names are interpolated into SQL, which is safe
+ * names its table. Every name is interpolated into SQL, which is safe
  * because they come from this record and never from a caller.
+ *
+ * `sessions.worktree` (migration `session-worktree`) repeats the row's
+ * `worktree` field, which `row_json` holds as well, so a query can read
+ * where a session ran without parsing every row. A row collected before
+ * the field carries it absent, and the column reads NULL for it, as it
+ * does for a session of the main checkout.
  */
-const KIND_TABLES: Readonly<Record<EffortRowKind, KindTable>> = {
-  sessions: { name: 'sessions', keyColumn: 'session_id' },
-  commits: { name: 'commits', keyColumn: 'sha' },
+const KIND_TABLES: { readonly [K in EffortRowKind]: KindTable<EffortRow<K>> } = {
+  sessions: {
+    name: 'sessions',
+    keyColumn: 'session_id',
+    fieldColumns: [{ column: 'worktree', value: (row) => row.worktree ?? null }],
+  },
+  commits: { name: 'commits', keyColumn: 'sha', fieldColumns: [] },
 };
 
 /**
@@ -282,6 +315,8 @@ export const LONE_SURROGATE =
 interface BatchEntry {
   key: string;
   body: string;
+  /** The row's field column values, in the order the kind's table lists them. */
+  fields: readonly (string | null)[];
 }
 
 /** A row paired with its key projection, which may have answered null. */
@@ -324,6 +359,8 @@ function batchEntries<K extends EffortRowKind>(
 ): BatchEntry[] {
   const keyOf: (row: EffortRow<K>) => string | null =
     EFFORT_KEY_PROJECTIONS[kind];
+  const fieldColumns: readonly FieldColumn<EffortRow<K>>[] =
+    KIND_TABLES[kind].fieldColumns;
   const projected = rows.map((row) => ({ key: keyOf(row), row }));
   const keyed = projected.filter(hasKey);
   if (keyed.length < projected.length) {
@@ -337,7 +374,11 @@ function batchEntries<K extends EffortRowKind>(
       + ' which SQLite text cannot hold';
     throw refused(unholdableAt, rows.length, reason);
   }
-  return keyed.map(({ key, row }) => ({ key, body: JSON.stringify(row) }));
+  return keyed.map(({ key, row }) => ({
+    key,
+    body: JSON.stringify(row),
+    fields: fieldColumns.map(({ value }) => value(row)),
+  }));
 }
 
 /** A database's `user_version`, which a fresh database holds as 0. */
@@ -459,16 +500,19 @@ export function withSqliteStore<T>(
  */
 function insertBatch(
   db: Database,
-  table: KindTable,
+  table: KindTableNames,
   entries: readonly BatchEntry[],
 ): number {
-  const insert = db.query<unknown, [string, string]>(
-    `INSERT INTO ${table.name} (${table.keyColumn}, row_json, ${STAMPED_COLUMNS})`
-      + ` VALUES (?, ?, ${stampedValues(table.name)})`
+  const fieldNames = table.fieldColumns.map(({ column }) => column);
+  const columns = [table.keyColumn, 'row_json', ...fieldNames].join(', ');
+  const placeholders = ['?', '?', ...fieldNames.map(() => '?')].join(', ');
+  const insert = db.query<unknown, (string | null)[]>(
+    `INSERT INTO ${table.name} (${columns}, ${STAMPED_COLUMNS})`
+      + ` VALUES (${placeholders}, ${stampedValues(table.name)})`
       + ` ON CONFLICT (${table.keyColumn}) DO NOTHING`,
   );
   const insertAll = db.transaction(() => entries.reduce(
-    (appended, { key, body }) => appended + insert.run(key, body).changes,
+    (appended, { key, body, fields }) => appended + insert.run(key, body, ...fields).changes,
     0,
   ));
   return insertAll.immediate();

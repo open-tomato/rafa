@@ -78,7 +78,7 @@ describe('the retry wrap-up prompt', () => {
     const lines = retryPrompt().split('\n');
 
     expect(lines[1]).toStartWith('* The pull request is MISSING.');
-    expect(lines.findIndex((line) => line.includes('git fetch origin main'))).toBeGreaterThan(1);
+    expect(lines.findIndex((line) => line.includes(`git fetch origin ${BASE}`))).toBeGreaterThan(1);
   });
 
   test('quotes every line of the earlier final message under the bullet', () => {

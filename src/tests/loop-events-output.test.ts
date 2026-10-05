@@ -23,12 +23,12 @@ function eventLines(scratch: Scratch): { exitCode: number | null; lines: string[
   return { exitCode: run.exitCode, lines: run.stdout.split('\n').filter((line) => line !== '') };
 }
 
-/** The wrap-up's lines, the same after a task as with none: the phases, and no pull request with no origin. */
+/** The wrap-up's lines, the same after a task as with none: the phases, and `no pr` naming no provider, as the project config sets `pr.provider: none`. */
 const WRAP_UP_LINES: readonly string[] = [
   'rafa· wrap-up          tests',
   'rafa· wrap-up          fragment',
   'rafa· wrap-up          session',
-  `rafa· no pr            no open pull request for ${BRANCH}`,
+  'rafa· no pr            no pull request provider is configured',
   'rafa· wrap-up          release',
 ];
 

@@ -263,9 +263,11 @@ export const NO_PHASES: PrLifecyclePhases = Object.freeze({
 /**
  * The effects one attempt reaches through: {@link PrLifecycleSeams} with
  * its repair session bound to the run's setting sources by
- * {@link verifyPullRequest}.
+ * {@link verifyPullRequest}, and the run's base its repair prompts name.
  */
 interface AttemptSeams extends Omit<PrLifecycleSeams, 'runClaude'> {
+  /** The run's base branch, as `runWrapUp` resolved it once; a repair prompt names `origin/<base>`. */
+  readonly base: string;
   /** Writes phase `repair`, then spawns one repair session with the prompt on stdin; answers its exit code. */
   readonly runRepair: (prompt: string) => Promise<number>;
   /** Where each poll writes phase `ci`. */
@@ -285,11 +287,14 @@ type AttemptEnd = 'stop' | 'next';
  *
  * The session is told what failed and where, and explicitly told not to
  * open a second PR — the branch already has one, and a new branch would
- * split a single plan across two reviews.
+ * split a single plan across two reviews. Its lockfile line restores
+ * `bun.lock` from `origin/<base>`, the run's base and not the default
+ * branch.
  */
 async function repairPullRequest(
   prNumber: number,
   branch: string,
+  base: string,
   reason: string,
   detail: string,
   run: AttemptSeams['runRepair'],
@@ -300,7 +305,7 @@ async function repairPullRequest(
     detail,
     '',
     '* Diagnose the ACTUAL cause before changing anything. For a failing GitHub Actions job, read its log: `gh run view <run-id> --log-failed`, or `gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs` while other jobs in the run are still going. Identify which STEP failed — a job that dies at `Install dependencies` says nothing about the tests, and the fix is not in the test files.',
-    '* A `lockfile had changes, but lockfile is frozen` failure means `bun.lock` no longer matches the manifests. Restore the base copy with `git checkout origin/main -- bun.lock`, run a plain `bun install` to re-add this branch\'s own dependencies, and verify with `bun install --frozen-lockfile`. Never hand-edit the lockfile.',
+    `* A \`lockfile had changes, but lockfile is frozen\` failure means \`bun.lock\` no longer matches the manifests. Restore the base copy with \`git checkout origin/${base} -- bun.lock\`, run a plain \`bun install\` to re-add this branch's own dependencies, and verify with \`bun install --frozen-lockfile\`. Never hand-edit the lockfile.`,
     '* Reproduce locally before pushing a fix, and re-run the affected gate (`bun run lint:all`, `bun run check-types:all`, `bun run test:all`) so the push is not a guess.',
     '* A test that fails under the full suite and passes when run alone is the known parallel-load flake, not a regression. Re-run the file alone to establish which it is, and if it is the flake, say so and change nothing.',
     `* Commit the fix and push to the CURRENT branch (${branch}). Do NOT create a branch and do NOT open a second PR — #${prNumber} already exists and will pick the push up.`,
@@ -324,7 +329,10 @@ async function repairPullRequest(
  * and skips the wait instead, polling nothing; see the module note.
  *
  * Every repair session loads settings from `settingSources`, bound once
- * here so no attempt can spawn one under any other.
+ * here so no attempt can spawn one under any other. `base` is the run's
+ * base branch, resolved once by `runWrapUp` (`pr.base` when set, else
+ * the default branch): the conflict-repair line merges `origin/<base>`
+ * and every repair prompt's lockfile line restores `bun.lock` from it.
  *
  * `seams` replaces any of the effects {@link PrLifecycleSeams} names; a
  * key left out runs the real helper. `phases` is where `ci` and `repair`
@@ -334,6 +342,7 @@ export async function verifyPullRequest(
   timeoutMs: number,
   maxAttempts: number,
   settingSources: readonly ClaudeSettingSource[],
+  base: string,
   seams: Partial<PrLifecycleSeams> = {},
   phases: PrLifecyclePhases = NO_PHASES,
 ): Promise<void> {
@@ -344,6 +353,7 @@ export async function verifyPullRequest(
       phases.repairStarted();
       return given.runClaude(prompt, settingSources);
     },
+    base,
     phases,
   };
   const branch = io.currentBranch();
@@ -532,8 +542,9 @@ async function handleNoChecks(
   const exitCode = await repairPullRequest(
     prNumber,
     branch,
+    io.base,
     'it conflicts with the base branch, so GitHub scheduled no CI run at all.',
-    'Merge `origin/main` into this branch and resolve the conflicts, then push. Mechanical conflicts (versions, lockfiles, complementary additions) are yours to resolve; a genuine semantic conflict is not.',
+    `Merge \`origin/${io.base}\` into this branch and resolve the conflicts, then push. Mechanical conflicts (versions, lockfiles, complementary additions) are yours to resolve; a genuine semantic conflict is not.`,
     io.runRepair,
   );
   if (exitCode !== 0) {
@@ -556,6 +567,7 @@ async function handleRedChecks(
   const exitCode = await repairPullRequest(
     prNumber,
     branch,
+    io.base,
     'its CI checks failed.',
     ['The failing checks are:', formatRows(failed)].join('\n'),
     io.runRepair,

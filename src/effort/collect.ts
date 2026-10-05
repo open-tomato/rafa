@@ -11,26 +11,16 @@
  *
  * ## Where the session logs are
  *
- * Claude Code files a project's logs under
- * `~/.claude/projects/<encoded repo root>/`, where the encoding
- * replaces every `/` and `.` with a hyphen. That is measured off the
- * live directory rather than assumed: this repo's root encodes as
- * `-Users-marcos-projects-agentic-research`, and a sibling entry for
- * `<root>/.claude/worktrees/<name>` encodes as
- * `...-agentic-research--claude-worktrees-<name>` — the doubled
- * hyphen being the slash and the dot of `/.claude` in turn. Only
- * those two characters are known to be replaced; anything else in a
- * path is untested here, so {@link CollectOptions.logDir} exists as
- * the override rather than the derivation being widened on a guess.
- *
- * The population is DEPTH-DEFINED and that is the whole reason
- * {@link listSessionLogs} reads one directory instead of walking.
- * Loose `*.jsonl` files at the top of that directory are sessions;
- * `<session-uuid>/subagents/agent-*.jsonl` one level down are subagent
- * transcripts. A recursive walk folds the second population into the
- * first silently — the counts stay plausible, the token totals double
- * -count every subagent turn already billed to its parent, and
- * nothing in the output says so.
+ * `session-log-dirs.ts` says where Claude Code files a project's logs
+ * and which files there are sessions; this module reads them through
+ * it. A run reads the main checkout's folder and every worktree folder
+ * of the project, the worktree directory being `loop.worktreeDir` as
+ * the config resolves it, and stamps each row with the worktree its
+ * folder belongs to, null for the main checkout's. A session id found
+ * in two folders is read once, from the first, and counted in
+ * `duplicates`. {@link CollectOptions.logDir} is the override for the
+ * derivation, and names one folder: none of the worktree folders is
+ * read beside it, and every row it yields is null in `worktree`.
  *
  * ## What incrementality is keyed on
  *
@@ -181,47 +171,31 @@ import type {
   CommitLogParseResult,
   CommitStats,
 } from './commits.js';
+import type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
 import type {
   EffortStore,
   SessionEffortRow,
   SessionMode,
 } from './store/types.js';
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
-import { ConfigError } from '../config.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';
 import { parseCollectArgs } from './collect-args.js';
 import { collectSkillHalf, formatSkillSummary } from './collect-skills.js';
 import { readCommitLog } from './commits.js';
-import {
-  readLines,
-  readSessionLog,
-  sessionIdFromPath,
-} from './session-log.js';
+import { listProjectSessionLogs, projectLogDirs } from './session-log-dirs.js';
+import { readLines, readSessionLog } from './session-log.js';
 import { selectEffortStore } from './store/index.js';
 import { createHubContact } from './sync/contact.js';
-
-/**
- * Path characters the project log directory name replaces.
- *
- * Both are measured against the live directory; see the module note
- * on why the class is not widened past what was observed.
- */
-const LOG_DIR_SEPARATORS = /[/\\.]/g;
-
-/** A session log by name; a directory so named is excluded by stat. */
-const SESSION_LOG_NAME = /\.jsonl$/i;
-
-/** Where Claude Code files per-project logs, under the home directory. */
-const PROJECT_LOG_ROOT = ['.claude', 'projects'] as const;
 
 /**
  * The mode every session row this collector writes carries. A constant
@@ -240,14 +214,9 @@ export type { SessionEffortRow } from './store/types.js';
 export type { CollectArgs } from './collect-args.js';
 export { parseCollectArgs, parseSinceInstant } from './collect-args.js';
 
-/** One session log the walk found, before anything has been read. */
-export interface SessionLogCandidate {
-  path: string;
-  /** Basename without the extension, which is the session uuid. */
-  sessionId: string;
-  sizeBytes: number;
-  modifiedAtMs: number;
-}
+/* The session log location moved to its own module; re-exported so callers keep one import. */
+export type { ProjectLogDir, SessionLogCandidate } from './session-log-dirs.js';
+export { listSessionLogs, projectLogDirName, projectLogDirs, sessionLogDir } from './session-log-dirs.js';
 
 /** Candidates split into the three buckets, which partition them. */
 export interface SessionSelection {
@@ -267,7 +236,12 @@ export interface CommitSelection {
 
 /** What the session half did. */
 export interface SessionCollectSummary {
+  /** The main checkout's folder, or the `logDir` override. */
   logDir: string;
+  /** Every folder the run looked in, `logDir` first, then the worktrees' by name. */
+  logDirs: string[];
+  /** Copies of a session id an earlier folder held, never read. */
+  duplicates: number;
   /**
    * The file the append targeted, as the store's append answered it:
    * the kind's own file under NDJSON, the one file every kind shares
@@ -276,7 +250,7 @@ export interface SessionCollectSummary {
   storePath: string;
   /** Plan stubs the roster held; zero attributes nothing. */
   planStubCount: number;
-  /** Loose `*.jsonl` files found. */
+  /** Loose `*.jsonl` files found, each session id once. */
   candidates: number;
   outsideWindow: number;
   alreadyCollected: number;
@@ -322,16 +296,27 @@ export interface CollectResult {
 export interface CollectOptions {
   /** The project root, with no default. Governs the store and git's cwd. */
   repoRoot: string;
-  /** Defaults to the derived project log directory. */
+  /**
+   * One folder read in place of the derived set: the main checkout's
+   * project folder and its worktrees' under {@link home}. See the module note.
+   */
   logDir?: string;
+  /**
+   * The worktree directory whose folders the derived set takes, as
+   * `loop.worktreeDir` holds it. Defaults to the config's, or to
+   * `.rafa/worktrees` when no config is read. Unread beside `logDir`.
+   */
+  worktreeDir?: string;
   /** Defaults to `plan.dir` under the repo root, as the config resolves it. */
   plansDir?: string;
   /** The resolved `--since` instant, shared by both halves. */
   sinceEpochMs?: number | null;
   /**
-   * The home the user scope's config is read under. No default: the
+   * The home the user scope's config is read under, and the session
+   * logs are derived under when no `logDir` is passed. No default: the
    * command passes `homedir()`, so a caller cannot reach the real home by
-   * leaving it out. Unread when a store and `plansDir` are both passed.
+   * leaving it out. Its config is unread when a store and `plansDir` are
+   * both passed.
    */
   home: string;
   /**
@@ -364,7 +349,8 @@ export interface CollectOptions {
 /** Everything the two halves share, resolved once. */
 interface HalfContext {
   repoRoot: string;
-  logDir: string;
+  /** The folders the session half reads, the first being the summary's `logDir`. */
+  logDirs: ProjectLogDir[];
   plansDir: string;
   sinceEpochMs: number | null;
   /** The one store both halves read keys from and append to. */
@@ -372,78 +358,6 @@ interface HalfContext {
   log: (line: string) => void;
   note: (line: string) => void;
   readCommits: (options: CommitLogOptions) => CommitLogParseResult;
-}
-
-/** Encodes a repo root the way Claude Code names its log directory. */
-export function projectLogDirName(repoRoot: string): string {
-  return repoRoot.replace(LOG_DIR_SEPARATORS, '-');
-}
-
-/** The session log directory for one repo root. */
-export function sessionLogDir(
-  repoRoot: string,
-  home: string = homedir(),
-): string {
-  return join(home, ...PROJECT_LOG_ROOT, projectLogDirName(repoRoot));
-}
-
-/**
- * Lists the loose session logs in one directory.
- *
- * One directory read, never a walk — see the module note on the depth
- * rule. Entries are stat'd here rather than at read time so the
- * `--since` filter and the row's own size and mtime come from one
- * reading, and so the whole selection below is pure over the result.
- *
- * A missing directory THROWS rather than answering an empty list: an
- * empty answer is what a wrong derivation and a repo with no sessions
- * both look like, and only one of those is worth reporting as a clean
- * run of zero.
- */
-export function listSessionLogs(dir: string): SessionLogCandidate[] {
-  if (!existsSync(dir)) {
-    throw new Error(
-      `effort collect: no session log directory at ${dir}`
-      + ' (pass logDir, or run with --no-sessions)',
-    );
-  }
-
-  const candidates: SessionLogCandidate[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    if (!SESSION_LOG_NAME.test(entry.name)) continue;
-
-    const path = join(dir, entry.name);
-    const stats = statSync(path);
-    candidates.push({
-      path,
-      sessionId: sessionIdFromPath(path),
-      sizeBytes: stats.size,
-      modifiedAtMs: stats.mtimeMs,
-    });
-  }
-  return sortCandidates(candidates);
-}
-
-/**
- * Oldest first, ties broken by id.
- *
- * Deterministic on purpose: the store is append-only, so this is also
- * the order rows are written in, and two runs over the same tree
- * should not produce two different files.
- */
-function sortCandidates(
-  candidates: SessionLogCandidate[],
-): SessionLogCandidate[] {
-  return candidates.sort((a, b) => {
-    if (a.modifiedAtMs !== b.modifiedAtMs) {
-      return a.modifiedAtMs - b.modifiedAtMs;
-    }
-    if (a.sessionId === b.sessionId) return 0;
-    return a.sessionId < b.sessionId
-      ? -1
-      : 1;
-  });
 }
 
 /**
@@ -515,7 +429,8 @@ export function readPlanStubs(plansDir: string): string[] {
  * Two passes; see the module note. The candidate supplies the size
  * and mtime rather than a second stat, so the row describes the file
  * as the walk saw it. The mode is read from neither pass; see the
- * module note on why it is the phase's constant.
+ * module note on why it is the phase's constant. The worktree is the
+ * candidate's, null when it names none.
  */
 export async function collectSessionRow(
   candidate: SessionLogCandidate,
@@ -541,6 +456,7 @@ export async function collectSessionRow(
     enqueueRecordIndex: enqueue.recordIndex,
     sizeBytes: candidate.sizeBytes,
     modifiedAt: new Date(candidate.modifiedAtMs).toISOString(),
+    worktree: candidate.worktree ?? null,
   };
 }
 
@@ -560,14 +476,15 @@ interface SessionHalf {
 /** Collects the session half. */
 async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
   const planStubs = readPlanStubs(context.plansDir);
-  const candidates = listSessionLogs(context.logDir);
+  const { candidates, duplicates } = listProjectSessionLogs(context.logDirs);
   const selection = selectSessionLogs(
     candidates,
     context.store.keys('sessions'),
     context.sinceEpochMs,
   );
 
-  context.note(`sessions: ${candidates.length} logs in ${context.logDir}`);
+  for (const { dir } of context.logDirs) context.note(`sessions: reading ${dir}`);
+  context.note(`sessions: ${candidates.length} logs, ${duplicates.length} held twice`);
   const stubs = `${planStubs.length} plan stubs`;
   context.note(`sessions: ${stubs} in ${context.plansDir}`);
 
@@ -587,7 +504,9 @@ async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
 
   const appended = context.store.append('sessions', rows);
   const summary = {
-    logDir: context.logDir,
+    logDir: context.logDirs[0]?.dir ?? '',
+    logDirs: context.logDirs.map(({ dir }) => dir),
+    duplicates: duplicates.length,
     storePath: appended.path,
     planStubCount: planStubs.length,
     candidates: candidates.length,
@@ -603,13 +522,13 @@ async function collectSessionHalf(context: HalfContext): Promise<SessionHalf> {
 
 /**
  * The logs the skill half reads: under `held`, every loose log in the
- * directory whose session the store holds, inside the window; under
+ * session half's folders whose session the store holds, inside the window; under
  * `appended`, the ones the session half read, or null when it did not run.
  */
 function skillLogs(context: HalfContext, scope: SkillScope, sessions: SessionHalf | null): SkillLog[] | null {
   if (scope === 'appended') return sessions?.read ?? null;
   const held = context.store.keys('sessions');
-  return selectSessionLogs(listSessionLogs(context.logDir), new Set(), context.sinceEpochMs)
+  return selectSessionLogs(listProjectSessionLogs(context.logDirs).candidates, new Set(), context.sinceEpochMs)
     .pending.filter((candidate) => held.has(candidate.sessionId));
 }
 
@@ -637,9 +556,11 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 }
 
 /**
- * The store and the plans directory a run goes through: each one passed,
- * else the one the config under the repo root and the home names, with
- * the config's warnings sent to `log`. Passed both, it reads no file.
+ * The store, the plans directory and the worktree directory a run goes
+ * through: each one passed, else the one the config under the repo root
+ * and the home names, with the config's warnings sent to `log`. Passed a
+ * store and a plans directory, it reads no file, and the worktree
+ * directory not passed is the default.
  *
  * Called once per run, so each file is read and warned about once.
  * Throws a `ConfigError` when the config is one the loop cannot run on.
@@ -647,12 +568,25 @@ function collectCommitHalf(context: HalfContext): CommitCollectSummary {
 function resolveSources(
   options: CollectOptions,
   log: (line: string) => void,
-): Pick<HalfContext, 'store' | 'plansDir'> {
+): Pick<HalfContext, 'store' | 'plansDir'> & { worktreeDir: string } {
   const { repoRoot: root, store, plansDir } = options;
-  if (store !== undefined && plansDir !== undefined) return { store, plansDir };
+  if (store !== undefined && plansDir !== undefined) {
+    return { store, plansDir, worktreeDir: options.worktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir };
+  }
 
   const { config } = loadConfig({ root, home: options.home }, {}, log);
-  return { store: store ?? selectEffortStore(root, config), plansDir: plansDir ?? resolve(root, config.planDir) };
+  return {
+    store: store ?? selectEffortStore(root, config),
+    plansDir: plansDir ?? resolve(root, config.planDir),
+    worktreeDir: options.worktreeDir ?? config.loopWorktreeDir,
+  };
+}
+
+/** The folders the session half reads: the `logDir` override alone, else the derived set. */
+function logDirsOf(options: CollectOptions, worktreeDir: string): ProjectLogDir[] {
+  return options.logDir === undefined
+    ? projectLogDirs(options.repoRoot, worktreeDir, options.home)
+    : [{ dir: options.logDir, worktree: null }];
 }
 
 /**
@@ -674,10 +608,11 @@ export async function collectEffort(
   const { repoRoot } = options;
   const verbose = options.verbose ?? false;
   const log = options.log ?? ((line: string) => activeOutput().info(line));
+  const { worktreeDir, ...sources } = resolveSources(options, log);
   const context: HalfContext = {
     repoRoot,
-    logDir: options.logDir ?? sessionLogDir(repoRoot),
-    ...resolveSources(options, log),
+    logDirs: logDirsOf(options, worktreeDir),
+    ...sources,
     sinceEpochMs: options.sinceEpochMs ?? null,
     log,
     note: (line: string) => {
@@ -721,6 +656,7 @@ export function formatCollectSummary(result: CollectResult): string[] {
       + `, ${sessions.failed} failed`
       + `, +${sessions.appended} rows`,
     );
+    lines.push(formatFolderLine(sessions));
     lines.push(`  sessions  ${sessions.planStubCount} plan stubs`);
   }
 
@@ -735,6 +671,20 @@ export function formatCollectSummary(result: CollectResult): string[] {
   }
   lines.push(formatSkillSummary(result.skills));
   return lines;
+}
+
+/** `count` and `noun`, the noun plural unless the count is one. */
+function counted(count: number, noun: string): string {
+  return count === 1
+    ? `${String(count)} ${noun}`
+    : `${String(count)} ${noun}s`;
+}
+
+/** The summary's line naming how many folders the session half read; every one past the first is a worktree's. */
+function formatFolderLine(sessions: SessionCollectSummary): string {
+  return `  sessions  ${counted(sessions.logDirs.length, 'folder')}`
+    + `, ${counted(sessions.logDirs.length - 1, 'worktree')}`
+    + `, ${counted(sessions.duplicates, 'log')} held twice`;
 }
 
 /** Refuses the run with exit code 1, its message one line per refusal. */
