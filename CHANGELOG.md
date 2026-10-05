@@ -9,7 +9,7 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
-## 0.36.0 — 2026-10-05, Close the tooling hook's dead ends — specs and closing issues through rafa, gap reports from sessions; rafa loop wait — wait on a running loop for one event, on awake time; Bug sweep 6 — macOS failures print their cause; Bug sweep 7 — scoped test steps without `Owns:`, a repaired pre-wrap-up, exact blocker paths; Bug sweep 8 — the run's base everywhere, claim branches that catch up, worktree sessions collected, forward references, `issue ready --yes`; Bug sweep 9 — the reference check refuses only drift; Planned under assumptions
+## 0.36.0 — 2026-10-05, Close the tooling hook's dead ends — specs and closing issues through rafa, gap reports from sessions; rafa loop wait — wait on a running loop for one event, on awake time; Bug sweep 6 — macOS failures print their cause; Bug sweep 7 — scoped test steps without `Owns:`, a repaired pre-wrap-up, exact blocker paths; Bug sweep 8 — the run's base everywhere, claim branches that catch up, worktree sessions collected, `issue ready --yes`; Bug sweep 9 — the reference check refuses only drift; Bug sweep 10 — real-repository tests that bring their own git identity
 <!-- rafa:fragments rafa-468-close-tooling-hook-s rafa-639-rafa-loop-wait rafa-766-bug-sweep-6 rafa-767-bug-sweep-7 rafa-768-bug-sweep-8 rafa-787-bug-sweep-9 rafa-799-bug-sweep-10 -->
 
 - CLI: `rafa issue create` takes `--body-file=<path>` (or `-` for standard input) to read the issue body from a file, and refuses it beside `--body` or when the file cannot be read.
