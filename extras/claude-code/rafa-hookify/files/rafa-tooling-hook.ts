@@ -11,13 +11,17 @@
  *   self-update, loop start, and the ones that need a terminal).
  * - **deny, use rafa**: a `gh` command one rafa line replaces, with that line.
  *   A `gh pr view --json` is one only when `rafa pr show` answers every
- *   field it asks for.
+ *   field it asks for, and a `gh issue create` only when every flag and
+ *   label on it maps onto `rafa issue create` (see {@link mapIssueCreate}),
+ *   the translated line named.
  * - **let through, with a reason**: a `gh` command a rafa line almost
  *   replaces, such as a `gh pr view --json` asking for a field `rafa pr
- *   show` does not answer. No permission decision is written, so the
- *   normal permission flow applies, and the reason goes to the session as
- *   `additionalContext`: what rafa lacks, ending with the offer to report
- *   the gap under `module:cli-gap`.
+ *   show` does not answer, or a `gh issue create` carrying a flag or label
+ *   `rafa issue create` has no flag for, an `epic:` label among them. No
+ *   permission decision is written, so the normal permission flow
+ *   applies, and the reason goes to the session as `additionalContext`:
+ *   what rafa lacks, ending with the offer to report the gap under
+ *   `module:cli-gap`.
  * - **ask**: a rafa command that starts a Claude session (🪙).
  *
  * A `gh pr` or `gh issue` naming another repository with `-R`/`--repo`
@@ -82,14 +86,46 @@ export const PR_SHOW_ANSWERED_FIELDS: readonly string[] = Object.freeze([
 ]);
 const PR_SHOW_ANSWERS = new Set(PR_SHOW_ANSWERED_FIELDS);
 
+/** The `--type` values `rafa issue create` takes, each mapped from a `type:<t>` label. */
+export const ISSUE_CREATE_TYPES: readonly string[] = Object.freeze(['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec']);
+
+/** The `--priority` values `rafa issue create` takes, each mapped from a `priority:<p>` label. */
+export const ISSUE_CREATE_PRIORITIES: readonly string[] = Object.freeze(['urgent', 'high', 'medium', 'low']);
+
+/** The `rafa issue create` flags the `gh issue create` mapping writes. */
+export const ISSUE_CREATE_FLAGS: readonly string[] = Object.freeze(['title', 'body', 'body-file', 'type', 'module', 'priority']);
+
+// `gh issue create`'s short flags by their long names, and the flags that take no value.
+const GH_ISSUE_CREATE_SHORT: Readonly<Record<string, string>> = Object.freeze({
+  '-a': '--assignee',
+  '-b': '--body',
+  '-e': '--editor',
+  '-F': '--body-file',
+  '-l': '--label',
+  '-m': '--milestone',
+  '-p': '--project',
+  '-R': '--repo',
+  '-T': '--template',
+  '-t': '--title',
+  '-w': '--web',
+});
+const GH_ISSUE_CREATE_SWITCHES = new Set(['--editor', '--web']);
+// The gh flags with a rafa flag of the same name, and the label prefixes the mapping reads.
+const ISSUE_CREATE_SAME_FLAGS = new Set(['--title', '--body', '--body-file']);
+const MAPPED_LABEL_PREFIXES = new Set(['type', 'module', 'priority', 'spec']);
+const SPEC_BLOCKED = 'spec:blocked';
+const BLANKED = '""';
+const LONG_OPTION = /^(--[^=]+)(?:=(.*))?$/;
+const SHORT_OPTION = /^(-[A-Za-z])=?(.*)$/;
+
 const handOver = (line: string, why: string): Verdict => ({
   decision: 'deny',
   reason: `\`${line}\` is the user's to run (${why}). Do not run it or retry it another way: hand it over in a fenced bash block, one command per block, with one line on what it does. See ${SKILL}.`,
 });
 
-const useRafa = (instead: string, rafa: string): Verdict => ({
+const useRafa = (instead: string, rafa: string, notes: readonly string[] = []): Verdict => ({
   decision: 'deny',
-  reason: `This project has rafa installed: run \`${rafa}\` in place of \`${instead}\`. Keep gh for steps rafa has no action for (gh pr create outside a loop, gh pr checkout, gh run view --log, gh api). See ${SKILL}.`,
+  reason: `This project has rafa installed: run \`${rafa}\` in place of \`${instead}\`.${notes.map((note) => ` ${note}`).join('')} Keep gh for steps rafa has no action for (gh pr create outside a loop, gh pr checkout, gh run view --log, gh api). See ${SKILL}.`,
 });
 
 /**
@@ -209,6 +245,169 @@ const judgePrViewJson = (instead: string, fields: string[], target: string): Ver
     : 's'} ${unanswered.join(', ')}.`, 'rafa pr show', unanswered);
 };
 
+/** One option of a gh line: its flag, long where gh names one, and its value; a word no flag takes has an empty flag. */
+export type GhOption = { flag: string; value: string | undefined };
+
+const optionIn = (word: string): GhOption => {
+  const long = LONG_OPTION.exec(word);
+  if (long?.[1] !== undefined) return { flag: long[1], value: long[2] };
+  const short = SHORT_OPTION.exec(word);
+  if (short?.[1] === undefined) return { flag: '', value: word };
+  return {
+    flag: GH_ISSUE_CREATE_SHORT[short[1]] ?? short[1],
+    value: short[2] === ''
+      ? undefined
+      : short[2],
+  };
+};
+
+/**
+ * The options of a `gh issue create`, its words after `create`. A flag
+ * written `--flag value`, `--flag=value`, `-f value` or `-fvalue` takes
+ * its value; one gh takes no value for does not.
+ */
+export const issueCreateOptionsOf = (words: string[]): GhOption[] => {
+  const options: GhOption[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const option = optionIn(words[i] ?? '');
+    const next = words[i + 1];
+    const takesNext = option.flag !== '' && option.value === undefined && !GH_ISSUE_CREATE_SWITCHES.has(option.flag)
+      && next !== undefined && (next === '-' || !next.startsWith('-'));
+    options.push(takesNext
+      ? { ...option, value: next }
+      : option);
+    if (takesNext) i += 1;
+  }
+  return options;
+};
+
+/** The `rafa issue create` flag a label maps to, `''` for one rafa adds itself, or null for one with no flag. */
+const rafaFlagForLabel = (label: string, specFromFile: boolean): string | null => {
+  if (label === SPEC_BLOCKED) {
+    return specFromFile
+      ? ''
+      : null;
+  }
+  const colon = label.indexOf(':');
+  if (colon <= 0) return null;
+  const prefix = label.slice(0, colon);
+  const value = label.slice(colon + 1);
+  if (prefix === 'type' && ISSUE_CREATE_TYPES.includes(value)) return `--type=${value}`;
+  if (prefix === 'module' && value !== '') return `--module=${value}`;
+  if (prefix === 'priority' && ISSUE_CREATE_PRIORITIES.includes(value)) return `--priority=${value}`;
+  return null;
+};
+
+/** How a label rafa has no flag for is named: in full, or by its prefix when rafa reads no label with that prefix. */
+const labelName = (label: string): string => {
+  const colon = label.indexOf(':');
+  const prefix = label.slice(0, colon);
+  return colon <= 0 || MAPPED_LABEL_PREFIXES.has(prefix)
+    ? `${label} label`
+    : `${prefix}: label`;
+};
+
+/** The labels one `--label` value names, comma-joined or alone. */
+const labelsIn = (value: string | undefined): string[] => (value ?? '')
+  .split(',')
+  .map((label) => label.trim())
+  .filter((label) => label !== '');
+
+const shownValue = (value: string): string => value === BLANKED
+  ? '"…"'
+  : value;
+
+/**
+ * What a `gh issue create` maps to: the `rafa issue create` flags in the
+ * line's order, what rafa has no flag for, what the hook cannot read,
+ * the rafa flags asked for two different values, and whether
+ * `spec:blocked` was left to rafa.
+ */
+export type IssueCreateMapping = {
+  flags: string[];
+  unmapped: string[];
+  unreadable: string[];
+  conflicting: string[];
+  leavesSpecBlocked: boolean;
+};
+
+/**
+ * The mapping of a `gh issue create`, its words after `create`.
+ * `--title`/`-t`, `--body`/`-b` and `--body-file`/`-F` map to the rafa
+ * flag of the same name; a `type:<t>`, `module:<m>` or `priority:<p>`
+ * label, one per `--label`/`-l` or comma-joined, to `--type`, `--module`
+ * or `--priority` for a value rafa takes; `spec:blocked` to nothing on a
+ * `type:spec` with a body file, since rafa adds it from the body's
+ * `Blocked by:` line; `-R`/`--repo` to nothing, as only the project's
+ * own reaches here. Every other flag, label and argument has no flag.
+ */
+export const mapIssueCreate = (words: string[]): IssueCreateMapping => {
+  const options = issueCreateOptionsOf(words);
+  const labels = options
+    .filter((option) => option.flag === '--label')
+    .flatMap((option) => labelsIn(option.value));
+  const specFromFile = labels.includes('type:spec') && options.some((option) => option.flag === '--body-file' && option.value !== undefined);
+  const flags: string[] = [];
+  const unmapped: string[] = [];
+  const unreadable: string[] = [];
+  const conflicting: string[] = [];
+  const add = (flag: string): void => {
+    const name = flag.slice(0, flag.indexOf('='));
+    const held = flags.find((written) => written.startsWith(`${name}=`));
+    if (held === undefined) flags.push(flag);
+    else if (held !== flag && !conflicting.includes(name)) conflicting.push(name);
+  };
+  const addLabel = (label: string): void => {
+    const rafa = label.includes('"')
+      ? undefined
+      : rafaFlagForLabel(label, specFromFile);
+    if (rafa === undefined) unreadable.push('a quoted --label');
+    else if (rafa === null) unmapped.push(labelName(label));
+    else if (rafa !== '') add(rafa);
+  };
+  for (const { flag, value } of options) {
+    if (flag === '--label') labelsIn(value).forEach(addLabel);
+    else if (flag === '--repo') continue;
+    else if (flag === '') unmapped.push(`argument ${shownValue(value ?? '')}`);
+    else if (!ISSUE_CREATE_SAME_FLAGS.has(flag)) unmapped.push(flag);
+    else if (value === undefined) unreadable.push(`${flag} with no value`);
+    else add(`${flag}=${shownValue(value)}`);
+  }
+  return { flags, unmapped, unreadable, conflicting, leavesSpecBlocked: specFromFile && labels.includes(SPEC_BLOCKED) };
+};
+
+/**
+ * The verdict on a `gh issue create`: deny naming the translated
+ * `rafa issue create` line when every flag and label maps, else let it
+ * through naming the ones that do not.
+ */
+const judgeIssueCreate = (instead: string, words: string[]): Verdict => {
+  const { flags, unmapped, unreadable, conflicting, leavesSpecBlocked } = mapIssueCreate(words);
+  if (unmapped.length === 0 && unreadable.length === 0 && conflicting.length === 0) {
+    const notes = [
+      ...flags.some((flag) => flag.startsWith('--title='))
+        ? []
+        : ['`rafa issue create` needs a `--title`, which this line leaves out: add one.'],
+      ...leavesSpecBlocked
+        ? ['Leave `spec:blocked` off: rafa adds it itself when the body file carries a `Blocked by: #<n>` line.']
+        : [],
+    ];
+    return useRafa(instead, ['rafa issue create', ...flags].join(' '), notes);
+  }
+  const why = [
+    ...unmapped.length > 0
+      ? [`\`rafa issue create\` has no flag for ${unmapped.join(', ')}.`]
+      : [],
+    ...unreadable.length > 0
+      ? [`The hook cannot read ${unreadable.join(', ')}, so it cannot tell whether rafa has a flag for it.`]
+      : [],
+    ...conflicting.length > 0
+      ? [`The line asks ${conflicting.join(', ')} for two values, and rafa takes one.`]
+      : [],
+  ].join(' ');
+  return letThrough(instead, why, 'rafa issue create', unmapped);
+};
+
 const nextIsSafe =(words: string[]): boolean => {
   if (hasFlag(words, 'dry-run')) return true;
   const ids = flagValue(words, 'yes');
@@ -266,7 +465,7 @@ const judgeGhIssue = (words: string[]): Verdict | null => {
   const instead = `gh ${words.join(' ')}`;
   if (action === 'list') return useRafa(instead, 'rafa issue list --type=… --search=…');
   if (action === 'view') return useRafa(instead, `rafa issue show ${n}`);
-  if (action === 'create') return useRafa(instead, 'rafa issue create --title=… --body=… --type=…');
+  if (action === 'create') return judgeIssueCreate(instead, words.slice(2));
   if (action === 'comment') return useRafa(instead, `rafa issue comment ${n} --body=…`);
   if (action === 'close') return useRafa(instead, `rafa issue move ${n} done (and rafa issue comment ${n} --body=… for a comment)`);
   return null;

@@ -6,8 +6,10 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import {
   commandsOf,
+  issueCreateOptionsOf,
   jsonFieldsOf,
   judgeLine,
+  mapIssueCreate,
   PR_SHOW_ANSWERED_FIELDS,
   repoFlagOf,
   repoOf,
@@ -110,6 +112,112 @@ describe('judgeLine: gh commands rafa replaces', () => {
     'gh pr list --author @me',
   ])('lets %s through', (line) => {
     expect(judgeLine(line)).toBeNull();
+  });
+});
+
+describe('issueCreateOptionsOf', () => {
+  test.each([
+    [['--title', 'x', '--body-file=spec.md'], [{ flag: '--title', value: 'x' }, { flag: '--body-file', value: 'spec.md' }]],
+    [['-t', 'x', '-lbug', '-F', '-'], [{ flag: '--title', value: 'x' }, { flag: '--label', value: 'bug' }, { flag: '--body-file', value: '-' }]],
+    [['--web', 'stray'], [{ flag: '--web', value: undefined }, { flag: '', value: 'stray' }]],
+    [['--title', '--web'], [{ flag: '--title', value: undefined }, { flag: '--web', value: undefined }]],
+  ])('reads %p as %p', (words, options) => {
+    expect(issueCreateOptionsOf(words)).toEqual(options);
+  });
+});
+
+describe('judgeLine: gh issue create', () => {
+  const denied = (line: string): string => {
+    const verdict = judgeLine(line);
+    expect(verdict?.decision).toBe('deny');
+    return verdict?.reason ?? '';
+  };
+
+  test('denies a spec filed from a body file, naming the translated line', () => {
+    expect(denied('gh issue create --label type:spec --body-file spec.md')).toContain('run `rafa issue create --type=spec --body-file=spec.md` in place of `gh issue create --label type:spec --body-file spec.md`');
+  });
+
+  test('maps comma-joined labels, each one, in the line\'s order', () => {
+    expect(denied('gh issue create --title x --label type:bug,module:cli,priority:high')).toContain('`rafa issue create --title=x --type=bug --module=cli --priority=high`');
+  });
+
+  test('maps short flags onto their long rafa flags', () => {
+    expect(denied('gh issue create -t x -l type:spec -lmodule:hook -F spec.md')).toContain('`rafa issue create --title=x --type=spec --module=hook --body-file=spec.md`');
+  });
+
+  test('maps -b and a body read from standard input', () => {
+    expect(denied('gh issue create -t x -b y')).toContain('`rafa issue create --title=x --body=y`');
+    expect(denied('cat spec.md | gh issue create -t x -F -')).toContain('`rafa issue create --title=x --body-file=-`');
+  });
+
+  test('shows a quoted value it cannot read as an ellipsis', () => {
+    expect(denied('gh issue create --title "Gap in the hook" --body="a; b"')).toContain('`rafa issue create --title="…" --body="…"`');
+  });
+
+  test('leaves spec:blocked to rafa on a spec with a body file, and says so', () => {
+    const reason = denied('gh issue create -t x --label type:spec --label spec:blocked --body-file spec.md');
+    expect(reason).toContain('`rafa issue create --title=x --type=spec --body-file=spec.md`');
+    expect(reason).toContain('Leave `spec:blocked` off');
+  });
+
+  test('says rafa needs a title when the line leaves it out', () => {
+    expect(denied('gh issue create --label type:spec --body-file spec.md')).toContain('needs a `--title`');
+    expect(denied('gh issue create -t x')).not.toContain('needs a `--title`');
+  });
+
+  test('drops -R naming the project\'s own repository', () => {
+    const verdict = judgeLine('gh issue create -R open-tomato/rafa -t x', 'open-tomato/rafa');
+    expect(verdict?.decision).toBe('deny');
+    expect(verdict?.reason).toContain('`rafa issue create --title=x`');
+  });
+
+  test('lets an epic: label through, naming it and ending with the report offer', () => {
+    const verdict = judgeLine('gh issue create -t x --label type:spec,epic:backlog-fixes --body-file spec.md');
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain('`rafa issue create` has no flag for epic: label.');
+    expect(verdict?.reason).not.toContain('in place of');
+    expect(verdict?.reason.endsWith(reportOffer('rafa issue create', ['epic: label']))).toBe(true);
+  });
+
+  test.each([
+    ['gh issue create -t x --assignee @me', ['--assignee']],
+    ['gh issue create -t x -a @me -w', ['--assignee', '--web']],
+    ['gh issue create -t x --label bug', ['bug label']],
+    ['gh issue create -t x --label type:feature', ['type:feature label']],
+    ['gh issue create -t x --label priority:p1', ['priority:p1 label']],
+    ['gh issue create -t x --label spec:blocked --body-file spec.md', ['spec:blocked label']],
+    ['gh issue create -t x --label type:spec,spec:blocked --body y', ['spec:blocked label']],
+    ['gh issue create -t x stray', ['argument stray']],
+  ])('lets %s through, naming %p', (line, unmapped) => {
+    const verdict = judgeLine(line);
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain(`has no flag for ${unmapped.join(', ')}.`);
+  });
+
+  test('lets a quoted label through, which it cannot read', () => {
+    const verdict = judgeLine('gh issue create -t x --label "type:spec"');
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain('cannot read a quoted --label');
+    expect(verdict?.reason).toContain('--title="rafa issue create has no <flag or field>"');
+  });
+
+  test('lets two types through, since rafa takes one', () => {
+    const verdict = judgeLine('gh issue create -t x -l type:spec -l type:bug');
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain('asks --type for two values');
+  });
+
+  test('takes a label repeated with the same value once', () => {
+    expect(mapIssueCreate(['-l', 'type:spec', '-l', 'type:spec,module:x']).flags).toEqual(['--type=spec', '--module=x']);
+  });
+
+  test('maps every type and priority rafa takes', () => {
+    for (const type of ['code', 'bug', 'spike', 'adr', 'chore', 'package-api', 'epic', 'spec']) {
+      expect(mapIssueCreate(['-l', `type:${type}`]).flags).toEqual([`--type=${type}`]);
+    }
+    for (const priority of ['urgent', 'high', 'medium', 'low']) {
+      expect(mapIssueCreate(['-l', `priority:${priority}`]).flags).toEqual([`--priority=${priority}`]);
+    }
   });
 });
 
@@ -288,6 +396,12 @@ describe('the hook process', () => {
     expect(out.hookSpecificOutput.permissionDecisionReason).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toContain('someFieldRafaLacks');
     expect(out.hookSpecificOutput.additionalContext).toContain('rafa issue list --module=cli-gap');
+  });
+
+  test('prints the translated rafa line for a gh issue create that maps', async () => {
+    const out = JSON.parse(await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'gh issue create --label type:spec --body-file spec.md' } })));
+    expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain('rafa issue create --type=spec --body-file=spec.md');
   });
 
   test('prints nothing for a command it lets through', async () => {
