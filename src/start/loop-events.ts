@@ -190,8 +190,7 @@ export function emitLoopEvent(event: LoopEvent, now: () => Date = () => new Date
 /**
  * Makes `read` unless the active output is text, and answers null there.
  * Text prints no event, so a reading only an event carries, such as a
- * pull request lookup over `gh` or a session log's tokens, is skipped
- * rather than paid for on every run.
+ * session log's tokens, is skipped rather than paid for on every run.
  */
 export async function unlessText<T>(read: () => Promise<T>): Promise<T | null> {
   return activeOutputMode() === 'text'

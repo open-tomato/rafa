@@ -497,6 +497,17 @@ was pushed while the working tree had conflicts), the run ends `blocked` with
 the step and branch named. With `pr.provider: none`, the pull-request check
 and creation are both skipped and the run advances directly to CI or closes.
 
+**The wrap-up emits `pr` or `no-pr` once, in every output mode.**
+`emitPullRequestEvent` (`src/start/wrap-up-run.ts`) writes the event to
+the run's events file whatever the mode, so `rafa loop wait` ends a text
+run on it as it does a json or events run. Json and events emit it right
+after the first wrap-up session, over a fresh lookup of the branch's open
+pull request. Text emits it at the delivery's place instead: over the
+delivered pull request's number with no lookup, and over a lookup when the
+delivery holds no number (blocked or interrupted), when a moved checkout
+halts the run first, or under `pr.provider: none`. Text still prints no
+line for it; the output, not the emit, decides what reaches stdout.
+
 **The retry configuration is `loop.wrapUp.retries`.** This config key (in
 `.rafa/config.yaml`) controls how many times the runner will retry the
 wrap-up session when no pull request is found. Valid values are:
