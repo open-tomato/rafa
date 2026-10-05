@@ -9,7 +9,9 @@
  *    `origin/main` and left unmerged: the worktree lacks the base's new
  *    commit and the branch tip is where it was.
  */
-import { execFileSync } from 'node:child_process';
+import type { GitRunner } from '../pr/git.js';
+
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,20 +30,34 @@ const BASE_FILE = 'base-moved.txt';
 
 const scratch: string[] = [];
 
+/** The environment every git here runs under: isolated config, scratch HOME, fixed identity. */
+function isolatedGitEnv(cwd: string): Record<string, string> {
+  return {
+    PATH: process.env.PATH ?? '',
+    HOME: cwd,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    ...gitIdentityEnv(),
+  };
+}
+
 /** Runs git in `cwd` under an isolated config and a fixed identity; answers trimmed stdout. */
 function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    env: {
-      PATH: process.env.PATH ?? '',
-      HOME: cwd,
-      GIT_CONFIG_GLOBAL: '/dev/null',
-      GIT_CONFIG_SYSTEM: '/dev/null',
-      ...gitIdentityEnv(),
-    },
-  }).trim();
+  return execFileSync('git', args, { cwd, encoding: 'utf8', env: isolatedGitEnv(cwd) }).trim();
 }
+
+/** The `seams.git` runner: the same isolated environment, so the catch-up merge has an identity. */
+const isolatedGitRunner = (root: string): GitRunner => (args) => {
+  const result = spawnSync('git', [...args], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...isolatedGitEnv(root), LC_ALL: 'C' },
+  });
+  if (result.error !== undefined) {
+    return { ok: false, stdout: '', stderr: `could not run git in ${root}: ${result.error.message}` };
+  }
+  return { ok: result.status === 0, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+};
 
 /** A project cloned from a bare origin holding one commit on `main`, plus the origin's path. */
 function plantProject(): { readonly project: string; readonly origin: string } {
@@ -106,7 +122,7 @@ describe('addRunWorktree over a real repository: claim catch-up', () => {
     git(project, 'checkout', BASE);
     const baseTip = moveBase(project, origin);
 
-    const outcome = addRunWorktree({ projectRoot: project, worktreeDir: WORKTREE_DIR, planStub: stub, base: BASE });
+    const outcome = addRunWorktree({ projectRoot: project, worktreeDir: WORKTREE_DIR, planStub: stub, base: BASE }, { git: isolatedGitRunner });
 
     expect(outcome.route).toBe('switch-local');
     expect(outcome.catchUp?.reading.kind).toBe('catch-up');
@@ -128,7 +144,7 @@ describe('addRunWorktree over a real repository: claim catch-up', () => {
     git(project, 'checkout', BASE);
     moveBase(project, origin);
 
-    const outcome = addRunWorktree({ projectRoot: project, worktreeDir: WORKTREE_DIR, planStub: stub, base: BASE });
+    const outcome = addRunWorktree({ projectRoot: project, worktreeDir: WORKTREE_DIR, planStub: stub, base: BASE }, { git: isolatedGitRunner });
 
     expect(outcome.catchUp?.reading).toMatchObject({ kind: 'behind', behind: 1, workCommits: 1 });
     expect(existsSync(join(outcome.path, BASE_FILE))).toBe(false);
