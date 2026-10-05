@@ -174,14 +174,14 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run propose from
     writeGhStub(scratch, ISSUES, LABELLED, []);
   });
 
-  it('before any switch, rafa next --dry-run proposes #102, the default board\'s epic\'s member', RUN_TIMEOUT, () => {
+  it('before any switch, rafa next --dry-run proposes #102, the default board\'s epic\'s member', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain(`#${String(READY_A)} is next on the roadmap and carries \`${SPEC_READY_LABEL}\``);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa switch 200 moves to it, then rafa next --dry-run proposes #202, naming neither #100 nor #102', RUN_TIMEOUT, () => {
+  it('rafa switch 200 moves to it, then rafa next --dry-run proposes #202, naming neither #100 nor #102', () => {
     const moved = runRafa(scratch, scratch.repo, ['switch', String(EPIC_B)]);
     expect(moved.exitCode).toBe(0);
 
@@ -192,9 +192,9 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run propose from
     expect(run.stdout).toContain(`create the plan for #${String(READY_B)}`);
     expect(run.stdout).not.toContain(`#${String(EPIC_A)}`);
     expect(run.stdout).not.toContain(`#${String(READY_A)}`);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa plan create --next --dry-run proposes from the same switched-to epic, #202, naming neither #100 nor #102', RUN_TIMEOUT, () => {
+  it('rafa plan create --next --dry-run proposes from the same switched-to epic, #202, naming neither #100 nor #102', () => {
     const run = runRafa(scratch, scratch.repo, ['plan', 'create', '--next', '--dry-run', '--no-progress']);
 
     expect(run.exitCode).toBe(0);
@@ -226,9 +226,9 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
     plantProjectConfig(scratch.repo, `${projectConfigText()}pr:\n  provider: gh\n  base: main\n`);
     gitSetup(scratch);
     writeGhStub(scratch, ISSUES, [], [{ number: ROADMAP, title: 'Roadmap' }]);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa next prints the roadmap exhausted, byte for byte, as it always did', RUN_TIMEOUT, () => {
+  it('rafa next prints the roadmap exhausted, byte for byte, as it always did', () => {
     const run = runRafa(scratch, scratch.repo, ['next']);
 
     // Spawned with no terminal to answer on and no --yes, `rafa next`
@@ -244,18 +244,18 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toBe(expected);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa epics prints no now epic, byte for byte, as it always did', RUN_TIMEOUT, () => {
+  it('rafa epics prints no now epic, byte for byte, as it always did', () => {
     const run = runRafa(scratch, scratch.repo, ['epics']);
 
     const expected = `${noNowEpicLine(ROADMAP)}\n`;
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toBe(expected);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa status prints its six section lines, byte for byte, with no place line under Board', RUN_TIMEOUT, () => {
+  it('rafa status prints its six section lines, byte for byte, with no place line under Board', () => {
     const run = runRafa(scratch, scratch.repo, ['status']);
 
     const expected = [
@@ -269,5 +269,5 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toBe(expected);
-  });
+  }, RUN_TIMEOUT);
 });
