@@ -19,10 +19,19 @@
  * | a file | its blob sha, as `git rev-parse HEAD:<path>` answers it | `blob:<sha>` |
  * | a symbol, a command, a flag, a key | that it exists | `present` |
  * | any target that does not exist | that it does not | `absent` |
+ * | a target but an issue that did not exist when first read | that it was new then | `new` |
  *
  * `absent` is both what a missing target reads live and what
  * `--accept-refs` stamps for one, so accepting a missing target is
  * writing its live fingerprint like any other.
+ *
+ * `new` is never a live reading — no target reads as `new` — and only
+ * a stamp: what a spec names before it exists, a file or a flag the
+ * plan is to add, kept apart from `absent` so a later reading can tell
+ * a target that never existed from one stamped present and since
+ * deleted. An issue or a cross-repository issue is never stamped
+ * `new`, and the codec refuses a block that stamps one so: an issue
+ * number that does not exist is a wrong number, not one to come.
  *
  * ## An issue's fingerprint
  *
@@ -59,15 +68,21 @@
  *
  *  1. `unknown` — the target could not be read ({@link UNREADABLE}),
  *     which only a cross-repository issue answers. It never refuses.
- *  2. With no stamp, `dangling` when the target is `absent` and `ok`
- *     otherwise: a target that does not exist is dangling even on the
- *     first read, and one that does is stamped and read as it is.
- *  3. `dangling` — the target is `absent` and the stamp is not.
- *  4. `ok` — both are `absent`: the missing target was accepted.
- *  5. `suspect` — the stamp is `absent` and the target now exists.
- *  6. `resolved` — the reference is an issue the spec waits on
+ *  2. With no stamp, a target that exists reads `ok`, and is stamped
+ *     and read as it is. One that is `absent` reads `new` when the
+ *     reference is any kind but `issue` or `cross-issue`, and
+ *     `dangling` when it is an issue or no kind was given
+ *     ({@link StampComparisonInput.kind}).
+ *  3. Stamped `new`, `new` while the target is still `absent` and
+ *     `ok` once it exists: it was named before it was made, and its
+ *     arrival is no change to what the spec said.
+ *  4. `dangling` — the target is `absent` and the stamp is not: a
+ *     target stamped present, a blob or an issue, and since gone.
+ *  5. `ok` — both are `absent`: the missing target was accepted.
+ *  6. `suspect` — the stamp is `absent` and the target now exists.
+ *  7. `resolved` — the reference is an issue the spec waits on
  *     (`Ref.blocker`, `./extract.ts`), stamped `open` and now `closed`.
- *  7. `ok` when the fingerprints are the same, `suspect` when not.
+ *  8. `ok` when the fingerprints are the same, `suspect` when not.
  *
  * `resolved` is read before sameness on purpose: a blocker that closed
  * is the news, and the `rafa issue unblock` it leads to is where the
@@ -98,6 +113,9 @@
  *   - kind: path
  *     text: "src/a.ts"
  *     stamp: "blob:<sha>"
+ *   - kind: path
+ *     text: "src/to-come.ts"
+ *     stamp: "new"
  * ```
  *
  * Headings are a list of pairs rather than a mapping because
@@ -170,16 +188,21 @@ export interface AbsentFingerprint {
   readonly kind: 'absent';
 }
 
+/** A stamp only: a target but an issue that did not exist on its first reading. */
+export interface NewFingerprint {
+  readonly kind: 'new';
+}
+
 /** What a target reads as when it was read, and what a stamp keeps. */
-export type Fingerprint = IssueFingerprint | BlobFingerprint | PresentFingerprint | AbsentFingerprint;
+export type Fingerprint = IssueFingerprint | BlobFingerprint | PresentFingerprint | AbsentFingerprint | NewFingerprint;
 
 /** A target the reader could not reach: a cross-repository issue it may not read. */
 export interface UnreadableTarget {
   readonly kind: 'unreadable';
 }
 
-/** What reading a target answers: its fingerprint, or that it could not be read. */
-export type LiveReading = Fingerprint | UnreadableTarget;
+/** What reading a target answers: its fingerprint, never `new`, or that it could not be read. */
+export type LiveReading = Exclude<Fingerprint, NewFingerprint> | UnreadableTarget;
 
 /** The fingerprint of a symbol, command, flag or key that exists. */
 export const PRESENT: PresentFingerprint = Object.freeze({ kind: 'present' });
@@ -187,11 +210,14 @@ export const PRESENT: PresentFingerprint = Object.freeze({ kind: 'present' });
 /** The fingerprint of a target that does not exist. */
 export const ABSENT: AbsentFingerprint = Object.freeze({ kind: 'absent' });
 
+/** The stamp of a target but an issue that did not exist when first read. */
+export const NEW: NewFingerprint = Object.freeze({ kind: 'new' });
+
 /** The reading of a target that could not be read. */
 export const UNREADABLE: UnreadableTarget = Object.freeze({ kind: 'unreadable' });
 
 /** What a reference reads as against its stamp; the module note holds the order. */
-export type RefState = 'ok' | 'dangling' | 'suspect' | 'resolved' | 'unknown';
+export type RefState = 'ok' | 'new' | 'dangling' | 'suspect' | 'resolved' | 'unknown';
 
 /** A reference's state and, for an issue, the headings whose text changed. */
 export interface StampComparison {
@@ -212,6 +238,11 @@ export interface StampComparisonInput {
   readonly stamp: Fingerprint | null;
   /** True when the spec waits on the target (`Ref.blocker`, `./extract.ts`). */
   readonly blocker: boolean;
+  /**
+   * What the reference points at. Left out, an absent target with no
+   * stamp reads `dangling` as an issue's does, never `new`.
+   */
+  readonly kind?: RefKind;
 }
 
 /** One reference's stamp, as the block keeps it. */
@@ -262,12 +293,15 @@ const ESCAPED = /[>\p{C}\p{Zl}\p{Zp}]/gu;
 const STAMPS_BY_KIND: Readonly<Record<RefKind, readonly Fingerprint['kind'][]>> = {
   'issue': ['issue', 'absent'],
   'cross-issue': ['issue', 'absent'],
-  'path': ['blob', 'present', 'absent'],
-  'symbol': ['present', 'absent'],
-  'command': ['present', 'absent'],
-  'flag': ['present', 'absent'],
-  'key': ['present', 'absent'],
+  'path': ['blob', 'present', 'absent', 'new'],
+  'symbol': ['present', 'absent', 'new'],
+  'command': ['present', 'absent', 'new'],
+  'flag': ['present', 'absent', 'new'],
+  'key': ['present', 'absent', 'new'],
 };
+
+/** The kinds a target absent on its first reading reads `dangling` for rather than `new`. */
+const ISSUE_KINDS: ReadonlySet<RefKind> = new Set(['issue', 'cross-issue']);
 
 /** `text` with LF line breaks and no trailing whitespace on any line or at its end. */
 export function normaliseIssueText(text: string): string {
@@ -343,13 +377,14 @@ export function blobFingerprint(sha: string): BlobFingerprint {
   return Object.freeze({ kind: 'blob', sha });
 }
 
-/** A fingerprint in one word: `present`, `absent`, `blob:<sha>` or `sha256:<hex>`. */
+/** A fingerprint in one word: `present`, `absent`, `new`, `blob:<sha>` or `sha256:<hex>`. */
 export function fingerprintText(fingerprint: Fingerprint): string {
   switch (fingerprint.kind) {
     case 'issue': return `sha256:${fingerprint.digest}`;
     case 'blob': return `blob:${fingerprint.sha}`;
     case 'present':
-    case 'absent': return fingerprint.kind;
+    case 'absent':
+    case 'new': return fingerprint.kind;
   }
 }
 
@@ -379,11 +414,17 @@ function comparison(state: RefState, changedHeadings: readonly string[] = []): S
  * order. Never throws.
  */
 export function compareToStamp(input: StampComparisonInput): StampComparison {
-  const { live, stamp, blocker } = input;
+  const { live, stamp, blocker, kind } = input;
   if (live.kind === 'unreadable') return comparison('unknown');
   if (stamp === null) {
-    return comparison(live.kind === 'absent'
+    if (live.kind !== 'absent') return comparison('ok');
+    return comparison(kind === undefined || ISSUE_KINDS.has(kind)
       ? 'dangling'
+      : 'new');
+  }
+  if (stamp.kind === 'new') {
+    return comparison(live.kind === 'absent'
+      ? 'new'
       : 'ok');
   }
   if (live.kind === 'absent') {
@@ -482,6 +523,7 @@ function readFingerprint(entry: unknown, what: string): Fingerprint {
   const stamp = stringField(field(entry, 'stamp'), `${what}: stamp`);
   if (stamp === 'present') return PRESENT;
   if (stamp === 'absent') return ABSENT;
+  if (stamp === 'new') return NEW;
   if (stamp.startsWith('blob:') && OBJECT_ID.test(stamp.slice('blob:'.length))) {
     return blobFingerprint(stamp.slice('blob:'.length));
   }
