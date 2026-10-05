@@ -797,7 +797,7 @@ describe('the pull request event in each output mode', () => {
     expect(WRAP_UP_RUN.lastIndexOf('await emitPullRequestEvent(\'delivery\', expected.branch, null, lookup);', halt)).toBeGreaterThan(-1);
     expect(delivered).toBeGreaterThan(-1);
     expect(delivered).toBeLessThan(interrupted);
-    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\('delivery', expected\.branch, null, \(\) => Promise\.resolve\(null\)\);\n\s*\}\n\s*if \(ciWait\)/);
+    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\('delivery', expected\.branch, null, lookup\);\n\s*\}\n\s*if \(ciWait\)/);
   });
 
   it('reads an emit planted before the session as being before it', () => {
