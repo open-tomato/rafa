@@ -723,7 +723,7 @@ describe('the flags each command declares', () => {
 
     expect(readers.length).toBeGreaterThan(0);
     expect(own.map(typedFlag).sort((a, b) => a.localeCompare(b))).toEqual(read);
-    expect(names.filter((name) => wrapper.includes(name))).toEqual(wrapper);
+    expect(names.filter((name) => wrapper.includes(name))).toEqual([...wrapper]);
   });
 
   it('reads a planted quoted flag literal, and none inside a message', () => {
