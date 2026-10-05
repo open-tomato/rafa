@@ -140,7 +140,8 @@ function world(): World {
   git(other, ['push', '-q', 'origin', 'main']);
 
   git(dir, ['clone', '-q', origin, caller]);
-  for (const [key, value] of [['user.name', 'rafa settle'], ['user.email', 'settle@example.invalid'], ['commit.gpgsign', 'false'], ['core.hooksPath', join(dir, 'no-hooks')]]) {
+  const identity: ReadonlyArray<readonly [string, string]> = [['user.name', 'rafa settle'], ['user.email', 'settle@example.invalid'], ['commit.gpgsign', 'false'], ['core.hooksPath', join(dir, 'no-hooks')]];
+  for (const [key, value] of identity) {
     git(caller, ['config', key, value]);
   }
   git(caller, ['switch', '-q', '-c', 'feat']);
