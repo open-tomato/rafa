@@ -286,7 +286,7 @@ export function createIssueCheckCommand(seams: IssueCheckSeams = {}): RafaComman
     action: 'check',
     summary: 'read the references a spec\'s saved copy names, each with its state',
     description: 'Reads the saved copy of issue <n> under `specs.dir` and prints every reference it names — an'
-      + ' issue, a file, an exported symbol, a command, a flag, a config key — with its state against the'
+      + ' issue, a file, a declared symbol, a command, a flag, a config key — with its state against the'
       + ' stamp the copy keeps: ok, dangling, suspect, resolved or unknown. A reference the copy keeps no'
       + ' stamp for is stamped on this read. Exits 0 whatever the states are, and plans nothing. A missing'
       + ' saved copy is refused, naming the `rafa plan create --issue=<n>` that writes one. With'

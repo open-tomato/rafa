@@ -137,7 +137,7 @@ request carry the same name: `rafa-42-<slug>`, `feat/rafa-42-<slug>`,
 `rafa-42: <title>`, with `Closes #42` in the pull request.
 
 Before any planning session starts, rafa also checks the references the
-spec makes: the other issues it names, and the files, exported symbols,
+spec makes: the other issues it names, and the files, declared symbols,
 `rafa` commands, flags and config keys it writes in backticks. The first
 time it reads one it records what the target held then, in a comment at
 the top of the saved copy. On every later run it compares again, and it

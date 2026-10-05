@@ -136,7 +136,7 @@ export type RefKind =
   | 'cross-issue'
   /** A file or directory of the repository. */
   | 'path'
-  /** An exported name. */
+  /** A name some TypeScript file declares. */
   | 'symbol'
   /** A rafa command, `rafa <subject> <action>`. */
   | 'command'

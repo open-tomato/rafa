@@ -1614,7 +1614,7 @@ New; it replaces no earlier text. What a row or an action added to
   through the same `gh` runner, and writes nothing. A same-repository
   issue the board listing holds is answered from the listing already
   read (`listedIssueReader`), and a `ts-symbols` outline is kept by the
-  outlined file's content under `.rafa/cache/outline/v1/`
+  outlined file's content under `.rafa/cache/outline/v2/`
   (`src/refs/outline-cache.ts`), so a second run outlines nothing that
   has not changed. In text mode over a Roadmap naming an epic the column
   is not read at all (`refsWhen: 'plain'` in `src/board/roadmap-rows.ts`),

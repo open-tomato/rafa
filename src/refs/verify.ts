@@ -18,7 +18,7 @@
  * | `issue` | {@link IssueReader} over `gh issue view` | its fingerprint, `absent`, or a throw |
  * | `cross-issue` | the same reader, with `--repo owner/repo` | its fingerprint, or `unreadable` on any failure |
  * | `path` | `git ls-files`, then `git rev-parse HEAD:<path>` | its blob sha, `present` or `absent` |
- * | `symbol` | `git grep` for `export … <name>` over tracked `.ts`, confirmed by `ts-symbols outline` | `present` or `absent` |
+ * | `symbol` | `git grep` for a line declaring `<name>` over tracked `.ts`, confirmed by `ts-symbols outline` where it can | `present` or `absent` |
  * | `command`, `flag` | the `describe` roster | `present` or `absent` |
  * | `key` | `SETTINGS` | `present` or `absent` |
  *
@@ -78,30 +78,65 @@
  *
  * ## Symbols
  *
- * The candidates are the tracked `.ts` files holding a line that opens
- * with `export` and names the symbol as a whole word, answered by `git
- * grep -l -E` over the pathspec `*.ts`. With no `ts-symbols` on `PATH`
- * ({@link RefVerifySeams.outline} null), a candidate is enough.
+ * A symbol is `present` when some tracked `.ts` file declares it, which
+ * `git grep --null -E` over the pathspec `*.ts` answers line by line. A
+ * line declares `name` in one of three forms, each opening the line
+ * after any white space:
  *
- * With it, each candidate is outlined in turn and the symbol is
- * `present` when one lists it as an exported top-level name — so a line
- * such as `export function f(): Name` does not make `Name` present. A
- * candidate `ts-symbols` could not outline counts as the grep found it.
- * Read off `ts-symbols outline --json` on 2026-09-24: `export const`,
- * `export default function`, `export enum`, `export class` and
- * `export declare const` are all `exported: true`, a barrel's `export
- * … from` lists nothing, and a name exported only through a local
- * `export { name }` list is `exported: false`. Every such list in this
- * repository re-exports a name another file declares `export const`,
- * which that file's outline confirms; a name exported ONLY through such
- * a list reads `absent` under `ts-symbols` and `present` without it. The
- * command takes one file (a second was ignored when tried) and took
- * 0.65s over `./stamp.ts`, which is why the grep narrows first rather
- * than every tracked file being outlined.
+ * | Form | Reads | Such as |
+ * |---|---|---|
+ * | keyword | `function`, `const`, `let`, `class`, `type` or `interface`, after any of `export`, `default`, `declare`, `abstract`, `async` | `function localHelper(`, `export const A =`, `function* gen` |
+ * | member or field | the name, bare or quoted, then `:` or `?:`, after any of `readonly`, `static`, `get` and the other member modifiers; inline after `{`, `,` or `;` on a line that does not open with `/` or `*` | `  readonly kind: …`, `  'quoted': 2,`, `const T = { field: 1 }` |
+ * | method | the name, then one parenthesised list (one level of nesting), then `:` or `{` | `  run(args: string): void;`, `  get size() {` |
+ *
+ * So a word in a `//` comment or a doc comment's ` * ` line declares
+ * nothing, and neither does a call opening a line (`callOnly(a, b);`,
+ * or `describe('x', () => {`, whose list does not close on the line) or
+ * a name standing only in a type (`const v: Foreign`). Missed: a
+ * method whose parameters span lines, a name destructured
+ * (`const { a } =`), and a second name of one `const a = 1, b = 2`.
+ * Read too: a parameter on a line of its own (`  name: string,`), which
+ * the field form cannot tell from a field. All of these were measured
+ * over a planted file on 2026-10-05.
+ *
+ * With no `ts-symbols` on `PATH` ({@link RefVerifySeams.outline} null),
+ * any declaring line is enough. With it, the outline confirms where it
+ * can, which was read off `ts-symbols outline --json` on 2026-10-05: it
+ * lists every top-level declaration, exported or not (`function`,
+ * `async function`, `function*`, `const`, `let`, `class`, `abstract
+ * class`, `type`, `interface`, `enum`, `declare const`, and `export
+ * default function f` as `f`), and one level of members under an
+ * interface, a class or an enum. It does NOT list an object literal's
+ * fields, a type literal's fields, or a declaration inside a body. Those
+ * are written indented, so:
+ *
+ *  1. a declaring line that opens with white space is `present` on the
+ *     grep alone, with nothing outlined: the outline cannot tell a
+ *     member it lists from a field it never lists;
+ *  2. otherwise each file holding a declaring line, all at the start of
+ *     their lines, is outlined in turn, and the symbol is `present` when
+ *     one lists it, a member included;
+ *  3. a file `ts-symbols` could not outline counts as the grep found it.
+ *
+ * Rule 2 is what refuses a line the grep reads wrongly at the start of a
+ * line, such as `const planted = 1;` inside a template literal: the
+ * outline lists the template's `const`, not `planted` (measured the same
+ * day). A barrel's `export … from` lists nothing and declares nothing
+ * here either, so a name only re-exported is found where it is
+ * declared. The command takes one file (a second was ignored when
+ * tried) and took 0.65s over `./stamp.ts` on 2026-09-24, which is why
+ * the grep narrows first rather than every tracked file being outlined.
+ *
+ * Measured against this repository with `ts-symbols` on `PATH` on
+ * 2026-10-05: the module-local `issueOf`, `pathTarget` and `trackedFiles`,
+ * the type alias `PathTarget` and the interface members `outline` and
+ * `roster` of {@link RefVerifySeams} read `present`, each of which the
+ * export-only grep this replaced read `absent`; two words no file holds
+ * read `absent` under both.
  *
  * `git grep` exits 1, writing nothing, when no line matches; the runner
  * answers that as not ok with an empty stderr, which reads as no
- * candidate. Not ok with anything on stderr throws.
+ * declaration. Not ok with anything on stderr throws.
  *
  * ## Commands and flags
  *
@@ -157,8 +192,9 @@ export type IssueRead =
 export type IssueReader = (number: number, repo?: string) => Promise<IssueRead>;
 
 /**
- * The names one TypeScript file exports at its top level, or null when
- * the file could not be outlined. Never rejects.
+ * The names one TypeScript file declares at its top level, exported or
+ * not, with each one's members, or null when the file could not be
+ * outlined. Never rejects.
  */
 export type SymbolOutliner = (file: string) => Promise<readonly string[] | null>;
 
@@ -205,6 +241,18 @@ const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
 /** A plain identifier; `./extract.ts` reads no other symbol. */
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+
+/** A line that opens with white space: a declaration below the top level, as written. */
+const INDENTED = /^\s/u;
+
+/** What may stand before a top-level keyword, each followed by white space. */
+const DECLARATION_MODIFIERS = '((export|default|declare|abstract|async)[[:space:]]+)*';
+
+/** What may stand before a member's or a field's name, each followed by white space. */
+const MEMBER_MODIFIERS = '((readonly|static|public|private|protected|abstract|override|declare|async|get|set)[[:space:]]+)*';
+
+/** A character no identifier holds: the end of a whole word. */
+const NOT_IDENTIFIER = '[^A-Za-z0-9_$]';
 
 /** A flag's name out of a global flag's spelling. */
 const SPELLED_FLAG = /--([a-z][a-z0-9-]*)/gu;
@@ -267,12 +315,20 @@ export interface OutlinerOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
-/** The exported top-level names a `ts-symbols outline --json` payload lists, or null when it lists none as it should. */
-function exportedNames(payload: unknown): readonly string[] | null {
+/** A listed symbol with its members, the one level `ts-symbols outline` lists under it. */
+function withMembers(symbol: unknown): readonly unknown[] {
+  const children = field(symbol, 'children');
+  return Array.isArray(children)
+    ? [symbol, ...(children as readonly unknown[])]
+    : [symbol];
+}
+
+/** Every name a `ts-symbols outline --json` payload lists, members included, or null when it lists none as it should. */
+function declaredNames(payload: unknown): readonly string[] | null {
   const symbols = field(payload, 'symbols');
   if (!Array.isArray(symbols)) return null;
   return symbols
-    .filter((symbol: unknown) => field(symbol, 'exported') === true)
+    .flatMap(withMembers)
     .map((symbol: unknown) => field(symbol, 'name'))
     .filter((name): name is string => typeof name === 'string');
 }
@@ -292,7 +348,7 @@ export function tsSymbolsOutliner(options: OutlinerOptions): SymbolOutliner | nu
   return async (file) => {
     const result = await run(['outline', file, '--json']);
     return result.ok
-      ? exportedNames(parsedJson(result.stdout))
+      ? declaredNames(parsedJson(result.stdout))
       : null;
   };
 }
@@ -367,30 +423,48 @@ function trackedFiles(git: GitRunner): readonly string[] {
   return result.stdout.split('\0').filter((file) => file !== '');
 }
 
-/** The `git grep -E` pattern for a line opening with `export` that names `name` as a whole word. */
-function exportPattern(name: string): string {
-  return `^[[:space:]]*export[[:space:]](.*[^A-Za-z0-9_$])?${name}([^A-Za-z0-9_$]|$)`;
+/**
+ * The `git grep -E` patterns for a line declaring `name`, one per form the
+ * module note's table lists: a keyword's, a member's or field's, a method's.
+ */
+function declarationPatterns(name: string): readonly string[] {
+  const written = `(${name}|'${name}'|"${name}")`;
+  return [
+    `^[[:space:]]*${DECLARATION_MODIFIERS}(function[[:space:]*]+|(const|let|class|type|interface)[[:space:]]+)${name}(${NOT_IDENTIFIER}|$)`,
+    `^[[:space:]]*(([^/*[:space:]].*)?[{,;][[:space:]]*)?${MEMBER_MODIFIERS}${written}[?!]?[[:space:]]*:`,
+    `^[[:space:]]*${MEMBER_MODIFIERS}${written}[?]?[[:space:]]*(<[^>]*>)?\\(([^()]|\\([^()]*\\))*\\)[[:space:]]*[:{]`,
+  ];
 }
 
-/** The tracked `.ts` files with an `export … <name>` line; throws when git cannot say. */
-function exportCandidates(name: string, git: GitRunner): readonly string[] {
-  const result = git(['grep', '-l', '-E', '-e', exportPattern(name), '--', '*.ts']);
-  if (result.ok) return result.stdout.split('\n').filter((file) => file !== '');
-  if (result.stderr.trim() === '') return [];
-  throw new RefVerifyError(`git grep for ${name} failed: ${gitSaid(result)}`);
+/** One line `git grep` read as declaring a name, and the file it sits in. */
+interface DeclarationLine {
+  readonly file: string;
+  readonly text: string;
 }
 
-/** A symbol's reading: `present` when a candidate file exports it, by the rules in the module note. */
+/** The lines of tracked `.ts` files that declare `name`; throws when git cannot say. */
+function declarationLines(name: string, git: GitRunner): readonly DeclarationLine[] {
+  const patterns = declarationPatterns(name).flatMap((pattern) => ['-e', pattern]);
+  const result = git(['grep', '--null', '-E', ...patterns, '--', '*.ts']);
+  if (!result.ok && result.stderr.trim() === '') return [];
+  if (!result.ok) throw new RefVerifyError(`git grep for ${name} failed: ${gitSaid(result)}`);
+  return result.stdout
+    .split('\n')
+    .filter((line) => line.includes('\0'))
+    .map((line) => {
+      const end = line.indexOf('\0');
+      return { file: line.slice(0, end), text: line.slice(end + 1) };
+    });
+}
+
+/** A symbol's reading: `present` when some tracked file declares it, by the rules in the module note. */
 async function verifySymbol(name: string, git: GitRunner, outline: SymbolOutliner | null): Promise<LiveReading> {
   if (!IDENTIFIER.test(name)) return ABSENT;
 
-  const candidates = exportCandidates(name, git);
-  if (outline === null) {
-    return candidates.length > 0
-      ? PRESENT
-      : ABSENT;
-  }
-  for (const file of candidates) {
+  const lines = declarationLines(name, git);
+  if (lines.length === 0) return ABSENT;
+  if (outline === null || lines.some((line) => INDENTED.test(line.text))) return PRESENT;
+  for (const file of new Set(lines.map((line) => line.file))) {
     const names = await outline(file);
     if (names === null || names.includes(name)) return PRESENT;
   }
