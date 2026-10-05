@@ -584,6 +584,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',

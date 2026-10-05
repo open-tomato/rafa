@@ -1542,7 +1542,12 @@ New; it replaces no earlier text. What a row or an action added to
   priority unless a flag names one, its body `--body` or the bytes of the
   file `--body-file` names (standard input for `-`, a seam of the
   factory), the two refused together and an unreadable file refused
-  before the chain is resolved; `comment` posts `--body`; and `move`
+  before the chain is resolved; a `spec` whose body carries a
+  `Blocked by:` line is read through `readBlockedBy`
+  (`issue/create-blocked.ts`) and filed with `specBlocked` when the line
+  reads, refused naming the fault when it names no issue (before the
+  chain), the issue being filed or an issue the board's `find` listing
+  lacks (before `create`); `comment` posts `--body`; and `move`
   moves an issue to a state, writing a `warning` the tracker answers at
   `warn` and still exiting 0. In json mode the result's `data` holds the
   tracker (its kind, whether the chain degraded, and why) beside the

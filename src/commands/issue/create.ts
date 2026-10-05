@@ -35,6 +35,19 @@
  * permission), is refused without reading the config, running a
  * preflight or filing anything.
  *
+ * ## A spec's `Blocked by:` line
+ *
+ * A `spec` draft whose body carries a `Blocked by: #24 #26` line is
+ * filed with `specBlocked`, which the `github` adapter writes as the
+ * board's `spec:blocked` label. The line is read through `readBlockedBy`
+ * in `./create-blocked.ts`: a line naming no issue is refused before the
+ * chain is resolved, and one naming the issue being filed or an issue
+ * the board has no number for is refused once the chain has landed and
+ * the board's issues are listed, before anything is filed. A board too
+ * large to list whole has no id checked, and a `warn` line says so. A
+ * draft of another type, or a spec with no such line, is filed as its
+ * flags made it.
+ *
  * The adapter checks the draft again. `github` refuses a module holding a
  * comma, which `gh` would read as two labels, and makes every label it
  * sends before it files. `local` writes the file `<number>.md` under
@@ -56,17 +69,21 @@
  * set, a blank `--module`, a config refused, a chain landing nowhere, and
  * a `create` that rejects. Two more are this action's own, each naming
  * the usage line: `--body` beside `--body-file`, and a body file that
- * cannot be read, naming the path and the reason the read gave.
+ * cannot be read, naming the path and the reason the read gave. A third,
+ * a spec's `Blocked by:` line read as a fault, names the line and the
+ * fault and no usage line, since the fix is in the body; a board listing
+ * that rejects is refused as any other tracker call.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { IssueDraft, IssueRef, IssueType } from '../../ports/index.js';
+import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index.js';
 
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { messageOf } from '../../config-sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
+import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueName,
@@ -163,10 +180,21 @@ export function renderCreated(ref: IssueRef): string[] {
 /** Files the issue a line describes; see the module note. */
 export async function createIssue(context: RafaContext, seams: IssueSeams): Promise<IssueCreateResult> {
   expectNoArgument(context.args, USAGE);
-  const draft = await readIssueLine(context.flags, seams);
+  const read = await readIssueLine(context.flags, seams);
+  const blockedLine = readSpecLine(read);
   const { tracker, data } = await resolveIssueTracker(context, seams);
+  const draft = blockedLine === null
+    ? read
+    : await settledDraft(read, tracker, context);
   const ref = await onTracker(tracker, 'create the issue', () => tracker.create(draft));
   return { tracker: data, ref };
+}
+
+/** The spec draft {@link settleSpecLine} answers, its unchecked sentence written at `warn`. */
+async function settledDraft(read: IssueDraft, tracker: Tracker, context: RafaContext): Promise<IssueDraft> {
+  const settled = await settleSpecLine(read, tracker);
+  if (settled.unchecked !== null) context.output.warn(`issue create: ${settled.unchecked}`);
+  return settled.draft;
 }
 
 /** The command, resolving the chain with `seams`; see the module note. */
@@ -180,7 +208,9 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
       + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
       + ' `--title` is required. The issue is of type `code` and module `unassigned` unless `--type` and'
       + ' `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. The body is'
-      + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. Prints the'
+      + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
+      + ' carries a `Blocked by: #24` line is filed blocked, and refused when the line names no issue, the'
+      + ' issue itself or an issue the board does not hold. Prints the'
       + ' tracker and id of the issue filed, and its URL when there is one. With `--output=json` the tracker'
       + ' and the ref are the data of the terminal result event.',
     args: [],

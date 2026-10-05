@@ -17,6 +17,13 @@
  * the same. A seam that rejects when read stands in for standard input
  * wherever a case must not read it.
  *
+ * A spec's `Blocked by:` line is driven on the fake and on `local` over
+ * a board whose first issue a case files itself: a line naming it files
+ * the spec marked blocked, beside a bug with the same line filed
+ * unmarked, and a line naming the issue being filed, an issue the board
+ * lacks or no issue at all is refused with the issue count unchanged,
+ * the last before any `gh` runs.
+ *
  * The spawned case runs `bun src/rafa.ts issue create` in a scratch
  * repository whose config names `github` first, under a PATH holding a
  * stand-in `gh` that logs its arguments and exits 1. So the registered
@@ -36,6 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
+import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { SPEC_LABEL } from '../../board/issue.js';
 import { CommandExit } from '../../cli/command.js';
 import {
@@ -47,6 +55,7 @@ import {
   runRafa,
 } from '../../tests/cli-capture.js';
 
+import { KNOWN_LIST_LIMIT } from './create-blocked.js';
 import {
   createIssueCreateCommand,
   readBodyFile,
@@ -72,6 +81,9 @@ const USAGE = 'rafa issue create --title=<text> [--body=<text> | --body-file=<pa
 
 /** The subject the dispatched cases route under. */
 const SUBJECTS = [{ name: 'issue', summary: 'issues' }];
+
+/** What a refused `Blocked by:` line tells the author to do. */
+const BLOCKED_REMEDY = 'name the issues it waits on as "Blocked by: #24 #26", or take the line out';
 
 /** A config naming `local` first. */
 const LOCAL_CONFIG = 'tracker:\n  default: local\n';
@@ -384,7 +396,7 @@ describe('rafa issue create, dispatched', () => {
     const command = createIssueCreateCommand({ gh: fake.run, stdin: seam.stdin });
     const path = plantBodyFile(FILE_BODY);
 
-    const fromFile = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', `--body-file=${path}`], SUBJECTS, [command], project);
+    const fromFile = await dispatchInProject(['issue', 'create', '--title=A spec', `--body-file=${path}`], SUBJECTS, [command], project);
     const fromStdin = await dispatchInProject(['issue', 'create', '--title=Piped', '--body-file=-'], SUBJECTS, [command], project);
 
     expect([fromFile.exitCode, fromStdin.exitCode]).toEqual([0, 0]);
@@ -448,6 +460,91 @@ describe('rafa issue create, dispatched', () => {
     expect(refusedState).toEqual([0, false]);
     expect(taken.exitCode).toBe(0);
     expect([fake.calls().length > 0, existsSync(localIssuesDir(project.root))]).toEqual([true, true]);
+  });
+});
+
+describe('rafa issue create, a spec\'s Blocked by: line', () => {
+  it('files a spec naming an issue the gh fake holds with spec:blocked, and a bug with the same line without it', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const command = createIssueCreateCommand({ gh: fake.run });
+
+    const first = await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+    const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1\n\nThe spec.'], SUBJECTS, [command], project);
+    const bug = await dispatchInProject(['issue', 'create', '--title=A bug', '--type=bug', '--body=Blocked by: #1'], SUBJECTS, [command], project);
+
+    expect([first.exitCode, spec, bug.exitCode]).toEqual([
+      0,
+      { exitCode: 0, stdout: 'Created github issue 2.\nURL: https://github.com/open-tomato/rafa/issues/2\n', stderr: '' },
+      0,
+    ]);
+    expect(fake.issue('2')?.labels).toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.issue('2')?.labels).toContain(SPEC_LABEL);
+    expect(fake.issue('3')?.labels).not.toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.calls()).toContainEqual(['issue', 'list', '--state', 'all', '--json', 'number,url,labels', '--limit', String(KNOWN_LIST_LIMIT)]);
+  });
+
+  it('files a spec with no line unmarked and lists no board for it', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+
+    const outcome = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=The spec.'], SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fake.issue('1')?.labels).not.toContain(SPEC_BLOCKED_LABEL);
+    expect(fake.calls().some((call) => call[0] === 'issue' && call[1] === 'list')).toBe(false);
+  });
+
+  it('refuses a line naming the issue being filed and one naming an issue the board lacks, filing nothing', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const command = createIssueCreateCommand({ gh: fake.run });
+    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+
+    const itself = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #2'], SUBJECTS, [command], project);
+    const unknown = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #7'], SUBJECTS, [command], project);
+
+    expect(itself).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names #2, the number this issue would be filed as: ${BLOCKED_REMEDY}\n`,
+    });
+    expect(unknown).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names #7, which the board has no issue for: ${BLOCKED_REMEDY}\n`,
+    });
+    expect(fake.issueCount()).toBe(1);
+  });
+
+  it('refuses a line naming no issue before resolving the tracker, running no gh and filing nothing', async () => {
+    const fake = createFakeGh();
+    const project = plantCase(GITHUB_CONFIG);
+    const path = plantBodyFile('Blocked by: the API work\n');
+
+    const outcome = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', `--body-file=${path}`], SUBJECTS, [createIssueCreateCommand({ gh: fake.run, stdin: unreadStdin })], project);
+
+    expect(outcome).toEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: `❌ The spec's "Blocked by:" line, line 1 of the body, names no issue: "the API work": ${BLOCKED_REMEDY}\n`,
+    });
+    expect([fake.calls().length, fake.issueCount(), existsSync(localIssuesDir(project.root))]).toEqual([0, 0, false]);
+  });
+
+  it('records specBlocked in the local issue file for a line naming a local issue, and refuses one naming itself', async () => {
+    const project = plantCase(LOCAL_CONFIG);
+    const command = createIssueCreateCommand();
+    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+
+    const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1'], SUBJECTS, [command], project);
+    const itself = await dispatchInProject(['issue', 'create', '--title=Another', '--type=spec', '--body=Blocked by: #3'], SUBJECTS, [command], project);
+
+    expect(spec).toEqual({ exitCode: 0, stdout: 'Created local issue 2.\n', stderr: '' });
+    expect(localIssue(project, 2).draft.specBlocked).toBe(true);
+    expect(localIssue(project, 1).draft.specBlocked).toBeUndefined();
+    expect([itself.exitCode, itself.stderr]).toEqual([1, expect.stringContaining('names #3, the number this issue would be filed as')]);
+    expect(existsSync(join(localIssuesDir(project.root), '3.md'))).toBe(false);
   });
 });
 
