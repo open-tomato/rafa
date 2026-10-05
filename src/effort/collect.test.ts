@@ -65,6 +65,9 @@
  * failed log read instead of counting it, and dropping the `--no-git`
  * line from the summary. The rewire took those two key projections out
  * of this module: the projection is the port's now.
+ * The cases that caught five of them — the `isFile` guard, the name
+ * match, the order, the missing directory and the dot — moved with
+ * the functions they cover to `session-log-dirs.test.ts`.
  *
  * Thirteen more were driven against the rewire, eleven in this module
  * and two in the port, with the restored files green either side and
@@ -96,8 +99,9 @@
  * each field dropped fails with TS2741, and `remote` with TS2322, so
  * the mode is held at `local` by the compiler as well as by this suite.
  */
-import type { CollectOptions, SessionLogCandidate } from './collect.js';
+import type { CollectOptions } from './collect.js';
 import type { CommitLogParseResult, CommitStats } from './commits.js';
+import type { SessionLogCandidate } from './session-log-dirs.js';
 import type { EffortStore } from './store/types.js';
 
 import {
@@ -125,15 +129,13 @@ import {
   collectEffort,
   collectSessionRow,
   formatCollectSummary,
-  listSessionLogs,
   parseCollectArgs,
   parseSinceInstant,
-  projectLogDirName,
   readPlanStubs,
   selectCommits,
   selectSessionLogs,
-  sessionLogDir,
 } from './collect.js';
+import { listSessionLogs } from './session-log-dirs.js';
 import { openNdjsonStore, openSqliteStore } from './store/index.js';
 
 /** The task prompt's prefix, taken from the shape that declares it. */
@@ -274,23 +276,6 @@ function plantedCommits(rows: readonly CommitStats[]): PlantedCommits {
   };
 }
 
-describe('the project log directory', () => {
-  it('replaces every slash and dot with a hyphen', () => {
-    expect(projectLogDirName('/Users/dev/projects/agentic-research'))
-      .toBe('-Users-dev-projects-agentic-research');
-  });
-
-  it('doubles the hyphen for a dot-directory segment', () => {
-    expect(projectLogDirName('/Users/dev/repo/.claude/worktrees/x'))
-      .toBe('-Users-dev-repo--claude-worktrees-x');
-  });
-
-  it('files the encoded name under the projects root', () => {
-    expect(sessionLogDir('/Users/dev/repo', '/home'))
-      .toBe(join('/home', '.claude', 'projects', '-Users-dev-repo'));
-  });
-});
-
 describe('parseCollectArgs', () => {
   it('collects both halves and stays quiet by default', () => {
     const parsed = parseCollectArgs([]);
@@ -410,66 +395,6 @@ describe('parseSinceInstant', () => {
   it('answers null for an empty value', () => {
     expect(parseSinceInstant('')).toBeNull();
     expect(parseSinceInstant('  ')).toBeNull();
-  });
-});
-
-describe('listSessionLogs', () => {
-  it('takes the loose logs and nothing one level down', () => {
-    const dir = makeScratch();
-    writeLog(dir, 'aaa', ['{}']);
-    writeLog(dir, 'bbb', ['{}']);
-    mkdirSync(join(dir, 'aaa', 'subagents'), { recursive: true });
-    writeFileSync(join(dir, 'aaa', 'subagents', 'agent-1.jsonl'), '{}\n');
-
-    const ids = listSessionLogs(dir).map((entry) => entry.sessionId);
-
-    expect(ids.sort()).toEqual(['aaa', 'bbb']);
-  });
-
-  it('skips a directory whose name ends in .jsonl', () => {
-    const dir = makeScratch();
-    writeLog(dir, 'real', ['{}']);
-    mkdirSync(join(dir, 'decoy.jsonl'));
-
-    expect(listSessionLogs(dir).map((e) => e.sessionId)).toEqual(['real']);
-  });
-
-  it('skips a file that is not a session log', () => {
-    const dir = makeScratch();
-    writeLog(dir, 'real', ['{}']);
-    writeFileSync(join(dir, 'notes.md'), 'hello\n');
-    writeFileSync(join(dir, '.DS_Store'), 'x\n');
-
-    expect(listSessionLogs(dir).map((e) => e.sessionId)).toEqual(['real']);
-  });
-
-  it('carries each log size and modification time', () => {
-    const dir = makeScratch();
-    const body = '{"a":1}';
-    writeLog(dir, 'one', [body]);
-
-    const found = listSessionLogs(dir);
-
-    expect(found).toHaveLength(1);
-    expect(found[0]?.sizeBytes).toBe(body.length + 1);
-    expect(found[0]?.modifiedAtMs).toBeGreaterThan(0);
-    expect(found[0]?.path).toBe(join(dir, 'one.jsonl'));
-  });
-
-  it('orders oldest first', () => {
-    const dir = makeScratch();
-    const older = writeLog(dir, 'zzz', ['{}']);
-    writeLog(dir, 'aaa', ['{}']);
-    utimesSync(older, 1_600_000, 1_600_000);
-
-    expect(listSessionLogs(dir).map((e) => e.sessionId))
-      .toEqual(['zzz', 'aaa']);
-  });
-
-  it('throws rather than reading a missing directory as empty', () => {
-    const dir = join(makeScratch(), 'not-there');
-
-    expect(() => listSessionLogs(dir)).toThrow(/no session log directory/);
   });
 });
 
