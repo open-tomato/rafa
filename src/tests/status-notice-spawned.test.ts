@@ -26,7 +26,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { NOTICE_PREFIX } from '../status/notice.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 120_000 };
@@ -107,7 +107,7 @@ describe('the since-last-command notice, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, PLAIN);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(noticeLines(run.stderr)).toEqual([]);
     expect(existsSync(join(scratch.repo, SEEN_PATH))).toBe(true);
   });
@@ -118,7 +118,7 @@ describe('the since-last-command notice, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, PLAIN);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(noticeLines(run.stderr)).toEqual([]);
   });
 
@@ -131,7 +131,7 @@ describe('the since-last-command notice, spawned', () => {
     const crossing = runRafa(scratch, scratch.repo, PLAIN);
     const after = runRafa(scratch, scratch.repo, PLAIN);
 
-    expect(crossing.exitCode).toBe(0);
+    expectExit(crossing, 0, scratch);
     const lines = noticeLines(crossing.stderr);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('1 worktree went idle');
@@ -147,7 +147,7 @@ describe('the since-last-command notice, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, [...PLAIN, '--output=json']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(noticeLines(run.stderr)).toEqual([]);
     expect(noticeLines(run.stdout)).toEqual([]);
   });
@@ -160,7 +160,7 @@ describe('the since-last-command notice, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, PLAIN);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(noticeLines(run.stderr)).toEqual([]);
     expect(existsSync(join(scratch.repo, SEEN_PATH))).toBe(false);
   });
@@ -187,8 +187,8 @@ describe('the since-last-command notice, spawned', () => {
     const first = runRafa(scratch, scratch.repo, PLAIN);
     const second = runRafa(scratch, scratch.repo, PLAIN);
 
-    expect(first.exitCode).toBe(0);
-    expect(second.exitCode).toBe(0);
+    expectExit(first, 0, scratch);
+    expectExit(second, 0, scratch);
     const calls = readFileSync(log, 'utf8').split('\n')
       .filter((line) => line !== '');
     expect(calls.some((line) => line.startsWith('git '))).toBe(true);

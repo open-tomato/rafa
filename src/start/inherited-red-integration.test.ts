@@ -27,6 +27,8 @@
  * task's, for the `## Failures this run inherited` section naming the
  * failure by file and case.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { localIssuesDir } from '../adapters/tracker/local.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -272,15 +274,8 @@ function plant(): Scratch {
   return scratch;
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
@@ -316,7 +311,7 @@ describe('a bug reported for a test already red before the run starts', () => {
     const run = runLoopStart(scratch);
     const output = `${run.stdout}\n${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     // The task's session and the wrap-up's, neither retried.
     expect(callCount(scratch)).toBe(2);
 

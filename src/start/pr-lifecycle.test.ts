@@ -262,6 +262,7 @@ function detail(
     mergeable,
     mergeStateStatus,
     labels: [],
+    closes: [],
   };
 }
 

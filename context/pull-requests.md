@@ -10,8 +10,10 @@ Seven actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
-- `pr show [<n>]` — details: title, author, branch → base, mergeable, each
-  check with its state and link, last triage comment
+- `pr show [<n>]` — details: title, author, branch → base, mergeable, the
+  issues it closes (an issue the provider links that the body does not name,
+  and one the body names by keyword that the provider does not link, are
+  marked), each check with its state and link, last triage comment
 - `pr view [<n>]` — open it in the browser
 - `pr list` — open PRs: `#n`, title, branch, age, checks verdict, mergeable,
   and where the release is on the forecast its body carries, marked
@@ -569,45 +571,53 @@ the session check 3 is part of, so a refusal from it spends no session:
 4. References (`src/board/refs-gate.ts`, placed on the command by
    `src/commands/plan/refs-check.ts`): every reference the saved copy's
    body names — an issue `#<n>`, `rafa-<n>` or `owner/repo#<n>`, and in
-   backticks a path, a code-shaped symbol, a `rafa <subject> <action>`
-   command and a config key, and a flag either way (the seven kinds of
-   `src/refs/extract.ts`) — read against the stamp the copy keeps for it in its
-   `<!-- rafa:refs` block. It runs on `--issue` and `--next` only, once
-   checks 0–2 have passed and the snapshot has settled and once the
-   plan-already-there refusal has passed, and before the `progress.txt`
-   read, the notices and the session. `--spec` has no saved copy,
-   `--dry-run` stops before any snapshot is written and so before it,
+   backticks a path, a symbol at declaration position, a `rafa <subject> <action>`
+   command and a config key, and a flag only inside a code span opening with
+   `rafa` (the seven kinds of `src/refs/extract.ts`) — read against the
+   stamp the copy keeps for it in its `<!-- rafa:refs` block. It runs on
+   `--issue` and `--next` only, once checks 0–2 have passed and the snapshot
+   has settled and once the plan-already-there refusal has passed, and before
+   the `progress.txt` read, the notices and the session. `--spec` has no saved
+   copy, `--dry-run` stops before any snapshot is written and so before it,
    and neither `plan needs --issue` nor `issue ready` runs it.
 
-   A reference the copy keeps no stamp for is stamped on that reading
-   and reads `ok`, except a target that does not exist, which is
-   `dangling` on its first read. What each state does:
+   On each reading, a reference stamped on the copy is verified: the target
+   exists (a path through git, a symbol in the checkout's `describe` roster,
+   a command and config key through the roster, an issue through the board),
+   and on a non-issue kind, the blob or text has not changed since the stamp
+   was written. Targets that change in ways not shown by the stamp read
+   `drift` and stop the gate; targets verified to hold their fingerprint read
+   `ok`. An issue whose state query cannot be run reads `unknown` and goes on.
+   A reference the copy keeps no stamp for is stamped on that reading and
+   reads `ok`.
+
+   What each state does:
 
    | State | What check 4 does |
    |---|---|
    | `ok` | nothing |
-   | `dangling`, `suspect` | refuses, exit 2, every such row on its own line |
+   | `drift` | refuses, exit 2, each row with why it drifted |
+   | `dangling` | issue number that does not exist, reads as part of initial stamping, not in a reread |
    | `resolved` | prints `resolved #<n> — rafa issue unblock <spec>` and goes on |
    | `unknown` | lists the row (a repository `gh` could not read) and goes on |
 
-   The refusal opens `❌ issue #<n> names references that are missing
-   or changed since the spec was read:`, lists each row as
-   `• dangling src/a.ts (line 12)` or `• suspect #7: heading "Design"
-   changed (line 3)` — the line is the body's, as the issue was
-   written — and ends naming the two ways past it: pass `--accept-refs`
-   on this run, or edit the issue. A board issue `gh` could not read and
-   a refs block the codec will not read refuse with the same exit code
-   and the error's own words.
+   The refusal opens `❌ issue #<n> names references that have drifted
+   since the spec was read:`, lists each row as `• drift src/a.ts (line 12)`
+   or `• drift #7: heading "Design" changed (line 3)` — the line is the
+   body's, as the issue was written — and ends naming the two ways past it:
+   pass `--accept-refs` on this run, or edit the issue. A board issue `gh`
+   could not read and a refs block the codec will not read refuse with the
+   same exit code and the error's own words.
 
-   `--accept-refs` re-stamps every reference of the spec as reviewed,
-   a missing target as `absent`, which then reads `ok` until the target
-   appears, prints `🔖 --accept-refs: re-stamped <count> references of
+   `--accept-refs` re-stamps every reference of the spec as reviewed, stamps
+   a non-existent non-issue target `absent`, which then reads `ok` until the
+   target appears, prints `🔖 --accept-refs: re-stamped <count> references of
    issue #<n> as reviewed.` with each row it let through, and plans.
-   `dangerous.acceptStaleRefs: true` in the config does the same on
-   every run and names itself in that line; it also prints one warn
-   line at the very start of a board-route run that is not `--dry-run`,
-   before any board read, so a forgotten setting is seen before
-   anything is spent. When both are on, the flag is the one named.
+   `dangerous.acceptStaleRefs: true` in the config does the same on every run
+   and names itself in that line; it also prints one warn line at the very
+   start of a board-route run that is not `--dry-run`, before any board read,
+   so a forgotten setting is seen before anything is spent. When both are on,
+   the flag is the one named.
 
 `--skip-review` bypasses check 3 only, and the plan's `rafa:plan` block
 records `review: skipped`. No flag but `--accept-refs`, and no setting
@@ -697,7 +707,8 @@ refuses a body matching a home path or a token shape, naming the line.
 
 `rafa init --board` sets up the board: labels `type:spec`, `spec:ready`,
 `spec:needs-work`, and the ones triage already files under (`type:bug`,
-`needs-triage`, `module:unassigned`); `.github/ISSUE_TEMPLATE/spec.md` when
+`needs-triage`, `module:unassigned`) and `module:cli-gap`, the module a
+session's gap report is filed under; `.github/ISSUE_TEMPLATE/spec.md` when
 absent; and a pinned "Roadmap" issue from a template body when none exists.
 The Roadmap issue is opened with `--label type:roadmap`, and an open issue
 titled "Roadmap" that it adopts instead gets that label added when it

@@ -17,8 +17,8 @@
  * member the union lacks, so `check-types` fails on a list that drifts
  * from its port union either way. The keys come back in the order the
  * record spells them, which is the source's order: lifecycle order for
- * the states. The one exception is `epic`, rafa's own type, which the
- * source lacks and which comes last.
+ * the states. The exceptions are `epic` and `spec`, rafa's own types,
+ * which the source lacks and which come last, in that order.
  */
 import type { IssuePriority, IssueState, IssueType } from '../../ports/index.js';
 
@@ -31,6 +31,7 @@ const TYPE_MEMBERS = {
   'chore': true,
   'package-api': true,
   'epic': true,
+  'spec': true,
 } satisfies Record<IssueType, true>;
 
 /** Every priority, closed over {@link IssuePriority}. */
@@ -52,7 +53,7 @@ const STATE_MEMBERS = {
   'cancelled': true,
 } satisfies Record<IssueState, true>;
 
-/** Every issue type, in the source's order with `epic` last. Frozen. */
+/** Every issue type, in the source's order with `epic` and `spec` last. Frozen. */
 export const ISSUE_TYPES: readonly IssueType[] = Object.freeze(
   Object.keys(TYPE_MEMBERS) as IssueType[],
 );

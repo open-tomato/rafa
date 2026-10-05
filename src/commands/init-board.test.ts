@@ -448,6 +448,27 @@ describe('whether the step runs', () => {
     ]));
   });
 
+  it('creates the module:cli-gap label gap reports are filed under, under --board', async () => {
+    const gh = fakeGh();
+    const root = freshRoot('cli-gap-label');
+
+    const result = await runBoardStep({
+      wanted: true,
+      provider: 'gh',
+      root,
+      openGh: () => gh.run,
+      isTerminal: () => false,
+      openPrompter: noPrompter,
+    });
+
+    const created = gh.calls()
+      .filter((args) => args[0] === 'label' && args[1] === 'create')
+      .map((args) => args[2]);
+    expect(created).toContain('module:cli-gap');
+    expect(BOARD_LABELS.map((label) => label.name)).toContain('module:cli-gap');
+    expect(renderBoardStep(result)).toContain('  created  label module:cli-gap');
+  });
+
   it('creates the Roadmap issue with --label type:roadmap under --board, after the label is made', async () => {
     const gh = fakeGh();
     const root = freshRoot('roadmap-label');

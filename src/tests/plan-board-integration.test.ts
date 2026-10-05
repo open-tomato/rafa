@@ -72,6 +72,7 @@
  * `origin` through `git` for the label a refusal would carry, which a
  * scratch repository answers with no remote.
  */
+import type { CapturedRun } from './cli-capture.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
@@ -116,7 +117,7 @@ import { pickLine, roadmapHeaderLine, skipLine } from '../board/spec-source-road
 import { describeIssue, dryRunLine } from '../board/spec-source.js';
 import { tickRoadmapAfterMerge } from '../commands/pr/merge-tick.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
@@ -404,10 +405,7 @@ function claimWithBranch(scratch: Scratch, issue: number, suffix: string): void 
 }
 
 /** What one command run did, and the record path it may have written. */
-interface CommandRun {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
+interface CommandRun extends CapturedRun {
   readonly record: string;
 }
 
@@ -493,7 +491,7 @@ describe('plan create --next, walked end to end over one stubbed gh', () => {
 
     const run = runPlan(scratch, 'picked', ['--next', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     const branchRef = 'refs/heads/feat/rafa-22-taken';
     const positions = positionsOf(run.stdout, expectedWalkLines(branchRef));
     expect(positions.every((position) => position >= 0)).toBe(true);
@@ -526,7 +524,7 @@ describe('plan create --next, walked end to end over one stubbed gh', () => {
 
     const run = runPlan(scratch, 'dry-run', ['--next', '--dry-run', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     const branchRef = 'refs/heads/feat/rafa-22-taken';
     const positions = positionsOf(run.stdout, [
       ...expectedWalkLines(branchRef),
@@ -549,7 +547,7 @@ describe('plan create --next, walked end to end over one stubbed gh', () => {
 
     const run = runPlan(scratch, 'exhausted', ['--next', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stdout).toContain('issue #31');
     expect(run.stdout).toContain('is done or taken (2 of them)');
     expect(existsSync(run.record)).toBe(false);
@@ -581,7 +579,7 @@ describe('plan create --next, carrying the epic context into the prompt', () => 
 
     const run = runPlan(scratch, 'epic-context', ['--next', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     const record = readPromptRecord(run);
     expect(record.specContent).toContain(PICKED_BODY.trim());
     expect(record.prompt).toContain(`epic #${String(EPIC.number)}, "${EPIC.title}" (\`epic:${EPIC_SLUG}\`)`);
@@ -599,7 +597,7 @@ describe('each refusal plan create --issue meets on the board', () => {
 
     const run = runPlan(scratch, 'closed', ['--issue=40', '--no-progress']);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, { ...scratch });
     expect(run.stderr).toContain(closedIssueMessage(40));
     expect(existsSync(join(scratch.repo, specPath(SPECS_DIR, 40, 'Old work')))).toBe(false);
   }, 30_000);
@@ -610,7 +608,7 @@ describe('each refusal plan create --issue meets on the board', () => {
 
     const run = runPlan(scratch, 'unlabelled', ['--issue=41', '--no-progress']);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, { ...scratch });
     expect(run.stderr).toContain(missingSpecLabelMessage(41));
     expect(existsSync(join(scratch.repo, specPath(SPECS_DIR, 41, 'No label')))).toBe(false);
   }, 30_000);
@@ -622,14 +620,14 @@ describe('each refusal plan create --issue meets on the board', () => {
       issues: [issueOf({ number: 42, title, body: completeSpecBody(title, 'first body'), labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
     });
     const first = runPlan(scratch, 'first', ['--issue=42', '--no-progress']);
-    expect(first.exitCode).toBe(0);
+    expectExit(first, 0, { ...scratch });
 
     writeGhStub(join(scratch.root, 'bin'), {
       issues: [issueOf({ number: 42, title, body: completeSpecBody(title, 'a different body'), labels: [SPEC_LABEL, SPEC_READY_LABEL] })],
     });
     const second = runPlan(scratch, 'second', ['--issue=42', '--no-progress']);
 
-    expect(second.exitCode).toBe(2);
+    expectExit(second, 2, { ...scratch });
     expect(second.stderr).toContain(snapshotDiffersMessage(specPath(SPECS_DIR, 42, title), 42));
   }, 30_000);
 
@@ -641,7 +639,7 @@ describe('each refusal plan create --issue meets on the board', () => {
 
     const run = runPlan(scratch, 'collision', ['--issue=43', '--no-progress']);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, { ...scratch });
     expect(run.stderr).toContain(notesCollisionMessage(specPath(SPECS_DIR, 43, 'Notes'), 43));
   }, 30_000);
 });
@@ -653,7 +651,7 @@ describe('each refusal about which issue is the roadmap', () => {
 
     const run = runPlan(scratch, 'no-roadmap', ['--next', '--no-progress']);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, { ...scratch });
     expect(run.stderr).toContain(noRoadmapMessage());
   }, 30_000);
 
@@ -666,7 +664,7 @@ describe('each refusal about which issue is the roadmap', () => {
 
     const run = runPlan(scratch, 'several-roadmaps', ['--next', '--no-progress']);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, { ...scratch });
     expect(run.stderr).toContain(severalRoadmapsMessage([1, 2]));
   }, 30_000);
 });

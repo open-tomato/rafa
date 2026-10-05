@@ -39,7 +39,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bringForward } from '../effort/store/bring-forward.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -120,7 +120,7 @@ describe('a project naming no effort.sync at all', () => {
 
     const run = runRafa(scratch, scratch.repo, ['doctor']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('Effort sync: ok, local');
     expect(run.stdout).not.toContain('Effort sync: fail');
   });
@@ -133,7 +133,7 @@ describe('a project naming no effort.sync at all', () => {
     });
 
     const copyRun = runRafa(scratch, scratch.repo, ['effort', 'copy']);
-    expect(copyRun.exitCode).toBe(0);
+    expectExit(copyRun, 0, scratch);
     expect(copyRun.stdout).toContain('✅ Copied effort.sqlite from');
     expect(`${copyRun.stdout}${copyRun.stderr}`).not.toContain('effort.sync');
 
@@ -144,7 +144,7 @@ describe('a project naming no effort.sync at all', () => {
     });
 
     const mergeRun = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath]);
-    expect(mergeRun.exitCode).toBe(0);
+    expectExit(mergeRun, 0, scratch);
     expect(mergeRun.stdout).toContain('✅ Merged. The original is kept whole at');
     expect(`${mergeRun.stdout}${mergeRun.stderr}`).not.toContain('effort.sync');
   });
@@ -154,7 +154,7 @@ describe('a project naming no effort.sync at all', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('❌ preflight halted: 1 required item failed');
     expect(run.stderr).not.toContain('Refusing to start: effort.sync');
     expect(run.stderr).not.toContain('sync');

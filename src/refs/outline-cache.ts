@@ -7,16 +7,19 @@
  * TypeScript compiler. Measured on 2026-09-28, `rafa roadmap` ran 26
  * outlines for 19.4 s of its 37 s, and 65.8 s of CPU against 4.2 s with
  * `ts-symbols` off the `PATH`. An outline is a reading of one file's text:
- * the names it exports at its top level, re-exports included, and nothing
- * outside the file. So the key is the sha256 of the file's bytes, and a
- * kept answer can never be stale: a changed file has another key.
+ * the names it declares at its top level, exported or not, with each
+ * one's members, and nothing outside the file. So the key is the sha256
+ * of the file's bytes, and a kept answer can never be stale: a changed
+ * file has another key.
  *
  * ## The files
  *
  * One JSON list of names per key under {@link OUTLINE_CACHE_DIR}, which
  * carries the shape version in its last segment, so a later shape reads
  * as no cache rather than as a wrong one. A file is written whole through
- * a temporary file and a rename.
+ * a temporary file and a rename. `v1` kept the exported names alone;
+ * `v2` keeps every declared name, since a `v1` list read as a `v2` one
+ * would answer a module-local name `absent`.
  *
  * ## What is never kept
  *
@@ -35,7 +38,7 @@ import { join, resolve } from 'node:path';
 import { SCOPE_DIR } from '../project/scope.js';
 
 /** Where kept outlines are written, relative to the project root. */
-export const OUTLINE_CACHE_DIR = join(SCOPE_DIR, 'cache', 'outline', 'v1');
+export const OUTLINE_CACHE_DIR = join(SCOPE_DIR, 'cache', 'outline', 'v2');
 
 /** The kept names in `path`, or null when there are none this version can read. */
 function readKept(path: string): readonly string[] | null {

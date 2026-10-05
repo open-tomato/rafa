@@ -30,7 +30,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -90,7 +90,7 @@ describe('a project naming effort.sync: git with no module loaded', () => {
 
     const run = runRafa(scratch, scratch.repo, ['doctor']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stdout).toContain('Effort sync: fail, git');
     for (const line of MODULE_FIX_LINES) {
       expect(`${run.stdout}${run.stderr}`).toContain(line);
@@ -102,7 +102,7 @@ describe('a project naming effort.sync: git with no module loaded', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('❌ Refusing to start: effort.sync names a strategy no adapter serves.');
     for (const line of MODULE_FIX_LINES) {
       expect(run.stderr).toContain(line);

@@ -4,7 +4,7 @@
  * {@link setUpBoard} came to; then the optional epic guard workflow,
  * with a question of its own.
  *
- * `src/board/setup.ts` makes the board — the fourteen labels, the spec issue
+ * `src/board/setup.ts` makes the board — the fifteen labels, the spec issue
  * template, the pinned Roadmap issue and `roadmap.issue` — and reports
  * each part as created, present or refused. This module is the half
  * that decides whether that runs, and it is where the flags, the

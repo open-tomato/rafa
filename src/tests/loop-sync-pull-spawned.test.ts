@@ -41,7 +41,7 @@ import { beginSession } from '../loop/sessions.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
 
@@ -197,7 +197,7 @@ describe('rafa loop start over a module\'s sync strategy whose pull merges anoth
     const run = startLoop(scratch, otherStore);
     const output = `${run.stdout}${run.stderr}`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(readFileSync(join(scratch.repo, '.plans', 'PLAN_TRACKER-sync.md'), 'utf8')).toContain('- [x] Only task');
     expect(pullLog(scratch)).toEqual(['pulled:merged:1']);
     expect(output).not.toContain('effort sync:');
@@ -213,7 +213,7 @@ describe('rafa loop start over a module\'s sync strategy whose pull merges anoth
     const output = `${run.stdout}${run.stderr}`;
 
     // A contact never throws and never sets the exit code: the task is still done.
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(readFileSync(join(scratch.repo, '.plans', 'PLAN_TRACKER-sync.md'), 'utf8')).toContain('- [x] Only task');
     expect(pullLog(scratch)).toEqual(['refused']);
     expect(output).toContain('effort sync: pull over service failed: REFUSED');

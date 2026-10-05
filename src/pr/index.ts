@@ -43,6 +43,7 @@ export type {
 } from './checks.js';
 export type {
   ChecksReading,
+  ClosingIssue,
   Mergeability,
   MergeMethod,
   MergeOutcome,

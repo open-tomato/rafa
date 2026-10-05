@@ -463,6 +463,22 @@ API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
 loop's own machinery (`src/utils/claude.ts` for the session and
 `src/effort/store/` for the record) runs all the code.
 
+### Bug sweep convention
+
+**When a tooling phase completes, the first group of the bug sweep that
+follows is every open `module:cli-gap` issue.** As new rafa commands or
+fields are shipped, the hook denies `gh` equivalents with a gap report
+offering to file a bug for each missing capability. Those bugs are filed
+with the `module:cli-gap` label. When the feature that closed the gap
+completes and ships, `rafa next` or a manual `rafa issue list
+--module=cli-gap` sweeps those issues: each one names a `gh` command or
+flag the hook denied, matched against the rafa line that can now do the
+step. The person running the sweep confirms each equivalence or corrects
+the report, and closes the issue. This establishes a clear pipeline from
+tooling promise (the hook's denial) to tooling completion (the rafa
+command) to closure (the verification sweep), and leaves no gap report
+buried in a list of general bugs.
+
 ### Files beside the tree
 
 **`.rafa/plans/` and `.rafa/specs/` are gitignored**, so they live only in the

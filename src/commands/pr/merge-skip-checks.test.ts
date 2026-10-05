@@ -116,6 +116,7 @@ function detail(base: string = BASE): PullRequestDetail {
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],
+    closes: [],
   };
 }
 

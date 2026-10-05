@@ -33,6 +33,8 @@
  * file name, and its arguments for the repair's agent, proving the
  * repair actually carries what blocked it.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -271,15 +273,8 @@ function plant(): Scratch {
   return scratch;
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
@@ -316,7 +311,7 @@ describe('a stage step after a task that broke a file outside its --changed sele
     // fresh against the baseline, and inserts a blocked repair task
     // above the second task, which is never dispatched.
     const run1 = runLoopStart(scratch);
-    expect(run1.exitCode).toBe(0);
+    expectExit(run1, 0, { ...scratch });
     expect(callCount(scratch)).toBe(2);
 
     const trackerPath = join(scratch.repo, '.plans', TRACKER_NAME);
@@ -346,7 +341,7 @@ describe('a stage step after a task that broke a file outside its --changed sele
     // ahead of the repair, which is dispatched straight away under its
     // declared agent, handed the blocker text the stage step wrote.
     const run2 = runLoopStart(scratch);
-    expect(run2.exitCode).toBe(0);
+    expectExit(run2, 0, { ...scratch });
     expect(callCount(scratch)).toBe(3);
 
     const retryPrompt = promptOf(scratch, 3);

@@ -120,6 +120,7 @@ import {
 
 export type {
   FakeCheckKind,
+  FakeClosingIssue,
   FakeHttpStatus,
   FakePrAuthor,
   FakePrCheck,

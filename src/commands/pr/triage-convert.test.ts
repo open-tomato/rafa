@@ -168,6 +168,7 @@ function detailAt(head: string): PullRequestDetail {
     mergeable: 'conflicting',
     mergeStateStatus: 'DIRTY',
     labels: [],
+    closes: [],
   };
 }
 

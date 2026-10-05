@@ -68,9 +68,10 @@
  * the event loop they need to answer — or, for the silent one, to accept
  * a connection and never answer. The same file's note on `Bun.secrets`,
  * the real `rafa-sync-service` package named by path, and the
- * `SECRETS_OK` skip applies here unchanged; the git and secret-bus
- * helpers below are its own, kept local rather than shared, since
- * neither file is the other's fixture.
+ * `SECRETS_OK` skip applies here unchanged: both files gate on and spawn
+ * under `testdata/secrets-env.js`. The git helpers below are its own,
+ * kept local rather than shared, since neither file is the other's
+ * fixture.
  */
 import type { StandInGitHub } from './identity/testdata/stand-in-github.js';
 import type { HubServer } from './server.js';
@@ -90,7 +91,7 @@ import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
 import { expectSameMergedTables } from './testdata/compare-merged-stores.js';
-import { scratchHomeEnv } from './testdata/scratch-home-env.js';
+import { probeSecrets, secretsChildEnv } from './testdata/secrets-env.js';
 
 const VERSION = '0.0.0-hub-unreachable';
 const REPOSITORY = 'open-tomato/rafa';
@@ -123,32 +124,11 @@ const HUB_TIMEOUT_MS = 1000;
 /** The slack the timing bound allows past one `hub.timeout`, in milliseconds: "plus one second". */
 const TIMING_SLACK_MS = 1000;
 
-/** The environment variables a libsecret-backed `Bun.secrets` reaches its session bus through; carried into the spawned CLI only when this process itself has them. */
-const SECRET_BUS_ENV = ['DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR'] as const;
-
 /** The reason this suite skips, when it does. */
-const SKIP_REASON = 'Bun.secrets could not store and read a credential on this machine';
+const SKIP_REASON = 'a child spawned under the secret environment this suite spawns its CLI under could not store and read a credential through Bun.secrets';
 
-/** Whether `Bun.secrets` can round-trip a credential here, probed once at load. */
-async function probeSecrets(): Promise<boolean> {
-  const probe = { service: SECRET_SERVICE, name: `hub-unreachable-probe-${randomUUID()}` };
-  try {
-    await Bun.secrets.set({ ...probe, value: 'probe' });
-    await Bun.secrets.delete(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
+/** Whether a child spawned under {@link secretsChildEnv} can round-trip a credential, probed once at load. */
 const SECRETS_OK = await probeSecrets();
-
-/** `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`, carried from this process's own environment when it has them. */
-function secretsEnv(): Readonly<Record<string, string>> {
-  return Object.fromEntries(SECRET_BUS_ENV
-    .map((name): readonly [string, string | undefined] => [name, process.env[name]])
-    .filter((entry): entry is readonly [string, string] => entry[1] !== undefined));
-}
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
 function gitEnv(): Record<string, string> {
@@ -360,8 +340,7 @@ async function runCommand(device: Device, words: readonly string[]): Promise<Com
       TMPDIR: tmpdir(),
       RAFA_TEST: '1',
       PATH: [device.bin, GIT_DIR].join(delimiter),
-      ...scratchHomeEnv(device.home),
-      ...secretsEnv(),
+      ...secretsChildEnv(device.home),
     },
     stdout: 'pipe',
     stderr: 'pipe',

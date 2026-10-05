@@ -42,6 +42,8 @@
  * tracker once the run has finished: all four tasks ticked `[x]`, and no
  * line ever marked `[BLOCKED]`.
  */
+import type { CapturedRun } from '../tests/cli-capture.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { readSessions } from '../loop/sessions.js';
-import { plantProjectConfig } from '../tests/cli-capture.js';
+import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
@@ -324,15 +326,8 @@ function plant(): Scratch {
   return scratch;
 }
 
-/** What one `rafa loop start` run did. */
-interface LoopRun {
-  readonly exitCode: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): LoopRun {
+function runLoopStart(scratch: Scratch): CapturedRun {
   const resolved = Bun.which('claude', { PATH: scratch.path });
   if (resolved !== scratch.claude) {
     throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
@@ -359,7 +354,7 @@ describe('a plan of two stages of two tasks each, with no Owns: folders to read'
     const scratch = plant();
     const run = runLoopStart(scratch);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     // Four task sessions, one per task, and the wrap-up's own: five real
     // Claude calls, none of them retried.
     expect(callCount(scratch)).toBe(5);

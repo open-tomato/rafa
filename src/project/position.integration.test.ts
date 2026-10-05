@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { expectExit } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { writeTrackingGitignore } from './gitignore.js';
@@ -119,22 +120,18 @@ function racerSource(root: string, board: number, iterations: number): string {
   ].join('\n');
 }
 
-/** Runs one racer as a real child process, rejecting on a non-zero exit. */
-function runRacer(root: string, board: number, iterations: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = Bun.spawn(['bun', '-e', racerSource(root, board, iterations)], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    void (async () => {
-      const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`racer for board ${String(board)} exited ${String(code)}: ${stderr}`));
-    })();
+/** Runs one racer as a real child process, failing on a non-zero exit. */
+async function runRacer(root: string, board: number, iterations: number): Promise<void> {
+  const child = Bun.spawn(['bun', '-e', racerSource(root, board, iterations)], {
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  expectExit({ exitCode, stdout, stderr }, 0, { root });
 }
 
 describe('two writers racing over the position file', () => {

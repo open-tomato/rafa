@@ -89,10 +89,17 @@ describe('extractRefs: each kind', () => {
     ]);
   });
 
-  it('reads a flag in running text, in a span of its own and in a bare subject\'s span', () => {
-    const body = 'Pass --output=json, or `--accept-refs`, or `plan create --next`.';
+  it('reads the flag of a span opening with rafa, less its =value', () => {
+    expect(kindsOf('Pass `rafa plan create --accept-refs` or `rafa list --output=json`.')).toEqual([
+      'command rafa plan create@1',
+      'flag --accept-refs@1',
+      'command rafa list@1',
+      'flag --output@1',
+    ]);
+  });
 
-    expect(kindsOf(body)).toEqual(['flag --output@1', 'flag --accept-refs@1', 'flag --next@1']);
+  it('reads the flag of a span naming rafa with no command word', () => {
+    expect(kindsOf('`rafa --version`')).toEqual(['flag --version@1']);
   });
 
   it('reads section.key as a key when SETTINGS holds the section', () => {
@@ -102,9 +109,9 @@ describe('extractRefs: each kind', () => {
   });
 
   it('answers each reference once, frozen, in the order the text names them', () => {
-    const refs = extractRefs('`src/a.ts` then #7\n`--deep` and `GhRunner`');
+    const refs = extractRefs('`src/a.ts` then #7\n`rafa doctor --deep` and `GhRunner`');
 
-    expect(refs.map((ref) => ref.kind)).toEqual(['path', 'issue', 'flag', 'symbol']);
+    expect(refs.map((ref) => ref.kind)).toEqual(['path', 'issue', 'command', 'flag', 'symbol']);
     expect(Object.isFrozen(refs)).toBe(true);
     expect(refs.every((ref) => Object.isFrozen(ref))).toBe(true);
   });
@@ -145,9 +152,13 @@ describe('extractRefs: what is skipped', () => {
   });
 
   it('skips a quotation line and reads the same token on the line after', () => {
-    const body = ['> the old spec named `src/old.ts` and #9', '   > and `--gone`', 'Now `src/old.ts`, #9 and `--gone`.'].join('\n');
+    const body = [
+      '> the old spec named `src/old.ts` and #9',
+      '   > and `rafa doctor --gone`',
+      'Now `src/old.ts`, #9 and `rafa doctor --gone`.',
+    ].join('\n');
 
-    expect(kindsOf(body)).toEqual(['path src/old.ts@3', 'issue #9@3', 'flag --gone@3']);
+    expect(kindsOf(body)).toEqual(['path src/old.ts@3', 'issue #9@3', 'command rafa doctor@3', 'flag --gone@3']);
   });
 
   it('reads no issue from inside a code span, and the same id outside one', () => {
@@ -160,6 +171,43 @@ describe('extractRefs: what is skipped', () => {
     const body = 'Run `git push --force-with-lease`, `bun install --frozen-lockfile`, then `rafa pr merge --resolve`.';
 
     expect(kindsOf(body)).toEqual(['command rafa pr merge@1', 'flag --resolve@1']);
+  });
+});
+
+describe('extractRefs: what is not a flag', () => {
+  it('reads no flag from gh issue create --body-file, and the same flag under rafa', () => {
+    expect(kindsOf('`gh issue create --body-file`')).toEqual([]);
+    expect(kindsOf('`rafa issue create --body-file`')).toEqual(['command rafa issue create@1', 'flag --body-file@1']);
+  });
+
+  it('reads no flag from claude --setting-sources, and the same flag under rafa', () => {
+    expect(kindsOf('`claude --setting-sources`')).toEqual([]);
+    expect(kindsOf('`rafa --setting-sources`')).toEqual(['flag --setting-sources@1']);
+  });
+
+  it('reads the flag --accept-refs from rafa plan create --accept-refs', () => {
+    expect(refOf('`rafa plan create --accept-refs`', 'flag', '--accept-refs'))
+      .toEqual({ kind: 'flag', text: '--accept-refs', line: 1, blocker: false });
+  });
+
+  it('reads no flag in running text, in a span of its own or after a bare subject', () => {
+    const body = 'Pass --output=json, or `--accept-refs`, or `plan create --next`.';
+
+    expect(kindsOf(body)).toEqual([]);
+    expect(kindsOf(`${body}\nOr \`rafa plan create --output --accept-refs --next\`.`)).toEqual([
+      'command rafa plan create@2',
+      'flag --output@2',
+      'flag --accept-refs@2',
+      'flag --next@2',
+    ]);
+  });
+
+  it('reads no flag from a span whose first word is not rafa, even one naming rafa later', () => {
+    expect(kindsOf('`bunx rafa doctor --deep` and `ralph --deep`')).toEqual([]);
+  });
+
+  it('reads no lone flag token as a path, even one with a listed extension', () => {
+    expect(kindsOf('`--out.json` and `--src/a.ts`')).toEqual([]);
   });
 });
 

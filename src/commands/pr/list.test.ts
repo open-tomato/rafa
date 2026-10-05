@@ -140,6 +140,7 @@ function stubPulls(answers: StubAnswers = {}): PullRequests {
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],
+      closes: [],
     })),
     checks: answers.checks ?? (() => Promise.resolve({ rows: [], verdict: 'none' })),
   }, { refusal: 'the stub provider models the reading members alone' }).pulls;

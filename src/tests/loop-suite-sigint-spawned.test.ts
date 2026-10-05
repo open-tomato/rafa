@@ -39,7 +39,7 @@ import { readSessions } from '../loop/sessions.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { createGitRunner } from '../pr/index.js';
 
-import { plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
+import { describeRun, expectExit, plantProjectConfig, plantScratchRepo, startRafa } from './cli-capture.js';
 
 const RUN_TIMEOUT = { timeout: 90_000 };
 
@@ -185,7 +185,7 @@ describe('rafa loop start sent SIGINT during its suite step', () => {
     } catch (error) {
       process.kill(run.pid, 'SIGKILL');
       const ended = await run.result;
-      throw new Error(`${String(error)}\n${ended.stdout}${ended.stderr}`);
+      throw new Error(`${String(error)}\n${describeRun(ended, scratch)}`);
     }
     process.kill(run.pid, 'SIGINT');
     await Bun.sleep(SIGNAL_SETTLE_MS);
@@ -193,7 +193,7 @@ describe('rafa loop start sent SIGINT during its suite step', () => {
     const ended = await run.result;
     const output = `${ended.stdout}${ended.stderr}`;
 
-    expect(ended.exitCode).toBe(0);
+    expectExit(ended, 0, scratch);
     expect(output).toContain('Stopping here, as rafa loop stop does: no task is marked blocked.');
     expect(output).not.toContain('Task marked as blocked');
 

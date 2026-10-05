@@ -201,7 +201,7 @@ import {
   SKILL_INDEX_HEADING,
 } from './plan.js';
 import { projectConfigText } from './project/scaffold.js';
-import { ABSENT, readRefsBlock } from './refs/stamp.js';
+import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from './refs/stamp.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
@@ -895,16 +895,19 @@ describe('rafa plan through the adapter registry', () => {
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);
 
-  it('refuses a snapshot naming a file the repository lacks at check 4, exit 2, before the planner', () => {
+  it('refuses a snapshot naming a file stamped present that the repository lacks now at check 4, exit 2, before the planner', () => {
     const scratch = plantScratch({ body: GONE_BODY });
     const snapshot = specPath('.rafa/specs', ISSUE.number, ISSUE.title);
+    const stamped = writeRefsBlock(GONE_BODY, [{ kind: 'path', text: 'src/gone.ts', fingerprint: PRESENT }]);
+    mkdirSync(dirname(join(scratch.repo, snapshot)), { recursive: true });
+    writeFileSync(join(scratch.repo, snapshot), stamped, 'utf8');
 
     const run = runPlan(scratch, 'plan-written', ['--issue=20', '--no-progress']);
 
     expect(run.exitCode).toBe(2);
     expect(run.stderr).toContain('❌ issue #20 names references that are missing or changed since the spec was read:');
     expect(run.stderr).toContain('   • dangling src/gone.ts (line 5)');
-    expect(readFileSync(join(scratch.repo, snapshot), 'utf8')).toBe(GONE_BODY);
+    expect(readFileSync(join(scratch.repo, snapshot), 'utf8')).toBe(stamped);
     expect(existsSync(scratch.record)).toBe(false);
     expect(existsSync(scratch.spawned)).toBe(false);
   }, 30_000);

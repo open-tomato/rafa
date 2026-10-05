@@ -167,6 +167,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
 
 import { parseChecks, verdictOf } from './checks.js';
+import { CLOSING_ISSUES_FIELD, readClosingIssues } from './gh-closing-issues.js';
 import { MERGE_METHODS, isMergeMethod } from './types.js';
 
 /** What every refusal opens with. */
@@ -178,8 +179,11 @@ const REPO_PATH = '{owner}/{repo}';
 /** The fields a summary is read from. */
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
 
-/** The fields a detail is read from: the summary's, and what only a per-PR read answers. */
-const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable`;
+/**
+ * The fields a detail is read from: the summary's, and what only a per-PR
+ * read answers. The closing references are read by `./gh-closing-issues.ts`.
+ */
+const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable,${CLOSING_ISSUES_FIELD}`;
 
 /** The fields a check row is read from; `parseChecks` reads exactly these. */
 const CHECK_FIELDS = 'name,state,link';
@@ -356,6 +360,7 @@ function readDetail(value: unknown, command: string, where: string): PullRequest
     mergeable: readMergeability(pull['mergeable'], command, `${where}.mergeable`),
     mergeStateStatus: readString(pull['mergeStateStatus'], command, `${where}.mergeStateStatus`),
     labels: readLabels(pull['labels'], command, `${where}.labels`),
+    closes: readClosingIssues(pull[CLOSING_ISSUES_FIELD], command, `${where}.${CLOSING_ISSUES_FIELD}`),
   };
 }
 
