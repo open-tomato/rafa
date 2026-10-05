@@ -1539,7 +1539,10 @@ New; it replaces no earlier text. What a row or an action added to
   the query its flags make and reads each ref it answers with `get`, and
   `github`'s `find` refuses every `--state`. `show` reads one issue;
   `create` files a draft of type `code`, module `unassigned` and no
-  priority unless a flag names one; `comment` posts `--body`; and `move`
+  priority unless a flag names one, its body `--body` or the bytes of the
+  file `--body-file` names (standard input for `-`, a seam of the
+  factory), the two refused together and an unreadable file refused
+  before the chain is resolved; `comment` posts `--body`; and `move`
   moves an issue to a state, writing a `warning` the tracker answers at
   `warn` and still exiting 0. In json mode the result's `data` holds the
   tracker (its kind, whether the chain degraded, and why) beside the

@@ -581,11 +581,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/issue/create.js', [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
+      'lineRefusal',
       'onTracker',
       'readChoiceFlag',
       'readNonBlankFlag',
