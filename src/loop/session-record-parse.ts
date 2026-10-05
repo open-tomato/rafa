@@ -37,6 +37,14 @@
  * does not know; neither is a problem. The frozen record keeps a phase of
  * {@link SESSION_PHASES} and leaves out any other, and
  * {@link sessionPhase} reads a record without one as `task`.
+ *
+ * A step's `reason`, for the same two causes: a step written by rafa
+ * 0.35.0 or earlier carries no `reason` key, and a later rafa may name a
+ * reason this one does not know. The frozen step keeps a reason of
+ * {@link SESSION_STEP_REASONS}, right after its `scope`, and leaves out
+ * any other value, null, a number or an unknown word alike, so the
+ * record is read whole and its next write carries no `reason` key on
+ * that step.
  */
 import type { SessionRecord, SessionStep } from './sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
@@ -78,6 +86,17 @@ export const SESSION_STEP_KINDS = Object.freeze(['baseline', 'task', 'stage', 'p
 
 /** One of {@link SESSION_STEP_KINDS}. */
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
+
+/**
+ * Why a suite step ran at the scope it did: the task's own `tests=`
+ * declaration, a full-suite trigger, the `--changed` fallback taken when
+ * no `Owns:` folder narrows the run, a `tests=module` task whose module
+ * holds no test file, and a stage step's own scope.
+ */
+export const SESSION_STEP_REASONS = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
+
+/** One of {@link SESSION_STEP_REASONS}. */
+export type SessionStepReason = (typeof SESSION_STEP_REASONS)[number];
 
 /** A record file that cannot be read, or holds no record this module accepts. */
 export class SessionRecordError extends Error {
@@ -310,13 +329,30 @@ function freezeFailures(failures: readonly SuiteFailure[]): readonly SuiteFailur
   return Object.freeze(failures.map((failure) => Object.freeze({ file: failure.file, name: failure.name })));
 }
 
-/** A frozen step already checked, its fields in the order they are written. */
+/** True for one of {@link SESSION_STEP_REASONS}. */
+function isSessionStepReason(value: unknown): value is SessionStepReason {
+  return (SESSION_STEP_REASONS as readonly unknown[]).includes(value);
+}
+
+/** The `reason` entry of a frozen step: none for an absent reason or one outside {@link SESSION_STEP_REASONS}. */
+function reasonEntry(reason: unknown): { readonly reason?: SessionStepReason } {
+  return isSessionStepReason(reason)
+    ? { reason }
+    : {};
+}
+
+/**
+ * A frozen step already checked, its fields in the order they are
+ * written: `reason` right after `scope`, only when it is one of
+ * {@link SESSION_STEP_REASONS}, and `interrupted` last, only when there.
+ */
 function freezeStep(step: SessionStep): SessionStep {
   return Object.freeze({
     kind: step.kind,
     scope: typeof step.scope === 'string'
       ? step.scope
       : Object.freeze([...step.scope]),
+    ...reasonEntry(field(step, 'reason')),
     command: Object.freeze([...step.command]),
     exitCode: step.exitCode,
     summary: step.summary,

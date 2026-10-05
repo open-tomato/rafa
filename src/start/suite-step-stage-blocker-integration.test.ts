@@ -4,25 +4,26 @@
  * `./suite-steps-run.ts`) catches a task's breakage the task step never
  * saw, and hands it on to the retried task's prompt.
  *
- * The scratch repository's one test file, `shared.test.ts`, reads
- * `shared-data.json` off disk with `readFileSync` rather than importing
- * it, so Bun's `--changed` dependency graph never reaches it from a
- * change to that JSON file alone (`./suite-step.ts`'s module note). The
- * first task's stand-in session flips the JSON's `flag`, breaking that
- * test, and answers `status: done` with no blocker: its own task step,
- * `bun test --changed=<base>`, runs zero test files and stays green,
- * since `shared-data.json` is outside its `--changed` selection.
+ * The scratch repository's test file, `shared.test.ts`, imports `dep.ts`
+ * and reads `shared-data.json` off disk with `readFileSync` rather than
+ * importing it, so Bun's `--changed` dependency graph reaches it from a
+ * change to `dep.ts` and never from one to that JSON file alone. The
+ * first stage's first task touches `dep.ts` (its step runs
+ * `shared.test.ts`, green); its second task flips the JSON's `flag`,
+ * breaking that test, and answers `status: done` with no blocker: its own
+ * task step, `bun test --changed=<base>`, selects no test file and stays
+ * green.
  *
- * That task is its stage's only, and so its last, task. The stage step
- * that follows has no `Owns:` folders to narrow it (`stageStepScope`'s
- * `no-owns` answer), so it runs the WHOLE suite regardless of what
- * changed, catches `shared.test.ts` failing fresh against the baseline,
- * and is red. It inserts a `[BLOCKED]` repair task carrying its blocker
- * above the next open task — the second stage's only task — which it
- * leaves open and never dispatched (`./suite-blocker.ts`): the first
- * run's assertions are that repair line, naming `shared.test.ts` and
- * declared for `build-error-resolver`, the second task still `[ ]`, and
- * the stand-in never called a second time.
+ * That second task is the stage's last. The stage step that follows has
+ * no `Owns:` folders to narrow it (`stageStepScope`'s `fallback` answer),
+ * so it runs `bun test --changed=<since>` from the stage's own base: the
+ * stage's diff holds `dep.ts`, so it selects `shared.test.ts`, catches it
+ * failing fresh against the baseline, and is red. It inserts a `[BLOCKED]`
+ * repair task carrying its blocker above the next open task — the second
+ * stage's only task — which it leaves open and never dispatched
+ * (`./suite-blocker.ts`): the first run's assertions are that repair
+ * line, naming `shared.test.ts` and declared for `build-error-resolver`,
+ * the second stage's task still `[ ]`, and the stand-in called twice.
  *
  * A second `loop start` over the same repository dispatches the repair:
  * the stage's step is already in the ledger, so nothing runs before the
@@ -42,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readSessions } from '../loop/sessions.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
@@ -73,18 +75,22 @@ const PLAN_FLAG = `--plan=.plans/PLAN-${STUB}.md`;
 /** The tracker's file name, beside the plan under `.plans/`. */
 const TRACKER_NAME = `PLAN_TRACKER-${STUB}.md`;
 
-/** The first stage's only task: breaks `shared.test.ts` outside its own `--changed` selection. */
+/** The first stage's first task: touches `dep.ts`, which `shared.test.ts` imports, so the stage's diff reaches that test. */
+const TASK0 = 'Touch the dependency the shared test imports';
+
+/** The first stage's last task: breaks `shared.test.ts` outside its own `--changed` selection. */
 const TASK1 = 'Flip the shared flag, outside this task\'s own diff selection';
 
 /** The second stage's only task: never dispatched until the stage step's repair is done. */
 const TASK2 = 'Read the shared flag back, after the flip';
 
-/** The plan: one task per stage, so the first task's commit is its stage's last. */
+/** The plan: the first stage's last task commits the break; the second stage holds one task. */
 const PLAN = [
   `# Plan: ${STUB}`,
   '',
   '# Stage: flips the flag',
   '',
+  `- [ ] ${TASK0}`,
   `- [ ] ${TASK1}`,
   '',
   '# Stage: reads it back',
@@ -99,16 +105,22 @@ const DATA_FILE = 'shared-data.json';
 /** The test file the first task's change breaks, outside Bun's `--changed` import graph. */
 const TEST_FILE = 'shared.test.ts';
 
+/** The module `shared.test.ts` imports, so a change to it selects that test under `--changed`. */
+const DEP_FILE = 'dep.ts';
+
 /** `shared.test.ts`'s source: reads {@link DATA_FILE} off disk, never imports it. */
 const TEST_FILE_SOURCE = [
   'import { expect, test } from \'bun:test\';',
   'import { readFileSync } from \'node:fs\';',
   'import { join } from \'node:path\';',
   '',
+  'import { LABEL } from \'./dep\';',
+  '',
   'test(\'reads the shared flag\', () => {',
   '  const raw = readFileSync(join(import.meta.dir, \'shared-data.json\'), \'utf8\');',
   '  const data = JSON.parse(raw) as { flag: boolean };',
   '  expect(data.flag).toBe(true);',
+  '  expect(LABEL).toBe(\'dep\');',
   '});',
   '',
 ].join('\n');
@@ -168,10 +180,13 @@ function reportLines(status: 'done' | 'blocked', feedback: string): readonly str
   ];
 }
 
-/** Call 1's report: the task done, having flipped the flag outside its own diff. */
+/** Call 1's report: the dependency touched, every test it reaches still green. */
+const CALL0_REPORT = reportLines('done', 'touched dep.ts; shared.test.ts still passes');
+
+/** Call 2's report: the task done, having flipped the flag outside its own diff. */
 const CALL1_REPORT = reportLines('done', 'flipped shared-data.json; the tests it reaches by --changed stay green');
 
-/** Call 2's report: blocked, once the retry has been handed the stage step's failure. */
+/** Call 3's report: blocked, once the retry has been handed the stage step's failure. */
 const CALL2_REPORT = reportLines('blocked', 'read the stage step blocker the retry prompt carried');
 
 /**
@@ -193,6 +208,9 @@ function standInScript(calls: string): string {
     'for arg in "$@"; do printf \'%s\\n\' "$arg"; done > "$calls/$n.args"',
     '/bin/cat > "$calls/$n.prompt"',
     'if [ "$n" -eq 1 ]; then',
+    `  printf '%s\\n' '// touched' >> ${DEP_FILE}`,
+    ...printLines(CALL0_REPORT),
+    'elif [ "$n" -eq 2 ]; then',
     `  printf '%s\\n' '{"flag": false}' > ${DATA_FILE}`,
     ...printLines(CALL1_REPORT),
     'else',
@@ -241,6 +259,7 @@ function plant(): Scratch {
   git(repo, home, 'config', 'user.name', 'Rafa Loop');
   git(repo, home, 'config', 'commit.gpgsign', 'false');
   writeFileSync(join(repo, DATA_FILE), '{"flag": true}\n', 'utf8');
+  writeFileSync(join(repo, DEP_FILE), 'export const LABEL = \'dep\';\n', 'utf8');
   writeFileSync(join(repo, TEST_FILE), TEST_FILE_SOURCE, 'utf8');
   writeFileSync(join(repo, '.gitignore'), 'progress.txt\n.plans/\n.rafa/\n', 'utf8');
   git(repo, home, 'add', '-A');
@@ -286,17 +305,18 @@ describe('a stage step after a task that broke a file outside its --changed sele
   it('inserts a repair task naming the file above the next task, and hands the repair its prompt', async () => {
     const scratch = plant();
 
-    // Run 1: the first task flips the flag, its own task step stays
-    // green, and the stage step that follows — the stage's only task is
-    // also its last — runs the whole suite, catches `shared.test.ts`
+    // Run 1: the second task flips the flag, its own task step stays
+    // green, and the stage step that follows — that task is the stage's
+    // last — runs `--changed=<since>`, catches `shared.test.ts`
     // fresh against the baseline, and inserts a blocked repair task
     // above the second task, which is never dispatched.
     const run1 = runLoopStart(scratch);
     expectExit(run1, 0, { ...scratch });
-    expect(callCount(scratch)).toBe(1);
+    expect(callCount(scratch)).toBe(2);
 
     const trackerPath = join(scratch.repo, '.plans', TRACKER_NAME);
     const trackerAfterRun1 = readFileSync(trackerPath, 'utf8');
+    expect(trackerAfterRun1).toContain(`- [x] ${TASK0}`);
     expect(trackerAfterRun1).toContain(`- [x] ${TASK1}`);
 
     expect(trackerAfterRun1).toContain(`- [ ] ${TASK2}`);
@@ -307,21 +327,27 @@ describe('a stage step after a task that broke a file outside its --changed sele
     expect(blockedTask?.blocker).toContain(TEST_FILE);
     expect(blockedTask?.blocker).toContain('stage step');
 
+    // The stage step ran the no-`Owns:` fallback, and its record says so.
+    const [record] = readSessions(scratch.repo);
+    const stageStep = record?.steps?.find((step) => step.kind === 'stage');
+    expect(stageStep?.scope).toBe('affected');
+    expect(stageStep?.reason).toBe('fallback');
+
     // The first call's prompt carries no blocker: nothing had failed yet
     // when the first task was dispatched.
-    expect(promptOf(scratch, 1)).not.toContain(BLOCKER_PROMPT_PREFIX);
+    expect(promptOf(scratch, 2)).not.toContain(BLOCKER_PROMPT_PREFIX);
 
     // Run 2: the stage's step is already in the ledger, so nothing runs
     // ahead of the repair, which is dispatched straight away under its
     // declared agent, handed the blocker text the stage step wrote.
     const run2 = runLoopStart(scratch);
     expectExit(run2, 0, { ...scratch });
-    expect(callCount(scratch)).toBe(2);
+    expect(callCount(scratch)).toBe(3);
 
-    const retryPrompt = promptOf(scratch, 2);
+    const retryPrompt = promptOf(scratch, 3);
     expect(retryPrompt).toContain(BLOCKER_PROMPT_PREFIX);
     expect(retryPrompt).toContain(TEST_FILE);
     expect(retryPrompt).toContain(blockedTask?.blocker ?? '');
-    expect(readFileSync(join(scratch.calls, '2.args'), 'utf8')).toContain('--agent\nbuild-error-resolver\n');
+    expect(readFileSync(join(scratch.calls, '3.args'), 'utf8')).toContain('--agent\nbuild-error-resolver\n');
   }, CASE_TIMEOUT_MS);
 });

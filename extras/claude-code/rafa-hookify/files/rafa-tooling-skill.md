@@ -160,6 +160,27 @@ worktree to check it.
 pipe, or read `${pipestatus[1]}` in zsh. In zsh, `echo ====` fails with
 `==== not found`, so quote separators: `echo '----'`.
 
+## Gap reports
+
+When you find a rafa command lacks a flag or field the `gh` command has,
+the hook may let the `gh` command through with a reason naming it. Before
+filing a new issue, search for existing gap reports:
+
+```bash
+rafa issue list --module=cli-gap --search="<command> <flag>"
+```
+
+If nothing matches, ask once (this conversation) before filing a bug:
+
+```bash
+rafa issue create --type=bug --module=cli-gap \
+  --title="<command> has no <flag or field>" --body="…"
+```
+
+Replace `<command>` with the rafa subject and action (e.g. `issue create`,
+`pr show`), and `<flag or field>` with the missing flag or JSON field name.
+In the body, describe what it does and why rafa needs it.
+
 ## The mappings
 
 Each row pairs the verbose command with the rafa line that replaces it.
@@ -168,11 +189,11 @@ Each row pairs the verbose command with the rafa line that replaces it.
 |---|---|
 | `gh issue list --label …` | `rafa issue list --type=bug --search=…` |
 | `gh issue view 12` | `rafa issue show 12` |
-| `gh issue create --title … --label …` | `rafa issue create --title=… --type=… --priority=…` |
+| `gh issue create --title … --label … --body-file …` | `rafa issue create --title=… --type=… --priority=… --body-file=…` |
 | `gh issue comment 12 --body …` | `rafa issue comment 12 --body=…` |
 | `gh issue close 12`, label edits for state | `rafa issue move 12 done` |
 | `gh pr view --json … \| jq …` for the current branch | `rafa pr current` |
-| `gh pr view 41`, `gh pr checks 41` | `rafa pr show 41` |
+| `gh pr view 41 --json closingIssuesReferences`, `gh pr checks 41` | `rafa pr show 41` |
 | `gh pr view 41 --web` | `rafa pr view 41` |
 | `gh pr list` | `rafa pr list` |
 | `gh pr checks 41 --watch` | `rafa pr wait 41` |
@@ -183,6 +204,9 @@ Each row pairs the verbose command with the rafa line that replaces it.
 
 Board and roadmap reads have no short `gh` form at all: use `rafa status`,
 `rafa next --dry-run`, `rafa roadmap` and `rafa epic show`.
+
+When you use `-R` or `--repo` to name another repository, `gh issue` and
+`gh pr` commands go through to that repository unchanged.
 
 ## When to keep gh or git
 

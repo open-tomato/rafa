@@ -163,8 +163,11 @@
  * inserts a `[BLOCKED]` repair task above the first open task, or blocks
  * the repair it followed (`start/suite-blocker.ts`), and the run stops as
  * it does after a blocked task, so the next run dispatches that repair
- * handed the failing files. A red pre-wrap-up step stops the run before
- * the wrap-up.
+ * handed the failing files. A red pre-wrap-up step inserts its repair
+ * after the checklist's last task and the loop turns back to dispatch
+ * it in the same run, then runs the pre-wrap-up step again; red a second
+ * time, it blocks that repair again and the run stops before the
+ * wrap-up.
  * Each task prompt lists the baseline's failures as inherited
  * (`start/inherited-notice.ts`), read again before each dispatch.
  *
@@ -601,12 +604,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // repair a red step left and runs first) or the pre-wrap-up step
       // before the wrap-up. A red stage step has inserted a blocked
       // repair task, and a red one stops the run as a blocked task does.
+      // A red pre-wrap-up step's first repair answers `repair` instead:
+      // back to `findNextTask`, which answers that repair, so it runs in
+      // this run and the pre-wrap-up step runs again after it.
       if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
-      if (!(await suiteSteps.beforeSession(taskInfo))) {
+      const suiteGate = await suiteSteps.beforeSession(taskInfo);
+      if (suiteGate === 'stop') {
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }
       if (interrupted) break;
+      if (suiteGate === 'repair') continue;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;

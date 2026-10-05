@@ -141,6 +141,7 @@ const RECORDS = [
   'const detail: T.PullRequestDetail = {',
   '  ...summary, body: "Closes #20", headRefOid: "deadbeef",',
   '  mergeable: "mergeable", mergeStateStatus: "CLEAN", labels: ["type:spec"],',
+  '  closes: [{ number: 20, repository: "open-tomato/rafa", url: "https://github.com/open-tomato/rafa/issues/20" }],',
   '};',
   // Exported so the probe omitting `listMerged`, its one reader, draws no
   // unused-local diagnostic beside the one it is held to.

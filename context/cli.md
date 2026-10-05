@@ -732,6 +732,16 @@ New; it replaces no earlier text. What a row or an action added to
   sends no call. Every failure is a warning. `--output=json` carries the
   reading as `freed`, a key left out in `labels` mode, with `unblocked`
   null.
+- **`pr show` reads the issues a pull request closes** (`src/pr/gh.ts`,
+  `src/commands/pr/show.ts`). The `closes` field of the JSON output lists
+  each issue as a number, title, state and repository. In text mode, the
+  `closes` line names each issue number and marks one not named by the
+  pull request's body keywords (like "Closes" or "Fixes") as `(not named
+  by the body)`, and marks one named only by keywords as `(named by the
+  body only)`. The reading is parsed from `closingIssuesReferences` in
+  the pull request data and from `closedIssuesIn` reading the body's
+  keywords, refusing nothing when either fails, just falling back to an
+  empty list.
 - **Checks 0–2 of the readiness gate's five run in the board route's
   resolution** (`src/board/plan-spec.ts`): the author's trust (`src/board/trust.ts`),
   the `spec:ready` label, then the leak refusal and the completeness
@@ -1538,8 +1548,17 @@ New; it replaces no earlier text. What a row or an action added to
   fell back to, which numbers its issues on its own. `list` hands `find`
   the query its flags make and reads each ref it answers with `get`, and
   `github`'s `find` refuses every `--state`. `show` reads one issue;
-  `create` files a draft of type `code`, module `unassigned` and no
-  priority unless a flag names one; `comment` posts `--body`; and `move`
+  `create` files a draft with default type `code` (changed by `--type`),
+  module `unassigned` and no priority unless a flag names one. Its body
+  is `--body` or the bytes of the file `--body-file` names (standard input
+  for `-`, a seam of the factory); the two are refused together and an
+  unreadable path refused before the chain is resolved. When `--type=spec`,
+  a body carrying a `Blocked by:` line is read through `readBlockedBy`
+  (`issue/create-blocked.ts`) and filed with `specBlocked` when the line
+  reads; the reading is refused naming its fault when it names no issue,
+  the issue being filed, or an issue the board's `find` listing lacks,
+  each refusal thrown before the chain is resolved or before `create`,
+  respectively; `comment` posts `--body`; and `move`
   moves an issue to a state, writing a `warning` the tracker answers at
   `warn` and still exiting 0. In json mode the result's `data` holds the
   tracker (its kind, whether the chain degraded, and why) beside the
@@ -2087,7 +2106,7 @@ New; it replaces no earlier text. What a row or an action added to
   `comment`, `stub`, `progress` and `hint`, three of them mutually exclusive (`spec`, `issue`
   and `next`), each with `text` and `json`. Of the `issue` actions, `list` declares the
   flags `roadmap`, `all`, `full`, `check`, `state`, `type`, `module`, `search` and `limit`,
-  `show` the argument `id`, `create` the flags `title`, `body`, `type`,
+  `show` the argument `id`, `create` the flags `title`, `body`, `body-file`, `type`,
   `module` and `priority`, `comment` the argument `id` and the flag `body`,
   and `move` the arguments `id` and `state`; each declares `text` and
   `json`. `roadmap` is also a top-level command that runs `list` with

@@ -361,8 +361,19 @@ describe('where start.ts takes the suite steps', () => {
 
   it('stops the run when a step before a session is red, and breaks on an interrupt it ran through', () => {
     expect(START).toContain(
-      'if (!(await suiteSteps.beforeSession(taskInfo))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
+      'const suiteGate = await suiteSteps.beforeSession(taskInfo);\n      if (suiteGate === \'stop\') {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
     );
+  });
+
+  it('turns back to findNextTask on a pre-wrap-up repair, ahead of progress.txt and the wrap-up', () => {
+    // `continue` re-reads the tracker, where `findNextTask` answers the
+    // blocked repair first; `start/suite-steps-run.test.ts` reads when
+    // `beforeSession` answers `repair`.
+    expect(START).toContain('      if (interrupted) break;\n      if (suiteGate === \'repair\') continue;\n');
+    const turn = START.indexOf('if (suiteGate === \'repair\') continue;');
+    expect(turn).toBeGreaterThan(START.indexOf('const taskInfo = findNextTask(trackerContent);'));
+    expect(turn).toBeLessThan(START.indexOf('renderProgressForDispatch(repoRoot'));
+    expect(turn).toBeLessThan(START.indexOf('await runWrapUp('));
   });
 
   it('takes the task step from the task\'s base once its commit is stored', () => {

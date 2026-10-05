@@ -14,9 +14,10 @@
  * An issue is the file `<number>.md` under the directory: YAML
  * frontmatter, then the body exactly as the draft held it. The
  * frontmatter holds, in this order, the draft's `opt`, `type`, `module`,
- * `priority`, `project`, `title` and `blockedBy`, then the issue's
- * `state`, its `fallbackReason`, the `capturedAt` it was created at and
- * its `comments`, each comment written as `<now>: <body>`.
+ * `priority`, `project`, `title` and `blockedBy`, then its
+ * `specBlocked` when the draft sets it, then the issue's `state`, its
+ * `fallbackReason`, the `capturedAt` it was created at and its
+ * `comments`, each comment written as `<now>: <body>`.
  * `Bun.YAML.stringify` writes the block and `Bun.YAML.parse` reads it
  * back.
  *
@@ -60,7 +61,7 @@
  *     directory.
  *   - Validation. Fields are checked by hand where the source used
  *     `zod`, and `Bun.YAML` parses where the source used `js-yaml`. Keys
- *     beyond the eleven are ignored, as `zod`'s default object strips
+ *     beyond the twelve are ignored, as `zod`'s default object strips
  *     them. The source checked a file when reading it; the copy also
  *     checks one before writing it. A draft, a state or a clock reading
  *     no read would accept is refused with nothing written, rather than
@@ -175,6 +176,8 @@ interface LocalIssueFrontmatter {
   project: string | null;
   title: string;
   blockedBy: readonly number[];
+  /** rafa's own, absent from the source: written only when the draft sets it. */
+  specBlocked?: boolean;
   state: IssueState;
   fallbackReason: string | null;
   capturedAt: string;
@@ -204,6 +207,16 @@ function orNull(accepts: (value: unknown) => boolean): (value: unknown) => boole
   return (value) => value === null || accepts(value);
 }
 
+/** Accepts an absent value, or what `accepts` accepts. */
+function orAbsent(accepts: (value: unknown) => boolean): (value: unknown) => boolean {
+  return (value) => value === undefined || accepts(value);
+}
+
+/** True for a boolean. */
+function isBoolean(value: unknown): boolean {
+  return typeof value === 'boolean';
+}
+
 /** Accepts a list whose every item `accepts` accepts. */
 function listOf(accepts: (value: unknown) => boolean): (value: unknown) => boolean {
   return (value) => Array.isArray(value) && value.every(accepts);
@@ -221,6 +234,7 @@ const FIELD_CHECKS = {
   project: [orNull(isString), 'a string or null'],
   title: [isString, 'a string'],
   blockedBy: [listOf(isFiniteNumber), 'a list of numbers'],
+  specBlocked: [orAbsent(isBoolean), 'absent or a boolean'],
   state: [oneOf(ISSUE_STATES), `one of: ${ISSUE_STATES.join(', ')}`],
   fallbackReason: [orNull(isString), 'a string or null'],
   capturedAt: [isString, 'a string'],
@@ -306,6 +320,9 @@ export function renderLocalIssue(record: LocalIssueRecord): string {
     project: draft.project,
     title: draft.title,
     blockedBy: draft.blockedBy,
+    ...(draft.specBlocked === undefined
+      ? {}
+      : { specBlocked: draft.specBlocked }),
     state: record.state,
     fallbackReason: record.fallbackReason,
     capturedAt: record.capturedAt,
@@ -364,6 +381,9 @@ export function parseLocalIssue(contents: string, sourcePath?: string): LocalIss
       priority: fields.priority,
       project: fields.project,
       blockedBy: fields.blockedBy,
+      ...(fields.specBlocked === undefined
+        ? {}
+        : { specBlocked: fields.specBlocked }),
     },
     fallbackReason: fields.fallbackReason,
     capturedAt: fields.capturedAt,

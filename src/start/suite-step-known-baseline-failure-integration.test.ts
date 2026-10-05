@@ -8,10 +8,14 @@
  * The scratch repository's seed commit holds `always-red.test.ts`,
  * failing already, beside the plan's two stages of one task each. Every
  * task line carries `{tests=full}`, so its own task step, like the
- * stage step and the pre-wrap-up step, runs the WHOLE project rather
- * than only what the task's own diff reaches — the one way to be sure
- * every step this file names actually re-runs `always-red.test.ts`
- * rather than skipping a file neither task ever touches. Neither task
+ * pre-wrap-up step, runs the WHOLE project rather than only what the
+ * task's own diff reaches. The stage step, with no `Owns:` folder to
+ * read, falls back to `bun test --changed=<since>`, which never selects
+ * a file neither task touches, so the project's config names
+ * `always-red.test.ts` in `tests.alwaysRun` and the fallback's second
+ * run, over the always-run files, re-runs it. Together they are the way
+ * to be sure every step this file names actually re-runs
+ * `always-red.test.ts` rather than skipping it. Neither task
  * changes that file: each writes a companion test of its own that
  * passes, so the plan's tasks both commit clean and the run reaches its
  * wrap-up.
@@ -129,8 +133,13 @@ function companionSource(name: string): string {
 /** The flags every `loop start` in this file runs with: no CI wait, and `pr.provider: none` so the wrap-up push costs no `gh`. */
 const RUN_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];
 
-/** The project config: `pr.provider: none`, so the wrap-up's push is the run's only reach for a remote, and it never throws without one. */
-const CONFIG = 'pr:\n  provider: none\n';
+/**
+ * The project config: `pr.provider: none`, so the wrap-up's push is the
+ * run's only reach for a remote, and it never throws without one; and
+ * {@link ALWAYS_RED_FILE} in `tests.alwaysRun`, so the stage step's
+ * `--changed` fallback re-runs it too.
+ */
+const CONFIG = `pr:\n  provider: none\ntests:\n  alwaysRun: [${ALWAYS_RED_FILE}]\n`;
 
 /** A scratch repository, and what a spawned run reads under it. */
 interface Scratch {
@@ -322,6 +331,10 @@ describe('a test already red before the run starts', () => {
     if (record === undefined) throw new Error('the run wrote no session record at all');
     const steps = record.steps ?? [];
     expect(steps.map((step) => step.kind)).toEqual(['baseline', 'task', 'stage', 'task', 'pre-wrap-up']);
+    // The stage step took the `--changed` fallback, not the whole
+    // project: it read always-red.test.ts through its always-run run.
+    expect(steps.map((step) => step.scope)).toEqual(['full', 'full', 'affected', 'full', 'full']);
+    expect(steps[2]?.command).toContain(`./${ALWAYS_RED_FILE}`);
 
     for (const step of steps) {
       expect(step.failures).toContainEqual({ file: ALWAYS_RED_FILE, name: ALWAYS_RED_TEST_NAME });

@@ -105,7 +105,7 @@ function viewOf(issue: (typeof ALL_ISSUES)[number]): object {
 }
 
 /** The fields `gh pr view` reads a detail through, as `src/pr/gh.ts` sends them. */
-const DETAIL_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url,body,headRefOid,labels,mergeStateStatus,mergeable';
+const DETAIL_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url,body,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences';
 
 /** The pull request `PULL`'s detail, `state` the one thing a case varies. */
 function pullDetail(state: 'OPEN' | 'MERGED'): object {
@@ -124,6 +124,7 @@ function pullDetail(state: 'OPEN' | 'MERGED'): object {
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'BLOCKED',
     labels: [],
+    closingIssuesReferences: [],
   };
 }
 

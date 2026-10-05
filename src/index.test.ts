@@ -581,11 +581,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/issue/create.js', [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
+    ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
+      'lineRefusal',
       'onTracker',
       'readChoiceFlag',
       'readNonBlankFlag',
@@ -650,6 +653,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
   ]],
   ['./commands/pr/show.js', [
+    ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/index.js', ['formatRows']],
     ['./current.js', ['SEPARATOR']],

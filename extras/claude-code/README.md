@@ -48,18 +48,34 @@ the next session.
 ## What the hook decides
 
 The hook reads each command in a Bash line, with quoted text blanked so
-a comment body cannot trigger it, and answers one of three ways.
+a comment body cannot trigger it, and answers one of four ways.
 
 | Answer | Commands | The agent is told |
 | --- | --- | --- |
 | deny, hand it over | `rafa pr merge`, `release tag`, `self-update`, `loop start`, `issue ready`; `cleanup` without `--dry-run`; `next` without `--dry-run` or a `--yes` list of only `sync`, `wait`, `unblock`, `home`, `resume`; `gh pr merge` | Hand the line to the user in a `bash` block, and do not retry |
-| deny, use rafa | `gh pr view`, `checks`, and `list` with no filter; `gh issue view`, `list`, `create`, `comment`, `close` | The rafa line that replaces it |
+| deny, use rafa | `gh pr view`, `checks`, and `list` with no filter; `gh pr view --json` when `rafa pr show` answers every field asked; `gh issue create` when every flag and label maps onto `rafa issue create`; `gh issue view`, `list`, `comment`, `close` | The rafa line that replaces it, a `gh issue create` translated flag by flag |
+| let through, with a reason | `gh pr view --json` asking for a field `rafa pr show` does not answer, or a field list the hook cannot read; `gh issue create` carrying a flag or label `rafa issue create` has no flag for, such as `--assignee` or an `epic:` label | What rafa lacks, ending with an offer to report the gap: search `rafa issue list --module=cli-gap` first, ask the person once, then file it with `rafa issue create --type=bug --module=cli-gap` |
 | ask | `plan create` without `--dry-run`, `pr triage`, `epic close`, `skill backfill` | That it starts a Claude session (🪙) |
 
-Everything else passes: `gh pr list` with a filter or a closed state,
-since `rafa pr list` shows open pull requests only, and `gh pr create`,
-`gh pr checkout`, `gh run view` and `gh api`. To turn the hook off in a
-project, remove its entry from `.claude/settings.json`.
+A `gh issue create` maps flag by flag. `--title`/`-t`, `--body`/`-b`
+and `--body-file`/`-F` keep their names; a `type:<t>`, `module:<m>` or
+`priority:<p>` label, given once per `--label`/`-l` or comma-joined,
+becomes `--type`, `--module` or `--priority` for a value rafa takes; and
+`spec:blocked` on a `type:spec` with a body file is left off, since rafa
+adds it from the body's `Blocked by:` line. So `gh issue create --label
+type:spec --body-file spec.md` is denied naming `rafa issue create
+--type=spec --body-file=spec.md`.
+
+A let-through writes no permission decision, so the normal permission
+flow applies, and its reason reaches the session as `additionalContext`.
+Everything else passes with no output: `gh pr list` with a filter or a
+closed state, since `rafa pr list` shows open pull requests only, and
+`gh pr create`, `gh pr checkout`, `gh run view` and `gh api`. A `gh pr` or `gh issue`
+naming another repository with `-R`/`--repo` passes too, since rafa reads
+only the project's own: the hook reads that from `git remote get-url
+origin`, and when it cannot, any named repository counts as another one.
+To turn the hook off in a project, remove its entry from
+`.claude/settings.json`.
 
 ## What the pack cannot reach
 

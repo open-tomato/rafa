@@ -7,7 +7,7 @@
  * checkout (`.rafa/specs/rafa-20-pr-commands.md`): a spec is an issue, its
  * readiness is a label, and the order is a task list in one pinned
  * issue. A repository that has none of that cannot be planned from, and
- * making it by hand is fourteen labels, a template file and an issue body
+ * making it by hand is fifteen labels, a template file and an issue body
  * nobody remembers the shape of. This module makes all four, and
  * {@link setUpBoard} is the whole of it; the question, the flags and the
  * lines printed are `src/commands/init.ts`'s, and the present-or-missing
@@ -19,7 +19,7 @@
  * it or wrote to it, `present` when it was already there and nothing was written, or
  * `refused` when it was not made and the detail says why. So a second
  * run over a board already set up writes no byte and answers `present`
- * fourteen-plus-three times, which is what keeps `rafa init`'s "Nothing
+ * fifteen-plus-three times, which is what keeps `rafa init`'s "Nothing
  * changed." true when the board step is part of it.
  *
  * A refusal is never a throw. `setUpBoard` reports a failed `gh`
@@ -30,14 +30,15 @@
  *
  * ## The labels, and where their names come from
  *
- * {@link BOARD_LABELS} is the spec's list, and of its fourteen names only
+ * {@link BOARD_LABELS} is the spec's list, and of its fifteen names only
  * the three horizons and {@link ROADMAP_LABEL} are spelled here for the
  * first time: `type:spec`
  * is `./issue.ts`'s {@link SPEC_LABEL}, the label an issue is refused
  * for not carrying, `spec:ready` is `./readiness.ts`'s {@link SPEC_READY_LABEL},
  * `spec:needs-work` is `./gate.ts`'s {@link SPEC_NEEDS_WORK_LABEL},
  * `spec:blocked` is `./blocked.ts`'s {@link SPEC_BLOCKED_LABEL}, and
- * `type:bug`, `type:epic`, `needs-triage` and `module:unassigned` are
+ * `type:bug`, `type:epic`, `needs-triage`, `module:unassigned` and
+ * `module:cli-gap` are
  * built from `GITHUB_LABELS`, the prefixes `src/adapters/tracker/github.ts`
  * files a draft under. A label spelled twice is a label the gate looks
  * for and this command does not make. `horizon:now`, `horizon:next` and
@@ -65,7 +66,7 @@
  * every run a write.
  *
  * That listing reads {@link LABEL_LIST_LIMIT} labels. A repository
- * holding more than that can have one of the fourteen fall off the end, and
+ * holding more than that can have one of the fifteen fall off the end, and
  * what it costs is a refused part: `gh label create --help` says
  * `--force` is what updates a label that already exists, so the plain
  * form this sends fails, and the failure is reported as the refusal
@@ -174,7 +175,7 @@ export interface BoardLabel {
 export const ROADMAP_LABEL = `${GITHUB_LABELS.typePrefix}roadmap`;
 
 /**
- * The fourteen labels the workflow files under, in the order they are made.
+ * The fifteen labels the workflow files under, in the order they are made.
  * See the module note on where each name comes from.
  */
 export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
@@ -205,6 +206,10 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
   {
     name: `${GITHUB_LABELS.modulePrefix}unassigned`,
     description: 'No module owns this yet',
+  },
+  {
+    name: `${GITHUB_LABELS.modulePrefix}cli-gap`,
+    description: 'A step a session needed that no rafa command can do, filed as a gap report',
   },
   {
     name: `${GITHUB_LABELS.typePrefix}epic`,
@@ -376,7 +381,7 @@ export function missingBoardLabels(held: readonly string[]): readonly BoardLabel
 
 /**
  * Makes each of {@link BOARD_LABELS} the repository does not carry, and
- * answers one part per label. A failed listing refuses all fourteen, naming
+ * answers one part per label. A failed listing refuses all fifteen, naming
  * the command, because nothing is known about any of them then.
  */
 export async function setUpLabels(gh: GhRunner): Promise<readonly BoardPart[]> {
@@ -754,7 +759,7 @@ export interface BoardSetupOptions {
 
 /**
  * Makes every part of the board that is missing and answers what each
- * came to: the fourteen labels, the spec issue template, the pinned Roadmap
+ * came to: the fifteen labels, the spec issue template, the pinned Roadmap
  * issue and `roadmap.issue`.
  *
  * Writes nothing a second time: a run over a board already set up

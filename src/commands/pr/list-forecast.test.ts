@@ -287,6 +287,7 @@ function twoPulls(): ReturnType<typeof createPullRequestsDouble> {
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],
+      closes: [],
     }),
     checks: () => Promise.resolve({ rows: [], verdict: 'green' }),
   });
