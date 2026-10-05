@@ -4,8 +4,13 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
+import { describeRegistry } from '../../src/cli/describe';
+import { CORE_REGISTRY } from '../../src/commands/index';
+import { PR_SHOW_JSON_FIELDS } from '../../src/commands/pr/show';
+
 import {
   commandsOf,
+  ISSUE_CREATE_FLAGS,
   issueCreateOptionsOf,
   jsonFieldsOf,
   judgeLine,
@@ -435,5 +440,57 @@ describe('the hook process', () => {
     test('prints nothing for a gh line naming another repository', async () => {
       expect(await run(bash('gh pr view 3 --repo other/repo'), dir)).toBe('');
     });
+  });
+});
+
+describe('drift from what rafa describe says', () => {
+  const document = describeRegistry(CORE_REGISTRY, '0.0.0');
+  const entry = (subject: string, name: string) => document.subjects
+    .find((held) => held.name === subject)?.actions.find((action) => action.name === name);
+
+  test('every rafa issue create flag the hook writes is a flag of that command', () => {
+    const declared = (entry('issue', 'create')?.flags ?? []).map((flag) => flag.name);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(ISSUE_CREATE_FLAGS.filter((flag) => !declared.includes(flag))).toEqual([]);
+  });
+
+  test('every mapped flag of a full gh issue create line is a flag of that command', () => {
+    const declared = (entry('issue', 'create')?.flags ?? []).map((flag) => flag.name);
+    const mapping = mapIssueCreate(['-t', 'x', '-F', 'b.md', '-l', 'type:bug,module:cli,priority:high']);
+    expect(mapping.unmapped).toEqual([]);
+    const written = mapping.flags.map((flag) => flag.replace(/^--/, '').split('=')[0]);
+    expect(written.filter((flag) => !declared.includes(flag))).toEqual([]);
+  });
+
+  test('pr show describes the json fields the hook builds its answer table on', () => {
+    const description = entry('pr', 'show')?.description ?? '';
+    for (const field of PR_SHOW_JSON_FIELDS) expect(description).toContain(`\`${field}\``);
+    expect(PR_SHOW_JSON_FIELDS).toContain('detail');
+    expect(PR_SHOW_JSON_FIELDS).toContain('checks');
+  });
+
+  test('every field the hook says pr show answers is read into the detail, the checks or the closes', async () => {
+    const source = await Bun.file(`${import.meta.dir}/../../src/pr/gh.ts`).text();
+    const detail = /const SUMMARY_FIELDS = '([^']*)'/.exec(source)?.[1].split(',') ?? [];
+    const more = /const DETAIL_FIELDS = `[^,]*,([^`]*)`/.exec(source)?.[1].split(',') ?? [];
+    const readIn = new Set([...detail, ...more.filter((field) => !field.startsWith('$')), 'statusCheckRollup', 'closingIssuesReferences']);
+    expect(detail.length).toBeGreaterThan(0);
+    expect(PR_SHOW_ANSWERED_FIELDS.filter((field) => !readIn.has(field))).toEqual([]);
+  });
+
+  test.each([
+    ['gh pr view 41 --json closingIssuesReferences', 'deny', 'rafa pr show 41'],
+    ['gh pr view 41 --json someFieldRafaLacks', 'let-through', 'rafa issue list --module=cli-gap'],
+  ])('definition of done: %s is a %s', (line, decision, text) => {
+    const verdict = judgeLine(line, 'open-tomato/rafa');
+    expect(verdict?.decision).toBe(decision as string);
+    expect(verdict?.reason).toContain(text);
+  });
+
+  test.each([
+    'gh issue list -R other/repo',
+    'gh pr view 3 --repo other/repo',
+  ])('definition of done: %s passes with no verdict', (line) => {
+    expect(judgeLine(line, 'open-tomato/rafa')).toBeNull();
   });
 });
