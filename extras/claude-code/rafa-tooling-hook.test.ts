@@ -4,7 +4,15 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
-import { commandsOf, judgeLine, repoFlagOf, repoOf } from './rafa-hookify/files/rafa-tooling-hook';
+import {
+  commandsOf,
+  jsonFieldsOf,
+  judgeLine,
+  PR_SHOW_ANSWERED_FIELDS,
+  repoFlagOf,
+  repoOf,
+  reportOffer,
+} from './rafa-hookify/files/rafa-tooling-hook';
 
 const HOOK = `${import.meta.dir}/rafa-hookify/files/rafa-tooling-hook.ts`;
 
@@ -179,6 +187,84 @@ describe('judgeLine: gh naming a repository', () => {
   });
 });
 
+describe('jsonFieldsOf', () => {
+  test.each([
+    [['pr', 'view', '41', '--json', 'state,closingIssuesReferences'], ['state', 'closingIssuesReferences']],
+    [['pr', 'view', '41', '--json=number,title'], ['number', 'title']],
+    [['pr', 'view', '41', '--json', '""'], []],
+    [['pr', 'view', '41', '--json'], []],
+    [['pr', 'view', '41', '--json', '--jq', '.state'], []],
+    [['pr', 'view', '41'], undefined],
+  ])('reads %p as %p', (words, fields) => {
+    expect(jsonFieldsOf(words)).toEqual(fields);
+  });
+});
+
+describe('judgeLine: gh pr view --json', () => {
+  test.each([
+    ['gh pr view 41 --json closingIssuesReferences', 'rafa pr show 41'],
+    ['gh pr view 41 --json=number,closingIssuesReferences,statusCheckRollup', 'rafa pr show 41'],
+    ['gh pr view 41 --json state --jq .state', 'rafa pr show 41'],
+    ['gh pr view --json headRefName,url', 'rafa pr show --output=json'],
+  ])('denies %s, every field answered, naming %s', (line, rafa) => {
+    const verdict = judgeLine(line);
+    expect(verdict?.decision).toBe('deny');
+    expect(verdict?.reason).toContain(rafa);
+  });
+
+  test('denies a line asking for every field in the table', () => {
+    expect(judgeLine(`gh pr view 41 --json ${PR_SHOW_ANSWERED_FIELDS.join(',')}`)?.decision).toBe('deny');
+  });
+
+  test('lets a field rafa pr show lacks through, naming it and ending with the report offer', () => {
+    const verdict = judgeLine('gh pr view 41 --json someFieldRafaLacks');
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain('does not answer the --json field someFieldRafaLacks.');
+    expect(verdict?.reason).toContain('rafa issue list --module=cli-gap --search="rafa pr show someFieldRafaLacks"');
+    expect(verdict?.reason).toContain('rafa issue create --type=bug --module=cli-gap --title="rafa pr show has no someFieldRafaLacks"');
+    expect(verdict?.reason.endsWith(reportOffer('rafa pr show', ['someFieldRafaLacks']))).toBe(true);
+  });
+
+  test('names only the fields rafa pr show lacks among several', () => {
+    const reason = judgeLine('gh pr view 41 --json number,reviews,comments')?.reason ?? '';
+    expect(reason).toContain('the --json fields reviews, comments.');
+    expect(reason).not.toContain('fields number');
+    expect(reason).toContain('once for each one named');
+    expect(reason.endsWith(reportOffer('rafa pr show', ['reviews', 'comments']))).toBe(true);
+  });
+
+  test('lets a quoted field list through, which it cannot read', () => {
+    const verdict = judgeLine('gh pr view 41 --json "closingIssuesReferences"');
+    expect(verdict?.decision).toBe('let-through');
+    expect(verdict?.reason).toContain('cannot read the --json fields');
+    expect(verdict?.reason).toContain('rafa issue list --module=cli-gap');
+  });
+
+  test('keeps the deny for gh pr view with no --json', () => {
+    expect(judgeLine('gh pr view 41')?.decision).toBe('deny');
+  });
+
+  test('lets the line through on another repository before reading its fields', () => {
+    expect(judgeLine('gh pr view 41 --json someFieldRafaLacks -R other/repo', 'open-tomato/rafa')).toBeNull();
+  });
+});
+
+describe('reportOffer', () => {
+  test('ends with the ask-once rule and names the duplicate search before the report line', () => {
+    const offer = reportOffer('rafa issue create', ['--epic']);
+    const search = offer.indexOf('rafa issue list --module=cli-gap --search="rafa issue create --epic"');
+    const ask = offer.indexOf('ask the person once');
+    const file = offer.indexOf('rafa issue create --type=bug --module=cli-gap --title="rafa issue create has no --epic" --body=');
+    expect(search).toBeGreaterThan(-1);
+    expect(ask).toBeGreaterThan(search);
+    expect(file).toBeGreaterThan(ask);
+  });
+
+  test('carries a placeholder when no single gap is named', () => {
+    expect(reportOffer('rafa pr show', [])).toContain('--title="rafa pr show has no <flag or field>"');
+  });
+});
+
 describe('the hook process', () => {
   const run = async (input: string, cwd?: string): Promise<string> => {
     const env = { ...process.env };
@@ -193,6 +279,15 @@ describe('the hook process', () => {
     const out = JSON.parse(await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'gh pr checks 442' } })));
     expect(out.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+  });
+
+  test('prints a let-through as additionalContext with no permission decision', async () => {
+    const out = JSON.parse(await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'gh pr view 41 --json someFieldRafaLacks' } })));
+    expect(out.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect(out.hookSpecificOutput.permissionDecisionReason).toBeUndefined();
+    expect(out.hookSpecificOutput.additionalContext).toContain('someFieldRafaLacks');
+    expect(out.hookSpecificOutput.additionalContext).toContain('rafa issue list --module=cli-gap');
   });
 
   test('prints nothing for a command it lets through', async () => {

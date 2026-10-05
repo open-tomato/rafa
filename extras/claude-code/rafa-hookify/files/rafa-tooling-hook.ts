@@ -5,11 +5,19 @@
  * merge before handing it over.
  *
  * It reads the hook input on stdin and, for each command in a Bash line,
- * answers one of three ways:
+ * answers one of four ways:
  *
  * - **deny, hand it over**: a rafa command the user runs (merge, tag,
  *   self-update, loop start, and the ones that need a terminal).
  * - **deny, use rafa**: a `gh` command one rafa line replaces, with that line.
+ *   A `gh pr view --json` is one only when `rafa pr show` answers every
+ *   field it asks for.
+ * - **let through, with a reason**: a `gh` command a rafa line almost
+ *   replaces, such as a `gh pr view --json` asking for a field `rafa pr
+ *   show` does not answer. No permission decision is written, so the
+ *   normal permission flow applies, and the reason goes to the session as
+ *   `additionalContext`: what rafa lacks, ending with the offer to report
+ *   the gap under `module:cli-gap`.
  * - **ask**: a rafa command that starts a Claude session (🪙).
  *
  * A `gh pr` or `gh issue` naming another repository with `-R`/`--repo`
@@ -27,7 +35,12 @@
  * ```
  */
 
-export type Verdict = { decision: 'deny' | 'ask'; reason: string };
+/**
+ * What the hook answers for a command. `deny` and `ask` are written as the
+ * permission decision; `let-through` writes none and hands its reason to
+ * the session as `additionalContext`.
+ */
+export type Verdict = { decision: 'deny' | 'ask' | 'let-through'; reason: string };
 
 const SKILL = '.claude/skills/rafa-tooling/SKILL.md';
 const QUOTED = /'[^']*'|"(?:\\.|[^"\\])*"/g;
@@ -43,6 +56,31 @@ const NEXT_SAFE_IDS = new Set(['sync', 'wait', 'unblock', 'home', 'resume']);
 // `gh pr list` that filters, or reads closed and merged ones, passes.
 const PR_LIST_FILTERS = ['state', 'head', 'base', 'search', 'author', 'label', 'assignee', 'draft', 'app'];
 const PR_LIST_SHORT_FILTERS = new Set(['-s', '-H', '-B', '-S', '-A', '-l', '-a', '-d']);
+const JSON_FLAG = /^--json(?:=(.*))?$/;
+
+/**
+ * The `gh pr view --json` fields `rafa pr show --output=json` answers: its
+ * `detail`, the issues it closes, and its checks.
+ */
+export const PR_SHOW_ANSWERED_FIELDS: readonly string[] = Object.freeze([
+  'author',
+  'baseRefName',
+  'body',
+  'closingIssuesReferences',
+  'headRefName',
+  'headRefOid',
+  'isCrossRepository',
+  'labels',
+  'mergeStateStatus',
+  'mergeable',
+  'number',
+  'state',
+  'statusCheckRollup',
+  'title',
+  'updatedAt',
+  'url',
+]);
+const PR_SHOW_ANSWERS = new Set(PR_SHOW_ANSWERED_FIELDS);
 
 const handOver = (line: string, why: string): Verdict => ({
   decision: 'deny',
@@ -52,6 +90,27 @@ const handOver = (line: string, why: string): Verdict => ({
 const useRafa = (instead: string, rafa: string): Verdict => ({
   decision: 'deny',
   reason: `This project has rafa installed: run \`${rafa}\` in place of \`${instead}\`. Keep gh for steps rafa has no action for (gh pr create outside a loop, gh pr checkout, gh run view --log, gh api). See ${SKILL}.`,
+});
+
+/**
+ * The offer every let-through reason ends with: search for an open report
+ * of the gap, ask the person once, and file one under `module:cli-gap`.
+ * `missing` names what `command` lacks; with none or several named, the
+ * search and title carry a `<flag or field>` placeholder.
+ */
+export const reportOffer = (command: string, missing: readonly string[]): string => {
+  const gap = missing.length === 1
+    ? missing[0]
+    : '<flag or field>';
+  const each = missing.length > 1
+    ? ', once for each one named'
+    : '';
+  return `If rafa should have a line for this, report the gap: first run \`rafa issue list --module=cli-gap --search="${command} ${gap}"\`${each}, and when an open report covers it, say which one and file nothing. Otherwise ask the person once whether to report it, never filing unasked; on a yes, run \`rafa issue create --type=bug --module=cli-gap --title="${command} has no ${gap}" --body=…\` with the gh line, this reason, the rafa line and what it lacks in the body, and no local path.`;
+};
+
+const letThrough = (instead: string, why: string, command: string, missing: readonly string[]): Verdict => ({
+  decision: 'let-through',
+  reason: `\`${instead}\` is not denied: ${why} It goes to the normal permission flow. ${reportOffer(command, missing)}`,
 });
 
 const spends = (line: string): Verdict => ({
@@ -117,6 +176,39 @@ const prListFilters = (words: string[]): boolean => {
   return filters && !openOnly;
 };
 
+/**
+ * The fields a `--json` flag asks for, or undefined when the command has no
+ * `--json`. An empty list is a field list the hook cannot read: quoted,
+ * whose text is blanked, or left out.
+ */
+export const jsonFieldsOf = (words: string[]): string[] | undefined => {
+  for (const [i, word] of words.entries()) {
+    const flag = JSON_FLAG.exec(word);
+    if (flag === null) continue;
+    const next = words[i + 1];
+    const list = flag[1] ?? (next === undefined || next.startsWith('-')
+      ? ''
+      : next);
+    return list.split(',')
+      .map((field) => field.trim())
+      .filter((field) => field !== '' && field !== '""');
+  }
+  return undefined;
+};
+
+/** The verdict on a `gh pr view --json`: deny when `rafa pr show` answers every field, else let it through naming the rest. */
+const judgePrViewJson = (instead: string, fields: string[], target: string): Verdict => {
+  const rafa = `rafa pr show${target} --output=json`;
+  if (fields.length === 0) {
+    return letThrough(instead, `the hook cannot read the --json fields it asks for, quoted or left out. \`${rafa}\` answers ${PR_SHOW_ANSWERED_FIELDS.join(', ')}: run it in place of this line when those cover every field asked.`, 'rafa pr show', []);
+  }
+  const unanswered = fields.filter((field) => !PR_SHOW_ANSWERS.has(field));
+  if (unanswered.length === 0) return useRafa(instead, rafa);
+  return letThrough(instead, `\`${rafa}\` does not answer the --json field${unanswered.length === 1
+    ? ''
+    : 's'} ${unanswered.join(', ')}.`, 'rafa pr show', unanswered);
+};
+
 const nextIsSafe =(words: string[]): boolean => {
   if (hasFlag(words, 'dry-run')) return true;
   const ids = flagValue(words, 'yes');
@@ -156,6 +248,10 @@ const judgeGhPr = (words: string[]): Verdict | null => {
   }
   if (action === 'view' && hasFlag(words, 'web')) return useRafa(instead, `rafa pr view${target}`);
   if (action === 'checks' && hasFlag(words, 'watch')) return useRafa(instead, `rafa pr wait${target}`);
+  const fields = action === 'view'
+    ? jsonFieldsOf(words)
+    : undefined;
+  if (fields !== undefined) return judgePrViewJson(instead, fields, target);
   if (action === 'view' || action === 'checks') {
     return useRafa(instead, target === ''
       ? 'rafa pr current'
@@ -240,12 +336,9 @@ if (import.meta.main) {
       ? readOwnRepo()
       : null);
   if (verdict !== null) {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: verdict.decision,
-        permissionDecisionReason: verdict.reason,
-      },
-    }));
+    const hookSpecificOutput = verdict.decision === 'let-through'
+      ? { hookEventName: 'PreToolUse', additionalContext: verdict.reason }
+      : { hookEventName: 'PreToolUse', permissionDecision: verdict.decision, permissionDecisionReason: verdict.reason };
+    console.log(JSON.stringify({ hookSpecificOutput }));
   }
 }
