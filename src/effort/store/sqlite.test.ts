@@ -308,9 +308,19 @@ describe('openSqliteStore layout', () => {
 
     expect(tablesOf(root))
       .toEqual(['blockers', 'changes', 'commits', 'dispatches', 'findings', 'merge_conflicts', 'merges', 'out_of_scope_bugs', 'plan_ci', 'preflight', 'report_absences', 'schema_migrations', 'sessions', 'skill_invocations', 'store_meta', 'task_reports']);
+    const fieldColumns: Readonly<Record<EffortRowKind, readonly { name: string }[]>> = {
+      sessions: [{ name: 'worktree' }],
+      commits: [],
+    };
     for (const [kind, keyColumn] of Object.entries(KEY_COLUMNS)) {
-      expect(rawQuery<{ name: string }>(root, columns, kind))
-        .toEqual([{ name: 'seq' }, { name: keyColumn }, { name: 'row_json' }, { name: 'origin_store' }, { name: 'origin_seq' }]);
+      expect(rawQuery<{ name: string }>(root, columns, kind)).toEqual([
+        { name: 'seq' },
+        { name: keyColumn },
+        { name: 'row_json' },
+        { name: 'origin_store' },
+        { name: 'origin_seq' },
+        ...fieldColumns[kind as EffortRowKind],
+      ]);
     }
     expect(rawQuery(root, 'SELECT session_id AS key FROM sessions'))
       .toEqual([{ key: 'aaaa-1111' }, { key: 'bbbb-2222' }]);

@@ -27,6 +27,8 @@
  * `store-meta` entry with its row written: the next open adds the
  * column, leaves the row's generation NULL and every other column as it
  * was, and a control shows the column's CHECK refuses an empty value.
+ * `session-worktree` is held to a store an older runtime left in
+ * `session-worktree.test.ts`, beside the backend that fills its column.
  */
 import type { CreatedObject, ShapeProblem } from './migration-shapes.js';
 import type { MigrationBreak, MigrationLock, MigrationSpec, SqliteMigration } from './migrations.js';
@@ -424,6 +426,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   ).flat(),
   'store-meta': ['create-table', 'create-table', 'create-table'],
   'store-meta-generation': ['add-column'],
+  'session-worktree': ['add-column'],
 };
 
 describe('classifyMigration over the catalogue', () => {

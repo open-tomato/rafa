@@ -53,6 +53,20 @@ fix:** TS2345 at each `effortStorePath` call in `store/ndjson.ts` until
 one**, so a field added to the attribution reaches no stored row until it
 is copied there as well.
 
+**A port row field SQLite should query by gets a column of its own,
+filled through the kind's `fieldColumns` in `KIND_TABLES`
+(`store/sqlite.ts`).** `row_json` still holds the field and `read`
+answers from it, so both backends' rows stay byte-identical; the column
+only repeats it. `sessions.worktree`, added by migration
+`session-worktree`, is the one such column today: the row's `worktree`
+field, NULL for a session of the main checkout, for a row collected
+before the field and for a row an older runtime inserts. Such a column
+takes an additive, nullable migration with no CHECK the NDJSON backend
+would not also hold, its line in `migrations.lock.json`, the field's key
+in `row-fields.lock.json`, and its place in the column list
+`sqlite.test.ts` reads; `session-worktree.test.ts` holds the entry to a
+store an older runtime left.
+
 ### A store past this rafa
 
 **A plan that adds a migration can lock its own loop out of the store.**

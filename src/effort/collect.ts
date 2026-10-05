@@ -405,7 +405,8 @@ export function readPlanStubs(plansDir: string): string[] {
  * Two passes; see the module note. The candidate supplies the size
  * and mtime rather than a second stat, so the row describes the file
  * as the walk saw it. The mode is read from neither pass; see the
- * module note on why it is the phase's constant.
+ * module note on why it is the phase's constant. The worktree is null:
+ * every log this collector reads is the main checkout's.
  */
 export async function collectSessionRow(
   candidate: SessionLogCandidate,
@@ -431,6 +432,7 @@ export async function collectSessionRow(
     enqueueRecordIndex: enqueue.recordIndex,
     sizeBytes: candidate.sizeBytes,
     modifiedAt: new Date(candidate.modifiedAtMs).toISOString(),
+    worktree: null,
   };
 }
 

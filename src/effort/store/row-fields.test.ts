@@ -86,6 +86,7 @@ const SESSION_SAMPLE: SessionEffortRow = {
   enqueueRecordIndex: 0,
   sizeBytes: 2048,
   modifiedAt: '2026-09-24T09:00:42.000Z',
+  worktree: null,
 };
 
 /**
