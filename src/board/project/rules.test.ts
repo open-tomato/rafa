@@ -1,17 +1,37 @@
 /**
- * Tests for the Stage rule (`rules.ts`): one case per row of the Stage
- * outline, each row's negative cases first — the facts that look like
- * the row and must NOT land in its column — then the row itself.
+ * Tests for the field rules (`rules.ts`).
  *
- * Every row below Cancelled is also held against the rows to its right,
- * so a case proves the rightmost matching column wins rather than only
- * that a lone fact maps to its column.
+ * Stage: one case per row of the Stage outline, each row's negative cases
+ * first — the facts that look like the row and must NOT land in its
+ * column — then the row itself. Every row below Cancelled is also held
+ * against the rows to its right, so a case proves the rightmost matching
+ * column wins rather than only that a lone fact maps to its column.
+ *
+ * Horizon: a non-epic issue carrying a `horizon:` label is the control
+ * that the label alone gives no Horizon, and a closed epic carrying one
+ * proves the close state wins over the label.
+ *
+ * Progress: read through the real `readEpics` over a literal listing, so
+ * the text is held to the counts `../epics.ts` computes, not to numbers
+ * the test makes up; a member closed as completed beside one closed as
+ * not planned proves only the first reaches `done`.
  */
-import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
+import type { HorizonFacts, StageFacts, StageFragment, StagePullRequest } from './rules.js';
+import type { Epic } from '../epics.js';
+import type { BoardIssue } from '../roadmap-board.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { stageOf, STAGE_OPTIONS } from './rules.js';
+import { typeOfLabels } from '../../adapters/tracker/github.js';
+import { readEpics, unknownEpic } from '../epics.js';
+
+import {
+  HORIZON_OPTIONS,
+  horizonOptionOf,
+  progressTextOf,
+  stageOf,
+  STAGE_OPTIONS,
+} from './rules.js';
 
 /** An open issue with no label and no pull request, overridden by `facts`. */
 function issue(facts: Partial<StageFacts> = {}): StageFacts {
@@ -183,5 +203,125 @@ describe('stageOf: the label rows', () => {
 describe('stageOf: nothing → Backlog', () => {
   it('is Backlog for an open issue with no stage label and no pull request', () => {
     expect(stageOf(issue({ labels: ['type:feature', 'module:board'] }))).toBe('Backlog');
+  });
+});
+
+/** An open epic carrying `labels` beside `type:epic`, overridden by `facts`. */
+function epicFacts(labels: readonly string[] = [], facts: Partial<HorizonFacts> = {}): HorizonFacts {
+  return { state: 'OPEN', stateReason: null, labels: ['type:epic', ...labels], ...facts };
+}
+
+describe('HORIZON_OPTIONS', () => {
+  it('names the five options of the template, left to right, by their exact names', () => {
+    expect(HORIZON_OPTIONS).toEqual(['Later', 'Next', 'Now', 'Done', 'Cancelled']);
+  });
+});
+
+describe('horizonOptionOf: epics only', () => {
+  it('gives an issue that is no epic no Horizon, whatever its horizon label and close state', () => {
+    expect(horizonOptionOf({ state: 'OPEN', stateReason: null, labels: ['horizon:now'] })).toBeNull();
+    expect(horizonOptionOf({ state: 'CLOSED', stateReason: 'COMPLETED', labels: ['horizon:now'] })).toBeNull();
+    expect(horizonOptionOf({ state: 'CLOSED', stateReason: 'NOT_PLANNED', labels: [] })).toBeNull();
+  });
+
+  it('gives an epic carrying the same label its Horizon', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:now']))).toBe('Now');
+  });
+});
+
+describe('horizonOptionOf: closed → Cancelled or Done', () => {
+  it('cancels an epic closed as not planned or as a duplicate, over its horizon label', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:now'], { state: 'CLOSED', stateReason: 'NOT_PLANNED' }))).toBe('Cancelled');
+    expect(horizonOptionOf(epicFacts(['horizon:next'], { state: 'CLOSED', stateReason: 'DUPLICATE' }))).toBe('Cancelled');
+  });
+
+  it('is Done for an epic closed as completed or with no close reason, over its horizon label', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:later'], { state: 'CLOSED', stateReason: 'COMPLETED' }))).toBe('Done');
+    expect(horizonOptionOf(epicFacts([], { state: 'CLOSED', stateReason: null }))).toBe('Done');
+  });
+
+  it('does not cancel an open epic whose close reason was left from a reopen', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:next'], { stateReason: 'NOT_PLANNED' }))).toBe('Next');
+  });
+});
+
+describe('horizonOptionOf: open → the horizon label, else empty', () => {
+  it('takes the option each horizon label names', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:now']))).toBe('Now');
+    expect(horizonOptionOf(epicFacts(['horizon:next']))).toBe('Next');
+    expect(horizonOptionOf(epicFacts(['horizon:later']))).toBe('Later');
+  });
+
+  it('leaves the field empty with no horizon label, never falling back to Later', () => {
+    expect(horizonOptionOf(epicFacts())).toBeNull();
+  });
+
+  it('leaves the field empty for two horizon labels or an unknown value', () => {
+    expect(horizonOptionOf(epicFacts(['horizon:now', 'horizon:later']))).toBeNull();
+    expect(horizonOptionOf(epicFacts(['horizon:someday']))).toBeNull();
+    expect(horizonOptionOf(epicFacts(['horizon:Now']))).toBeNull();
+  });
+});
+
+/** One listing row, its type read from its labels as `parseBoardListing` reads it. */
+function row(number: number, labels: readonly string[], fields: Partial<BoardIssue> = {}): BoardIssue {
+  return {
+    number,
+    title: `#${String(number)}`,
+    body: '',
+    state: 'OPEN',
+    stateReason: null,
+    labels,
+    type: typeOfLabels(labels),
+    module: '',
+    ...fields,
+  };
+}
+
+/** The epic numbered `number` that `readEpics` reads off `issues` in labels mode. */
+function readEpic(issues: readonly BoardIssue[], number: number): Epic {
+  const found = readEpics({ issues, claims: new Set(), today: new Date(2026, 9, 6) })
+    .epics.find((epic) => epic.number === number);
+  if (found === undefined) throw new Error(`epic #${String(number)} not read`);
+  return found;
+}
+
+describe('progressTextOf', () => {
+  it('gives an issue that is no epic no Progress', () => {
+    expect(progressTextOf(null)).toBeNull();
+  });
+
+  it('gives an epic read off a failed listing no Progress, having no counts to show', () => {
+    expect(progressTextOf(unknownEpic(40, 'gh failed'))).toBeNull();
+  });
+
+  it('writes done / total as readEpics counts them, leaving a not-planned member off both sides', () => {
+    const issues = [
+      row(40, ['type:epic', 'epic:alpha']),
+      row(41, ['epic:alpha'], { state: 'CLOSED', stateReason: 'COMPLETED' }),
+      row(42, ['epic:alpha'], { state: 'CLOSED', stateReason: 'NOT_PLANNED' }),
+      row(43, ['epic:alpha']),
+      row(44, ['epic:alpha']),
+      row(45, ['epic:beta'], { state: 'CLOSED', stateReason: 'COMPLETED' }),
+    ];
+
+    const epic = readEpic(issues, 40);
+
+    expect(epic.progress).toEqual({ done: 1, total: 3, notPlanned: 1 });
+    expect(progressTextOf(epic)).toBe('1 / 3');
+  });
+
+  it('writes 0 / 0 for an epic with no members', () => {
+    expect(progressTextOf(readEpic([row(40, ['type:epic', 'epic:alpha'])], 40))).toBe('0 / 0');
+  });
+
+  it('writes a done epic with every member closed', () => {
+    const issues = [
+      row(40, ['type:epic', 'epic:alpha']),
+      row(41, ['epic:alpha'], { state: 'CLOSED', stateReason: 'COMPLETED' }),
+      row(42, ['epic:alpha'], { state: 'CLOSED', stateReason: null }),
+    ];
+
+    expect(progressTextOf(readEpic(issues, 40))).toBe('2 / 2');
   });
 });

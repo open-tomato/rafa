@@ -29,6 +29,28 @@
  * fragment sits on the integration branch, so where it is now is not read.
  * An epic (`type:epic`) gets no Stage; the Issues view leaves it out.
  *
+ * ## Horizon
+ *
+ * {@link horizonOptionOf} places an epic in one of the five
+ * {@link HORIZON_OPTIONS}, by the template's exact names: Cancelled when
+ * closed as not planned or duplicate, Done when closed otherwise, else the
+ * option its one `horizon:now|next|later` label names. An open epic whose
+ * `horizon:` labels name no single known horizon — none, two or more, or
+ * an unknown value — gets null, an empty field: `rafa roadmap` groups such
+ * an epic under `later` (`horizonOf`, `../roadmap-epic-rows.ts`), but the
+ * project shows no column it was not given, and `rafa doctor`'s epic
+ * problems (`../epic-problems.ts`) name the fault. Only epics get a
+ * Horizon; any other issue gets null.
+ *
+ * ## Progress
+ *
+ * {@link progressTextOf} writes an epic's `done / total` exactly as
+ * `readEpics` (`../epics.ts`) counted it, in either `board.relationships`
+ * mode: members closed as not planned count on neither side, so an epic
+ * whose every member was dropped reads `0 / 0`, as does one with no
+ * members. An epic read off a failed listing (`unknown`) has no counts to
+ * show and gets null, as does an issue that is no epic.
+ *
  * The label names are imported from the modules that own them, never
  * spelled again here. `needs-triage` and `spec:blocked` are the github
  * tracker's (`GITHUB_LABELS`): the board's own `SPEC_BLOCKED_LABEL` sits
@@ -38,14 +60,18 @@
  * column, so it takes the tracker's spelling of the same name.
  */
 import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { Epic } from '../epics.js';
 import type { BoardIssue } from '../roadmap-board.js';
+import type { Horizon } from '../roadmap-epic-rows.js';
 
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
 import { EPIC_TYPE_LABEL } from '../epic-context.js';
+import { HORIZON_LABEL_PREFIX } from '../epic-problems.js';
 import { NOT_PLANNED_REASON } from '../epics.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../gate.js';
 import { SPEC_READY_LABEL } from '../readiness.js';
+import { HORIZONS } from '../roadmap-epic-rows.js';
 
 /** The Stage field's options, left to right, by the template's exact names. */
 export const STAGE_OPTIONS = Object.freeze([
@@ -110,6 +136,11 @@ function ships(fragment: StageFragment | null): fragment is StageFragment {
   return fragment !== null && fragment.level !== NO_SHIPPING_LEVEL;
 }
 
+/** True when an issue's close reason reads not planned or duplicate. */
+function cancelled(facts: Pick<BoardIssue, 'stateReason'>): boolean {
+  return facts.stateReason === NOT_PLANNED_REASON || facts.stateReason === DUPLICATE_REASON;
+}
+
 /** The merged pull requests of `facts`. */
 function mergedOf(facts: StageFacts): readonly StagePullRequest[] {
   return facts.pullRequests.filter(({ state }) => state === 'MERGED');
@@ -117,7 +148,7 @@ function mergedOf(facts: StageFacts): readonly StagePullRequest[] {
 
 /** The Stage of a closed issue: Cancelled, In review or Done. */
 function closedStage(facts: StageFacts): StageOption {
-  if (facts.stateReason === NOT_PLANNED_REASON || facts.stateReason === DUPLICATE_REASON) {
+  if (cancelled(facts)) {
     return 'Cancelled';
   }
   const unreleased = mergedOf(facts).some(({ fragment }) => ships(fragment) && fragment.onBase);
@@ -158,4 +189,66 @@ export function stageOf(facts: StageFacts): StageOption | null {
   return facts.state === 'CLOSED'
     ? closedStage(facts)
     : openStage(facts);
+}
+
+/** The Horizon field's options, left to right, by the template's exact names. */
+export const HORIZON_OPTIONS = Object.freeze([
+  'Later',
+  'Next',
+  'Now',
+  'Done',
+  'Cancelled',
+] as const);
+
+/** One option of the Horizon field. */
+export type HorizonOption = (typeof HORIZON_OPTIONS)[number];
+
+/** The option each `horizon:` label's value names. */
+const HORIZON_LABEL_OPTIONS: Readonly<Record<Horizon, HorizonOption>> = Object.freeze({
+  now: 'Now',
+  next: 'Next',
+  later: 'Later',
+});
+
+/** The facts the Horizon rule reads of one issue. */
+export type HorizonFacts = Pick<BoardIssue, 'state' | 'stateReason' | 'labels'>;
+
+/** The option the one known `horizon:` label of `labels` names, or null for none, several or an unknown value. */
+function labelledHorizon(labels: readonly string[]): HorizonOption | null {
+  const found = labels.filter((label) => label.startsWith(HORIZON_LABEL_PREFIX));
+  if (found.length !== 1) return null;
+  const value = (found[0] ?? '').slice(HORIZON_LABEL_PREFIX.length);
+  const known = HORIZONS.find((horizon) => horizon === value);
+
+  return known === undefined
+    ? null
+    : HORIZON_LABEL_OPTIONS[known];
+}
+
+/**
+ * The Horizon of the issue `facts` describe, by the module note: null for
+ * an issue that is no epic, and for an open epic with no single known
+ * `horizon:` label.
+ */
+export function horizonOptionOf(facts: HorizonFacts): HorizonOption | null {
+  if (!facts.labels.includes(EPIC_TYPE_LABEL)) return null;
+  if (facts.state === 'CLOSED') {
+    return cancelled(facts)
+      ? 'Cancelled'
+      : 'Done';
+  }
+
+  return labelledHorizon(facts.labels);
+}
+
+/**
+ * The Progress text of `epic` as `readEpics` read it, `done / total`, or
+ * null for an issue that is no epic (`epic` null) and for an `unknown`
+ * epic, whose listing failed. See the module note.
+ */
+export function progressTextOf(epic: Pick<Epic, 'state' | 'progress'> | null): string | null {
+  if (epic === null || epic.state === 'unknown') return null;
+  const { done, total } = epic.progress;
+
+  return `${String(done)} / ${String(total)}`;
 }
