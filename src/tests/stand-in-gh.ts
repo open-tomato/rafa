@@ -33,6 +33,23 @@ export function plantGitOnlyDir(root: string): string {
   return dir;
 }
 
+/**
+ * The system directories a stand-in script's own tools live in. Linux
+ * keeps `cat`, `mkdir` and `rm` in `/usr/bin` beside git, but macOS
+ * keeps them in `/bin` alone, so a PATH of git's directory finds no
+ * `cat` there. Neither holds a `gh` on macOS.
+ */
+const SYSTEM_TOOL_DIRS: readonly string[] = ['/usr/bin', '/bin'];
+
+/**
+ * git's own directory, then {@link SYSTEM_TOOL_DIRS}, each once: the
+ * host directories a scratch PATH takes after its `bin/`, so a stand-in
+ * finds `cat` and the like on Linux and macOS alike.
+ */
+export function hostToolDirs(): readonly string[] {
+  return [...new Set([hostGitDir(), ...SYSTEM_TOOL_DIRS])];
+}
+
 /** The PATH of `dirs` alone, in order. */
 export function builtPath(...dirs: readonly string[]): string {
   return dirs.join(delimiter);
