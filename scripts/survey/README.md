@@ -18,7 +18,7 @@ repository name: the repository is public. The outputs under
 | `import-graph.ts` | `.rafa/survey/import-graph.json`, `.rafa/survey/import-graph.md` | `bun scripts/survey/import-graph.ts` | added |
 | `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | added |
 | `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | added |
-| `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | planned |
+| `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | added |
 | `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts` | planned |
 
 A `planned` row names a script its own task adds; that task turns the row
@@ -52,6 +52,18 @@ for a root commit or one whose subject names the import, `spec` or
 or a change no spec designed, and `bug-sweep` for a `fix:` subject no
 issue decided. A worktree keeps no board cache of its own: pass
 `--board <path>` to read another checkout's.
+
+`concepts.ts` seeds concepts from every heading of the tracked
+`context/*.md` pages (fenced code aside) and from the defined terms of
+`context/terminology.md`, a bold span opening a line before `is` or
+`are`. A heading naming a procedure ("What …", "Adding …") or with no
+searchable term is listed as skipped. Each concept's terms match a source
+file's path or text in any spelling a name takes (`copyDetection`,
+`copy-detection.ts`, `COPY_DETECTION`). It searches the sources
+`import-graph.ts` clusters, so that script runs first, and writes the
+concept-by-cluster matrix, reading each concept as absent from the code,
+within one cluster or crossing several, never renaming a cluster after a
+concept. A file that is not valid UTF-8 is named as missed.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
