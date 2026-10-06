@@ -20,7 +20,7 @@ import { bringForward } from '../effort/store/bring-forward.js';
 import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
 import { unknownAdditiveWarning } from '../effort/store/schema-report.js';
 import { migrateSchema, SQLITE_MIGRATIONS } from '../effort/store/sqlite.js';
-import { eventsOf, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { eventsOf, expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import {
   developmentAppliedWarning,
@@ -182,8 +182,8 @@ describe('rafa doctor, spawned', () => {
   it('fails where effort schema --check fails, naming the next safe step, and passes where it passes', () => {
     const refused = scratchWith((dir) => plantPreLog(dir, SQLITE_MIGRATIONS.length + 2));
     const [doctor, check] = doctorAndCheck(refused.scratch);
-    expect(check.exitCode).toBe(1);
-    expect(doctor.exitCode).toBe(1);
+    expectExit(check, 1, refused.scratch);
+    expectExit(doctor, 1, refused.scratch);
     expect(doctor.stdout).toContain(`Effort store schema: fail, pre-log-unreleased (${refused.path})`);
     expect(doctor.stderr).toContain(`rafa doctor: effort store schema: this rafa refuses ${refused.path} (pre-log-unreleased)`);
     expect(doctor.stderr).toContain(`Next safe step: ${FIX_SCHEMA_STEP}`);
@@ -191,22 +191,22 @@ describe('rafa doctor, spawned', () => {
     // The control: the same command over a current store, where --check passes.
     const current = scratchWith(plantCurrent);
     const [passed, passedCheck] = doctorAndCheck(current.scratch);
-    expect(passedCheck.exitCode).toBe(0);
-    expect(passed.exitCode).toBe(0);
+    expectExit(passedCheck, 0, current.scratch);
+    expectExit(passed, 0, current.scratch);
     expect(passed.stdout).toContain(`Effort store schema: ok, current (${current.path})`);
   }, SPAWN_TIMEOUT);
 
   it('gives a failing row\'s next step in json mode as the command_exit message, and a passing row as data', () => {
     const refused = scratchWith((dir) => plantPreLog(dir, SQLITE_MIGRATIONS.length + 2));
     const failed = runRafa(refused.scratch, refused.scratch.repo, ['--output=json', 'doctor']);
-    expect(failed.exitCode).toBe(1);
+    expectExit(failed, 1, refused.scratch);
     const failure = JSON.stringify(eventsOf(failed.stdout).at(-1));
     expect(failure).toContain('command_exit');
     expect(failure).toContain(`Next safe step: ${FIX_SCHEMA_STEP}`);
 
     const current = scratchWith(plantCurrent);
     const passed = runRafa(current.scratch, current.scratch.repo, ['--output=json', 'doctor']);
-    expect(passed.exitCode).toBe(0);
+    expectExit(passed, 0, current.scratch);
     const result = JSON.stringify(eventsOf(passed.stdout).at(-1));
     expect(result).toContain('"effortSchema":{"outcome":"ok"');
   }, SPAWN_TIMEOUT);
@@ -218,8 +218,8 @@ describe('rafa doctor, spawned', () => {
       return path;
     });
     const [doctor, check] = doctorAndCheck(additive.scratch);
-    expect(check.exitCode).toBe(0);
-    expect(doctor.exitCode).toBe(0);
+    expectExit(check, 0, additive.scratch);
+    expectExit(doctor, 0, additive.scratch);
     expect(doctor.stdout).toContain(`Effort store schema: warn, current (${additive.path})`);
     expect(`${doctor.stdout}${doctor.stderr}`).toContain(unknownAdditiveWarning({ id: 'future-notes', appliedBy: '0.30.0' }));
   }, SPAWN_TIMEOUT);
@@ -231,7 +231,7 @@ describe('rafa doctor, spawned', () => {
       return path;
     });
     const doctor = runRafa(live.scratch, live.scratch.repo, ['doctor']);
-    expect(doctor.exitCode).toBe(0);
+    expectExit(doctor, 0, live.scratch);
     expect(doctor.stdout).toContain(`Effort store schema: warn, current (${live.path})`);
     expect(`${doctor.stdout}${doctor.stderr}`).toContain(`applied by a development build (${DEV_APPLIED_BY})`);
 
@@ -239,7 +239,7 @@ describe('rafa doctor, spawned', () => {
     markDevelopment(plantCurrent(copyDir));
     const clean = plantScratchRepo(tempBase);
     const copied = runRafa(clean, clean.repo, ['doctor'], { RAFA_EFFORT_DIR: copyDir });
-    expect(copied.exitCode).toBe(0);
+    expectExit(copied, 0, clean);
     expect(copied.stdout).toContain(`Effort store schema: ok, current (${storeIn(copyDir)})`);
     expect(`${copied.stdout}${copied.stderr}`).not.toContain('applied by a development build');
   }, SPAWN_TIMEOUT);
@@ -250,7 +250,7 @@ describe('rafa doctor, spawned', () => {
     const behind = scratchWith((dir) => plantPreLog(dir, LEGACY_GATE_OPEN));
     const before = readFileSync(behind.path);
     const doctor = runRafa(behind.scratch, behind.scratch.repo, ['doctor']);
-    expect(doctor.exitCode).toBe(0);
+    expectExit(doctor, 0, behind.scratch);
     expect(doctor.stdout).toContain(`Effort store schema: ok, behind (${behind.path})`);
     expect(readFileSync(behind.path).equals(before)).toBe(true);
   }, SPAWN_TIMEOUT);

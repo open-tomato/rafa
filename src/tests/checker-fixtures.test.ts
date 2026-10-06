@@ -48,7 +48,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-checker-fixtures-')));
@@ -123,7 +123,7 @@ describe('rafa skill check, spawned over a broken tier', () => {
       'skill', 'check', '.claude/skills/broken', '--project=.',
     ]);
 
-    expect(answered.exitCode).toBe(5);
+    expectExit(answered, 5, scratch);
     expect(answered.stdout).toBe('');
     expect(answered.stderr).toContain('schema missing-field (stack)');
     expect(answered.stderr).toContain('resolution unresolved-path');
@@ -156,7 +156,7 @@ describe('rafa instinct check, spawned over a task-report record', () => {
 
     const answered = runRafa(scratch, scratch.repo, ['instinct', 'check', '.rafa/instincts']);
 
-    expect(answered.exitCode).toBe(1);
+    expectExit(answered, 1, scratch);
     expect(answered.stdout).toBe('');
     expect(answered.stderr).toContain('instinct missing-evidence');
     expect(answered.stderr).toContain('1 failing, 0 with warnings');
@@ -296,7 +296,7 @@ describe('rafa skill check --fix, spawned', () => {
     const after = readFileSync(path, 'utf8');
     const bodyAfter = after.slice(after.indexOf('\n---\n') + '\n---\n'.length);
 
-    expect(answered.exitCode).toBe(0);
+    expectExit(answered, 0, scratch);
     expect(answered.stderr).toBe('');
     expect(answered.stdout).toContain('(filled tags, stack)');
     expect(after).not.toBe(before);

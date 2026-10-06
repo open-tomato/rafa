@@ -21,7 +21,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../../effort/store/sqlite.js';
 import { beginSession } from '../../loop/sessions.js';
-import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createFixSchemaCommand, fileStamp } from './fix-schema.js';
 
@@ -241,7 +241,7 @@ describe('rafa effort fix-schema spawned as a development build over a store it 
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'fix-schema'], env);
 
-    expect(outcome.exitCode).toBe(1);
+    expectExit(outcome, 1, scratch);
     expect(outcome.stderr).toContain('this rafa is a development build (');
     expect(outcome.stderr.trimEnd()).toEndWith('Next safe step: rafa effort fix-schema');
     expect(readFileSync(path).equals(before)).toBe(true);
@@ -255,7 +255,7 @@ describe('rafa effort fix-schema spawned as a development build over a store it 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'fix-schema', '--dry-run'], env);
 
     expect(outcome.stderr).toBe('');
-    expect(outcome.exitCode).toBe(0);
+    expectExit(outcome, 0, scratch);
     expect(outcome.stdout).toContain('Refused as pre-log-unreleased:');
     expect(outcome.stdout).toContain('+dev:');
     expect(outcome.stdout).toContain('🔍 Dry run:');

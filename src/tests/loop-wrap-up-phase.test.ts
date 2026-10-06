@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -117,7 +117,7 @@ describe('a run record in phase wrap-up with every task ticked', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'status']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout.toString()).toContain(`Tasks: ${TASK_COUNT}/${TASK_COUNT} done (phase wrap-up)`);
   });
 });

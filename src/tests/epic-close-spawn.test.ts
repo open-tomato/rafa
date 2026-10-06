@@ -75,7 +75,7 @@ import { MEMBERSHIP_NOTE, renderEpicCost } from '../effort/epic-cost.js';
 import { VERIFY_PROMPT_PREFIX } from '../epic/verify-plan.js';
 import { CHECK_PROMPT_PREFIX } from '../epic/verify-run.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -291,7 +291,7 @@ describe('rafa epic close, spawned', () => {
 
     const run = runRafa(setup.scratch, setup.scratch.repo, ['epic', 'close', '40']);
 
-    expect(run.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expectExit(run, EPIC_CLOSE_REFUSAL_EXIT, setup.scratch);
     expect(run.stderr).toContain('Epic #40 has 1 open member: #41 issue 41.');
     expect(linesOf(setup.claudeLog)).toEqual([]);
     expect(linesOf(setup.ghLog)).toEqual([LIST_CALL]);
@@ -309,7 +309,7 @@ describe('rafa epic close, spawned', () => {
 
     const run = runRafa(setup.scratch, setup.scratch.repo, ['epic', 'close', '50']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, setup.scratch);
     expect(run.stdout).toContain(`Closed epic #50 as completed: 1 criterion passed against ${commit}.`);
     const [costLine] = renderEpicCost({ runs: 0, wallSeconds: 0, runsWithoutTime: 0, tokens: 0 }, 'three days');
     expect(run.stdout).toContain(`${costLine ?? ''}\n${MEMBERSHIP_NOTE}\n`);
@@ -332,7 +332,7 @@ describe('rafa epic close, spawned', () => {
 
     const run = runRafa(setup.scratch, setup.scratch.repo, ['epic', 'close', '60']);
 
-    expect(run.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expectExit(run, EPIC_CLOSE_REFUSAL_EXIT, setup.scratch);
     expect(run.stderr).toContain(`Epic #60 was not closed: against ${commit}, 1 criterion failed its check, each filed as a bug.`);
     expect(run.stdout).toContain('Criterion 1: filed on the public tracker as local issue');
     expect(linesOf(setup.claudeLog)).toEqual(['plan', 'check']);
@@ -349,7 +349,7 @@ describe('rafa epic close, spawned', () => {
 
     const run = runRafa(setup.scratch, setup.scratch.repo, ['epic', 'close', '70']);
 
-    expect(run.exitCode).toBe(EPIC_CLOSE_REFUSAL_EXIT);
+    expectExit(run, EPIC_CLOSE_REFUSAL_EXIT, setup.scratch);
     expect(run.stdout).toContain('warn: Uncheckable criterion 1: - Feels right. — It needs a person to judge.');
     expect(run.stderr).toContain(`pass --${ACCEPT_UNCHECKED_FLAG} to close over them`);
     expect(linesOf(setup.claudeLog)).toEqual(['plan']);
@@ -372,7 +372,7 @@ describe('rafa epic close, spawned', () => {
 
     const run = runRafa(setup.scratch, setup.scratch.repo, ['epic', 'close', '80', `--${ACCEPT_UNCHECKED_FLAG}`]);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, setup.scratch);
     expect(run.stdout).toContain(`Closed epic #80 as completed: 1 criterion passed against ${commit}, 1 criterion closed over with --${ACCEPT_UNCHECKED_FLAG}.`);
     expect(linesOf(setup.claudeLog)).toEqual(['plan', 'check']);
     expect(linesOf(setup.ghLog)).toEqual([LIST_CALL, 'issue close 80 --reason=completed']);

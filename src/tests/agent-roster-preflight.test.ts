@@ -52,7 +52,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
@@ -325,7 +325,7 @@ describe('the agent roster preflight, over a plan naming an unresolvable agent b
 
     const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
 
-    expect(start.exitCode).toBe(1);
+    expectExit(start, 1, { ...scratch });
     expect(start.stderr).toContain(
       `❌ Refusing to start: PLAN-${CLOSED_STUB}.md names 1 agent(s) no loaded tier serves`,
     );
@@ -339,7 +339,7 @@ describe('the agent roster preflight, over a plan naming an unresolvable agent b
 
     const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
 
-    expect(start.exitCode).toBe(1);
+    expectExit(start, 1, { ...scratch });
     expect(start.stderr).toContain(
       `❌ Refusing to start: PLAN-${UNCLOSED_STUB}.md names 1 agent(s) no loaded tier serves`,
     );
@@ -361,7 +361,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       // command, before any session.
       const firstStart = runRafa(scratch, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-      expect(firstStart.exitCode).toBe(1);
+      expectExit(firstStart, 1, { ...scratch });
       expect(firstStart.stderr).toContain(
         `❌ Refusing to start: PLAN_TRACKER-${STUB}.md names 1 agent(s) no loaded tier serves`,
       );
@@ -374,7 +374,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       // agent and the same reason, and starts no session either.
       const validate = runRafa(scratch, ['plan', 'validate', scratch.planFile]);
 
-      expect(validate.exitCode).toBe(1);
+      expectExit(validate, 1, { ...scratch });
       expect(validate.stdout).toContain(`error: ${scratch.planFile}: agent "${AGENT}" (line 3) ${homeOnly(scratch)}`);
       expect(validate.stderr).toBe(
         `❌ ${scratch.planFile}: 1 unresolvable agent; no session would be dispatched\n`,
@@ -384,7 +384,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       // 3. `rafa agent vendor` copies the home's definition in, once.
       const vendored = runRafa(scratch, ['agent', 'vendor', AGENT]);
 
-      expect(vendored.exitCode).toBe(0);
+      expectExit(vendored, 0, { ...scratch });
       expect(vendored.stdout).toBe(`✅ ${AGENT}: ${vendoredAgentFile(scratch)} (from the user tier)\n`);
       expect(existsSync(vendoredAgentFile(scratch))).toBe(true);
       const firstCopy = readFileSync(vendoredAgentFile(scratch), 'utf8');
@@ -395,7 +395,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       // is left exactly as the first copy wrote it.
       const vendoredAgain = runRafa(scratch, ['agent', 'vendor', AGENT]);
 
-      expect(vendoredAgain.exitCode).toBe(1);
+      expectExit(vendoredAgain, 1, { ...scratch });
       expect(vendoredAgain.stderr).toContain(
         `agent "${AGENT}": ${vendoredAgentFile(scratch)} is already there; pass --force to replace it`,
       );
@@ -410,7 +410,7 @@ describe('the agent roster preflight, end to end over one scratch project and ho
       // the log ends up with two calls rather than one).
       const secondStart = runRafa(scratch, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-      expect(secondStart.exitCode).toBe(0);
+      expectExit(secondStart, 0, { ...scratch });
       expect(secondStart.stderr).not.toContain('Refusing to start');
       expect(secondStart.stderr).not.toContain(`agent "${AGENT}"`);
       expect(callCount(scratch)).not.toBeNull();

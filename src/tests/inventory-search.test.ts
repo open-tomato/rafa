@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-inventory-search-')));
 
@@ -110,7 +110,7 @@ describe('rafa skill search, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['skill', 'search', QUESTION, '--no-model'], { TMPDIR: tmp });
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('keyword ranking, no session');
     expect(run.stdout).toContain('documentation');
     expect(run.stdout).toContain('commenting');
@@ -126,7 +126,7 @@ describe('rafa skill search, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['skill', 'search', QUESTION], { TMPDIR: tmp });
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`"${TRUE_QUOTE}"`);
     expect(run.stdout).toContain('documentation (project)');
     expect(run.stdout).not.toContain('commenting (project)');

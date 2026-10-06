@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { projectConfigText } from '../project/scaffold.js';
 
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -153,19 +153,19 @@ describe('rafa issue list --roadmap, spawned', () => {
 
   it('refuses --roadmap beside --state', () => {
     const run = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap', '--state=open']);
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, good.scratch);
     expect(run.stdout + run.stderr).toContain('--state cannot narrow --roadmap');
   });
 
   it('refuses --all alone, before reading anything', () => {
     const run = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--all']);
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, good.scratch);
     expect(run.stdout + run.stderr).toContain('--all keeps the ticked Roadmap lines, so it needs --roadmap');
   });
 
   it('prints the four rows in the Roadmap\'s order with spec, blocked by, has and refs as planted', () => {
     const run = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, good.scratch);
     expect(run.stdout).toContain('Roadmap: #1');
     expect(numbersOf(run.stdout)).toEqual(ORDER);
     const [third, first, second, fourth] = cellsOf(run.stdout);
@@ -178,20 +178,20 @@ describe('rafa issue list --roadmap, spawned', () => {
   it('prints the same stdout bytes under rafa roadmap', () => {
     const list = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap']);
     const short = runRafa(good.scratch, good.scratch.repo, ['roadmap']);
-    expect(short.exitCode).toBe(0);
+    expectExit(short, 0, good.scratch);
     expect(short.stdout).toBe(list.stdout);
   });
 
   it('keeps only the roadmap\'s bugs, in order, under --type=bug', () => {
     const run = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap', '--type=bug']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, good.scratch);
     expect(numbersOf(run.stdout)).toEqual([13, 11, 14]);
   });
 
   it('gives json rows matching the text rows', () => {
     const text = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap']);
     const json = runRafa(good.scratch, good.scratch.repo, ['issue', 'list', '--roadmap', '--output=json']);
-    expect(json.exitCode).toBe(0);
+    expectExit(json, 0, good.scratch);
     const result = eventsOf(json.stdout).find((event: CliEvent) => event.type === 'result') as unknown as {
       data: { roadmap: number; rows: { line: { issue: number }; issue: { title: string } | null }[] };
     };
@@ -202,7 +202,7 @@ describe('rafa issue list --roadmap, spawned', () => {
 
   it('exits 0 with the warn line and the order intact when the board is unreachable', () => {
     const run = runRafa(down.scratch, down.scratch.repo, ['issue', 'list', '--roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, down.scratch);
     expect(run.stdout + run.stderr).toContain('the board could not be listed');
     expect(numbersOf(run.stdout)).toEqual(ORDER);
     const rows = cellsOf(run.stdout);

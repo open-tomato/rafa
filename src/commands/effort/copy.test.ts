@@ -14,7 +14,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
-import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createCopyCommand } from './copy.js';
 
@@ -115,7 +115,7 @@ describe('rafa effort copy over a live store', () => {
     // Either refusal message, by SQLite build; see LOCKED_OUT_WRITE.
     expect(isLockedOutWrite(lockedOut), `writer was not locked out: ${JSON.stringify(lockedOut)}`).toBe(true);
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`✅ Copied effort.sqlite, sessions.ndjson from ${liveDir(scratch.repo)} to ${target}.`);
     expect(run.stdout.trimEnd().split('\n')
       .at(-1)).toBe(`RAFA_EFFORT_DIR=${target}`);
@@ -146,7 +146,7 @@ describe('rafa effort copy over a live store', () => {
 
     const copied = new Database(join(target, 'effort.sqlite'), { readonly: true });
     try {
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(copied.query('PRAGMA user_version').get()).toEqual({ user_version: SQLITE_MIGRATIONS.length });
       expect(copied.query('SELECT name FROM sqlite_master WHERE name = \'schema_migrations\'').all()).toEqual([]);
     } finally {
@@ -163,7 +163,7 @@ describe('rafa effort copy over a live store', () => {
     const run = copy(scratch);
 
     const made = readdirSync(join(scratch.repo, '.rafa', 'scratch'));
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(made).toHaveLength(1);
     expect(made[0]).toMatch(/^effort-\d{8}T\d{6}Z$/);
     const directory = join(scratch.repo, '.rafa', 'scratch', made[0] ?? '');
@@ -179,7 +179,7 @@ describe('rafa effort copy over a live store', () => {
 
     const run = copy(scratch, ['--to=.rafa/scratch/named']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(readdirSync(join(scratch.repo, '.rafa', 'scratch', 'named'))).toEqual(['effort.sqlite']);
   }, SPAWN_TIMEOUT);
 
@@ -191,7 +191,7 @@ describe('rafa effort copy over a live store', () => {
 
     const run = copy(scratch, [`--to=${target}`]);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(readdirSync(target)).toEqual(['effort.sqlite']);
   }, SPAWN_TIMEOUT);
 });
@@ -207,7 +207,7 @@ describe('rafa effort copy refusals, exit code 1', () => {
 
     const run = copy(scratch, [`--to=${target}`]);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(`❌ rafa effort copy: ${target} is not empty (1 entries); nothing was copied.`);
     expect(readdirSync(target)).toEqual(['keep.txt']);
     expect(readFileSync(join(target, 'keep.txt'), 'utf8')).toBe('kept\n');
@@ -222,7 +222,7 @@ describe('rafa effort copy refusals, exit code 1', () => {
 
     const run = copy(scratch, [`--to=${target}`]);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(`${target} is a file, not a directory`);
     expect(readFileSync(target, 'utf8')).toBe('x');
   }, SPAWN_TIMEOUT);
@@ -234,9 +234,9 @@ describe('rafa effort copy refusals, exit code 1', () => {
     const byDefault = copy(scratch);
     const named = copy(scratch, [`--to=${target}`]);
 
-    expect(byDefault.exitCode).toBe(1);
+    expectExit(byDefault, 1, scratch);
     expect(byDefault.stderr).toContain(`❌ rafa effort copy: no effort store at ${liveDir(scratch.repo)}`);
-    expect(named.exitCode).toBe(1);
+    expectExit(named, 1, scratch);
     expect(existsSync(join(scratch.repo, '.rafa', 'scratch'))).toBe(false);
     expect(existsSync(target)).toBe(false);
     expect(existsSync(liveDir(scratch.repo))).toBe(false);
@@ -249,7 +249,7 @@ describe('rafa effort copy refusals, exit code 1', () => {
 
     const run = copy(scratch, [], { RAFA_EFFORT_DIR: elsewhere });
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(`❌ rafa effort copy: RAFA_EFFORT_DIR is set (${elsewhere}); a copy is taken from the project's own store.`);
     expect(existsSync(join(scratch.repo, '.rafa', 'scratch'))).toBe(false);
     expect(readdirSync(elsewhere)).toEqual([]);
@@ -279,7 +279,7 @@ describe('rafa effort copy failures, exit code 2', () => {
 
     const run = copy(scratch, [`--to=${target}`]);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, scratch);
     expect(run.stderr).toContain(`❌ rafa effort copy: copying ${liveDir(scratch.repo)} to ${target} failed:`);
     expect(readFileSync(join(scratch.repo, 'blocker'), 'utf8')).toBe('x');
     expect(Buffer.compare(readFileSync(live), before)).toBe(0);
@@ -293,7 +293,7 @@ describe('rafa effort copy failures, exit code 2', () => {
 
     const run = copy(scratch, [`--to=${target}`]);
 
-    expect(run.exitCode).toBe(2);
+    expectExit(run, 2, scratch);
     expect(run.stderr).toContain('file is not a database');
     expect(existsSync(join(scratch.repo, '.rafa', 'scratch'))).toBe(false);
   }, SPAWN_TIMEOUT);

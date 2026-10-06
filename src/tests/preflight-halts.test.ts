@@ -64,7 +64,7 @@ import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { builtPath, plantGitOnlyDir, plantStandInGh } from './stand-in-gh.js';
@@ -216,7 +216,7 @@ describe('a required prerequisite probe that fails', () => {
       const failedStart = runLoopStart(failing, [PLAN_FLAG, '--no-ci-wait']);
       const passedStart = runLoopStart(passing, [PLAN_FLAG, '--no-ci-wait']);
 
-      expect(failedStart.exitCode).toBe(1);
+      expectExit(failedStart, 1, { ...failing });
       // The preflight prints before it halts, so stdout is not empty; what
       // it never carries is any sign a task session ran.
       expect(failedStart.stdout).not.toContain('Executing task');
@@ -227,19 +227,19 @@ describe('a required prerequisite probe that fails', () => {
       expect(existsSync(callsFile(failing, 'count'))).toBe(false);
 
       // The control: the same plant, its probe passing, does spawn a session (and the wrap-up's).
-      expect(passedStart.exitCode).toBe(0);
+      expectExit(passedStart, 0, { ...passing });
       expect(existsSync(callsFile(passing, 'count'))).toBe(true);
 
       const failedReport = runEffortReport(failing);
       const passedReport = runEffortReport(passing);
 
-      expect(failedReport.exitCode).toBe(0);
+      expectExit(failedReport, 0, { ...failing });
       expect(failedReport.stderr).toBe('');
       expect(failedReport.stdout).toContain('preflight halts: 1 run, by run and failed required item');
       expect(failedReport.stdout).toContain('tool "needed"');
 
       // The control's preflight passed, so its rows are stored but list no halt.
-      expect(passedReport.exitCode).toBe(0);
+      expectExit(passedReport, 0, { ...passing });
       expect(passedReport.stdout).not.toContain('preflight halts:');
     },
     RUN_TIMEOUT,
@@ -268,7 +268,7 @@ describe('a pr.provider: gh run with no gh on the child\'s PATH', () => {
       const failedStart = runLoopStart(failing, [PLAN_FLAG, '--no-ci-wait']);
       const passedStart = runLoopStart(passing, [PLAN_FLAG, '--no-ci-wait']);
 
-      expect(failedStart.exitCode).toBe(1);
+      expectExit(failedStart, 1, { ...failing });
       // The preflight prints before it halts, so stdout is not empty; what
       // it never carries is any sign a task session ran.
       expect(failedStart.stdout).not.toContain('Executing task');
@@ -285,7 +285,7 @@ describe('a pr.provider: gh run with no gh on the child\'s PATH', () => {
 
       // The control: the same absent gh, but `pr.provider: none` contributes
       // no automatic item, so the preflight passes and a session runs.
-      expect(passedStart.exitCode).toBe(0);
+      expectExit(passedStart, 0, { ...passing });
       expect(passedStart.stderr).not.toContain('preflight halted');
       expect(existsSync(callsFile(passing, 'count'))).toBe(true);
     },
@@ -307,7 +307,7 @@ describe('a pr.provider: gh run over a stand-in gh', () => {
       const outStart = runLoopStart(out, [PLAN_FLAG, '--no-ci-wait']);
       const inStart = runLoopStart(inn, [PLAN_FLAG, '--no-ci-wait']);
 
-      expect(outStart.exitCode).toBe(1);
+      expectExit(outStart, 1, { ...out });
       expect(outStart.stderr).toContain('❌ preflight halted: 1 required item failed');
       expect(outStart.stderr).toContain(`service "https://${DEFAULT_GH_HOST}": probe`);
       expect(outStart.stderr).not.toContain('tool "gh": probe');
@@ -346,8 +346,8 @@ describe('an optional prerequisite probe that fails', () => {
       const failedStart = runLoopStart(failing, [PLAN_FLAG, '--no-ci-wait']);
       const passedStart = runLoopStart(passing, [PLAN_FLAG, '--no-ci-wait']);
 
-      expect(failedStart.exitCode).toBe(0);
-      expect(passedStart.exitCode).toBe(0);
+      expectExit(failedStart, 0, { ...failing });
+      expectExit(passedStart, 0, { ...passing });
 
       const failedPrompt = readFileSync(callsFile(failing, '1.prompt'), 'utf8');
       const passedPrompt = readFileSync(callsFile(passing, '1.prompt'), 'utf8');

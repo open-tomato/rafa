@@ -431,7 +431,7 @@ describe('the same run under pr.provider: none', () => {
   it('writes a no-pr line saying no provider is configured to the events file of a text-mode run', () => {
     const scratch = plant({ config: CONFIG_NONE, refusePush: false, ghOpens: true });
     const run = runLoopStart(scratch);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
 
     const runsDir = join(scratch.repo, '.rafa', 'runs');
     const eventsFile = readdirSync(runsDir).find((name) => name.endsWith('.events.ndjson'));

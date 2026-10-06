@@ -82,7 +82,7 @@ import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readSessions } from '../loop/sessions.js';
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
@@ -385,7 +385,7 @@ describe('rafa loop pause against a run spawned over the same plan', () => {
     try {
       await waitForTask(scratch.repo, TASK1);
       const paused = run(scratch, ['loop', 'pause']);
-      expect(paused.exitCode).toBe(0);
+      expectExit(paused, 0, { ...scratch });
 
       await waitForPausedIdle(scratch.repo);
 
@@ -414,7 +414,7 @@ describe('a stand-in session ending on its budget', () => {
 
     const started = run(scratch, ['loop', 'start', ...RUN_FLAGS]);
 
-    expect(started.exitCode).toBe(0);
+    expectExit(started, 0, { ...scratch });
     const tracker = readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8');
     expect(tracker).toContain(`- [BLOCKED] ${BUDGET_TASK}  <!-- blocked: budget exceeded -->`);
     expect(tracker).toContain(`- [ ] ${TASK2}`);
@@ -429,7 +429,7 @@ describe('a stand-in session that writes no report and leaves no commit', () => 
 
     const started = run(scratch, ['loop', 'start', ...RUN_FLAGS]);
 
-    expect(started.exitCode).toBe(0);
+    expectExit(started, 0, { ...scratch });
     const tracker = readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8');
     expect(tracker).toContain(`- [BLOCKED] ${TASK1}  <!-- blocked: ${NOTHING_REPORTED_OR_COMMITTED} -->`);
     expect(tracker).toContain(`- [ ] ${TASK2}`);
@@ -462,7 +462,7 @@ describe('rafa loop start --runtime, spawned over the same checkout', () => {
 
     const refused = run(scratch, ['loop', 'start', '--runtime=src', ...RUN_FLAGS]);
 
-    expect(refused.exitCode).toBe(1);
+    expectExit(refused, 1, { ...scratch });
     expect(refused.stderr).toContain(`inside ${join(scratch.repo, 'src')}`);
     expect(existsSync(scratch.callLog)).toBe(false);
     expect(existsSync(join(scratch.repo, '.rafa', 'runs'))).toBe(false);

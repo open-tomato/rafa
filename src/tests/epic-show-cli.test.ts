@@ -50,7 +50,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** The file holding the pre-move captures; see the module note. */
@@ -201,7 +201,7 @@ describe('rafa epics after the move under the epic subject, spawned over one fix
 
   it('control: another epic\'s capture differs from the pre-move capture of rafa epics 60', () => {
     const other = capture(scratch, ['epics', String(EPIC_ALPHA)]);
-    expect(other.exitCode).toBe(0);
+    expectExit(other, 0, scratch);
     expect(sameView(other)).not.toEqual(sameView(preMove.captures['epics 60'] as Capture));
   });
 });

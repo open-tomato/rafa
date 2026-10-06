@@ -105,7 +105,7 @@ import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';
 import { rootCandidates } from '../project/roots.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
-import { dispatchCaptured, eventsOf, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { dispatchCaptured, eventsOf, expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 import { RELEASE_FIX } from './init-release.js';
 import {
@@ -1069,7 +1069,7 @@ describe('the registered command, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['init']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toStartWith(`rafa init: no terminal to choose a root on.\nRoot candidates for a rafa project, from ${scratch.repo}:\n  1) ${scratch.repo}   the git toplevel\n`);
     expect([existsSync(join(scratch.repo, '.rafa')), existsSync(join(scratch.home, '.rafa'))]).toEqual([false, false]);
   }, SPAWN_TIMEOUT);
@@ -1082,7 +1082,7 @@ describe('the registered command, spawned', () => {
     const run = runRafa(scratch, sub, ['init', '--yes', '--output=json']);
 
     const result = resultOf(run.stdout);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stderr).toBe('');
     expect([result.root, result.source, result.binPath.state]).toEqual([scratch.repo, 'git-toplevel', 'missing']);
     expect(readFileSync(join(scratch.repo, '.rafa', 'config.yaml'), 'utf8')).toBe(projectConfigText());

@@ -404,7 +404,8 @@ describe('a step with errors outside any test', () => {
     const outcome = await runTaskStep(context, input);
 
     expect(seen.runs).toHaveLength(2);
-    expect(seen.runs[1]).toEqual(seen.runs[0] ?? {});
+    expect(seen.runs[0]).toBeDefined();
+    expect(seen.runs[1]).toEqual(seen.runs[0]!);
     expect(outcome).toMatchObject({ kind: 'task', red: false, interrupted: false, blocker: null, blockedLine: null });
     expect(seen.steps).toHaveLength(2);
     expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);

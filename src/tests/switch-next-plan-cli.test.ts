@@ -46,7 +46,7 @@ import { noNowEpicLine } from '../commands/epic/show.js';
 import { YES_FLAG } from '../next/ceiling.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -177,17 +177,17 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run propose from
   it('before any switch, rafa next --dry-run proposes #102, the default board\'s epic\'s member', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`#${String(READY_A)} is next on the roadmap and carries \`${SPEC_READY_LABEL}\``);
   }, RUN_TIMEOUT);
 
   it('rafa switch 200 moves to it, then rafa next --dry-run proposes #202, naming neither #100 nor #102', () => {
     const moved = runRafa(scratch, scratch.repo, ['switch', String(EPIC_B)]);
-    expect(moved.exitCode).toBe(0);
+    expectExit(moved, 0, scratch);
 
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`#${String(READY_B)} is next on the roadmap and carries \`${SPEC_READY_LABEL}\``);
     expect(run.stdout).toContain(`create the plan for #${String(READY_B)}`);
     expect(run.stdout).not.toContain(`#${String(EPIC_A)}`);
@@ -197,7 +197,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run propose from
   it('rafa plan create --next --dry-run proposes from the same switched-to epic, #202, naming neither #100 nor #102', () => {
     const run = runRafa(scratch, scratch.repo, ['plan', 'create', '--next', '--dry-run', '--no-progress']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`walking into epic #${String(EPIC_B)}`);
     expect(run.stdout).toContain(`Next on the roadmap: issue #${String(READY_B)}`);
     expect(run.stdout).toContain(`would plan from issue #${String(READY_B)}`);
@@ -242,7 +242,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
         + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
   }, RUN_TIMEOUT);
 
@@ -251,7 +251,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
 
     const expected = `${noNowEpicLine(ROADMAP)}\n`;
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
   }, RUN_TIMEOUT);
 
@@ -267,7 +267,7 @@ describe('rafa next, rafa epics and rafa status over a project with no position 
       'Housekeeping: 0 merged, 0 stale, 0 not pushed, 0 worktrees (0 idle)',
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
   }, RUN_TIMEOUT);
 });

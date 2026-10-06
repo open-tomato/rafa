@@ -34,7 +34,7 @@ import {
   SKILL_INDEX_HEADING,
 } from '../plan.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { hostToolDirs } from './stand-in-gh.js';
 
@@ -147,14 +147,14 @@ describe('a skills= name no tier holds, over a scratch plan and project', () => 
 
     const validate = runRafa(scratch, ['plan', 'validate', scratch.planFile]);
 
-    expect(validate.exitCode).toBe(1);
+    expectExit(validate, 1, { ...scratch });
     expect(validate.stdout).toContain(`error: ${scratch.planFile}: ${GHOST_LINE}`);
     expect(validate.stdout).not.toContain(`skill "${KNOWN}"`);
     expect(validate.stderr).toContain('1 unresolvable skill');
 
     const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
 
-    expect(start.exitCode).toBe(1);
+    expectExit(start, 1, { ...scratch });
     expect(start.stderr).toContain(`❌ Refusing to start: PLAN-${STUB}.md names 1 skill(s) no loaded tier resolves`);
     expect(start.stderr).toContain(GHOST_LINE);
     expect(start.stderr).not.toContain(`skill "${KNOWN}"`);
