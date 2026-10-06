@@ -245,6 +245,30 @@ describe('editing an issue', () => {
     expect(runner.calls).toEqual([[['issue', 'edit', '4', '--body-file', '-'], BODY]]);
   });
 
+  it('reads back a body edited through the adapter byte-identical, CRLF, emoji and trailing spaces included', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const { edit, editable } = pairOf(tracker);
+    const tricky = 'line one  \r\n\r\nemoji 🍅 and café\r\n\ttabbed\n\n';
+
+    await edit(githubRef('1'), { body: tricky });
+
+    expect(fake.inputs().at(-1)).toBe(tricky);
+    expect((await editable(githubRef('1'))).body).toBe(tricky);
+    expect(fake.issue('1')?.body).toBe(tricky);
+  });
+
+  it('surfaces a refused gh issue edit over the fake as a rejected promise, leaving the stored body as it was', async () => {
+    const { tracker, fake } = await overOneIssue();
+    const { edit, editable } = pairOf(tracker);
+
+    const refused = edit(githubRef('9'), { body: BODY });
+
+    expect(refused).toBeInstanceOf(Promise);
+    await expect(refused).rejects.toThrow('github tracker: gh issue edit 9 failed');
+    expect((await editable(githubRef('1'))).body).toBe('Codes stay valid.\n');
+    expect(fake.issue('1')?.body).toBe('Codes stay valid.\n');
+  });
+
   it('rejects an edit of an issue the repository does not hold, changing no other issue', async () => {
     const { tracker, fake } = await overOneIssue();
 
