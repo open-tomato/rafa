@@ -237,7 +237,7 @@ describe('runTaskStep over a real scratch repository, its type step real', () =>
     expect(outcome.repairInserted).toBe(false);
     expect(readFileSync(scratch.trackerPath, 'utf8')).toBe(TRACKER);
     // The inherited error was seen, and read as not new: not a step that ran nothing.
-    expect(lines.some((line) => line.includes('1 error(s), 0 not held at'))).toBe(true);
+    expect(lines.some((line) => line.includes('1 error(s), 1 already held at'))).toBe(true);
   }, CASE_TIMEOUT_MS);
 
   it('is red on the new error alone when the same edit also adds a second, different error', async () => {

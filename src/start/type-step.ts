@@ -519,7 +519,7 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
   const base = await baseErrors(input, label, modules, files.filter((file) => head.errors.some((error) => error.file === file.head)));
   if ('outcome' in base) return base.outcome;
   const added = newErrors(head.errors, base.errors);
-  activeOutput().info(`${ran}: ${head.errors.length} error(s), ${added.length} not held at ${input.base}.`);
+  activeOutput().info(`${ran}: ${head.errors.length} error(s), ${head.errors.length - added.length} already held at ${input.base}, ${added.length} not held.`);
   for (const line of listed(added)) activeOutput().info(`   ${line}`);
   if (added.length === 0) return GREEN;
   return { ran: true, red: true, interrupted: false, blocker: typeBlockerText(label, input.base, added) };

@@ -170,6 +170,7 @@ describe('runTypeStep over a planted repository', () => {
     expect(outcome).toMatchObject({ ran: true, red: true, interrupted: false });
     expect(outcome.blocker).toContain(`The runner's type step after "second task" found type errors in the task's test files that ${base} did not hold.`);
     expect(outcome.blocker).toContain(`New errors: a.test.ts:6:14 ${TS2322}.`);
+    expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 0 already held at ${base}, 1 not held.`);
     expect(linesAt('info')).toContain(`   a.test.ts:6:14 ${TS2322}`);
   }, TSC_TIMEOUT);
 
@@ -178,7 +179,7 @@ describe('runTypeStep over a planted repository', () => {
     commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, '// edited by the task'] }, 'task');
     const held = await runTypeStep(realInput(base));
     expect(held).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
-    expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 0 not held at ${base}.`);
+    expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 1 already held at ${base}, 0 not held.`);
 
     // Control: a second error with the same code and message is one more than the base held.
     commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, SAME_ERROR_LINE] }, 'task again');
@@ -193,7 +194,7 @@ describe('runTypeStep over a planted repository', () => {
     commit({ 'a.test.ts': ['// one', '// two', ...CLEAN, ERROR_LINE] }, 'task');
     const outcome = await runTypeStep(realInput(base));
     expect(outcome).toEqual({ ran: true, red: false, interrupted: false, blocker: null });
-    expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 0 not held at ${base}.`);
+    expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 1 already held at ${base}, 0 not held.`);
   }, TSC_TIMEOUT);
 
   it('reads every error of a file new since the base as new, even one another file held at the base', async () => {
