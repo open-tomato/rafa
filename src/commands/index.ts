@@ -200,8 +200,10 @@
  *     rows and files it refused.
  *   - `release status [--plan=<stub>]`, the version the version file
  *     declares, the latest release tag by semantic version precedence,
- *     the versions the changelog calls released that carry no tag, and
- *     the change notes pending for the current plan, writing nothing;
+ *     the versions the changelog calls released that carry no tag, the
+ *     change notes pending for the current plan, the change fragments
+ *     waiting on the base branch for the release to settle, and the audit
+ *     of the changelog's released history, writing nothing;
  *     `release settle [--dry-run]`, which folds the fragments waiting
  *     on the base branch into one version and one changelog section in
  *     a scratch worktree, commits `chore: release <version>` and
