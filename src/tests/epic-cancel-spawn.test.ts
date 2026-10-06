@@ -61,7 +61,7 @@ import { renderCancelComment, renderDependentComment, renderUnblockNote } from '
 import { parseBoardListing } from '../board/roadmap-board.js';
 import { readEpicToCancel, dependentLines, dependentQuestion, unaskedCancelMessage } from '../commands/epic/cancel.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
@@ -251,7 +251,7 @@ describe('rafa epic cancel 40, spawned, with no terminal', () => {
     const run = runRafa(scratch, scratch.repo, ['epic', 'cancel', '40']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe([
       ...dependentLines(40, [dependentOf(57), dependentOf(58)]),
       unaskedCancelMessage(40),
@@ -420,14 +420,14 @@ describe('rafa epics 70, spawned, over an epic closed as not planned', () => {
     addOrigin(waiting);
     writeEpicsGhStub(waiting, epicsBoard(true));
     const waitingRun = runRafa(waiting, waiting.repo, ['epics', '70']);
-    expect(waitingRun.exitCode).toBe(0);
+    expectExit(waitingRun, 0, waiting);
     expect(waitingRun.stdout).toContain(notice);
 
     const answered = plantScratchRepo(tempBase);
     addOrigin(answered);
     writeEpicsGhStub(answered, epicsBoard(false));
     const answeredRun = runRafa(answered, answered.repo, ['epics', '70']);
-    expect(answeredRun.exitCode).toBe(0);
+    expectExit(answeredRun, 0, answered);
     expect(answeredRun.stdout).not.toContain('was closed as not planned');
   }, SPAWN_TIMEOUT);
 });

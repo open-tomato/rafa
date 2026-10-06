@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-inventory-cli-')));
 
@@ -73,7 +73,7 @@ function rowsOf(stdout: string, key: 'skills' | 'agents'): Row[] {
 describe('rafa skill list, spawned', () => {
   it('reports shadowed, user-only and switched-off skills', () => {
     const answer = run(['skill', 'list', '--output=json']);
-    expect(answer.exitCode).toBe(0);
+    expectExit(answer, 0, scratch);
     const rows = rowsOf(answer.stdout, 'skills');
 
     const shadowed = rows.find((row) => row.name === 'shared-skill' && row.source === 'user');
@@ -95,8 +95,8 @@ describe('rafa skill list, spawned', () => {
   it('--tier=project answers exactly what --source=project does', () => {
     const tier = run(['skill', 'list', '--tier=project', '--output=json']);
     const source = run(['skill', 'list', '--source=project', '--output=json']);
-    expect(tier.exitCode).toBe(0);
-    expect(source.exitCode).toBe(0);
+    expectExit(tier, 0, scratch);
+    expectExit(source, 0, scratch);
     const tierRows = rowsOf(tier.stdout, 'skills');
     expect(tierRows.length).toBeGreaterThan(0);
     expect(tierRows.every((row) => row.source === 'project')).toBe(true);
@@ -105,39 +105,39 @@ describe('rafa skill list, spawned', () => {
 
   it('exits 1 on an unknown --source and 0 on a known one', () => {
     const refused = run(['skill', 'list', '--source=nowhere']);
-    expect(refused.exitCode).toBe(1);
+    expectExit(refused, 1, scratch);
     expect(refused.stdout + refused.stderr).toContain('nowhere');
-    expect(run(['skill', 'list', '--source=user']).exitCode).toBe(0);
+    expectExit(run(['skill', 'list', '--source=user']), 0, scratch);
   }, SPAWN_TIMEOUT);
 });
 
 describe('rafa agent list, spawned', () => {
   it('--hidden-from-loop names the user-only agent and not the project one', () => {
     const answer = run(['agent', 'list', '--hidden-from-loop', '--output=json']);
-    expect(answer.exitCode).toBe(0);
+    expectExit(answer, 0, scratch);
     const names = rowsOf(answer.stdout, 'agents').map((row) => row.name);
     expect(names).toContain('user-agent');
     expect(names).not.toContain('project-agent');
   }, SPAWN_TIMEOUT);
 
   it('exits 1 on an unknown --source', () => {
-    expect(run(['agent', 'list', '--source=nowhere']).exitCode).toBe(1);
+    expectExit(run(['agent', 'list', '--source=nowhere']), 1, scratch);
   }, SPAWN_TIMEOUT);
 });
 
 describe('rafa skill show and agent show, spawned', () => {
   it('exit 1 on an unknown name and 0 on a known one', () => {
-    expect(run(['skill', 'show', 'no-such-skill']).exitCode).toBe(1);
-    expect(run(['skill', 'show', 'user-only']).exitCode).toBe(0);
-    expect(run(['agent', 'show', 'no-such-agent']).exitCode).toBe(1);
-    expect(run(['agent', 'show', 'user-agent']).exitCode).toBe(0);
+    expectExit(run(['skill', 'show', 'no-such-skill']), 1, scratch);
+    expectExit(run(['skill', 'show', 'user-only']), 0, scratch);
+    expectExit(run(['agent', 'show', 'no-such-agent']), 1, scratch);
+    expectExit(run(['agent', 'show', 'user-agent']), 0, scratch);
   }, SPAWN_TIMEOUT);
 });
 
 describe('rafa describe, spawned', () => {
   it('lists all four commands', () => {
     const answer = run(['describe', '--output=json']);
-    expect(answer.exitCode).toBe(0);
+    expectExit(answer, 0, scratch);
     const result = eventsOf(answer.stdout).find((event) => event.type === 'result') as unknown as {
       data: { subjects: { name: string; actions: { name: string }[] }[] };
     };
