@@ -212,18 +212,24 @@ type PushReading =
   | { readonly kind: 'behind' | 'protected' | 'failed'; readonly said: string }
   | { readonly kind: 'rule'; readonly rule: string };
 
+/** What {@link pushSaid} answers for a push that printed nothing past its porcelain noise. */
+export const PUSH_SAID_NOTHING = 'git push failed and named no reason';
+
 /**
  * What a refused push said, git's own way ({@link gitSaid}) but with the
  * `To <origin>` and `Done` lines `--porcelain` prints dropped, so a
  * refusal never ends on a line that reads as success; see the module
- * note.
+ * note. A push that printed nothing else, or only `Done`, answers
+ * {@link PUSH_SAID_NOTHING}, so the sentence quoting it still names a
+ * failure. The one reading every release push quotes: this module's,
+ * `./settle-pr.ts`'s, `./settle-tag.ts`'s and `./tag-push.ts`'s.
  */
 export function pushSaid(pushed: GitResult): string {
   const stdout = pushed.stdout
     .split('\n')
     .filter((line) => !PORCELAIN_NOISE.test(line.trim()))
     .join('\n');
-  return gitSaid({ ...pushed, stdout });
+  return gitSaid({ ...pushed, stdout }) || PUSH_SAID_NOTHING;
 }
 
 /**
