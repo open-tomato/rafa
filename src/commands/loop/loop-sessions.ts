@@ -63,7 +63,7 @@
  * system's own ({@link resolveLoopSeams}).
  */
 import type { RafaContext, RafaFlagSpec } from '../../cli/command.js';
-import type { PidProbe, SessionChange, SessionRecord } from '../../loop/sessions.js';
+import type { PidProbe, SessionChange, SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
 import type { TaskCounts } from '../plan/plan-files.js';
 
@@ -324,14 +324,38 @@ export function readSessionChecklist(root: string, record: Pick<SessionRecord, '
   return { file, tasks: parsePlan(content).tasks, lines: content.split('\n') };
 }
 
-/** The phase a session's run is in, as `status` and `list` write it beside a count: `(phase wrap-up)`. */
-export function phaseNote(record: Pick<SessionRecord, 'phase'>): string {
-  return `(phase ${sessionPhase(record)})`;
+/**
+ * The phase a session's run is in, as `status` and `list` write it beside a
+ * count: `(phase wrap-up)`.
+ *
+ * A running record whose phase reads `task` and whose `task` is null, over
+ * a plan whose every task is ticked, reads `wrap-up`: the loop has left
+ * its last task and not yet written the wrap-up phase, so `task` would say
+ * a task runs when none is left (#577). Any other record, and a record read
+ * with no counts, reads the phase it holds.
+ *
+ * @param record - The session record, or the fields of it the reading needs.
+ * @param counts - The plan's task counts, or none when nothing was there to count.
+ */
+export function phaseNote(
+  record: Pick<SessionRecord, 'phase' | 'state' | 'task'>,
+  counts: TaskCounts | null = null,
+): string {
+  return `(phase ${notedPhase(record, counts)})`;
 }
 
-/** A session's counts with its phase beside the tasks done over total. See the module note. */
-export function phasedCounts(counts: TaskCounts, record: Pick<SessionRecord, 'phase'>): string {
-  return `${counts.done}/${counts.total} done ${phaseNote(record)}, ${counts.blocked} blocked, ${counts.open} open`;
+/** The phase {@link phaseNote} writes; see its note. */
+function notedPhase(record: Pick<SessionRecord, 'phase' | 'state' | 'task'>, counts: TaskCounts | null): SessionPhase {
+  const phase = sessionPhase(record);
+  const everyTaskTicked = counts !== null && counts.total > 0 && counts.done === counts.total;
+  return phase === 'task' && record.state === 'running' && record.task === null && everyTaskTicked
+    ? 'wrap-up'
+    : phase;
+}
+
+/** A session's counts with its phase beside the tasks done over total. See the module note and {@link phaseNote}. */
+export function phasedCounts(counts: TaskCounts, record: Pick<SessionRecord, 'phase' | 'state' | 'task'>): string {
+  return `${counts.done}/${counts.total} done ${phaseNote(record, counts)}, ${counts.blocked} blocked, ${counts.open} open`;
 }
 
 /** The checkbox a checklist holds at a 1-based line, or null when no task is there. */
