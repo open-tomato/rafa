@@ -89,6 +89,33 @@ criteria — **do not execute the plan**.
   prove a tool with `<tool> --version`, `<tool> --help` or `which <tool>`.
 * Do not create or touch any tracker file — the loop derives it from the plan.
 
+## The effort-store rule for plans that carry migrations
+
+A plan task that names a migration by its id (``migration `<id>` `` in the task line)
+is one the loop's installed runtime must be able to read before the task runs. If the
+task changes the store's schema, the loop's own open would fail once the branch code
+runs.
+
+**In a plan that carries an effort-store migration:**
+
+* Every `bun src/rafa.ts` command on a still-to-run task line must carry
+  `RAFA_EFFORT_DIR=<absolute path of the scratch copy>` as the first assignment on
+  the same line. That names the copy made by the command the plan should declare
+  under Prerequisites, `bun src/rafa.ts effort copy --to=.rafa/scratch/<stub>-effort`
+  (spelled unprefixed, as that step makes the copy). Once made, every branch
+  subcommand runs over the copy, and the loop's own store stays unaffected until the
+  installed runtime has brought it forward.
+
+* The PREREQUISITES file (`PREREQUISITES-<stub>.md`) must carry an `[auto]` item
+  probing exactly `rafa effort schema --check`, the probe that holds the plan back
+  until the installed rafa can read the store that branch code will migrate. Write
+  it as: `- [ ] The installed rafa can read and write the live store: \`rafa effort
+  schema --check\`` under an `[auto]` section.
+
+`rafa plan create` checks both rules when a plan carries a migration and refuses the
+plan if either breaks, moving it into `rejected/` so the loop does not pick it up.
+The same checks run in the loop's preflight before any task starts.
+
 {PLAN_FORMAT}
 
 {ROUTING}
