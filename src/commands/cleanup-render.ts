@@ -12,8 +12,12 @@
  * the four groups in the order the spec's Design table lists them —
  * Merged, Stale, Not pushed, Worktrees — and last Run records, each
  * under a heading naming how many rows it holds, and each row one line,
- * indented two spaces: its name, its date and its reason, the names
- * padded to one column across all five groups so the dates line up. A
+ * indented two spaces: its name, its date and its reason. The names are
+ * padded per kind of row ({@link cleanupNameWidth}): the three branch
+ * groups to the widest branch name, the worktrees to the widest
+ * worktree path and the run records to the widest plan, so the dates
+ * line up within a kind and a long worktree path never widens a branch
+ * row past what its own name, date and reason need. A
  * group with no rows still shows its heading and {@link NO_ROWS_TEXT},
  * so a listing always names all five groups: the no-terminal run's
  * definition of done is that it prints them.
@@ -224,27 +228,40 @@ export function runRowLine(row: RunRow, width = 0): string {
   return columns(row.plan, width, date, runRowReason(row));
 }
 
-/** The widest name across all five groups: the column every row's name is padded to. */
-export function cleanupNameWidth(read: CleanupRead): number {
-  const names = [
-    ...[...read.merged, ...read.stale, ...read.notPushed].map((row) => row.branch.name),
-    ...read.worktrees.map((row) => row.path),
-    ...read.runs.map((row) => row.plan),
-  ];
+/**
+ * The kinds of row a name column is measured over: the Merged, Stale
+ * and Not-pushed groups together (`branches`), the worktrees and the
+ * run records.
+ */
+export type CleanupNameKind = 'branches' | 'worktrees' | 'runs';
+
+/**
+ * The widest name among `read`'s rows of `kind`: the column those rows'
+ * names are padded to. Each kind is measured on its own, so a long
+ * worktree path pads the worktree rows only; 0 when the kind has no rows.
+ */
+export function cleanupNameWidth(read: CleanupRead, kind: CleanupNameKind): number {
+  const names = kind === 'branches'
+    ? [...read.merged, ...read.stale, ...read.notPushed].map((row) => row.branch.name)
+    : kind === 'worktrees'
+      ? read.worktrees.map((row) => row.path)
+      : read.runs.map((row) => row.plan);
   return names.reduce((widest, name) => Math.max(widest, name.length), 0);
 }
 
 /** The lines text mode writes for `read`; see the module note. */
 export function renderCleanup(read: CleanupRead): readonly string[] {
-  const width = cleanupNameWidth(read);
-  const branchLines = (rows: readonly BranchRow[]): string[] => rows.map((row) => branchRowLine(row, width));
+  const branchWidth = cleanupNameWidth(read, 'branches');
+  const worktreeWidth = cleanupNameWidth(read, 'worktrees');
+  const runWidth = cleanupNameWidth(read, 'runs');
+  const branchLines = (rows: readonly BranchRow[]): string[] => rows.map((row) => branchRowLine(row, branchWidth));
   return [
     ...read.notes.map((note) => `note: ${note}`),
     ...groupLines(CLEANUP_GROUP_TITLES.merged, branchLines(read.merged)),
     ...groupLines(CLEANUP_GROUP_TITLES.stale, branchLines(read.stale)),
     ...groupLines(CLEANUP_GROUP_TITLES.notPushed, branchLines(read.notPushed)),
-    ...groupLines(CLEANUP_GROUP_TITLES.worktrees, read.worktrees.map((row) => worktreeRowLine(row, width))),
-    ...groupLines(CLEANUP_GROUP_TITLES.runs, read.runs.map((row) => runRowLine(row, width))),
+    ...groupLines(CLEANUP_GROUP_TITLES.worktrees, read.worktrees.map((row) => worktreeRowLine(row, worktreeWidth))),
+    ...groupLines(CLEANUP_GROUP_TITLES.runs, read.runs.map((row) => runRowLine(row, runWidth))),
   ];
 }
 

@@ -205,10 +205,12 @@ function worktreeLabel(row: WorktreeRow, width: number): string {
 
 /** The five groups of the checklist, each row the line the listing prints; see the module note. */
 export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow>[] {
-  const width = cleanupNameWidth(read);
+  const branchWidth = cleanupNameWidth(read, 'branches');
+  const worktreeWidth = cleanupNameWidth(read, 'worktrees');
+  const runWidth = cleanupNameWidth(read, 'runs');
   const branches = (title: string, rows: readonly BranchRow[]): MultiGroup<CleanupRow> => ({
     title,
-    choices: rows.map((row) => ({ label: branchRowLine(row, width), value: row, checked: row.ticked })),
+    choices: rows.map((row) => ({ label: branchRowLine(row, branchWidth), value: row, checked: row.ticked })),
   });
   return [
     branches(CLEANUP_GROUP_TITLES.merged, read.merged),
@@ -217,7 +219,7 @@ export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow
     {
       title: CLEANUP_GROUP_TITLES.worktrees,
       choices: read.worktrees.map((row) => ({
-        label: worktreeLabel(row, width),
+        label: worktreeLabel(row, worktreeWidth),
         value: row,
         checked: row.ticked,
         ...(row.tickable
@@ -227,7 +229,7 @@ export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow
     },
     {
       title: CLEANUP_GROUP_TITLES.runs,
-      choices: read.runs.map((row) => ({ label: runRowLine(row, width), value: row, checked: row.ticked })),
+      choices: read.runs.map((row) => ({ label: runRowLine(row, runWidth), value: row, checked: row.ticked })),
     },
   ];
 }

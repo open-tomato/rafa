@@ -323,10 +323,10 @@ describe('cleanupGroups and selectionOf', () => {
     expect(dirty?.label).toBe(`${WT_DIRTY.path}  2026-09-20`);
   });
 
-  it('labels a run record\'s row with its plan and start day, padded to the widest name', () => {
+  it('labels a run record\'s row with its plan and start day, padded to the widest plan', () => {
     const read = reading({ runs: [RUN] });
     const [run] = cleanupGroups(read)[4]?.choices ?? [];
-    expect(run?.label).toBe(runRowLine(RUN, WT_DIRTY.path.length));
+    expect(run?.label).toBe(runRowLine(RUN, RUN.plan.length));
     expect(run?.label).toStartWith('rafa-12-a-plan ');
     expect(run?.label).toContain('  2026-08-01  run a1b2c3d4');
     expect(run?.disabled).toBeUndefined();

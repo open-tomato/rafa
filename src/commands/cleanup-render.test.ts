@@ -37,6 +37,7 @@ import {
   NO_ROWS_TEXT,
   UNKNOWN_DATE,
   branchRowLine,
+  branchRowReason,
   cleanupData,
   cleanupDate,
   cleanupNameWidth,
@@ -181,7 +182,7 @@ describe('row lines', () => {
 describe('renderCleanup', () => {
   it('lists the five groups in order, each heading with its count and one line per row', () => {
     const read = reading({ worktrees: [] });
-    const width = cleanupNameWidth(read);
+    const width = cleanupNameWidth(read, 'branches');
     expect(width).toBe('old-idea'.length);
     expect(renderCleanup(read)).toEqual([
       'Merged (1)',
@@ -200,7 +201,7 @@ describe('renderCleanup', () => {
   it('lists the run records last, one line per record, under a heading counting them', () => {
     const second: RunRow = { ...RUN, sessionId: 'e5f6a7b8', path: '/repo/.rafa/runs/e5f6a7b8.json', eventsPath: null };
     const read = reading({ worktrees: [], runs: [RUN, second] });
-    const width = cleanupNameWidth(read);
+    const width = cleanupNameWidth(read, 'runs');
     expect(width).toBe(RUN.plan.length);
     expect(renderCleanup(read).slice(-3)).toEqual([
       `${CLEANUP_GROUP_TITLES.runs} (2)`,
@@ -209,12 +210,38 @@ describe('renderCleanup', () => {
     ]);
   });
 
-  it('pads every name, branch, worktree path or plan, to one column so the dates line up', () => {
+  it('pads each kind of row, branches, worktree paths and plans, to its own column', () => {
     const lines = renderCleanup(reading({ runs: [RUN] })).filter((line) => line.startsWith('  '));
     expect(lines).toHaveLength(5);
-    const dateColumns = new Set(lines.map((line) => line.search(/\d{4}-\d{2}-\d{2}/)));
-    expect(dateColumns.size).toBe(1);
-    expect([...dateColumns][0]).toBe(2 + WORKTREE.path.length + 2);
+    const dateColumn = (line: string): number => line.search(/\d{4}-\d{2}-\d{2}/);
+    expect(lines.slice(0, 3).map(dateColumn)).toEqual([2 + 'old-idea'.length + 2, 2 + 'old-idea'.length + 2, 2 + 'old-idea'.length + 2]);
+    expect(dateColumn(lines[3] ?? '')).toBe(2 + WORKTREE.path.length + 2);
+    expect(dateColumn(lines[4] ?? '')).toBe(2 + RUN.plan.length + 2);
+  });
+
+  it('keeps a 100-character worktree path from widening a branch row past its name, date and reason', () => {
+    const longPath = `/repo/${'w'.repeat(94)}`;
+    const names = ['feature-aaaaaaaaaaaa', 'feature-bbbbbbbbbbbb', 'feature-cccccccccccc'];
+    const merged: MergedRow = { ...MERGED, branch: branch(names[0] ?? '') };
+    const stale: StaleRow = { ...STALE, branch: branch(names[1] ?? '', { lastCommit: OLD }) };
+    const notPushed: NotPushedRow = { ...NOT_PUSHED, branch: branch(names[2] ?? '', { upstream: null, ahead: null }) };
+    const read = reading({ merged: [merged], stale: [stale], notPushed: [notPushed], worktrees: [{ ...WORKTREE, path: longPath }] });
+    expect(longPath).toHaveLength(100);
+    expect(names.every((name) => name.length === 20)).toBe(true);
+    expect(cleanupNameWidth(read, 'branches')).toBe(20);
+    expect(cleanupNameWidth(read, 'worktrees')).toBe(100);
+    const lines = renderCleanup(read);
+    for (const row of [merged, stale, notPushed]) {
+      const line = lines.find((candidate) => candidate.startsWith(`  ${row.branch.name}`)) ?? '';
+      const needed = 2 + row.branch.name.length + 2 + 'YYYY-MM-DD'.length + 2 + branchRowReason(row).length;
+      expect(line.length).toBe(needed);
+    }
+    const worktreeLine = lines.find((line) => line.startsWith(`  ${longPath}`)) ?? '';
+    expect(worktreeLine.search(/\d{4}-\d{2}-\d{2}/)).toBe(2 + 100 + 2);
+  });
+
+  it('measures 0 for a kind with no rows', () => {
+    expect(cleanupNameWidth(reading(), 'runs')).toBe(0);
   });
 
   it('names all five groups when every one is empty', () => {
@@ -358,7 +385,7 @@ describe('the scratch repository', () => {
       `Worktrees (${String(read.worktrees.length)})`,
       'Run records (0)',
     ]);
-    expect(lines).toContain(`  ${branchRowLine(read.stale[0] as StaleRow, cleanupNameWidth(read))}`);
+    expect(lines).toContain(`  ${branchRowLine(read.stale[0] as StaleRow, cleanupNameWidth(read, 'branches'))}`);
   });
 
   it('names a remote delete that, run, deletes the stale branch in the remote', () => {
