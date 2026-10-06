@@ -15,7 +15,7 @@ import type { TypeDiagnostic, TypeRunOptions, TypeRunResult, TypeStepInput } fro
 import type { GitResult, GitRunner } from '../pr/index.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -27,6 +27,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
+  findNodeModules,
   newErrors,
   parseTscOutput,
   readTypeFiles,
@@ -75,10 +76,10 @@ const TS2322 = 'TS2322 Type \'string\' is not assignable to type \'number\'.';
 let repo: string;
 let lines: { level: string; message: string }[];
 
-/** Runs git in the planted repository under a fixed identity and no operator config; answers stdout. */
-function git(...args: string[]): string {
+/** Runs git in `cwd` under a fixed identity and no operator config; answers stdout. */
+function gitAt(cwd: string, ...args: string[]): string {
   const result = spawnSync('git', args, {
-    cwd: repo,
+    cwd,
     encoding: 'utf8',
     env: { ...process.env, ...gitIdentityEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
   });
@@ -86,15 +87,25 @@ function git(...args: string[]): string {
   return result.stdout.trim();
 }
 
-/** Writes each file under the repository and commits them all; answers the commit. */
-function commit(files: Readonly<Record<string, readonly string[]>>, message: string): string {
+/** Runs git in the planted repository; see {@link gitAt}. */
+function git(...args: string[]): string {
+  return gitAt(repo, ...args);
+}
+
+/** Writes each file under `root` and commits them all; answers the commit. */
+function commitAt(root: string, files: Readonly<Record<string, readonly string[]>>, message: string): string {
   for (const [path, body] of Object.entries(files)) {
-    mkdirSync(dirname(join(repo, path)), { recursive: true });
-    writeFileSync(join(repo, path), `${body.join('\n')}\n`, 'utf8');
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), `${body.join('\n')}\n`, 'utf8');
   }
-  git('add', '-A');
-  git('commit', '-q', '--no-verify', '-m', message);
-  return git('rev-parse', 'HEAD');
+  gitAt(root, 'add', '-A');
+  gitAt(root, 'commit', '-q', '--no-verify', '-m', message);
+  return gitAt(root, 'rev-parse', 'HEAD');
+}
+
+/** Writes each file under the planted repository and commits them all; answers the commit. */
+function commit(files: Readonly<Record<string, readonly string[]>>, message: string): string {
+  return commitAt(repo, files, message);
 }
 
 /** The lines of one level. */
@@ -216,7 +227,7 @@ describe('runTypeStep over a planted repository', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'type-step-scratch-'));
     try {
       const tsc = join(repo, 'node_modules', '.bin', 'tsc');
-      const right = JSON.parse(scratchTsconfig(repo, ['a.test.ts'])) as Record<string, unknown>;
+      const right = JSON.parse(scratchTsconfig(repo, ['a.test.ts'], join(repo, 'node_modules'))) as Record<string, unknown>;
       writeFileSync(join(scratch, 'bare.json'), JSON.stringify({ ...right, extends: 'tsconfig.json' }), 'utf8');
       writeFileSync(join(scratch, 'no-roots.json'), JSON.stringify({ ...right, compilerOptions: {} }), 'utf8');
       const bare = await runTsc({ cwd: repo, argv: [tsc, '-p', join(scratch, 'bare.json'), ...TSC_FLAGS] });
@@ -257,6 +268,117 @@ describe('runTypeStep over a planted repository', () => {
     symlinkSync(join(REPO_ROOT, 'node_modules'), join(repo, 'node_modules'));
     expect(await runTypeStep(realInput(base))).toMatchObject({ ran: true, red: true });
   }, TSC_TIMEOUT);
+});
+
+/** What one tsc spawn of the walk cases was handed: the tsc, the scratch's typeRoots, and the tree's node_modules link. */
+interface WalkRun {
+  readonly cwd: string;
+  readonly tsc: string | undefined;
+  readonly typeRoots: unknown;
+  readonly link: string | null;
+}
+
+describe('runTypeStep finds node_modules by the walk', () => {
+  let top: string;
+  let main: string;
+
+  /** Plants `<dir>/node_modules/.bin/tsc`, a script that leaves `tsc.ran` beside it when spawned; answers the node_modules. */
+  function plantTsc(dir: string): string {
+    const bin = join(dir, 'node_modules', '.bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'tsc'), '#!/bin/sh\ntouch "$0.ran"\n', 'utf8');
+    chmodSync(join(bin, 'tsc'), 0o755);
+    return join(dir, 'node_modules');
+  }
+
+  /** A runner answering one TS2322 in `a.test.ts`, so the base tree is made too, recording each spawn. */
+  function recorder(seen: WalkRun[]): (options: TypeRunOptions) => Promise<TypeRunResult> {
+    return (options) => {
+      const scratch = JSON.parse(readFileSync(options.argv[2] ?? '', 'utf8')) as { compilerOptions: { typeRoots: unknown } };
+      const modules = join(options.cwd, 'node_modules');
+      const link = existsSync(modules) && lstatSync(modules).isSymbolicLink()
+        ? readlinkSync(modules)
+        : null;
+      seen.push({ cwd: options.cwd, tsc: options.argv[0], typeRoots: scratch.compilerOptions.typeRoots, link });
+      return Promise.resolve({ exitCode: 2, stdout: `a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}\n`, stderr: '' });
+    };
+  }
+
+  /** The step's input from `checkout` over the base, through the real git and the recorder. */
+  function walkInput(checkout: string, base: string, seen: WalkRun[]): TypeStepInput {
+    return { checkout, base, task: 'second task', git: createGitRunner(checkout), runTypes: recorder(seen), stopCode: STOP };
+  }
+
+  /** The head run in `checkout` and the base run in a temporary tree, both through `modules`. */
+  function expectRunsThrough(seen: readonly WalkRun[], checkout: string, modules: string): void {
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toEqual({ cwd: checkout, tsc: join(modules, '.bin', 'tsc'), typeRoots: [join(modules, '@types')], link: null });
+    expect(seen[1]?.cwd).not.toBe(checkout);
+    expect(seen[1]).toMatchObject({ tsc: join(modules, '.bin', 'tsc'), typeRoots: [join(modules, '@types')], link: modules });
+  }
+
+  /** Commits a clean `a.test.ts` as the base and the task's error on top; answers the base. */
+  function plantCommits(): string {
+    const base = commitAt(main, { 'a.test.ts': CLEAN }, 'base');
+    commitAt(main, { 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
+    return base;
+  }
+
+  beforeEach(() => {
+    top = realpathSync(mkdtempSync(join(tmpdir(), 'type-step-walk-')));
+    main = join(top, 'repo');
+    mkdirSync(main);
+    gitAt(main, 'init', '-q', '-b', 'main');
+    writeFileSync(join(main, 'tsconfig.json'), TSCONFIG, 'utf8');
+    writeFileSync(join(main, '.gitignore'), 'node_modules\n.rafa\n', 'utf8');
+  });
+
+  afterEach(() => {
+    rmSync(top, { recursive: true, force: true });
+  });
+
+  it('runs a checkout holding its own node_modules through it, over a decoy above the repository', async () => {
+    const base = plantCommits();
+    const modules = plantTsc(main);
+    plantTsc(top);
+    const seen: WalkRun[] = [];
+    await runTypeStep(walkInput(main, base, seen));
+    expectRunsThrough(seen, main, modules);
+    expect(findNodeModules(main, createGitRunner(main))).toBe(modules);
+  });
+
+  it('runs a worktree nested in a checkout through the checkout\'s node_modules, and through its own once it holds one', async () => {
+    const base = plantCommits();
+    const modules = plantTsc(main);
+    const worktree = join(main, '.rafa', 'worktrees', 'nested');
+    gitAt(main, 'worktree', 'add', '-q', '--detach', worktree, 'HEAD');
+    const seen: WalkRun[] = [];
+    await runTypeStep(walkInput(worktree, base, seen));
+    expectRunsThrough(seen, worktree, modules);
+
+    // Control: the walk stops at the first node_modules, so the worktree's own wins once it holds one.
+    const own = plantTsc(worktree);
+    const again: WalkRun[] = [];
+    await runTypeStep(walkInput(worktree, base, again));
+    expectRunsThrough(again, worktree, own);
+  });
+
+  it('never runs a decoy tsc above the git top level, and runs nothing when the repository holds none', async () => {
+    const base = plantCommits();
+    const decoy = plantTsc(top);
+    const outcome = await runTypeStep({ checkout: main, base, task: 'second task', git: createGitRunner(main), stopCode: STOP });
+    expect(outcome).toEqual({ ran: false, red: false, interrupted: false, blocker: null });
+    expect(linesAt('warn')[0]).toContain('could not run tsc (ENOENT');
+    expect(linesAt('warn')[0]).toContain(join(main, 'node_modules', '.bin', 'tsc'));
+    expect(existsSync(join(decoy, '.bin', 'tsc.ran'))).toBe(false);
+    expect(findNodeModules(main, createGitRunner(main))).toBeNull();
+
+    // Controls: the decoy leaves its trace when spawned, and a git whose common dir sat above it would reach it.
+    await runTsc({ cwd: top, argv: [join(decoy, '.bin', 'tsc')] });
+    expect(existsSync(join(decoy, '.bin', 'tsc.ran'))).toBe(true);
+    const wider: GitRunner = () => ({ ok: true, stdout: `${join(top, '.git')}\n`, stderr: '' });
+    expect(findNodeModules(main, wider)).toBe(decoy);
+  });
 });
 
 describe('runTypeStep over scripted seams', () => {
