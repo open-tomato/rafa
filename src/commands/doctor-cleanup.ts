@@ -1,8 +1,9 @@
 /**
  * The cleanup reading `rafa doctor` prints one row for: how many rows
- * each of the four groups `rafa cleanup` lists would hold — Merged,
- * Stale, Not pushed and Worktrees — read by `src/cleanup/`'s
- * {@link readCleanup} and counted by {@link cleanupCounts}.
+ * four of the five groups `rafa cleanup` lists would hold — Merged,
+ * Stale, Not pushed and Worktrees, never Run records — read by
+ * `src/cleanup/`'s {@link readCleanup} and counted by
+ * {@link cleanupCounts}.
  *
  * ## Without fetching
  *

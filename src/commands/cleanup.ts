@@ -1,8 +1,9 @@
 /**
- * `rafa cleanup [--dry-run]`: the local branches and worktrees that have
- * piled up, listed in four groups — Merged, Stale, Not pushed and
- * Worktrees — and the ones the person ticks removed. It is all code: it
- * starts no Claude session and declares no `spends`.
+ * `rafa cleanup [--dry-run]`: the local branches, worktrees and run
+ * records that have piled up, listed in five groups — Merged, Stale,
+ * Not pushed, Worktrees and Run records — and the ones the person ticks
+ * removed. It is all code: it starts no Claude session and declares no
+ * `spends`.
  *
  * ## What it reads
  *
@@ -12,24 +13,28 @@
  * `resolvePrProvider` (`src/pr/provider.ts`) resolves for the project
  * root: `gh` gives the provider {@link ghPullRequestsIn} makes there,
  * `none` gives none, and the Stale and Not-pushed rows then say
- * `merged state unknown`. A reading git refuses is exit code 1, as is a
- * config `loadConfig` refuses.
+ * `merged state unknown`. The run records are the ones
+ * `src/cleanup/runs.ts` lists under the project root's `.rafa/runs/`:
+ * every record but a live run's and the newest of each plan's. A
+ * reading git refuses is exit code 1, as is a config `loadConfig`
+ * refuses.
  *
  * ## Listing only
  *
  * With `--output=json`, or when {@link CleanupCommandSeams.terminal}
  * answers no terminal, it asks nothing and removes nothing, exiting 0:
  * text mode prints `renderCleanup`'s lines (`./cleanup-render.ts`), the
- * notes and all four groups, and json mode gives `cleanupData` as the
+ * notes and all five groups, and json mode gives `cleanupData` as the
  * terminal result's data. `--dry-run` changes neither, since nothing
  * would be run without a checklist answered.
  *
  * ## Asking
  *
- * With a terminal, each reading note is one warning, and the four
+ * With a terminal, each reading note is one warning, and the five
  * groups are one grouped `multiSelect` (`src/cli/prompt/`), each row
  * the line the listing prints, ticked as `src/cleanup/` ticks it: every
- * Merged row and every clean worktree on a Merged branch. A worktree
+ * Merged row, every clean worktree on a Merged branch and every run
+ * record. A worktree
  * that cannot be ticked shows its path and date, and its reason beside
  * the disabled mark. A reading with no row at all asks nothing. Then:
  *
@@ -41,8 +46,8 @@
  *   3. The ticked rows become `src/cleanup/steps.ts`'s steps. Every
  *      ticked row that is not a step is one warning with its reason.
  *   4. `--dry-run` prints each step's command line and stops.
- *      Otherwise {@link cleanupQuestion} asks
- *      `Delete <n> branches and remove <m> worktrees? [y/N]`, and a
+ *      Otherwise {@link cleanupQuestion} asks `Delete <n> branches,
+ *      remove <m> worktrees and remove <r> run records? [y/N]`, and a
  *      yes runs the steps: one `✓ <command>` line per step that ran
  *      clean, one warning per step that did not, and exit code 1 when
  *      any did not.
@@ -71,8 +76,10 @@ import type {
   CleanupSeams,
   CleanupSelection,
   CleanupSettings,
+  CleanupStepKind,
   MergedRow,
   NotPushedRow,
+  RunRow,
   StaleRow,
   WorktreeRow,
 } from '../cleanup/index.js';
@@ -103,6 +110,7 @@ import {
   cleanupData,
   cleanupNameWidth,
   renderCleanup,
+  runRowLine,
   worktreeRowLine,
 } from './cleanup-render.js';
 import { lazyPrompter } from './issue/ready.js';
@@ -121,7 +129,7 @@ const DRY_RUN_FLAG = 'dry-run';
 export const CLEANUP_MESSAGE = 'Tick what to remove (space ticks, a ticks a group, enter goes on)';
 
 /** The line a reading with no row at all prints. */
-export const NOTHING_LISTED_TEXT = 'Nothing to clean up: no branch or worktree is listed.';
+export const NOTHING_LISTED_TEXT = 'Nothing to clean up: no branch, worktree or run record is listed.';
 
 /** The line every run that removes nothing by the person's answer ends with. */
 export const NOTHING_REMOVED_TEXT = 'Nothing removed.';
@@ -151,12 +159,22 @@ export interface CleanupCommandSeams {
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_CLEANUP_SEAMS: CleanupCommandSeams = Object.freeze({});
 
-/** One row of the checklist: a branch row, or a worktree row. */
-export type CleanupRow = BranchRow | WorktreeRow;
+/** One row of the checklist: a branch row, a worktree row, or a run record's row. */
+export type CleanupRow = BranchRow | WorktreeRow | RunRow;
 
-/** Whether `row` is a branch row rather than a worktree row. */
+/** Whether `row` is a branch row. */
 function isBranchRow(row: CleanupRow): row is BranchRow {
   return 'group' in row;
+}
+
+/** Whether `row` is a run record's row. */
+function isRunRow(row: CleanupRow): row is RunRow {
+  return 'sessionId' in row;
+}
+
+/** Whether `row` is a worktree row. */
+function isWorktreeRow(row: CleanupRow): row is WorktreeRow {
+  return !isBranchRow(row) && !isRunRow(row);
 }
 
 /** `count` and `noun`, or `pluralNoun` unless the count is 1. */
@@ -166,9 +184,10 @@ function counted(count: number, noun: string, pluralNoun: string): string {
     : `${String(count)} ${pluralNoun}`;
 }
 
-/** The final question, over `branches` deletes and `worktrees` removals. */
-export function cleanupQuestion(branches: number, worktrees: number): string {
-  return `Delete ${counted(branches, 'branch', 'branches')} and remove ${counted(worktrees, 'worktree', 'worktrees')}? [y/N] `;
+/** The final question, over `branches` deletes, `worktrees` removals and `runs` run-record removals. */
+export function cleanupQuestion(branches: number, worktrees: number, runs: number): string {
+  const removed = `${counted(worktrees, 'worktree', 'worktrees')} and remove ${counted(runs, 'run record', 'run records')}`;
+  return `Delete ${counted(branches, 'branch', 'branches')}, remove ${removed}? [y/N] `;
 }
 
 /** The second question a ticked Not-pushed row gets, naming the commits deleting it loses. */
@@ -184,7 +203,7 @@ function worktreeLabel(row: WorktreeRow, width: number): string {
     : worktreeRowLine({ ...row, reason: '' }, width).trimEnd();
 }
 
-/** The four groups of the checklist, each row the line the listing prints; see the module note. */
+/** The five groups of the checklist, each row the line the listing prints; see the module note. */
 export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow>[] {
   const width = cleanupNameWidth(read);
   const branches = (title: string, rows: readonly BranchRow[]): MultiGroup<CleanupRow> => ({
@@ -206,6 +225,10 @@ export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow
           : { disabled: row.reason }),
       })),
     },
+    {
+      title: CLEANUP_GROUP_TITLES.runs,
+      choices: read.runs.map((row) => ({ label: runRowLine(row, width), value: row, checked: row.ticked })),
+    },
   ];
 }
 
@@ -213,16 +236,17 @@ export function cleanupGroups(read: CleanupRead): readonly MultiGroup<CleanupRow
 export function selectionOf(rows: readonly CleanupRow[]): CleanupSelection {
   const branches = rows.filter(isBranchRow);
   return {
-    worktrees: rows.filter((row): row is WorktreeRow => !isBranchRow(row)),
+    worktrees: rows.filter(isWorktreeRow),
     merged: branches.filter((row): row is MergedRow => row.group === 'merged'),
     stale: branches.filter((row): row is StaleRow => row.group === 'stale'),
     notPushed: branches.filter((row): row is NotPushedRow => row.group === 'not-pushed'),
+    runs: rows.filter(isRunRow),
   };
 }
 
 /** Whether `read` lists no row in any group. */
 function isEmpty(read: CleanupRead): boolean {
-  return read.merged.length + read.stale.length + read.notPushed.length + read.worktrees.length === 0;
+  return read.merged.length + read.stale.length + read.notPushed.length + read.worktrees.length + read.runs.length === 0;
 }
 
 /** The project the dispatcher resolved, which this command declares it needs. */
@@ -247,10 +271,10 @@ async function confirmNotPushed(selection: CleanupSelection, ask: (question: str
   return { ...selection, notPushed: kept };
 }
 
-/** How many steps of `plan` are branch deletes and how many worktree removals. */
-function stepCounts(plan: CleanupPlan): { readonly branches: number; readonly worktrees: number } {
-  const branches = plan.steps.filter((step) => step.kind === 'delete-branch').length;
-  return { branches, worktrees: plan.steps.length - branches };
+/** How many steps of `plan` are branch deletes, worktree removals and run-record removals. */
+function stepCounts(plan: CleanupPlan): { readonly branches: number; readonly worktrees: number; readonly runs: number } {
+  const of = (kind: CleanupStepKind): number => plan.steps.filter((step) => step.kind === kind).length;
+  return { branches: of('delete-branch'), worktrees: of('remove-worktree'), runs: of('remove-run') };
 }
 
 /** Writes what the steps came to, refusing with exit code 1 when any did not run clean. */
@@ -307,7 +331,7 @@ async function askAndRemove(run: AskingRun): Promise<void> {
       return;
     }
     const counts = stepCounts(plan);
-    if (!await prompter.ask(cleanupQuestion(counts.branches, counts.worktrees))) {
+    if (!await prompter.ask(cleanupQuestion(counts.branches, counts.worktrees, counts.runs))) {
       context.output.info(NOTHING_REMOVED_TEXT);
       return;
     }
@@ -365,30 +389,33 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
     name: 'cleanup',
     subject: 'cleanup',
     action: 'cleanup',
-    summary: 'list merged, stale and unpushed branches and leftover worktrees; remove the ones ticked',
-    description: 'Runs `git fetch --prune`, then lists the local branches and worktrees that have piled up in'
-      + ' four groups, each row its name, its last commit date and why it is listed: Merged (reachable from'
+    summary: 'list merged, stale and unpushed branches, leftover worktrees and old run records; remove the ones'
+      + ' ticked',
+    description: 'Runs `git fetch --prune`, then lists the local branches, worktrees and run records that have'
+      + ' piled up in five groups, each row its name, its date and why it is listed: Merged (reachable from'
       + ' the base, its pull request merged per the provider, or its upstream gone), Stale (an upstream, not'
-      + ' merged, no commit in `cleanup.staleDays`), Not pushed (no upstream, or commits ahead of it) and'
-      + ' Worktrees (under `.claude/worktrees/`, `~/.rafa/worktrees/` and `loop.worktreeDir`). The current'
+      + ' merged, no commit in `cleanup.staleDays`), Not pushed (no upstream, or commits ahead of it),'
+      + ' Worktrees (under `.claude/worktrees/`, `~/.rafa/worktrees/` and `loop.worktreeDir`) and Run records'
+      + ' (the session records under `.rafa/runs/`, each named by its plan and the day it started, with its'
+      + ' events file; a running or paused run and the newest run of each plan are never listed). The current'
       + ' branch, the base and every name a `cleanup.keep` glob matches are never listed. With a terminal'
-      + ' the groups are one checklist: space ticks a row, `a` ticks a whole group, and Merged rows and'
-      + ' clean worktrees on a'
-      + ' Merged branch start ticked; a worktree that is dirty, locked, the current one, running a loop'
-      + ' session or modified within `cleanup.worktreeIdleDays` cannot be ticked, and says why. A ticked'
-      + ' Not-pushed branch asks again, naming the commits deleting it loses. Enter then asks `Delete <n>'
-      + ' branches and remove <m> worktrees? [y/N]`, and a yes runs `git worktree remove` for each worktree'
-      + ' and `git branch -d` for each Merged branch, `-D` for a squash-merged one and for a Stale or'
-      + ' Not-pushed branch ticked and confirmed. Nothing runs with `--force` and nothing remote is'
-      + ' deleted: a Stale row names the `git push origin --delete <b>` to run by hand. It exits 1 when a'
-      + ' step did not run clean. Without a terminal, or with `--output=json`, it prints the four groups,'
-      + ' asks nothing and removes nothing, exiting 0; with `--output=json` they are the data of the terminal'
-      + ' result event. Starts no session.',
+      + ' the groups are one checklist: space ticks a row, `a` ticks a whole group, and Merged rows, clean'
+      + ' worktrees on a Merged branch and run records start ticked; a worktree that is dirty, locked, the'
+      + ' current one, running a loop session or modified within `cleanup.worktreeIdleDays` cannot be ticked,'
+      + ' and says why. A ticked Not-pushed branch asks again, naming the commits deleting it loses. Enter'
+      + ' then asks `Delete <n> branches, remove <m> worktrees and remove <r> run records? [y/N]`, and a yes'
+      + ' runs `git worktree remove` for each worktree and `git branch -d` for each Merged branch, `-D` for a'
+      + ' squash-merged one and for a Stale or Not-pushed branch ticked and confirmed, then removes each run'
+      + ' record and its events file. Nothing runs with `--force` and nothing remote is deleted: a Stale row'
+      + ' names the `git push origin --delete <b>` to run by hand. It exits 1 when a step did not run clean.'
+      + ' Without a terminal, or with `--output=json`, it prints the five groups, asks nothing and removes'
+      + ' nothing, exiting 0; with `--output=json` they are the data of the terminal result event. Starts no'
+      + ' session.',
     args: [],
     flags: [
       {
         name: DRY_RUN_FLAG,
-        description: 'Show the checklist and ask as usual, then print the `git` commands the answer would run'
+        description: 'Show the checklist and ask as usual, then print the commands the answer would run'
           + ' instead of running them. Removes nothing.',
         type: 'boolean',
       },
@@ -396,15 +423,15 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
     examples: [
       {
         cmd: 'rafa cleanup',
-        note: 'Lists the four groups and removes what is ticked, once the final question is answered yes.',
+        note: 'Lists the five groups and removes what is ticked, once the final question is answered yes.',
       },
       {
         cmd: 'rafa cleanup --dry-run',
-        note: 'Prints the `git` commands the ticked rows would run, running none of them.',
+        note: 'Prints the `git` and `rm` commands the ticked rows would run, running none of them.',
       },
       {
         cmd: 'rafa cleanup --output=json',
-        note: 'Gives the four groups as data, asking nothing and removing nothing.',
+        note: 'Gives the five groups as data, asking nothing and removing nothing.',
       },
     ],
     outputs: ['text', 'json'],

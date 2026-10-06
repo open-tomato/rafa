@@ -1,5 +1,5 @@
 /**
- * The words `rafa cleanup` shows for what `src/cleanup/` read: the four
+ * The words `rafa cleanup` shows for what `src/cleanup/` read: the five
  * groups as text lines, one line per row, and the same reading as the
  * JSON data of the terminal result event. It prints nothing and deletes
  * nothing; `./cleanup.ts` writes these lines and, where there is a
@@ -10,18 +10,22 @@
  * The notes come first, one `note: <line>` each, because they qualify
  * every row below them (a failed fetch, an unreachable provider). Then
  * the four groups in the order the spec's Design table lists them —
- * Merged, Stale, Not pushed, Worktrees — each under a heading naming
- * how many rows it holds, and each row one line, indented two spaces:
- * its name, its date and its reason, the names padded to one column
- * across all four groups so the dates line up. A group with no rows
- * still shows its heading and {@link NO_ROWS_TEXT}, so a listing always
- * names all four groups: the no-terminal run's definition of done is
- * that it prints them.
+ * Merged, Stale, Not pushed, Worktrees — and last Run records, each
+ * under a heading naming how many rows it holds, and each row one line,
+ * indented two spaces: its name, its date and its reason, the names
+ * padded to one column across all five groups so the dates line up. A
+ * group with no rows still shows its heading and {@link NO_ROWS_TEXT},
+ * so a listing always names all five groups: the no-terminal run's
+ * definition of done is that it prints them.
  *
  * A branch row's date is its last commit; a worktree row's is when it
  * was last modified, {@link UNKNOWN_DATE} when that could not be read.
- * Both are the UTC calendar day, `YYYY-MM-DD`, so a line reads the same
- * on every machine and in every test.
+ * A run record's row is named by its plan (the stub, or the plan path
+ * when the record carries none) and dated by when the run started,
+ * {@link UNKNOWN_DATE} when the record's `startedAt` does not parse;
+ * its reason names the session id and whether an events file goes with
+ * it. Every date is the UTC calendar day, `YYYY-MM-DD`, so a line reads
+ * the same on every machine and in every test.
  *
  * ## The remote delete a Stale row names
  *
@@ -45,8 +49,10 @@
  * each row's reason and whether it starts ticked, what each group's
  * rows carry beyond that (`mergedBy` and the pull request number,
  * `idleDays` and the remote delete line, the commit count, a
- * worktree's blocker kinds), the counts `cleanupCounts` gives, and the
- * notes. It holds no ticks the person made: with `--output=json` the
+ * worktree's blocker kinds), each run record's session id, paths, plan
+ * and start time as the record holds it, the counts `cleanupCounts`
+ * gives (branches and worktrees; the run records are counted by the
+ * length of `runs`), and the notes. It holds no ticks the person made: with `--output=json` the
  * command asks nothing and removes nothing.
  */
 import type {
@@ -56,6 +62,7 @@ import type {
   MergedBy,
   MergedRow,
   NotPushedRow,
+  RunRow,
   StaleRow,
   WorktreeBlockKind,
   WorktreeRow,
@@ -64,12 +71,13 @@ import type {
 import { cleanupCounts } from '../cleanup/index.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
-/** The four group headings, in the order they are listed. */
+/** The five group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES = Object.freeze({
   merged: 'Merged',
   stale: 'Stale',
   notPushed: 'Not pushed',
   worktrees: 'Worktrees',
+  runs: 'Run records',
 });
 
 /** The line an empty group shows under its heading. */
@@ -131,6 +139,20 @@ export interface WorktreeRowData {
   readonly blockers: readonly WorktreeBlockKind[];
 }
 
+/** A run record's row as JSON data. */
+export interface RunRowData {
+  readonly sessionId: string;
+  /** The record's absolute path. */
+  readonly path: string;
+  /** Its events file, or null when none sits beside it. */
+  readonly eventsPath: string | null;
+  /** The plan's stub, or its path when the record carries no stub. */
+  readonly plan: string;
+  /** When the run started, as the record holds it. */
+  readonly startedAt: string;
+  readonly ticked: boolean;
+}
+
 /** The JSON data of the terminal result event; see the module note. */
 export interface CleanupData {
   readonly base: string;
@@ -140,6 +162,7 @@ export interface CleanupData {
   readonly stale: readonly StaleRowData[];
   readonly notPushed: readonly NotPushedRowData[];
   readonly worktrees: readonly WorktreeRowData[];
+  readonly runs: readonly RunRowData[];
   readonly notes: readonly string[];
 }
 
@@ -185,11 +208,28 @@ export function worktreeRowLine(row: WorktreeRow, width = 0): string {
   return columns(row.path, width, date, row.reason);
 }
 
-/** The widest name across all four groups: the column every row's name is padded to. */
+/** The reason a run record's row shows: its session id, and its events file when one goes with it. */
+export function runRowReason(row: RunRow): string {
+  return row.eventsPath === null
+    ? `run ${row.sessionId}`
+    : `run ${row.sessionId} and its events file`;
+}
+
+/** One run record's row: its plan padded to `width`, the day the run started and its reason. */
+export function runRowLine(row: RunRow, width = 0): string {
+  const started = new Date(row.startedAt);
+  const date = Number.isNaN(started.getTime())
+    ? UNKNOWN_DATE
+    : cleanupDate(started);
+  return columns(row.plan, width, date, runRowReason(row));
+}
+
+/** The widest name across all five groups: the column every row's name is padded to. */
 export function cleanupNameWidth(read: CleanupRead): number {
   const names = [
     ...[...read.merged, ...read.stale, ...read.notPushed].map((row) => row.branch.name),
     ...read.worktrees.map((row) => row.path),
+    ...read.runs.map((row) => row.plan),
   ];
   return names.reduce((widest, name) => Math.max(widest, name.length), 0);
 }
@@ -204,6 +244,7 @@ export function renderCleanup(read: CleanupRead): readonly string[] {
     ...groupLines(CLEANUP_GROUP_TITLES.stale, branchLines(read.stale)),
     ...groupLines(CLEANUP_GROUP_TITLES.notPushed, branchLines(read.notPushed)),
     ...groupLines(CLEANUP_GROUP_TITLES.worktrees, read.worktrees.map((row) => worktreeRowLine(row, width))),
+    ...groupLines(CLEANUP_GROUP_TITLES.runs, read.runs.map((row) => runRowLine(row, width))),
   ];
 }
 
@@ -217,6 +258,7 @@ export function cleanupData(read: CleanupRead): CleanupData {
     stale: read.stale.map(staleData),
     notPushed: read.notPushed.map(notPushedData),
     worktrees: read.worktrees.map(worktreeData),
+    runs: read.runs.map(runData),
     notes: [...read.notes],
   };
 }
@@ -275,5 +317,16 @@ function worktreeData(row: WorktreeRow): WorktreeRowData {
     ticked: row.ticked,
     branchMerged: row.branchMerged,
     blockers: row.blockers.map((blocker) => blocker.kind),
+  };
+}
+
+function runData(row: RunRow): RunRowData {
+  return {
+    sessionId: row.sessionId,
+    path: row.path,
+    eventsPath: row.eventsPath,
+    plan: row.plan,
+    startedAt: row.startedAt,
+    ticked: row.ticked,
   };
 }
