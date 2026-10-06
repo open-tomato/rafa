@@ -184,7 +184,15 @@ sentence replaces nothing.
    `report`, `ask`, `refuse`); `collision` refuses unless
    `dangerous.acceptVersionCollision` is true. Its question comes before the
    merge question, `--yes` does not answer it, and without a TTY `ask`
-   refuses.
+   refuses. Settle's release pull request, a head of `rafa/release`
+   (`RELEASE_PR_BRANCH`) that stamps a version the base has neither
+   released nor passed (`src/release/release-delivery.ts`), is not
+   `stale`: it prints one line on stdout,
+   `Release: #<n> is settle's release pull request; merging it lands <version>`,
+   with no forecast and no `fix:` line, merges whatever
+   `pr.versionCollision` says, and its json `guard` reads answer `release`,
+   reaction `print` (#843). A `rafa/release` head the base has passed or
+   collides with reads as any branch does.
 3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -302,7 +310,9 @@ Assessment is CODE, not a session:
   `ci-install`, `ci-lint`, `ci-types`, `ci-test`, `ci-other`. The failing STEP
   name decides the `ci-*` class; `conflict-version` is the guard's `stale` or
   `collision` answer (the branch stamped a version) and outranks every other
-  class, a git conflict included; `no-checks` means the PR reports no checks at all (verdict `none`),
+  class, a git conflict included, except on settle's release pull request,
+  which `readTriageGuard` answers as the delivery and which is classed by its
+  checks and conflicts alone, so `--resolve` never turns it into a fragment; `no-checks` means the PR reports no checks at all (verdict `none`),
   whatever the workflow count; the count, or that it could not be read,
   goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,

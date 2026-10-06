@@ -160,6 +160,17 @@ to all three failures, and its existing `--resolve` owns the fix: turn a stamped
 changelog section into a fragment and restore the version file to the base
 branch's value, in one commit on the branch.
 
+Settle's own release pull request is not a failure (#843). A head of
+`rafa/release` (`RELEASE_PR_BRANCH`, `src/release/settle-pr.ts`) whose stamp
+the base has neither released nor passed is the delivery
+(`src/release/release-delivery.ts`): `rafa pr merge` prints one line,
+`Release: #<n> is settle's release pull request; merging it lands <version>`,
+in place of the `stale` line, the forecast's no-fragment line and the `fix:`
+line, and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it
+no `conflict-version` class. A `rafa/release` head the base has passed, already
+released or collides with reads as any branch does, fix included, and an
+ordinary branch stamping a version still reads `stale`.
+
 ### Readers: status, list, and doctor
 
 **`rafa release status`** reads the base branch (fetching nothing, reading as

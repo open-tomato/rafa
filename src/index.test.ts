@@ -729,7 +729,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'readBooleanFlag',
       'readPullArgument',
     ]],
-    ['./triage-guard.js', ['readTriageGuard']],
+    ['./triage-guard.js', ['readTriageGuard', 'triageVerdict']],
     ['./triage-read.js', ['readConflictFiles', 'readFailedLogs', 'readWorkflowCount']],
     ['./triage-report.js', ['evidenceOf', 'renderTriages', 'workflowCountOf']],
     ['./triage-resolve.js', ['resolvePullRequest']],
