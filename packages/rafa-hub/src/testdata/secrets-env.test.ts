@@ -66,6 +66,28 @@ describe('probeSecrets', () => {
     rmSync(scratch, { recursive: true, force: true });
   });
 
+  it('answers false on macOS without spawning a child, whatever the source holds', async () => {
+    let spawned = 0;
+    const spawnProbe = async (): Promise<boolean> => {
+      spawned += 1;
+      return true;
+    };
+
+    expect(await probeSecrets(process.env, { platform: 'darwin', spawnProbe })).toBe(false);
+    expect(spawned).toBe(0);
+  });
+
+  it('spawns the probe child on Linux, answering what it answers', async () => {
+    let spawned = 0;
+    const spawnProbe = async (): Promise<boolean> => {
+      spawned += 1;
+      return true;
+    };
+
+    expect(await probeSecrets({}, { platform: 'linux', spawnProbe })).toBe(true);
+    expect(spawned).toBe(1);
+  });
+
   it('answers false when the session bus names a socket that does not exist and no runtime dir is set', async () => {
     const source = { DBUS_SESSION_BUS_ADDRESS: deadBusAddress(scratch) };
 

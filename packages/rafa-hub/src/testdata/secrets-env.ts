@@ -17,6 +17,11 @@
  * own, which sets, reads back and deletes a credential under a random
  * name, and answers true only when that child exits 0 having printed the
  * value it set. A suite computes it once at load; it costs one spawn.
+ *
+ * On macOS it answers false and spawns nothing. There `Bun.secrets` uses
+ * the Keychain, which a child under a scratch `HOME` cannot reach: the
+ * set opens a Keychain dialog on the person's screen and waits on it
+ * until the probe's kill, so the hub suites skip there.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -86,17 +91,26 @@ function roundTripScript(name: string, value: string): string {
   ].join('\n');
 }
 
+/** What {@link probeSecrets} reads the host through, so a test can name another. */
+export interface ProbeSeams {
+  /** `process.platform`'s spelling. `process.platform` when absent. */
+  readonly platform?: string;
+  /** Spawns the probe child. {@link runProbeChild} when absent. */
+  readonly spawnProbe?: typeof runProbeChild;
+}
+
 /**
  * Whether a child spawned under {@link secretsChildEnv} of `source`, with
  * a scratch `HOME`, can store a credential through `Bun.secrets` and read
- * it back; see the module note.
+ * it back; false on macOS with no child spawned. See the module note.
  */
-export async function probeSecrets(source: SourceEnv = process.env): Promise<boolean> {
+export async function probeSecrets(source: SourceEnv = process.env, seams: ProbeSeams = {}): Promise<boolean> {
+  if ((seams.platform ?? process.platform) === 'darwin') return false;
   const scratch = mkdtempSync(join(tmpdir(), 'rafa-hub-secrets-probe-'));
   const value = randomUUID();
   try {
     const env = secretsChildEnv(join(scratch, 'home'), source);
-    return await runProbeChild(roundTripScript(`secrets-probe-${randomUUID()}`, value), value, env);
+    return await (seams.spawnProbe ?? runProbeChild)(roundTripScript(`secrets-probe-${randomUUID()}`, value), value, env);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
