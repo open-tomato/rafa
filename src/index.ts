@@ -249,6 +249,7 @@ export type {
 export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
 export { loadConfig, readConfigFile } from './config-load.js';
 export {
+  BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
