@@ -448,7 +448,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
  * `warn: ` or `error: ` prefix, split on the newlines the message
  * itself carries. A message written as a pattern stays one line.
  */
-function textLines(level: 'info' | 'warn' | 'error', message: string | RegExp): readonly unknown[] {
+function textLines(level: 'info' | 'warn' | 'error', message: string | RegExp): readonly string[] {
   if (typeof message !== 'string') return [expect.stringMatching(message)];
   const prefix = level === 'info'
     ? ''
@@ -498,7 +498,7 @@ describe('a loop start run with no open task', () => {
     // Read line by line rather than as one string: the last line
     // carries the run's own temporary path, so it is the one entry
     // matched as a pattern.
-    const expected = noTaskLines().flatMap(([level, message]) => textLines(level, message));
+    const expected: string[] = noTaskLines().flatMap(([level, message]) => textLines(level, message));
 
     expect(run.exitCode).toBe(0);
     expect(run.stderr).toBe('');
