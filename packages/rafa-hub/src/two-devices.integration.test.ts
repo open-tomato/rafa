@@ -16,19 +16,13 @@
  * `modules:` names the real `packages/rafa-sync-service` package by its
  * filesystem path (never imported here, exactly as
  * `sync-service-package-integration.test.ts` names it for `loadModules`),
- * and `allowList:` trusts it. That package's `create` always reads the
- * hub token through `Bun.secrets` (`token.ts`'s `bunSecretReader`) with
- * no seam this acceptance test could override, so the suite stores a
- * real credential under service `rafa` before each case and removes it
- * after, skipping whole when a child spawned under the CLI's own
- * environment cannot round-trip a credential (`SECRETS_OK`), rather than
- * fail on a machine with no secret-service backend reachable from it. On
- * Linux, `Bun.secrets` reaches the desktop secret service over
- * `DBUS_SESSION_BUS_ADDRESS`, which the child process does not inherit
- * unless it is named in its own environment, so
- * `testdata/secrets-env.js`'s `secretsChildEnv()` carries it (and
- * `XDG_RUNTIME_DIR`) from this process's into the spawned CLI's, and its
- * `probeSecrets()` asks a child spawned under exactly that environment.
+ * and `allowList:` trusts it. That package reads the hub token through
+ * `token.ts`'s `defaultSecretReader`, which in a test process naming
+ * `RAFA_TEST_SECRETS_FILE` reads a JSON file rather than `Bun.secrets`.
+ * So each case plants the token in a scratch file under its scope
+ * (`testdata/test-secrets.js`'s `plantTestSecret`) and spawns every
+ * device under `testSecretsChildEnv`, which names that file: no case
+ * touches the system secret store, and the suite runs on every machine.
  *
  * A device "writes a row apart" by committing a file of its own under a
  * fresh git repository, so `rafa effort collect --no-sessions` finds one
@@ -60,7 +54,7 @@ import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
 import { expectSameMergedTables, mergedTableNames, sortedContent } from './testdata/compare-merged-stores.js';
-import { probeSecrets, secretsChildEnv } from './testdata/secrets-env.js';
+import { plantTestSecret, testSecretsChildEnv, testSecretsFileIn } from './testdata/test-secrets.js';
 
 const VERSION = '0.0.0-two-devices';
 const REPOSITORY = 'open-tomato/rafa';
@@ -72,9 +66,6 @@ const RUN_TIMEOUT_MS = 30_000;
 /** How long the whole convergence, three rounds of two devices, may take. */
 const CASE_TIMEOUT_MS = 120_000;
 
-/** Where every rafa secret lives (`packages/rafa-sync-service/src/token.ts`'s `SECRET_SERVICE`). */
-const SECRET_SERVICE = 'rafa';
-
 /** The real rafa CLI entry, spawned as a process; never imported. */
 const RAFA_ENTRY = fileURLToPath(new URL('../../../src/rafa.ts', import.meta.url));
 
@@ -83,12 +74,6 @@ const SYNC_SERVICE_PACKAGE = fileURLToPath(new URL('../../rafa-sync-service', im
 
 /** The `name` the package's `package.json` carries, and `allowList:` must match. */
 const SYNC_SERVICE_NAME = '@open-tomato/rafa-sync-service';
-
-/** The reason this suite skips, when it does. */
-const SKIP_REASON = 'a child spawned under the secret environment this suite spawns its CLI under could not store and read a credential through Bun.secrets';
-
-/** Whether a child spawned under {@link secretsChildEnv} can round-trip a credential, probed once at load. */
-const SECRETS_OK = await probeSecrets();
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
 function gitEnv(): Record<string, string> {
@@ -107,6 +92,8 @@ interface Device {
   readonly name: string;
   readonly root: string;
   readonly home: string;
+  /** The secrets file under the case's scope, holding the hub token. */
+  readonly secretsFile: string;
 }
 
 /** A device's config naming `effort.sync: service` over `hubUrl`, its token under `secretName`. */
@@ -145,7 +132,7 @@ function plantDevice(scope: string, name: string, hubUrl: string, secretName: st
 
   mkdirSync(join(root, '.rafa'), { recursive: true });
   writeFileSync(join(root, '.rafa', 'config.yaml'), deviceConfig(hubUrl, secretName), 'utf8');
-  return { name, root, home };
+  return { name, root, home, secretsFile: testSecretsFileIn(scope) };
 }
 
 /** What one `effort collect` run answered: its exit code, and standard output and error together. */
@@ -172,7 +159,7 @@ async function runCollect(device: Device): Promise<CollectRun> {
       TMPDIR: tmpdir(),
       RAFA_TEST: '1',
       PATH: GIT_DIR,
-      ...secretsChildEnv(device.home),
+      ...testSecretsChildEnv(device.home, device.secretsFile),
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -186,14 +173,14 @@ async function runCollect(device: Device): Promise<CollectRun> {
   return { exitCode, output: `${stdout}${stderr}` };
 }
 
-describe.skipIf(!SECRETS_OK)(`two devices converge through a hub the test starts (skipped when: ${SKIP_REASON})`, () => {
+describe('two devices converge through a hub the test starts', () => {
   let scope = '';
   let hubDir = '';
   let github: StandInGitHub;
   let hub: HubServer;
   let secretName = '';
 
-  beforeEach(async () => {
+  beforeEach(() => {
     scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-two-devices-')));
     hubDir = realpathSync(mkdtempSync(join(scope, 'hub-')));
     github = startStandInGitHub({ [WRITER]: { login: 'writer', roles: { [REPOSITORY]: 'write' } } });
@@ -205,11 +192,10 @@ describe.skipIf(!SECRETS_OK)(`two devices converge through a hub the test starts
       openStore: () => openSqliteHubStore({ directory: hubDir, now: () => new Date() }),
     });
     secretName = `hub-token-${randomUUID()}`;
-    await Bun.secrets.set({ service: SECRET_SERVICE, name: secretName, value: WRITER });
+    plantTestSecret(scope, secretName, WRITER);
   });
 
   afterEach(async () => {
-    await Bun.secrets.delete({ service: SECRET_SERVICE, name: secretName });
     await hub.stop();
     await github.stop();
     rmSync(scope, { recursive: true, force: true });

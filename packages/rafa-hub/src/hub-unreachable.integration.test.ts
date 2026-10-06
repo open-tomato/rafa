@@ -66,12 +66,12 @@
  * `Bun.spawnSync`, since the hub and the silent listener are both
  * `Bun.serve` in this very process, and a synchronous spawn would block
  * the event loop they need to answer — or, for the silent one, to accept
- * a connection and never answer. The same file's note on `Bun.secrets`,
- * the real `rafa-sync-service` package named by path, and the
- * `SECRETS_OK` skip applies here unchanged: both files gate on and spawn
- * under `testdata/secrets-env.js`. The git helpers below are its own,
- * kept local rather than shared, since neither file is the other's
- * fixture.
+ * a connection and never answer. The same file's note on the hub token,
+ * planted in a scratch file rather than the system secret store, and the
+ * real `rafa-sync-service` package named by path applies here unchanged:
+ * both files spawn under `testdata/test-secrets.js`. The git helpers
+ * below are its own, kept local rather than shared, since neither file
+ * is the other's fixture.
  */
 import type { StandInGitHub } from './identity/testdata/stand-in-github.js';
 import type { HubServer } from './server.js';
@@ -91,7 +91,7 @@ import { startStandInGitHub } from './identity/testdata/stand-in-github.js';
 import { startHubServer } from './server.js';
 import { openSqliteHubStore } from './store/sqlite.js';
 import { expectSameMergedTables } from './testdata/compare-merged-stores.js';
-import { probeSecrets, secretsChildEnv } from './testdata/secrets-env.js';
+import { plantTestSecret, testSecretsChildEnv, testSecretsFileIn } from './testdata/test-secrets.js';
 
 const VERSION = '0.0.0-hub-unreachable';
 const REPOSITORY = 'open-tomato/rafa';
@@ -102,9 +102,6 @@ const RUN_TIMEOUT_MS = 15_000;
 
 /** How long the whole case, twenty-one spawned commands and one hub restart, may take. */
 const CASE_TIMEOUT_MS = 180_000;
-
-/** Where every rafa secret lives (`packages/rafa-sync-service/src/token.ts`'s `SECRET_SERVICE`). */
-const SECRET_SERVICE = 'rafa';
 
 /** The real rafa CLI entry, spawned as a process; never imported. */
 const RAFA_ENTRY = fileURLToPath(new URL('../../../src/rafa.ts', import.meta.url));
@@ -123,12 +120,6 @@ const HUB_TIMEOUT_MS = 1000;
 
 /** The slack the timing bound allows past one `hub.timeout`, in milliseconds: "plus one second". */
 const TIMING_SLACK_MS = 1000;
-
-/** The reason this suite skips, when it does. */
-const SKIP_REASON = 'a child spawned under the secret environment this suite spawns its CLI under could not store and read a credential through Bun.secrets';
-
-/** Whether a child spawned under {@link secretsChildEnv} can round-trip a credential, probed once at load. */
-const SECRETS_OK = await probeSecrets();
 
 /** The environment this process runs `git` fixture steps under: its own, with no `GIT_*` variable reaching it. */
 function gitEnv(): Record<string, string> {
@@ -248,6 +239,8 @@ interface Device {
   readonly root: string;
   readonly home: string;
   readonly bin: string;
+  /** The secrets file under the case's scope, holding the hub token. */
+  readonly secretsFile: string;
 }
 
 /** Whether a device needs `rafa next --dry-run` to run on it (`pr.provider: gh`, a roadmap and a stand-in `gh`) or stays plain (`pr.provider: none`). */
@@ -309,7 +302,7 @@ function plantDevice(scope: string, name: string, kind: DeviceKind, hubUrl: stri
   }
 
   mkdirSync(join(root, '.rafa'), { recursive: true });
-  const device: Device = { name, root, home, bin };
+  const device: Device = { name, root, home, bin, secretsFile: testSecretsFileIn(scope) };
   writeDeviceConfig(device, kind, hubUrl, secretName);
   return device;
 }
@@ -340,7 +333,7 @@ async function runCommand(device: Device, words: readonly string[]): Promise<Com
       TMPDIR: tmpdir(),
       RAFA_TEST: '1',
       PATH: [device.bin, GIT_DIR].join(delimiter),
-      ...secretsChildEnv(device.home),
+      ...testSecretsChildEnv(device.home, device.secretsFile),
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -463,7 +456,7 @@ function startHub(port: number, githubUrl: string, directory: string): HubServer
   });
 }
 
-describe.skipIf(!SECRETS_OK)(`every command survives the hub being unreachable (skipped when: ${SKIP_REASON})`, () => {
+describe('every command survives the hub being unreachable', () => {
   let scope = '';
   let hubDir = '';
   let hubPort = 0;
@@ -472,7 +465,7 @@ describe.skipIf(!SECRETS_OK)(`every command survives the hub being unreachable (
   let silent: SilentListener;
   let secretName = '';
 
-  beforeEach(async () => {
+  beforeEach(() => {
     scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-hub-unreachable-')));
     hubDir = realpathSync(mkdtempSync(join(scope, 'hub-')));
     github = startStandInGitHub({ [WRITER]: { login: 'writer', roles: { [REPOSITORY]: 'write' } } });
@@ -480,11 +473,10 @@ describe.skipIf(!SECRETS_OK)(`every command survives the hub being unreachable (
     hubPort = Number(new URL(hub.url).port);
     silent = startSilentListener();
     secretName = `hub-token-${randomUUID()}`;
-    await Bun.secrets.set({ service: SECRET_SERVICE, name: secretName, value: WRITER });
+    plantTestSecret(scope, secretName, WRITER);
   });
 
   afterEach(async () => {
-    await Bun.secrets.delete({ service: SECRET_SERVICE, name: secretName });
     await silent.stop();
     await hub.stop();
     await github.stop();
