@@ -34,7 +34,7 @@
  * no planner and no loop-start double.
  */
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -45,6 +45,7 @@ import {
   BASE, CONFIG_TEXT, git, makeTempBase, NEXT_ISSUE, NEXT_TITLE, OLD_BRANCH, PR_DETAIL,
   PR_NUMBER, PR_SUMMARY, type Scratch, SRC_DIR, runProbe, writeStandInGh,
 } from './next-chain-fixtures.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** A temporary directory this file's own scratch repositories sit under. */
 const tempBase = makeTempBase('rafa-next-merge-settle-spawned-');
@@ -227,9 +228,7 @@ function plantScratch(): Scratch {
   writeStandInGh(bin, ROADMAP_BODY);
   writeStandInClaude(bin);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  const path = [bin, dirname(gitBinary)].join(delimiter);
+  const path = [bin, ...hostToolDirs()].join(delimiter);
 
   const probe = join(root, 'probe.ts');
   writeFileSync(probe, buildProbe(), 'utf8');

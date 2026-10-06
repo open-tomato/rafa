@@ -70,6 +70,7 @@ import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The command every run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -351,9 +352,7 @@ function plantScratch(): Scratch {
   const plan = [`# Plan: ${STUB}`, '', `- [ ] ${INVOKE_TASK}`, `- [ ] ${FINDING_TASK}`, ''];
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), plan.join('\n'), 'utf8');
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** Runs one rafa command inside the scratch repository. */

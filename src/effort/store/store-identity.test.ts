@@ -28,7 +28,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
@@ -394,6 +394,17 @@ describe('readHostId', () => {
       .toBe(hostIdFrom('machine-id', machineId));
     expect(readHostId({ platform: 'darwin', readMachineId: refuse, readPlatformUuid: () => platformUuid, readHostname: refuse }))
       .toBe(hostIdFrom('platform-uuid', platformUuid));
+  });
+
+  // A spawned run's PATH may lack /usr/sbin, where ioreg lives; a hostname
+  // id there would read the store as a copy and mint it a new id.
+  it.skipIf(process.platform !== 'darwin')('reads the macOS platform UUID in a child whose PATH holds no /usr/sbin', () => {
+    const script = `import { readHostId } from '${join(import.meta.dir, 'store-identity.ts')}'; console.log(readHostId());`;
+    const child = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } });
+
+    expect(child.stderr).toBe('');
+    expect(child.stdout.trim()).toBe(readHostId());
+    expect(child.stdout.trim()).not.toBe(hostIdFrom('hostname', hostname()));
   });
 
   it('keeps sources apart, so a hostname spelled like a machine id is another host', () => {

@@ -26,7 +26,7 @@ import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -42,6 +42,7 @@ import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** `src/`, where every module the probe imports lives. */
 const SRC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -200,12 +201,10 @@ function plantScratch(config = ''): Scratch {
   const claude = join(bin, 'claude');
   writeFileSync(claude, ['#!/bin/sh', 'echo "the stand-in claude ran" >&2', 'exit 97', ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
 
   const probe = join(root, 'probe.ts');
   writeFileSync(probe, PROBE, 'utf8');
-  return { root, repo, bin, home, path: [bin, dirname(gitBinary)].join(delimiter), probe, sessions: join(root, 'sessions.log') };
+  return { root, repo, bin, home, path: [bin, ...hostToolDirs()].join(delimiter), probe, sessions: join(root, 'sessions.log') };
 }
 
 /** The spec issue with `lines` as the prose under its first heading. */

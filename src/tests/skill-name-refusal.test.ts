@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -36,17 +36,12 @@ import {
 
 import { plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 const KILL_AFTER_MS = 45_000;
 const RUN_TIMEOUT = { timeout: 60_000 };
-
-const GIT_DIR = (() => {
-  const found = Bun.which('git');
-  if (found === null) throw new Error('git is not on the PATH this suite runs under');
-  return dirname(found);
-})();
 
 const STUB = 'skill-name-refusal';
 const GHOST = 'skill-name-ghost';
@@ -125,7 +120,7 @@ function plantScratch(): Scratch {
   plantProjectConfig(repo);
   plantSkill(repo, KNOWN);
 
-  return { repo, home, calls, path: [bin, GIT_DIR].join(delimiter), planFile: `.plans/PLAN-${STUB}.md` };
+  return { repo, home, calls, path: [bin, ...hostToolDirs()].join(delimiter), planFile: `.plans/PLAN-${STUB}.md` };
 }
 
 interface SpawnRun {

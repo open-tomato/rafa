@@ -22,7 +22,7 @@ import type { Fragment } from '../release/fragment.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -30,6 +30,7 @@ import { serializeFragment } from '../release/fragment.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-release-settle-squash-')));
@@ -148,9 +149,7 @@ function world(): World {
   run(caller, ['commit', '-q', '-m', 'ignore .rafa/']);
   plantProjectConfig(caller);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  const scratch: ScratchRepo = { repo: caller, home, bin, callLog: join(dir, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  const scratch: ScratchRepo = { repo: caller, home, bin, callLog: join(dir, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
   return { origin, scratch, hub, git };
 }
 

@@ -62,6 +62,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { parseFragment } from '../../release/fragment.js';
 import { plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
+import { hostToolDirs } from '../../tests/stand-in-gh.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-version-collision-incident-')));
@@ -231,9 +232,7 @@ function caller(w: World): ScratchRepo {
   ] as const) w.git(repo, ['config', key, value]);
   plantProjectConfig(repo, CONFIG_TEXT);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(dir, 'gh.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, bin, callLog: join(dir, 'gh.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** The pull request `gh pr view --json ...` answers with, both sides read as mergeable; see the module note. */

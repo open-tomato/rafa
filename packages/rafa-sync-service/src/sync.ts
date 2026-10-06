@@ -107,7 +107,7 @@ import { Database } from 'bun:sqlite';
 
 import { createHubClient } from './client.js';
 import { readSyncCursors, syncStatePath, writeSyncCursor } from './state.js';
-import { bunSecretReader, readHubToken } from './token.js';
+import { defaultSecretReader, readHubToken } from './token.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync (service)';
@@ -176,7 +176,7 @@ export interface ServiceSyncOptions {
   /** The project's resolved `store` backend. */
   readonly backend: StoreBackend;
   readonly hub: ServiceHub;
-  /** Where the token is read from; `Bun.secrets` when left out. */
+  /** Where the token is read from; `defaultSecretReader()` (`Bun.secrets` outside a test) when left out. */
   readonly readSecret?: SecretReader;
   /** The fetch the hub client calls; the global `fetch` when left out. */
   readonly fetch?: typeof fetch;
@@ -281,7 +281,7 @@ export function createServiceSync(options: ServiceSyncOptions): Sync {
   let known: readonly string[] | undefined;
 
   const hubClient = (): Promise<HubClient> => {
-    client ??= readHubToken(hub.tokenSecret, options.readSecret ?? bunSecretReader)
+    client ??= readHubToken(hub.tokenSecret, options.readSecret ?? defaultSecretReader())
       .then((token) => createHubClient({ url: hub.url, token, timeoutMs: hub.timeoutMs, fetch: options.fetch }));
     return client;
   };

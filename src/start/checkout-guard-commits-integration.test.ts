@@ -28,7 +28,7 @@ import type { Subprocess } from 'bun';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -37,6 +37,7 @@ import { readSessions } from '../loop/sessions.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { CHECKOUT_MOVED } from './checkout-guard.js';
 
@@ -162,14 +163,12 @@ function plant(): Scratch {
   const home = join(root, 'home');
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const scratch: Scratch = {
     repo,
     home,
     claude: join(bin, 'claude'),
     callLog: join(root, 'calls.log'),
-    path: [bin, dirname(gitBinary)].join(delimiter),
+    path: [bin, ...hostToolDirs()].join(delimiter),
   };
   plantStandIn(scratch);
 

@@ -44,6 +44,7 @@ import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 const BUNDLED_BIN = join(dirname(RAFA_ENTRY), 'bundled', 'bin');
@@ -105,9 +106,6 @@ function plant(): Scratch {
   const calls = join(root, 'calls');
   for (const dir of [repo, bin, home, calls]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-
   const reportPath = join(root, 'report.txt');
   writeFileSync(reportPath, STAND_IN_REPORT, 'utf8');
   const claude = join(bin, 'claude');
@@ -138,7 +136,7 @@ function plant(): Scratch {
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`, 'utf8');
   plantProjectConfig(repo);
 
-  return { repo, home, calls, path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, calls, path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** Every call the stand-in recorded. */

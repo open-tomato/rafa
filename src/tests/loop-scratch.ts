@@ -23,6 +23,7 @@ import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 import { plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -144,12 +145,10 @@ function plantUnder(base: string, n: number, planting: Planting): Scratch {
   }
   plantProjectConfig(repo, planting.config);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   // The runner's suite steps spawn `bun test` themselves, so bun must resolve in the child.
   const bunBinary = Bun.which('bun');
   if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
-  return { repo, home, claude, callLog, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
+  return { repo, home, claude, callLog, path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter) };
 }
 
 /**

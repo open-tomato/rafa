@@ -205,6 +205,7 @@ import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from './refs/stamp.js'
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { scratchHomeEnv } from './tests/scratch-home-env.js';
 import { completeSpecBody } from './tests/spec-bodies.js';
+import { hostToolDirs } from './tests/stand-in-gh.js';
 
 /** This file's directory, `src/`, where the modules the probe imports sit. */
 const SRC_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -443,7 +444,7 @@ function plantScratch(options: ScratchOptions = {}): Scratch {
 
   const git = Bun.which('git');
   if (git === null) throw new Error('git is not on the PATH this suite runs under');
-  const path = [bin, dirname(process.execPath), dirname(git)].join(delimiter);
+  const path = [bin, dirname(process.execPath), ...hostToolDirs()].join(delimiter);
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
