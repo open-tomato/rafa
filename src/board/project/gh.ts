@@ -157,12 +157,12 @@ function refuse(problem: string, detail = ''): never {
   throw new ProjectPortError(problem, detail);
 }
 
-function readMapping(value: unknown, where: string): Answer {
+export function readMapping(value: unknown, where: string): Answer {
   if (!isMapping(value)) refuse(`${where} is ${describeValue(value)}, expected a mapping`);
   return value;
 }
 
-function readString(value: unknown, where: string): string {
+export function readString(value: unknown, where: string): string {
   if (typeof value !== 'string' || value === '') refuse(`${where} is ${describeValue(value)}, expected a non-empty string`);
   return value;
 }
@@ -194,12 +194,12 @@ function readOnePage(value: unknown, where: string): readonly unknown[] {
 }
 
 /** The `gh api graphql` argv sending `query` with `fields`, each `-f` but the ones named `-F`. */
-function graphqlArgs(query: string, fields: readonly (readonly [flag: '-f' | '-F', name: string, value: string])[]): readonly string[] {
+export function graphqlArgs(query: string, fields: readonly (readonly [flag: '-f' | '-F', name: string, value: string])[]): readonly string[] {
   return Object.freeze(['api', 'graphql', ...fields.flatMap(([flag, name, value]) => [flag, `${name}=${value}`]), '-f', `query=${query}`]);
 }
 
 /** `text` parsed as JSON, or undefined when it is not JSON. */
-function parsed(text: string): unknown {
+export function parsed(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -208,7 +208,7 @@ function parsed(text: string): unknown {
 }
 
 /** What `gh` wrote on a failed call, for a refusal's detail. */
-function written(stdout: string, stderr: string): string {
+export function written(stdout: string, stderr: string): string {
   return stderr.trim() || stdout.trim();
 }
 
@@ -276,7 +276,7 @@ export function findArgs(ref: ProjectRef): readonly string[] {
 }
 
 /** Throws a `RangeError` on an empty node id, naming `what`, article and all, it should have named. */
-function requireNodeId(id: string, what: string): void {
+export function requireNodeId(id: string, what: string): void {
   if (id === '') throw new RangeError(`not ${what} node id: ""`);
 }
 

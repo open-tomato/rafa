@@ -42,6 +42,20 @@
  * naming a project, owner, repository or content id it does not hold is
  * refused with a `fake gh:` message.
  *
+ * The batched field writes of `./writes.ts` change the values later reads
+ * answer, all of a request or none of it: a set holds an option by its
+ * id, a number sent with `-F` and declared `Float!`, or a text; a clear
+ * drops the value. A write naming an item, field or option the project
+ * does not hold, or a value of another kind than its field, refuses the
+ * whole request with a `fake gh:` message. That a request is applied
+ * whole is the fake's own rule: no mutation was sent to GitHub.
+ *
+ * {@link FakeProjectGhOptions.rateLimitAfter} makes the fake refuse every
+ * write request after that many, with {@link FAKE_RATE_LIMIT_MESSAGE} as
+ * an error of `type` `RATE_LIMITED` on stdout and on stderr after `gh:`.
+ * That shape is GitHub's documentation, NOT a reading: no rate limit was
+ * hit to read it.
+ *
  * ## Strict
  *
  * Anything but those calls — another command, a query of another
@@ -129,6 +143,8 @@ export interface FakeProjectGhOptions {
   /** Logins that exist and hold no project here; every project's and repository's owner exists too. */
   readonly owners?: readonly string[];
   readonly repositories?: readonly FakeRepository[];
+  /** How many field-write requests are answered before every later one is refused as rate-limited; none is when left out. */
+  readonly rateLimitAfter?: number;
 }
 
 /** The fake, and what it recorded. */
@@ -163,6 +179,18 @@ function ok(data: Json): GhResult {
 
 function refused(message: string): GhResult {
   return { ok: false, stdout: '', stderr: `fake gh: ${message}\n` };
+}
+
+/** The message of the fake's rate-limit refusal; see the module note. */
+export const FAKE_RATE_LIMIT_MESSAGE = 'API rate limit exceeded for user ID 1.';
+
+/** The rate-limit refusal; see the module note. */
+function rateLimited(): GhResult {
+  return {
+    ok: false,
+    stdout: JSON.stringify({ errors: [{ type: 'RATE_LIMITED', message: FAKE_RATE_LIMIT_MESSAGE }] }),
+    stderr: `gh: ${FAKE_RATE_LIMIT_MESSAGE}\n`,
+  };
 }
 
 /** A failure carrying the data and one `NOT_FOUND` error, as `gh` wrote it. */
@@ -266,6 +294,68 @@ function itemNode(project: FakeProject, item: FakeProjectItem, index: number, va
   };
 }
 
+/** The `-f` and `-F` fields of a call, by name. */
+type CallFields = ReadonlyMap<string, { readonly flag: string; readonly value: string }>;
+
+/** One aliased write of a `./writes.ts` request: its alias, mutation, variables and value key. */
+const FIELD_WRITE = new RegExp('(w\\d+): (updateProjectV2ItemFieldValue|clearProjectV2ItemFieldValue)\\(input: '
+  + '\\{ projectId: \\$project, itemId: \\$(item\\d+), fieldId: \\$(field\\d+)'
+  + '(?:, value: \\{ (singleSelectOptionId|number|text): \\$(value\\d+) \\})? \\}\\) \\{ projectV2Item \\{ id \\} \\}', 'gu');
+
+/** The field data type, flag and declared type of each value key. */
+const VALUE_KEYS: Readonly<Record<string, { readonly dataType: string; readonly flag: string; readonly declared: string }>> = Object.freeze({
+  singleSelectOptionId: { dataType: 'SINGLE_SELECT', flag: '-f', declared: 'String!' },
+  number: { dataType: 'NUMBER', flag: '-F', declared: 'Float!' },
+  text: { dataType: 'TEXT', flag: '-f', declared: 'String!' },
+});
+
+/** The value `field` holds after a set of `raw` under `key`, or why the fake refuses it. */
+function setValue(field: HeldField, key: string, raw: string): string | number | { readonly refusal: string } {
+  if (key === 'number') {
+    const number = Number(raw);
+    return Number.isFinite(number)
+      ? number
+      : { refusal: `the number ${JSON.stringify(raw)} is not a number` };
+  }
+  if (key === 'text') return raw;
+  const option = [...field.optionIds].find(([, id]) => id === raw);
+  return option?.[0] ?? { refusal: `"${field.name}" has no option of id ${JSON.stringify(raw)}` };
+}
+
+/** `items` with its `index`th item replaced by `item`. */
+function replaceAt(items: readonly FakeProjectItem[], index: number, item: FakeProjectItem): readonly FakeProjectItem[] {
+  return items.map((held, at) => (at === index
+    ? item
+    : held));
+}
+
+/** `items` after the write `match` names, or why the fake refuses it; see the module note. */
+function applyFieldWrite(
+  project: FakeProject,
+  items: readonly FakeProjectItem[],
+  match: RegExpMatchArray,
+  call: { readonly query: string; readonly fields: CallFields },
+): readonly FakeProjectItem[] | string {
+  const [, alias = '', mutation = '', itemVar = '', fieldVar = '', key, valueVar = ''] = match;
+  const itemId = call.fields.get(itemVar)?.value;
+  const index = items.findIndex((_, at) => fakeItemId(project, at) === itemId);
+  const field = heldFields(project).find(({ id }) => id === call.fields.get(fieldVar)?.value);
+  if (index < 0 || field === undefined) return `${alias} names an item or field the project does not hold`;
+  const item = items[index] ?? {};
+  const values = Object.fromEntries(Object.entries(item.values ?? {}).filter(([name]) => name !== field.name));
+  if (mutation === 'clearProjectV2ItemFieldValue') return replaceAt(items, index, { ...item, values });
+  const expected = VALUE_KEYS[key ?? ''];
+  const raw = call.fields.get(valueVar);
+  if (expected === undefined || raw === undefined) return `${alias} sets no value`;
+  if (expected.dataType !== field.dataType) return `${alias} sets ${key ?? ''} on "${field.name}", a ${field.dataType} field`;
+  if (raw.flag !== expected.flag || !call.query.includes(`$${valueVar}: ${expected.declared}`)) {
+    return `${alias} sends its ${key ?? ''} with ${expected.flag}, declared ${expected.declared}`;
+  }
+  const value = setValue(field, key ?? '', raw.value);
+  if (typeof value === 'object') return `${alias}: ${value.refusal}`;
+  return replaceAt(items, index, { ...item, values: { ...values, [field.name]: value } });
+}
+
 /** Makes the fake; see the module note. */
 export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakeProjectGh {
   let projects: readonly FakeProject[] = options.projects ?? [];
@@ -282,6 +372,7 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
   let links: ReadonlyMap<string, readonly string[]> = new Map();
   const recorded: (readonly string[])[] = [];
   let failure: string | null = null;
+  let writeRequests = 0;
 
   const projectById = (id: string | undefined): FakeProject | undefined => projects.find((held) => fakeProjectId(held) === id);
 
@@ -345,9 +436,25 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
     return ok({ addProjectV2ItemById: { item: { id: fakeItemId(next, items.length) } } });
   };
 
+  const answerFieldWrites = (query: string, fields: CallFields): GhResult => {
+    if (options.rateLimitAfter !== undefined && writeRequests >= options.rateLimitAfter) return rateLimited();
+    const project = projectById(fields.get('project')?.value);
+    if (project === undefined) return refused(`the field writes name a project the fake does not hold: ${fields.get('project')?.value ?? ''}`);
+    const matches = [...query.matchAll(FIELD_WRITE)];
+    if (matches.length === 0) return refused('the field writes hold no write of the recorded shape');
+    const applied = matches.reduce<readonly FakeProjectItem[] | string>((items, match) => (typeof items === 'string'
+      ? items
+      : applyFieldWrite(project, items, match, { query, fields })), project.items ?? []);
+    if (typeof applied === 'string') return refused(applied);
+    writeRequests += 1;
+    replaceProject(project, { ...project, items: applied });
+    return ok(Object.fromEntries(matches.map((match) => [match[1] ?? '', { projectV2Item: { id: fields.get(match[3] ?? '')?.value } }])));
+  };
+
   /** The mutation or id lookup `query` asks, or null when it is none of them. */
-  const answerWrite = (query: string, fields: ReadonlyMap<string, { readonly flag: string; readonly value: string }>): GhResult | null => {
+  const answerWrite = (query: string, fields: CallFields): GhResult | null => {
     const value = (name: string): string => fields.get(name)?.value ?? '';
+    if (query.includes('updateProjectV2ItemFieldValue(') || query.includes('clearProjectV2ItemFieldValue(')) return answerFieldWrites(query, fields);
     if (query.includes('copyProjectV2(')) return answerCopy(value('template'), value('owner'), value('title'));
     if (query.includes('linkProjectV2ToRepository(')) return answerLink(value('project'), value('repository'));
     if (query.includes('addProjectV2ItemById(')) return answerAddItem(value('project'), value('content'));
