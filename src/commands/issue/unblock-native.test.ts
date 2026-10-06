@@ -20,7 +20,9 @@
  *    setting `labels` explicitly: the same output and the same `gh`
  *    calls, the edit included.
  */
+import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
+import type { ProjectRefresh } from '../../board/project/refresh.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -33,7 +35,7 @@ import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import { NATIVE_UNBLOCK_LINE, nativeUnblockReport } from './unblock-native.js';
+import { NATIVE_UNBLOCK_LINE, nativeUnblockReport, refreshNativeUnblock } from './unblock-native.js';
 import { createIssueUnblockCommand, UNBLOCK_USAGE } from './unblock.js';
 
 /** A temporary directory of this file's own. */
@@ -100,6 +102,11 @@ interface Run {
 
 /** Dispatches `rafa issue unblock <words>` under `mode`, on a terminal answering yes. */
 async function unblock(mode: string | null, words: readonly string[]): Promise<Run> {
+  return unblockWith(mode, words);
+}
+
+/** {@link unblock} over a `board.relationships` value spelled as given, which may carry the board's other keys. */
+async function unblockWith(mode: string | null, words: readonly string[]): Promise<Run> {
   const gh = fakeGh();
   const asked: string[] = [];
   let opened = 0;
@@ -192,5 +199,87 @@ describe('rafa issue unblock with a config it cannot use', () => {
     expect([run.exitCode, run.stdout, run.calls, run.opened]).toEqual([1, '', [], 0]);
     expect(run.stderr).toContain('❌ The config cannot be used:');
     expect(run.stderr).toContain('board.relationships');
+  });
+});
+
+/** A refresh config with `board.project.number` set to `number`. */
+function refreshConfig(number: number | null): NativeUnblockRefreshOptions['config'] {
+  return {
+    boardProjectNumber: number,
+    boardRelationships: 'native',
+    roadmapIssue: null,
+    releaseFragments: '.changes',
+  } as unknown as NativeUnblockRefreshOptions['config'];
+}
+
+/** What one {@link refreshNativeUnblock} call sent and warned. */
+async function refreshRun(
+  issues: readonly number[] | null,
+  number: number | null,
+  answer: () => Promise<ProjectRefresh>,
+): Promise<{ asked: readonly (readonly number[])[]; opened: number; warned: readonly string[] }> {
+  const asked: (readonly number[])[] = [];
+  const warned: string[] = [];
+  let opened = 0;
+  await refreshNativeUnblock(issues, {
+    config: refreshConfig(number),
+    openGh: () => {
+      opened += 1;
+      return fakeGh().run;
+    },
+    warn: (line) => {
+      warned.push(line);
+    },
+    refresh: (_options, refreshed) => {
+      asked.push(refreshed);
+      return answer();
+    },
+    failedLine: (issue, error) => `The project was not updated for #${String(issue)}: ${(error as Error).message}. Run rafa board sync.`,
+  });
+  return { asked, opened, warned };
+}
+
+/** A refresh answering `warnings`. */
+function answering(warnings: readonly string[]): () => Promise<ProjectRefresh> {
+  return () => Promise.resolve({ kind: 'skipped', reason: 'no-issues', warnings });
+}
+
+describe('the native-mode project refresh', () => {
+  it('opens no runner and refreshes nothing with board.project.number unset', async () => {
+    const run = await refreshRun([12], null, answering([]));
+
+    expect([run.asked, run.opened, run.warned]).toEqual([[], 0, []]);
+  });
+
+  it('refreshes nothing under --all, which names no issue', async () => {
+    const run = await refreshRun(null, 6, answering([]));
+
+    expect([run.asked, run.opened]).toEqual([[], 0]);
+  });
+
+  it('control: refreshes the named issue with the number set, handing each line to warn', async () => {
+    const run = await refreshRun([12], 6, answering(['the project was not updated']));
+
+    expect([run.asked, run.opened, run.warned]).toEqual([[[12]], 1, ['the project was not updated']]);
+  });
+
+  it('answers a refresh that rejects with the failed line, never rejecting', async () => {
+    const run = await refreshRun([12], 6, () => Promise.reject(new Error('repo view refused')));
+
+    expect(run.warned).toHaveLength(1);
+    expect(run.warned[0]).toContain('The project was not updated for #12: repo view refused.');
+    expect(run.warned[0]).toContain('rafa board sync');
+  });
+
+  it('runs from the command: with the number set, the line printed, then a refresh warning, exit 0', async () => {
+    const run = await unblockWith('native\n  project:\n    number: 6', ['12']);
+
+    const lines = run.stdout.split('\n');
+
+    expect([run.exitCode, run.asked, run.opened]).toEqual([0, [], 1]);
+    expect(lines[0]).toBe(NATIVE_UNBLOCK_LINE);
+    expect(lines[1]).toStartWith('warn: The project was not updated for #12');
+    expect(run.calls[0]?.slice(0, 2)).toEqual(['repo', 'view']);
+    expect(run.calls.some((args) => args[1] === 'edit')).toBe(false);
   });
 });

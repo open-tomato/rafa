@@ -21,7 +21,8 @@
  *
  * The `epic` actions build their own boards and are refreshed through
  * their own helper, and native-mode `issue unblock` writes no label
- * through a board, so neither is built here.
+ * through a board and refreshes through `refreshNativeUnblock`
+ * (`src/commands/issue/unblock-native.ts`), so neither is built here.
  *
  * ## The write first, then the refresh
  *
@@ -87,6 +88,17 @@ export interface RefreshingGhIssueBoardOptions {
   readonly warn?: ProjectWarn;
   /** The pause between two write requests; `Bun.sleep` when left out. */
   readonly sleep?: RefreshOptions['sleep'];
+}
+
+/**
+ * {@link refreshProjectItems}, for a caller that refreshes with no board
+ * write (native-mode `rafa issue unblock`). Reached through this module
+ * so the caller adds no import of `./refresh.ts`: imported from a module
+ * this directory's import cycle loads, that import reads `./port.ts`'s
+ * bindings before they are initialized.
+ */
+export function refreshIssueItems(options: RefreshOptions, issues: readonly number[]): Promise<ProjectRefresh> {
+  return refreshProjectItems(options, issues);
 }
 
 /** The line a refresh that rejected after `issue` was labelled is answered as. */

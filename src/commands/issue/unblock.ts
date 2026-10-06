@@ -119,8 +119,9 @@
  * Under `board.relationships: native` a blocker is GitHub's blocked-by
  * link, which the tracker clears when the blocking issue closes. The
  * command reads the line, so a refused line is refused in both modes,
- * then prints `./unblock-native.ts`'s one line, sends no `gh` call and
- * exits 0. Everything above is the labels mode, the default.
+ * then prints `./unblock-native.ts`'s one line, sends no board call,
+ * refreshes the named issue on the project when `board.project.number`
+ * is set, and exits 0. Everything above is the labels mode, the default.
  *
  * ## Nothing here spawns
  *
@@ -129,6 +130,7 @@
  * `./unblock.test.ts` drives a recorded runner and a scripted prompter
  * and none of them reaches GitHub, spawns `gh` or waits on an answer.
  */
+import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { BlockedReading } from '../../board/blocked.js';
 import type { IssueBoard } from '../../board/issue-board.js';
@@ -140,7 +142,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
-import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
+import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
@@ -148,7 +150,7 @@ import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 import { plural } from '../plan/plan-files.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
-import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, unblockRelationshipsMode } from './unblock-native.js';
+import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';
 
 /** The usage line a refusal names. */
 export const UNBLOCK_USAGE = 'rafa issue unblock [<n>] [--all]';
@@ -690,6 +692,21 @@ function writeReport(context: RafaContext, report: UnblockReport): void {
   if (report.unchecked !== null) context.output.warn(report.unchecked);
 }
 
+/** The native-mode refresh's config, runner and warn, from `context` and `seams`. */
+function nativeRefreshOptions(context: RafaContext, seams: UnblockSeams): NativeUnblockRefreshOptions {
+  const openGh = seams.openGh ?? ((dir: string): GhRunner => createGhRunner({ cwd: dir }));
+  return {
+    // Its warnings dropped, as `unblockRelationshipsMode` drops them.
+    config: issueSubjectConfig(issueProject(context), () => undefined),
+    openGh: () => openGh(projectRoot(context)),
+    warn: (message) => {
+      context.output.warn(message);
+    },
+    refresh: refreshIssueItems,
+    failedLine: refreshFailedWarning,
+  };
+}
+
 /** The command, reading the board with `seams`; see the module note. */
 export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_SEAMS): RafaCommand {
   const command: RafaCommand = {
@@ -732,10 +749,11 @@ export function createIssueUnblockCommand(seams: UnblockSeams = DEFAULT_UNBLOCK_
     ],
     outputs: ['text', 'json'],
     run: async (context) => {
-      readUnblockLine(context);
+      const line = readUnblockLine(context);
       if (unblockRelationshipsMode(issueProject(context)) === 'native') {
         if (context.outputMode === 'json') context.output.result(nativeUnblockReport());
         else context.output.info(NATIVE_UNBLOCK_LINE);
+        await refreshNativeUnblock(line.issues, nativeRefreshOptions(context, seams));
         return;
       }
       const report = await unblockIssues(context, seams);
