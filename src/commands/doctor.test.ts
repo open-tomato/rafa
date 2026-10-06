@@ -369,7 +369,7 @@ const PASSED: ProbeRun = { exitCode: 0, stderr: '', timedOut: false };
 /** The probe of `item`, which every automatic item carries. */
 function probeOf(item: PrerequisiteItem): string {
   const { probe } = item;
-  if (probe === undefined) throw new Error(`${item.name} carries no probe`);
+  if (probe === undefined || probe === null) throw new Error(`${item.name} carries no probe`);
   return probe;
 }
 
@@ -1098,7 +1098,7 @@ describe('json mode', () => {
 
     expect(run.exitCode).toBe(0);
     expect(events.filter((event) => event.type === 'log').map((event) => (event as { message?: string }).message))
-      .toContain(warning);
+      .toContain(warning as string);
     expect(result?.data?.previousCopies).toEqual({ count: 51, warning });
   });
 

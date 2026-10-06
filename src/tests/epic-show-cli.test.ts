@@ -143,7 +143,7 @@ function plant(): ScratchRepo {
 
 /** A capture as the move promised to keep it; see the module note. */
 interface View {
-  readonly exitCode: number;
+  readonly exitCode: number | null;
   readonly stderr: string;
   /** Every stdout line above the table's header. */
   readonly head: readonly string[];

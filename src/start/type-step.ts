@@ -23,9 +23,10 @@
  * `tsc` reads the files through a scratch tsconfig written OUTSIDE the
  * tree: it `extends` the tree's `tsconfig.json` by absolute path, lists
  * the files by absolute path under `files`, sets `include` to `[]`, and
- * names `<tree>/node_modules/@types` absolutely under `typeRoots`; the
- * run is `<checkout>/node_modules/.bin/tsc -p <scratch> --noEmit
- * --pretty false` with the tree as its cwd ({@link scratchTsconfig}).
+ * names `<modules>/@types` absolutely under `typeRoots`; the run is
+ * `<modules>/.bin/tsc -p <scratch> --noEmit --pretty false` with the
+ * tree as its cwd ({@link scratchTsconfig}). `<modules>` is the
+ * `node_modules` {@link findNodeModules} walks up to, below.
  * Each part was measured on tsc 5.9.3: a bare `tsconfig.json` under
  * `extends` is looked up as a package, so tsc reports `TS6053: File
  * 'tsconfig.json' not found` on the scratch file and checks under its
@@ -36,8 +37,19 @@
  * Only errors in the listed files are read: an error tsc reports in a
  * module a test imports is `check-types`'s to report.
  *
+ * `<modules>` is found by walking up from the checkout to the first
+ * directory holding `node_modules/.bin/tsc`, the checkout itself first,
+ * as `bun` and `tsc` resolve imports. A loop's worktree under
+ * `.rafa/worktrees/` holds no `node_modules` of its own, so the walk
+ * reaches the main checkout's. It stops at the parent of `git rev-parse
+ * --path-format=absolute --git-common-dir`, the main checkout's root, so
+ * a `node_modules` above the repository is never used. When git does not
+ * answer, or the checkout is not under that root, only the checkout is
+ * looked at. When the walk finds none, `<modules>` is the checkout's
+ * `node_modules`, and the spawn fails as the table below says.
+ *
  * The base is a detached worktree of `<base>` in a temporary directory,
- * its `node_modules` a symlink to the checkout's, so a test file at the
+ * its `node_modules` a symlink to `<modules>`, so a test file at the
  * base is checked against the modules it imported then, not against the
  * task's. It is made only when a file with an error at HEAD existed at
  * the base, and removed with `git worktree remove --force` after the
@@ -72,7 +84,7 @@
  * | `tsc` cannot be spawned | warns, runs nothing |
  * | the base worktree cannot be made, or tsc cannot run in it | warns, never red |
  *
- * The fourth is a checkout with no `node_modules/.bin/tsc`: measured on
+ * The fourth is a walk that found no `node_modules/.bin/tsc`: measured on
  * bun 1.3, `Bun.spawn` throws `ENOENT: no such file or directory,
  * posix_spawn '<path>'`. None of these is red: each says the step has
  * nothing to compare, and none says the task added an error.
@@ -95,9 +107,9 @@
  */
 import type { GitRunner } from '../pr/index.js';
 
-import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../config-sections.js';
@@ -111,6 +123,12 @@ export const TSC_FLAGS: readonly string[] = ['--noEmit', '--pretty', 'false'];
 
 /** How many errors the blocker and the run output list before they count the rest. */
 export const ERRORS_LISTED = 10;
+
+/** The directory the walk looks for, and the step's modules come from. */
+const NODE_MODULES = 'node_modules';
+
+/** Where tsc sits under a `node_modules`. */
+const TSC_BIN: readonly string[] = ['.bin', 'tsc'];
 
 /** The scratch tsconfig's file name. */
 const SCRATCH_NAME = 'tsconfig.json';
@@ -249,12 +267,55 @@ export function readTypeFiles(git: GitRunner, base: string): readonly TypeFile[]
   return files;
 }
 
-/** The scratch tsconfig over `files` (relative to `tree`); see the module note. */
-export function scratchTsconfig(tree: string, files: readonly string[]): string {
+/** `path` with its symlinks resolved, or resolved alone when it does not exist. */
+function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/** The root the walk stops at: the parent of git's common dir, or null when git does not answer. */
+function walkStop(git: GitRunner): string | null {
+  const result = git(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  const common = result.stdout.trim();
+  return result.ok && common !== ''
+    ? dirname(realPath(common))
+    : null;
+}
+
+/** True when `dir` is `root` or below it. */
+function isUnder(dir: string, root: string): boolean {
+  return dir === root || dir.startsWith(root.endsWith(sep)
+    ? root
+    : `${root}${sep}`);
+}
+
+/**
+ * The `node_modules` of the first directory from `checkout` up that holds
+ * `node_modules/.bin/tsc`, stopping at the parent of git's common dir;
+ * null when none does. See the module note.
+ */
+export function findNodeModules(checkout: string, git: GitRunner): string | null {
+  const start = realPath(checkout);
+  const stop = walkStop(git);
+  const top = stop !== null && isUnder(start, stop)
+    ? stop
+    : start;
+  for (let dir = start; ; dir = dirname(dir)) {
+    const modules = join(dir, NODE_MODULES);
+    if (existsSync(join(modules, ...TSC_BIN))) return modules;
+    if (dir === top || dirname(dir) === dir) return null;
+  }
+}
+
+/** The scratch tsconfig over `files` (relative to `tree`), its types from `modules`; see the module note. */
+export function scratchTsconfig(tree: string, files: readonly string[], modules: string): string {
   const root = resolve(tree);
   return `${JSON.stringify({
     extends: join(root, 'tsconfig.json'),
-    compilerOptions: { typeRoots: [join(root, 'node_modules', '@types')] },
+    compilerOptions: { typeRoots: [join(resolve(modules), '@types')] },
     files: files.map((file) => join(root, file)),
     include: [],
   }, null, 2)}\n`;
@@ -349,13 +410,13 @@ function firstLine(run: TypeRunResult): string | undefined {
     .find((line) => line !== '');
 }
 
-/** Runs tsc over `files` of `tree` through a scratch tsconfig; see the module note. */
-async function checkTree(input: TypeStepInput, tree: string, files: readonly string[]): Promise<TreeRun> {
+/** Runs `<modules>/.bin/tsc` over `files` of `tree` through a scratch tsconfig; see the module note. */
+async function checkTree(input: TypeStepInput, modules: string, tree: string, files: readonly string[]): Promise<TreeRun> {
   const scratchDir = mkdtempSync(join(tmpdir(), 'rafa-type-step-'));
   const scratch = join(scratchDir, SCRATCH_NAME);
   try {
-    writeFileSync(scratch, scratchTsconfig(tree, files), 'utf8');
-    const tsc = join(resolve(input.checkout), 'node_modules', '.bin', 'tsc');
+    writeFileSync(scratch, scratchTsconfig(tree, files, modules), 'utf8');
+    const tsc = join(modules, ...TSC_BIN);
     let run: TypeRunResult;
     try {
       run = await (input.runTypes ?? runTsc)({ cwd: tree, argv: [tsc, '-p', scratch, ...TSC_FLAGS] });
@@ -374,8 +435,8 @@ async function checkTree(input: TypeStepInput, tree: string, files: readonly str
   }
 }
 
-/** Runs `check` in a detached worktree of the base, removed after; null with a warning when it cannot be made. */
-async function inBaseTree(input: TypeStepInput, label: string, check: (tree: string) => Promise<TreeRun>): Promise<TreeRun | null> {
+/** Runs `check` in a detached worktree of the base, its `node_modules` linked to `modules`, removed after; null with a warning when it cannot be made. */
+async function inBaseTree(input: TypeStepInput, label: string, modules: string, check: (tree: string) => Promise<TreeRun>): Promise<TreeRun | null> {
   const parent = mkdtempSync(join(tmpdir(), 'rafa-type-base-'));
   const tree = join(parent, 'tree');
   try {
@@ -384,8 +445,7 @@ async function inBaseTree(input: TypeStepInput, label: string, check: (tree: str
       activeOutput().warn(`⚠️  The ${label} could not check out ${input.base} (${gitSaid(added) || 'nothing said'}); it reads no error as new.`);
       return null;
     }
-    const modules = join(resolve(input.checkout), 'node_modules');
-    if (existsSync(modules) && !existsSync(join(tree, 'node_modules'))) symlinkSync(modules, join(tree, 'node_modules'));
+    if (existsSync(modules) && !existsSync(join(tree, NODE_MODULES))) symlinkSync(modules, join(tree, NODE_MODULES));
     if (!existsSync(join(tree, 'tsconfig.json'))) return { kind: 'read', errors: [] };
     return await check(tree);
   } finally {
@@ -398,10 +458,10 @@ async function inBaseTree(input: TypeStepInput, label: string, check: (tree: str
 }
 
 /** The base's errors keyed by HEAD path, or the outcome that ends the step. */
-async function baseErrors(input: TypeStepInput, label: string, files: readonly TypeFile[]): Promise<BaseReading> {
+async function baseErrors(input: TypeStepInput, label: string, modules: string, files: readonly TypeFile[]): Promise<BaseReading> {
   const pairs = files.filter((file): file is TypeFile & { base: string } => file.base !== null);
   if (pairs.length === 0) return { errors: [] };
-  const run = await inBaseTree(input, label, (tree) => checkTree(input, tree, pairs.map((file) => file.base)));
+  const run = await inBaseTree(input, label, modules, (tree) => checkTree(input, modules, tree, pairs.map((file) => file.base)));
   if (run === null) return { outcome: GREEN };
   if (run.kind === 'interrupted') return { outcome: interrupted(label) };
   if (run.kind !== 'read') {
@@ -439,7 +499,8 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
   const label = typeLabel(input.task);
   const files = filesToCheck(input, label);
   if (files === null) return NOTHING_RAN;
-  const head = await checkTree(input, input.checkout, files.map((file) => file.head));
+  const modules = findNodeModules(input.checkout, input.git) ?? join(resolve(input.checkout), NODE_MODULES);
+  const head = await checkTree(input, modules, input.checkout, files.map((file) => file.head));
   if (head.kind === 'threw') {
     activeOutput().warn(`⚠️  The ${label} could not run tsc (${head.why}); the run goes on without it.`);
     return NOTHING_RAN;
@@ -455,10 +516,10 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
     activeOutput().info(`${ran}: no type error.`);
     return GREEN;
   }
-  const base = await baseErrors(input, label, files.filter((file) => head.errors.some((error) => error.file === file.head)));
+  const base = await baseErrors(input, label, modules, files.filter((file) => head.errors.some((error) => error.file === file.head)));
   if ('outcome' in base) return base.outcome;
   const added = newErrors(head.errors, base.errors);
-  activeOutput().info(`${ran}: ${head.errors.length} error(s), ${added.length} not held at ${input.base}.`);
+  activeOutput().info(`${ran}: ${head.errors.length} error(s), ${head.errors.length - added.length} already held at ${input.base}, ${added.length} not held.`);
   for (const line of listed(added)) activeOutput().info(`   ${line}`);
   if (added.length === 0) return GREEN;
   return { ran: true, red: true, interrupted: false, blocker: typeBlockerText(label, input.base, added) };

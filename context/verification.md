@@ -314,8 +314,15 @@ a64ab15c2756104ae685421cbfe063efa2f845a6. The command was:
 false`, with the scratch `tsconfig.json` holding `"extends":
 "<repo>/tsconfig.json"` (absolute path), `"files"` listing every `.test.ts`
 by absolute path, `"include": []`, and `"compilerOptions": { "typeRoots":
-["<repo>/node_modules/@types"] }`. This baseline lets later sweeps compare
-against it and measure progress on the backlog.
+["<repo>/node_modules/@types"] }` (absolute path to the repository root's
+`node_modules`; both `bun` and `tsc` resolve imports by walking up the
+filesystem from the worktree, stopping at the main checkout's top level to
+find the shared `node_modules` there).
+A test type error that existed on the task's base commit is a held error:
+backlog rather than a bug, and not reported as out-of-scope. The type
+step's line in the task session output reports the held error count from
+the base, allowing later sweeps to compare against this baseline and measure
+progress on the backlog.
 
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each

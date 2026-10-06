@@ -25,26 +25,26 @@
  *      the blocker names the new error alone, never the inherited one:
  *      the comparison is the base's errors against HEAD's, not "the file
  *      holds an error".
+ *   4. Run from a worktree nested under the planted checkout (as a loop's
+ *      `.rafa/worktrees/<stub>`), which holds no `node_modules` of its own,
+ *      the step still runs, and reads a new error as red.
  */
 import type { SuiteStepContext } from './suite-step.js';
 import type { SessionStep } from '../loop/sessions.js';
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
+import { realNodeModules } from '../tests/real-node-modules.js';
 
 import { runTaskStep } from './suite-step.js';
-
-/** This repository's root, whose `node_modules` the scratch repository links to. */
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** This file's own test timeout: two `tsc` runs, a worktree and a real `bun test` per case. */
 const CASE_TIMEOUT_MS = 120_000;
@@ -159,7 +159,7 @@ function plant(seed: string): Scratch {
   writeFileSync(join(repo, TEST_FILE), seed, 'utf8');
   git(repo, home, 'add', '-A');
   git(repo, home, 'commit', '-q', '--no-verify', '-m', 'seed');
-  symlinkSync(join(REPO_ROOT, 'node_modules'), join(repo, 'node_modules'));
+  symlinkSync(realNodeModules(), join(repo, 'node_modules'));
 
   const trackerPath = join(root, 'PLAN_TRACKER-type-step.md');
   writeFileSync(trackerPath, TRACKER, 'utf8');
@@ -237,7 +237,7 @@ describe('runTaskStep over a real scratch repository, its type step real', () =>
     expect(outcome.repairInserted).toBe(false);
     expect(readFileSync(scratch.trackerPath, 'utf8')).toBe(TRACKER);
     // The inherited error was seen, and read as not new: not a step that ran nothing.
-    expect(lines.some((line) => line.includes('1 error(s), 0 not held at'))).toBe(true);
+    expect(lines.some((line) => line.includes('1 error(s), 1 already held at'))).toBe(true);
   }, CASE_TIMEOUT_MS);
 
   it('is red on the new error alone when the same edit also adds a second, different error', async () => {
@@ -249,5 +249,22 @@ describe('runTaskStep over a real scratch repository, its type step real', () =>
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toContain('TS2322 Type \'number\' is not assignable to type \'boolean\'.');
     expect(outcome.blocker).not.toContain(INHERITED_ERROR);
+  }, CASE_TIMEOUT_MS);
+
+  it('runs from a worktree nested under a checkout holding node_modules, and reads a new error as red', async () => {
+    const scratch = plant(CLEAN);
+    const worktree = join(scratch.repo, '.rafa', 'worktrees', 'stub');
+    git(scratch.repo, scratch.home, 'worktree', 'add', '-q', '-b', 'task', worktree, scratch.base);
+    expect(existsSync(join(worktree, 'node_modules'))).toBe(false);
+    const nested: Scratch = { ...scratch, repo: worktree };
+    commitTask(nested, CLEAN_PLUS_ERROR);
+
+    const outcome = await runStep(nested);
+
+    // The step ran (found the checkout's tsc through the walk) rather than running nothing.
+    expect(lines.some((line) => line.includes('could not run tsc'))).toBe(false);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`${TEST_FILE}:6:7 TS2322 ${INHERITED_ERROR}`);
+    expect(outcome.blocker).toContain('type step after');
   }, CASE_TIMEOUT_MS);
 });

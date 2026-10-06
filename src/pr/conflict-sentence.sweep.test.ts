@@ -106,7 +106,7 @@ describe('the wrap-up prompt as a reader', () => {
     const firstLine = prompt.split('\n')[0] ?? '';
 
     expect(shape?.prefix).toBeTruthy();
-    expect(firstLine).toBe(shape?.prefix);
+    expect(firstLine).toBe(shape?.prefix as string);
     expect(firstLine).not.toContain('MECHANICAL');
   });
 });
