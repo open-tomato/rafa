@@ -47,10 +47,11 @@ instead of the gate's, and `${PIPESTATUS[0]}` prints empty on zsh. Polls
 waste time when the runner will record the same gate later as a real
 step anyway.
 
-The full-suite scripts treat the workspace packages apart: `check-types` runs
-`tsc` over the root, then each `packages/*/src/` with its tests
-included; `bun run lint` ignores `packages/` whole, so package code is
-never linted.
+The full-suite scripts treat the workspace packages apart only for
+types: `check-types` runs `tsc` over the root, then each
+`packages/*/src/` with its tests included. `bun run lint` lints package
+code from the root config as it lints `src/`, so a changed package file
+belongs in the scoped `bunx eslint <changed files>` run too.
 
 **Runner recorded steps** (full suite, recorded at fixed points):
 - `baseline` — Full suite once at plan start (first dispatch)
@@ -211,12 +212,17 @@ recorded step.
 
 **An ESLint run that touches only ignored files prints "File ignored"
 warnings and must not read as red.** The root `eslint.config.mjs` ignores
-`packages/**`, and a diff touching only files under that tree produces
-warnings on stdout, but the exit code is still 0. Both the warnings and
-the pass are correct: the files are ignored (no error), and the tool's
-success is not blocked. When reading the exit code immediately with `$?`,
-capture both stdout and stderr to a file first, so the task step captures
-the warnings in the gate output without reading them as a failure.
+`.claude/**`, `.rafa/**`, `.tmp/**` and `.docs/**`, and no config block
+matches `.yml` or hook files. A run over only such files prints `File
+ignored because of a matching ignore pattern` or `File ignored because
+no matching configuration was supplied` as warnings on stdout, and still
+exits 0 (measured on ESLint 9.39.5). Both the warnings and the pass are
+correct: the files are ignored (no error), and the tool's success is not
+blocked. When reading the exit code immediately with `$?`, capture both
+stdout and stderr to a file first, so the task step captures the
+warnings in the gate output without reading them as a failure. Files
+under `packages/` are not ignored: they are linted like `src/`, and a
+package file breaking a rule reads red.
 
 **The runner's lint step tells "could not run ESLint" from "found ESLint
 errors" by the JSON report** (`src/start/lint-step.ts`). A nonzero exit
