@@ -40,7 +40,7 @@ import type { GitRunner } from '../pr/index.js';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -51,6 +51,7 @@ import { createGitRunner } from '../pr/index.js';
 import { REMOTE } from '../start/branch-decision.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-loop-start-claim-spawned-')));
@@ -131,9 +132,7 @@ function plantDevice(originPath: string, label: string, storeId: string): Scratc
   plantProjectConfig(repo, CONFIG);
   mintDeviceStore(repo, storeId);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** Writes and commits `SPEC_FILE` at `scratch`'s repository root. */

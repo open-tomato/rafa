@@ -50,7 +50,7 @@ import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -61,6 +61,7 @@ import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once its one case has run. */
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-loop-wrap-up-claim-lost-spawned-')));
@@ -140,9 +141,7 @@ function plantDevice(originPath: string, dir: string, label: string, storeId: st
   plantProjectConfig(repo, CONFIG);
   mintDeviceStore(repo, storeId);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /**
