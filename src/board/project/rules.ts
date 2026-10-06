@@ -51,6 +51,35 @@
  * members. An epic read off a failed listing (`unknown`) has no counts to
  * show and gets null, as does an issue that is no epic.
  *
+ * ## Rank
+ *
+ * {@link ranksOf} numbers the home board's order, 1 first, as `rafa
+ * roadmap` and `rafa epic show` read it: each line of the board, in the
+ * order `parseRoadmapBody` (`../roadmap.ts`) answers them, takes the
+ * next number, and a line naming an epic is followed at once by that
+ * epic's members, then the board's next line. The members are taken in
+ * the order {@link epicLines} (`../epic-walk.ts`) spells, the one the
+ * walk reads and `rafa epic show` prints: in `labels` mode the epic's
+ * checklist, then its open members missing from it by ascending number.
+ *
+ * Ticked items keep their Rank, so finishing one shifts no number below
+ * it: every board line and every checklist line is numbered, ticked or
+ * not. In `native` mode nothing is ticked and the epic's sub-issue order
+ * is its checklist, so every sub-issue `readEpics` hands over is
+ * numbered, closed ones included, in that order: `epicLines` drops the
+ * closed ones because the walk has no use for them, and taking its lines
+ * as they are would renumber the rest each time a sub-issue closed. A
+ * `labels`-mode member closed while missing from the checklist sits on no
+ * line and has no Rank, as the spec words it.
+ *
+ * An issue on no line has none: {@link rankOf} answers null for it. An
+ * issue named on two lines keeps the Rank of the first, and its second
+ * line takes no number, so the numbers run without a gap. Only the
+ * board's own lines are opened: an epic named on another epic's checklist
+ * takes one number and its own members are not read there, as the walk
+ * descends one level only. A board line naming an issue `epics` does not
+ * hold — no epic, or one the listing left out — takes one number.
+ *
  * The label names are imported from the modules that own them, never
  * spelled again here. `needs-triage` and `spec:blocked` are the github
  * tracker's (`GITHUB_LABELS`): the board's own `SPEC_BLOCKED_LABEL` sits
@@ -63,11 +92,13 @@ import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { Epic } from '../epics.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { Horizon } from '../roadmap-epic-rows.js';
+import type { RoadmapLine } from '../roadmap.js';
 
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
 import { EPIC_TYPE_LABEL } from '../epic-context.js';
 import { HORIZON_LABEL_PREFIX } from '../epic-problems.js';
+import { epicLines } from '../epic-walk.js';
 import { NOT_PLANNED_REASON } from '../epics.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../gate.js';
 import { SPEC_READY_LABEL } from '../readiness.js';
@@ -251,4 +282,47 @@ export function progressTextOf(epic: Pick<Epic, 'state' | 'progress'> | null): s
   const { done, total } = epic.progress;
 
   return `${String(done)} / ${String(total)}`;
+}
+
+/** What the Rank rule reads: the home board's lines and the epics read off the listing. */
+export interface RankFacts {
+  /** The home board's lines, every one, ticked included, as `parseRoadmapBody` reads them. */
+  readonly lines: readonly RoadmapLine[];
+  /** The epics `readEpics` or `readListedEpics` read off the board listing, in either mode. */
+  readonly epics: readonly Epic[];
+}
+
+/**
+ * The listing row `epicLines` numbers its label-only lines past; Rank
+ * reads which issue each line names and never its line number.
+ */
+const UNREAD_ROW: Pick<BoardIssue, 'body'> = Object.freeze({ body: '' });
+
+/** `epic`'s members in Rank order; the module note holds why `native` mode keeps the closed ones. */
+function memberOrder(epic: Epic): readonly number[] {
+  return epic.order === 'sub-issues'
+    ? epic.members.map(({ number }) => number)
+    : epicLines(epic, UNREAD_ROW).lines.map(({ issue }) => issue);
+}
+
+/**
+ * Every ranked issue's Rank, by issue number, 1 first: the home board's
+ * lines in order, each epic's members right after it. See the module note.
+ */
+export function ranksOf(facts: RankFacts): ReadonlyMap<number, number> {
+  const epics = new Map(facts.epics.map((epic) => [epic.number, epic]));
+  const order = facts.lines.flatMap(({ issue }) => {
+    const epic = epics.get(issue);
+
+    return epic === undefined
+      ? [issue]
+      : [issue, ...memberOrder(epic)];
+  });
+
+  return new Map([...new Set(order)].map((issue, index) => [issue, index + 1]));
+}
+
+/** The Rank of issue `issue` in `ranks`, or null for an issue on no line. */
+export function rankOf(ranks: ReadonlyMap<number, number>, issue: number): number | null {
+  return ranks.get(issue) ?? null;
 }
