@@ -6,11 +6,13 @@
  * `git fetch --prune` when asked, `./branches.ts` for the listable
  * branches, `./groups.ts` for Merged, Stale and Not pushed, and
  * `./worktrees.ts` for the worktrees, told which branches are in Merged
- * so a clean worktree on one starts ticked. {@link cleanupCounts} is the
- * number of rows in each group, which `rafa doctor` and the later
- * `rafa status` print. Like every module here it prints nothing and
- * deletes nothing; `./steps.ts`, re-exported below, builds and runs the
- * removals.
+ * so a clean worktree on one starts ticked, and last `./runs.ts` for the
+ * run records under the project's `.rafa/runs/`. {@link cleanupCounts} is
+ * the number of rows in each branch group and in Worktrees, which
+ * `rafa doctor` and `rafa status` print; the run records are listed for
+ * `rafa cleanup` alone and are not counted there. Like every module here
+ * it prints nothing and deletes nothing; `./steps.ts`, re-exported below,
+ * builds and runs the removals.
  *
  * ## The fetch
  *
@@ -34,6 +36,7 @@
  * an unreachable one into a note.
  */
 import type { BranchGroups } from './groups.js';
+import type { RunRow, RunSeams } from './runs.js';
 import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
 import type { PullRequests } from '../pr/types.js';
 
@@ -41,6 +44,7 @@ import { gitSaid } from '../pr/git.js';
 
 import { readBranches } from './branches.js';
 import { classifyBranches, readProviderMerges } from './groups.js';
+import { readRunRecords } from './runs.js';
 import { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 export type {
@@ -63,7 +67,9 @@ export type {
   ProviderMerges,
   StaleRow,
 } from './groups.js';
+export type { RunRow, RunSeams, RunsReading } from './runs.js';
 export type {
+  CleanupFiles,
   CleanupOutcome,
   CleanupPlan,
   CleanupSelection,
@@ -88,11 +94,13 @@ export {
   MERGED_STATE_UNKNOWN,
   readProviderMerges,
 } from './groups.js';
+export { readRunRecords } from './runs.js';
 export {
   cleanupCommandLine,
   cleanupSteps,
   dryRunLines,
   forcedFlagRefusal,
+  removeRunStep,
   runCleanupSteps,
 } from './steps.js';
 export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
@@ -100,8 +108,11 @@ export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 /** The argv the remote-tracking branches are refreshed with. Never forced. */
 export const FETCH_PRUNE = Object.freeze(['fetch', '--prune']);
 
-/** What {@link readCleanup} reads through: the worktree seams, and the provider or null. */
-export interface CleanupSeams extends WorktreeSeams {
+/**
+ * What {@link readCleanup} reads through: the worktree seams, the pid
+ * probe the run records are read with, and the provider or null.
+ */
+export interface CleanupSeams extends WorktreeSeams, RunSeams {
   /** The pull request provider, or null when `pr.provider` is `none`. */
   readonly pulls: PullRequests | null;
 }
@@ -124,19 +135,21 @@ export interface CleanupSettings {
   readonly home: string;
   /** The directory the command runs from. */
   readonly cwd: string;
-  /** The project root whose `.rafa/runs/` holds the loop's session records. */
+  /** The project root whose `.rafa/runs/` holds the loop's session records, and the run records listed. */
   readonly projectRoot: string;
   /** `loop.worktreeDir`, resolved from {@link projectRoot}; the loop's worktrees are listed from it. */
   readonly worktreeDir: string;
 }
 
-/** The four groups, and the notes about readings that could not be taken. */
+/** The five groups, and the notes about readings that could not be taken. */
 export interface CleanupRead extends Omit<BranchGroups, 'notes'> {
   /** True when {@link FETCH_PRUNE} ran and git answered success. */
   readonly fetched: boolean;
   /** The listed worktrees, in the order git listed them. */
   readonly worktrees: readonly WorktreeRow[];
-  /** One-line notes: the fetch's first, then the groups'; empty when every reading was taken. */
+  /** The removable run records, oldest first; see `./runs.ts`. */
+  readonly runs: readonly RunRow[];
+  /** One-line notes: the fetch's first, then the groups', then the run records'; empty when every reading was taken. */
   readonly notes: readonly string[];
 }
 
@@ -150,7 +163,7 @@ export interface CleanupUnread {
 /** What {@link readCleanup} answers. Never a rejection. */
 export type CleanupReading = CleanupRead | CleanupUnread;
 
-/** The number of rows in each group. */
+/** The number of rows in each branch group and in Worktrees; the run records are not counted. */
 export interface CleanupCounts {
   readonly merged: number;
   readonly stale: number;
@@ -170,8 +183,10 @@ export function fetchFailedNote(detail: string): string {
 
 /**
  * Every group `rafa cleanup` lists: {@link FETCH_PRUNE} first when
- * `settings.fetch` is true, then the branches, their three groups, and
- * the worktrees with the Merged branches' names.
+ * `settings.fetch` is true, then the branches, their three groups, the
+ * worktrees with the Merged branches' names, and the run records under
+ * `settings.projectRoot`. A run-record directory that cannot be read is
+ * a note, never a failure.
  */
 export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings): Promise<CleanupReading> {
   const notes: string[] = [];
@@ -209,6 +224,7 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
   if (!worktrees.ok) {
     return worktrees;
   }
+  const runs = readRunRecords(settings.projectRoot, seams);
 
   return {
     ok: true,
@@ -218,11 +234,15 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
     stale: groups.stale,
     notPushed: groups.notPushed,
     worktrees: worktrees.worktrees,
-    notes: [...notes, ...groups.notes],
+    runs: runs.runs,
+    notes: [...notes, ...groups.notes, ...runs.notes],
   };
 }
 
-/** How many rows each group of `read` holds. */
+/**
+ * How many rows each branch group and Worktrees of `read` hold, what
+ * `rafa doctor` and `rafa status` print. `read.runs` is left out.
+ */
 export function cleanupCounts(read: CleanupRead): CleanupCounts {
   return {
     merged: read.merged.length,

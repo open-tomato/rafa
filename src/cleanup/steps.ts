@@ -1,7 +1,7 @@
 /**
- * The removal steps of `rafa cleanup` as data: which worktrees and
- * branches the ticked rows turn into, in which order, with which delete
- * flag, and the one runner that spawns them.
+ * The removal steps of `rafa cleanup` as data: which worktrees, branches
+ * and run records the ticked rows turn into, in which order, with which
+ * delete flag, and the one runner that carries them out.
  *
  * `src/pr/worktree.ts` draws the line this module copies: a step is an
  * argv that can be read in a test without a repository, printed as the
@@ -20,6 +20,14 @@
  *      below). A Stale or Not-pushed row is `-D`: the caller hands it
  *      over only once the person ticked it and, for Not pushed, answered
  *      the question naming its commit count.
+ *   3. Last, every ticked run record (`./runs.ts`), `rm <record>
+ *      [<events file>]`: one step per record, removing the record and,
+ *      when the row names one, its events file. An unticked run row is no
+ *      step. The runner does not spawn `rm`: it removes the step's paths
+ *      itself, in argv order, through {@link CleanupFiles}, stopping at
+ *      the first that fails, so the printed line and what ran are the
+ *      same paths. A run record holds no worktree or branch, so these
+ *      steps wait on nothing.
  *
  * A branch a ticked worktree holds is deleted only when it is Merged,
  * and only after that worktree's removal succeeded: its step names the
@@ -61,24 +69,28 @@
  * is the renderer's, not a step.
  */
 import type { MergedRow, NotPushedRow, StaleRow } from './groups.js';
+import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '../pr/git.js';
 
+import { rmSync } from 'node:fs';
+
+import { messageOf } from '../config-sections.js';
 import { gitSaid } from '../pr/git.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
 /** The flag spellings that make a worktree removal or branch delete forced. */
 const FORCING_FLAG = /^(?:--force(?:=.*)?|-[^-]*f[^-]*)$/;
 
-/** Which of the two removals a step is. */
-export type CleanupStepKind = 'remove-worktree' | 'delete-branch';
+/** Which of the three removals a step is. */
+export type CleanupStepKind = 'remove-worktree' | 'delete-branch' | 'remove-run';
 
 /** One step: what it removes, and exactly what it runs. */
 export interface CleanupStep {
   readonly kind: CleanupStepKind;
-  /** The worktree path or the branch name it removes. */
+  /** The worktree path, the branch name or the run record's path it removes. */
   readonly subject: string;
-  /** The whole command, `git` included, ready to spawn or to print. */
+  /** The whole command, `git` or `rm` included, ready to print; see the module note for `rm`. */
   readonly argv: readonly string[];
   /** The worktree whose removal must succeed first, or null. */
   readonly after: string | null;
@@ -102,11 +114,13 @@ export interface CleanupSelection {
   readonly stale: readonly StaleRow[];
   /** The Not-pushed rows the person ticked and confirmed by the second question. */
   readonly notPushed: readonly NotPushedRow[];
+  /** The run-record rows; only the ticked ones become steps. None when left out. */
+  readonly runs?: readonly RunRow[];
 }
 
 /** What {@link cleanupSteps} answers. */
 export interface CleanupPlan {
-  /** Worktree removals first, then branch deletes. */
+  /** Worktree removals first, then branch deletes, then run-record removals. */
   readonly steps: readonly CleanupStep[];
   readonly withheld: readonly WithheldRemoval[];
 }
@@ -114,15 +128,28 @@ export interface CleanupPlan {
 /** How one step ended. Never a throw; see the module note. */
 export interface CleanupOutcome {
   readonly step: CleanupStep;
-  /** True when git was spawned for it. */
+  /** True when git was spawned for it, or the run record's removal was tried. */
   readonly ran: boolean;
-  /** True when git exited 0; false when it was not run at all. */
+  /** True when git exited 0 or every path was removed; false when it was not run at all. */
   readonly ok: boolean;
   /** The step as one line the person can paste. */
   readonly command: string;
-  /** What git said, standard error first, or why it was not run. */
+  /** What git said, standard error first, why a path was not removed, or why it was not run. */
   readonly said: string;
 }
+
+/** How the runner removes a run-record step's files. */
+export interface CleanupFiles {
+  /** Removes the file at `path`; throws when it cannot. */
+  readonly remove: (path: string) => void;
+}
+
+/** The real disk: `rmSync`, never recursive, never forced. */
+export const DEFAULT_CLEANUP_FILES: CleanupFiles = Object.freeze({
+  remove: (path: string) => {
+    rmSync(path);
+  },
+});
 
 /** Freezes a step and the argv inside it. */
 function frozenStep(step: CleanupStep): CleanupStep {
@@ -152,6 +179,22 @@ export function deleteBranchStep(branch: string, forced: boolean, after: string 
     subject: branch,
     argv: ['git', 'branch', flag, branch],
     after,
+  });
+}
+
+/**
+ * The step removing the run record `row` names, and its events file when
+ * the row names one: `rm <record> [<events file>]`, never `-f`.
+ */
+export function removeRunStep(row: RunRow): CleanupStep {
+  const events = row.eventsPath === null
+    ? []
+    : [row.eventsPath];
+  return frozenStep({
+    kind: 'remove-run',
+    subject: row.path,
+    argv: ['rm', row.path, ...events],
+    after: null,
   });
 }
 
@@ -222,8 +265,9 @@ function holders(rows: readonly WorktreeRow[]): ReadonlyMap<string, string> {
 
 /**
  * The steps the ticked rows turn into: worktree removals first, then
- * branch deletes, and every ticked row that is not a step with why; see
- * the module note for the order, the flags and what is withheld.
+ * branch deletes, then the ticked run records, and every ticked row that
+ * is not a step with why; see the module note for the order, the flags
+ * and what is withheld.
  */
 export function cleanupSteps(selection: CleanupSelection): CleanupPlan {
   const removable = selection.worktrees.filter((row) => row.tickable);
@@ -234,6 +278,7 @@ export function cleanupSteps(selection: CleanupSelection): CleanupPlan {
     steps: Object.freeze([
       ...removable.map((row) => removeWorktreeStep(row.path)),
       ...branchEntries.filter(isStep),
+      ...(selection.runs ?? []).filter((row) => row.ticked).map((row) => removeRunStep(row)),
     ]),
     withheld: Object.freeze([
       ...untickable.map((row): WithheldRemoval => ({ kind: 'remove-worktree', subject: row.path, reason: row.reason })),
@@ -278,24 +323,43 @@ function notRun(step: CleanupStep, said: string): CleanupOutcome {
   return { step, ran: false, ok: false, command: cleanupCommandLine(step), said };
 }
 
+/** Removes a run-record step's paths in order, stopping at the first that fails. */
+function removeRun(files: CleanupFiles, step: CleanupStep): CleanupOutcome {
+  const command = cleanupCommandLine(step);
+  for (const path of step.argv.slice(1)) {
+    try {
+      files.remove(path);
+    } catch (error) {
+      return { step, ran: true, ok: false, command, said: `cannot remove ${path}: ${messageOf(error)}` };
+    }
+  }
+  return { step, ran: true, ok: true, command, said: '' };
+}
+
 /** Runs one step, unless the guard or its `after` worktree stops it. */
-function runStep(git: GitRunner, step: CleanupStep, removed: ReadonlySet<string>): CleanupOutcome {
+function runStep(git: GitRunner, files: CleanupFiles, step: CleanupStep, removed: ReadonlySet<string>): CleanupOutcome {
   const refusal = forcedFlagRefusal(step.argv);
   if (refusal !== null) return notRun(step, refusal);
   if (step.after !== null && !removed.has(step.after)) return notRun(step, afterFailedReason(step.after));
+  if (step.kind === 'remove-run') return removeRun(files, step);
   const result = git(step.argv.slice(1));
   return { step, ran: true, ok: result.ok, command: cleanupCommandLine(step), said: gitSaid(result) };
 }
 
 /**
  * Runs `plan`'s steps in order through `git`, a runner made for the
- * repository the command runs in, answering one outcome per step. A
- * failed step does not stop the rest; see the module note.
+ * repository the command runs in, and the run-record steps through
+ * `files`, answering one outcome per step. A failed step does not stop
+ * the rest; see the module note.
  */
-export function runCleanupSteps(git: GitRunner, plan: CleanupPlan): readonly CleanupOutcome[] {
+export function runCleanupSteps(
+  git: GitRunner,
+  plan: CleanupPlan,
+  files: CleanupFiles = DEFAULT_CLEANUP_FILES,
+): readonly CleanupOutcome[] {
   const removed = new Set<string>();
   return plan.steps.map((step) => {
-    const outcome = runStep(git, step, removed);
+    const outcome = runStep(git, files, step, removed);
     if (outcome.ok && step.kind === 'remove-worktree') removed.add(step.subject);
     return outcome;
   });

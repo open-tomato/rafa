@@ -6,12 +6,13 @@
  */
 import type { LocalBranch } from './branches.js';
 import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
-import type { CleanupSelection } from './steps.js';
+import type { RunRow } from './runs.js';
+import type { CleanupFiles, CleanupSelection } from './steps.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,6 +27,7 @@ import {
   dryRunLines,
   forcedFlagRefusal,
   needsForcedDelete,
+  removeRunStep,
   removeWorktreeStep,
   runCleanupSteps,
 } from './steps.js';
@@ -66,6 +68,32 @@ function worktreeRow(path: string, branch: string | null, tickable = true): Work
       ? 'clean'
       : '1 changed file',
   };
+}
+
+/** A run-record row under `/p/.rafa/runs/`, with its events file unless `events` is false. */
+function runRow(sessionId: string, ticked = true, events = true): RunRow {
+  return {
+    sessionId,
+    path: `/p/.rafa/runs/${sessionId}.json`,
+    eventsPath: events
+      ? `/p/.rafa/runs/${sessionId}.events.ndjson`
+      : null,
+    plan: 'demo',
+    startedAt: '2026-09-01T12:00:00.000Z',
+    ticked,
+  };
+}
+
+/** Files that remove nothing, recording every path asked for, and throwing for the paths in `refuse`. */
+function scriptedFiles(refuse: readonly string[] = []): { files: CleanupFiles; removed: string[] } {
+  const removed: string[] = [];
+  const files: CleanupFiles = {
+    remove: (path) => {
+      removed.push(path);
+      if (refuse.includes(path)) throw new Error(`EACCES: permission denied, unlink '${path}'`);
+    },
+  };
+  return { files, removed };
 }
 
 function selection(fields: Partial<CleanupSelection>): CleanupSelection {
@@ -297,6 +325,92 @@ describe('runCleanupSteps over a scripted git', () => {
     const { git, calls } = scriptedGit();
     runCleanupSteps(git, { steps: [removeWorktreeStep('/w/a')], withheld: [] });
     expect(calls).toEqual(['worktree remove /w/a']);
+  });
+});
+
+describe('run-record steps', () => {
+  it('turns a ticked run row into one step removing the record and its events file', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1')] }));
+    expect(plan.steps).toEqual([{
+      kind: 'remove-run',
+      subject: '/p/.rafa/runs/r1.json',
+      argv: ['rm', '/p/.rafa/runs/r1.json', '/p/.rafa/runs/r1.events.ndjson'],
+      after: null,
+    }]);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('turns an unticked run row into no step and nothing withheld', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1', false)] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('removes the record alone when no events file sits beside it', () => {
+    expect(removeRunStep(runRow('r1', true, false)).argv).toEqual(['rm', '/p/.rafa/runs/r1.json']);
+  });
+
+  it('puts the run records after the worktrees and branches, and the force guard lets them through', () => {
+    const plan = cleanupSteps(selection({
+      runs: [runRow('r1')],
+      worktrees: [worktreeRow('/w/a', 'other')],
+      merged: [mergedRow('done')],
+    }));
+    expect(plan.steps.map((step) => step.kind)).toEqual(['remove-worktree', 'delete-branch', 'remove-run']);
+    expect(plan.steps.map((step) => forcedFlagRefusal(step.argv))).toEqual([null, null, null]);
+  });
+
+  it('prints one --dry-run line per ticked record', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1'), runRow('r2', false), runRow('r3', true, false)] }));
+    expect(dryRunLines(plan)).toEqual([
+      'rm /p/.rafa/runs/r1.json /p/.rafa/runs/r1.events.ndjson',
+      'rm /p/.rafa/runs/r3.json',
+    ]);
+  });
+
+  it('removes both files through the files seam and spawns no git', () => {
+    const { git, calls } = scriptedGit();
+    const { files, removed } = scriptedFiles();
+    const outcomes = runCleanupSteps(git, cleanupSteps(selection({ runs: [runRow('r1')] })), files);
+    expect(calls).toEqual([]);
+    expect(removed).toEqual(['/p/.rafa/runs/r1.json', '/p/.rafa/runs/r1.events.ndjson']);
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok, outcome.command, outcome.said])).toEqual([
+      [true, true, 'rm /p/.rafa/runs/r1.json /p/.rafa/runs/r1.events.ndjson', ''],
+    ]);
+  });
+
+  it('keeps the events file when the record cannot be removed, says why, and runs the next record', () => {
+    const { git } = scriptedGit();
+    const { files, removed } = scriptedFiles(['/p/.rafa/runs/r1.json']);
+    const plan = cleanupSteps(selection({ runs: [runRow('r1'), runRow('r2', true, false)] }));
+    const outcomes = runCleanupSteps(git, plan, files);
+    expect(removed).toEqual(['/p/.rafa/runs/r1.json', '/p/.rafa/runs/r2.json']);
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok])).toEqual([[true, false], [true, true]]);
+    expect(outcomes[0]?.said)
+      .toBe('cannot remove /p/.rafa/runs/r1.json: EACCES: permission denied, unlink \'/p/.rafa/runs/r1.json\'');
+  });
+
+  it('removes both files from the real disk by default, and says so for a file already gone', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-steps-runs-')));
+    try {
+      const record = join(dir, 'r1.json');
+      const events = join(dir, 'r1.events.ndjson');
+      writeFileSync(record, '{}\n');
+      writeFileSync(events, '{}\n');
+      const row = { ...runRow('r1'), path: record, eventsPath: events };
+      expect([existsSync(record), existsSync(events)]).toEqual([true, true]);
+
+      const { git } = scriptedGit();
+      const outcomes = runCleanupSteps(git, cleanupSteps(selection({ runs: [row] })));
+      expect(outcomes.map((outcome) => outcome.ok)).toEqual([true]);
+      expect([existsSync(record), existsSync(events)]).toEqual([false, false]);
+
+      const again = runCleanupSteps(git, cleanupSteps(selection({ runs: [row] })));
+      expect(again.map((outcome) => outcome.ok)).toEqual([false]);
+      expect(again[0]?.said).toStartWith(`cannot remove ${record}: `);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
