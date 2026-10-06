@@ -27,7 +27,7 @@ import {
   MERGED_STATE_UNKNOWN,
   baseUnreadNote,
   classifyBranches,
-  holdMergedRows,
+  holdBranchRows,
   pastHeadReason,
   pastHeadUnreadNote,
   readProviderMerges,
@@ -337,26 +337,70 @@ describe('classifyBranches: a Merged branch its worktree holds', () => {
       .toEqual([{ ticked: true, heldBy: undefined, reason: 'merged into main' }]);
   });
 
-  it('leaves ticked a Merged branch an untickable worktree does not hold, and leaves Stale rows alone', () => {
+  it('leaves ticked a Merged branch an untickable worktree does not hold', () => {
     const { git } = scriptedGit({ [MERGED_CALL]: said('done\nother\n') });
     const dirty = { kind: 'dirty', reason: '1 untracked file' } as const;
     const settings = {
       ...SETTINGS,
       worktrees: [worktree('/w/old', 'old', [dirty]), worktree('/w/detached', null, [dirty])],
     };
-    const old = branch('old', { lastCommit: new Date(NOW.getTime() - 40 * DAY) });
-    const answer = classifyBranches(git, reading(branch('done'), old), NO_MERGES, settings);
+    const answer = classifyBranches(git, reading(branch('done')), NO_MERGES, settings);
     expect(rows(answer)).toEqual([
       { group: 'merged', name: 'done', ticked: true, reason: 'merged into main' },
-      { group: 'stale', name: 'old', ticked: false, reason: 'no commit in 40 days' },
     ]);
   });
 
-  it('holdMergedRows returns a row no untickable worktree holds as it came', () => {
+  it('holdBranchRows returns a row no untickable worktree holds as it came', () => {
     const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
     const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, SETTINGS));
-    const [row] = holdMergedRows(read.merged, [worktree('/w/x', 'elsewhere', [{ kind: 'locked', reason: 'locked' }])]);
+    const [row] = holdBranchRows(read.merged, [worktree('/w/x', 'elsewhere', [{ kind: 'locked', reason: 'locked' }])]);
     expect(row).toBe(read.merged[0]);
+  });
+});
+
+describe('classifyBranches: a Stale or Not-pushed branch its worktree holds (#852)', () => {
+  const old = branch('old', { lastCommit: new Date(NOW.getTime() - 40 * DAY) });
+  const local = branch('local', { upstream: null, ahead: null });
+  const answers = { [MERGED_CALL]: said(''), [countCall('local')]: said('2\n') };
+
+  it('names a dirty holder on a Stale row and a locked holder on a Not-pushed row, both unticked', () => {
+    const { git } = scriptedGit(answers);
+    const settings = {
+      ...SETTINGS,
+      worktrees: [
+        worktree('/w/scratch', 'old', [{ kind: 'dirty', reason: '1 untracked file' }]),
+        worktree('/w/pinned', 'local', [{ kind: 'locked', reason: 'locked' }]),
+      ],
+    };
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, settings));
+    expect(read.stale.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason }))).toEqual([{
+      ticked: false,
+      heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] },
+      reason: 'no commit in 40 days; checked out in scratch (dirty)',
+    }]);
+    expect(read.notPushed.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason }))).toEqual([{
+      ticked: false,
+      heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] },
+      reason: 'no upstream; 2 commits not on any remote; checked out in pinned (locked)',
+    }]);
+  });
+
+  it('names no holder when the worktree on the branch can be ticked', () => {
+    const { git } = scriptedGit(answers);
+    const settings = { ...SETTINGS, worktrees: [worktree('/w/clean', 'old'), worktree('/w/clean2', 'local')] };
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, settings));
+    expect([...read.stale, ...read.notPushed].map(({ heldBy, reason }) => ({ heldBy, reason }))).toEqual([
+      { heldBy: undefined, reason: 'no commit in 40 days' },
+      { heldBy: undefined, reason: 'no upstream; 2 commits not on any remote' },
+    ]);
+  });
+
+  it('holdBranchRows holds a Stale row read without worktrees, as `./index.ts` applies it', () => {
+    const { git } = scriptedGit(answers);
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, SETTINGS));
+    const [row] = holdBranchRows(read.stale, [worktree('/w/scratch', 'old', [{ kind: 'dirty', reason: 'dirty' }])]);
+    expect(row?.heldBy?.name).toBe('scratch');
+    expect(row?.reason).toBe('no commit in 40 days; checked out in scratch (dirty)');
   });
 });
 
