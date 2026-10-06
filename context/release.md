@@ -88,6 +88,17 @@ base branch that requires review.
 `--dry-run` prints the fragments, their order, the strategy, and the version
 that would settle, and writes nothing to the tree or remote.
 
+A base with no `release.changelog` doesn't stop a settle (#842): the release
+commit creates the file holding `# Changelog` and the settled section
+(`buildSettle`, `src/release/settle.ts`), and settle prints
+`Changelog: <path> is missing, so the release commit creates it under "# Changelog".`
+above its delivery line. A delivery that refused prints no such line. The dry
+run reads the base's tree, not the checkout, and prints the same line. Only an
+absent file is created. A changelog that exists and can't be read, or a
+directory that refuses the new file, still stops the settle with exit 1. The
+parent directory isn't made, so a `release.changelog` under a directory the
+base lacks stops it too.
+
 The caller is unspecified and all are equivalent: a person running the command,
 a CI job after each merge, a post-merge hook, or `rafa next` (which runs settle
 after its merge step). `rafa pr merge` does not call settle itself; instead, it

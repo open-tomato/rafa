@@ -31,7 +31,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
 import { withSettleWorktree } from './settle-worktree.js';
-import { buildSettle, readSettle, releaseCommitSubject } from './settle.js';
+import { buildSettle, CHANGELOG_TITLE, readSettle, releaseCommitSubject } from './settle.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-settle-')));
@@ -213,6 +213,7 @@ describe('readSettle, the dry run', () => {
       ['rafa-9', '.changes/rafa-9.md', first, '2026-09-10'],
       ['rafa-1', '.changes/rafa-1.md', second, '2026-09-11'],
     ]);
+    expect(reading.changelogMissing).toBe(false);
     expect(reading.section).toBe([
       '## 0.5.0 — 2026-09-11, title of rafa-9; title of rafa-1',
       '<!-- rafa:fragments rafa-9 rafa-1 -->',
@@ -220,6 +221,20 @@ describe('readSettle, the dry run', () => {
       '- Walk: one hop',
       '- Loop: a fix',
     ].join('\n'));
+  });
+
+  it('reads a changelog the base lacks as missing, from the tree alone', () => {
+    const w = world({ 'CHANGELOG.md': null });
+    landTwo(w);
+    w.git(w.caller, ['fetch', '-q', 'origin', 'main']);
+    // The caller's own checkout holds one, so a reading off the working tree would say present.
+    writeFileSync(join(w.caller, 'CHANGELOG.md'), CHANGELOG);
+
+    const reading = readSettle(createGitRunner(w.caller), 'origin/main', SETTINGS);
+
+    expect(reading.outcome).toBe('folded');
+    if (reading.outcome !== 'folded') return;
+    expect(reading.changelogMissing).toBe(true);
   });
 
   it('writes nothing: the caller\'s status, branch and every ref read the same after', () => {
@@ -423,17 +438,81 @@ describe('buildSettle, the release commit', () => {
     expect(built.status).toBe('');
   });
 
-  it('answers unbuilt, committing nothing, when the changelog is missing', async () => {
+  it('creates a missing changelog holding the heading and the section, and says it created it', async () => {
     const w = world({ 'CHANGELOG.md': null });
+    const { second } = landTwo(w);
+
+    const built = await buildIn(w);
+
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.build.changelogMissing).toBe(true);
+    expect(built.build.createdChangelog).toBe('CHANGELOG.md');
+    expect(built.build.insertPoint).toBe('file-end');
+    expect(built.files['CHANGELOG.md']).toBe(`${CHANGELOG_TITLE}\n\n${built.build.section}\n`);
+    expect(built.status).toBe('');
+    expect(w.git(w.caller, ['diff', '--name-status', second, built.head]).split('\n')).toContain('A\tCHANGELOG.md');
+  });
+
+  it('inserts into a changelog that exists, creating nothing', async () => {
+    const w = world();
     landTwo(w);
 
     const built = await buildIn(w);
 
-    expect(built.build.outcome).toBe('unbuilt');
-    if (built.build.outcome !== 'unbuilt') return;
-    expect(built.build.problem).toStartWith('CHANGELOG.md could not be read: ');
-    expect(built.build.version).toBe('0.5.0');
-    expect(built.head).toBe(built.before);
+    expect(built.build.outcome).toBe('built');
+    if (built.build.outcome !== 'built') return;
+    expect(built.build.changelogMissing).toBe(false);
+    expect(built.build.createdChangelog).toBeNull();
+    expect(built.files['CHANGELOG.md']).toStartWith('# Changelog\n\nEvery release.\n\n## 0.5.0');
+  });
+
+  it('answers unbuilt, committing nothing, when a missing changelog\'s directory refuses the write', async () => {
+    const w = world({ 'CHANGELOG.md': null });
+    landTwo(w);
+
+    const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (worktree) => {
+      const before = worktree.git(['rev-parse', 'HEAD']).stdout.trim();
+      chmodSync(worktree.path, 0o555);
+      try {
+        // The control: the directory really refuses a new file, so the problem below is the write's.
+        expect(() => {
+          writeFileSync(join(worktree.path, 'probe'), '');
+        }).toThrow();
+        const build = buildSettle(worktree, SETTINGS);
+        return { build, before, head: worktree.git(['rev-parse', 'HEAD']).stdout.trim() };
+      } finally {
+        chmodSync(worktree.path, 0o755);
+      }
+    });
+    if (!outcome.ok) throw new Error(outcome.problem);
+    const { build, before, head } = outcome.value;
+
+    expect(build.outcome).toBe('unbuilt');
+    if (build.outcome !== 'unbuilt') return;
+    expect(build.problem).toStartWith('CHANGELOG.md could not be created: ');
+    expect(build.problem).toContain('EACCES');
+    expect(head).toBe(before);
+  });
+
+  it('answers unbuilt when the changelog exists and cannot be read', async () => {
+    const w = world();
+    landTwo(w);
+
+    const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (worktree) => {
+      const changelog = join(worktree.path, 'CHANGELOG.md');
+      chmodSync(changelog, 0o000);
+      try {
+        return buildSettle(worktree, SETTINGS);
+      } finally {
+        chmodSync(changelog, 0o644);
+      }
+    });
+    if (!outcome.ok) throw new Error(outcome.problem);
+
+    expect(outcome.value.outcome).toBe('unbuilt');
+    if (outcome.value.outcome !== 'unbuilt') return;
+    expect(outcome.value.problem).toStartWith('CHANGELOG.md could not be read: ');
   });
 
   it('refuses a worktree whose version file is not the base commit\'s', async () => {

@@ -36,7 +36,12 @@
  * base received them, first-parent add commit first — each with its
  * level, its title and the commit and date that added it. A fold that
  * answered adds the version it moves to; a delivery adds one line for
- * what it did, and a tag one more. After a push that was retried, the
+ * what it did, and a tag one more. A settle whose base lacks
+ * `release.changelog` creates it holding `# Changelog` and the section
+ * (`buildSettle`, #842), and says so in a `Changelog:` line above the
+ * delivery's — the dry run in the same words, before its own last line;
+ * a delivery that refused prints no such line, since nothing landed.
+ * After a push that was retried, the
  * reading printed is the REBUILT one, the batch the base now holds.
  *
  * ## Exit codes
@@ -72,7 +77,7 @@ import { settleByPr } from '../../release/settle-pr.js';
 import { settleByPush } from '../../release/settle-push.js';
 import { tagSettle } from '../../release/settle-tag.js';
 import { withSettleWorktree } from '../../release/settle-worktree.js';
-import { readSettle, releaseCommitSubject } from '../../release/settle.js';
+import { CHANGELOG_TITLE, readSettle, releaseCommitSubject } from '../../release/settle.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '../plan/plan-files.js';
 
@@ -201,11 +206,21 @@ function resultOf(
   return { ...base, lines, problem, exitCode };
 }
 
-/** The dry run's answer: the reading, and what a settle would commit. */
-export function dryRunResult(reading: SettleReading, ref: string, branch: string): ReleaseSettleResult {
+/** The line naming a changelog the release commit creates rather than inserts into. */
+function createdChangelogLine(changelog: string): string {
+  return `Changelog: ${changelog} is missing, so the release commit creates it under "${CHANGELOG_TITLE}".`;
+}
+
+/**
+ * The dry run's answer: the reading, and what a settle would commit.
+ * `changelog` is `release.changelog`, named in a line of its own when
+ * the base lacks it and the settle would create it.
+ */
+export function dryRunResult(reading: SettleReading, ref: string, branch: string, changelog: string): ReleaseSettleResult {
   const base = { dryRun: true, delivery: null, reading, delivered: null, tag: null };
   const lines = [...readingLines(reading, ref)];
   if (reading.outcome === 'folded') {
+    if (reading.changelogMissing) lines.push(createdChangelogLine(changelog));
     lines.push(`Dry run: settle would commit "${releaseCommitSubject(reading.version)}" on ${branch}; nothing was written.`);
     return resultOf(base, lines, null);
   }
@@ -256,6 +271,10 @@ export function settledResult(
   const lines = [...readingLines(reading, ref)];
   const ending = deliveryEnding(delivered, branch);
   if (ending.refuses) return resultOf(base, lines, ending.line);
+  const landed = delivered.outcome.outcome === 'pushed' || delivered.outcome.outcome === 'delivered';
+  if (landed && reading.outcome === 'built' && reading.createdChangelog !== null) {
+    lines.push(createdChangelogLine(reading.createdChangelog));
+  }
   lines.push(ending.line);
   if (tag.outcome === 'failed') return resultOf(base, lines, `❌ ${tag.sentence}`);
   if (tag.outcome === 'tagged') lines.push(`✅ ${tag.sentence}`);
@@ -292,7 +311,7 @@ export async function runSettle(
   };
 
   const ran = await withSettleWorktree(options, async (worktree) => {
-    if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch);
+    if (dryRun) return dryRunResult(readSettle(worktree.git, 'HEAD', settings), worktree.ref, branch, settings.releaseChangelog);
     const delivered: SettleDelivered = pulls === null
       ? { delivery: 'push', outcome: settleByPush(worktree, settings) }
       : { delivery: 'pr', outcome: await settleByPr(worktree, settings, pulls) };
@@ -314,7 +333,7 @@ export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_R
     description: 'Fetches `origin/<pr.base>` (or `origin/main`) and works in a scratch worktree of it, so the'
       + ' checkout it runs from is never touched. It lists the fragments under `release.fragments` in the order'
       + ' the base received them, folds them through `release.strategy` into the next version and one'
-      + ' changelog section, writes both, deletes the folded fragments and commits `chore: release <version>`.'
+      + ' changelog section, writes both (creating `release.changelog` under `# Changelog` when the base lacks it), deletes the folded fragments and commits `chore: release <version>`.'
       + ' With `release.settle: push` (the default) the commit is pushed to the base, never forced; a refused'
       + ' push fetches again and ends as settled when another run released the same fragments, or rebuilds'
       + ' and pushes once more. With `release.settle: pr` it goes to `rafa/release` and one pending release'

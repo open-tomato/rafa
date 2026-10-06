@@ -954,7 +954,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/settle-push.js', ['settleByPush']],
     ['../../release/settle-tag.js', ['tagSettle']],
     ['../../release/settle-worktree.js', ['withSettleWorktree']],
-    ['../../release/settle.js', ['readSettle', 'releaseCommitSubject']],
+    ['../../release/settle.js', ['CHANGELOG_TITLE', 'readSettle', 'releaseCommitSubject']],
     ['../../release/version.js', ['RELEASE_BASE_BRANCH', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
