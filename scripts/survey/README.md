@@ -16,7 +16,7 @@ repository name: the repository is public. The outputs under
 | --- | --- | --- | --- |
 | `survey-io.ts` | none; the shared helper the others import: `listTrackedFiles`, `measureCoverage`, `coverageLine`, `writeSurvey` | imported, not run | added |
 | `import-graph.ts` | `.rafa/survey/import-graph.json`, `.rafa/survey/import-graph.md` | `bun scripts/survey/import-graph.ts` | added |
-| `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | planned |
+| `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | added |
 | `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | planned |
 | `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | planned |
 | `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts` | planned |
@@ -32,6 +32,16 @@ no edges. It clusters the graph with Louvain (`graphology`,
 clusters ranked `c1` to `c8`, and scores betweenness per file with
 `graphology-metrics`. A file with no edge is listed as isolated, and one
 left beyond the eighth cluster with no edge out of it as detached.
+
+`test-index.ts` reads every tracked test file under `src/` and
+`packages/` and gives each its index, epic #801's criterion 4 baseline:
+how many groups its `from '…'` imports reach under `src/` and
+`packages/`, its own folder counted, doubled when it spawns a process. It
+reads the groups by folder (the first folder under `src/`, or the
+package) and by cluster from `.rafa/survey/import-graph.json`, so
+`import-graph.ts` runs first. The guard index sets aside imports of
+`src/tests/`, of `testdata/` folders and of files named `fake` or
+`stand-in`.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
