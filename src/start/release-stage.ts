@@ -171,6 +171,7 @@ import type {
 import type { ReleaseVerification, ReleaseVerificationContext } from '../release/verify.js';
 
 import { activeOutput } from '../adapters/output/active.js';
+import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
 import { messageOf } from '../config-sections.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { parsePlan } from '../plan/parse.js';
@@ -337,8 +338,8 @@ const PLAN_LABEL = /^plan\s*[:—–-]\s*/i;
 
 /**
  * The title the fragment names this release after: the plan's own
- * first heading, its `Plan:` label off, and the plan stub when the
- * document carries no heading at all.
+ * title as {@link planTitleIn} picks it, its `Plan:` label off, and the
+ * plan stub when the document carries no title heading.
  *
  * The label comes off because settle renders the title into a changelog
  * heading a person reads — `## 0.5.0 — 2026-09-20, Plan: rafa-21 …`
@@ -350,19 +351,24 @@ function releaseTitle(input: ReleaseStageInput): string {
 }
 
 /**
- * The plan's title as {@link releaseTitle} reads it: its first heading,
- * its `Plan:` label off, or `planStub` (empty when null) with no heading.
+ * The plan's title as {@link releaseTitle} reads it, its `Plan:` label
+ * off: the first heading carrying that label; else the first heading
+ * other than {@link ASSUMPTIONS_HEADING}, which the readiness gate puts
+ * above a plan created under assumptions and which names no release;
+ * else `planStub` (empty when null).
  * The runner-opened pull request takes its title from here too
  * (`start/wrap-up-run.ts`), so the fragment and that title cannot name
  * the plan two ways.
  */
 export function planTitleIn(planContent: string, planStub: string | null): string {
-  for (const line of planContent.split('\n')) {
-    const heading = PLAN_HEADING.exec(line);
-    if (heading === null) continue;
-    return (heading[1] ?? '').replace(PLAN_LABEL, '').trim();
-  }
-  return planStub ?? '';
+  const headings = planContent.split('\n')
+    .filter((line) => line.trim() !== ASSUMPTIONS_HEADING)
+    .map((line) => (PLAN_HEADING.exec(line)?.[1] ?? '').trim())
+    .filter((heading) => heading !== '');
+  const chosen = headings.find((heading) => PLAN_LABEL.test(heading)) ?? headings[0];
+  return chosen === undefined
+    ? planStub ?? ''
+    : chosen.replace(PLAN_LABEL, '').trim();
 }
 
 /** Says what step 1 wrote, or why it wrote nothing, and the level report. */

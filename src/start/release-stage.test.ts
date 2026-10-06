@@ -43,6 +43,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { assumptionsHeading } from '../board/review-stamp.js';
 import { verifyRelease } from '../release/verify.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -81,7 +82,7 @@ import {
 } from '../tests/release-stage-fixtures.js';
 import { getCurrentBranch } from '../utils/git.js';
 
-import { bodyWithSentence, finishRelease, prepareReleaseStage, RELEASE_STAGE_SEAMS } from './release-stage.js';
+import { bodyWithSentence, finishRelease, planTitleIn, prepareReleaseStage, RELEASE_STAGE_SEAMS } from './release-stage.js';
 
 /** A temporary directory this file's own planted-edit case writes into. */
 const PLANTED_ROOT = mkdtempSync(join(tmpdir(), 'rafa-release-stage-'));
@@ -664,6 +665,32 @@ describe('finishRelease on the run\'s head branch', () => {
     expect(finish.body?.number).toBe(PR);
     expect(provider.asked).toEqual([BRANCH]);
     expect(provider.edits).toEqual([`#${PR}: Closes #21\n\n${SKIP_SENTENCE}`]);
+  });
+});
+
+describe('planTitleIn', () => {
+  const ASSUMED = assumptionsHeading([{ heading: 'Design', what: 'the store backend is not named', blocking: false, assumption: 'the SQLite backend' }]);
+
+  it('answers the Plan: title of a plan opening with the assumptions section', () => {
+    // Control: the assumptions heading is the plan's first heading, so a
+    // reader taking the first heading would answer it.
+    expect(ASSUMED.split('\n')[0]).toBe('# Planned under assumptions');
+
+    expect(planTitleIn(`${ASSUMED}# Plan: rafa-21 — release title\n\n## Stage\n`, 'rafa-21')).toBe('rafa-21 — release title');
+  });
+
+  it('answers the stub for a plan holding only the assumptions heading', () => {
+    expect(planTitleIn(ASSUMED, 'rafa-21')).toBe('rafa-21');
+  });
+
+  it('answers the stub, or empty without one, for a plan with no heading', () => {
+    expect(planTitleIn('just prose\n## Stage\n', 'rafa-21')).toBe('rafa-21');
+    expect(planTitleIn('just prose\n', null)).toBe('');
+  });
+
+  it('answers an ordinary plan\'s first heading as before', () => {
+    expect(planTitleIn('# Plan: rafa-21 — release title\n\n# Later\n', 'stub')).toBe('rafa-21 — release title');
+    expect(planTitleIn('# A plain title\n\n# Later\n', 'stub')).toBe('A plain title');
   });
 });
 

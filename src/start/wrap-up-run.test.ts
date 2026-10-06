@@ -84,6 +84,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { assumptionsHeading } from '../board/review-stamp.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -680,6 +681,13 @@ describe('the runner\'s pull request input', () => {
     const input = runnerPrInputFor({ branch: BRANCH, base: 'main', planContent: plan('579'), planStub: 'some-plan', notes: ['- one'] });
 
     expect(input).toEqual({ branch: BRANCH, base: 'main', issue: 579, planTitle: 'A loop run ends delivered', notes: ['- one'] });
+  });
+
+  it('titles the pull request of a plan created under assumptions from its Plan: heading', () => {
+    const assumed = `${assumptionsHeading([{ heading: 'Design', what: 'the store backend is not named', blocking: false, assumption: 'the SQLite backend' }])}${plan('579')}`;
+    const input = runnerPrInputFor({ branch: BRANCH, base: 'main', planContent: assumed, planStub: 'some-plan', notes: [] });
+
+    expect(input?.planTitle).toBe('A loop run ends delivered');
   });
 
   it('answers no input for a plan that names no issue number', () => {
