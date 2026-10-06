@@ -46,7 +46,9 @@ loop is red and shows the task in progress; a paused one is yellow and
 shows the tasks done; neither count goes past the total. Once its tasks
 are done, a loop shows the phase its record names instead of a count:
 `wrap-up`, `pull-request`, `ci` or `repair`, as in `│ 🍅 #367 wrap-up`.
-A record with no phase, from an older rafa, shows the count.
+A record with no phase, from an older rafa, shows the count, and a running
+loop whose record says `task` (or no phase) with every task ticked shows
+`wrap-up`.
 
 A loop is live while its record under `.rafa/runs/` says `running` or
 `paused` and its process is still alive, so a record left behind by a

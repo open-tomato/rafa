@@ -96,6 +96,9 @@ _rafa_prompt_label() {
 # tasks done for a paused one, never past the total. In any other phase
 # (`wrap-up`, `pull-request`, `ci`, `repair`) it is "#<n> <phase>", since
 # every task is done by then and a count would read one past the total.
+# A running loop whose phase reads `task` (or names none) but whose
+# tracker has every task ticked is past its last task, so it is
+# "#<n> wrap-up" rather than "#<n> <total>/<total>".
 _rafa_prompt_live_entry() {
   local -a f
   f=("${(@ps:\t:)1}")
@@ -109,6 +112,10 @@ _rafa_prompt_live_entry() {
   [[ -f ${plan:h}/PLAN_TRACKER-$stub.md ]] && file=${plan:h}/PLAN_TRACKER-$stub.md
   _rafa_prompt_count $file
   local total=$(( reply[1] + reply[2] + reply[3] )) at=${reply[1]}
+  if [[ $state == running ]] && (( total > 0 && at == total )); then
+    REPLY="$label wrap-up"
+    return 0
+  fi
   [[ $state == running ]] && at=$(( reply[1] + 1 ))
   (( at > total )) && at=$total
   REPLY="$label $at/$total"
@@ -133,9 +140,11 @@ _rafa_prompt_git() {
 # `main` and `branch`; on a branch other than the base it also sets
 # `stub`, `issue` (the number in a `rafa-<n>-…` stub, else empty) and
 # `label`, and, when the branch has a plan, `plan`, `title`, `done`,
-# `open`, `blocked`, `total` and `run`. It also fills `rafa_live_runs`
-# with every live loop of the project. With a first argument it reuses
-# the `rafa_git` a caller has just read instead of calling git again.
+# `open`, `blocked`, `total`, `run` and `phase` (the live run's state and
+# its record's phase, both empty when no loop runs on the branch). It
+# also fills `rafa_live_runs` with every live loop of the project. With a
+# first argument it reuses the `rafa_git` a caller has just read instead
+# of calling git again.
 _rafa_prompt_read() {
   setopt localoptions extendedglob
   typeset -gA rafa_plan
@@ -172,19 +181,25 @@ _rafa_prompt_read() {
 
   _rafa_prompt_count ${tracker:-$plan}
   local done=${reply[1]} open=${reply[2]} blocked=${reply[3]}
-  local entry run=''
+  local entry run='' phase=''
+  local -a fields
   for entry in $rafa_live_runs; do
     if [[ ${entry%%$'\t'*} == $branch ]]; then
-      run=${${(@ps:\t:)entry}[3]}
+      fields=("${(@ps:\t:)entry}")
+      run=${fields[3]} phase=${fields[5]}
       break
     fi
   done
   rafa_plan+=(plan $plan title "$title" done $done open $open
-    blocked $blocked total $(( done + open + blocked )) run "$run")
+    blocked $blocked total $(( done + open + blocked )) run "$run" phase "$phase")
 }
 
 # Sets REPLY to the task segment for what `_rafa_prompt_read` read, or to
-# nothing when there is none to show.
+# nothing when there is none to show. A running loop shows
+# "🍅 <label> <phase>" once its record's phase is other than `task`, and
+# "🍅 <label> wrap-up" when the phase reads `task` (or is absent) but every
+# task is ticked; otherwise it shows the task in progress, `done + 1`,
+# never past the total.
 _rafa_prompt_task_segment() {
   REPLY=''
   local label=${rafa_plan[label]} done=${rafa_plan[done]} total=${rafa_plan[total]}
@@ -194,7 +209,14 @@ _rafa_prompt_task_segment() {
     # plan is not rafa's, so it gets no segment.
     [[ ${rafa_plan[branch]} == feat/* ]] && REPLY="%F{244}📝 $label no plan%f"
   elif [[ ${rafa_plan[run]} == running ]]; then
-    REPLY="%F{red}🍅 $label $(( done + 1 ))/$total%f"
+    local phase=${rafa_plan[phase]:-task} at=$(( done + 1 ))
+    (( total > 0 && done == total )) && [[ $phase == task ]] && phase=wrap-up
+    if [[ $phase != task ]]; then
+      REPLY="%F{red}🍅 $label $phase%f"
+    else
+      (( at > total )) && at=$total
+      REPLY="%F{red}🍅 $label $at/$total%f"
+    fi
   elif [[ ${rafa_plan[run]} == paused ]]; then
     REPLY="%F{yellow}⏸ $label paused $done/$total%f"
   elif (( ${rafa_plan[blocked]} > 0 )); then
