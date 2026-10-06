@@ -36,6 +36,13 @@
  * worktree holds is not a step at all but a {@link WithheldRemoval},
  * as is a worktree row the caller passed although it cannot be ticked.
  *
+ * A Merged row a listed worktree that cannot be ticked holds
+ * ({@link MergedRow.heldBy}, `./groups.ts`) starts unticked. Ticked
+ * anyway, it is one {@link WithheldRemoval} naming that worktree and its
+ * blockers, never a step, so `--dry-run` prints no line for it: git
+ * refuses to delete a branch a worktree has checked out, and that
+ * worktree is not removed.
+ *
  * ## The force guard
  *
  * {@link forcedFlagRefusal} reads the argv about to be spawned, not the
@@ -68,7 +75,7 @@
  * `git push origin --delete <b>` for the person to run, and that line
  * is the renderer's, not a step.
  */
-import type { MergedRow, NotPushedRow, StaleRow } from './groups.js';
+import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.js';
 import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '../pr/git.js';
@@ -78,6 +85,8 @@ import { rmSync } from 'node:fs';
 import { messageOf } from '../config-sections.js';
 import { gitSaid } from '../pr/git.js';
 import { shellQuote } from '../pr/preflight-items.js';
+
+import { heldReason as checkedOutReason } from './groups.js';
 
 /** The flag spellings that make a worktree removal or branch delete forced. */
 const FORCING_FLAG = /^(?:--force(?:=.*)?|-[^-]*f[^-]*)$/;
@@ -213,14 +222,21 @@ interface BranchPick {
   readonly name: string;
   readonly merged: boolean;
   readonly forced: boolean;
+  /** The untickable worktree holding a Merged row, when `./groups.ts` named one. */
+  readonly holder: BranchHolder | null;
 }
 
 /** The ticked branch rows, Merged first, each with its flag. */
 function branchPicks(selection: CleanupSelection): readonly BranchPick[] {
   return [
-    ...selection.merged.map((row) => ({ name: row.branch.name, merged: true, forced: needsForcedDelete(row) })),
-    ...selection.stale.map((row) => ({ name: row.branch.name, merged: false, forced: true })),
-    ...selection.notPushed.map((row) => ({ name: row.branch.name, merged: false, forced: true })),
+    ...selection.merged.map((row) => ({
+      name: row.branch.name,
+      merged: true,
+      forced: needsForcedDelete(row),
+      holder: row.heldBy ?? null,
+    })),
+    ...selection.stale.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null })),
+    ...selection.notPushed.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null })),
   ];
 }
 
@@ -234,12 +250,20 @@ function blockedHolderReason(path: string): string {
   return `held by the worktree at ${path}, which is not removed`;
 }
 
+/** Why a Merged branch an untickable worktree holds is not deleted. */
+function untickableHolderReason(holder: BranchHolder): string {
+  return `${checkedOutReason(holder)}, which is not removed`;
+}
+
 /** The step for one ticked branch, or why there is none. */
 function branchStep(
   pick: BranchPick,
   removed: ReadonlyMap<string, string>,
   blocked: ReadonlyMap<string, string>,
 ): CleanupStep | WithheldRemoval {
+  if (pick.holder !== null) {
+    return { kind: 'delete-branch', subject: pick.name, reason: untickableHolderReason(pick.holder) };
+  }
   const blockedPath = blocked.get(pick.name);
   if (blockedPath !== undefined) {
     return { kind: 'delete-branch', subject: pick.name, reason: blockedHolderReason(blockedPath) };

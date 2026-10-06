@@ -192,6 +192,32 @@ describe('cleanupSteps', () => {
     ]);
   });
 
+  it('withholds, with one warning, a held Merged row ticked anyway, so --dry-run prints no step for it', () => {
+    const held: MergedRow = {
+      ...mergedRow('done'),
+      ticked: false,
+      heldBy: { path: '/repo/.claude/worktrees/cranky', name: 'cranky', blockers: ['recent'] },
+    };
+    const plan = cleanupSteps(selection({ merged: [held, mergedRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d other']);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'done', reason: 'checked out in cranky (recent), which is not removed' },
+    ]);
+  });
+
+  it('withholds a held Merged row once when its untickable worktree is passed too', () => {
+    const held: MergedRow = {
+      ...mergedRow('done'),
+      ticked: false,
+      heldBy: { path: '/w/dirty', name: 'dirty', blockers: ['dirty'] },
+    };
+    const plan = cleanupSteps(selection({ worktrees: [worktreeRow('/w/dirty', 'done', false)], merged: [held] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld.filter((entry) => entry.kind === 'delete-branch')).toEqual([
+      { kind: 'delete-branch', subject: 'done', reason: 'checked out in dirty (dirty), which is not removed' },
+    ]);
+  });
+
   it('removes a detached worktree without any branch step', () => {
     const plan = cleanupSteps(selection({ worktrees: [worktreeRow('/w/detached', null)] }));
     expect(plan.steps.map((step) => step.argv.join(' '))).toEqual(['git worktree remove /w/detached']);

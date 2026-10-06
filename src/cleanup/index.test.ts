@@ -202,6 +202,23 @@ describe('readCleanup over scripted seams', () => {
     ]);
   });
 
+  it('unticks the Merged branch a worktree that cannot be ticked holds, naming it', async () => {
+    const { seams } = scripted();
+    const recentA: CleanupSeams = {
+      ...seams,
+      modifiedAt: (path) => (path.includes('worktrees/a')
+        ? NOW
+        : new Date(NOW.getTime() - 30 * DAY)),
+    };
+    const reading = await readCleanup(recentA, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.worktrees.map((row) => [row.path, row.tickable])).toEqual([[`${CLAUDE}/a`, false], [`${CLAUDE}/b`, true]]);
+    expect(reading.merged.map((row) => [row.branch.name, row.ticked, row.reason])).toEqual([
+      ['done', false, 'merged into main; checked out in a (recent)'],
+    ]);
+  });
+
   it('runs no fetch when it is not asked for, as rafa doctor reads', async () => {
     const { seams, log } = scripted();
     const reading = await readCleanup(seams, settings({ fetch: false }));

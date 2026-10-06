@@ -13,7 +13,8 @@
  * The spec's Design table, applied to each branch in this order, the
  * first that holds deciding:
  *
- *   1. **Merged**, ticked: `git branch --merged refs/heads/<base>` lists
+ *   1. **Merged**, ticked unless a worktree that cannot be ticked holds
+ *      it (below): `git branch --merged refs/heads/<base>` lists
  *      it; OR the provider answers a merged pull request whose head is
  *      the branch AND whose head commit is the branch's tip; OR its
  *      upstream reads `[gone]`. Every reading that holds is kept on the
@@ -31,6 +32,25 @@
  *
  * A branch none of them holds for — pushed, level with its upstream,
  * committed to recently — is somebody's current work and is not listed.
+ *
+ * ## A Merged branch its worktree holds
+ *
+ * Git refuses to delete a branch a worktree has checked out (`error:
+ * cannot delete branch 'w' used by worktree at '<path>'`, `./steps.ts`).
+ * A ticked worktree is removed first and its branch's delete waits for
+ * it. A listed worktree that cannot be ticked (`./worktrees.ts`: dirty,
+ * locked, current, a live session, recent or unreadable) is never
+ * removed, so a Merged branch it holds starts UNticked, carries the
+ * holder ({@link MergedRow.heldBy}), and its reason ends with
+ * `checked out in <worktree name> (<blocker>)`: the name is the last
+ * part of the worktree's path, the blocker every
+ * {@link WorktreeBlockKind} that holds for it, comma-joined. A worktree
+ * the cleanup does not list is somebody's own checkout and holds nothing
+ * here. {@link holdMergedRows} applies the rule, and
+ * {@link classifyBranches} applies it to the worktrees
+ * {@link GroupSettings.worktrees} names; `./index.ts` reads the
+ * worktrees after the groups (they need the Merged names to tick a
+ * clean one), so it applies {@link holdMergedRows} to them after.
  *
  * ## The provider's reading, and its two absences
  *
@@ -74,8 +94,11 @@
  * crashing.
  */
 import type { BranchesRead, BranchesUnread, LocalBranch } from './branches.js';
+import type { WorktreeBlockKind, WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest, PullRequests } from '../pr/types.js';
+
+import { basename } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
 import { gitSaid } from '../pr/git.js';
@@ -103,10 +126,23 @@ interface RowFields {
   readonly reason: string;
 }
 
-/** A branch in Merged: ticked by default. */
+/** The listed worktree that cannot be ticked and holds a Merged branch; see the module note. */
+export interface BranchHolder {
+  /** The worktree's path, as git resolved it. */
+  readonly path: string;
+  /** The last part of {@link path}, the name its reason shows. */
+  readonly name: string;
+  /** Every rule that blocks it, in the worktree row's order; never empty. */
+  readonly blockers: readonly WorktreeBlockKind[];
+}
+
+/** A branch in Merged: ticked by default, unless a worktree that cannot be ticked holds it. */
 export interface MergedRow extends RowFields {
   readonly group: 'merged';
-  readonly ticked: true;
+  /** True unless {@link heldBy} names a holder. */
+  readonly ticked: boolean;
+  /** The listed worktree that cannot be ticked and holds the branch; absent when none does. */
+  readonly heldBy?: BranchHolder;
   /** Every reading that holds, in the order of {@link MergedBy}; never empty. */
   readonly mergedBy: readonly MergedBy[];
   /** The merged pull request whose head commit is the tip, or null when none is. */
@@ -147,6 +183,8 @@ export interface GroupSettings {
   readonly staleDays: number;
   /** The clock, read once by the caller. */
   readonly now: Date;
+  /** The listed worktrees, whose untickable ones untick the Merged branches they hold; none when left out. */
+  readonly worktrees?: readonly WorktreeRow[];
 }
 
 /** The three branch groups, each in the order the branches were read. */
@@ -193,11 +231,39 @@ export async function readProviderMerges(pulls: PullRequests | null): Promise<Pr
   }
 }
 
+/** The reason a held Merged row's reason ends with: `checked out in <name> (<blockers>)`. */
+export function heldReason(holder: BranchHolder): string {
+  return `checked out in ${holder.name} (${holder.blockers.join(', ')})`;
+}
+
+/**
+ * `rows` with every Merged branch a listed worktree that cannot be
+ * ticked holds unticked, its holder kept and named in its reason; see
+ * the module note. A row no such worktree holds is returned as it came.
+ */
+export function holdMergedRows(rows: readonly MergedRow[], worktrees: readonly WorktreeRow[]): MergedRow[] {
+  const holders = new Map<string, BranchHolder>();
+  for (const row of worktrees) {
+    if (row.tickable || row.branch === null) {
+      continue;
+    }
+    const blockers = [...new Set(row.blockers.map((blocker) => blocker.kind))];
+    holders.set(row.branch, { path: row.path, name: basename(row.path), blockers });
+  }
+  return rows.map((row) => {
+    const holder = holders.get(row.branch.name);
+    return holder === undefined
+      ? row
+      : { ...row, ticked: false, heldBy: holder, reason: `${row.reason}; ${heldReason(holder)}` };
+  });
+}
+
 /**
  * Sorts `read`'s branches into Merged, Stale and Not pushed by the
  * rules in the module note, running `git branch --merged` once, a tip
  * read when a merged pull request names a listed branch, and one
- * `rev-list --count` per Not-pushed branch.
+ * `rev-list --count` per Not-pushed branch. A Merged branch an
+ * untickable worktree of `settings.worktrees` holds starts unticked.
  */
 export function classifyBranches(
   git: GitRunner,
@@ -258,7 +324,8 @@ export function classifyBranches(
       stale.push({ group: 'stale', branch, ticked: false, idleDays, reason: `no commit in ${plural(idleDays, 'day')}${suffix}` });
     }
   }
-  return { ok: true, base: read.base, merged, stale, notPushed, notes };
+  const held = holdMergedRows(merged, settings.worktrees ?? []);
+  return { ok: true, base: read.base, merged: held, stale, notPushed, notes };
 }
 
 /** What every unmerged row's reason and count read from. */

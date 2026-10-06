@@ -6,7 +6,9 @@
  * `git fetch --prune` when asked, `./branches.ts` for the listable
  * branches, `./groups.ts` for Merged, Stale and Not pushed, and
  * `./worktrees.ts` for the worktrees, told which branches are in Merged
- * so a clean worktree on one starts ticked, and last `./runs.ts` for the
+ * so a clean worktree on one starts ticked, then `./groups.ts`'s
+ * `holdMergedRows` over those worktrees, so a Merged branch a worktree
+ * that cannot be ticked holds starts unticked, and last `./runs.ts` for the
  * run records under the project's `.rafa/runs/`. {@link cleanupCounts} is
  * the number of rows in each branch group and in Worktrees, which
  * `rafa doctor` and `rafa status` print; the run records are listed for
@@ -43,7 +45,7 @@ import type { PullRequests } from '../pr/types.js';
 import { gitSaid } from '../pr/git.js';
 
 import { readBranches } from './branches.js';
-import { classifyBranches, readProviderMerges } from './groups.js';
+import { classifyBranches, holdMergedRows, readProviderMerges } from './groups.js';
 import { readRunRecords } from './runs.js';
 import { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
@@ -56,6 +58,7 @@ export type {
 } from './branches.js';
 export type {
   BranchGroup,
+  BranchHolder,
   BranchGroups,
   BranchGroupsReading,
   BranchGroupsUnread,
@@ -230,7 +233,7 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
     ok: true,
     base: groups.base,
     fetched,
-    merged: groups.merged,
+    merged: holdMergedRows(groups.merged, worktrees.worktrees),
     stale: groups.stale,
     notPushed: groups.notPushed,
     worktrees: worktrees.worktrees,

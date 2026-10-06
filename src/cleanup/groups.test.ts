@@ -6,6 +6,7 @@
  */
 import type { BranchesRead, LocalBranch } from './branches.js';
 import type { BranchGroups, BranchGroupsReading, ProviderMerges } from './groups.js';
+import type { WorktreeBlocker, WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
@@ -25,6 +26,7 @@ import {
   MERGED_STATE_UNKNOWN,
   baseUnreadNote,
   classifyBranches,
+  holdMergedRows,
   readProviderMerges,
   unreachableNote,
 } from './groups.js';
@@ -233,6 +235,95 @@ describe('classifyBranches: Stale', () => {
     const young = branch('young', { lastCommit: new Date(NOW.getTime() - 2 * DAY) });
     expect(rows(classifyBranches(git, reading(young), NO_MERGES, { staleDays: 1, now: NOW })))
       .toEqual([{ group: 'stale', name: 'young', ticked: false, reason: 'no commit in 2 days' }]);
+  });
+});
+
+/** A listed worktree on `branch`, untickable when `blockers` holds any. */
+function worktree(path: string, branch: string | null, blockers: readonly WorktreeBlocker[] = []): WorktreeRow {
+  const tickable = blockers.length === 0;
+  return {
+    path,
+    branch,
+    lastModified: NOW,
+    branchMerged: true,
+    blockers,
+    tickable,
+    ticked: tickable,
+    reason: tickable
+      ? 'clean'
+      : blockers.map((blocker) => blocker.reason).join('; '),
+  };
+}
+
+describe('classifyBranches: a Merged branch its worktree holds', () => {
+  const holders: readonly (readonly [string, WorktreeBlocker])[] = [
+    ['dirty', { kind: 'dirty', reason: '1 untracked file' }],
+    ['locked', { kind: 'locked', reason: 'locked' }],
+    ['current', { kind: 'current', reason: 'rafa cleanup runs from it' }],
+    ['running', { kind: 'session', reason: 'loop session s1 is running in it' }],
+    ['recent', { kind: 'recent', reason: 'modified today, within cleanup.worktreeIdleDays (7)' }],
+  ];
+
+  for (const [label, blocker] of holders) {
+    it(`starts it unticked when a ${label} worktree holds it, naming the worktree and its blocker`, () => {
+      const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+      const holder = worktree('/repo/.claude/worktrees/cranky-antonelli', 'done', [blocker]);
+      const settings = { ...SETTINGS, worktrees: [holder] };
+      const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, settings));
+      expect(read.merged).toEqual([{
+        group: 'merged',
+        branch: branch('done'),
+        ticked: false,
+        heldBy: { path: '/repo/.claude/worktrees/cranky-antonelli', name: 'cranky-antonelli', blockers: [blocker.kind] },
+        mergedBy: ['base'],
+        pullRequest: null,
+        reason: `merged into main; checked out in cranky-antonelli (${blocker.kind})`,
+      }]);
+    });
+  }
+
+  it('names every blocker of the holder, once each', () => {
+    const holder = worktree('/w/busy', 'done', [
+      { kind: 'dirty', reason: '1 uncommitted change' },
+      { kind: 'session', reason: 'loop session a is running in it' },
+      { kind: 'session', reason: 'loop session b is paused in it' },
+      { kind: 'recent', reason: 'modified today' },
+    ]);
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const answer = classifyBranches(git, reading(branch('done')), NO_MERGES, { ...SETTINGS, worktrees: [holder] });
+    expect(rows(answer)).toEqual([
+      { group: 'merged', name: 'done', ticked: false, reason: 'merged into main; checked out in busy (dirty, session, recent)' },
+    ]);
+  });
+
+  it('leaves it ticked when the worktree holding it can be ticked, so its delete waits for the removal', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const settings = { ...SETTINGS, worktrees: [worktree('/w/clean', 'done')] };
+    const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, settings));
+    expect(read.merged.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason })))
+      .toEqual([{ ticked: true, heldBy: undefined, reason: 'merged into main' }]);
+  });
+
+  it('leaves ticked a Merged branch an untickable worktree does not hold, and leaves Stale rows alone', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\nother\n') });
+    const dirty = { kind: 'dirty', reason: '1 untracked file' } as const;
+    const settings = {
+      ...SETTINGS,
+      worktrees: [worktree('/w/old', 'old', [dirty]), worktree('/w/detached', null, [dirty])],
+    };
+    const old = branch('old', { lastCommit: new Date(NOW.getTime() - 40 * DAY) });
+    const answer = classifyBranches(git, reading(branch('done'), old), NO_MERGES, settings);
+    expect(rows(answer)).toEqual([
+      { group: 'merged', name: 'done', ticked: true, reason: 'merged into main' },
+      { group: 'stale', name: 'old', ticked: false, reason: 'no commit in 40 days' },
+    ]);
+  });
+
+  it('holdMergedRows returns a row no untickable worktree holds as it came', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, SETTINGS));
+    const [row] = holdMergedRows(read.merged, [worktree('/w/x', 'elsewhere', [{ kind: 'locked', reason: 'locked' }])]);
+    expect(row).toBe(read.merged[0]);
   });
 });
 
