@@ -39,13 +39,14 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry each spawned case runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -53,13 +54,6 @@ const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
 /** How long a spawned run may take before it is killed, and a case that drives one. */
 const KILL_AFTER_MS = 30_000;
 const RUN_TIMEOUT = { timeout: 60_000 };
-
-/** git's own directory, resolved once and appended to the scratch PATH. */
-const GIT_DIR = (() => {
-  const found = Bun.which('git');
-  if (found === null) throw new Error('git is not on the PATH this suite runs under');
-  return dirname(found);
-})();
 
 /** Runs git for the fixture's own setup, inheriting this process's environment. */
 function git(cwd: string, ...args: string[]): void {
@@ -135,7 +129,7 @@ function plantScratch(): Scratch {
   writeFileSync(join(repo, '.plans', 'PREREQUISITES-parity.md'), PREREQUISITES_TEXT, 'utf8');
   plantProjectConfig(repo, CONFIG_LINES.join('\n'));
 
-  return { repo, home, path: [bin, GIT_DIR].join(delimiter) };
+  return { repo, home, path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** What one spawned run wrote, and how it ended. */

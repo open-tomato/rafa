@@ -29,7 +29,7 @@ import type { GitRunner } from '../pr/index.js';
 
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -41,6 +41,7 @@ import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { completeSpecBody } from './spec-bodies.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-claim-race-spawned-')));
@@ -191,9 +192,7 @@ function plantDevice(originPath: string, label: string, storeId: string): Scratc
   plantProjectConfig(repo);
   mintDeviceStore(repo, storeId);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  const scratch: ScratchRepo = { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  const scratch: ScratchRepo = { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
   writeIssueGh(bin, { number: ISSUE, title: TITLE, body: ISSUE_BODY, state: 'OPEN', labels: [SPEC_LABEL, SPEC_READY_LABEL], author: AUTHOR });
   plantPlanningClaude(scratch, STUB);
   return scratch;

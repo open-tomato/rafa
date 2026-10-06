@@ -47,13 +47,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry every spawned case runs. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -63,13 +64,6 @@ const KILL_AFTER_MS = 45_000;
 
 /** How long the one case in this file may take, over the kill above. */
 const RUN_TIMEOUT = { timeout: 60_000 };
-
-/** git's own directory, appended to the scratch PATH beside the stand-in. */
-const GIT_DIR = (() => {
-  const found = Bun.which('git');
-  if (found === null) throw new Error('git is not on the PATH this suite runs under');
-  return dirname(found);
-})();
 
 /** Runs git for the fixture's own setup, inheriting this process's environment. */
 function git(cwd: string, ...args: string[]): void {
@@ -167,7 +161,7 @@ function plantScratch(): Scratch {
     home,
     calls,
     claude,
-    path: [bin, GIT_DIR].join(delimiter),
+    path: [bin, ...hostToolDirs()].join(delimiter),
     planFile: `.plans/PLAN-${STUB}.md`,
   };
 }
@@ -320,7 +314,7 @@ function plantFenceScratch(stub: string, planText: string): Scratch {
     home,
     calls,
     claude,
-    path: [bin, GIT_DIR].join(delimiter),
+    path: [bin, ...hostToolDirs()].join(delimiter),
     planFile: `.plans/PLAN-${stub}.md`,
   };
 }

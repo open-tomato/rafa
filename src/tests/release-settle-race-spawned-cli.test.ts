@@ -46,6 +46,7 @@ import { serializeFragment } from '../release/fragment.js';
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry an asynchronously spawned run executes; mirrors `cli-capture.ts`'s own. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -176,7 +177,7 @@ function caller(w: World, name: string): ScratchRepo {
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(dir, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, bin, callLog: join(dir, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /**

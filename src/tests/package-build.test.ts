@@ -330,6 +330,7 @@ import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/p
 
 import { plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -643,7 +644,7 @@ function plantPlanScratch(name: string): PlanScratch {
 
   const git = Bun.which('git');
   if (git === null) throw new Error('git is not on the PATH this suite runs under');
-  const path = [bin, dirname(git)].join(delimiter);
+  const path = [bin, ...hostToolDirs()].join(delimiter);
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 

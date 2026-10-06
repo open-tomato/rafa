@@ -86,6 +86,7 @@ import { plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry every case spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -162,7 +163,7 @@ interface Scratch {
   readonly claude: string;
   /** The file the stand-in appends one line to per call, outside the repository. */
   readonly callLog: string;
-  /** The PATH a spawned run gets: the stand-in's directory, then git's own. */
+  /** The PATH a spawned run gets: the stand-in's directory, then git's own and the system tools' (`hostToolDirs`). */
   readonly path: string;
 }
 
@@ -246,14 +247,12 @@ function plant(planText: string, standIn: (scratch: Scratch) => void = plantStan
   const home = join(root, 'home');
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const scratch: Scratch = {
     repo,
     home,
     claude: join(bin, 'claude'),
     callLog: join(root, 'calls.log'),
-    path: [bin, dirname(gitBinary)].join(delimiter),
+    path: [bin, ...hostToolDirs()].join(delimiter),
   };
   standIn(scratch);
 
