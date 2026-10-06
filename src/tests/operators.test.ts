@@ -15,6 +15,8 @@ import { describe, expect, it } from 'bun:test';
 import { BUNDLED_AGENTS_DIR } from '../inventory/trees.js';
 import { BUNDLED_SKILLS_DIR } from '../schema/tiers.js';
 
+import { expectExit } from './cli-capture.js';
+
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
@@ -60,7 +62,7 @@ describe('the bundled operators', () => {
     });
 
     expect(`${run.stdout.toString()}${run.stderr.toString()}`).not.toContain('error');
-    expect(run.exitCode).toBe(0);
+    expectExit({ exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() }, 0);
   });
 
   describe('the plugin the launcher loads', () => {

@@ -37,7 +37,7 @@ import { NATIVE_UNBLOCK_LINE } from '../commands/issue/unblock-native.js';
 import { freedHeaderLine, freedIssueLine } from '../commands/pr/merge-freed.js';
 import { positionAt, writePositionFile } from '../project/position.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -75,7 +75,7 @@ describe('rafa issue unblock in native mode, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['issue', 'unblock', '12']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stderr).toBe('');
     expect(run.stdout).toBe(`${NATIVE_UNBLOCK_LINE}\n`);
   }, SPAWN_TIMEOUT);
@@ -191,7 +191,7 @@ describe('rafa epic move in native mode, spawned', () => {
     ]);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout.split('\n')).toEqual([
       `Moved #${String(ISSUE)} from epic #${String(FROM_EPIC)} to #${String(TO_EPIC)}: Consolidating with billing`,
       nativeParentLine(TO_EPIC),
@@ -291,7 +291,7 @@ describe('rafa epic new in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['epic', 'new', 'Sign-in without passwords']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(
       `${NATIVE_MODE}, so it is named by its number and title and no epic: label was created.`,
     );
@@ -342,7 +342,7 @@ describe('rafa init --board --epic-guard in native mode, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['init', `--root=${scratch.repo}`, '--board', '--epic-guard']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(EPIC_GUARD_NATIVE_REFUSAL);
     expect(existsSync(join(scratch.repo, EPIC_GUARD_PATH))).toBe(false);
 
@@ -539,7 +539,7 @@ describe('rafa pr merge in native mode, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['pr', 'merge', String(PR_NUMBER), '--yes', '--no-hint']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(freedHeaderLine([CLOSED_ISSUE], 1));
     expect(run.stdout).toContain(freedIssueLine({ number: FREED_ISSUE, title: 'Sign-in page' }));
     expect(run.stdout).not.toContain(`#${String(STILL_WAITING_ISSUE)}`);

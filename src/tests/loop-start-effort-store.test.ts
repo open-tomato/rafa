@@ -31,7 +31,7 @@ import { bringForward } from '../effort/store/bring-forward.js';
 import { unknownAdditiveWarning } from '../effort/store/schema-report.js';
 import { NOTICE_IDS, writeDismissed } from '../notices/notices.js';
 
-import { plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, plantStandInClaude, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const RUN_TIMEOUT = { timeout: 60_000 };
@@ -136,7 +136,7 @@ describe('loop start while RAFA_EFFORT_DIR is set', () => {
     const refused = plantLoopScratch();
     const run = runRafa(refused, refused.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], { RAFA_EFFORT_DIR: copy });
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, refused);
     expect(run.stderr).toContain(refusalLine(copy));
     expect(run.stderr).toContain('Nothing was checked and nothing was dispatched.');
     expect(`${run.stdout}${run.stderr}`).not.toContain('Preflight');
@@ -146,7 +146,7 @@ describe('loop start while RAFA_EFFORT_DIR is set', () => {
     // The control: the same run with the variable empty, which counts as unset.
     const control = plantLoopScratch();
     const passed = runRafa(control, control.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait'], { RAFA_EFFORT_DIR: '' });
-    expect(passed.exitCode).toBe(1);
+    expectExit(passed, 1, control);
     expect(passed.stderr).not.toContain('RAFA_EFFORT_DIR is set');
     expect(passed.stderr).toContain('❌ preflight halted: 1 required item failed');
     expect(existsSync(control.callLog)).toBe(false);
@@ -164,7 +164,7 @@ describe('loop start over a store logging an unknown additive migration', () => 
     const warning = unknownAdditiveWarning({ id: 'future-notes', appliedBy: '0.30.0' });
     expect(occurrences(output, warning)).toBe(1);
     // The run went on to its preflight and stored its halt in that store.
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('and `rafa effort report` lists the halt.');
     expect(preflightRows(path)).toBe(1);
     expect(existsSync(scratch.callLog)).toBe(false);
@@ -173,7 +173,7 @@ describe('loop start over a store logging an unknown additive migration', () => 
     const control = plantLoopScratch();
     const controlPath = plantStore(control);
     const passed = runRafa(control, control.repo, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
-    expect(passed.exitCode).toBe(1);
+    expectExit(passed, 1, control);
     expect(`${passed.stdout}${passed.stderr}`).not.toContain('this rafa does not know');
     expect(preflightRows(controlPath)).toBe(1);
   }, RUN_TIMEOUT);

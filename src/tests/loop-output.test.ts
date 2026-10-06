@@ -141,6 +141,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CONFIG_DEFAULTS } from '../config.js';
 import { parsePlan } from '../plan/index.js';
 
+import { expectExit } from './cli-capture.js';
 import { PLAN_DONE, PLAN_FLAG, PLAN_OPEN, RUN_TIMEOUT, runLoopStart, scratchPlanter, SESSION_FLAGS, STUB, TASK } from './loop-scratch.js';
 import { consoleAndExitUses } from './source-uses.js';
 
@@ -347,7 +348,7 @@ describe('loop start refusing', () => {
 
     expect(text).toEqual({ exitCode: 1, stdout: '', stderr: `${refusal(textScratch)}\n` });
 
-    expect(json.exitCode).toBe(1);
+    expectExit(json, 1, { ...jsonScratch });
     expect(json.stderr).toBe('');
     expect(eventsOf(json.stdout)).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
@@ -372,7 +373,7 @@ describe('loop start refusing', () => {
 
     const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait', '--create-branch']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { ...scratch });
     // The offer's opening line, written before its first step runs.
     expect(run.stdout).toBe(`\n🌿 Creating feat/${STUB} from the latest origin/main.\n`);
     expect(run.stderr.split('\n').slice(0, 2)).toEqual([
@@ -391,7 +392,7 @@ describe('loop start with no --plan', () => {
 
     const run = runLoopStart(scratch, 'text', ['--no-ci-wait']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { ...scratch });
     expect(run.stdout).toBe('');
     expect(run.stderr.startsWith('\n❌ Refusing to run a plan on `main`.\n')).toBe(true);
     expect(existsSync(scratch.callLog)).toBe(false);
@@ -462,7 +463,7 @@ describe('a loop start run with no open task', () => {
 
     const run = runLoopStart(scratch, 'json', [PLAN_FLAG, '--no-ci-wait']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     // The loop's named events (`start/loop-events.ts`) ride beside the log
     // lines; they are read on their own below.
@@ -500,7 +501,7 @@ describe('a loop start run with no open task', () => {
     // matched as a pattern.
     const expected: string[] = noTaskLines().flatMap(([level, message]) => textLines(level, message));
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(run.stdout.split('\n')).toEqual([...expected, '']);
   }, RUN_TIMEOUT);
@@ -514,7 +515,7 @@ describe('a loop start run with no open task', () => {
     // read for "the run went on" is the first one after the guard.
     const firstRunLine = lines.find((line) => line.startsWith('🧭 Task sessions are handed the plan')) ?? '';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stdout).toContain('is alpha software');
     expect(run.stdout).toContain('--dangerously-skip-permissions');
     // No terminal, so nothing was asked and the run went on: its own
@@ -540,7 +541,7 @@ describe('a loop start run whose session fails', () => {
     const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const failure = 'error:\n❌ Task failed (exit 3). Marked as blocked. Run again to retry.';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(existsSync(scratch.callLog)).toBe(true);
     expect(named).toEqual(['event:task-start', 'event:task-blocked']);
@@ -579,7 +580,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
     const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const steps = events.filter((event) => event.type === 'step');
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(named).toEqual([
       'event:task-start',
@@ -624,7 +625,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
 
     const run = runLoopStart(scratch, 'text', SESSION_FLAGS);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
     expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
