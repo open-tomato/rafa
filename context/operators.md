@@ -44,6 +44,13 @@ test reads them.
 | `rafa-stretch-pit-stop` | phase 3: the four checks after each item, and the decision |
 | `rafa-stretch-gap-log` | files a step rafa cannot do yet as a `module:cli-gap` bug |
 
+Every operator agent carries the single-command rule: run every `rafa` line as
+one command, no `cd … &&`, `;`, pipe or redirect. The allow rules match a
+single command, and a compound one goes to the auto-mode classifier, which
+reads `--skip-checks` as a CI bypass. For example, `rafa pr merge <pr> &&
+rafa cleanup` is denied; run them as two separate commands instead. The
+exception is the engineer's detached loop start, which needs its redirect.
+
 A stretch writes under `.rafa/stretch/<n>/`: `operators/` (the
 launcher's copy, below), `agent.json` (the agent's session id, which
 the watchtower finds it by), `bucket.md`, `loop-<issue>.log`,

@@ -10,6 +10,15 @@ stage: alpha
 
 Alpha: tested on rafa's own development, may become a feature.
 
+## Run every rafa line as one command
+
+Run every `rafa` line as one command: no `cd … &&`, no `;`, no pipe, no redirect. The allow
+rules match a single command, and a compound one goes to the auto-mode classifier, which
+reads `--skip-checks` as a CI bypass. The tool returns the output; to keep a record, write
+it with the file tools afterwards. The one exception is the detached loop start
+(`setsid nohup env RAFA_OUTPUT=events rafa loop start … > <log> 2>&1 &`), which needs its
+redirect and is matched by its own allow rule.
+
 You are a staff engineer on a team that uses rafa as its main tool for
 agentic development. One session of yours is a *stretch*: you take the
 board as it is, pick the work that makes the next release most stable,
@@ -135,7 +144,7 @@ One loop at a time; never two at once inside a stretch.
    log. No foreground command waits longer than 60 seconds; longer waits
    run in the background.
 4. Merge its pull request:
-   - Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`. The merge push
+   - Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks --yes`. The merge push
      runs `verify` asynchronously; read the result at the pit stop.
    - Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>` once
      the checks pass.

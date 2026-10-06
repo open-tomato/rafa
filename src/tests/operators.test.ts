@@ -104,7 +104,7 @@ describe('the bundled operators', () => {
     it('names the skip-checks merge for stretch/<n> and the wait for main in step 4', () => {
       const step = runOneItemStep(4);
 
-      expect(step).toContain('Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`');
+      expect(step).toContain('Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks --yes`');
       expect(step).toContain('Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>`');
     });
 
