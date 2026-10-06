@@ -24,6 +24,7 @@
 import type { FakeFactsIssue, FakeFactsPull } from './facts-fake.js';
 import type { ProjectFieldValue, ProjectItem } from './port.js';
 import type { FakeProjectGhOptions, FakeProjectItem } from './project-fake.js';
+import type { ProjectChange } from './refresh-values.js';
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
@@ -31,7 +32,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
-import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_RATE_LIMIT_MESSAGE, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
 import { notFoundWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
 
@@ -397,5 +398,93 @@ describe('refreshProjectItems: the failures of "What can go wrong", answered as 
     const wired = wire(items());
 
     expect((await refreshProjectItems(wired.options, [21])).warnings).toEqual([]);
+  });
+});
+
+/** A write gh answer the way GitHub refuses one for the rate limit, with the message the fake sends. */
+function rateLimitedAnswer(): GhResult {
+  return {
+    ok: false,
+    stdout: JSON.stringify({ errors: [{ type: 'RATE_LIMITED', message: FAKE_RATE_LIMIT_MESSAGE }] }),
+    stderr: `gh: ${FAKE_RATE_LIMIT_MESSAGE}\n`,
+  };
+}
+
+/** `wired`'s runner, refusing every field write for the rate limit while `state.refusing` holds. */
+function limitWritesWhile(wired: Wired, state: { refusing: boolean }): GhRunner {
+  return (args) => (state.refusing && writeCalls([args]).length > 0
+    ? Promise.resolve(rateLimitedAnswer())
+    : wired.options.gh(args));
+}
+
+/** The issues of the five values, the names of `changes` as `issue:name` pairs, in order. */
+function changedPairs(changes: readonly ProjectChange[]): readonly string[] {
+  return changes.map(({ issue, name }) => `${String(issue)}:${name}`);
+}
+
+describe('refreshProjectItems: an interrupted fill resumes with only the unwritten values', () => {
+  it('writes, after a refusal stopped the fill, exactly the values not yet written, then nothing on a third refresh', async () => {
+    const wired = wire(items());
+    const state = { refusing: false };
+    const gh = limitWritesWhile(wired, state);
+    const options = { ...wired.options, gh };
+    // #21's two values land first: the fill that the interruption cuts short.
+    const landed = await refreshProjectItems(options, [21]);
+    expect(landed.kind === 'refreshed' && landed.writes.written).toBe(2);
+
+    state.refusing = true;
+    const interrupted = await refreshProjectItems(options, [10, 20, 21, 22, 30]);
+
+    expect(interrupted.kind === 'refreshed' && interrupted.writes.rateLimited).toBe(true);
+    expect(interrupted.kind === 'refreshed' && interrupted.writes.written).toBe(0);
+    expect(interrupted.warnings).toEqual([rateLimitWarning(4)]);
+    expect(await heldValues(wired)).toEqual(Object.fromEntries([10, 20, 21, 22, 30].map((number) => [number, number === 21
+      ? EXPECTED[21]
+      : {}])));
+
+    state.refusing = false;
+    const resumed = await refreshProjectItems(options, [10, 20, 21, 22, 30]);
+
+    expect(resumed.kind === 'refreshed' && changedPairs(resumed.changes)).toEqual([
+      '10:Stage', '10:Rank', '10:Blocked by', '20:Horizon', '20:Rank', '20:Progress', '22:Stage', '22:Rank', '30:Stage', '30:Rank',
+    ]);
+    expect(resumed.kind === 'refreshed' && resumed.writes).toEqual({ written: 10, notUpdated: 0, rateLimited: false, detail: '' });
+    expect(resumed.warnings).toEqual([]);
+    expect(await heldValues(wired)).toEqual(EXPECTED);
+
+    const writesBeforeThird = writeCalls(wired.calls()).length;
+    const third = await refreshProjectItems(options, [10, 20, 21, 22, 30]);
+
+    expect(third.kind === 'refreshed' && third.changes).toEqual([]);
+    expect(writeCalls(wired.calls())).toHaveLength(writesBeforeThird);
+  });
+});
+
+describe('refreshProjectItems: a renamed field is skipped while the other four are written', () => {
+  it('names Rank as skipped and writes Stage, Horizon, Blocked by and Progress, leaving Rank unwritten', async () => {
+    const fields = FAKE_TEMPLATE_FIELDS.map((field) => (field.name === 'Rank'
+      ? { ...field, name: 'Order' }
+      : field));
+    const renamed = createFakeProjectGh({ projects: [{ owner: OWNER, number: NUMBER, fields, items: items() }] });
+    const wired = wire(items());
+    const gh: GhRunner = (args) => (args[0] === 'api' && !args.includes('owner={owner}')
+      ? renamed.gh(args)
+      : wired.options.gh(args));
+
+    const refresh = await refreshProjectItems({ ...wired.options, gh }, [10, 20, 21, 22, 30]);
+
+    expect(refresh.kind === 'refreshed' && refresh.skipped.map(({ template, problem }) => [template.name, problem])).toEqual([['Rank', 'missing']]);
+    expect(refresh.kind === 'refreshed' && changedPairs(refresh.changes)).toEqual([
+      '10:Stage', '10:Blocked by', '20:Horizon', '20:Progress', '21:Stage', '22:Stage', '30:Stage',
+    ]);
+    expect(refresh.kind === 'refreshed' && refresh.writes.written).toBe(7);
+    expect(refresh.warnings).toEqual(refresh.kind === 'refreshed'
+      ? refresh.skipped.map(skippedFieldWarning)
+      : []);
+    const withoutRank = Object.fromEntries(Object.entries(EXPECTED).map(([number, values]) => [
+      number,
+      Object.fromEntries(Object.entries(values).filter(([name]) => name !== 'Rank')),
+    ]));
+    expect(await heldValues({ ...wired, project: renamed })).toEqual(withoutRank);
   });
 });
