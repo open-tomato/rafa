@@ -1202,3 +1202,37 @@ describe('dispatchTask and renderProgressForDispatch, in the run\'s checkout', (
     expect(readFileSync(join(root, 'progress.txt'), 'utf8')).toContain('the finding the store holds');
   });
 });
+
+describe('dispatchTask, handing out the shipped PROMPT.md', () => {
+  const SHIPPED_PROMPT = readFileSync(join(import.meta.dir, '..', 'PROMPT.md'), 'utf8');
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('hands the session the foreground rule, and a prompt without it carries none', async () => {
+    const root = freshRoot();
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (promptContent: string): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent,
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
+      newSessionId: () => 'session-under-test',
+    });
+    const rule = 'Run every command in the foreground, the full test suite included';
+
+    const shipped = (await dispatchWith(SHIPPED_PROMPT)).prompt;
+    expect(shipped).toContain(rule);
+    expect(shipped).toContain('never start a background command and never wait on a notification');
+    expect(shipped).toContain('end the session only after your `rafa:report` block');
+    expect((await dispatchWith('The loop commits.')).prompt).not.toContain(rule);
+  });
+});
