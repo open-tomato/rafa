@@ -85,7 +85,7 @@ import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSIO
 import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { recordTaskReport } from '../report/record.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command every black-boxed run executes. */
@@ -193,11 +193,11 @@ describe('a nothing-new effort collect run over a future-version store', () => {
     const repo = makeRepo();
 
     const first = runCollect(repo);
-    expect(first.exitCode).toBe(0);
+    expectExit(first, 0, { ...repo });
     expect(first.stdout).toContain('+1 rows');
 
     const control = runCollect(repo);
-    expect(control.exitCode).toBe(0);
+    expectExit(control, 0, { ...repo });
     expect(control.stdout).toContain('+0 rows');
     const beforeGuard = storeBytes(repo);
 

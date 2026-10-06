@@ -41,7 +41,7 @@ import { renderRoadmapTable } from '../commands/issue/roadmap-table.js';
 import { createGitRunner } from '../pr/git.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -167,7 +167,7 @@ describe('rafa roadmap and rafa epics over a fixture board with two epics, spawn
 
   it('prints both epic rows with their computed state and done/total, and exits 0 despite the disagreement', () => {
     const run = runRafa(up, up.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, up);
     expect(run.stdout).toContain(`Roadmap #${String(ROADMAP)} · now`);
 
     const rows = epicCellsOf(run.stdout);
@@ -184,7 +184,7 @@ describe('rafa roadmap and rafa epics over a fixture board with two epics, spawn
 
   it('--full prints each epic\'s issues underneath its row, alpha\'s between its row and beta\'s', () => {
     const run = runRafa(up, up.repo, ['roadmap', '--full']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, up);
     expect(run.stdout).toContain('Alpha open member');
     expect(run.stdout).toContain('Alpha closed member');
     expect(run.stdout).toContain('Beta member one');
@@ -201,27 +201,27 @@ describe('rafa roadmap and rafa epics over a fixture board with two epics, spawn
   it('--check exits non-zero: beta is open with all its members closed', () => {
     const bare = runRafa(up, up.repo, ['roadmap']);
     const checked = runRafa(up, up.repo, ['roadmap', '--check']);
-    expect(bare.exitCode).toBe(0);
-    expect(checked.exitCode).toBe(EPIC_CHECK_EXIT);
+    expectExit(bare, 0, up);
+    expectExit(checked, EPIC_CHECK_EXIT, up);
     expect(checked.stdout + checked.stderr).toContain(`done, but epic #${String(EPIC_BETA)} is still open`);
   });
 
   it('prints the epics unknown, with the reason, when the board listing fails', () => {
     const run = runRafa(down, down.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, down);
     expect(run.stdout).toContain(`Roadmap #${String(ROADMAP)} · epics unknown:`);
     expect(run.stdout).toContain('connection refused');
   });
 
   it('--check also fails, naming that the epics could not be checked, when the listing is unknown', () => {
     const run = runRafa(down, down.repo, ['roadmap', '--check']);
-    expect(run.exitCode).toBe(EPIC_CHECK_EXIT);
+    expectExit(run, EPIC_CHECK_EXIT, down);
     expect(run.stdout + run.stderr).toContain('Could not check the epics');
   });
 
   it('rafa epics <n> names no issue of the other epic', () => {
     const run = runRafa(up, up.repo, ['epics', String(EPIC_ALPHA)]);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, up);
     expect(run.stdout).toContain(`Epic #${String(EPIC_ALPHA)} · Alpha epic`);
     expect(run.stdout).toContain(`#${String(ALPHA_OPEN_MEMBER)}`);
     expect(run.stdout).toContain(`#${String(ALPHA_CLOSED_MEMBER)}`);
@@ -275,7 +275,7 @@ describe('rafa roadmap over a fixture naming no epic at all, spawned', () => {
 
   it('prints a capture byte-identical to the one taken on origin/main', async () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(await goldenCapture());
   });
 });
