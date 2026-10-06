@@ -118,7 +118,7 @@ describe('withTaskBudget', () => {
 
 describe('the plan that ships', () => {
   test('parses with no issue and carries the budget on every task it answers', () => {
-    const filled = withTaskBudget(loadPinnedPlan('conflict-lockfile', { block: BLOCK }), 1.5);
+    const filled = withTaskBudget(loadPinnedPlan('conflict-lockfile', { base: 'main', block: BLOCK }), 1.5);
 
     const plan = parsePlan(filled);
     expect(plan.issues).toEqual([]);

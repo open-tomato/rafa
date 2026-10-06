@@ -12,7 +12,10 @@
  *
  * A session that left NEITHER a report the loop could read NOR a commit
  * is held rather than ticked, on one hold line per absence; either
- * absence alone still ticks. See {@link commitFinishedTask}.
+ * absence alone still ticks. See {@link commitFinishedTask}. When such a
+ * session's final message names a command it left running in the
+ * background (`start/background-wait.ts`), the report's hold line names
+ * that wait in place of the bare "no report".
  *
  * What the operator is told goes through the active output
  * (`adapters/output/active.ts`): the done, commit and nothing-to-commit
@@ -29,6 +32,8 @@ import { parseReport } from '../report/parse.js';
 import { commitTaskWork } from '../utils/commit.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
+
+import { readBackgroundWait } from './background-wait.js';
 
 /** How one git invocation is made on a finished task's behalf. */
 export type TaskCommitRunner = (options: CommitOptions) => CommitAttempt;
@@ -60,13 +65,20 @@ export interface FinishedTaskOptions {
    * reads no report marks its task as it did before.
    */
   reported?: boolean;
+  /**
+   * The session's final message, read only for a task held on both
+   * absences, to name a command it left running in the background; see
+   * {@link noReportHold}. Absent, that task's report hold is the bare
+   * {@link NO_REPORT_HOLD}.
+   */
+  output?: string;
 }
 
 /**
  * What {@link finishCleanExit} needs: the task, and its session's output.
  * The holds and whether a report was read are the output's to answer.
  */
-export interface CleanExitOptions extends Omit<FinishedTaskOptions, 'holds' | 'reported'> {
+export interface CleanExitOptions extends Omit<FinishedTaskOptions, 'holds' | 'reported' | 'output'> {
   /** Everything the session wrote to stdout, its report included. */
   output: string;
 }
@@ -96,6 +108,14 @@ const DROPPED_BLOCKER_FIELD = /^blockers\[\d+\]$/;
 
 /** The hold naming the absent half a session was asked to write. */
 const NO_REPORT_HOLD = 'no report: the session wrote no rafa:report block the loop could read';
+
+/**
+ * The opening of the hold that replaces {@link NO_REPORT_HOLD} for a
+ * session that ended its turn waiting on a background command; the line
+ * its final message named the wait on follows it.
+ */
+export const BACKGROUND_WAIT_HOLD
+  = 'no report: the session ended its turn waiting on a command left running in the background:';
 
 /** The hold naming the absent half its work was asked to leave behind. */
 const NO_COMMIT_HOLD = 'no commit: the task changed no tracked file';
@@ -171,12 +191,34 @@ function leftNothingBehind(attempt: CommitAttempt, reported: boolean): boolean {
 }
 
 /**
+ * The hold naming a missing report: {@link BACKGROUND_WAIT_HOLD} and the
+ * waiting line when `output` names a command left running in the
+ * background, {@link NO_REPORT_HOLD} otherwise, an absent `output`
+ * included.
+ */
+function noReportHold(output: string | undefined): string {
+  const waiting = output === undefined
+    ? null
+    : readBackgroundWait(output);
+  return waiting === null
+    ? NO_REPORT_HOLD
+    : `${BACKGROUND_WAIT_HOLD} ${waiting}`;
+}
+
+/**
  * The holds that stand once git has answered: what the report held, plus
  * one line per absence when the session left nothing behind at all.
+ *
+ * The output is read for a background wait only on that last shape, so
+ * a reported or ticked task's message is never read here.
  */
-function holdsAfterCommit(holds: readonly string[], silent: boolean): readonly string[] {
+function holdsAfterCommit(
+  holds: readonly string[],
+  silent: boolean,
+  output: string | undefined,
+): readonly string[] {
   return silent
-    ? [...holds, NO_REPORT_HOLD, NO_COMMIT_HOLD]
+    ? [...holds, noReportHold(output), NO_COMMIT_HOLD]
     : holds;
 }
 
@@ -204,9 +246,14 @@ function holdsAfterCommit(holds: readonly string[], silent: boolean): readonly s
  * blocker comment (`writeTrackerBlocker` in `utils/tracker.ts`), so the
  * task's next dispatch reads what held it. A line that comment cannot go
  * on, being no open or blocked task line with text, is marked as every
- * other hold marks it. Either absence ALONE still ticks: a report beside
- * an empty commit is the ordinary shape above, and a commit beside no
- * report is a session that did the work and skipped the block.
+ * other hold marks it. The report's line names the wait instead when
+ * `output` ends on a command left running in the background
+ * ({@link BACKGROUND_WAIT_HOLD}), the shape of a session that ended its
+ * one `claude -p` turn to wait for a notification it never got; the
+ * output is read on this shape alone. Either absence ALONE still
+ * ticks: a report beside an empty commit is the ordinary shape above,
+ * and a commit beside no report is a session that did the work and
+ * skipped the block.
  *
  * A task its report holds is committed all the same, and then marked
  * `[BLOCKED]`. The partial work is kept in the history rather than left
@@ -249,7 +296,7 @@ export function commitFinishedTask(options: FinishedTaskOptions): CommitAttempt 
   }
 
   const silent = leftNothingBehind(attempt, reported);
-  const holds = holdsAfterCommit(reportHolds, silent);
+  const holds = holdsAfterCommit(reportHolds, silent, options.output);
   const held = holds.length > 0;
   const marked = silent
     && writeTrackerBlocker(trackerPath, taskInfo.lineNum, NOTHING_REPORTED_OR_COMMITTED);
@@ -302,8 +349,8 @@ export function finishCleanExit(options: CleanExitOptions): FinishedTask {
   const reportHolds = reported
     ? holdsOf(reading)
     : [];
-  const attempt = commitFinishedTask({ ...task, holds: reportHolds, reported });
-  const holds = holdsAfterCommit(reportHolds, leftNothingBehind(attempt, reported));
+  const attempt = commitFinishedTask({ ...task, holds: reportHolds, reported, output });
+  const holds = holdsAfterCommit(reportHolds, leftNothingBehind(attempt, reported), output);
   const blocked = attempt.outcome === 'failed' || holds.length > 0;
   return {
     attempt,

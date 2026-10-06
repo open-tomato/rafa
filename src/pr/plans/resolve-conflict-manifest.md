@@ -19,7 +19,7 @@ This plan resolves a pull request with a `package.json` conflict by merging the 
 
 # Stage: Resolve
 
-- [ ] Merge the base branch into the current branch using `git merge origin/main` {agent=loop-implementer}
+- [ ] Merge the base branch into the current branch using `git merge origin/{BASE}` {agent=loop-implementer}
 - [ ] Resolve the `package.json` conflict by keeping both sides' entries and taking the higher version where both sides bumped a dependency {agent=loop-implementer}
 - [ ] Run `bun install` (plain, not `--frozen-lockfile`) to ensure both sides' dependencies are installed and the lockfile is updated {agent=loop-implementer}
 - [ ] Run `bun install --frozen-lockfile` to verify the lockfile is now consistent with the merged manifests {agent=loop-implementer}

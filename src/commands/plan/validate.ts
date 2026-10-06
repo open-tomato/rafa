@@ -69,9 +69,10 @@
  * task spelling a code span that runs `src/rafa.ts`, `dist/cli.js` or
  * `bun run rafa` without a leading `RAFA_EFFORT_DIR=`, and an `[auto]`
  * item probing `rafa effort schema --check` in the plan's
- * `PREREQUISITES-<stub>.md` beside it. They need no project, so they
- * run whether or not one was found; like the roster, they are the
- * command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
+ * `PREREQUISITES-<stub>.md` beside it, read by `./store-check.ts`, the
+ * one reading `rafa plan create` refuses a generated plan with too. They
+ * need no project, so they run whether or not one was found; like the
+ * roster, they are the command's and not `validatePlan`'s, which `src/board/gate.ts` weighs a
  * planner's plan with and which reads one file only.
  *
  * ## What it writes
@@ -113,7 +114,7 @@ import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import {
   collidingPlanSkills,
@@ -128,10 +129,10 @@ import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { parsePlan } from '../../plan/index.js';
-import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
-import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
+import { storeRuleLine } from '../../plan/store-rules.js';
 
 import { countTasks, expectOneArgument, formatCounts, isFile, issueLine, plural } from './plan-files.js';
+import { checkStoreRules } from './store-check.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa plan validate <file>';
@@ -165,23 +166,6 @@ export interface RosterFindings {
 export interface PlanValidationResult extends PlanValidation, RosterFindings {
   /** Every effort-store rule the plan breaks, in line order; see the module note. */
   readonly storeProblems: readonly StoreRuleProblem[];
-}
-
-/** The text at `path`, or null when no file sits there. */
-function readFileOrNull(path: string | null): string | null {
-  return path !== null && isFile(path)
-    ? readFileSync(path, 'utf8')
-    : null;
-}
-
-/** The effort-store rules the plan at `file`, whose text is `markdown`, breaks; see the module note. */
-function checkStoreRules(file: string, markdown: string): readonly StoreRuleProblem[] {
-  const prerequisitesPath = prerequisitesPathForPlan(file);
-  return findStoreRuleProblems({
-    plan: markdown,
-    prerequisites: readFileOrNull(prerequisitesPath),
-    prerequisitesName: basename(prerequisitesPath ?? 'PREREQUISITES-<stub>.md'),
-  });
 }
 
 /** The plan at the absolute path `file`, read, or a refusal with exit code 1 when it is no file. */

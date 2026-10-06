@@ -73,7 +73,11 @@
  * dangling or suspect with no `--accept-refs`
  * (`commands/plan/refs-check.ts`) — throws exit code 2, and a spec the planner
  * judged not ready over a gap that blocks planning throws exit code 3
- * with every gap in it. Text mode writes
+ * with every gap in it. A generated plan that breaks an effort-store
+ * rule throws exit code 1 with one line per broken rule, the plan and
+ * its PREREQUISITES file moved into `rejected/` first
+ * (`commands/plan/store-check.ts`); that check runs straight after the
+ * session and before the gate. Text mode writes
  * that message to stderr, the bytes the command printed there before;
  * json mode carries it in the terminal result.
  *
@@ -219,6 +223,7 @@ import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
+import { enforceStoreRules } from './commands/plan/store-check.js';
 import { loadConfig } from './config-load.js';
 import { ConfigError } from './config.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -676,6 +681,11 @@ export default async function plan(
 
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
   const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
+
+  // The store rules `loop start`'s preflight repeats, read as
+  // `plan validate` reads them, before the gate settles a verdict over a
+  // plan the loop would refuse anyway.
+  enforceStoreRules(repoRoot, generated);
 
   await settleReview(gate, generated, flags.skipReview);
 

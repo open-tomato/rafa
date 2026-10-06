@@ -46,6 +46,11 @@ before it. Never pipe to `| tail` alone, and never poll with
 tool's own summary line (`N pass, N fail` for the suite); never grep the
 capture for `failed`, which appears in deliberate log fixtures.
 
+Run every command in the foreground, the full test suite included: no
+background command, and no waiting on a notification. The session is a
+single `claude -p` turn, so ending it to wait leaves no report and no
+commit; end it only after its `rafa:report` block.
+
 The full suite runs only after your task completes (at the task step,
 stage end, and before wrap-up), not in your session. If a diff touches
 `bunfig.toml`, `tsconfig*.json`, `package.json`, `bun.lock`, `bun.lockb`,

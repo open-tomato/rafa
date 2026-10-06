@@ -71,7 +71,9 @@
  * runs and the prompt a person pastes quote the same lines of the same
  * log rather than two different tails of it. A fill carrying no excerpt still answers the
  * slot, and the two conflict plans carry no such slot at all, so the
- * value goes unused there.
+ * value goes unused there. The conflict plans' own `{BASE}` slot is
+ * filled from the pull request's `baseRefName`, so a resolve merges the
+ * branch the pull request targets and not `main` (#636).
  *
  * The evidence travels WITH the assessment, as {@link AssessedLog},
  * and moves only when the re-assessment classified something. That is
@@ -412,7 +414,7 @@ function excerptOf(assessed: AssessedLog): ExcerptReading | undefined {
 function planFor(run: ResolveRun, detail: PullRequestDetail, assessed: AssessedLog, attempt: number): string {
   const { assessment } = assessed;
   const block = blockOf(detail, assessment, run.now(), attempt);
-  const fill = { block, excerpt: excerptOf(assessed) };
+  const fill = { base: detail.baseRefName, block, excerpt: excerptOf(assessed) };
   const plan = withTaskBudget(loadPinnedPlan(assessment.triageClass, fill), run.budgetUsd);
   return writeResolvePlan({
     home: run.home,
