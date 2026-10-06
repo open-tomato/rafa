@@ -264,6 +264,72 @@ describe('readIssueFacts: the fragment a pull request added', () => {
   });
 });
 
+describe('readIssueFacts: the Stage edge cases, read through the fake', () => {
+  it('reads a pull request merged into an integration branch, its fragment on that branch, as In review', async () => {
+    const path = '.changes/rafa-821.md';
+    const { facts, calls } = await read({
+      issues: [{ number: 821, state: 'OPEN', mentions: [{ pull: 850 }] }],
+      pulls: [pull(850, { baseRefName: 'stretch/4', body: 'Closes #821', files: [added(path)] })],
+      trees: { head850: { [path]: fragmentText('minor') }, 'stretch/4': { [path]: fragmentText('minor') } },
+    }, [821]);
+    const issue = facts.get(821);
+
+    expect(issue?.pullRequests).toEqual([
+      expect.objectContaining({ number: 850, state: 'MERGED', baseRefName: 'stretch/4' }),
+    ]);
+    expect(issue?.pullRequests[0]?.fragment).toEqual({ path, level: 'minor', onBase: true, problem: null });
+    expect(issue && stageOf(issue)).toBe('In review');
+    expect(calls.some((args) => args.join(' ').includes('stretch/4:' + path))).toBe(true);
+  });
+
+  it('keeps an open issue In review when its integration-branch pull request added a shipping fragment, even after settle has folded it off that branch', async () => {
+    const path = '.changes/rafa-821.md';
+    const { facts } = await read({
+      issues: [{ number: 821, state: 'OPEN', mentions: [{ pull: 850 }] }],
+      pulls: [pull(850, { baseRefName: 'stretch/4', body: 'Closes #821', files: [added(path)] })],
+      trees: { head850: { [path]: fragmentText('minor') }, 'stretch/4': {} },
+    }, [821]);
+    const issue = facts.get(821);
+
+    expect(issue?.pullRequests[0]?.fragment).toEqual({ path, level: 'minor', onBase: false, problem: null });
+    expect(issue && stageOf(issue)).toBe('In review');
+  });
+
+  it('reads a pull request whose body only mentions the issue as no close, so the issue stays Backlog', async () => {
+    const path = '.changes/rafa-821.md';
+    const { facts } = await read({
+      issues: [{ number: 821, state: 'OPEN', mentions: [{ pull: 850 }] }],
+      pulls: [pull(850, { baseRefName: 'stretch/4', body: 'Works toward #821', files: [added(path)] })],
+      trees: { head850: { [path]: fragmentText('minor') }, 'stretch/4': { [path]: fragmentText('minor') } },
+    }, [821]);
+    const issue = facts.get(821);
+
+    expect(issue?.pullRequests).toEqual([]);
+    expect(issue && stageOf(issue)).toBe('Backlog');
+  });
+
+  it('reads an issue closed by hand with no pull request as Done, sending no file or blob read', async () => {
+    const { facts, calls } = await read({
+      issues: [{ number: 7, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['spec:ready'] }],
+    }, [7]);
+    const issue = facts.get(7);
+
+    expect(issue?.pullRequests).toEqual([]);
+    expect(issue && stageOf(issue)).toBe('Done');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('reads an issue closed as not planned with no pull request as Cancelled', async () => {
+    const { facts } = await read({
+      issues: [{ number: 8, state: 'CLOSED', stateReason: 'NOT_PLANNED' }],
+    }, [8]);
+    const issue = facts.get(8);
+
+    expect(issue?.pullRequests).toEqual([]);
+    expect(issue && stageOf(issue)).toBe('Cancelled');
+  });
+});
+
 describe('readIssueFacts: refusals', () => {
   /** A runner answering `answer` to every call. */
   function answering(answer: GhResult): GhRunner {
