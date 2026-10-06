@@ -73,6 +73,8 @@ case are not counted. A test file's cluster is its subject source file's,
 else its directory's most common, else `none`, from
 `.rafa/survey/import-graph.json`, so `import-graph.ts` runs first. A
 tracked test file the report holds no case for is named as missed.
+A case the report marks with a `<failure>` or `<error>` child is listed
+under "Failed cases", its seconds not timings to trust.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:

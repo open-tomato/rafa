@@ -50,9 +50,23 @@ describe('parseJunit', () => {
     const files = parseJunit(junit([['src/a/x.test.ts', '0.5'], ['src/a/x.test.ts', '0.25'], ['src/b/y.test.ts', '2']]));
 
     expect([...files]).toEqual([
-      ['src/a/x.test.ts', { tests: 2, seconds: 0.75 }],
-      ['src/b/y.test.ts', { tests: 1, seconds: 2 }],
+      ['src/a/x.test.ts', { tests: 2, seconds: 0.75, failed: [] }],
+      ['src/b/y.test.ts', { tests: 1, seconds: 2, failed: [] }],
     ]);
+  });
+
+  it('names the failed cases of a file, a case with a failure or error child being failed', () => {
+    const xml = '<testsuites>\n'
+      + '  <testcase name="fails &amp; says why" time="1" file="src/a.test.ts" line="1">\n'
+      + '    <failure type="AssertionError" />\n'
+      + '  </testcase>\n'
+      + '  <testcase name="passes" time="2" file="src/a.test.ts" line="2" />\n'
+      + '  <testcase name="errors" time="3" file="src/a.test.ts" line="3"><error type="E" /></testcase>\n'
+      + '</testsuites>\n';
+
+    const file = parseJunit(xml).get('src/a.test.ts');
+
+    expect(file).toEqual({ tests: 3, seconds: 6, failed: ['fails & says why', 'errors'] });
   });
 
   it('decodes an escaped file path', () => {

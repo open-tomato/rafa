@@ -53,7 +53,8 @@ const TOP_FILES = 20;
 /** Seconds are rounded to this many decimals in the reading. */
 const DECIMALS = 3;
 
-const TESTCASE = /<testcase\b([^>]*?)\/?>/g;
+const TESTCASE = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+const FAILURE = /<(failure|error)\b/;
 const ATTRIBUTE = /([\w:-]+)="([^"]*)"/g;
 const TEST_SUFFIX = /\.test(\.[cm]?[jt]sx?)$/;
 const ENTITIES: Readonly<Record<string, string>> = {
@@ -73,6 +74,12 @@ export interface FileTiming {
   readonly seconds: number;
 }
 
+/** A test case the report marks as failed; its time is not one to trust. */
+export interface FailedCase {
+  readonly file: string;
+  readonly name: string;
+}
+
 /** A folder's or a cluster's time, summed over its test files. */
 export interface GroupTiming {
   readonly name: string;
@@ -90,12 +97,15 @@ export interface TestTimingData {
   readonly clusters: readonly GroupTiming[];
   /** Report files that are not tracked test files under the scope, by path. */
   readonly untracked: readonly string[];
+  /** Failed cases in tracked test files, by file then case order. */
+  readonly failures: readonly FailedCase[];
 }
 
-/** One file's sum from the report. */
+/** One file's sum from the report, with the names of its failed cases. */
 export interface ReportFile {
   readonly tests: number;
   readonly seconds: number;
+  readonly failed: readonly string[];
 }
 
 function decode(value: string): string {
@@ -111,10 +121,11 @@ function round(seconds: number): number {
 }
 
 /**
- * Each file's test count and summed seconds from a junit XML report's
- * `<testcase>` elements. Throws when the text holds no `<testsuites>` or
- * `<testsuite>` element, or a case without a `file` or with a `time` that
- * is not a number.
+ * Each file's test count, summed seconds and failed case names from a
+ * junit XML report's `<testcase>` elements; a case holding a `<failure>`
+ * or `<error>` child is failed. Throws when the text holds no
+ * `<testsuites>` or `<testsuite>` element, or a case without a `file` or
+ * with a `time` that is not a number.
  */
 export function parseJunit(xml: string): Map<string, ReportFile> {
   if (!/<testsuites?\b/.test(xml)) {
@@ -131,8 +142,11 @@ export function parseJunit(xml: string): Map<string, ReportFile> {
     if (!Number.isFinite(seconds)) {
       throw new Error(`a <testcase> in ${file} carries a time that is not a number: ${attributes.get('time')}`);
     }
-    const previous = files.get(file) ?? { tests: 0, seconds: 0 };
-    files.set(file, { tests: previous.tests + 1, seconds: previous.seconds + seconds });
+    const previous = files.get(file) ?? { tests: 0, seconds: 0, failed: [] };
+    const failed = FAILURE.test(match[2] ?? '')
+      ? [...previous.failed, attributes.get('name') ?? '']
+      : previous.failed;
+    files.set(file, { tests: previous.tests + 1, seconds: previous.seconds + seconds, failed });
   }
   return files;
 }
@@ -187,6 +201,10 @@ export function readTestTiming(
   clusterOf: ReadonlyMap<string, string>,
 ): TestTimingData {
   const tracked = new Set(expected);
+  const failures: FailedCase[] = [...report]
+    .filter(([path]) => tracked.has(path))
+    .flatMap(([file, entry]) => entry.failed.map((name) => ({ file, name })))
+    .sort((a, b) => a.file.localeCompare(b.file));
   const files: FileTiming[] = [...report]
     .filter(([path]) => tracked.has(path))
     .map(([path, entry]) => ({
@@ -204,6 +222,7 @@ export function readTestTiming(
     folders: groupBy(files, (file) => file.folder),
     clusters: groupBy(files, (file) => file.cluster),
     untracked: [...report.keys()].filter((path) => !tracked.has(path)).sort(),
+    failures,
   };
 }
 
@@ -212,6 +231,19 @@ function groupTable(title: string, groups: readonly GroupTiming[]): string[] {
     `| ${title} | Files | Tests | Seconds |`,
     '| --- | --- | --- | --- |',
     ...groups.map((group) => `| \`${group.name}\` | ${group.files} | ${group.tests} | ${group.seconds} |`),
+  ];
+}
+
+function failureLines(failures: readonly FailedCase[]): string[] {
+  if (failures.length === 0) {
+    return ['No failed case in the report.'];
+  }
+  return [
+    `${failures.length} failed cases. Their seconds are not timings to trust; the folder, cluster and file sums above include them as reported.`,
+    '',
+    '| File | Case |',
+    '| --- | --- |',
+    ...failures.map((failure) => `| \`${failure.file}\` | ${failure.name.replace(/\|/g, '\\|')} |`),
   ];
 }
 
@@ -235,6 +267,10 @@ export function renderTestTiming(data: TestTimingData): string {
     '## Per cluster',
     '',
     ...groupTable('Cluster', data.clusters),
+    '',
+    '## Failed cases',
+    '',
+    ...failureLines(data.failures),
     '',
     '## Slowest files',
     '',
