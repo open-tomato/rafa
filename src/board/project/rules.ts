@@ -80,6 +80,22 @@
  * descends one level only. A board line naming an issue `epics` does not
  * hold — no epic, or one the listing left out — takes one number.
  *
+ * ## Blocked by
+ *
+ * {@link blockedByTextOf} writes the blockers still holding an issue back,
+ * read by the relations port's `blockersOf` (`../relations/port.ts`) in
+ * whichever `board.relationships` mode the board is in, joined by `, `:
+ * `#119, #120`, a blocker in another repository as `owner/name#12`, each
+ * in the mode's own order. A blocker holds exactly when the port's
+ * {@link isWaiting} says it does, asked of it alone: one read `OPEN`, or
+ * one on this board whose state was not read. A blocker read closed,
+ * whatever the reason, is left out, and so is a `labels`-mode foreign one,
+ * whose state that mode never asks. Null, an empty field, when none holds,
+ * when the issue waits on nothing, and for a `labels`-mode fault: a broken
+ * `Blocked by:` line names no blocker to trust, and `rafa doctor` names
+ * the fault. A `native` list `gh` cut short names the open blockers it
+ * read; the field shows no count past them.
+ *
  * The label names are imported from the modules that own them, never
  * spelled again here. `needs-triage` and `spec:blocked` are the github
  * tracker's (`GITHUB_LABELS`): the board's own `SPEC_BLOCKED_LABEL` sits
@@ -90,6 +106,7 @@
  */
 import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { Epic } from '../epics.js';
+import type { Blocker, BlockersReading } from '../relations/port.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { Horizon } from '../roadmap-epic-rows.js';
 import type { RoadmapLine } from '../roadmap.js';
@@ -102,6 +119,7 @@ import { epicLines } from '../epic-walk.js';
 import { NOT_PLANNED_REASON } from '../epics.js';
 import { SPEC_NEEDS_WORK_LABEL } from '../gate.js';
 import { SPEC_READY_LABEL } from '../readiness.js';
+import { isWaiting } from '../relations/port.js';
 import { HORIZONS } from '../roadmap-epic-rows.js';
 
 /** The Stage field's options, left to right, by the template's exact names. */
@@ -325,4 +343,31 @@ export function ranksOf(facts: RankFacts): ReadonlyMap<number, number> {
 /** The Rank of issue `issue` in `ranks`, or null for an issue on no line. */
 export function rankOf(ranks: ReadonlyMap<number, number>, issue: number): number | null {
   return ranks.get(issue) ?? null;
+}
+
+/** The separator between two blockers in the Blocked by field, as the template's example spells it. */
+const BLOCKER_SEPARATOR = ', ';
+
+/** True when `blocker` alone still holds `issue` back, by the port's own {@link isWaiting}. */
+function holds(issue: number, blocker: Blocker): boolean {
+  return isWaiting({ kind: 'blocked', issue, blockers: [blocker] });
+}
+
+/** `blocker` as the field names it: `#n` on this board, `owner/name#n` on another. */
+function blockerReference(blocker: Blocker): string {
+  return `${blocker.repository ?? ''}#${String(blocker.number)}`;
+}
+
+/**
+ * The Blocked by text of the issue `reading` describes, `#119, #120`, or
+ * null when no blocker holds it, it waits on nothing, or its `Blocked by:`
+ * line is a fault. See the module note.
+ */
+export function blockedByTextOf(reading: BlockersReading): string | null {
+  if (reading.kind !== 'blocked') return null;
+  const holding = reading.blockers.filter((blocker) => holds(reading.issue, blocker));
+
+  return holding.length === 0
+    ? null
+    : holding.map(blockerReference).join(BLOCKER_SEPARATOR);
 }
