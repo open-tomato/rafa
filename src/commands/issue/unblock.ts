@@ -140,13 +140,14 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
+import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 import { plural } from '../plan/plan-files.js';
 
-import { issueProject, lineRefusal } from './issue-tracker.js';
+import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, unblockRelationshipsMode } from './unblock-native.js';
 
 /** The usage line a refusal names. */
@@ -623,7 +624,12 @@ function lazyPrompter(open: () => Prompter): { ask: UnblockAsk; close: () => voi
   };
 }
 
-/** Runs the unblock a line asks for, asking through the prompter when there is a terminal. */
+/**
+ * Runs the unblock a line asks for, asking through the prompter when
+ * there is a terminal. Its board refreshes each issue it unlabels on the
+ * project (`../../board/project/issue-board-refresh.ts`), each line the
+ * refresh answers written at `warn`.
+ */
 export async function unblockIssues(context: RafaContext, seams: UnblockSeams): Promise<UnblockReport> {
   const line = readUnblockLine(context);
   const root = projectRoot(context);
@@ -631,10 +637,16 @@ export async function unblockIssues(context: RafaContext, seams: UnblockSeams): 
   const isTerminal = seams.isTerminal ?? ((): boolean => process.stdin.isTTY === true);
   const openPrompter = seams.openPrompter ?? ((): Prompter => createLinePrompter(process.stdin, process.stderr));
 
+  // Its warnings dropped, as `unblockRelationshipsMode` drops them when the run reads the mode.
+  const config = issueSubjectConfig(issueProject(context), () => undefined);
+  const gh = openGh(root);
   const prompter = lazyPrompter(openPrompter);
   try {
     return await runUnblock({
-      gh: openGh(root),
+      gh,
+      board: createRefreshingGhIssueBoard({ gh, config, warn: (message) => {
+        context.output.warn(message);
+      } }),
       issues: line.issues,
       ask: isTerminal()
         ? prompter.ask

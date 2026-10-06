@@ -17,6 +17,7 @@
  */
 import type { ClaimRouteSeams, PassOver } from './claim-route.js';
 import type { PlanSpecResolution } from '../../board/plan-spec.js';
+import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { SpecLineAhead, SpecSourceKind } from '../../board/spec-source.js';
 import type { AheadCandidate } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimRequest } from '../../claims/plan-claim.js';
@@ -477,6 +478,9 @@ describe('resolveAndClaim before the claim', () => {
   });
 });
 
+/** The project refresh's keys, no project set: a label write sends no refresh. */
+const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+
 describe('createPlanClaimContext', () => {
   let root = '';
 
@@ -489,8 +493,8 @@ describe('createPlanClaimContext', () => {
   });
 
   it('opens no board for a provider that is not gh, and one for gh', () => {
-    const none = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
-    const gh = createPlanClaimContext(root, { prProvider: 'gh', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+    const none = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
+    const gh = createPlanClaimContext(root, { prProvider: 'gh', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
 
     expect(none.board).toBeNull();
     expect(gh.board).not.toBeNull();
@@ -498,15 +502,15 @@ describe('createPlanClaimContext', () => {
   });
 
   it('carries claims.ahead as configured', () => {
-    const allow = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'allow' });
-    const off = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+    const allow = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'allow', ...NO_PROJECT });
+    const off = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
 
     expect([allow.claimsAhead, off.claimsAhead]).toEqual(['allow', 'off']);
   });
 
   it('reads the store id under the configured store: an NDJSON store names no claimant', () => {
-    const ndjson = createPlanClaimContext(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
-    const sqlite = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off' });
+    const ndjson = createPlanClaimContext(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
+    const sqlite = createPlanClaimContext(root, { prProvider: 'none', store: 'sqlite', claimsStaleAfter: 'disabled', claimsAhead: 'off', ...NO_PROJECT });
 
     const fromNdjson = ndjson.readStoreId();
     const fromSqlite = sqlite.readStoreId();
