@@ -534,7 +534,12 @@ and still no pull request exists, the runner opens one itself with the title
 fragment's notes, and a line saying the wrap-up did not finish. If opening
 fails (for instance, if the branch has not been merged into the base yet or
 was pushed while the working tree had conflicts), the run ends `blocked` with
-the step and branch named. With `pr.provider: none`, the pull-request check
+the step and branch named. A pull request a retry or the runner opened is
+then given the release forecast or failure sentence the release step found
+no pull request to write to (`carryReleaseIntoPullRequest`,
+`src/start/release-body.ts`), before the retarget and the CI wait; one the
+release step already wrote to is not written again, and a blocked delivery
+writes nothing. With `pr.provider: none`, the pull-request check
 and creation are both skipped and the run advances directly to CI or closes.
 
 **The wrap-up emits `pr` or `no-pr` once, in every output mode.**

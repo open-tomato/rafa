@@ -33,6 +33,15 @@
  * to deliver, and none of this runs: the CI gate's own `none` path
  * pushes the branch as before.
  *
+ * Step 3 writes the release's forecast or failure sentence into the
+ * pull request body, and finds none to write it to when the first
+ * session opened none. So once the delivery answers DELIVERED, before
+ * the retarget, the finish's write is made again over the pull request
+ * a retry or the runner opened (`carryReleaseIntoPullRequest`,
+ * `start/release-body.ts`); a finish whose write already reached a pull
+ * request, or that wrote nothing, writes nothing more, and a blocked or
+ * interrupted delivery reaches no second write.
+ *
  * Whoever opened it, a DELIVERED pull request whose base is not the
  * run's — the `base` resolved once at the top of {@link runWrapUp} —
  * is then retargeted onto it (`start/pr-retarget.ts`), before the CI
@@ -95,6 +104,7 @@ import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
 import { retargetPullRequest } from './pr-retarget.js';
+import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
 import { retryWrapUp } from './wrap-up-retry.js';
@@ -224,6 +234,12 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
       : null, lookup);
     if (delivery.kind === 'interrupted') return;
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
+    // The release's forecast or sentence, written again into the pull
+    // request the delivery answered when the finish's own write found
+    // none open: a retry or the runner opened it after step 3. A finish
+    // whose write reached a pull request, or wrote nothing, is left
+    // alone (`start/release-body.ts`).
+    await carryReleaseIntoPullRequest(finish, { repoRoot: checkout, branch: expected.branch }, { readProvider });
     // A delivered pull request opened into another base than the run's
     // is retargeted onto it, BEFORE the CI wait, so the checks the wait
     // reads are the ones GitHub runs against the right base. A refused
