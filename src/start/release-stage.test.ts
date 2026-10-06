@@ -289,6 +289,7 @@ describe('finishRelease', () => {
       sentence: null,
       forecast: null,
       levelReport: null,
+      written: null,
       body: null,
     });
     expect(world.git).toEqual([]);
