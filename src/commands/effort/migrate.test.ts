@@ -25,7 +25,7 @@ import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN } from '../../effort/store/migrati
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS } from '../../effort/store/sqlite.js';
 import { storeRows } from '../../effort/store/testdata/store-rows.js';
 import { beginSession } from '../../loop/sessions.js';
-import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createMigrateCommand } from './migrate.js';
 
@@ -326,7 +326,7 @@ describe('rafa effort migrate spawned as a development build', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'migrate'], childEnv());
 
-    expect(outcome.exitCode).toBe(1);
+    expectExit(outcome, 1, scratch);
     expect(outcome.stderr).toContain(`effort store: ${path} needs migration ${['schema_migrations', ...PENDING_AT_12].join(', ')}`
       + ' and this rafa is a development build (');
     expect(outcome.stderr).toContain('a development build migrates only a store under the temp directory or RAFA_EFFORT_DIR.'
@@ -344,7 +344,7 @@ describe('rafa effort migrate spawned as a development build', () => {
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'migrate'], childEnv({ RAFA_EFFORT_DIR: copyDir }));
 
     expect(outcome.stderr).toBe('');
-    expect(outcome.exitCode).toBe(0);
+    expectExit(outcome, 0, scratch);
     expect(outcome.stdout).toContain(`Applies ${['schema_migrations', ...PENDING_AT_12].join(', ')} to ${copy}`);
     expect(readdirSync(copyDir).filter((name) => name !== 'effort.sqlite')).toEqual([
       expect.stringMatching(/^effort\.sqlite\.before-plan-ci-\d{8}T\d{6}Z\.bak$/) as unknown as string,

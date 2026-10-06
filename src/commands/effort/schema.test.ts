@@ -22,7 +22,7 @@ import { bringForward } from '../../effort/store/bring-forward.js';
 import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
 import { readStoreMeta } from '../../effort/store/store-meta.js';
-import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 import { createSchemaCommand } from './schema.js';
@@ -222,7 +222,7 @@ describe('rafa effort schema over a store this rafa uses', () => {
     const run = schema(scratch, ['--check']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`Effort store: ${path}`);
     expect(run.stdout).toContain(`Applied (${String(SQLITE_MIGRATIONS.length)}): kind-tables (`);
     expect(run.stdout).toContain('Pending (0): none');
@@ -241,7 +241,7 @@ describe('rafa effort schema over a store this rafa uses', () => {
 
     const run = schema(scratch, ['--check']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('Migration log: none; a release before the log wrote this store, and the next open adopts it.');
     expect(run.stdout).toContain('Gate (user_version): 12 (a count of legacy migrations: no log yet); 13 (open:');
     const pending = SQLITE_MIGRATIONS.slice(12).map(({ id }) => id);
@@ -288,7 +288,7 @@ describe('rafa effort schema over a store this rafa uses', () => {
 
     const run = schema(scratch, ['--check']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('✅ Current:');
     expect(Buffer.compare(readFileSync(path), before)).toBe(0);
     expect(storeMetaRows(path)).toEqual([]);
@@ -305,7 +305,7 @@ describe('rafa effort schema over a store this rafa uses', () => {
 
     const run = schema(scratch, ['--check']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('No store yet');
     expect(lastLine(run)).toBe('Next safe step: none');
     expect(existsSync(join(scratch.repo, '.rafa', 'effort'))).toBe(false);
@@ -335,12 +335,12 @@ describe('rafa effort schema --check over a store this rafa refuses, one per rea
       const checked = schema(scratch, ['--check']);
       const plain = schema(scratch);
 
-      expect(checked.exitCode).toBe(1);
+      expectExit(checked, 1, scratch);
       expect(checked.stdout).toContain(`❌ Refused (${reason}): effort store: ${path} `);
       expect(lastLine(checked)).toBe(`Next safe step: ${nextStep}`);
       expect(checked.stderr).toContain(`❌ rafa effort schema --check: this rafa refuses ${path} (${reason}). Next safe step: ${nextStep}`);
       // Control: without --check the same report exits 0, so the 1 is --check's.
-      expect(plain.exitCode).toBe(0);
+      expectExit(plain, 0, scratch);
       expect(lastLine(plain)).toBe(`Next safe step: ${nextStep}`);
       expect(Buffer.compare(readFileSync(path), before)).toBe(0);
     }, SPAWN_TIMEOUT);
@@ -366,9 +366,9 @@ describe('rafa effort schema --check over a store this rafa refuses, one per rea
     const checked = schema(scratch, ['--check']);
     const report = runRafa(scratch, scratch.repo, ['effort', 'report']);
 
-    expect(checked.exitCode).toBe(1);
+    expectExit(checked, 1, scratch);
     expect(checked.stdout).toContain('Unknown (1): future-writers (breaks writers; applied by 0.30.0 on 2026-10-01T09:00:00.000Z)');
-    expect(report.exitCode).toBe(0);
+    expectExit(report, 0, scratch);
     expect(Buffer.compare(readFileSync(path), before)).toBe(0);
   }, SPAWN_TIMEOUT);
 

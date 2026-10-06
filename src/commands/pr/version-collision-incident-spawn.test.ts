@@ -60,7 +60,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parseFragment } from '../../release/fragment.js';
-import { plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
+import { expectExit, plantProjectConfig, runRafa } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
 /** A temporary directory of this file's own. */
@@ -326,7 +326,7 @@ describe('the 0.25.0 incident, replayed over two spawned clones of one bare orig
 
       const merge = runRafa(scratch, scratch.repo, ['pr', 'merge', String(NUMBER), '--skip-checks', '--no-hint']);
 
-      expect(merge.exitCode).toBe(1);
+      expectExit(merge, 1, scratch);
       expect(merge.stdout).toBe('');
       expect(merge.stderr).toContain(
         `❌ rafa pr merge refuses #${String(NUMBER)}: its release guard reads collision,`
@@ -342,7 +342,7 @@ describe('the 0.25.0 incident, replayed over two spawned clones of one bare orig
 
       const triage = runRafa(scratch, scratch.repo, ['pr', 'triage', String(NUMBER), '--no-comment', '--no-hint']);
 
-      expect(triage.exitCode).toBe(0);
+      expectExit(triage, 0, scratch);
       expect(triage.stdout).toContain('conflict-version');
       expect(triage.stdout).toContain(
         'Why: the release guard reads collision: the branch stamped 0.25.0, which the base already names with different notes;'
@@ -353,7 +353,7 @@ describe('the 0.25.0 incident, replayed over two spawned clones of one bare orig
 
       const resolve = runRafa(scratch, scratch.repo, ['pr', 'triage', String(NUMBER), '--resolve', '--no-hint']);
 
-      expect(resolve.exitCode).toBe(0);
+      expectExit(resolve, 0, scratch);
       expect(resolve.stdout).toContain(
         `✅ #${String(NUMBER)}: Converted the stamped 0.25.0 into ${FRAGMENT} (level minor): package.json back to 0.24.0`,
       );
