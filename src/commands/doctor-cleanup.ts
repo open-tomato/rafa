@@ -24,9 +24,9 @@
  * project's, and a doctor run from a subdirectory reads the same ones.
  * The settings are the resolved config's `pr.base`, `cleanup.keep`,
  * `cleanup.staleDays` and `cleanup.worktreeIdleDays`, as `rafa cleanup`
- * reads them, and `loop.worktreeDir` when the config handed in carries
- * it; `rafa status`'s narrower config does not, so its counts read the
- * loop's worktrees under the default `.rafa/worktrees`.
+ * reads them, and `loop.worktreeDir`, which `rafa status` and the
+ * status hook hand in too; a config that lacks it reads the loop's
+ * worktrees under the default `.rafa/worktrees`.
  *
  * ## The row
  *

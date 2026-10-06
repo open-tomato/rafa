@@ -75,7 +75,11 @@ const CONFIG: StatusConfig = {
   cleanupKeep: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
+  loopWorktreeDir: '.rafa/worktrees',
 };
+
+/** A time past `cleanup.worktreeIdleDays` before {@link SCRATCH_NOW}. */
+const OLD_WORKTREE = new Date('2026-01-01T00:00:00Z');
 
 /** A GitHub `origin`, which resolves `pr.provider` to `gh` when the config names none. */
 const GITHUB_ORIGIN = 'https://github.com/open-tomato/rafa.git';
@@ -855,5 +859,45 @@ describe('the housekeeping section', () => {
     expect(read.housekeeping.problem).toContain('not a git repository');
     expect(read.branch.read).toBe(true);
     expect(read.loops.read).toBe(true);
+  });
+});
+
+describe('the loop worktrees the housekeeping section counts', () => {
+  let repo: ScratchRepository;
+
+  beforeAll(() => {
+    repo = createScratchRepository();
+    repo.git(['worktree', 'add', '--quiet', '-b', 'loop-a', join(repo.clone, 'loop-trees', 'loop-a')]);
+    repo.git(['worktree', 'add', '--quiet', '-b', 'loop-b', join(repo.clone, '.rafa', 'worktrees', 'loop-b')]);
+    repo.git(['worktree', 'add', '--quiet', '-b', 'loop-c', join(repo.clone, '.rafa', 'worktrees', 'loop-c')]);
+  });
+
+  afterAll(() => {
+    repo.dispose();
+  });
+
+  /** The idle worktree count of the scratch clone under `loopWorktreeDir`, every path read as old. */
+  async function idleUnder(loopWorktreeDir: string): Promise<number | null> {
+    const read = await readStatusSections(
+      { root: repo.clone, home: repo.home, config: { ...CONFIG, loopWorktreeDir } },
+      {
+        readRemote: () => null,
+        now: () => SCRATCH_NOW,
+        timeoutMs: CASE_TIMEOUT_MS,
+        cleanupSeams: (cwd, pulls) => ({ ...defaultCleanupSeams(cwd, pulls), modifiedAt: () => OLD_WORKTREE }),
+      },
+    );
+    return read.housekeeping.read
+      ? read.housekeeping.idleWorktrees
+      : null;
+  }
+
+  it('counts the one under a configured loop.worktreeDir, and not the two under .rafa/worktrees', async () => {
+    // The three .claude/worktrees ones, plus loop-trees/loop-a alone.
+    expect(await idleUnder('loop-trees')).toBe(4);
+  });
+
+  it('counts the two under .rafa/worktrees, and not the other, when the config names the default', async () => {
+    expect(await idleUnder('.rafa/worktrees')).toBe(5);
   });
 });

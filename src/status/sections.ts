@@ -319,6 +319,7 @@ export type StatusConfig = Pick<
   | 'cleanupKeep'
   | 'cleanupStaleDays'
   | 'cleanupWorktreeIdleDays'
+  | 'loopWorktreeDir'
 >;
 
 /** What {@link readStatusSections} reads. */
