@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-needs-spawn-')));
 
@@ -93,7 +93,7 @@ describe('rafa plan needs, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['plan', 'needs', PLAN, '--missing']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     const userLine = linesNaming(run.stdout, 'user-reviewer');
     expect(userLine).toHaveLength(1);
     expect(userLine[0]).toContain('not visible to a run');
@@ -124,7 +124,7 @@ describe('rafa plan needs, spawned', () => {
     const listed = runRafa(scratch, scratch.repo, ['plan', 'needs', PLAN]);
 
     expect(met).toEqual({ exitCode: 0, stdout: '', stderr: '' });
-    expect(listed.exitCode).toBe(0);
+    expectExit(listed, 0, scratch);
     expect(listed.stdout).toContain('project-reviewer');
     expect(listed.stdout).toContain('present-tool');
   }, SPAWN_TIMEOUT);
@@ -134,7 +134,7 @@ describe('rafa plan needs, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['plan', 'needs', PLAN, '--source=project']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('project-reviewer');
     for (const other of ['user-reviewer', 'absent-skill', 'ghost', 'zz-absent-program', 'present-tool']) {
       expect(run.stdout).not.toContain(other);
@@ -151,7 +151,7 @@ describe('rafa plan needs, spawned', () => {
     plantProgram(scratch, 'ts-symbols');
     const provided = runRafa(scratch, scratch.repo, ['plan', 'needs', PLAN, '--missing']);
 
-    expect(missing.exitCode).toBe(1);
+    expectExit(missing, 1, scratch);
     expect(missing.stdout).toContain('ts-symbols');
     expect(provided).toEqual({ exitCode: 0, stdout: '', stderr: '' });
   }, SPAWN_TIMEOUT);

@@ -60,7 +60,7 @@ import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../board/roadmap-board.js';
 import { positionFilePath } from '../project/position.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -284,7 +284,7 @@ describe('rafa roadmap in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const rows = tableLines(run.stdout);
     expect(rows).toContain(`#${String(EPIC_ONE)}  in-progress  1/3         -        -     Epic one`);
     expect(rows).toContain(`#${String(EPIC_TWO)}  done         2/2         -        -     Epic two`);
@@ -300,7 +300,7 @@ describe('rafa roadmap in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap', '--full']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const rows = tableLines(run.stdout);
     expect(rows).toContain(`#${String(OPEN_MEMBER)}  open    Member open`);
     expect(rows).toContain(`└→ 🔴 #${String(LOCAL_BLOCKER)} 🟢 other/lib#7`);
@@ -442,7 +442,7 @@ describe('rafa next --dry-run in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe([
       `📍 #${String(SECOND)} is next on the roadmap and carries \`${SPEC_READY_LABEL}\`.`,
       `👉 create the plan for #${String(SECOND)} — rafa plan create --next`,
@@ -463,7 +463,7 @@ describe('rafa next --dry-run in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe([
       `📍 #${String(FIRST)} is next on the roadmap and carries \`${SPEC_READY_LABEL}\`.`,
       `👉 create the plan for #${String(FIRST)} — rafa plan create --next`,
@@ -648,7 +648,7 @@ describe('rafa next --roadmap in native mode, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['next', '--roadmap', '--dry-run']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe([
       `📍 hop from epic #${String(EPIC_HOME)}: #${String(H)} blocked by #${String(C)}, in epic #${String(EPIC_FAR)}.`,
       `👉 hop to epic #${String(EPIC_FAR)} on board #${String(BOARD_B)} and work #${String(C)}, keeping home`,
