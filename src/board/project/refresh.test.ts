@@ -23,7 +23,7 @@
  */
 import type { FakeFactsIssue, FakeFactsPull } from './facts-fake.js';
 import type { ProjectFieldValue, ProjectItem } from './port.js';
-import type { FakeProjectItem } from './project-fake.js';
+import type { FakeProjectGhOptions, FakeProjectItem } from './project-fake.js';
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
@@ -32,6 +32,7 @@ import { describe, expect, it } from 'bun:test';
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
+import { notFoundWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
 
 /** The owner of the repository and the project. */
@@ -113,9 +114,14 @@ interface Wired {
   readonly calls: () => readonly (readonly string[])[];
 }
 
-/** The router of the module note over `projectItems`, and `config`. */
-function wire(projectItems: readonly FakeProjectItem[] | null, config: RefreshConfig = CONFIG): Wired {
+/** The router of the module note over `projectItems`, and `config`, the project fake's rate limit as `fake` sets it. */
+function wire(
+  projectItems: readonly FakeProjectItem[] | null,
+  config: RefreshConfig = CONFIG,
+  fake: Pick<FakeProjectGhOptions, 'rateLimitAfter'> = {},
+): Wired {
   const project = createFakeProjectGh({
+    ...fake,
     projects: projectItems === null
       ? []
       : [{ owner: OWNER, number: NUMBER, items: projectItems }],
@@ -176,7 +182,7 @@ describe('refreshProjectItems: nothing without board.project.number', () => {
   it('answers no-project and sends no call with the number unset', async () => {
     const wired = wire(items(), { ...CONFIG, boardProjectNumber: null });
 
-    expect(await refreshProjectItems(wired.options, [10, 20])).toEqual({ kind: 'skipped', reason: 'no-project' });
+    expect(await refreshProjectItems(wired.options, [10, 20])).toEqual({ kind: 'skipped', reason: 'no-project', warnings: [] });
     expect(wired.calls()).toEqual([]);
   });
 
@@ -190,7 +196,7 @@ describe('refreshProjectItems: nothing without board.project.number', () => {
   it('answers no-issues and sends no call for an empty list', async () => {
     const wired = wire(items());
 
-    expect(await refreshProjectItems(wired.options, [])).toEqual({ kind: 'skipped', reason: 'no-issues' });
+    expect(await refreshProjectItems(wired.options, [])).toEqual({ kind: 'skipped', reason: 'no-issues', warnings: [] });
     expect(wired.calls()).toEqual([]);
   });
 
@@ -271,6 +277,7 @@ describe('refreshProjectItems: issues and projects that are not there', () => {
       writes: { written: 0, notUpdated: 0, rateLimited: false, detail: '' },
       missing: [40],
       skipped: [],
+      warnings: [],
     });
     expect(wired.calls().some((args) => args.includes('owner={owner}') || args[0] === 'issue')).toBe(false);
   });
@@ -278,7 +285,11 @@ describe('refreshProjectItems: issues and projects that are not there', () => {
   it('answers not-found, reading no item, when the owner holds no project of that number', async () => {
     const wired = wire(null);
 
-    expect(await refreshProjectItems(wired.options, [10])).toEqual({ kind: 'not-found', project: { owner: OWNER, number: NUMBER } });
+    expect(await refreshProjectItems(wired.options, [10])).toEqual({
+      kind: 'not-found',
+      project: { owner: OWNER, number: NUMBER },
+      warnings: [notFoundWarning({ owner: OWNER, number: NUMBER })],
+    });
     expect(wired.calls().some((args) => args.some((arg) => arg.includes('node(id: $project)')))).toBe(false);
   });
 
@@ -296,5 +307,95 @@ describe('refreshProjectItems: issues and projects that are not there', () => {
 
     expect(refresh.kind === 'refreshed' && refresh.skipped.map(({ template, problem }) => [template.name, problem])).toEqual([['Rank', 'missing']]);
     expect(refresh.kind === 'refreshed' && refresh.changes.map(({ name, to }) => [name, to])).toEqual([['Stage', 'Ready']]);
+  });
+});
+
+describe('refreshProjectItems: the failures of "What can go wrong", answered as warning lines', () => {
+  // GitHub's documented refusal, NOT a reading: both gh accounts on hand hold the project scope.
+  const SCOPE_STDERR = 'gh: Your token has not been granted the required scopes to execute this query. The \'projectV2\' field requires one of the following scopes: [\'read:project\'], but your token has only been granted the: [\'repo\'] scopes.\n';
+
+  it('answers refused with the scope line, never a rejection, when the find is refused for the project scope', async () => {
+    const wired = wire(items());
+    wired.project.failNext(SCOPE_STDERR);
+
+    expect(await refreshProjectItems(wired.options, [10])).toEqual({
+      kind: 'refused',
+      reason: 'scope',
+      project: { owner: OWNER, number: NUMBER },
+      warnings: [scopeWarning()],
+    });
+  });
+
+  it('still rejects a refused find that names no scope, the control of the case above', async () => {
+    const wired = wire(items());
+    wired.project.failNext('gh: HTTP 502: Bad gateway\n');
+
+    expect(refreshProjectItems(wired.options, [10])).rejects.toThrow('board project: gh api graphql failed: gh: HTTP 502: Bad gateway');
+  });
+
+  it('answers refused with the scope line when the writes are refused for the project scope, after the reads went through', async () => {
+    const wired = wire(items());
+    const gh: GhRunner = (args) => (writeCalls([args]).length > 0
+      ? Promise.resolve({ ok: false, stdout: '', stderr: SCOPE_STDERR })
+      : wired.options.gh(args));
+
+    const refresh = await refreshProjectItems({ ...wired.options, gh }, [21]);
+
+    expect(refresh.kind === 'refused' && refresh.warnings).toEqual([scopeWarning()]);
+    expect(await heldValues(wired)).toEqual(Object.fromEntries([10, 20, 21, 22, 30].map((number) => [number, {}])));
+  });
+
+  it('answers the rate-limit line counting the issues not updated, and still answers what was read', async () => {
+    const wired = wire(items(), CONFIG, { rateLimitAfter: 0 });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    expect(refresh.kind).toBe('refreshed');
+    expect(refresh.kind === 'refreshed' && refresh.writes.notUpdated).toBe(5);
+    expect(refresh.kind === 'refreshed' && refresh.changes).toHaveLength(12);
+    expect(refresh.warnings).toEqual([rateLimitWarning(5)]);
+  });
+
+  it('answers no rate-limit line when every write lands, the control of the case above', async () => {
+    const wired = wire(items(), CONFIG, { rateLimitAfter: 1 });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    expect(refresh.kind === 'refreshed' && refresh.writes.written).toBe(12);
+    expect(refresh.warnings).toEqual([]);
+  });
+
+  it('answers the not-found line naming the number when the owner holds no project of it', async () => {
+    const wired = wire(null);
+
+    const refresh = await refreshProjectItems(wired.options, [10]);
+
+    expect(refresh.warnings).toEqual([notFoundWarning({ owner: OWNER, number: NUMBER })]);
+    expect(refresh.warnings[0]).toContain('board.project.number 6 was not found');
+  });
+
+  it('answers one line per renamed field, naming each, while the rest are written', async () => {
+    const renamed: Readonly<Record<string, string>> = { 'Rank': 'Order', 'Blocked by': 'Waits on' };
+    const fields = FAKE_TEMPLATE_FIELDS.map((field) => ({ ...field, name: renamed[field.name] ?? field.name }));
+    const project = createFakeProjectGh({ projects: [{ owner: OWNER, number: NUMBER, fields, items: items() }] });
+    const wired = wire(items());
+    const gh: GhRunner = (args) => (args[0] === 'api' && !args.includes('owner={owner}')
+      ? project.gh(args)
+      : wired.options.gh(args));
+
+    const refresh = await refreshProjectItems({ ...wired.options, gh }, [21]);
+
+    const skipped = refresh.kind === 'refreshed'
+      ? refresh.skipped
+      : [];
+    expect(skipped.map(({ template }) => template.name)).toEqual(['Rank', 'Blocked by']);
+    expect(refresh.warnings).toEqual(skipped.map(skippedFieldWarning));
+    expect(refresh.kind === 'refreshed' && refresh.writes.written).toBe(1);
+  });
+
+  it('answers no warning when every field is held as the template has it, the control of the case above', async () => {
+    const wired = wire(items());
+
+    expect((await refreshProjectItems(wired.options, [21])).warnings).toEqual([]);
   });
 });

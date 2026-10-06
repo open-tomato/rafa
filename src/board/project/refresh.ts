@@ -48,15 +48,28 @@
  * project does not hold as the template has it is skipped and named in
  * {@link ProjectRefreshed.skipped}; the other fields are still written.
  *
- * ## Failures
+ * ## Failures, answered as warning lines
  *
- * A rate-limit refusal stops the writes and is answered in
- * {@link ProjectRefreshed.writes}, never thrown. Any other failed read or
- * write rejects with the reader's own error, a `ProjectPortError` from
- * the port keeping what `gh` wrote; a board with no default board rejects
- * as `resolveDefaultBoard` does. Turning those into the warning lines of
- * the spec's "What can go wrong" table is the caller-facing step built on
- * this one.
+ * The four rows of the spec's "What can go wrong" table are never
+ * thrown: each is answered in the refresh's `warnings`, one line naming
+ * its fix (`./refresh-warnings.ts`), for the caller to print after its
+ * own output while keeping its own exit code. A refresh with nothing to
+ * warn of answers an empty list.
+ *
+ *  - A token without the `project` scope, read off the refusal of any
+ *    project call, answers `refused` with the scope line; what was
+ *    written before the refusal stays written.
+ *  - A rate-limit refusal stops the writes and is answered in
+ *    {@link ProjectRefreshed.writes} with the line counting the issues
+ *    not updated.
+ *  - A `board.project.number` naming no project answers `not-found` with
+ *    the line naming the number.
+ *  - Each field in {@link ProjectRefreshed.skipped} gets its own line;
+ *    the other fields are still written.
+ *
+ * Any other failed read or write rejects with the reader's own error, a
+ * `ProjectPortError` from the port keeping what `gh` wrote; a board with
+ * no default board rejects as `resolveDefaultBoard` does.
  */
 import type { IssueFacts } from './facts.js';
 import type { FieldMismatch, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
@@ -78,6 +91,13 @@ import { readIssueFacts } from './facts.js';
 import { createGhProjectPort } from './gh.js';
 import { matchProjectFields } from './port.js';
 import { projectChangesOf, projectValuesOf } from './refresh-values.js';
+import {
+  isMissingProjectScope,
+  notFoundWarning,
+  rateLimitWarning,
+  scopeWarning,
+  skippedFieldWarning,
+} from './refresh-warnings.js';
 import { ranksOf } from './rules.js';
 import { writeProjectFields } from './writes.js';
 
@@ -101,12 +121,25 @@ export interface ProjectRefreshSkipped {
   readonly kind: 'skipped';
   /** `no-project` with `board.project.number` unset; `no-issues` when none was asked for. */
   readonly reason: 'no-project' | 'no-issues';
+  /** Always empty: a refresh that sent no call has nothing to warn of. */
+  readonly warnings: readonly string[];
 }
 
 /** A refresh whose `board.project.number` names no project of the repository's owner. */
 export interface ProjectRefreshNotFound {
   readonly kind: 'not-found';
   readonly project: ProjectRef;
+  /** The one line naming the number and `rafa init --board`. */
+  readonly warnings: readonly string[];
+}
+
+/** A refresh a project call refused for the token's missing `project` scope. */
+export interface ProjectRefreshRefused {
+  readonly kind: 'refused';
+  readonly reason: 'scope';
+  readonly project: ProjectRef;
+  /** The one line naming `gh auth refresh -s project`. */
+  readonly warnings: readonly string[];
 }
 
 /** A refresh that read the project, and wrote what differed. */
@@ -121,10 +154,12 @@ export interface ProjectRefreshed {
   readonly missing: readonly number[];
   /** The template's fields the project does not hold as expected, none written. */
   readonly skipped: readonly FieldMismatch[];
+  /** The rate-limit line when the writes were refused, then one line per skipped field. */
+  readonly warnings: readonly string[];
 }
 
 /** What {@link refreshProjectItems} answers. */
-export type ProjectRefresh = ProjectRefreshSkipped | ProjectRefreshNotFound | ProjectRefreshed;
+export type ProjectRefresh = ProjectRefreshSkipped | ProjectRefreshNotFound | ProjectRefreshRefused | ProjectRefreshed;
 
 /** The writes answer of a refresh that had nothing to write. */
 const NOTHING_WRITTEN: ProjectWritesResult = Object.freeze({ written: 0, notUpdated: 0, rateLimited: false, detail: '' });
@@ -208,25 +243,12 @@ async function changesFor(
   });
 }
 
-/**
- * Brings the project's items for `issues` in step with what rafa reads of
- * them, writing only the values that differ; with no
- * `board.project.number` it sends no call. See the module note.
- *
- * Throws a `RangeError`, having sent nothing, for an entry of `issues`
- * that is not a positive whole number.
- */
-export async function refreshProjectItems(options: RefreshOptions, issues: readonly number[]): Promise<ProjectRefresh> {
-  const { config, gh } = options;
-  const numbers = issueNumbers(issues);
-  if (config.boardProjectNumber === null) return { kind: 'skipped', reason: 'no-project' };
-  if (numbers.length === 0) return { kind: 'skipped', reason: 'no-issues' };
-
-  const repository = await readBoardRepository(gh);
-  const ref: ProjectRef = { owner: repository.split('/')[0] ?? '', number: config.boardProjectNumber };
+/** The refresh of `numbers` on the project `ref` names, once the repository is read. */
+async function refreshOn(options: RefreshOptions, repository: string, ref: ProjectRef, numbers: readonly number[]): Promise<ProjectRefresh> {
+  const { gh } = options;
   const port: ProjectPort = createGhProjectPort(gh);
   const project = await port.find(ref);
-  if (project === null) return { kind: 'not-found', project: ref };
+  if (project === null) return { kind: 'not-found', project: ref, warnings: [notFoundWarning(ref)] };
 
   const items = issueItems(await port.items(project.id), repository);
   const present = new Map(numbers.flatMap((issue) => {
@@ -245,5 +267,37 @@ export async function refreshProjectItems(options: RefreshOptions, issues: reado
     : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), options.sleep === undefined
       ? {}
       : { sleep: options.sleep });
-  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped };
+  const warnings = [
+    ...(writes.rateLimited
+      ? [rateLimitWarning(writes.notUpdated)]
+      : []),
+    ...skipped.map(skippedFieldWarning),
+  ];
+  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped, warnings };
+}
+
+/**
+ * Brings the project's items for `issues` in step with what rafa reads of
+ * them, writing only the values that differ; with no
+ * `board.project.number` it sends no call. The four failures of the
+ * spec's "What can go wrong" table are answered in `warnings`, never
+ * thrown. See the module note.
+ *
+ * Throws a `RangeError`, having sent nothing, for an entry of `issues`
+ * that is not a positive whole number.
+ */
+export async function refreshProjectItems(options: RefreshOptions, issues: readonly number[]): Promise<ProjectRefresh> {
+  const { config, gh } = options;
+  const numbers = issueNumbers(issues);
+  if (config.boardProjectNumber === null) return { kind: 'skipped', reason: 'no-project', warnings: [] };
+  if (numbers.length === 0) return { kind: 'skipped', reason: 'no-issues', warnings: [] };
+
+  const repository = await readBoardRepository(gh);
+  const ref: ProjectRef = { owner: repository.split('/')[0] ?? '', number: config.boardProjectNumber };
+  try {
+    return await refreshOn(options, repository, ref, numbers);
+  } catch (error) {
+    if (isMissingProjectScope(error)) return { kind: 'refused', reason: 'scope', project: ref, warnings: [scopeWarning()] };
+    throw error;
+  }
 }
