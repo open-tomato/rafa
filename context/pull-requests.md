@@ -155,8 +155,16 @@ sentence replaces nothing.
 
 ### The merge flow
 
-1. Refuse on a dirty working tree, on a PR that is not green or not
-   mergeable (the refusal names which; `pending` and `red` point at
+1. Refuse on a tracked change in the working tree, or on an untracked
+   path the merge would write a file onto — one the pull request's head
+   commit or `origin/<base>` holds, read with `git ls-tree -r --name-only`
+   over both only when the tree has an untracked path (a folded `?? dir/`
+   counts when either holds a path under it). Any other untracked path,
+   such as `.claude/settings.local.json`, is left in place and named in one
+   line when nothing refuses (`src/pr/merge.ts`, "Which untracked paths
+   refuse"; `src/commands/pr/merge-refuse.ts`). A head commit this clone
+   does not have is refused naming the `git fetch` that brings it. Refuse
+   too on a PR that is not green or not mergeable (the refusal names which; `pending` and `red` point at
    `pr triage`, and verdict `none` — no checks at all — points at
    `--skip-checks` instead, since triage has nothing to fix there), and
    when the branch is checked out in another worktree (names it). Before

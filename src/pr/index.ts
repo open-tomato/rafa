@@ -88,10 +88,12 @@ export { isMergeMethod, MERGE_METHODS } from './types.js';
 export {
   cleanUpSteps,
   commandLine,
+  parseTreePaths,
   parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
   remainingFrom,
+  untrackedLeftLine,
   worktreesHolding,
 } from './merge.js';
 export { compareUrl, pushBranch } from './none.js';
