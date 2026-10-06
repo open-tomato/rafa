@@ -127,6 +127,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { ConfigError } from '../config.js';
+import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { stampPrompt } from '../utils/plan-stamp.js';
 
@@ -1421,7 +1422,7 @@ describe('the collect command', () => {
 
     const run = runCollect(root, ['--no-sessions']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stdout).toContain('+1 rows');
     expect(readdirSync(storeDir(root))).toEqual(['commits.ndjson']);
   });
@@ -1431,7 +1432,7 @@ describe('the collect command', () => {
 
     const run = runCollect(root, ['--no-sessions']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { root });
     expect(run.stderr.trimEnd().split('\n')).toEqual([
       expect.stringMatching(/^rafa effort collect: .*store is "postgres"/),
     ]);
