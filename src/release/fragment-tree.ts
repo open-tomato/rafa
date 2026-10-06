@@ -148,7 +148,7 @@ function pathspecOf(prefix: string): string {
 }
 
 /** The id `name` carries as a fragment, or null when it is none. */
-function fragmentIdOf(name: string): string | null {
+export function fragmentIdOf(name: string): string | null {
   if (!name.endsWith(FRAGMENT_EXTENSION)) return null;
   const id = name.slice(0, -FRAGMENT_EXTENSION.length);
   return FRAGMENT_PLAN_ID_PATTERN.test(id)

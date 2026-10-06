@@ -181,7 +181,7 @@ export interface StageFacts extends Pick<BoardIssue, 'state' | 'stateReason' | '
 }
 
 /** True when `fragment` is there and ships something. */
-function ships(fragment: StageFragment | null): fragment is StageFragment {
+export function ships(fragment: StageFragment | null): fragment is StageFragment {
   return fragment !== null && fragment.level !== NO_SHIPPING_LEVEL;
 }
 
