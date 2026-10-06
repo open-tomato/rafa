@@ -443,9 +443,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-load.js', ['loadConfig']],
     ['../../config.js', ['ConfigError']],
     ['../../plan/index.js', ['parsePlan']],
-    ['../../plan/store-rules.js', ['findStoreRuleProblems', 'storeRuleLine']],
-    ['../../preflight/prerequisites-md.js', ['prerequisitesPathForPlan']],
+    ['../../plan/store-rules.js', ['storeRuleLine']],
     ['./plan-files.js', ['countTasks', 'expectOneArgument', 'formatCounts', 'isFile', 'issueLine', 'plural']],
+    ['./store-check.js', ['checkStoreRules']],
   ]],
   ['./commands/plan/risk.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
