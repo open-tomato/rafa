@@ -133,9 +133,9 @@ a new device or inode and will mint a new origin on its first write.
 This is the complement to copy detection: a backup is like a photo of
 the house before renovation; moving back into the photo is moving into
 a different house. The decision to carry identity is the same as a write
-open's decision to keep an origin: it happens under `BEGIN IMMEDIATE`
-inside `swapIn`, before the rename, and the carried generation is checked
-on the next write to catch a restoration. Releasing claims made after the
+open's decision to keep an origin: `decideLiveWrite` reads the live file
+read-only with no transaction, and the carried generation is checked on
+the next write to catch a restoration. Releasing claims made after the
 merge against this store's id before undoing the merge keeps them valid
 after restoration; undoing with unconfirmed claims in place orphans them
 until they are taken over with `rafa claim take <n> --stale`.

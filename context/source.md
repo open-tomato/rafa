@@ -96,33 +96,20 @@ spells out, and the shapes the lint config forces.
 **The 800-line cap is a convention only.** `eslint.base.mjs`,
 `eslint.config.mjs` and `sharedRules.mjs` carry no `max-lines` rule, so
 nothing refuses an oversized module and a file crosses the cap without
-any capture going red. `src/check/references.ts` is 825 lines at
-`12e6d17`, pushed over by its own ~130-line note recording measured
-corpus readings. Count the file with `wc -l` when a task adds to one
+any capture going red. Count the file with `wc -l` when a task adds to one
 already near the cap; a module that has to grow puts the new concern in
 a new file, and a note that has outgrown its module can move to the
-`context/` page that owns the subject. That module is no longer the
-example in the present tense: the shell-fence line reading moved to
-`src/check/shell-lines.ts`, leaving `references.ts` at 759 lines,
-wiring that reading back in as a whole-fence rule took it to 795, and
-the single-segment route rule took it to exactly 800 — its note paid
-for by rewrapping the prose the rule superseded. NO non-test file under
-`src/` is over the cap; the nearest is `src/check/references.ts` at
-that 800, with `src/demote/classify.ts` at 797 behind it. `src/effort/collect.ts`
-was at 798 until its argv parser moved to `collect-args.ts` and its
-skill half went to `collect-skills.ts`, which left it at 777; it grew
-back to 795, and moving the session log location to
-`session-log-dirs.ts` took it to 685.
+`context/` page that owns the subject. Some modules including
+`src/schema/instinct.ts` exceed the cap; the cap is a convention about
+the target size, not an upper bound the gates enforce.
 
-**The cap is a rule about modules, not about their tests.** At `b2bebfe`
-exactly one non-test file under `src/` is over it, `src/check/references.ts`
-above, while EIGHTEEN colocated `*.test.ts` files are, from
-`src/utils/commit.test.ts` at 811 to `src/effort/collect.test.ts` at 1297.
-A suite that grows past 800 lines beside the module it covers is therefore
-the tree's own convention and not a thing to split, and no capture reads
-it either way. Splitting one costs the shared world helpers a home, which
-is what keeps `src/commands/doctor.test.ts` (898) and
-`src/commands/init.test.ts` (806) whole.
+**The cap is a rule about modules, not about their tests.** Multiple
+colocated `*.test.ts` files exceed the cap by design; splitting a test
+file costs the shared helpers a home, which is why larger suites like
+`src/commands/doctor.test.ts` and `src/commands/init.test.ts` stay
+whole rather than split. The gate reads nothing and no capture goes red,
+so a suite that grows past 800 lines is the tree's own convention and not
+a thing to split.
 
 ### Adding a setting
 
