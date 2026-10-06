@@ -1,8 +1,9 @@
 /**
- * A strict fake of the project port's `gh api graphql` reads (`./gh.ts`)
+ * A strict fake of the project port's `gh api graphql` calls (`./gh.ts`)
  * behind a {@link GhRunner}: in-memory owners and their projects, each
- * with its fields and items, recording every command it is handed. No
- * case that uses it spawns a process or reaches GitHub.
+ * with its fields and items, and repositories with their issues and pull
+ * requests, recording every command it is handed. No case that uses it
+ * spawns a process or reaches GitHub.
  *
  * This module is a test helper that is not itself a test file, as
  * `./facts-fake.ts` is: bun runs nothing in it until a `*.test.ts` calls
@@ -23,9 +24,27 @@
  * A draft's content as `{}` and a redacted item's as null are NOT
  * readings: no project read held either, and the adapter reads neither.
  *
+ * The id lookups before a write answer as `./gh.ts`'s module note
+ * records: an owner that does not exist as `repositoryOwner` null, a
+ * repository or a number it does not hold failing with `NOT_FOUND` and
+ * the stderr `gh` wrote. The node ids the fake makes (`O_fake_<login>`,
+ * `R_fake_<owner/name>`, `I_fake_...`, `PR_fake_...`) are its own.
+ *
+ * ## The writes it holds
+ *
+ * The three mutations change what later reads answer, from the fake's
+ * own rule, not a reading, since no mutation was sent to GitHub: a copy
+ * becomes the owner's project of the next free number, with the
+ * template's fields and none of its items; a link is kept in
+ * {@link FakeProjectGh.linked}; an add appends an item holding no value,
+ * or answers the item already there for the same content, the way
+ * GitHub's documentation says `addProjectV2ItemById` does. A mutation
+ * naming a project, owner, repository or content id it does not hold is
+ * refused with a `fake gh:` message.
+ *
  * ## Strict
  *
- * Anything but the two reads — another command, a query of another
+ * Anything but those calls — another command, a query of another
  * shape, the project number sent as a string with `-f` rather than as an
  * integer with `-F` — is refused with `ok` false and a message opening
  * with `fake gh:`, the prefix of every message the fake invents.
@@ -96,11 +115,20 @@ export interface FakeProject {
   readonly items?: readonly FakeProjectItem[];
 }
 
+/** One repository the fake holds. */
+export interface FakeRepository {
+  /** `owner/name`; its owner exists too. */
+  readonly nameWithOwner: string;
+  readonly issues?: readonly number[];
+  readonly pullRequests?: readonly number[];
+}
+
 /** What the fake is made with. */
 export interface FakeProjectGhOptions {
   readonly projects?: readonly FakeProject[];
-  /** Logins that exist and hold no project here; every project's owner exists too. */
+  /** Logins that exist and hold no project here; every project's and repository's owner exists too. */
   readonly owners?: readonly string[];
+  readonly repositories?: readonly FakeRepository[];
 }
 
 /** The fake, and what it recorded. */
@@ -110,9 +138,18 @@ export interface FakeProjectGh {
   calls(): readonly (readonly string[])[];
   /** Makes the next call fail with `stderr`, as a refused `gh` would. */
   failNext(stderr: string): void;
+  /** The repositories linked to the project whose node id is `projectId`, in link order. */
+  linked(projectId: string): readonly string[];
 }
 
 type Json = Readonly<Record<string, unknown>>;
+
+/** An issue or pull request of a held repository, by its node id. */
+interface HeldContent {
+  readonly type: 'ISSUE' | 'PULL_REQUEST';
+  readonly repository: string;
+  readonly number: number;
+}
 
 /** A field as the fake answers it, with the ids it made. */
 interface HeldField extends FakeProjectField {
@@ -142,6 +179,23 @@ export function fakeProjectId(project: Pick<FakeProject, 'owner' | 'number' | 'i
 /** The node id of the `index`th item of `project`. */
 export function fakeItemId(project: Pick<FakeProject, 'owner' | 'number' | 'id'>, index: number): string {
   return `PVTI_${fakeProjectId(project)}_${String(index)}`;
+}
+
+/** The node id of the owner `login`. */
+export function fakeOwnerId(login: string): string {
+  return `O_fake_${login}`;
+}
+
+/** The node id of the repository `nameWithOwner`. */
+export function fakeRepositoryId(nameWithOwner: string): string {
+  return `R_fake_${nameWithOwner}`;
+}
+
+/** The node id of an issue, or of a pull request, of `nameWithOwner`. */
+export function fakeContentId(nameWithOwner: string, number: number, type: 'ISSUE' | 'PULL_REQUEST' = 'ISSUE'): string {
+  return `${type === 'ISSUE'
+    ? 'I'
+    : 'PR'}_fake_${nameWithOwner}_${String(number)}`;
 }
 
 /** The id the fake gives the `option`th option of the `field`th field: eight hex digits, as GitHub's are. */
@@ -214,10 +268,97 @@ function itemNode(project: FakeProject, item: FakeProjectItem, index: number, va
 
 /** Makes the fake; see the module note. */
 export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakeProjectGh {
-  const projects = options.projects ?? [];
-  const owners = new Set([...(options.owners ?? []), ...projects.map(({ owner }) => owner)]);
+  let projects: readonly FakeProject[] = options.projects ?? [];
+  const repositories = options.repositories ?? [];
+  const owners = new Set([
+    ...(options.owners ?? []),
+    ...projects.map(({ owner }) => owner),
+    ...repositories.map(({ nameWithOwner }) => nameWithOwner.split('/')[0] ?? ''),
+  ]);
+  const contents = new Map<string, HeldContent>(repositories.flatMap(({ nameWithOwner, issues = [], pullRequests = [] }) => [
+    ...issues.map((number) => [fakeContentId(nameWithOwner, number), { type: 'ISSUE', repository: nameWithOwner, number }] as const),
+    ...pullRequests.map((number) => [fakeContentId(nameWithOwner, number, 'PULL_REQUEST'), { type: 'PULL_REQUEST', repository: nameWithOwner, number }] as const),
+  ]));
+  let links: ReadonlyMap<string, readonly string[]> = new Map();
   const recorded: (readonly string[])[] = [];
   let failure: string | null = null;
+
+  const projectById = (id: string | undefined): FakeProject | undefined => projects.find((held) => fakeProjectId(held) === id);
+
+  const replaceProject = (old: FakeProject, next: FakeProject): void => {
+    projects = projects.map((held) => (held === old
+      ? next
+      : held));
+  };
+
+  const answerOwner = (owner: string): GhResult => (owners.has(owner)
+    ? ok({ repositoryOwner: { id: fakeOwnerId(owner), login: owner } })
+    : ok({ repositoryOwner: null }));
+
+  const answerRepository = (owner: string, name: string, number: string | undefined): GhResult => {
+    const nameWithOwner = `${owner}/${name}`;
+    const repository = repositories.find((held) => held.nameWithOwner === nameWithOwner);
+    if (repository === undefined) return notFound({ repository: null }, ['repository'], 57, `Could not resolve to a Repository with the name '${nameWithOwner}'.`);
+    const id = fakeRepositoryId(nameWithOwner);
+    if (number === undefined) return ok({ repository: { id } });
+    const held = [...contents].find(([, content]) => content.repository === nameWithOwner && String(content.number) === number);
+    return held === undefined
+      ? notFound({ repository: { id, issueOrPullRequest: null } }, ['repository', 'issueOrPullRequest'], 101, `Could not resolve to an issue or pull request with the number of ${number}.`)
+      : ok({ repository: { id, issueOrPullRequest: { id: held[0] } } });
+  };
+
+  const answerCopy = (templateId: string, ownerId: string, title: string): GhResult => {
+    const template = projectById(templateId);
+    const owner = [...owners].find((login) => fakeOwnerId(login) === ownerId);
+    if (template === undefined || owner === undefined) return refused(`the copy names a template or owner the fake does not hold: ${templateId}, ${ownerId}`);
+    const number = Math.max(0, ...projects.filter((held) => held.owner === owner).map((held) => held.number)) + 1;
+    const copied: FakeProject = { owner, number, title, public: false, closed: false, fields: template.fields ?? FAKE_TEMPLATE_FIELDS, items: [] };
+    projects = [...projects, copied];
+    const found = answerFind(owner, String(number));
+    const data = (JSON.parse(found.stdout) as { data: { repositoryOwner: { projectV2: Json } } }).data.repositoryOwner.projectV2;
+    return ok({ copyProjectV2: { projectV2: data } });
+  };
+
+  const answerLink = (projectId: string, repositoryId: string): GhResult => {
+    const repository = repositories.find(({ nameWithOwner }) => fakeRepositoryId(nameWithOwner) === repositoryId);
+    if (projectById(projectId) === undefined || repository === undefined) {
+      return refused(`the link names a project or repository the fake does not hold: ${projectId}, ${repositoryId}`);
+    }
+    const held = links.get(projectId) ?? [];
+    links = new Map([...links, [projectId, held.includes(repository.nameWithOwner)
+      ? held
+      : [...held, repository.nameWithOwner]]]);
+    return ok({ linkProjectV2ToRepository: { repository: { id: repositoryId } } });
+  };
+
+  const answerAddItem = (projectId: string, contentId: string): GhResult => {
+    const project = projectById(projectId);
+    const content = contents.get(contentId);
+    if (project === undefined || content === undefined) return refused(`the add names a project or content the fake does not hold: ${projectId}, ${contentId}`);
+    const items = project.items ?? [];
+    const index = items.findIndex((item) => (item.type ?? 'ISSUE') === content.type
+      && (item.repository ?? FAKE_PROJECT_REPOSITORY) === content.repository
+      && item.number === content.number);
+    if (index >= 0) return ok({ addProjectV2ItemById: { item: { id: fakeItemId(project, index) } } });
+    const next = { ...project, items: [...items, { type: content.type, repository: content.repository, number: content.number }] };
+    replaceProject(project, next);
+    return ok({ addProjectV2ItemById: { item: { id: fakeItemId(next, items.length) } } });
+  };
+
+  /** The mutation or id lookup `query` asks, or null when it is none of them. */
+  const answerWrite = (query: string, fields: ReadonlyMap<string, { readonly flag: string; readonly value: string }>): GhResult | null => {
+    const value = (name: string): string => fields.get(name)?.value ?? '';
+    if (query.includes('copyProjectV2(')) return answerCopy(value('template'), value('owner'), value('title'));
+    if (query.includes('linkProjectV2ToRepository(')) return answerLink(value('project'), value('repository'));
+    if (query.includes('addProjectV2ItemById(')) return answerAddItem(value('project'), value('content'));
+    if (query.includes('repositoryOwner(login: $owner) { id')) return answerOwner(value('owner'));
+    if (query.includes('repository(owner: $owner, name: $name)')) {
+      const number = fields.get('number');
+      if (number !== undefined && number.flag !== '-F') return refused('the content lookup names its number with -F');
+      return answerRepository(value('owner'), value('name'), number?.value);
+    }
+    return null;
+  };
 
   const answerFind = (owner: string, number: string): GhResult => {
     if (!owners.has(owner)) return ok({ repositoryOwner: null });
@@ -281,6 +422,8 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
     const fields = fieldsOf(args);
     const query = fields?.get('query')?.value;
     if (fields === null || query === undefined) return refused(`unmodelled command: gh ${args.join(' ')}`);
+    const write = answerWrite(query, fields);
+    if (write !== null) return write;
     if (query.includes('projectV2(number: $number)')) {
       const owner = fields.get('owner');
       const number = fields.get('number');
@@ -311,5 +454,6 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
     failNext: (stderr) => {
       failure = stderr;
     },
+    linked: (projectId) => links.get(projectId) ?? [],
   };
 }

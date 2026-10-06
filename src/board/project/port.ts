@@ -18,6 +18,19 @@
  * {@link ProjectPort.items} lists every item of a project with the values
  * it holds, read page by page.
  *
+ * ## Writes
+ *
+ * {@link ProjectPort.copy} copies the template to an owner under a title,
+ * answering the new project as the find reads it; its draft issues are
+ * left behind. {@link ProjectPort.link} links a repository to a project,
+ * so the project shows on the repository's Projects tab.
+ * {@link ProjectPort.addItem} adds an issue or a pull request to a
+ * project, answering the item's node id. Each names its owner, repository
+ * or issue the way a caller holds it, by login, `owner/name` and number,
+ * and the adapter reads the node id the mutation needs first, so each
+ * write is two `gh` calls. Setting and clearing an item's fields is not
+ * here: `./writes.ts` batches them.
+ *
  * ## Fields and options by exact name
  *
  * rafa finds the five fields of the template (`board.project.template`)
@@ -46,7 +59,8 @@
  * {@link ProjectPortError}, whose {@link ProjectPortError.detail} keeps
  * what `gh` wrote so a caller can tell a missing scope from a rate limit
  * without the port deciding it. Only a project that is not there answers
- * null rather than rejecting.
+ * null rather than rejecting: a write naming an owner, a repository or an
+ * issue that is not there rejects.
  */
 import { HORIZON_OPTIONS, STAGE_OPTIONS } from './rules.js';
 
@@ -156,12 +170,35 @@ export interface ProjectItem {
   readonly values: ReadonlyMap<string, ProjectFieldValue>;
 }
 
-/** The reads of a project. See the module note. */
+/** What {@link ProjectPort.copy} copies, and where to. */
+export interface ProjectCopy {
+  /** The node id of the project copied, as {@link ProjectPort.find} read it. */
+  readonly templateId: string;
+  /** The login of the organization or user the copy goes to. */
+  readonly owner: string;
+  /** The copy's title. */
+  readonly title: string;
+}
+
+/** An issue or a pull request, as {@link ProjectPort.addItem} names it. */
+export interface ProjectContentRef {
+  /** Its repository, `owner/name`. */
+  readonly repository: string;
+  readonly number: number;
+}
+
+/** The reads and writes of a project. See the module note. */
 export interface ProjectPort {
   /** The project `ref` names, or null when its owner holds none of that number, or there is no such owner. */
   find(ref: ProjectRef): Promise<Project | null>;
   /** Every item of the project whose node id is `projectId`, in the project's order. */
   items(projectId: string): Promise<readonly ProjectItem[]>;
+  /** Copies the template, without its draft issues, answering the new project. */
+  copy(request: ProjectCopy): Promise<Project>;
+  /** Links `repository` (`owner/name`) to the project whose node id is `projectId`. */
+  link(projectId: string, repository: string): Promise<void>;
+  /** Adds the issue or pull request `content` names to the project `projectId`, answering the item's node id. */
+  addItem(projectId: string, content: ProjectContentRef): Promise<string>;
 }
 
 /** A refusal of the port; see the module note. */

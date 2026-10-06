@@ -38,9 +38,36 @@
  *  - A node id that names nothing exited 1 with `NOT_FOUND` at `node`;
  *    {@link ProjectPort.items} rejects on it, since a project found a
  *    moment ago and gone now is not one to read as empty.
+ *
+ * ## The writes, and what was and was not measured
+ *
+ * Copy, link and add item each read the node id their mutation needs,
+ * then send the mutation: `repositoryOwner(login:) { id }` for the copy's
+ * owner, `repository(owner:, name:) { id }` for the link, and
+ * `issueOrPullRequest(number:)` under it for the item. Those lookups were
+ * measured read-only with `gh` 2.100.0 on 2026-10-06: an owner answered
+ * `{"data":{"repositoryOwner":{"id":"O_...","login":...}}}` (`U_...` for
+ * a user), and an owner that does not exist `repositoryOwner` null, exit
+ * 0; a repository that does not exist exited 1 with `NOT_FOUND` at
+ * `repository`, and a number it does not hold exited 1 with `NOT_FOUND`
+ * at `repository.issueOrPullRequest`, each with `gh: Could not resolve
+ * ...` on stderr. All three reject: a write has nothing to answer null
+ * about.
+ *
+ * The mutations' inputs and payloads were read off the schema by
+ * introspection the same day: `copyProjectV2` takes `projectId`,
+ * `ownerId`, `title` and an optional `includeDraftIssues`, sent false, and
+ * answers `projectV2`; `linkProjectV2ToRepository` takes `projectId` and
+ * `repositoryId` and answers `repository`; `addProjectV2ItemById` takes
+ * `projectId` and `contentId` and answers `item`. No mutation was sent to
+ * GitHub, so their answers to a second link of the same repository, or
+ * a second add of the same issue, are NOT readings: the adapter reads
+ * only the payload the schema names, and rejects a null one.
  */
 import type {
   Project,
+  ProjectContentRef,
+  ProjectCopy,
   ProjectField,
   ProjectFieldValue,
   ProjectItem,
@@ -70,10 +97,38 @@ const QUOTED_LENGTH = 200;
 /** What the find reads of each field. */
 const FIELD_SELECTION = '... on ProjectV2FieldCommon { id name dataType } ... on ProjectV2SingleSelectField { options { id name } }';
 
+/** What the find and the copy read of a project. */
+const PROJECT_SELECTION = 'id number title url closed public'
+  + ` fields(first: ${String(PROJECT_PAGE_SIZE)}) { pageInfo { hasNextPage } nodes { ${FIELD_SELECTION} } }`;
+
 /** What the find asks; see the module note. */
 export const FIND_QUERY = 'query($owner: String!, $number: Int!) { repositoryOwner(login: $owner) { login ... on ProjectV2Owner'
-  + ' { projectV2(number: $number) { id number title url closed public'
-  + ` fields(first: ${String(PROJECT_PAGE_SIZE)}) { pageInfo { hasNextPage } nodes { ${FIELD_SELECTION} } } } } } }`;
+  + ` { projectV2(number: $number) { ${PROJECT_SELECTION} } } } }`;
+
+/** The node id of an owner, read before the copy. */
+export const OWNER_QUERY = 'query($owner: String!) { repositoryOwner(login: $owner) { id login } }';
+
+/** The copy; see the module note. */
+export const COPY_MUTATION = 'mutation($template: ID!, $owner: ID!, $title: String!) { copyProjectV2(input:'
+  + ` { projectId: $template, ownerId: $owner, title: $title, includeDraftIssues: false }) { projectV2 { ${PROJECT_SELECTION} } } }`;
+
+/** The node id of a repository, read before the link. */
+export const REPOSITORY_QUERY = 'query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }';
+
+/** The link; see the module note. */
+export const LINK_MUTATION = 'mutation($project: ID!, $repository: ID!) { linkProjectV2ToRepository(input:'
+  + ' { projectId: $project, repositoryId: $repository }) { repository { id } } }';
+
+/** The node id of an issue or a pull request, read before the add. */
+export const CONTENT_QUERY = 'query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name)'
+  + ' { id issueOrPullRequest(number: $number) { ... on Issue { id } ... on PullRequest { id } } } }';
+
+/** The add; see the module note. */
+export const ADD_ITEM_MUTATION = 'mutation($project: ID!, $content: ID!) { addProjectV2ItemById(input:'
+  + ' { projectId: $project, contentId: $content }) { item { id } } }';
+
+/** A repository name GitHub accepts after its owner. */
+const REPOSITORY_NAME = /^[\w.-]+$/u;
 
 /** The field a value belongs to. */
 const VALUE_FIELD = 'field { ... on ProjectV2FieldCommon { id name } }';
@@ -198,12 +253,11 @@ function readField(value: unknown, where: string): ProjectField {
   };
 }
 
-/** The project at `data.repositoryOwner.projectV2`. */
-function readProject(owner: Answer): Project {
-  const where = 'data.repositoryOwner.projectV2';
-  const project = readMapping(owner['projectV2'], where);
+/** The project at `where`, held by `owner`. */
+function readProject(owner: string, value: unknown, where: string): Project {
+  const project = readMapping(value, where);
   return {
-    owner: readString(owner['login'], 'data.repositoryOwner.login'),
+    owner,
     number: readWhole(project['number'], `${where}.number`),
     id: readString(project['id'], `${where}.id`),
     title: readString(project['title'], `${where}.title`),
@@ -216,14 +270,79 @@ function readProject(owner: Answer): Project {
 
 /** The argv of the find; throws a `RangeError` on an owner or number GitHub could not hold. */
 export function findArgs(ref: ProjectRef): readonly string[] {
-  if (!LOGIN.test(ref.owner)) throw new RangeError(`not a GitHub login: ${JSON.stringify(ref.owner)}`);
-  if (!Number.isSafeInteger(ref.number) || ref.number < 1) throw new RangeError(`not a project number: ${String(ref.number)}`);
+  requireLogin(ref.owner);
+  requireNumber(ref.number, 'a project number');
   return graphqlArgs(FIND_QUERY, [['-f', 'owner', ref.owner], ['-F', 'number', String(ref.number)]]);
+}
+
+/** Throws a `RangeError` on an empty node id, naming `what`, article and all, it should have named. */
+function requireNodeId(id: string, what: string): void {
+  if (id === '') throw new RangeError(`not ${what} node id: ""`);
+}
+
+/** Throws a `RangeError` on a login GitHub could not hold. */
+function requireLogin(login: string): void {
+  if (!LOGIN.test(login)) throw new RangeError(`not a GitHub login: ${JSON.stringify(login)}`);
+}
+
+/** Throws a `RangeError` on a number no issue, pull request or project could hold. */
+function requireNumber(number: number, what: string): void {
+  if (!Number.isSafeInteger(number) || number < 1) throw new RangeError(`not ${what}: ${String(number)}`);
+}
+
+/** `owner/name` split in two; throws a `RangeError` on anything else. */
+function splitRepository(repository: string): readonly [owner: string, name: string] {
+  const [owner = '', name = '', ...rest] = repository.split('/');
+  if (rest.length > 0 || !LOGIN.test(owner) || !REPOSITORY_NAME.test(name) || name === '.' || name === '..') {
+    throw new RangeError(`not a repository, owner/name: ${JSON.stringify(repository)}`);
+  }
+  return [owner, name];
+}
+
+/** The argv of the owner lookup before a copy. */
+export function ownerArgs(owner: string): readonly string[] {
+  requireLogin(owner);
+  return graphqlArgs(OWNER_QUERY, [['-f', 'owner', owner]]);
+}
+
+/** The argv of the copy of `templateId` to the owner whose node id is `ownerId`. */
+export function copyArgs(templateId: string, ownerId: string, title: string): readonly string[] {
+  requireNodeId(templateId, 'a project');
+  requireNodeId(ownerId, 'an owner');
+  if (title.trim() === '') throw new RangeError('not a project title: an empty one');
+  return graphqlArgs(COPY_MUTATION, [['-f', 'template', templateId], ['-f', 'owner', ownerId], ['-f', 'title', title]]);
+}
+
+/** The argv of the repository lookup before a link. */
+export function repositoryArgs(repository: string): readonly string[] {
+  const [owner, name] = splitRepository(repository);
+  return graphqlArgs(REPOSITORY_QUERY, [['-f', 'owner', owner], ['-f', 'name', name]]);
+}
+
+/** The argv of the link of the repository `repositoryId` to the project `projectId`. */
+export function linkArgs(projectId: string, repositoryId: string): readonly string[] {
+  requireNodeId(projectId, 'a project');
+  requireNodeId(repositoryId, 'a repository');
+  return graphqlArgs(LINK_MUTATION, [['-f', 'project', projectId], ['-f', 'repository', repositoryId]]);
+}
+
+/** The argv of the issue or pull request lookup before an add; the number as an integer. */
+export function contentArgs(content: ProjectContentRef): readonly string[] {
+  const [owner, name] = splitRepository(content.repository);
+  requireNumber(content.number, 'an issue or pull request number');
+  return graphqlArgs(CONTENT_QUERY, [['-f', 'owner', owner], ['-f', 'name', name], ['-F', 'number', String(content.number)]]);
+}
+
+/** The argv of the add of the content `contentId` to the project `projectId`. */
+export function addItemArgs(projectId: string, contentId: string): readonly string[] {
+  requireNodeId(projectId, 'a project');
+  requireNodeId(contentId, 'an issue or pull request');
+  return graphqlArgs(ADD_ITEM_MUTATION, [['-f', 'project', projectId], ['-f', 'content', contentId]]);
 }
 
 /** The argv of one page of items, from `cursor` on, or from the start when null. */
 export function itemsArgs(projectId: string, cursor: string | null): readonly string[] {
-  if (projectId === '') throw new RangeError('not a project node id: ""');
+  requireNodeId(projectId, 'a project');
   return graphqlArgs(ITEMS_QUERY, [['-f', 'project', projectId], ...(cursor === null
     ? []
     : [['-f', 'after', cursor] as const])]);
@@ -306,9 +425,42 @@ async function find(gh: GhRunner, ref: ProjectRef): Promise<Project | null> {
   const answer = parsed(result.stdout);
   if (answer === undefined) refuse(`gh api graphql answered text that is not JSON: ${result.stdout.slice(0, QUOTED_LENGTH)}`, result.stdout);
   const owner = readMapping(readMapping(answer, 'the answer')['data'], 'data')['repositoryOwner'];
-  return owner === null
-    ? null
-    : readProject(readMapping(owner, 'data.repositoryOwner'));
+  if (owner === null) return null;
+  const held = readMapping(owner, 'data.repositoryOwner');
+  return readProject(readString(held['login'], 'data.repositoryOwner.login'), held['projectV2'], 'data.repositoryOwner.projectV2');
+}
+
+/** The node id of the mapping at `where` in `data`, its path split on dots. */
+function readNodeId(data: Answer, where: string): string {
+  const node = where.split('.').reduce<unknown>((value, key, index, keys) => {
+    const at = ['data', ...keys.slice(0, index)].join('.');
+    return readMapping(value, at)[key];
+  }, data);
+  return readString(readMapping(node, `data.${where}`)['id'], `data.${where}.id`);
+}
+
+/** Copies the template; see the module note. */
+async function copy(gh: GhRunner, request: ProjectCopy): Promise<Project> {
+  const owner = (await readData(gh, ownerArgs(request.owner)))['repositoryOwner'];
+  if (owner === null) refuse(`there is no owner named ${request.owner} to copy the project to`);
+  const ownerId = readString(readMapping(owner, 'data.repositoryOwner')['id'], 'data.repositoryOwner.id');
+  const data = await readData(gh, copyArgs(request.templateId, ownerId, request.title));
+  const where = 'data.copyProjectV2.projectV2';
+  return readProject(request.owner, readMapping(data['copyProjectV2'], 'data.copyProjectV2')['projectV2'], where);
+}
+
+/** Links `repository` to the project `projectId`; see the module note. */
+async function link(gh: GhRunner, projectId: string, repository: string): Promise<void> {
+  requireNodeId(projectId, 'a project');
+  const repositoryId = readNodeId(await readData(gh, repositoryArgs(repository)), 'repository');
+  readNodeId(await readData(gh, linkArgs(projectId, repositoryId)), 'linkProjectV2ToRepository.repository');
+}
+
+/** Adds the issue or pull request `content` names to the project `projectId`; see the module note. */
+async function addItem(gh: GhRunner, projectId: string, content: ProjectContentRef): Promise<string> {
+  requireNodeId(projectId, 'a project');
+  const contentId = readNodeId(await readData(gh, contentArgs(content)), 'repository.issueOrPullRequest');
+  return readNodeId(await readData(gh, addItemArgs(projectId, contentId)), 'addProjectV2ItemById.item');
 }
 
 /** Every item of the project `projectId`, page after page. */
@@ -328,5 +480,8 @@ export function createGhProjectPort(gh: GhRunner): ProjectPort {
   return {
     find: (ref) => find(gh, ref),
     items: (projectId) => items(gh, projectId),
+    copy: (request) => copy(gh, request),
+    link: (projectId, repository) => link(gh, projectId, repository),
+    addItem: (projectId, content) => addItem(gh, projectId, content),
   };
 }
