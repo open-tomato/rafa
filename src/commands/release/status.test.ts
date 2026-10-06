@@ -52,6 +52,7 @@ import {
   compareVersions,
   createReleaseStatusCommand,
   NOTHING,
+  MISSING_CHANGELOG_CELL,
   readPending,
   readTags,
   readUntagged,
@@ -141,7 +142,7 @@ function reading(over: Partial<ReleaseStatusReading> = {}): ReleaseStatusReading
   return {
     versionFile: { path: 'package.json', version: '0.5.0', problem: null },
     tags: { tags: [tag('v0.4.0')], latest: tag('v0.4.0'), problem: null },
-    untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], problem: null },
+    untagged: { path: 'CHANGELOG.md', released: ['0.5.0', '0.4.0'], versions: ['0.5.0'], missing: false, problem: null },
     plan: { stub: STUB, source: 'roster', branch: BRANCH, notes: [note()], level: 'minor', problem: null },
     waiting: { ref: 'origin/main', read: true, baseVersion: '0.5.0', fragments: [], malformed: 0, forecast: null, problems: [] },
     audit: { path: 'CHANGELOG.md', read: true, sections: 2, findings: [] },
@@ -427,11 +428,20 @@ describe('the changelog reading', () => {
     expect(answer.problem).toBeNull();
   });
 
-  it('says the changelog could not be read when there is none', () => {
+  it('reads a changelog that is not there as missing', () => {
     const root = scratch();
     const answer = readUntagged(root, 'CHANGELOG.md', []);
 
     expect(answer.versions).toEqual([]);
+    expect(answer.missing).toBe(true);
+  });
+
+  it('says the changelog could not be read when it exists and cannot be', () => {
+    const root = scratch();
+    mkdirSync(join(root, 'CHANGELOG.md'));
+    const answer = readUntagged(root, 'CHANGELOG.md', []);
+
+    expect(answer.missing).toBe(false);
     expect(answer.problem).toBe(`the changelog could not be read at ${join(root, 'CHANGELOG.md')}`);
   });
 });
@@ -579,14 +589,25 @@ describe('the block', () => {
 
   it('says so when every released version is tagged, and when none was ever released', () => {
     const tagged = renderStatus(reading({
-      untagged: { path: 'CHANGELOG.md', released: ['0.4.0'], versions: [], problem: null },
+      untagged: { path: 'CHANGELOG.md', released: ['0.4.0'], versions: [], missing: false, problem: null },
     }));
     const never = renderStatus(reading({
-      untagged: { path: 'CHANGELOG.md', released: [], versions: [], problem: null },
+      untagged: { path: 'CHANGELOG.md', released: [], versions: [], missing: false, problem: null },
     }));
 
     expect(cellOf(tagged, 'untagged')).toBe(NOTHING);
     expect(cellOf(never, 'untagged')).toBe(`${NOTHING}, and the changelog names no release`);
+  });
+
+  it('reads a missing changelog as settle creating it in the untagged and audit cells', () => {
+    const text = renderStatus(reading({
+      untagged: { path: 'CHANGELOG.md', released: [], versions: [], missing: true, problem: 'the changelog could not be read at /x' },
+      audit: { path: 'CHANGELOG.md', read: false, sections: 0, findings: [] },
+    }));
+
+    expect(cellOf(text, 'untagged')).toBe(MISSING_CHANGELOG_CELL);
+    expect(cellOf(text, 'audit')).toBe(MISSING_CHANGELOG_CELL);
+    expect(text).not.toContain('could not be read');
   });
 
   it('says there is no current plan, and lists no note, when none resolved', () => {
@@ -705,7 +726,8 @@ describe('the dispatched action', () => {
     expect(cellOf(run.stdout, 'version file')).toBe('package.json: 0.5.0');
     expect(cellOf(run.stdout, 'latest tag')).toBe(UNREADABLE);
     expect(run.stdout).toContain('the tags could not be listed');
-    expect(run.stdout).toContain('the changelog could not be read');
+    expect(cellOf(run.stdout, 'untagged')).toBe(MISSING_CHANGELOG_CELL);
+    expect(run.stdout).not.toContain('the changelog could not be read');
     expect(run.stdout).toContain('the branch could not be read');
     expect(seams.asked).toEqual([]);
   });

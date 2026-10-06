@@ -99,6 +99,13 @@ directory that refuses the new file, still stops the settle with exit 1. The
 parent directory isn't made, so a `release.changelog` under a directory the
 base lacks stops it too.
 
+The readers follow the same line. `rafa doctor`'s release row and
+`rafa release status` (its `untagged` and `audit` cells) read an absent
+changelog as `missing; rafa release settle creates it`, with no problem line
+and their forecasts unchanged; a changelog that exists and can't be read still
+reads as "could not be read". `rafa release tag` still refuses on a missing
+changelog, since a tag names a version a section already holds.
+
 The caller is unspecified and all are equivalent: a person running the command,
 a CI job after each merge, a post-merge hook, or `rafa next` (which runs settle
 after its merge step). `rafa pr merge` does not call settle itself; instead, it

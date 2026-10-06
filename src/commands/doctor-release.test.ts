@@ -246,12 +246,24 @@ describe('readDoctorRelease', () => {
     const reading = enabledOf(readDoctorRelease({ root: lone, config: CONFIG }));
 
     expect(releaseWaits(reading)).toBe(false);
-    expect(releaseRow(reading))
-      .toBe('Release: origin/main at ?, no release tag, CHANGELOG.md tops at ?, fragments ?.');
+    expect(releaseRow(reading)).toBe(
+      'Release: origin/main at ?, no release tag, CHANGELOG.md missing; rafa release settle creates it, fragments ?.',
+    );
     const problems = releaseProblemLines(reading);
-    expect(problems).toHaveLength(2);
+    expect(problems).toHaveLength(1);
     expect(problems[0]).toStartWith('  the tree of origin/main could not be read');
-    expect(problems[1]).toBe(`  the changelog could not be read at ${join(lone, 'CHANGELOG.md')}`);
+  });
+
+  it('reads a changelog that exists but cannot be read as could not be read', () => {
+    const w = world();
+    const lone = join(w.dir, 'lone-unreadable');
+    mkdirSync(lone);
+    mkdirSync(join(lone, 'CHANGELOG.md'));
+
+    const heading = readTopHeading(lone, 'CHANGELOG.md');
+
+    expect(heading.missing).toBe(false);
+    expect(heading.problem).toBe(`the changelog could not be read at ${join(lone, 'CHANGELOG.md')}`);
   });
 
   it('reads nothing and makes no git runner where the release is off', () => {
@@ -272,7 +284,12 @@ describe('readTopHeading', () => {
     const w = world();
     writeFileSync(join(w.caller, 'NEWS.md'), '# News\n\n## Unreleased\n\n```\n## 9.9.9\n```\n\n## v1.2.3 — 2026-01-01\n');
 
-    expect(readTopHeading(w.caller, 'NEWS.md')).toEqual({ path: 'NEWS.md', version: '1.2.3', problem: null });
+    expect(readTopHeading(w.caller, 'NEWS.md')).toEqual({
+      path: 'NEWS.md',
+      version: '1.2.3',
+      missing: false,
+      problem: null,
+    });
   });
 
   it('says the changelog names no version when no heading does', () => {
