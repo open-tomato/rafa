@@ -497,8 +497,8 @@ describe('a loop start run with no open task', () => {
       'event:wrap-up',
       'event:wrap-up',
       'event:wrap-up',
-      'event:no-pr',
       'event:wrap-up',
+      'event:no-pr',
     ]);
     expect(events.filter((event) => event.type !== 'event')).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
@@ -613,8 +613,8 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       'event:wrap-up',
       'event:wrap-up',
       'event:wrap-up',
-      'event:no-pr',
       'event:wrap-up',
+      'event:no-pr',
     ]);
     expect(labels[0]).toBe('start');
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
