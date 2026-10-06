@@ -46,10 +46,13 @@
  * whose fragments another settle released first. 1 for everything
  * else — a base that could not be fetched or read, a fragment that
  * does not parse, a strategy that threw, a commit that could not be
- * built, a push refused twice or by branch protection, a pull request
- * step that failed, and a tag that could not be written or pushed
- * after a push that landed. The failure's sentence is the refusal;
- * the reading above it is printed first either way. In json mode a
+ * built, a push refused twice, by branch protection or by a repository
+ * rule, a pull request step that failed, and a tag that could not be
+ * written or pushed after a push that landed. The failure's sentence is
+ * the refusal; the reading above it is printed first either way, and no
+ * success line follows it: a refused push's sentence carries none of
+ * the `Done` git's `--porcelain` prints after a refusal
+ * (`src/release/settle-push.ts`, #765). In json mode a
  * run exiting 0 gives {@link ReleaseSettleResult} as the terminal
  * result's data.
  *
