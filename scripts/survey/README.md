@@ -15,7 +15,7 @@ repository name: the repository is public. The outputs under
 | Script | Output | Run line | Status |
 | --- | --- | --- | --- |
 | `survey-io.ts` | none; the shared helper the others import: `listTrackedFiles`, `measureCoverage`, `coverageLine`, `writeSurvey` | imported, not run | added |
-| `import-graph.ts` | `.rafa/survey/import-graph.json`, `.rafa/survey/import-graph.md` | `bun scripts/survey/import-graph.ts` | planned |
+| `import-graph.ts` | `.rafa/survey/import-graph.json`, `.rafa/survey/import-graph.md` | `bun scripts/survey/import-graph.ts` | added |
 | `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | planned |
 | `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | planned |
 | `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | planned |
@@ -23,6 +23,15 @@ repository name: the repository is public. The outputs under
 
 A `planned` row names a script its own task adds; that task turns the row
 to `added` in the same commit.
+
+`import-graph.ts` builds every tracked non-test source file under `src/`
+and `packages/` in one `bun build --metafile` run, so its edges are the
+runtime graph: `import type` lines are erased before the metafile and are
+no edges. It clusters the graph with Louvain (`graphology`,
+`graphology-communities-louvain`, both devDependencies), capped at eight
+clusters ranked `c1` to `c8`, and scores betweenness per file with
+`graphology-metrics`. A file with no edge is listed as isolated, and one
+left beyond the eighth cluster with no edge out of it as detached.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
