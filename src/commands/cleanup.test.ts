@@ -543,6 +543,7 @@ describe('rafa cleanup reading', () => {
       cwd: '/repo',
       projectRoot: project.root,
       worktreeDir: join('.rafa', 'worktrees'),
+      release: { fragments: '.changes', changelog: 'CHANGELOG.md' },
     });
   });
 

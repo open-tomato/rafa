@@ -371,6 +371,7 @@ export async function runCleanup(context: RafaContext, seams: CleanupCommandSeam
     cwd,
     projectRoot: project.root,
     worktreeDir: config.loopWorktreeDir,
+    release: { fragments: config.releaseFragments, changelog: config.releaseChangelog },
   });
 
   if (context.outputMode === 'json') {
@@ -405,10 +406,15 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
       + ' worktrees on a Merged branch and run records start ticked; a worktree that is dirty, locked, the'
       + ' current one, running a loop session or modified within `cleanup.worktreeIdleDays` cannot be ticked,'
       + ' and says why, and a Merged branch such a worktree holds starts unticked, naming it, and is not'
-      + ' deleted even when ticked. A ticked Not-pushed branch asks again, naming the commits deleting it loses. Enter'
+      + ' deleted even when ticked. A Merged branch listed only because its upstream is gone also starts'
+      + ' unticked, saying the base does not reach its tip or, when its tip is past a merged pull request\'s'
+      + ' head, `<n> commits past #<pr>\'s head: <subjects>`. A ticked Not-pushed branch asks again, naming'
+      + ' the commits deleting it loses. Enter'
       + ' then asks `Delete <n> branches, remove <m> worktrees and remove <r> run records? [y/N]`, and a yes'
       + ' runs `git worktree remove` for each worktree and `git branch -d` for each Merged branch, `-D` for a'
-      + ' squash-merged one and for a Stale or Not-pushed branch ticked and confirmed, then removes each run'
+      + ' squash-merged one, for one whose commits past its pull request\'s head are release fragments the'
+      + ' base already holds (any other such branch is not deleted, its commits named), and for a Stale or'
+      + ' Not-pushed branch ticked and confirmed, then removes each run'
       + ' record and its events file. Nothing runs with `--force` and nothing remote is deleted: a Stale row'
       + ' names the `git push origin --delete <b>` to run by hand. It exits 1 when a step did not run clean.'
       + ' Without a terminal, or with `--output=json`, it prints the five groups, asks nothing and removes'

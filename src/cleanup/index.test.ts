@@ -433,7 +433,7 @@ describe('readCleanup over a real clone', () => {
     expect(fetched.fetched).toBe(true);
     expect(fetched.base).toBe('main');
     expect(fetched.merged.map((row) => [row.branch.name, row.reason, row.ticked]))
-      .toEqual([['gone', 'upstream origin/gone is gone', true]]);
+      .toEqual([['gone', 'upstream origin/gone is gone; main does not reach its tip', false]]);
     expect(fetched.notes).toEqual([]);
   });
 });

@@ -14,10 +14,14 @@
  *   1. Every ticked worktree first, `git worktree remove <path>`, never
  *      `--force`.
  *   2. Then every ticked branch. A Merged row is `git branch -d`, save
- *      one case: a row that is Merged by a merged pull request whose head
- *      commit is its tip, and NOT reachable from the base, is `-D`,
- *      because that is a squash merge and `-d` refuses it (measured
- *      below). A Stale or Not-pushed row is `-D`: the caller hands it
+ *      two cases, both NOT reachable from the base, which `-d` refuses
+ *      (measured below), so `-D` ({@link needsForcedDelete}): a row
+ *      Merged by a merged pull request whose head commit is its tip, a
+ *      squash merge; and a row whose tip is past such a head
+ *      ({@link MergedRow.pastHead}, `./groups.ts`) when every commit
+ *      past it is a release fragment the base already holds
+ *      (`./past-head.ts`), so deleting it loses nothing. A Stale or
+ *      Not-pushed row is `-D`: the caller hands it
  *      over only once the person ticked it and, for Not pushed, answered
  *      the question naming its commit count.
  *   3. Last, every ticked run record (`./runs.ts`), `rm <record>
@@ -35,6 +39,13 @@
  * when that removal failed. A Stale or Not-pushed branch a ticked
  * worktree holds is not a step at all but a {@link WithheldRemoval},
  * as is a worktree row the caller passed although it cannot be ticked.
+ *
+ * A Merged row whose commits past its pull request's head are not all
+ * held release fragments starts unticked (`./groups.ts`). Ticked anyway,
+ * it is one {@link WithheldRemoval} naming every commit past the head
+ * the base does not hold, short hash and subject
+ * ({@link unheldPastHeadReason}), never a step: `-d` refuses it and
+ * `-D` would lose those commits.
  *
  * A Merged row a listed worktree that cannot be ticked holds
  * ({@link MergedRow.heldBy}, `./groups.ts`) starts unticked. Ticked
@@ -76,6 +87,7 @@
  * is the renderer's, not a step.
  */
 import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.js';
+import type { PastHeadRead } from './past-head.js';
 import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitRunner } from '../pr/git.js';
@@ -87,6 +99,9 @@ import { gitSaid } from '../pr/git.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
 import { heldReason as checkedOutReason } from './groups.js';
+
+/** How many characters of a commit hash a withheld reason shows. */
+const SHORT_HASH_LENGTH = 7;
 
 /** The flag spellings that make a worktree removal or branch delete forced. */
 const FORCING_FLAG = /^(?:--force(?:=.*)?|-[^-]*f[^-]*)$/;
@@ -208,13 +223,34 @@ export function removeRunStep(row: RunRow): CleanupStep {
 }
 
 /**
- * Whether a Merged row is deleted with `-D`: merged by a pull request
- * at its tip and not reachable from the base, which is a squash merge.
+ * Whether a Merged row is deleted with `-D`: not reachable from the
+ * base, and either merged by a pull request at its tip, which is a
+ * squash merge, or past a merged pull request's head by commits that
+ * are all release fragments the base holds; see the module note.
  */
 export function needsForcedDelete(row: MergedRow): boolean {
-  return !row.mergedBy.includes('base')
-    && row.mergedBy.includes('pull-request')
-    && row.pullRequest !== null;
+  if (row.mergedBy.includes('base')) {
+    return false;
+  }
+  if (row.mergedBy.includes('pull-request') && row.pullRequest !== null) {
+    return true;
+  }
+  return row.pastHead?.held === true;
+}
+
+/**
+ * Why a Merged row past a merged pull request's head is not deleted:
+ * the commits past the head the base does not hold, each as short hash
+ * and subject, comma-joined oldest first.
+ */
+export function unheldPastHeadReason(reading: PastHeadRead): string {
+  const unheld = reading.commits.filter((commit) => !commit.held);
+  const named = unheld.map((commit) => `${commit.hash.slice(0, SHORT_HASH_LENGTH)} ${commit.subject}`).join(', ');
+  const head = `#${String(reading.pullRequest.number)}'s head`;
+  const counted = unheld.length === 1
+    ? `1 commit past ${head} is not a release fragment`
+    : `${String(unheld.length)} commits past ${head} are not release fragments`;
+  return `${counted} the base holds: ${named}; deleting it would lose them`;
 }
 
 /** One ticked branch, with the flag its group decides. */
@@ -224,6 +260,8 @@ interface BranchPick {
   readonly forced: boolean;
   /** The untickable worktree holding a Merged row, when `./groups.ts` named one. */
   readonly holder: BranchHolder | null;
+  /** A Merged row's commits past its pull request's head when they are not all held, else null. */
+  readonly unheld: PastHeadRead | null;
 }
 
 /** The ticked branch rows, Merged first, each with its flag. */
@@ -234,9 +272,12 @@ function branchPicks(selection: CleanupSelection): readonly BranchPick[] {
       merged: true,
       forced: needsForcedDelete(row),
       holder: row.heldBy ?? null,
+      unheld: row.pastHead === undefined || row.pastHead.held
+        ? null
+        : row.pastHead,
     })),
-    ...selection.stale.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null })),
-    ...selection.notPushed.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null })),
+    ...selection.stale.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null, unheld: null })),
+    ...selection.notPushed.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null, unheld: null })),
   ];
 }
 
@@ -263,6 +304,9 @@ function branchStep(
 ): CleanupStep | WithheldRemoval {
   if (pick.holder !== null) {
     return { kind: 'delete-branch', subject: pick.name, reason: untickableHolderReason(pick.holder) };
+  }
+  if (pick.unheld !== null) {
+    return { kind: 'delete-branch', subject: pick.name, reason: unheldPastHeadReason(pick.unheld) };
   }
   const blockedPath = blocked.get(pick.name);
   if (blockedPath !== undefined) {

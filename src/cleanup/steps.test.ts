@@ -6,6 +6,7 @@
  */
 import type { LocalBranch } from './branches.js';
 import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
+import type { PastHeadCommit } from './past-head.js';
 import type { RunRow } from './runs.js';
 import type { CleanupFiles, CleanupSelection } from './steps.js';
 import type { WorktreeRow } from './worktrees.js';
@@ -30,6 +31,7 @@ import {
   removeRunStep,
   removeWorktreeStep,
   runCleanupSteps,
+  unheldPastHeadReason,
 } from './steps.js';
 
 const NOW = new Date('2026-09-24T12:00:00Z');
@@ -43,6 +45,29 @@ function mergedRow(name: string, mergedBy: readonly MergedBy[] = ['base']): Merg
     ? { number: 7, headRefName: name, headRefOid: 'abc123', mergedAt: '2026-09-20T00:00:00Z' }
     : null;
   return { group: 'merged', ticked: true, branch: localBranch(name), reason: 'merged', mergedBy, pullRequest };
+}
+
+/** A commit past the head, its hash `<letter>` repeated to 40. */
+function pastCommit(letter: string, subject: string, held: boolean): PastHeadCommit {
+  return { hash: letter.repeat(40), subject, paths: [held
+    ? '.changes/x.md'
+    : 'src/x.ts'], held };
+}
+
+/** A Merged row listed by its gone upstream alone, its tip past pull request #21's head by `commits`. */
+function pastHeadRow(name: string, commits: readonly PastHeadCommit[], mergedBy: readonly MergedBy[] = ['gone']): MergedRow {
+  const pullRequest = { number: 21, headRefName: name, headRefOid: 'abc123', mergedAt: '2026-09-20T00:00:00Z' };
+  return {
+    ...mergedRow(name, mergedBy),
+    ticked: false,
+    pastHead: {
+      kind: 'past-head',
+      pullRequest,
+      count: commits.length,
+      commits,
+      held: commits.every((commit) => commit.held),
+    },
+  };
 }
 
 function staleRow(name: string): StaleRow {
@@ -246,6 +271,51 @@ describe('needsForcedDelete', () => {
   it('does not hold when the row names no pull request', () => {
     const row = { ...mergedRow('a', ['pull-request']), pullRequest: null };
     expect(needsForcedDelete(row)).toBe(false);
+  });
+
+  it('holds for a gone row past a pull request\'s head only when every commit past it is held', () => {
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true)]))).toBe(true);
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'source', false)]))).toBe(false);
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true), pastCommit('b', 'source', false)])))
+      .toBe(false);
+  });
+
+  it('does not hold for a held past-head row the base reaches, which -d deletes', () => {
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true)], ['base', 'gone']))).toBe(false);
+  });
+});
+
+describe('a Merged row past its pull request\'s head', () => {
+  it('deletes it with -D when the commits past the head are held release fragments', () => {
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('fragment', [pastCommit('a', 'chore: fragment', true)])] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -D fragment']);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('withholds a tick otherwise, naming the commits the base does not hold', () => {
+    const commits = [pastCommit('a', 'chore: fragment', true), pastCommit('b', 'feat: late', false)];
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('source', commits), mergedRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d other']);
+    expect(plan.withheld).toEqual([{
+      kind: 'delete-branch',
+      subject: 'source',
+      reason: '1 commit past #21\'s head is not a release fragment the base holds: bbbbbbb feat: late;'
+        + ' deleting it would lose them',
+    }]);
+  });
+
+  it('names every unheld commit, oldest first, when there are several', () => {
+    const { pastHead } = pastHeadRow('source', [pastCommit('a', 'one', false), pastCommit('c', 'two', false)]);
+    if (pastHead === undefined) throw new Error('the fixture carries no past-head reading');
+    expect(unheldPastHeadReason(pastHead)).toBe(
+      '2 commits past #21\'s head are not release fragments the base holds: aaaaaaa one, ccccccc two;'
+        + ' deleting it would lose them',
+    );
+  });
+
+  it('deletes a gone row with no past-head reading with -d, which git refuses for a tip nothing reaches', () => {
+    const plan = cleanupSteps(selection({ merged: [{ ...mergedRow('gone', ['gone']), ticked: false }] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d gone']);
   });
 });
 
@@ -462,6 +532,9 @@ describe('runCleanupSteps over a real repository', () => {
   sh(repo, 'switch', '-q', 'main');
   sh(repo, 'merge', '-q', '--squash', 'squashed');
   sh(repo, 'commit', '-q', '-m', 'squash');
+  sh(repo, 'switch', '-q', '-c', 'past', 'squashed');
+  sh(repo, 'commit', '-q', '--allow-empty', '-m', 'fragment past the head');
+  sh(repo, 'switch', '-q', 'main');
   sh(repo, 'branch', 'clean');
   sh(repo, 'branch', 'dirty');
   const cleanPath = join(scratch, 'wt-clean');
@@ -499,6 +572,16 @@ describe('runCleanupSteps over a real repository', () => {
     expect(outcomes[5]?.said).toContain('error: the branch \'squashed\' is not fully merged');
     expect([branchExists('clean'), branchExists('dirty'), branchExists('merged'), branchExists('squashed')])
       .toEqual([false, true, false, true]);
+  });
+
+  it('deletes a branch past its pull request\'s head with the -D held fragments allow, which -d refuses', () => {
+    const git = createGitRunner(repo);
+    const refused = runCleanupSteps(git, { steps: [deleteBranchStep('past', false)], withheld: [] });
+    expect(refused[0]?.said).toContain('error: the branch \'past\' is not fully merged');
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('past', [pastCommit('a', 'fragment past the head', true)])] }));
+    const outcomes = runCleanupSteps(git, plan);
+    expect(outcomes.map((outcome) => [outcome.command, outcome.ok])).toEqual([['git branch -D past', true]]);
+    expect(branchExists('past')).toBe(false);
   });
 
   it('deletes the squash-merged branch with the -D its pull request reading allows', () => {

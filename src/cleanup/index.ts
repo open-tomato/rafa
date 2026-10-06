@@ -37,7 +37,7 @@
  * than empty. The provider never fails the reading: `./groups.ts` turns
  * an unreachable one into a note.
  */
-import type { BranchGroups } from './groups.js';
+import type { BranchGroups, ReleasePaths } from './groups.js';
 import type { RunRow, RunSeams } from './runs.js';
 import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
 import type { PullRequests } from '../pr/types.js';
@@ -68,8 +68,10 @@ export type {
   MergedRow,
   NotPushedRow,
   ProviderMerges,
+  ReleasePaths,
   StaleRow,
 } from './groups.js';
+export type { PastHeadCommit, PastHeadRead } from './past-head.js';
 export type { RunRow, RunSeams, RunsReading } from './runs.js';
 export type {
   CleanupFiles,
@@ -142,6 +144,12 @@ export interface CleanupSettings {
   readonly projectRoot: string;
   /** `loop.worktreeDir`, resolved from {@link projectRoot}; the loop's worktrees are listed from it. */
   readonly worktreeDir: string;
+  /**
+   * `release.fragments` and `release.changelog`, which tell a Merged
+   * branch's commits past its pull request's head that the base holds;
+   * the config's defaults when left out (`./groups.ts`).
+   */
+  readonly release?: ReleasePaths;
 }
 
 /** The five groups, and the notes about readings that could not be taken. */
@@ -210,6 +218,9 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
   const groups = classifyBranches(seams.git, branches, provider, {
     staleDays: settings.staleDays,
     now: settings.now,
+    ...(settings.release === undefined
+      ? {}
+      : { release: settings.release }),
   });
   if (!groups.ok) {
     return groups;

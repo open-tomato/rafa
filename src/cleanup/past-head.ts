@@ -6,13 +6,15 @@
  * already hold.
  *
  * A squash merge leaves the base unable to reach the branch, so
- * `git branch -d` refuses it, and `./groups.ts` allows `-D` only when
- * the tip IS the pull request's head. A branch the wrap-up committed
+ * `git branch -d` refuses it, and a merged pull request at the tip is
+ * what lets `./steps.ts` use `-D`. A branch the wrap-up committed
  * one release fragment to after its pull request's head was taken
- * (#710, #149) fails both: the base does not reach it, and its tip is
+ * (#710, #149) has neither: the base does not reach it, and its tip is
  * one commit past the head. This module answers what those commits are,
  * so the cleanup can tell a fragment the base already carries from work
- * nobody merged.
+ * nobody merged: `./groups.ts` reads it for a Merged row listed only
+ * because its upstream is gone, and `./steps.ts` deletes that row with
+ * `-D` only when every commit past the head is held.
  *
  * This module prints nothing and deletes nothing. It reaches git only
  * through the {@link GitRunner} it is handed, and every call is a read.
