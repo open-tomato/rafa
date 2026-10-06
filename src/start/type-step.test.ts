@@ -25,6 +25,7 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
+import { realNodeModules } from '../tests/real-node-modules.js';
 
 import {
   findNodeModules,
@@ -37,7 +38,6 @@ import {
   TSC_FLAGS,
 } from './type-step.js';
 
-const REPO_ROOT = join(import.meta.dir, '..', '..');
 const STOP = 130;
 
 /** Two real tsc runs and a worktree take about 1.5 s here; the default 5 s leaves a loaded machine little room. */
@@ -148,7 +148,7 @@ beforeEach(() => {
   git('init', '-q', '-b', 'main');
   writeFileSync(join(repo, 'tsconfig.json'), TSCONFIG, 'utf8');
   writeFileSync(join(repo, '.gitignore'), 'node_modules\n', 'utf8');
-  symlinkSync(join(REPO_ROOT, 'node_modules'), join(repo, 'node_modules'));
+  symlinkSync(realNodeModules(), join(repo, 'node_modules'));
   lines = [];
   setActiveOutput(sinkOutput({
     info: (message) => lines.push({ level: 'info', message }),
@@ -266,7 +266,7 @@ describe('runTypeStep over a planted repository', () => {
     expect(linesAt('warn')[0]).toContain('could not run tsc (ENOENT');
 
     // Control: with node_modules back the same diff runs, and is red.
-    symlinkSync(join(REPO_ROOT, 'node_modules'), join(repo, 'node_modules'));
+    symlinkSync(realNodeModules(), join(repo, 'node_modules'));
     expect(await runTypeStep(realInput(base))).toMatchObject({ ran: true, red: true });
   }, TSC_TIMEOUT);
 });
