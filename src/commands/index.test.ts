@@ -236,7 +236,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'instinct promote': [[], []],
   'release status': [[], ['plan']],
   'release settle': [[], ['dry-run']],
-  'release tag': [[], []],
+  'release tag': [[], ['push']],
   'board list': [[], []],
   'status': [[], []],
   'next': [[], ['dry-run', 'roadmap', 'claim-ahead', 'yes']],

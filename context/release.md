@@ -137,6 +137,23 @@ joined by `; `, and `{date}` is the UTC date of the newest folded fragment's add
 commit (the commit that ADDED it to the base branch), never the clock. This keeps
 settle deterministic across machines and retries.
 
+### Tag and its push
+
+`rafa release tag [--push]` writes `v<version>` on the commit of the release
+branch that set the version, then prints what to run next: the push of the tag
+and the publish line. Without `--push` it reaches no network and the push is a
+line to copy.
+
+With `--push` (#736) it pushes `refs/tags/v<version>` itself once the tag is
+written (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote the
+release branch tracks (`branch.<pr.base>.remote`), or `origin` when the branch
+tracks none or tracks a local branch. A push that went prints
+`✅ Pushed v<version> to <remote>.` and drops the push line from the follow-ups;
+json mode carries it as the result's `pushed`, a key a run without the flag
+leaves out. A push that fails, a hook or rule refusing it included, exits 1 with
+git's words and the push to run again, and keeps the local tag, since it names
+the right commit whether or not the remote has it.
+
 ### Guards: the preflight check
 
 A preflight item in `rafa pr merge` (read also by `rafa pr triage`) runs the fold
@@ -216,7 +233,7 @@ branch) or `pr` (open or update one pending release pull request on
 `rafa/release`). Read by `rafa release settle` and `rafa next`.
 
 **`release.tag`** — Who tags the version: `manual` (default, tag by hand with
-`rafa release tag`) or `settle` (settle tags the commit it pushed). Read by
+`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags the commit it pushed). Read by
 `rafa release settle` and `rafa release tag`. Under `release.settle: pr`, the
 tag waits for `rafa release tag` after that pull request merges.
 
