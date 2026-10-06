@@ -19,7 +19,7 @@ repository name: the repository is public. The outputs under
 | `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | added |
 | `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | added |
 | `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | added |
-| `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts` | planned |
+| `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts [--report <path>]` | added |
 
 A `planned` row names a script its own task adds; that task turns the row
 to `added` in the same commit.
@@ -64,6 +64,15 @@ file's path or text in any spelling a name takes (`copyDetection`,
 concept-by-cluster matrix, reading each concept as absent from the code,
 within one cluster or crossing several, never renaming a cluster after a
 concept. A file that is not valid UTF-8 is named as missed.
+
+`test-timing.ts` runs no test: it reads the junit XML report a suite run
+wrote, `.rafa/survey/junit.xml` unless `--report <path>` names another
+(`bun test --reporter=junit --reporter-outfile=.rafa/survey/junit.xml`).
+A file's seconds are the sum of its test cases' times, so hooks outside a
+case are not counted. A test file's cluster is its subject source file's,
+else its directory's most common, else `none`, from
+`.rafa/survey/import-graph.json`, so `import-graph.ts` runs first. A
+tracked test file the report holds no case for is named as missed.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
