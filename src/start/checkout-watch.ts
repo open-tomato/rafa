@@ -42,6 +42,12 @@
  * committed. A line that comment cannot go on is marked as
  * `updateTrackerLine` marks it.
  *
+ * `dispatchTask` (`./dispatch.ts`) runs the same halt once more,
+ * immediately before it spawns the task's session, since the suite steps
+ * and `progress.txt` come between this guard and the spawn; a checkout
+ * gone by then halts there, and the spawn never reads a missing working
+ * directory.
+ *
  * No report is stored for it: no session ran, so there is no session id
  * for a row to carry and no output to read. The tracker line is what the
  * next run reads, and it hands the blocker text to the task's next
