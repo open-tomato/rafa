@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The CLI entry each spawned case runs. */
@@ -183,8 +183,8 @@ describe('doctor and loop start over one planted project', () => {
       const doctorRun = runRafaIn(scratch, ['doctor', PLAN_FLAG]);
       const loopRun = runRafaIn(scratch, ['loop', 'start', PLAN_FLAG, '--no-ci-wait']);
 
-      expect(doctorRun.exitCode).toBe(1);
-      expect(loopRun.exitCode).toBe(1);
+      expectExit(doctorRun, 1, { ...scratch });
+      expectExit(loopRun, 1, { ...scratch });
 
       // Both halt naming the plan's [start] item ahead of the configured
       // required one, in that order, since both build the required tier
