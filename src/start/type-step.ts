@@ -384,8 +384,11 @@ function listed(errors: readonly TypeDiagnostic[]): readonly string[] {
 /** The blocker of a run with new errors; see the module note. */
 export function typeBlockerText(label: string, base: string, errors: readonly TypeDiagnostic[]): string {
   const files = [...new Set(errors.map((error) => error.file ?? ''))];
+  // A tsc message often ends in its own period; the sentence's closing one would double it.
+  const shown = listed(errors).join('; ')
+    .replace(/\.$/u, '');
   return `The runner's ${label} found type errors in the task's test files that ${base} did not hold. `
-    + `New errors: ${listed(errors).join('; ')}. `
+    + `New errors: ${shown}. `
     + `Fix them, then check ${files.join(' ')} with tsc ${TSC_FLAGS.join(' ')} -p over a tsconfig outside the checkout `
     + 'that extends its tsconfig.json by absolute path and lists them under files.';
 }

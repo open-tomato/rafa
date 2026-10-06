@@ -36,6 +36,7 @@ import {
   runTypeStep,
   scratchTsconfig,
   TSC_FLAGS,
+  typeBlockerText,
 } from './type-step.js';
 
 const STOP = 130;
@@ -169,7 +170,7 @@ describe('runTypeStep over a planted repository', () => {
     const outcome = await runTypeStep(realInput(base));
     expect(outcome).toMatchObject({ ran: true, red: true, interrupted: false });
     expect(outcome.blocker).toContain(`The runner's type step after "second task" found type errors in the task's test files that ${base} did not hold.`);
-    expect(outcome.blocker).toContain(`New errors: a.test.ts:6:14 ${TS2322}.`);
+    expect(outcome.blocker).toContain(`New errors: a.test.ts:6:14 ${TS2322} Fix them`);
     expect(linesAt('info')).toContain(`🔎 type step after "second task": tsc over 1 test file(s): 1 error(s), 0 already held at ${base}, 1 not held.`);
     expect(linesAt('info')).toContain(`   a.test.ts:6:14 ${TS2322}`);
   }, TSC_TIMEOUT);
@@ -185,7 +186,7 @@ describe('runTypeStep over a planted repository', () => {
     commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, SAME_ERROR_LINE] }, 'task again');
     const added = await runTypeStep(realInput(base));
     expect(added.red).toBe(true);
-    expect(added.blocker).toContain(`New errors: a.test.ts:7:14 ${TS2322}.`);
+    expect(added.blocker).toContain(`New errors: a.test.ts:7:14 ${TS2322} Fix them`);
     expect(added.blocker).not.toContain('a.test.ts:6:');
   }, TSC_TIMEOUT);
 
@@ -202,7 +203,7 @@ describe('runTypeStep over a planted repository', () => {
     commit({ 'b.test.ts': [...CLEAN, ERROR_LINE, SAME_ERROR_LINE] }, 'task');
     const outcome = await runTypeStep(realInput(base));
     expect(outcome.red).toBe(true);
-    expect(outcome.blocker).toContain(`New errors: b.test.ts:6:14 ${TS2322}; b.test.ts:7:14 ${TS2322}.`);
+    expect(outcome.blocker).toContain(`New errors: b.test.ts:6:14 ${TS2322}; b.test.ts:7:14 ${TS2322} Fix them`);
     expect(outcome.blocker).not.toContain('a.test.ts');
   }, TSC_TIMEOUT);
 
@@ -468,5 +469,20 @@ describe('newErrors', () => {
     expect(newErrors([at('a', 9), at('a', 12)], [at('a', 3)])).toEqual([at('a', 12)]);
     expect(newErrors([at('a', 9)], [at('b', 9)])).toEqual([at('a', 9)]);
     expect(newErrors([at('a', 9, 'other')], [at('a', 9)])).toEqual([at('a', 9, 'other')]);
+  });
+});
+
+describe('typeBlockerText', () => {
+  const error = (message: string): TypeDiagnostic => ({ file: 'src/a.test.ts', line: 3, column: 5, code: 'TS2322', message });
+
+  it('adds no second period after a message that ends in one', () => {
+    const text = typeBlockerText('type step', 'main', [error('No overload matches this call.')]);
+    expect(text).toContain('TS2322 No overload matches this call. Fix them');
+    expect(text).not.toContain('..');
+  });
+
+  it('closes a message that ends without a period with one', () => {
+    const text = typeBlockerText('type step', 'main', [error('Type \'string\' is not assignable')]);
+    expect(text).toContain('TS2322 Type \'string\' is not assignable. Fix them');
   });
 });
