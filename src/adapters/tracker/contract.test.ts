@@ -37,6 +37,16 @@
  * transition case narrowed to `todo` no longer leaves every case
  * green: the closed case moves its issues to `done` and `cancelled`
  * whatever the narrowing, and rejects for a tracker that never moves.
+ *
+ * The five `editable` and `edit` cases arrived on 2026-10-06, each held
+ * by the breaks below. The in-memory tracker is run with
+ * `editsIssues: true`, and three earlier breaks redden one of them as
+ * well, as measured before their lists were widened: another kind
+ * reddens the editable case, keying issues by opt the body case, whose
+ * second issue replaces the first, and a tracker that never moves the
+ * closed case, narrowed or not. A body written with its trailing newline
+ * trimmed reddens the body case alone, which is what holds it to byte
+ * for byte.
  */
 import type { TrackerContractOptions } from './contract.js';
 import type { IssueDraft, IssueRef, IssueState, Tracker } from '../../ports/index.js';
@@ -66,10 +76,27 @@ const CASES = {
   openOfType: 'openIssues answers each open issue of the type with its title and body',
   openClosed: 'openIssues leaves out an issue moved to done or to cancelled',
   openNone: 'openIssues answers nothing for a type with no open issue',
+  editable: 'editable answers the title, body and open state of a created issue',
+  editableClosed: 'editable answers an issue moved to done or to cancelled as closed',
+  editBody: 'edit writes a body read back byte for byte, leaving the title and every other issue',
+  editTitle: 'edit writes a title alone, leaving the body',
+  editUnknown: 'editable and edit reject for an unknown ref',
 } as const;
 
 /** The case an adapter run with `readsOpenIssues: false` gets in place of the three `openIssues` cases. */
 const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
+
+/** The case an adapter run without `editsIssues` gets in place of the five `editable` and `edit` cases. */
+const EDIT_LEFT_OUT_CASE = 'leaves out the editable and edit pair it is run without';
+
+/** The names of the five `editable` and `edit` cases, in contract order. */
+const EDIT_CASES: readonly string[] = [
+  CASES.editable,
+  CASES.editableClosed,
+  CASES.editBody,
+  CASES.editTitle,
+  CASES.editUnknown,
+];
 
 /** Faults the in-memory tracker can be made with, each breaking what it names. */
 interface Faults {
@@ -83,6 +110,10 @@ interface Faults {
   readonly closedAsOpen?: boolean;
   /** `openIssues` answers open issues of every type. */
   readonly anyType?: boolean;
+  /** `edit` writes its change onto every issue held, not the one its ref names. */
+  readonly editsEveryIssue?: boolean;
+  /** `edit` given a body alone clears the title. */
+  readonly bodyEditClearsTitle?: boolean;
 }
 
 /** The states the in-memory tracker holds closed, as the port's `openIssues` note names them. */
@@ -160,6 +191,31 @@ function memoryTracker(faults: Faults = {}): {
         title: issue.draft.title,
         body: issue.draft.body,
       })),
+    editable: async (ref) => {
+      const issue = held(ref);
+      return {
+        ref,
+        title: issue.draft.title,
+        body: issue.draft.body,
+        open: !CLOSED.has(issue.state),
+        labels: [],
+        author: '',
+      };
+    },
+    edit: async (ref, change) => {
+      held(ref);
+      const targets = faults.editsEveryIssue === true
+        ? [...issues.keys()]
+        : [ref.externalId];
+      for (const externalId of targets) {
+        const issue = held({ ...ref, externalId });
+        const title = faults.bodyEditClearsTitle === true && change.title === undefined
+          ? ''
+          : change.title ?? issue.draft.title;
+        const draft = { ...issue.draft, title, body: change.body ?? issue.draft.body };
+        issues.set(externalId, { ...issue, draft });
+      }
+    },
   };
   return { tracker, comments: (ref) => held(ref).comments };
 }
@@ -178,6 +234,7 @@ function contractOptions(
     name: 'memory',
     expectsProjects: false,
     expectedKind: 'memory',
+    editsIssues: true,
     create: async () => {
       const made = memoryTracker(faults);
       comments = made.comments;
@@ -185,6 +242,18 @@ function contractOptions(
     },
     readComments: async (ref) => comments(ref),
   };
+}
+
+/** The `editable` member of a tracker, which every tracker here has. */
+function editableOf(tracker: Tracker): NonNullable<Tracker['editable']> {
+  if (tracker.editable === undefined) throw new Error('memory tracker: no editable member');
+  return tracker.editable;
+}
+
+/** The `edit` member of a tracker, which every tracker here has. */
+function editOf(tracker: Tracker): NonNullable<Tracker['edit']> {
+  if (tracker.edit === undefined) throw new Error('memory tracker: no edit member');
+  return tracker.edit;
 }
 
 /** The names of the cases that reject when run with `options`, in contract order. */
@@ -202,7 +271,7 @@ async function rejectedCases(options: TrackerContractOptions): Promise<string[]>
 
 /** Each break: what the tracker does, its options, and the cases it must redden. */
 const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly string[]])[] = [
-  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create, CASES.openOfType]],
+  ['reports another kind', contractOptions({}, () => ({ kind: 'github' })), [CASES.kind, CASES.create, CASES.openOfType, CASES.editable]],
   [
     'claims project support',
     contractOptions({}, (base) => ({ capabilities: () => ({ ...base.capabilities(), projects: true }) })),
@@ -236,6 +305,10 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.openOfType,
       CASES.openClosed,
       CASES.openNone,
+      CASES.editable,
+      CASES.editableClosed,
+      CASES.editBody,
+      CASES.editTitle,
     ],
   ],
   [
@@ -246,7 +319,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'keys issues by their opt',
     contractOptions({ idFromOpt: true }),
-    [CASES.sharedOpt, CASES.limit, CASES.titleText, CASES.openOfType, CASES.openClosed],
+    [CASES.sharedOpt, CASES.limit, CASES.titleText, CASES.openOfType, CASES.openClosed, CASES.editBody],
   ],
   [
     'answers a fixed module',
@@ -281,7 +354,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     [CASES.findModule, CASES.limit, CASES.titleText, CASES.bodyText],
   ],
   ['drops every comment', contractOptions({}, () => ({ comment: async () => {} })), [CASES.comment]],
-  ['never transitions', contractOptions({}, () => ({ transition: async () => ({}) })), [CASES.transition, CASES.openClosed]],
+  ['never transitions', contractOptions({}, () => ({ transition: async () => ({}) })), [CASES.transition, CASES.openClosed, CASES.editableClosed]],
   [
     'answers an unknown ref',
     contractOptions({}, (base) => ({
@@ -311,6 +384,58 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
     })),
     [CASES.openOfType],
   ],
+  ['has no editable and edit pair', contractOptions({}, () => ({ editable: undefined, edit: undefined })), EDIT_CASES],
+  ['has editable without edit', contractOptions({}, () => ({ edit: undefined })), EDIT_CASES],
+  [
+    'answers editable under another kind',
+    contractOptions({}, (base) => ({
+      editable: async (ref) => ({ ...(await editableOf(base)(ref)), ref: { ...ref, kind: 'github' } }),
+    })),
+    [CASES.editable],
+  ],
+  [
+    'answers editable without an author',
+    contractOptions({}, (base) => ({
+      editable: async (ref) => ({ ...(await editableOf(base)(ref)), author: undefined as unknown as string }),
+    })),
+    [CASES.editable],
+  ],
+  [
+    'answers every issue open from editable',
+    contractOptions({}, (base) => ({ editable: async (ref) => ({ ...(await editableOf(base)(ref)), open: true }) })),
+    [CASES.editableClosed],
+  ],
+  [
+    'answers editable with an empty body',
+    contractOptions({}, (base) => ({ editable: async (ref) => ({ ...(await editableOf(base)(ref)), body: '' }) })),
+    [CASES.editable, CASES.editBody, CASES.editTitle],
+  ],
+  [
+    'answers an unknown ref from editable',
+    contractOptions({}, (base) => ({
+      editable: async (ref) => editableOf(base)(ref).catch(() => ({
+        ref,
+        title: '',
+        body: '',
+        open: true,
+        labels: [],
+        author: '',
+      })),
+    })),
+    [CASES.editUnknown],
+  ],
+  ['drops every edit', contractOptions({}, () => ({ edit: async () => {} })), [CASES.editBody, CASES.editTitle, CASES.editUnknown]],
+  [
+    'writes the body with its trailing newline trimmed',
+    contractOptions({}, (base) => ({
+      edit: async (ref, change) => editOf(base)(ref, change.body === undefined
+        ? change
+        : { ...change, body: change.body.trimEnd() }),
+    })),
+    [CASES.editBody],
+  ],
+  ['writes the edit onto every issue', contractOptions({ editsEveryIssue: true }), [CASES.editBody]],
+  ['clears the title on a body edit', contractOptions({ bodyEditClearsTitle: true }), [CASES.editBody]],
 ];
 
 runTrackerContract(contractOptions());
@@ -338,9 +463,11 @@ describe('the Tracker contract cases', () => {
   it('narrows the transition case to the states it is handed', async () => {
     const neverTransitions = contractOptions({}, () => ({ transition: async () => ({}) }));
 
-    // The openIssues case moves its issues to done and cancelled whatever
-    // states the transition case is narrowed to, so it still rejects.
-    expect(await rejectedCases({ ...neverTransitions, transitionableStates: ['todo'] })).toEqual([CASES.openClosed]);
+    // The openIssues and editable closed cases move their issues to done
+    // and cancelled whatever states the transition case is narrowed to,
+    // so they still reject.
+    expect(await rejectedCases({ ...neverTransitions, transitionableStates: ['todo'] }))
+      .toEqual([CASES.openClosed, CASES.editableClosed]);
   });
 
   it('asks for the unknown external id it is handed', async () => {
@@ -359,8 +486,9 @@ describe('the Tracker contract cases', () => {
     const without = { ...contractOptions(), readsOpenIssues: false };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
-      ...Object.values(CASES).filter((name) => !name.startsWith('openIssues ')),
+      ...Object.values(CASES).filter((name) => !name.startsWith('openIssues ') && !EDIT_CASES.includes(name)),
       LEFT_OUT_CASE,
+      ...EDIT_CASES,
     ]);
   });
 
@@ -370,6 +498,30 @@ describe('the Tracker contract cases', () => {
 
     expect(await rejectedCases(withReading)).toEqual([LEFT_OUT_CASE]);
     expect(await rejectedCases(withoutReading)).toEqual([]);
+  });
+});
+
+describe('the Tracker contract cases run without editsIssues', () => {
+  it('swaps the five editable and edit cases for one holding the pair left out', () => {
+    const without = { ...contractOptions(), editsIssues: undefined };
+
+    expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([
+      ...Object.values(CASES).filter((name) => !EDIT_CASES.includes(name)),
+      EDIT_LEFT_OUT_CASE,
+    ]);
+  });
+
+  it('holds a tracker run without editsIssues to having neither member, beside one that has neither', async () => {
+    const withPair = { ...contractOptions(), editsIssues: false };
+    const withEditOnly = { ...contractOptions({}, () => ({ editable: undefined })), editsIssues: false };
+    const withoutPair = {
+      ...contractOptions({}, () => ({ editable: undefined, edit: undefined })),
+      editsIssues: false,
+    };
+
+    expect(await rejectedCases(withPair)).toEqual([EDIT_LEFT_OUT_CASE]);
+    expect(await rejectedCases(withEditOnly)).toEqual([EDIT_LEFT_OUT_CASE]);
+    expect(await rejectedCases(withoutPair)).toEqual([]);
   });
 });
 
