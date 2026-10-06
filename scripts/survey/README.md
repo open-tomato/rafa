@@ -17,7 +17,7 @@ repository name: the repository is public. The outputs under
 | `survey-io.ts` | none; the shared helper the others import: `listTrackedFiles`, `measureCoverage`, `coverageLine`, `writeSurvey` | imported, not run | added |
 | `import-graph.ts` | `.rafa/survey/import-graph.json`, `.rafa/survey/import-graph.md` | `bun scripts/survey/import-graph.ts` | added |
 | `test-index.ts` | `.rafa/survey/test-index.json`, `.rafa/survey/test-index.md` | `bun scripts/survey/test-index.ts` | added |
-| `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | planned |
+| `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | added |
 | `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | planned |
 | `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts` | planned |
 
@@ -42,6 +42,16 @@ package) and by cluster from `.rafa/survey/import-graph.json`, so
 `import-graph.ts` runs first. The guard index sets aside imports of
 `src/tests/`, of `testdata/` folders and of files named `fake` or
 `stand-in`.
+
+`provenance.ts` reads the same source files as `import-graph.ts`, grouped
+by its clusters, so `import-graph.ts` runs first. Each file is classified
+by the commit that added it (a rename carries the origin along): `imported`
+for a root commit or one whose subject names the import, `spec` or
+`bug-sweep` by the labels of the issues its message names (`#<n>`,
+`rafa-<n>`) resolved against `.rafa/cache/board.json`, `poc` for a spike
+or a change no spec designed, and `bug-sweep` for a `fix:` subject no
+issue decided. A worktree keeps no board cache of its own: pass
+`--board <path>` to read another checkout's.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
