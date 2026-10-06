@@ -1,10 +1,10 @@
 ---
 plan: rafa-820-bug-sweep-13
-title: Bug sweep 13
+title: Planned under assumptions
 level: patch
 ---
 
-- loop: A session that backgrounds a command and ends its turn is no longer held with a bare "no report"; the prompt now says to run commands in the foreground, and the runner names the background wait it saw.
-- plan: `rafa plan create` now checks the plan it writes against the store rules `loop start` enforces, so it no longer writes a plan the preflight refuses.
-- release: A release's title is no longer "Planned under assumptions".
-- pr: The pinned resolve plans and the planner's close-out guidance name the run's base branch instead of `main`.
+- loop: Loop sessions are told to run every command in the foreground and end only after their report, and a task whose session ended its turn waiting on a background command is now held with a line naming that wait instead of a bare "no report".
+- plan: `rafa plan create` now refuses a generated plan that breaks the effort-store rules `loop start` enforces, moving it to `rejected/` and naming each broken line as `rafa plan validate` does, and the planner prompt names the rule.
+- release: A release and its pull request are titled after the plan's own `# Plan:` title, no longer "Planned under assumptions".
+- pr: `rafa pr triage --resolve` now merges a conflicting pull request with the branch it targets instead of always with `main`, and the dev-planner close-out guidance names the run's base.
