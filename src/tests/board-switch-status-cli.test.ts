@@ -191,16 +191,16 @@ describe('rafa board list, rafa roadmap, rafa switch and rafa status over two ty
     scratch = plantWorld();
   });
 
-  it('rafa board list marks the default board current and home, with no position file yet', RUN_TIMEOUT, () => {
+  it('rafa board list marks the default board current and home, with no position file yet', () => {
     const run = runRafa(scratch, scratch.repo, ['board', 'list']);
 
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`#${String(BOARD_A)} Board Alpha · no owner · 1 epic · current · home`);
     expect(run.stdout).toContain(`#${String(BOARD_B)} Board Beta · no owner · 1 epic`);
     expect(run.stdout).not.toContain(`#${String(BOARD_B)} Board Beta · no owner · 1 epic · current`);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa switch 20, then rafa roadmap shows board #20\'s epic, not board #10\'s', RUN_TIMEOUT, () => {
+  it('rafa switch 20, then rafa roadmap shows board #20\'s epic, not board #10\'s', () => {
     const moved = runRafa(scratch, scratch.repo, ['switch', String(BOARD_B)]);
     expectExit(moved, 0, scratch);
 
@@ -210,9 +210,9 @@ describe('rafa board list, rafa roadmap, rafa switch and rafa status over two ty
     expect(run.stdout).toContain(`Roadmap #${String(BOARD_B)} · now`);
     expect(run.stdout).toContain('Beta work');
     expect(run.stdout).not.toContain('Alpha work');
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa switch <epic> moves to it, and rafa status prints its place line', RUN_TIMEOUT, () => {
+  it('rafa switch <epic> moves to it, and rafa status prints its place line', () => {
     const moved = runRafa(scratch, scratch.repo, ['switch', String(EPIC_A)]);
     expectExit(moved, 0, scratch);
 
@@ -220,9 +220,9 @@ describe('rafa board list, rafa roadmap, rafa switch and rafa status over two ty
 
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`board #${String(BOARD_A)} · epic #${String(EPIC_A)} Alpha work (now) · 0/1 done`);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa switch - returns to the earlier position, and rafa status prints its place line', RUN_TIMEOUT, () => {
+  it('rafa switch - returns to the earlier position, and rafa status prints its place line', () => {
     const back = runRafa(scratch, scratch.repo, ['switch', '-']);
     expectExit(back, 0, scratch);
 
@@ -230,9 +230,9 @@ describe('rafa board list, rafa roadmap, rafa switch and rafa status over two ty
 
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`board #${String(BOARD_B)} · epic #${String(EPIC_B)} Beta work (now) · 0/1 done`);
-  });
+  }, RUN_TIMEOUT);
 
-  it('rafa switch <n> --no-rehome leaves home unchanged, and rafa status prints the away line', RUN_TIMEOUT, () => {
+  it('rafa switch <n> --no-rehome leaves home unchanged, and rafa status prints the away line', () => {
     const homeBefore = readHome(scratch);
 
     const moved = runRafa(scratch, scratch.repo, ['switch', String(BOARD_A), '--no-rehome']);
@@ -243,5 +243,5 @@ describe('rafa board list, rafa roadmap, rafa switch and rafa status over two ty
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`away from home: working #${String(EPIC_A)} for #${String(EPIC_B)}`);
     expect(readHome(scratch)).toEqual(homeBefore);
-  });
+  }, RUN_TIMEOUT);
 });
