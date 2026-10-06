@@ -17,10 +17,10 @@
  * Spawned, the child runs under a scratch repository whose HOME, `bin/`
  * directory and call log sit beside it in a temporary directory, never
  * the real home. Its environment holds a PATH of that `bin/` directory
- * then git's own, the scratch HOME with the bun cache variables that
- * keep bun from writing under it (`./scratch-home-env.ts`), `RAFA_TEST=1`
- * and the suite's `TMPDIR` for the effort store's test guard, and nothing
- * else but what the case names. What the case names outranks all of it
+ * then git's own and the system tools' (`/usr/bin`, `/bin`), the
+ * scratch HOME with the bun cache variables that keep bun from writing
+ * under it (`./scratch-home-env.ts`), `RAFA_TEST=1` and the suite's
+ * `TMPDIR` for the effort store's test guard, and nothing else but what the case names. What the case names outranks all of it
  * but the PATH, so a case naming its own `TMPDIR` is the one whose
  * `TMPDIR` the child reads. So `claude` resolves to the stand-in
  * {@link plantStandInClaude} writes there, or to nothing: {@link runRafa}
@@ -50,7 +50,7 @@ import { projectConfigText } from '../project/scaffold.js';
 
 import { gitIdentityEnv } from './git-identity.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
-import { builtPath, hostGitDir, plantGitOnlyDir } from './stand-in-gh.js';
+import { builtPath, hostToolDirs, plantGitOnlyDir } from './stand-in-gh.js';
 
 /** The CLI entry a spawned run executes. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -177,7 +177,7 @@ export interface ScratchRepo {
   readonly bin: string;
   /** The file a stand-in `claude` appends one line to per call. */
   readonly callLog: string;
-  /** The PATH a spawned run gets: `bin`, then git's own directory, or a directory holding only a link to git under `gitOnlyPath`. */
+  /** The PATH a spawned run gets: `bin`, then git's own directory and the system tool directories, or a directory holding only a link to git under `gitOnlyPath`. */
   readonly path: string;
 }
 
@@ -187,8 +187,9 @@ export interface ScratchOptions {
   readonly project?: boolean;
   /**
    * Whether the PATH takes a directory holding only a link to git, so no
-   * host `gh` can resolve on it. Defaults to false: git's own directory,
-   * which a stand-in script may lean on for `cat` and the like.
+   * host `gh` can resolve on it. Defaults to false: git's own directory
+   * then `/usr/bin` and `/bin` ({@link hostToolDirs}), which a stand-in
+   * script leans on for `cat` and the like.
    */
   readonly gitOnlyPath?: boolean;
 }
@@ -217,9 +218,9 @@ export function plantScratchRepo(base: string, options: ScratchOptions = {}): Sc
     home,
     bin,
     callLog: join(root, 'calls.log'),
-    path: builtPath(bin, options.gitOnlyPath === true
-      ? plantGitOnlyDir(root)
-      : hostGitDir()),
+    path: options.gitOnlyPath === true
+      ? builtPath(bin, plantGitOnlyDir(root))
+      : builtPath(bin, ...hostToolDirs()),
   };
 }
 

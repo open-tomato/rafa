@@ -35,7 +35,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
 import { EVERY_TOOL, RISK_FOOTER } from '../../plan/risk.js';
-import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import { createPlanRiskCommand, riskLine, riskPlanPath, strictRefusal } from './risk.js';
 
@@ -263,7 +263,7 @@ describe('rafa plan risk, spawned', () => {
     const high = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/open.md', '--strict']);
     const clean = runRafa(scratch, scratch.repo, ['plan', 'risk', 'plans/narrow.md', '--strict']);
 
-    expect(high.exitCode).toBe(1);
+    expectExit(high, 1, scratch);
     expect(high.stderr).toContain('--strict refuses a plan with any');
     expect([clean.exitCode, clean.stderr]).toEqual([0, '']);
   }, SPAWN_TIMEOUT);

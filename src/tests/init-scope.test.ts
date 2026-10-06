@@ -53,7 +53,7 @@ import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 import { initHint } from '../project/scope.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, its real path. */
@@ -186,7 +186,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
 
     const run = initAt(fixture, fixture.scratch.repo);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, fixture.scratch);
     expect(run.stderr).toBe('');
     // Starts with, rather than is, because the scratch PATH carries no
     // ~/.rafa/bin: the PATH check's own warning, unrelated to this case,
@@ -212,7 +212,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
 
     const run = initAt(fixture, fixture.scratch.repo);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, fixture.scratch);
     // Starts with; see the note on the PATH warning above.
     expect(run.stdout).toStartWith([
       `${fixture.scratch.repo} (named by --root) is already a rafa project: its .rafa/config.yaml is left as it was.`,
@@ -235,7 +235,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
 
     const run = initAt(fixture, rootOf(fixture));
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, fixture.scratch);
     expect(run.stdout).toBe('');
     expect(run.stderr).toBe(`rafa init: refused: ${reasonOf(fixture)}\nNothing was written.\n`);
     expect(existsSync(join(fixture.scratch.repo, '.rafa'))).toBe(false);
@@ -248,7 +248,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
 
     const run = runRafa(fixture.scratch, fixture.sub, ['effort', 'collect', '--no-sessions']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, fixture.scratch);
     expect(run.stderr).toBe('');
     expect(run.stdout.split('\n')[0]).toBe(`effort collect: ${fixture.scratch.repo}`);
   }, RUN_TIMEOUT);
@@ -259,7 +259,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
 
     const run = runRafa(fixture.scratch, fixture.outside, ['status']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, fixture.scratch);
     expect(run.stdout).toBe('');
     expect(run.stderr).toBe(`rafa: ${initHint(fixture.outside)}\n`);
   }, RUN_TIMEOUT);
@@ -278,7 +278,7 @@ describe('rafa init and project scope, spawned in a monorepo fixture under a scr
     writeFileSync(join(fixture.scratch.repo, '.rafa', 'config.yaml'), `${projectConfigText()}tracking:\n  specs: true\n`);
     const run = initAt(fixture, fixture.scratch.repo);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, fixture.scratch);
     expect(isIgnored(fixture.scratch, 'zz-control.txt')).toBe(false);
     expect(isIgnored(fixture.scratch, '.rafa/specs/s.md')).toBe(false);
     expect(isIgnored(fixture.scratch, '.rafa/effort/e.sqlite')).toBe(true);

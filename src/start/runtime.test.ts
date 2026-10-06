@@ -41,7 +41,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
+import { expectExit, plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import {
@@ -436,10 +436,10 @@ describe('rafa loop start --runtime, spawned', () => {
     const refused = runRafa(scratch, scratch.repo, ['loop', 'start', '--runtime=src', plan]);
     const control = runRafa(scratch, scratch.repo, ['loop', 'start', plan]);
 
-    expect(refused.exitCode).toBe(1);
+    expectExit(refused, 1, scratch);
     expect(refused.stderr).toContain(`inside ${join(scratch.repo, 'src')}`);
     expect(refused.stderr).not.toContain('Plan file not found');
-    expect(control.exitCode).toBe(1);
+    expectExit(control, 1, scratch);
     expect(control.stderr).toContain('Plan file not found');
     expect(recordOf(join(scratch.repo, 'src'))).toBeNull();
     expect(existsSync(join(scratch.repo, '.rafa', 'runs'))).toBe(false);
@@ -454,7 +454,7 @@ describe('rafa loop start --runtime, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', 'start', '--runtime=9.9.9', '--plan=.plans/PLAN-absent.md']);
 
-    expect(run.exitCode).toBe(4);
+    expectExit(run, 4, scratch);
     expect(recordOf(dir)).toEqual({ argv: ['start', '--plan=.plans/PLAN-absent.md'], cwd: scratch.repo, output: 'text' });
     expect(run.stdout).toContain(`Running the loop from ${join(dir, 'cli.js')}`);
     expect(existsSync(join(scratch.repo, '.rafa', 'runs'))).toBe(false);
@@ -491,7 +491,7 @@ describe('rafa loop start --runtime, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['--runtime=9.9.9', 'loop', 'start', '--plan=.plans/PLAN-absent.md']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain('only typed after `loop start`');
     expect(run.stderr).not.toContain('Plan file not found');
     expect(recordOf(dir)).toBeNull();

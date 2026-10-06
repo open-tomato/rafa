@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -34,19 +34,14 @@ import {
   SKILL_INDEX_HEADING,
 } from '../plan.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
 const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
 const KILL_AFTER_MS = 45_000;
 const RUN_TIMEOUT = { timeout: 60_000 };
-
-const GIT_DIR = (() => {
-  const found = Bun.which('git');
-  if (found === null) throw new Error('git is not on the PATH this suite runs under');
-  return dirname(found);
-})();
 
 const STUB = 'skill-name-refusal';
 const GHOST = 'skill-name-ghost';
@@ -125,7 +120,7 @@ function plantScratch(): Scratch {
   plantProjectConfig(repo);
   plantSkill(repo, KNOWN);
 
-  return { repo, home, calls, path: [bin, GIT_DIR].join(delimiter), planFile: `.plans/PLAN-${STUB}.md` };
+  return { repo, home, calls, path: [bin, ...hostToolDirs()].join(delimiter), planFile: `.plans/PLAN-${STUB}.md` };
 }
 
 interface SpawnRun {
@@ -152,14 +147,14 @@ describe('a skills= name no tier holds, over a scratch plan and project', () => 
 
     const validate = runRafa(scratch, ['plan', 'validate', scratch.planFile]);
 
-    expect(validate.exitCode).toBe(1);
+    expectExit(validate, 1, { ...scratch });
     expect(validate.stdout).toContain(`error: ${scratch.planFile}: ${GHOST_LINE}`);
     expect(validate.stdout).not.toContain(`skill "${KNOWN}"`);
     expect(validate.stderr).toContain('1 unresolvable skill');
 
     const start = runRafa(scratch, ['loop', 'start', `--plan=${scratch.planFile}`, '--no-ci-wait']);
 
-    expect(start.exitCode).toBe(1);
+    expectExit(start, 1, { ...scratch });
     expect(start.stderr).toContain(`❌ Refusing to start: PLAN-${STUB}.md names 1 skill(s) no loaded tier resolves`);
     expect(start.stderr).toContain(GHOST_LINE);
     expect(start.stderr).not.toContain(`skill "${KNOWN}"`);

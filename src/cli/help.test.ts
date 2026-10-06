@@ -74,6 +74,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
+import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { commandSpelling } from './command.js';
@@ -275,7 +276,7 @@ describe('the frozen help snapshots', () => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('RAFA_')));
     const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, '--help'], { cwd: tempBase, env: { TMPDIR: tmpdir(), ...env, ...scratchHomeEnv(tempBase) } });
 
-    expect(run.exitCode).toBe(0);
+    expectExit({ exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() }, 0, { tempBase });
     expect(run.stderr.toString()).toBe('');
     expect(run.stdout.toString()).toBe(readSnapshot('rafa.txt'));
   }, 30_000);

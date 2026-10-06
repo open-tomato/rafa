@@ -47,7 +47,7 @@ import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -59,6 +59,7 @@ import { createGitRunner } from '../pr/index.js';
 
 import { expectExit, plantProjectConfig, runRafa } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's own temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-commands-spawned-')));
@@ -139,7 +140,7 @@ function plantDevice(originPath: string, dir: string, label: string, storeId: st
 
   const gitBinary = Bun.which('git');
   if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, home, bin, callLog: join(root, 'calls.log'), path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** What `branch` points at on `originGit`, or null when it has none. */

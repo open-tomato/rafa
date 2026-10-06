@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createLocalLearning, localInstinctsDir } from '../adapters/learning/local.js';
 import { actionHash } from '../learning/index.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-instinct-list-')));
 const RUN_TIMEOUT = 30_000;
@@ -82,7 +82,7 @@ beforeAll(async () => {
 describe('rafa instinct list in a scratch repository', () => {
   it('--blessed shows the 0.8 action and not the losing or flagged ones', () => {
     const run = runRafa(scratch, scratch.repo, ['instinct', 'list', '--blessed']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('use the fast path');
     expect(run.stdout).not.toContain('use the slow path');
     expect(run.stdout).not.toContain('restart the daemon');
@@ -91,7 +91,7 @@ describe('rafa instinct list in a scratch repository', () => {
 
   it('--conflicts shows the flagged pair side by side, highest confidence first', () => {
     const run = runRafa(scratch, scratch.repo, ['instinct', 'list', '--conflicts']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('close call trigger');
     const cache = run.stdout.indexOf('clear the cache');
     const daemon = run.stdout.indexOf('restart the daemon');

@@ -41,6 +41,7 @@ import { readSessions } from '../loop/sessions.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 /** The CLI entry this file spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -277,8 +278,6 @@ function plant(options: PlantOptions = REFUSED): Scratch {
   const calls = join(root, 'calls');
   for (const dir of [repo, origin, bin, home, calls]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const bunBinary = Bun.which('bun');
   if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
 
@@ -310,7 +309,7 @@ function plant(options: PlantOptions = REFUSED): Scratch {
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
   plantProjectConfig(repo, options.config);
 
-  return { repo, origin, home, calls, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
+  return { repo, origin, home, calls, path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter) };
 }
 
 /** Runs `rafa loop start` over {@link RUN_FLAGS} in `scratch`'s repository, waiting for it to finish. */
@@ -432,7 +431,7 @@ describe('the same run under pr.provider: none', () => {
   it('writes a no-pr line saying no provider is configured to the events file of a text-mode run', () => {
     const scratch = plant({ config: CONFIG_NONE, refusePush: false, ghOpens: true });
     const run = runLoopStart(scratch);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
 
     const runsDir = join(scratch.repo, '.rafa', 'runs');
     const eventsFile = readdirSync(runsDir).find((name) => name.endsWith('.events.ndjson'));

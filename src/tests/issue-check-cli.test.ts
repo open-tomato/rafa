@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-check-cli-')));
 
@@ -62,7 +62,7 @@ describe('rafa issue check, spawned', () => {
     const { scratch } = plant();
     const run = runRafa(scratch, scratch.repo, ['issue', 'check', '151', '--output=json']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const rows = rowsOf(run.stdout);
     expect(rows.length).toBeGreaterThanOrEqual(2);
     for (const row of rows) {
@@ -78,11 +78,11 @@ describe('rafa issue check, spawned', () => {
   it('--stamp leaves a copy whose next check reads every reference ok', () => {
     const { scratch, copy } = plant();
     const stamped = runRafa(scratch, scratch.repo, ['issue', 'check', '151', '--stamp', '--output=json']);
-    expect(stamped.exitCode).toBe(0);
+    expectExit(stamped, 0, scratch);
     expect(readFileSync(copy, 'utf8')).toContain('<!-- rafa:refs');
 
     const next = runRafa(scratch, scratch.repo, ['issue', 'check', '151', '--output=json']);
-    expect(next.exitCode).toBe(0);
+    expectExit(next, 0, scratch);
     const rows = rowsOf(next.stdout);
     expect(rows.length).toBeGreaterThanOrEqual(2);
     expect(rows.map((row) => row.state)).toEqual(rows.map(() => 'ok'));

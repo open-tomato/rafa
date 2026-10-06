@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 import { EFFORT_STORE_DIR } from '../store.js';
 
 import { fixStoreSchema } from './fix-schema.js';
@@ -353,8 +353,8 @@ describe('runRafa marks its child as a test process', () => {
     const inherited = runRafa(scratch, repo, ['effort', 'report']);
 
     expect(overridden.stderr).not.toContain('a test opens stores under tmpdir() only');
-    expect(overridden.exitCode).toBe(0);
+    expectExit(overridden, 0, scratch);
     expect(inherited.stderr).not.toContain('a test opens stores under tmpdir() only');
-    expect(inherited.exitCode).toBe(0);
+    expectExit(inherited, 0, scratch);
   });
 });

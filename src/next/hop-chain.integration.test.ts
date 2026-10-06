@@ -27,7 +27,7 @@ import type { Place } from '../project/position.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -36,6 +36,7 @@ import { locateBlockerEpic } from '../board/blocker-epic.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { createGhOpenPullRequests, createRoadmapReadings } from '../board/roadmap.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { decideHop } from './hop-chain.js';
 
@@ -137,9 +138,7 @@ function plantWorld(): ScratchWorld {
   ].join('\n'), 'utf8');
   chmodSync(gh, 0o755);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, bin, path: [bin, dirname(gitBinary)].join(':') };
+  return { repo, bin, path: [bin, ...hostToolDirs()].join(':') };
 }
 
 /** A `SpecIssueReader` no case here ever calls: `decideHop`'s taken readings read state off the listing, not this reader. */

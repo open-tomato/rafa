@@ -133,8 +133,8 @@ describe('runRafa', () => {
       env: { PATH: control.path, HOME: control.home },
     });
 
-    expect(run.exitCode).toBe(0);
-    expect(bare.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
+    expectExit({ exitCode: bare.exitCode, stdout: bare.stdout.toString(), stderr: bare.stderr.toString() }, 0, control);
     expect(existsSync(join(control.home, '.bun'))).toBe(bunWritesInstallCache);
     expect(existsSync(join(scratch.home, '.bun'))).toBe(false);
   });

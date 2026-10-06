@@ -25,7 +25,7 @@ import type { OwnedBoard } from '../board/board-owns.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -33,6 +33,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { readBoardOwnership } from '../board/board-owns.js';
 import { createOwnerResolver } from '../board/owner-resolve.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { createGhPullRequests } from './gh.js';
 import { createGhTeamMembership, readOwnerApproval } from './owner-approval.js';
@@ -142,9 +143,7 @@ function plantWorld(): ScratchWorld {
   ].join('\n'), 'utf8');
   chmodSync(gh, 0o755);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, path: [bin, dirname(gitBinary)].join(':') };
+  return { repo, path: [bin, ...hostToolDirs()].join(':') };
 }
 
 /** The gate's seams over one spawned `gh`, every reading real. */

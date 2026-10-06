@@ -38,6 +38,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { collectEffort } from '../effort/collect.js';
 import { buildReport } from '../effort/report.js';
 
+import { expectExit } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 
 /** The command a spawned case executes. */
@@ -241,7 +242,7 @@ describe('a spawned effort report over the SQLite store a collect wrote', () => 
 
     const run = runReportJson(root, home);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root, home });
     const events = run.stdout
       .trimEnd()
       .split('\n')

@@ -52,7 +52,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { initHint } from '../project/scope.js';
 
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 /** A temporary directory of this file's own, holding one scratch repository per case. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cli-surface-')));
@@ -103,7 +103,7 @@ describe('rafa --output=json, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, jsonCase.words);
 
-    expect(run.exitCode).toBe(jsonCase.exitCode);
+    expectExit(run, jsonCase.exitCode, scratch);
     expect(run.stderr).toBe('');
 
     let events: CliEvent[] = [];
@@ -161,7 +161,7 @@ describe('the removed usage subject', () => {
     expect(json.exitCode).not.toBe(0);
     expect(json.stderr).toBe('');
     expect(json.stdout).toContain('"message":"unknown subject or command \\"usage\\""');
-    expect(control.exitCode).toBe(0);
+    expectExit(control, 0, scratch);
   }, RUN_TIMEOUT);
 });
 
@@ -209,7 +209,7 @@ describe('the root a command acts on', () => {
 
     const run = runRafa(scratch, below, rootCase.words);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(join(project, rootCase.named));
     expect(run.stderr).not.toContain(join(scratch.repo, rootCase.named));
   }, RUN_TIMEOUT);

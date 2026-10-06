@@ -34,7 +34,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../cli/command.js';
 import { ConfigError } from '../config.js';
-import { plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
+import { expectExit, plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 
 import { asksDetached, loadRunConfig, refuseDetachedRun, refuseEffortDirRun } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';
@@ -236,10 +236,10 @@ describe('rafa loop start -d, spawned', () => {
     const detached = runRafa(scratch, scratch.repo, ['loop', 'start', '-d', plan]);
     const control = runRafa(scratch, scratch.repo, ['loop', 'start', plan]);
 
-    expect(detached.exitCode).toBe(1);
+    expectExit(detached, 1, scratch);
     expect(detached.stderr.startsWith(REFUSAL_HEAD)).toBe(true);
     expect(detached.stderr).not.toContain('Plan file not found');
-    expect(control.exitCode).toBe(1);
+    expectExit(control, 1, scratch);
     expect(control.stderr).toContain('Plan file not found');
     expect(control.stderr).not.toContain('detached');
     expect(existsSync(join(scratch.repo, '.rafa', 'runs'))).toBe(false);

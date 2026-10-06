@@ -130,6 +130,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../schema/instinct.js';
+import { expectExit } from '../tests/cli-capture.js';
 
 import { PROMPT_SHAPES } from './classify.js';
 import { formatSkillsReport, SKILLS_REPORT_HEADER } from './report-skills-format.js';
@@ -1047,7 +1048,7 @@ describe('the report command', () => {
 
     const run = runReport(root, ['--output=json']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stderr).toBe('');
     const events = eventsOf(run.stdout);
     expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
@@ -1060,7 +1061,7 @@ describe('the report command', () => {
 
     const run = runReport(root, []);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stderr).toBe('');
     expect(run.stdout).toStartWith('warn: ');
     expect(run.stdout.split('\n')[0]).toContain('"nonesuch"');
@@ -1072,7 +1073,7 @@ describe('the report command', () => {
     const deprecated = runReport(root, ['--json']);
     const canonical = runReport(root, ['--output=json']);
 
-    expect(deprecated.exitCode).toBe(0);
+    expectExit(deprecated, 0, { root });
     expect(deprecated.stderr)
       .toBe('rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"\n');
     expect(canonical.stderr).toBe('');
@@ -1092,7 +1093,7 @@ describe('the report command', () => {
 
     const run = runReport(root, []);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stdout.split('\n')).toEqual([
       noRows,
       '',
@@ -1116,7 +1117,7 @@ describe('the report command', () => {
 
     const run = runReport(root, []);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stdout.split('\n')).toEqual([
       noRows,
       '',
@@ -1137,7 +1138,7 @@ describe('the report command', () => {
 
     const run = runReport(root, []);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { root });
     expect(run.stdout.split('\n')).toEqual([
       noRows,
       '',
@@ -1160,7 +1161,7 @@ describe('the report command', () => {
       expect.stringContaining('store is "postgres"'),
       expect.stringContaining('bogus'),
     ]);
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { root });
     expect(run.stderr.trimEnd().split('\n')).toEqual(
       refusal.problems.map((problem) => `rafa effort report: ${problem}`),
     );
@@ -1173,7 +1174,7 @@ describe('the report command', () => {
 
     const run = runReport(root, ['--output=json']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { root });
     expect(run.stderr).toBe('');
     const events = eventsOf(run.stdout);
     expect(events.map((event) => event.type)).toEqual(['start', 'result']);
@@ -1357,7 +1358,7 @@ describe('the report command with --skills over a plan run under two resolvers',
     const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
     const text = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`]);
 
-    expect(json.exitCode).toBe(0);
+    expectExit(json, 0, { root });
     expect(eventsOf(json.stdout).at(-1)).toMatchObject({ ok: true, data: expected });
     const [plan] = expected.plans;
     expect(plan?.resolvers.map(({ resolver, sessions }) => [resolver, sessions])).toEqual([
@@ -1369,7 +1370,7 @@ describe('the report command with --skills over a plan run under two resolvers',
       ['tag', 50, 50],
     ]);
 
-    expect(text.exitCode).toBe(0);
+    expectExit(text, 0, { root });
     expect(text.stdout).toBe(`${formatSkillsReport(expected).join('\n')}\n`);
     const lines = text.stdout.split('\n');
     expect(lines).toContain('  resolver planner: 1 sessions');
@@ -1389,10 +1390,10 @@ describe('the report command with --skills', () => {
     const json = runReport(root, ['--skills', `--plan=${SKILLS_PLAN}`, '--output=json']);
     const text = runReport(root, ['--skills']);
 
-    expect(json.exitCode).toBe(0);
+    expectExit(json, 0, { root });
     expect(eventsOf(json.stdout).at(-1)).toMatchObject({ ok: true, data: expected });
     expect(expected.plans).toHaveLength(1);
-    expect(text.exitCode).toBe(0);
+    expectExit(text, 0, { root });
     expect(text.stderr).toBe('');
     expect(text.stdout).toBe(`${formatSkillsReport(expected).join('\n')}\n`);
     expect(text.stdout.split('\n')[0]).toBe(SKILLS_REPORT_HEADER);
@@ -1403,7 +1404,7 @@ describe('the report command with --skills', () => {
 
     const run = runReport(root, [`--plan=${SKILLS_PLAN}`]);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { root });
     expect(run.stderr).toBe('rafa effort report: --plan narrows the skills report and needs --skills\n');
     expect(run.stdout).toBe('');
   });
@@ -1414,10 +1415,10 @@ describe('the report command with --skills', () => {
     const refused = runReport(root, ['--plan=x']);
     const unknown = runReport(root, ['--skills', '--plan=no-such-plan', '--output=json']);
 
-    expect(refused.exitCode).toBe(1);
+    expectExit(refused, 1, { root });
     expect(refused.stderr).toBe('rafa effort report: --plan narrows the skills report and needs --skills\n');
     expect(refused.stdout).toBe('');
-    expect(unknown.exitCode).toBe(0);
+    expectExit(unknown, 0, { root });
     expect(eventsOf(unknown.stdout).at(-1)).toMatchObject({ ok: true, data: { plans: [] } });
   });
 
@@ -1427,12 +1428,12 @@ describe('the report command with --skills', () => {
     const json = runReport(root, ['--skills', '--output=json']);
     const text = runReport(root, ['--skills']);
 
-    expect(json.exitCode).toBe(0);
+    expectExit(json, 0, { root });
     const result = eventsOf(json.stdout).at(-1);
     expect(result).toMatchObject({ ok: true });
     const data = (result as { data: Record<string, unknown> }).data;
     expect(Object.keys(data).sort()).toEqual(['plans']);
-    expect(text.exitCode).toBe(0);
+    expectExit(text, 0, { root });
     expect(text.stdout.split('\n')[0]).toBe(SKILLS_REPORT_HEADER);
   });
 });
