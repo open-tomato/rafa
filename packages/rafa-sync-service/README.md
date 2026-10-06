@@ -77,6 +77,12 @@ the secret name provided (for example, `hub.tokenSecret: rafa-hub-token` reads
 when the first contact is made, on demand when a command syncs. If the secret
 is not found or cannot be read, the sync is refused.
 
+A test process (`RAFA_TEST=1`) that also sets `RAFA_TEST_SECRETS_FILE` reads
+the token from that JSON file instead, shaped
+`{ "rafa": { "rafa-hub-token": "<token>" } }`, and never from `Bun.secrets`. A
+suite spawning the CLI uses it to hand the child a token without touching the
+system secret store.
+
 ## Offline behaviour
 
 When the hub is unreachable:
