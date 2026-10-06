@@ -162,7 +162,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
 
   session.wrapUpStarted();
   activeOutput().info('\n✅ All tasks completed!');
-  activeOutput().info('🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.');
+  activeOutput().info('🧹 Wrap-up session starting: promote the listed lessons, sync with main, then commit, push and open the PR.');
   activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
   // Step 1 of the release, written BEFORE the session that
   // rewrites it (`start/release-stage.ts`), and handed to the
