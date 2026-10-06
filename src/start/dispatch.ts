@@ -73,9 +73,21 @@
  * the push did is told through `info`. A push that is refused, or an
  * adapter that cannot be resolved or made, is told through `warn` and
  * fails nothing: the report is already stored, and a lesson is its copy.
+ *
+ * The loop guard runs once more inside a dispatch, immediately before
+ * its session is spawned, when its caller names a
+ * {@link TaskDispatchOptions.guard}: `start()` guards the checkout ahead
+ * of the suite steps and `progress.txt`, and a worktree removed after
+ * that would otherwise reach the spawn, where `posix_spawn` throws
+ * `ENOENT` for a working directory that is gone. It is the reading
+ * `start()` takes, `haltIfCheckoutMoved` (`start/checkout-watch.ts`): a
+ * checkout moved or gone marks the task `[BLOCKED]` with its blocker
+ * text, prints the halt, and the dispatch answers
+ * {@link TaskDispatch.halted} with no session spawned.
  */
 import type { SkillResolverName } from '../config-sections.js';
 import type { ClaudeSettingSource, InjectMode } from '../config.js';
+import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterRegistry } from '../adapters/registry.js';
@@ -105,6 +117,7 @@ import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declarat
 import { PROGRESS_CAP_BYTES, writeProgress } from '../utils/progress.js';
 import { escapeBlockerText } from '../utils/tracker.js';
 
+import { haltIfCheckoutMoved } from './checkout-watch.js';
 import { EMPTY_RESOLUTION, handOut, taskInputFor, taskLearningAdapter } from './handout.js';
 import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
@@ -168,6 +181,20 @@ export function runTaskSession(
     ? {}
     : { cwd };
   return runClaudeCaptured(prompt, settingSources, [SESSION_ID_FLAG, sessionId, ...flags], spawn, served, options);
+}
+
+/**
+ * What the loop guard inside {@link dispatchTask} reads: the pair the
+ * run holds its checkout to and the tracker the task's line is marked
+ * in, as `start()` hands them to its own guard before the dispatch.
+ */
+export interface DispatchGuard {
+  /** The pair the run holds its checkout to (`start/checkout-watch.ts`). */
+  readonly expected: CheckoutExpectation;
+  /** The tracker holding the task's line, marked `[BLOCKED]` on a halt. */
+  readonly trackerPath: string;
+  /** How the guard reaches the disk and git. The real ones when left out. */
+  readonly seams?: CheckoutGuardSeams;
 }
 
 /** What {@link dispatchTask} needs to run one task. */
@@ -265,6 +292,12 @@ export interface TaskDispatchOptions {
    * its base, and the session would guess one.
    */
   base: string | null;
+  /**
+   * The loop guard run immediately before the spawn; see the module
+   * note. Left out, or null, nothing is guarded there, which a test
+   * driving the `run` seam with no checkout of its own names.
+   */
+  guard?: DispatchGuard | null;
   /** Session seam. Defaults to {@link runTaskSession}, the real CLI. */
   run?: TaskSessionRunner;
   /** Where the session's id comes from. Defaults to `randomUUID`. */
@@ -289,10 +322,17 @@ export interface TaskDispatch {
   declaration: TaskDeclaration | null;
   /** The id the session ran under, which also names its log. */
   sessionId: string;
-  /** The session's exit code. */
+  /** The session's exit code; {@link HALTED_EXIT_CODE} when it was never spawned. */
   exitCode: number;
-  /** Everything the session wrote to stdout, its report included. */
+  /** Everything the session wrote to stdout, its report included. Empty when it was never spawned. */
   output: string;
+  /**
+   * True when the loop guard found the checkout moved or gone just before
+   * the spawn (see the module note): the task is marked `[BLOCKED]` with
+   * the guard's blocker, no session ran, and {@link TaskDispatch.sessionId}
+   * names none. `start()` stops the run on it with the `halt` event.
+   */
+  halted: boolean;
   /**
    * The resolver that chose {@link TaskDispatch.skillsOffered}, the run's
    * `task.skills`, or null for a dispatch handed no
@@ -304,6 +344,12 @@ export interface TaskDispatch {
   /** The lessons the prompt's `## Lessons from earlier tasks` offered, in its order. Empty when it had none. */
   lessonsOffered: readonly InstinctRecord[];
 }
+
+/**
+ * The exit code a halted dispatch answers: not 0, so a reader that
+ * missed {@link TaskDispatch.halted} never takes the task for done.
+ */
+export const HALTED_EXIT_CODE = 1;
 
 /**
  * What opens the prompt line handing a session the text its task was
@@ -494,6 +540,13 @@ export function buildTaskPrompt(
  * served directory holds what the tiers held when that task was
  * dispatched. The lessons are pulled from the run's adapter between the
  * two, once; see the module note.
+ *
+ * With a {@link TaskDispatchOptions.guard}, the loop guard runs after
+ * the session is served and before it is spawned. A checkout moved or
+ * gone answers a record with {@link TaskDispatch.halted} set, the prompt
+ * it would have been handed, no session id, no output and
+ * {@link HALTED_EXIT_CODE}; the task's tracker line is already marked
+ * `[BLOCKED]` with the guard's blocker. See the module note.
  */
 export async function dispatchTask(
   options: TaskDispatchOptions,
@@ -558,23 +611,34 @@ export async function dispatchTask(
   ));
 
   const served = serveForSession(options.serving, resolution);
-  const sessionId = (options.newSessionId ?? randomUUID)();
-  const session = await run(prompt, flags, sessionId, options.settingSources, served, options.checkout);
-
-  return {
+  const record = {
     taskText,
     prompt,
     flags,
     served,
     declaration,
     injection,
-    sessionId,
-    exitCode: session.exitCode,
-    output: session.stdout,
     resolver: handed.resolver,
     skillsOffered: handed.skills,
     lessonsOffered: handed.lessons,
   };
+  if (haltBeforeSpawn(options.guard ?? null, taskInfo)) {
+    return { ...record, sessionId: '', exitCode: HALTED_EXIT_CODE, output: '', halted: true };
+  }
+
+  const sessionId = (options.newSessionId ?? randomUUID)();
+  const session = await run(prompt, flags, sessionId, options.settingSources, served, options.checkout);
+  return { ...record, sessionId, exitCode: session.exitCode, output: session.stdout, halted: false };
+}
+
+/**
+ * The loop guard just before a task's spawn: false for no `guard` or a
+ * checkout that held; true once `haltIfCheckoutMoved` has marked the
+ * task and printed the halt.
+ */
+function haltBeforeSpawn(guard: DispatchGuard | null, taskInfo: TaskInfo): boolean {
+  if (guard === null) return false;
+  return haltIfCheckoutMoved({ expected: guard.expected, trackerPath: guard.trackerPath, taskInfo }, guard.seams);
 }
 
 /**

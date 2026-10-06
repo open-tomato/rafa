@@ -39,6 +39,8 @@ import {
   etaLine,
   formatDuration,
   isLive,
+  phasedCounts,
+  phaseNote,
   planLabel,
   readSessionChecklist,
   resolveLoopSeams,
@@ -170,5 +172,29 @@ describe('the declaration and the seams', () => {
     expect([defaults.isAlive, defaults.stopWaitMs, defaults.pollMs]).toEqual([isPidAlive, STOP_WAIT_MS, STOP_POLL_MS]);
     expect([STOP_WAIT_MS, STOP_POLL_MS]).toEqual([30_000, 200]);
     expect([handed.sleep, handed.stopWaitMs, handed.pollMs, handed.isAlive]).toEqual([sleep, 5, 1, isPidAlive]);
+  });
+});
+
+describe('phaseNote and phasedCounts', () => {
+  /** Every one of 54 tasks ticked. */
+  const ticked: TaskCounts = { total: 54, done: 54, blocked: 0, open: 0 };
+  /** 53 of 54 ticked, one open. */
+  const oneOpen: TaskCounts = { total: 54, done: 53, blocked: 0, open: 1 };
+
+  it('reads a running record in phase task with no task over a fully ticked plan as wrap-up', () => {
+    const record = sessionRecord({ phase: 'task', task: null });
+
+    expect(phaseNote(record, ticked)).toBe('(phase wrap-up)');
+    expect(phasedCounts(ticked, record)).toBe('54/54 done (phase wrap-up), 0 blocked, 0 open');
+  });
+
+  it('keeps the phase it holds with an open task, a task running, another state, or no counts', () => {
+    const record = sessionRecord({ phase: 'task', task: null });
+
+    expect(phasedCounts(oneOpen, record)).toBe('53/54 done (phase task), 0 blocked, 1 open');
+    expect(phaseNote(sessionRecord({ phase: 'task' }), ticked)).toBe('(phase task)');
+    expect(phaseNote(sessionRecord({ phase: 'task', task: null, state: 'paused' }), ticked)).toBe('(phase task)');
+    expect(phaseNote(record)).toBe('(phase task)');
+    expect(phaseNote(sessionRecord({ phase: 'repair', task: null }), ticked)).toBe('(phase repair)');
   });
 });

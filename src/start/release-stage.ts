@@ -94,13 +94,14 @@
  *
  * Every way this stage falls short of a pushed fragment ends in one
  * sentence, and that sentence goes into the pull request body through
- * {@link PullRequests.editBody}: the spec's "on failure restore step
- * 1's text and say so in the PR body". The sentence is the record's
- * own — the skip's own sentence for a skip, the refusal's for a refused
- * verification (`release/prepare.ts`, `release/verify.ts`), and this
- * module's only for what only this module does, the commit and the
- * push — so the prompt and the body cannot word the same outcome two
- * ways. It is appended when the body does not carry it already.
+ * `PullRequests.editBody` (`./release-body.ts`): the spec's "on
+ * failure restore step 1's text and say so in the PR body". The
+ * sentence is the record's own — the skip's own sentence for a skip,
+ * the refusal's for a refused verification (`release/prepare.ts`,
+ * `release/verify.ts`), and this module's only for what only this
+ * module does, the commit and the push — so the prompt and the body
+ * cannot word the same outcome two ways. It is appended when the body
+ * does not carry it already.
  *
  * A pushed fragment instead gives the body its FORECAST — the fold
  * settle would run if the branch merged now, over the base step 1 read
@@ -111,42 +112,12 @@
  * one marked block that a re-run replaces rather than repeats, since a
  * forecast goes stale as the base moves.
  *
- * The write is a read-modify-write: a provider has no way to append to
- * a body, so the body is read back and the new one built over it. A
- * body the write would not change is left alone, which is what makes a
- * re-run of the stage idempotent and what keeps the sentence single
- * when the session already copied it in from its prompt. A pull
- * request that cannot be found or cannot be asked is reported and NOT
- * thrown: the release is already decided by then, and the operator is
- * owed the reason on their terminal whether or not GitHub took it.
- *
- * ## Which provider is asked, and what a `none` reading costs
- *
- * WHICH provider that write goes through is a reading, not a constant.
- * {@link ReleaseStageSeams.readProvider} answers it —
- * `resolvePrProvider` (`src/pr/provider.ts`), the one reading in this
- * repository that says `gh` or `none` — and it is taken BEFORE
- * {@link ReleaseStageSeams.pulls} is called, so a repository that
- * resolves to `none` spawns no `gh` at all rather than spawning one
- * and reporting what it said. A run under `pr.provider: none` has no
- * pull request to carry anything: the loop pushes the branch and
- * prints a compare URL (`src/pr/none.ts`), and asking the GitHub CLI
- * for a body there is a call that can only fail, slowly, on a machine
- * that may not have `gh` installed.
- *
- * The reading is the RUN's, so `src/start/wrap-up-run.ts` hands this stage a
- * reader carrying the run's own `pr.provider`, the way it already
- * hands one to the CI gate. The default seam here leaves `configured`
- * null, which is `origin` deciding — right for a caller that names no
- * seam, and wrong for a GitHub Enterprise remote, which reads as not
- * GitHub until a config says otherwise.
- *
- * What reaches no body is still what the operator is owed, so the
- * `none` path prints ONE line naming it: the lines quoted, and the
- * reading that kept them off the board. It prints at info rather than
- * error level, because a configured `none` provider writing no body is
- * the setting working and not a fault — the failure it reports, when
- * there is one, was already printed above it at its own level.
+ * The write itself — the read-modify-write, the provider it goes
+ * through, and the one line a `none` provider prints instead — is
+ * `./release-body.ts`. A finish keeps what it meant to write
+ * ({@link ReleaseFinish.written}), so that module can write it again
+ * once a retry session or the runner has opened a pull request the
+ * finish found missing.
  *
  * ## Whose branch is pushed, and whose body is written
  *
@@ -159,7 +130,8 @@
  * directory would push the base and write the line into whatever pull
  * request has the base as its head, or none (#627).
  */
-import type { GitResult, GitRunner, PrProviderReading, PullRequests, PushOutcome } from '../pr/index.js';
+import type { BodyWrite, ReleaseBodyRecord, ReleaseBodySeams } from './release-body.js';
+import type { GitResult, GitRunner, PushOutcome } from '../pr/index.js';
 import type { BranchForecast, BranchForecastInput, BranchForecastSettings } from '../release/branch-forecast.js';
 import type { ChangelogNote } from '../release/changelog.js';
 import type {
@@ -175,9 +147,8 @@ import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
 import { messageOf } from '../config-sections.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { parsePlan } from '../plan/parse.js';
-import { createGitRunner, ghPullRequestsIn, gitSaid, pushBranch, resolvePrProvider } from '../pr/index.js';
+import { createGitRunner, gitSaid, pushBranch } from '../pr/index.js';
 import {
-  bodyWithRelease,
   forecastLine,
   readBranchForecast,
   releaseBodyBlock,
@@ -188,12 +159,14 @@ import { prepareRelease } from '../release/prepare.js';
 import { verifyRelease } from '../release/verify.js';
 import { RELEASE_BASE_BRANCH } from '../release/version.js';
 
+import { RELEASE_BODY_SEAMS, writeBody } from './release-body.js';
+
 /**
  * The effects this stage reaches through, in one object so a test
  * replaces them together. {@link RELEASE_STAGE_SEAMS} holds the real
  * ones, and a key left out of a call runs the real helper.
  */
-export interface ReleaseStageSeams {
+export interface ReleaseStageSeams extends ReleaseBodySeams {
   /** Step 1: `release/prepare.ts`. */
   readonly prepare: (input: ReleasePreparationInput) => ReleasePreparation;
   /** Step 3's readings and restore: `release/verify.ts`. */
@@ -206,13 +179,6 @@ export interface ReleaseStageSeams {
   readonly git: (repoRoot: string) => GitRunner;
   /** Pushes the branch to `origin` with upstream set. */
   readonly push: (repoRoot: string, branch: string) => PushOutcome;
-  /** The provider the body is written through. */
-  readonly pulls: (repoRoot: string) => PullRequests;
-  /**
-   * Which provider that is. A reading of `none` writes no body and
-   * reaches no `gh`; see the module note.
-   */
-  readonly readProvider: (repoRoot: string) => PrProviderReading;
   /** When the forecast is made; a merge now would add the fragment on its UTC day. */
   readonly now: () => Date;
 }
@@ -225,11 +191,7 @@ export const RELEASE_STAGE_SEAMS: ReleaseStageSeams = {
   readNotes: readPlanChanges,
   git: createGitRunner,
   push: pushBranch,
-  pulls: ghPullRequestsIn,
-  // `configured: null` leaves the answer to `origin`. `start()` passes
-  // a reader carrying the run's own `pr.provider`; this default is what
-  // a caller that names no seam gets.
-  readProvider: (repoRoot: string) => resolvePrProvider({ configured: null, dir: repoRoot }),
+  ...RELEASE_BODY_SEAMS,
   now: () => new Date(),
 };
 
@@ -298,20 +260,13 @@ export type ReleaseFinishOutcome =
   /** Committed and pushed, and the forecast written. */
   | 'released';
 
-/** What became of what the body had to be given. */
-export interface ReleaseBodyWrite {
-  /** The pull request it was written to, or null when none was found. */
-  readonly number: number | null;
-  /** True when the body carries it now. */
-  readonly carried: boolean;
-  /** True when it already did, so nothing was written. */
-  readonly already: boolean;
-  /** Why it does not, or null when it does. */
-  readonly problem: string | null;
-}
-
-/** What one call to {@link finishRelease} did. */
-export interface ReleaseFinish {
+/**
+ * What one call to {@link finishRelease} did. Its `written` and `body`
+ * ({@link ReleaseBodyRecord}) are what the finish wrote into the pull
+ * request body and what that write answered: `written` is null only
+ * when there was nothing to write, the finish of no preparation.
+ */
+export interface ReleaseFinish extends ReleaseBodyRecord {
   /** How far the release got; see {@link ReleaseFinishOutcome}. */
   readonly outcome: ReleaseFinishOutcome;
   /** The fragment committed, relative to the repository root, or null. */
@@ -326,8 +281,6 @@ export interface ReleaseFinish {
   readonly forecast: BranchForecast | null;
   /** The level report, or null when the declaration overruled no note. */
   readonly levelReport: string | null;
-  /** What became of the body write, or null when there was nothing to write. */
-  readonly body: ReleaseBodyWrite | null;
 }
 
 /** The plan title heading: one `#`, a space, and the title after it. */
@@ -496,113 +449,7 @@ export function bodyWithSentence(body: string, sentence: string): string {
     : `${kept}\n\n${sentence}`;
 }
 
-/** What one finish writes into the body, before it is written. */
-interface BodyWrite {
-  /** The failure line, appended when the body lacks it; null on success. */
-  readonly sentence: string | null;
-  /** The marked forecast and level report block; null when both are absent. */
-  readonly block: string | null;
-  /** What a reader sees of the two, for the terminal line naming them. */
-  readonly lines: readonly string[];
-}
-
-/** Nothing reached a body, and why. */
-function unwritten(number: number | null, problem: string): ReleaseBodyWrite {
-  return { number, carried: false, already: false, problem };
-}
-
-/**
- * Puts `write` in the pull request body of `branch`, unless the body
- * already carries it.
- *
- * Reported and never thrown; see the module note for why the read comes
- * first and why a body the write would not change is left alone.
- */
-async function carryIntoBody(
-  pulls: PullRequests,
-  branch: string,
-  write: BodyWrite,
-): Promise<ReleaseBodyWrite> {
-  try {
-    const found = await pulls.findOpen(branch);
-    if (found === null) {
-      return unwritten(null, `no open pull request was found for ${branch} to write it to`);
-    }
-
-    const detail = await pulls.get(found.number);
-    if (detail === null) {
-      return unwritten(found.number, `pull request #${found.number} could not be read back`);
-    }
-    const next = bodyWithRelease(detail.body, write.sentence, write.block);
-    if (next === detail.body) {
-      return { number: found.number, carried: true, already: true, problem: null };
-    }
-
-    await pulls.editBody(found.number, next);
-    return { number: found.number, carried: true, already: false, problem: null };
-  } catch (error) {
-    return unwritten(null, `the pull request body could not be written: ${messageOf(error)}`);
-  }
-}
-
-/**
- * Why a reading that is not `gh` leaves the body unwritten, as the
- * record's own `problem` carries it.
- */
-function noProviderProblem(reading: PrProviderReading): string {
-  const origin = reading.remote === null
-    ? 'origin is not set'
-    : `origin is ${reading.remote}`;
-  const because = reading.source === 'config'
-    ? 'pr.provider says so'
-    : origin;
-  return `this repository resolves to pr.provider: ${reading.provider}, because ${because},`
-    + ' so there is no pull request to write it to';
-}
-
-/** `That line is` or `Those lines are`, by how many there are. */
-function linesSubject(count: number): { readonly noun: string; readonly verb: string } {
-  return count === 1
-    ? { noun: 'That line', verb: 'is' }
-    : { noun: 'Those lines', verb: 'are' };
-}
-
-/** Says where the lines went, or that they went nowhere. */
-function announceBody(write: ReleaseBodyWrite, count: number): void {
-  const out = activeOutput();
-  const { noun, verb } = linesSubject(count);
-  if (write.problem !== null) {
-    out.error(`   ${noun} ${verb} not in the pull request body: ${write.problem}`);
-    return;
-  }
-  if (write.already) {
-    out.info(`   Pull request #${write.number} already carries ${noun.toLowerCase()}.`);
-    return;
-  }
-  out.info(`   ${noun} ${verb} now in the body of pull request #${write.number}.`);
-}
-
-/**
- * Writes `write` into the pull request body through the resolved
- * provider, or prints the one line naming what went unwritten.
- */
-async function writeBody(io: ReleaseStageSeams, input: ReleaseFinishInput, write: BodyWrite): Promise<ReleaseBodyWrite> {
-  // Read BEFORE the provider is built, so a `none` repository spawns no
-  // `gh`; the one line it prints names what went unwritten. See the
-  // module note.
-  const reading = io.readProvider(input.repoRoot);
-  if (reading.provider !== 'gh') {
-    const problem = noProviderProblem(reading);
-    activeOutput().info(`   No pull request body carries ${JSON.stringify(write.lines.join(' '))}: ${problem}.`);
-    return unwritten(null, problem);
-  }
-
-  const body = await carryIntoBody(io.pulls(input.repoRoot), input.branch, write);
-  announceBody(body, write.lines.length);
-  return body;
-}
-
-/** What a finish carries besides its outcome, sentence and body. */
+/** What a finish carries besides its outcome, sentence and body write. */
 type FinishFacts = Pick<ReleaseFinish, 'fragment' | 'subject' | 'sha' | 'levelReport'>;
 
 /** A finish that ends in a sentence: written to the body, then reported. */
@@ -622,8 +469,9 @@ async function reportFailure(
 
   const parts = { forecast: null, levelReport: facts.levelReport };
   const block = releaseBodyBlock(parts);
-  const body = await writeBody(io, input, { sentence, block, lines: [sentence, ...releaseBodyLines(parts)] });
-  return { outcome, sentence, forecast: null, body, ...facts };
+  const written: BodyWrite = { sentence, block, lines: [sentence, ...releaseBodyLines(parts)] };
+  const body = await writeBody(io, input, written);
+  return { outcome, sentence, forecast: null, written, body, ...facts };
 }
 
 /** Nothing was prepared, nothing was finished. */
@@ -635,6 +483,7 @@ const NO_RELEASE: ReleaseFinish = {
   sentence: null,
   forecast: null,
   levelReport: null,
+  written: null,
   body: null,
 };
 
@@ -651,8 +500,9 @@ async function reportForecast(
 
   const parts = { forecast, levelReport: facts.levelReport };
   const block = releaseBodyBlock(parts);
-  const body = await writeBody(io, input, { sentence: null, block, lines: releaseBodyLines(parts) });
-  return { outcome: 'released', sentence: null, forecast, body, ...facts };
+  const written: BodyWrite = { sentence: null, block, lines: releaseBodyLines(parts) };
+  const body = await writeBody(io, input, written);
+  return { outcome: 'released', sentence: null, forecast, written, body, ...facts };
 }
 
 /**

@@ -4,8 +4,11 @@
  * and trackers planted in a scratch project, and prints what
  * `_rafa_prompt_live_entry` sets for each live loop. In phase `task` the
  * entry is `#<n> <task>/<total>`, never past the total; in any other phase
- * it is `#<n> <phase>`. The tomato theme, which puts its 🍅 before the
- * entries, is sourced once to read the whole header.
+ * it is `#<n> <phase>`, and a running loop whose tracker has every task
+ * ticked reads `#<n> wrap-up` when its phase reads `task` or is absent.
+ * `_rafa_prompt_task_segment` reads the same phase through
+ * `_rafa_prompt_read`, and the tomato theme, which puts its 🍅 before the
+ * entries, is sourced to read the whole header.
  */
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -105,6 +108,40 @@ async function liveEntries(root: string): Promise<string> {
   return runZsh(script, root);
 }
 
+/** The plugin's own task segment for {@link BRANCH} under `root`, colors stripped. */
+async function taskSegment(root: string): Promise<string> {
+  const script = [
+    `source ${JSON.stringify(PLUGIN)}`,
+    `typeset -gA rafa_git; rafa_git=(top $ROOT main $ROOT branch ${BRANCH})`,
+    '_rafa_prompt_read reuse',
+    '_rafa_prompt_task_segment',
+    'local zero=\'%([BSUbfksu]|([FK]|){*})\'',
+    'print -r -- "${(S)REPLY//$~zero/}"',
+  ].join('\n');
+  return runZsh(script, root);
+}
+
+/** The tomato theme's whole top right for {@link BRANCH} under `root`, colors stripped. */
+async function tomatoHeader(root: string): Promise<string> {
+  const script = [
+    `source ${JSON.stringify(THEME)}`,
+    `typeset -gA rafa_git; rafa_git=(top $ROOT main $ROOT branch ${BRANCH})`,
+    '_rafa_prompt_live_runs $ROOT',
+    'local right=\'\'',
+    '_tomato_right',
+    'local zero=\'%([BSUbfksu]|([FK]|){*})\'',
+    'print -r -- "${(S)right//$~zero/}"',
+  ].join('\n');
+  return runZsh(script, root);
+}
+
+/** The phases a fully ticked tracker is read under: absent, `task` and `wrap-up`. */
+const FULLY_TICKED: readonly { readonly name: string; readonly phase?: string }[] = [
+  { name: 'no phase' },
+  { name: 'phase task', phase: 'task' },
+  { name: 'phase wrap-up', phase: 'wrap-up' },
+];
+
 const zshMissing = Bun.which('zsh') === null;
 
 describe.skipIf(zshMissing)('_rafa_prompt_live_entry', () => {
@@ -118,8 +155,15 @@ describe.skipIf(zshMissing)('_rafa_prompt_live_entry', () => {
     expect(await liveEntries(root)).toBe('#579 2/5');
   });
 
-  test('caps the count at the total when every task is ticked', async () => {
-    const root = await plantProject({ state: 'running', phase: 'task' }, 5, 5);
+  for (const { name, phase } of FULLY_TICKED) {
+    test(`shows wrap-up for a running loop with every task ticked and ${name}`, async () => {
+      const root = await plantProject({ state: 'running', phase }, 5, 5);
+      expect(await liveEntries(root)).toBe('#579 wrap-up');
+    });
+  }
+
+  test('keeps the tasks done for a paused loop with every task ticked in phase task', async () => {
+    const root = await plantProject({ state: 'paused', phase: 'task' }, 5, 5);
     expect(await liveEntries(root)).toBe('#579 5/5');
   });
 
@@ -146,18 +190,45 @@ describe.skipIf(zshMissing)('_rafa_prompt_live_entry', () => {
   });
 });
 
+describe.skipIf(zshMissing)('_rafa_prompt_task_segment', () => {
+  test('shows the task in progress for a running loop in phase task', async () => {
+    const root = await plantProject({ state: 'running', phase: 'task' }, 2, 5);
+    expect(await taskSegment(root)).toBe('🍅 #579 3/5');
+  });
+
+  test('never counts past the total, even with no task at all', async () => {
+    const root = await plantProject({ state: 'running', phase: 'task' }, 0, 0);
+    expect(await taskSegment(root)).toBe('🍅 #579 0/0');
+  });
+
+  for (const { name, phase } of FULLY_TICKED) {
+    test(`shows wrap-up for a running loop with every task ticked and ${name}`, async () => {
+      const root = await plantProject({ state: 'running', phase }, 5, 5);
+      expect(await taskSegment(root)).toBe('🍅 #579 wrap-up');
+    });
+  }
+
+  test('shows the record\'s phase other than task', async () => {
+    const root = await plantProject({ state: 'running', phase: 'ci' }, 5, 5);
+    expect(await taskSegment(root)).toBe('🍅 #579 ci');
+  });
+
+  test('keeps the paused reading with every task ticked', async () => {
+    const root = await plantProject({ state: 'paused', phase: 'task' }, 5, 5);
+    expect(await taskSegment(root)).toBe('⏸ #579 paused 5/5');
+  });
+});
+
 describe.skipIf(zshMissing)('the tomato header', () => {
-  test('reads 🍅 #<n> wrap-up for a loop in its wrap-up', async () => {
-    const root = await plantProject({ state: 'running', phase: 'wrap-up' }, 5, 5);
-    const script = [
-      `source ${JSON.stringify(THEME)}`,
-      `typeset -gA rafa_git; rafa_git=(top $ROOT main $ROOT branch ${BRANCH})`,
-      '_rafa_prompt_live_runs $ROOT',
-      'local right=\'\'',
-      '_tomato_right',
-      'local zero=\'%([BSUbfksu]|([FK]|){*})\'',
-      'print -r -- "${(S)right//$~zero/}"',
-    ].join('\n');
-    expect(await runZsh(script, root)).toBe('│ 🍅 #579 wrap-up');
+  for (const { name, phase } of FULLY_TICKED) {
+    test(`reads 🍅 #<n> wrap-up for a running loop with every task ticked and ${name}`, async () => {
+      const root = await plantProject({ state: 'running', phase }, 5, 5);
+      expect(await tomatoHeader(root)).toBe('│ 🍅 #579 wrap-up');
+    });
+  }
+
+  test('reads the task in progress while tasks are open', async () => {
+    const root = await plantProject({ state: 'running', phase: 'task' }, 2, 5);
+    expect(await tomatoHeader(root)).toBe('│ 🍅 #579 3/5');
   });
 });

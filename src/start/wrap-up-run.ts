@@ -33,6 +33,15 @@
  * to deliver, and none of this runs: the CI gate's own `none` path
  * pushes the branch as before.
  *
+ * Step 3 writes the release's forecast or failure sentence into the
+ * pull request body, and finds none to write it to when the first
+ * session opened none. So once the delivery answers DELIVERED, before
+ * the retarget, the finish's write is made again over the pull request
+ * a retry or the runner opened (`carryReleaseIntoPullRequest`,
+ * `start/release-body.ts`); a finish whose write already reached a pull
+ * request, or that wrote nothing, writes nothing more, and a blocked or
+ * interrupted delivery reaches no second write.
+ *
  * Whoever opened it, a DELIVERED pull request whose base is not the
  * run's — the `base` resolved once at the top of {@link runWrapUp} —
  * is then retargeted onto it (`start/pr-retarget.ts`), before the CI
@@ -59,15 +68,17 @@
  *
  * ## The pull request's event
  *
- * The `pr` or `no-pr` loop event is emitted once a run in every output
- * mode, so the run's events file holds it in text too
- * ({@link emitPullRequestEvent}). Modes other than text emit it right
- * after the wrap-up session over a lookup of the open pull request.
- * Text emits it at the delivery's place, over the delivered number with
- * no lookup, or over a lookup on the paths with no number: a moved
- * checkout, a blocked or interrupted delivery, or a `none` provider, which
- * makes no delivery and whose `no-pr` reason says no provider is configured,
- * with no lookup.
+ * The `pr` or `no-pr` loop event is emitted once a run, in every output
+ * mode and at the same place: the delivery's, after the retries and the
+ * runner have had their turn ({@link emitPullRequestEvent}), so a pull
+ * request a retry or the runner opened is the one the event names, and
+ * the run's events file holds it in text too. It reads the delivered
+ * number with no lookup, or a lookup of the branch's open pull request
+ * made there on the paths with no number: a moved checkout, or a blocked
+ * or interrupted delivery. A `none` provider makes no delivery, and its
+ * `no-pr` reason says no provider is configured, with no lookup. Nothing
+ * is emitted right after the wrap-up session: a reading there would
+ * precede the retries and the runner.
  *
  * Every line written here goes through the active output
  * (`adapters/output/active.ts`), as the rest of `loop start` does.
@@ -81,7 +92,7 @@ import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
 import type { PullRequestSummary } from '../pr/index.js';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { CommandExit } from '../cli/command.js';
@@ -93,6 +104,7 @@ import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
 import { retargetPullRequest } from './pr-retarget.js';
+import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
 import { retryWrapUp } from './wrap-up-retry.js';
@@ -172,11 +184,12 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
   const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
-  // The `pr` or `no-pr` event, in every output mode: here in all but
-  // text, and in text at the delivery's place below, over the number the
-  // delivery holds when it holds one (see `emitPullRequestEvent`).
-  // A `none` provider has no pull request to ask: its lookup answers the
-  // reason and never runs `gh pr list`.
+  // The `pr` or `no-pr` event, in every output mode, at the delivery's
+  // place below and never here: over the number the delivery holds when
+  // it holds one, else over this lookup, made after the retries and the
+  // runner (see `emitPullRequestEvent`). A `none` provider has no pull
+  // request to ask: its lookup answers the reason and never runs
+  // `gh pr list`.
   const readProvider = () => resolvePrProvider({
     configured: settings.prProvider ?? null,
     dir: checkout,
@@ -184,12 +197,11 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   const lookup = (): Promise<number | string | null> => readProvider().provider === 'none'
     ? Promise.resolve(NO_PROVIDER_REASON)
     : openPullRequestNumber(checkout, expected.branch);
-  await emitPullRequestEvent('session', expected.branch, null, lookup);
   // The loop guard before the loop's own release commit, against the
   // HEAD the wrap-up session's commits left on the run's branch: a
   // moved branch or a gone checkout skips the commit, push and wait.
   if (haltIfWrapUpMoved({ expected: expectWrapUpCommits(expected), before: 'release' })) {
-    await emitPullRequestEvent('delivery', expected.branch, null, lookup);
+    await emitPullRequestEvent(expected.branch, null, lookup);
     emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
     return;
   }
@@ -217,11 +229,17 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
       deliverySeamsIn({ ...input, base, fragment: finish.fragment }),
     );
-    await emitPullRequestEvent('delivery', expected.branch, delivery.kind === 'delivered'
+    await emitPullRequestEvent(expected.branch, delivery.kind === 'delivered'
       ? delivery.pull.number
       : null, lookup);
     if (delivery.kind === 'interrupted') return;
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
+    // The release's forecast or sentence, written again into the pull
+    // request the delivery answered when the finish's own write found
+    // none open: a retry or the runner opened it after step 3. A finish
+    // whose write reached a pull request, or wrote nothing, is left
+    // alone (`start/release-body.ts`).
+    await carryReleaseIntoPullRequest(finish, { repoRoot: checkout, branch: expected.branch }, { readProvider });
     // A delivered pull request opened into another base than the run's
     // is retargeted onto it, BEFORE the CI wait, so the checks the wait
     // reads are the ones GitHub runs against the right base. A refused
@@ -229,7 +247,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
   } else {
     // A `none` provider delivers nothing: the event carries its reason, with no lookup.
-    await emitPullRequestEvent('delivery', expected.branch, null, lookup);
+    await emitPullRequestEvent(expected.branch, null, lookup);
   }
   if (ciWait) {
     emitLoopEvent({ kind: 'wrap-up', phase: 'ci' });
@@ -260,34 +278,23 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
 const NO_PROVIDER_REASON = 'no pull request provider is configured';
 
 /**
- * Where {@link runWrapUp} offers the pull request's event: right after
- * the wrap-up session, or at the delivery's place, which a moved
- * checkout and a `none` provider reach with no delivery made.
- */
-export type PullRequestEventPlace = 'session' | 'delivery';
-
-/**
- * Emits the `pr` or `no-pr` event for `branch` once a run, in every
- * output mode. Text emits it at the `delivery` place, other modes at
- * the `session` place; each mode ignores the other place. The number is
- * `known` when the delivery holds it, and only then is `lookup`, a read
- * of the branch's open pull request over the provider, skipped. A
- * `lookup` answering a string gives the `no-pr` reason as is. Text
- * prints nothing for the event: the events output decides what reaches
- * stdout, and the run's events file holds it whatever the mode
- * (`start/loop-events.ts`).
+ * Emits the `pr` or `no-pr` event for `branch`, the same in every output
+ * mode. {@link runWrapUp} calls it once a run, at the delivery's place:
+ * after the delivery, its retries and the runner's own open, or where a
+ * moved checkout or a `none` provider reaches that place with no
+ * delivery made. The number is `known` when the delivery holds it, and
+ * only then is `lookup`, a read of the branch's open pull request over
+ * the provider, skipped; otherwise the lookup is made here, after
+ * anything the delivery opened. A `lookup` answering a string gives the
+ * `no-pr` reason as is. Text prints nothing for the event: the events
+ * output decides what reaches stdout, and the run's events file holds it
+ * whatever the mode (`start/loop-events.ts`).
  */
 export async function emitPullRequestEvent(
-  place: PullRequestEventPlace,
   branch: string,
   known: number | null,
   lookup: () => Promise<number | string | null>,
 ): Promise<void> {
-  const textPlace: PullRequestEventPlace = 'delivery';
-  const ownPlace = activeOutputMode() === 'text'
-    ? textPlace
-    : 'session';
-  if (place !== ownPlace) return;
   const number = known ?? await lookup();
   if (typeof number === 'string') {
     emitLoopEvent({ kind: 'no-pr', reason: number });

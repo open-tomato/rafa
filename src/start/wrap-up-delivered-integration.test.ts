@@ -25,7 +25,9 @@
  * record, snapshotted by `gh` at the moment of the create, still reads
  * `running` there and reads `done` only once the run has ended. Under
  * `pr.provider: none` the same `claude` is spawned once for the wrap-up,
- * `gh` is asked only what that session's own prompt asks, and the run ends `done`.
+ * `gh` is asked only what `preserveProgress` asks (`start/wrap-up.ts`),
+ * the open pull request once for the session's prompt and once for the
+ * line it prints after the session, and the run ends `done`.
  */
 import type { CapturedRun } from '../tests/cli-capture.js';
 
@@ -417,10 +419,11 @@ describe('the same run under pr.provider: none', () => {
     expect(claudeCalls(scratch)).toBe(2);
     expect(said).not.toContain('No open pull request');
     expect(said).not.toContain('retry wrap-up session');
-    // The one `pr list` is the wrap-up session's own prompt reading whether a pull request is open;
-    // no delivery reading follows it, and nothing is created or viewed.
+    // The two `pr list` calls are `preserveProgress`'s own: one for the session's prompt and one for
+    // the line it prints once the session exits 0; no delivery reading follows them, and nothing
+    // is created or viewed.
     const calls = ghCalls(scratch);
-    expect(calls.filter((call) => call.startsWith('pr list'))).toHaveLength(1);
+    expect(calls.filter((call) => call.startsWith('pr list'))).toHaveLength(2);
     expect(calls.filter((call) => call.startsWith('pr create') || call.startsWith('pr view'))).toEqual([]);
 
     const [record] = readSessions(scratch.repo);
@@ -443,6 +446,6 @@ describe('the same run under pr.provider: none', () => {
 
     expect(noPr).toHaveLength(1);
     expect(noPr[0]?.data?.reason).toContain('no pull request provider is configured');
-    expect(ghCalls(scratch).filter((call) => call.startsWith('pr list'))).toHaveLength(1);
+    expect(ghCalls(scratch).filter((call) => call.startsWith('pr list'))).toHaveLength(2);
   }, CASE_TIMEOUT_MS);
 });

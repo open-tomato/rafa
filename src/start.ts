@@ -117,6 +117,9 @@
  * and stops the run: no further session is spawned, nothing is
  * committed, the checkout is not switched back, and the output names the
  * branch expected, what was found and the one command that restores it.
+ * The guard runs once more inside the dispatch, immediately before the
+ * session is spawned, and halts the same way, so a checkout removed
+ * after the first guard never reaches the spawn.
  * A halt before the commit stores the session's report as `blocked`. The guard
  * also runs before the wrap-up session, marking nothing since the
  * wrap-up has no tracker line, and before the loop's release commit,
@@ -672,8 +675,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         serving,
         handout,
         base,
+        guard: { expected, trackerPath },
       });
       const { exitCode } = dispatch;
+
+      // The loop guard ran again just before the spawn: a checkout gone
+      // since the guard above spawned nothing and marked the task blocked.
+      if (dispatch.halted) {
+        emitLoopEvent({ kind: 'task-blocked', position, reason: 'checkout moved' });
+        emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
+        return;
+      }
 
       // Stored once the task's fate is known, and never before: the
       // outcome goes on every row the report is stored as, and the

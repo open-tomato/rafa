@@ -15,6 +15,7 @@ its own.
 | `▶ #367 ready 0/47` | The plan exists and no task is done: good to go |
 | `⏳ #367 5/47` | Some tasks are done, and no loop is running |
 | `🍅 #367 6/47` | A loop is running on this branch, at its sixth task |
+| `🍅 #367 wrap-up` | A loop on this branch is past its last task, in the phase its run record names (`wrap-up`, `pull-request`, `ci` or `repair`; `wrap-up` when the record says `task` with every task ticked) |
 | `⏸ #367 paused 5/47` | A loop on this branch is paused |
 | `⚠ #370 2 blocked, check plan` | The tracker holds `[BLOCKED]` tasks: read the plan before looping again |
 | `✅ #367 done` | Every task is done |

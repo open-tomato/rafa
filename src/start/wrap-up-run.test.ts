@@ -70,7 +70,21 @@
  * requests the recorded `gh` fake (`pr/gh-fake.ts`) holds, and the pull
  * request it answers is handed to `retargetPullRequest` over the real
  * `gh` adapter on that fake, as `runWrapUp` hands it.
+ *
+ * ## The release written into a late pull request
+ *
+ * Where `runWrapUp` writes the release's forecast or sentence again —
+ * after a delivered delivery, before the retarget and the CI gate — is
+ * read off the source, beside a planted control. What reaches the body
+ * is driven over one recorded `gh` fake: a real `finishRelease` (its
+ * git, push and forecast stubbed by `tests/release-stage-fixtures.ts`)
+ * writes through the fake's adapter, the delivery reads the same fake,
+ * a retry or runner stand-in plants the pull request it opens there,
+ * and `carryReleaseIntoPullRequest` writes through it once more, so the
+ * `gh pr edit --body` calls the fake recorded are every body write the
+ * run made.
  */
+import type { ReleaseFinish } from './release-stage.js';
 import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } from './wrap-up-run.js';
 import type { CliEvent } from '../ports/index.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
@@ -88,9 +102,12 @@ import { assumptionsHeading } from '../board/review-stamp.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { sinkOutput } from '../tests/output-sinks.js';
+import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
 import { bindEventsFile, unbindEventsFile } from './loop-events.js';
 import { retargetPullRequest } from './pr-retarget.js';
+import { carryReleaseIntoPullRequest } from './release-body.js';
+import { finishRelease } from './release-stage.js';
 import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
@@ -703,7 +720,7 @@ describe('the pull request event in each output mode', () => {
   let root = '';
 
   /** A lookup stand-in counting each reading and answering `number`. */
-  function lookup(number: number | null): () => Promise<number | null> {
+  function lookup(number: number | string | null): () => Promise<number | string | null> {
     return () => {
       lookups += 1;
       return Promise.resolve(number);
@@ -729,29 +746,56 @@ describe('the pull request event in each output mode', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('emits nothing after the session in text mode, and reads no pull request there', async () => {
+  /** Delivers over `seams` in the current mode, then emits over what was delivered, as `runWrapUp` does. */
+  async function deliverAndEmit(seams: PullRequestDeliverySeams, after: number | string | null): Promise<PullRequestDelivery> {
+    const delivery = await deliverPullRequest({ branch: BRANCH, retries: 1, previousMessage: 'first final message' }, seams);
+    await emitPullRequestEvent(BRANCH, delivery.kind === 'delivered'
+      ? delivery.pull.number
+      : null, lookup(after));
+    return delivery;
+  }
+
+  it('emits nothing at the old session point of a json-mode run: no emit sits between the session and the guard', () => {
+    const emits = CALLS.filter((call) => call.name === 'emitPullRequestEvent');
+
+    expect(emits).toHaveLength(3);
+    expect(NAMES.indexOf('preserveProgress')).toBeGreaterThan(-1);
+    expect(NAMES.indexOf('haltIfWrapUpMoved')).toBeGreaterThan(NAMES.indexOf('preserveProgress'));
+    expect(NAMES.indexOf('emitPullRequestEvent')).toBeGreaterThan(NAMES.indexOf('haltIfWrapUpMoved'));
+    // No mode is read to pick a place: json, events and text emit at the same one.
+    expect(WRAP_UP_RUN).not.toContain('activeOutputMode');
+    expect(WRAP_UP_RUN).not.toContain('\'session\', expected.branch');
+  });
+
+  it('reads an emit planted right after the session as being before the guard', () => {
+    // The control for the case above: the old session-point emit, planted back.
+    const names = planted([
+      PREPARE,
+      SESSION,
+      'await emitPullRequestEvent(branch, null, lookup);',
+      'if (haltIfWrapUpMoved({ expected, before: \'release\' })) return;',
+      FINISH,
+      ...GATE,
+    ]).map((call) => call.name);
+
+    expect(names.indexOf('emitPullRequestEvent')).toBeLessThan(names.indexOf('haltIfWrapUpMoved'));
+  });
+
+  it('emits the same event in json and text mode, from the number it is handed, with no lookup', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
+    await emitPullRequestEvent(BRANCH, 612, lookup(null));
     setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
+    await emitPullRequestEvent(BRANCH, 612, lookup(null));
 
-    await emitPullRequestEvent('session', BRANCH, null, lookup(612));
-
-    expect(emitted()).toEqual([]);
+    expect(emitted()).toEqual([{ name: 'pr', data: { number: 612 } }, { name: 'pr', data: { number: 612 } }]);
     expect(lookups).toBe(0);
   });
 
-  it('emits the delivered number after the delivery in text mode, with no lookup', async () => {
-    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
+  it('reads the pull request when it is handed no number', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
 
-    await emitPullRequestEvent('delivery', BRANCH, 612, lookup(null));
-
-    expect(emitted()).toEqual([{ name: 'pr', data: { number: 612 } }]);
-    expect(lookups).toBe(0);
-  });
-
-  it('reads the pull request after the delivery in text mode when the delivery holds no number', async () => {
-    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'text');
-
-    await emitPullRequestEvent('delivery', BRANCH, null, lookup(null));
-    await emitPullRequestEvent('delivery', BRANCH, null, lookup(613));
+    await emitPullRequestEvent(BRANCH, null, lookup(null));
+    await emitPullRequestEvent(BRANCH, null, lookup(613));
 
     expect(emitted()).toEqual([
       { name: 'no-pr', data: { reason: `no open pull request for ${BRANCH}` } },
@@ -760,22 +804,49 @@ describe('the pull request event in each output mode', () => {
     expect(lookups).toBe(2);
   });
 
-  it('emits after the session in json mode, read then, and not again after the delivery', async () => {
+  it('emits one pr event with the number a retry opened, and no no-pr, in json mode', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
+    const { seams } = standIn({ readings: [null, pull(628)] });
+
+    const delivery = await deliverAndEmit(seams, null);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'retry' });
+    expect(emitted()).toEqual([{ name: 'pr', data: { number: 628 } }]);
+    expect(lookups).toBe(0);
+  });
+
+  it('emits one pr event with the number the runner opened, in json mode', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
+    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: pull(629) } });
+
+    const delivery = await deliverAndEmit(seams, null);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'runner' });
+    expect(emitted()).toEqual([{ name: 'pr', data: { number: 629 } }]);
+  });
+
+  it('emits one no-pr event for a moved checkout, read at the delivery\'s place', async () => {
     setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
 
-    await emitPullRequestEvent('session', BRANCH, null, lookup(614));
-    await emitPullRequestEvent('delivery', BRANCH, 614, lookup(614));
+    await emitPullRequestEvent(BRANCH, null, lookup(null));
 
-    expect(emitted()).toEqual([{ name: 'pr', data: { number: 614 } }]);
+    expect(emitted()).toEqual([{ name: 'no-pr', data: { reason: `no open pull request for ${BRANCH}` } }]);
     expect(lookups).toBe(1);
+  });
+
+  it('emits one no-pr event under a none provider, its reason as the lookup answers it', async () => {
+    setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
+
+    await emitPullRequestEvent(BRANCH, null, lookup('no pull request provider is configured'));
+
+    expect(emitted()).toEqual([{ name: 'no-pr', data: { reason: 'no pull request provider is configured' } }]);
   });
 
   it('writes a text run\'s pr line to its events file', async () => {
     setActiveOutput(sinkOutput({}), 'text');
     const file = bindEventsFile(root, RUN_ID);
 
-    await emitPullRequestEvent('session', BRANCH, null, lookup(615));
-    await emitPullRequestEvent('delivery', BRANCH, 615, lookup(null));
+    await emitPullRequestEvent(BRANCH, 615, lookup(null));
 
     const lines = readFileSync(file, 'utf8')
       .trim()
@@ -784,34 +855,172 @@ describe('the pull request event in each output mode', () => {
     expect(lines.map((line) => [line.name, line.data])).toEqual([['pr', { number: 615 }]]);
   });
 
-  it('emits at both places in runWrapUp: after the session, and over the delivery\'s number', () => {
-    const emits = CALLS.filter((call) => call.name === 'emitPullRequestEvent');
-
-    expect(emits[0]?.args[0]).toBe('\'session\'');
-    expect(NAMES.indexOf('preserveProgress')).toBeLessThan(NAMES.indexOf('emitPullRequestEvent'));
-    expect(emits.slice(1).every((call) => call.args[0] === '\'delivery\'')).toBe(true);
-    expect(WRAP_UP_RUN).toMatch(/const delivery = await deliverPullRequest\([\s\S]*?\);\n\s*await emitPullRequestEvent\('delivery', expected\.branch, delivery\.kind === 'delivered'\n\s*\? delivery\.pull\.number\n\s*: null, lookup\);/);
-    // The text-only guard the events file could not see past is gone.
-    expect(WRAP_UP_RUN).not.toContain('activeOutputMode() !== \'text\'');
+  it('emits over the delivery\'s number in runWrapUp, right after the delivery', () => {
+    expect(WRAP_UP_RUN).toMatch(/const delivery = await deliverPullRequest\([\s\S]*?\);\n\s*await emitPullRequestEvent\(expected\.branch, delivery\.kind === 'delivered'\n\s*\? delivery\.pull\.number\n\s*: null, lookup\);/);
   });
 
-  it('emits after the delivery on every path out of runWrapUp: a moved checkout, each delivery outcome and a none provider', () => {
-    const emits = CALLS.filter((call) => call.name === 'emitPullRequestEvent');
+  it('emits once on every path out of runWrapUp: a moved checkout, each delivery outcome and a none provider', () => {
     const halt = WRAP_UP_RUN.indexOf('emitLoopEvent({ kind: \'halt\', reason: \'checkout moved\' });');
     const interrupted = WRAP_UP_RUN.indexOf('if (delivery.kind === \'interrupted\') return;');
-    const delivered = WRAP_UP_RUN.indexOf('await emitPullRequestEvent(\'delivery\', expected.branch, delivery.kind');
+    const delivered = WRAP_UP_RUN.indexOf('await emitPullRequestEvent(expected.branch, delivery.kind');
 
-    expect(emits).toHaveLength(4);
-    expect(WRAP_UP_RUN.lastIndexOf('await emitPullRequestEvent(\'delivery\', expected.branch, null, lookup);', halt)).toBeGreaterThan(-1);
+    expect(WRAP_UP_RUN.lastIndexOf('await emitPullRequestEvent(expected.branch, null, lookup);', halt)).toBeGreaterThan(-1);
     expect(delivered).toBeGreaterThan(-1);
     expect(delivered).toBeLessThan(interrupted);
-    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\('delivery', expected\.branch, null, lookup\);\n\s*\}\n\s*if \(ciWait\)/);
+    expect(WRAP_UP_RUN).toMatch(/\} else \{\n(?:\s*\/\/[^\n]*\n)*\s*await emitPullRequestEvent\(expected\.branch, null, lookup\);\n\s*\}\n\s*if \(ciWait\)/);
+  });
+});
+
+describe('where runWrapUp writes the release into a pull request opened after it', () => {
+  it('writes it after a delivered delivery and before the retarget and the CI gate', () => {
+    const carry = WRAP_UP_RUN.indexOf('await carryReleaseIntoPullRequest(');
+
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('carryReleaseIntoPullRequest'));
+    expect(NAMES.indexOf('carryReleaseIntoPullRequest')).toBeLessThan(NAMES.indexOf('retargetPullRequest'));
+    expect(NAMES.indexOf('carryReleaseIntoPullRequest')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+    expect(NAMES.filter((name) => name === 'carryReleaseIntoPullRequest')).toHaveLength(1);
+    expect(carry).toBeGreaterThan(WRAP_UP_RUN.indexOf('if (delivery.kind === \'interrupted\') return;'));
+    expect(carry).toBeGreaterThan(WRAP_UP_RUN.indexOf('if (delivery.kind === \'blocked\') throw new CommandExit(1, delivery.message);'));
   });
 
-  it('reads an emit planted before the session as being before it', () => {
-    // The control for the ordering above.
-    const names = planted(['await emitPullRequestEvent(\'session\', branch, null, lookup);', PREPARE, SESSION, FINISH, ...GATE]).map((call) => call.name);
+  it('hands it the finish, the run\'s checkout and branch, and the run\'s provider reading', () => {
+    expect(callTo(CALLS, 'finishRelease').bound).toBe('finish');
+    expect(callTo(CALLS, 'carryReleaseIntoPullRequest').args).toEqual([
+      'finish',
+      '{ repoRoot: checkout, branch: expected.branch }',
+      '{ readProvider }',
+    ]);
+  });
 
-    expect(names.indexOf('emitPullRequestEvent')).toBeLessThan(names.indexOf('preserveProgress'));
+  it('reads a write planted before the delivery as being before it', () => {
+    // The control for the first case: the same reader over a body that
+    // writes before the delivery answers that order.
+    const names = planted([
+      PREPARE,
+      SESSION,
+      FINISH,
+      'await carryReleaseIntoPullRequest(finish, target, seams);',
+      'const delivery = await deliverPullRequest(input, seams);',
+      ...GATE,
+    ]).map((call) => call.name);
+
+    expect(names.indexOf('carryReleaseIntoPullRequest')).toBeLessThan(names.indexOf('deliverPullRequest'));
+  });
+});
+
+/** The body every planted pull request opens with. */
+const OPENING_BODY = 'Closes #579';
+
+/** What one run over the fake left: the finish, the delivery, and the pull request's body. */
+interface CarriedRun {
+  readonly finish: ReleaseFinish;
+  readonly delivery: PullRequestDelivery;
+  readonly fake: FakePrGh;
+}
+
+/** Who opens the pull request in a {@link runOverFake} run, and when. */
+interface Opening {
+  /** A pull request open before the release step, by the first session. */
+  readonly beforeRelease?: number;
+  /** A pull request the one retry session opens. */
+  readonly byRetry?: number;
+  /** A pull request the runner opens, or `blocked` for an attempt that stops. */
+  readonly byRunner?: number | 'blocked';
+}
+
+/**
+ * Finishes the release over the fake, delivers over it with one retry,
+ * and writes the release again when the delivery answered `delivered`,
+ * as `runWrapUp` does.
+ */
+async function runOverFake(opening: Opening): Promise<CarriedRun> {
+  const fake = createFakePrGh();
+  const pulls = createGhPullRequests({ gh: fake.run });
+  const plantOpen = (number: number): void => {
+    fake.plant({ number, headRefName: BRANCH, baseRefName: 'main', body: OPENING_BODY });
+  };
+  if (opening.beforeRelease !== undefined) plantOpen(opening.beforeRelease);
+  const world = stub({ git: COMMITTED });
+  const bodySeams = { pulls: () => pulls, readProvider: () => PROVIDER_GH };
+  const finish = await finishRelease(
+    { repoRoot: '/repo', branch: BRANCH, settings: SETTINGS, preparation: prepared() },
+    { ...world.seams, ...bodySeams, verify: () => VERIFIED },
+  );
+  const seams: PullRequestDeliverySeams = {
+    findOpen: (branch) => pulls.findOpen(branch),
+    retry: (previousMessage) => {
+      if (opening.byRetry !== undefined) plantOpen(opening.byRetry);
+      return Promise.resolve(`after ${previousMessage}`);
+    },
+    openRunnerPullRequest: async () => {
+      const runner = opening.byRunner;
+      if (runner === undefined || runner === 'blocked') return { kind: 'blocked', message: '❌ the push was refused' };
+      plantOpen(runner);
+      return { kind: 'opened', pull: await readBack(pulls, runner) };
+    },
+    isInterrupted: () => false,
+  };
+  const delivery = await deliverPullRequest({ branch: BRANCH, retries: 1, previousMessage: 'first final message' }, seams);
+  if (delivery.kind === 'delivered') {
+    await carryReleaseIntoPullRequest(finish, { repoRoot: '/repo', branch: BRANCH }, bodySeams);
+  }
+  return { finish, delivery, fake };
+}
+
+/** The `gh pr edit <n> --body` commands the fake was handed, as `<n>`. */
+function bodyEdits(fake: FakePrGh): readonly string[] {
+  return edits(fake)
+    .filter((call) => call.includes('--body'))
+    .map((call) => call[2] ?? '');
+}
+
+/** How many times `text` occurs in `body`. */
+function occurrences(body: string | undefined, text: string): number {
+  return (body ?? '').split(text).length - 1;
+}
+
+describe('the release written into the delivered pull request', () => {
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('writes a pull request open before the release step once, from the finish alone', async () => {
+    const { finish, delivery, fake } = await runOverFake({ beforeRelease: 630 });
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'wrap-up' });
+    expect(finish.body?.number).toBe(630);
+    expect(bodyEdits(fake)).toEqual(['630']);
+    expect(occurrences(fake.pull(630)?.body, FORECAST_LINE)).toBe(1);
+  });
+
+  it('writes the forecast into the pull request the runner opened, after the delivery', async () => {
+    const { finish, delivery, fake } = await runOverFake({ byRunner: 631 });
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'runner' });
+    // The finish found none to write to: the one write is the carry's.
+    expect(finish.body?.number).toBeNull();
+    expect(bodyEdits(fake)).toEqual(['631']);
+    expect(fake.pull(631)?.body).toBe(`${OPENING_BODY}\n\n${finish.written?.block ?? ''}`);
+    expect(occurrences(fake.pull(631)?.body, FORECAST_LINE)).toBe(1);
+  });
+
+  it('writes the forecast into the pull request a retry opened, after the delivery', async () => {
+    const { finish, delivery, fake } = await runOverFake({ byRetry: 632 });
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'retry' });
+    expect(finish.body?.number).toBeNull();
+    expect(bodyEdits(fake)).toEqual(['632']);
+    expect(occurrences(fake.pull(632)?.body, FORECAST_LINE)).toBe(1);
+  });
+
+  it('writes nothing after a blocked delivery', async () => {
+    const { finish, delivery, fake } = await runOverFake({ byRunner: 'blocked' });
+
+    expect(delivery.kind).toBe('blocked');
+    // The control: the finish holds a forecast its own write found no
+    // pull request for, so a carry made here would have had one to write.
+    expect(finish.written?.block).toContain(FORECAST_LINE);
+    expect(finish.body?.number).toBeNull();
+    expect(bodyEdits(fake)).toEqual([]);
   });
 });
