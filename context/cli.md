@@ -73,7 +73,7 @@ module's note is the long form.
 | `src/commands/pr/merge-followups.ts` | what `pr merge` names after a clean-up that finished: `rafa self-update` while the project's `package.json` names rafa's own package and the version is not installed under the home, and `rafa release settle` — always last, so it is the merge's last line ahead of the ending hint — while the settle dry run folds the fragments waiting on the base into a version (`<n> fragments wait on <base> and fold into <version>`); a base holding only `level: none` fragments names nothing. It no longer names `rafa release tag`, which settle's own tag step names where it leaves the tag to the operator; `versionTag` stays spelled here |
 | `src/commands/pr/pr-context.ts` | what the seven `pr` actions share: the usage lines, the line readers, the provider check and its exit-2 refusal, and the pull request `<n>` or the branch names |
 | `src/commands/pr/last-triage.ts` | the `<!-- rafa:pr-triage v1 -->` comment and its `rafa:triage` block as one record, which `pr show` ends with; the marker, the block and the writer that posts and edits the comment are `src/pr/triage/comment.ts`'s |
-| `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, and the scopes written through `src/project/` |
+| `src/commands/init.ts` | `rafa init`: the root chosen by `--root`, `--yes` or a prompt, the project scope (`.rafa/`, `.rafa/config.yaml` and `specs/`, `plans/`, `runs/`, `effort/`, `instincts/` directories under it), the user scope (`~/.rafa/` and its `config.yaml` and `instincts/`), and the `.gitignore` entry, written by `src/project/scaffold.ts` |
 | `src/commands/init-board.ts` | the board step `rafa init` ends with: `--board`, `--no-board` and the one question with its public-repository line, over `src/board/setup.ts`. When `board.relationships` is set it runs the relationships move step: it reads the board listing in the configured mode and finds the other mode's marks (in `labels` mode every `parent` and `blockedBy` list, in `native` mode every `epic:` label on a non-epic and every `spec:blocked` label), prints every write that would move them (from `labels` to `native` each epic's members become sub-issues and each `Blocked by:` line becomes blocked-by, the reverse moves back), asks once whether to run them, writes nothing on a no, and removes the old mode's marks on a second question asked only after every write succeeded, finding nothing on a rerun. Then the epic guard step: `--epic-guard`, `--no-epic-guard` and its own question, writing `.github/workflows/epic-guard.yml` through `src/board/epic-guard.ts`; under `board.relationships: native` the guard step reads, asks and writes nothing (`native` status), and `--epic-guard` is refused with the warning `EPIC_GUARD_NATIVE_REFUSAL` naming the mode, exit 0 |
 | `src/commands/init-release.ts` | the release step `rafa init` takes once the scopes are written: `--release`, `--no-release` and the one question, written as `release.enabled` through `src/release/setting.ts` |
 | `src/commands/doctor.ts` | `rafa doctor [--plan=<file>] [--deep]`: the `rafa <version>` line it opens with, the preflight `loop start` checks, checked for the config and a plan with no run started, the risk total of a plan `--plan` names over `src/start/risk-total.ts`, the GitHub board readings over `src/commands/doctor-board.ts`, the cleanup row over `src/commands/doctor-cleanup.ts`, the references row over `src/commands/doctor-refs.ts`, the release row over `src/commands/doctor-release.ts`, the skill tier rows over `src/commands/doctor-tiers.ts`, the `effort store schema` row over `src/commands/doctor-effort-schema.ts`, the `effort sync` row over `src/commands/doctor-effort-sync.ts`, and the install warnings over `src/commands/doctor-install.ts`; under `--deep` it hands each deep section module its seams and prints their readings |
@@ -359,7 +359,7 @@ New; it replaces no earlier text. What a row or an action added to
   `issue ready`, `issue unblock` and `issue check`;
   `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
   and `pr triage`;
-  `effort collect`, `effort report`, `effort dashboard`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
+  `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
   `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release settle`, `release tag`, `board list`, `epic show`, aliased
@@ -478,14 +478,15 @@ New; it replaces no earlier text. What a row or an action added to
   words it does not read. A declared `default` or flag alias fills the
   context's `flags` alone: `rafa loop start -p x.md` hands `start`
   `-p x.md`, which it does not read. `describe`, `init`, `doctor`, `status`, `cleanup`, `self-update`, the plan readers, the
-  `loop` session actions, the `issue` actions, the two checkers, the
-  three listings (`skill list`, `instinct list` and `instinct show`),
-  `instinct flag`, `instinct promote`, `agent show`, `agent search`, `skill show`, `skill search`, `skill demote`,
-  `skill backfill` and the `pr` actions wrap none: `describe` reads the registry off its context, and `init`,
-  `doctor`, `status`, `cleanup`, `self-update`, each plan reader, each `loop` session action,
-  each `issue` action, each checker, each listing, `instinct flag`,
-  `instinct promote`, `agent show`, `agent search`, `skill show`,
-  `skill search`, `skill demote`, `skill backfill` and each `pr` action their `args` and `flags`.
+  `loop` session actions, the `issue` actions, the remaining `effort` commands, `module list`, `module exec`,
+  `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`, `skill list`, `skill show`,
+  `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
+  `instinct flag`, `instinct promote`, the `release` commands, `board list`, the `epic` commands, the
+  `claim` commands, the `update` commands, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
+  `describe` reads the registry off its context, and `init`, `doctor`, `status`, `cleanup`,
+  `self-update`, each plan reader, each `loop` session action, each `issue` action, each remaining
+  `effort` command, `module list`, `module exec`, each `agent`, `skill`, `instinct`, `release`, `epic`,
+  `claim`, `update` and `pr` action, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
@@ -1127,8 +1128,7 @@ New; it replaces no earlier text. What a row or an action added to
   with the store that owns it, the stage label its issue carries off the one
   board listing, and whether it is stale, from `src/status/claims.ts`);
   housekeeping (the branches and worktrees `rafa cleanup` would list,
-  counted per group, nothing fetched). The first three are read with no network; the pull request
-  and board are read through `gh` with a short deadline. A section that could
+  counted per group, nothing fetched). The pull request, board and claims' stage labels go through `gh` under a short deadline; the rest are read with no network. A section that could
   not be read — git refusing, `gh` timing out, a provider that is not `gh` —
   is one `warn` line saying why; everything else is `info`. A reading that
   answers `{ ok: false }` is thrown as an error and swallowed into a `warn`
