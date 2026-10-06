@@ -33,7 +33,7 @@ import type { CapturedRun } from '../tests/cli-capture.js';
 import type { Subprocess } from 'bun';
 
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,6 +93,8 @@ interface Scratch {
   readonly home: string;
   readonly claude: string;
   readonly callLog: string;
+  /** Written by the stand-in as it starts, before it sleeps: the session is spawned. */
+  readonly startedLog: string;
   readonly path: string;
 }
 
@@ -134,6 +136,7 @@ function plantStandIn(scratch: Scratch): void {
   writeFileSync(scratch.claude, [
     '#!/bin/sh',
     'while read -r _line; do :; done',
+    `echo started >> '${scratch.startedLog}'`,
     `/bin/sleep ${STAND_IN_DELAY_SECONDS}`,
     `printf 'written by the loop\\n' > '${MARKER_FILE}'`,
     `echo called >> '${scratch.callLog}'`,
@@ -174,6 +177,7 @@ function plant(): Scratch {
     home,
     claude: join(bin, 'claude'),
     callLog: join(root, 'calls.log'),
+    startedLog: join(root, 'started.log'),
     path: [bin, ...hostToolDirs()].join(delimiter),
   };
   plantStandIn(scratch);
@@ -262,6 +266,11 @@ describe('the loop guard replaying the 2026-09-29 incident in a real run', () =>
       // the same in another terminal on what turns out to be this same
       // directory.
       await waitForTask(scratch.repo, TASK1);
+      // The guard also runs just before the spawn, so the switch waits for
+      // the stand-in to have started: it is the mid-task window.
+      await waitUntil(() => existsSync(scratch.startedLog)
+        ? true
+        : null, RUN_TIMEOUT);
       const seedHead = gitOut(scratch.repo, scratch.home, 'rev-parse', 'HEAD');
       expect(gitOut(scratch.repo, scratch.home, 'rev-parse', BRANCH)).toBe(seedHead);
       expect(gitOut(scratch.repo, scratch.home, 'rev-parse', 'main')).toBe(seedHead);
