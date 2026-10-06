@@ -65,10 +65,24 @@
  *
  * A value handed for a slot the template does not carry is silently
  * unused, which is what lets one value map serve all four plans: only
- * the two conflict plans carry `{CONFLICT_SENTENCE}` and
- * `{CONFLICT_FILES}`, and only the two CI plans carry `{FAILING_LOG}`.
- * Every fill answers all three, and each plan takes the ones its own
+ * the two conflict plans carry `{CONFLICT_SENTENCE}`, `{CONFLICT_FILES}`
+ * and `{BASE}`, and only the two CI plans carry `{FAILING_LOG}`.
+ * Every fill answers all four, and each plan takes the ones its own
  * text asks for.
+ *
+ * ## The base, which is the pull request's and not `main`
+ *
+ * The two conflict plans merge the base into the branch and, for the
+ * lockfile, take the base's `bun.lock`. Both spell that ref as
+ * `origin/{BASE}`, and {@link PinnedPlanFill.base} fills it with the
+ * branch the pull request targets — `baseRefName`, which
+ * `src/commands/pr/triage-resolve.ts` reads off the pull request it is
+ * resolving. A plan that named `origin/main` outright would merge the
+ * wrong branch into every pull request opened against an integration
+ * or stretch branch, and a conflict cleared against `main` is not the
+ * conflict GitHub reported (#636). The field is REQUIRED rather than
+ * defaulting to `main` for that reason: a caller that forgot it would
+ * otherwise get the old bug back with no error to say so.
  *
  * ## Filled from the triage block, and from ONE conflict sentence
  *
@@ -253,6 +267,12 @@ export const CONFLICT_FILES_SLOT = 'CONFLICT_FILES';
  */
 export const NO_CONFLICT_FILES = 'the paths `git status` reports as conflicted';
 
+/**
+ * The slot the two conflict plans carry the pull request's base branch
+ * in, as `origin/{BASE}`; see the module note on the base.
+ */
+export const BASE_SLOT = 'BASE';
+
 /** The slot the two CI plans carry the failing job's log excerpt in. */
 export const FAILING_LOG_SLOT = 'FAILING_LOG';
 
@@ -302,6 +322,12 @@ export function fillPinnedPlan(
 
 /** What one pinned plan is filled from. */
 export interface PinnedPlanFill {
+  /**
+   * The branch the pull request targets, its `baseRefName` — such as
+   * `main` or `stretch/4` — which the conflict plans merge from as
+   * `origin/<base>`. Required; see the module note on the base.
+   */
+  readonly base: string;
   /** The `rafa:triage` block the last assessment stored, fields and all. */
   readonly block: TriageBlock;
   /**
@@ -357,6 +383,7 @@ function failingLog(excerpt: ExcerptReading | undefined): string {
  */
 export function pinnedPlanValues(fill: PinnedPlanFill): Record<string, string> {
   return {
+    [BASE_SLOT]: fill.base,
     [CONFLICT_SENTENCE_SLOT]: fill.conflictSentence ?? MECHANICAL_CONFLICT_SENTENCE,
     [CONFLICT_FILES_SLOT]: conflictFiles(fill.block.files),
     [FAILING_LOG_SLOT]: failingLog(fill.excerpt),

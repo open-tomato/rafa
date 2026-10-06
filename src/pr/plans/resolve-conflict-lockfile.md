@@ -19,8 +19,8 @@ This plan resolves a pull request with a `bun.lock` conflict by taking the base'
 
 # Stage: Resolve
 
-- [ ] Merge the base branch into the current branch using `git merge origin/main` {agent=loop-implementer}
-- [ ] Take the base's `bun.lock` with `git checkout origin/main -- bun.lock` {agent=loop-implementer}
+- [ ] Merge the base branch into the current branch using `git merge origin/{BASE}` {agent=loop-implementer}
+- [ ] Take the base's `bun.lock` with `git checkout origin/{BASE} -- bun.lock` {agent=loop-implementer}
 - [ ] Run `bun install` (plain, not `--frozen-lockfile`) to re-anchor dependencies to the merged state {agent=loop-implementer}
 - [ ] Run `bun install --frozen-lockfile` to verify the lockfile is now consistent with the merged manifests {agent=loop-implementer}
 - [ ] Run the gates (`env -u CLAUDECODE bun test`, `bunx tsc --noEmit`, `bunx eslint .`) to verify no other conflicts arose {agent=loop-implementer}

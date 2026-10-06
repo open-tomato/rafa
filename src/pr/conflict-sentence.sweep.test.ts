@@ -113,16 +113,17 @@ describe('the wrap-up prompt as a reader', () => {
 
 describe('the pinned plans as readers', () => {
   test('a fill with no override carries the shipped sentence', () => {
-    const values = pinnedPlanValues({ block: EMPTY_BLOCK });
+    const values = pinnedPlanValues({ base: 'main', block: EMPTY_BLOCK });
 
     expect(values.CONFLICT_SENTENCE).toBe(MECHANICAL_CONFLICT_SENTENCE);
-    expect(loadPinnedPlan('conflict-lockfile', { block: EMPTY_BLOCK }))
+    expect(loadPinnedPlan('conflict-lockfile', { base: 'main', block: EMPTY_BLOCK }))
       .toContain(MECHANICAL_CONFLICT_SENTENCE);
   });
 
   test('an override wins, which is the control on that default', () => {
     const override = 'Stop for every conflict, whatever it is.';
     const filled = loadPinnedPlan('conflict-manifest', {
+      base: 'main',
       block: EMPTY_BLOCK,
       conflictSentence: override,
     });

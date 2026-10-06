@@ -108,7 +108,7 @@ describe('the slots a pinned plan carries are covered by its fill', () => {
     it(`covers every slot ${triageClass}'s pinned plan carries`, () => {
       const raw = readPinnedPlan(triageClass);
       const values = {
-        ...pinnedPlanValues({ block: blockWith({ class: triageClass, files: ['bun.lock'] }) }),
+        ...pinnedPlanValues({ base: 'main', block: blockWith({ class: triageClass, files: ['bun.lock'] }) }),
         FAILING_LOG: 'npm ERR! code ENOTFOUND',
       };
 
