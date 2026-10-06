@@ -55,7 +55,7 @@ const HOST = readHostId();
 const PROJECT = { rootCommit: 'a1b2c3d4', remote: null };
 
 /** The backup path a done line prints. */
-const BACKUP_LINE = /kept (?:whole )?at (\S+\.bak)/;
+const BACKUP_LINE = /copied to (\S+\.bak)/;
 
 /** Seams of one host and project whose store ids come from `ids` in order, and throw when none is left. */
 function seamsOf(...ids: readonly string[]): StoreIdentitySeams {

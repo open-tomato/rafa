@@ -193,8 +193,8 @@ dispatches that repair first and runs no stage step before it, or before
 any `[BLOCKED]` task, because a due step run there would meet the same
 failures and stop the run again before the repair got its session. The
 stage steps still due run before the first open task after it. The blocked
-task holds until its session completes or a human unblocks it with a
-`[BLOCKED]` mark on its line in the tracker.
+task holds until its session completes or a human unblocks it by removing
+the `[BLOCKED]` mark on its line in the tracker.
 
 ### Skills and lessons at dispatch
 

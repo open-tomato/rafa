@@ -142,7 +142,7 @@ settle deterministic across machines and retries.
 `rafa release tag [--push]` writes `v<version>` on the commit of the release
 branch that set the version, then prints what to run next: the push of the tag
 and the publish line. Without `--push` it reaches no network and the push is a
-line to copy.
+line to copy, naming the remote `--push` would reach (#857).
 
 With `--push` (#736) it pushes `refs/tags/v<version>` itself once the tag is
 written (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote the

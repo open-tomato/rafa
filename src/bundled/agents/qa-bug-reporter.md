@@ -134,8 +134,8 @@ confirmation — it only adds evidence to a record that already exists.
 **7. File it.**
 
 ```bash
-gh issue create --title "Fix …" --body-file /tmp/bug.md \
-  --label bug --label "<area>" --label "<priority>"
+rafa issue create --type=bug --body-file /tmp/bug.md \
+  --label "<area>" --label "<priority>"
 ```
 
 Drop the priority label entirely if step 4 produced none, and the area label if

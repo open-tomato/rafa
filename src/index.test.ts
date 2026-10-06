@@ -29,8 +29,8 @@
  * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
- * `issue` actions, and `module list` and `module exec` are held to be the
- * modules wrapping none. `describe` runs the roster builder
+ * `issue` actions, and `module list` and `module exec` from the registry are held to be
+ * the command modules wrapping none. `describe` runs the roster builder
  * of `src/cli/describe.ts`, which is no root export, and each of the first
  * three plan readers imports `parsePlan` from the `./plan` entry, which is
  * one, where `plan risk` and `plan needs` import their readings from
@@ -964,8 +964,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config.js', ['ConfigError']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
     ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
-    ['../../release/tag-push.js', ['pushTag']],
-    ['../../release/version.js', ['readManifestVersion']],
+    ['../../release/tag-push.js', ['pushTag', 'trackedRemote']],
+    ['../../release/version.js', ['readManifestVersion', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['../pr/merge-followups.js', ['versionTag']],
     ['./release-commit.js', ['readReleaseCommit']],

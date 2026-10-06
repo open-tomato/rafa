@@ -223,7 +223,7 @@ const SESSION_STDOUT = 'session line one\n\nsession line two';
 const SESSION_LINES: readonly string[] = ['info:session line one', 'info:', 'info:session line two'];
 
 /** The line announcing the wrap-up session. */
-const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.';
+const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote the listed lessons, sync with main, then commit, push and open the PR.';
 
 /** The line after it, saying the wrap-up is one quiet session. */
 const WRAP_UP_QUIET = '   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.';

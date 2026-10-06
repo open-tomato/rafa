@@ -1,9 +1,9 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the eighty-seven commands it registers: what the registry
- * holds, how each spelling of the command tree routes, with the
- * deprecation line each alias prints, and that each command wrapping a
- * phase 0 command declares the flags its phase 0 module reads.
+ * declarations of the commands it registers: what the registry holds,
+ * how each spelling of the command tree routes, with the deprecation
+ * line each alias prints, and that each command wrapping a phase 0
+ * command declares the flags its phase 0 module reads.
  * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,

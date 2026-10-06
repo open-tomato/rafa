@@ -123,7 +123,12 @@
  * The push line is printed beside it for the same reason: the tag this
  * action writes is local until something pushes it, and a release
  * nobody can fetch is not a release. Without `--push` it is text too,
- * and nothing here reaches a network.
+ * and nothing here reaches a network. It names the remote `--push`
+ * would reach (#857), read by `trackedRemote` off
+ * `../../release/tag-push.ts`: the one the release branch tracks, or
+ * `RELEASE_REMOTE` (`origin`, `../../release/version.ts`) when it
+ * tracks none, so the line to copy and the push the flag makes go to
+ * the same place.
  *
  * ## `--push`
  *
@@ -175,8 +180,8 @@ import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
-import { pushTag } from '../../release/tag-push.js';
-import { readManifestVersion } from '../../release/version.js';
+import { pushTag, trackedRemote } from '../../release/tag-push.js';
+import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { versionTag } from '../pr/merge-followups.js';
 
@@ -194,9 +199,6 @@ export const DEFAULT_RELEASE_BRANCH = 'main';
 
 /** The registry a publish reaches when the manifest names none. */
 export const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
-
-/** The remote the push line names, as `src/pr/none.ts` names it too. */
-export const RELEASE_REMOTE = 'origin';
 
 /** What every line under a heading is indented by, as `pr merge` indents its follow-ups. */
 const INDENT = '  ';
@@ -438,8 +440,9 @@ export interface TagPlace {
 const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRANCH });
 
 /**
- * What the operator does next once `tag` is written: push it, unless
- * `pushed` says the run pushed it already, and publish `version` with
+ * What the operator does next once `tag` is written: push it to
+ * `pushTo`, unless `pushTo` is `null` because the run pushed it
+ * already, and publish `version` with
  * `publish`, `release.publishCommand`, when there is something to
  * publish — from the tag when HEAD is past it; see the module note.
  * Pure and total.
@@ -450,11 +453,11 @@ export function followUpsFor(
   target: PublishTarget,
   publish: string,
   place: TagPlace = ON_HEAD,
-  pushed = false,
+  pushTo: string | null = RELEASE_REMOTE,
 ): readonly ReleaseFollowUp[] {
-  const push: readonly ReleaseFollowUp[] = pushed
+  const push: readonly ReleaseFollowUp[] = pushTo === null
     ? []
-    : [{ command: `git push ${RELEASE_REMOTE} ${tag}`, why: `the tag is local until ${RELEASE_REMOTE} has it` }];
+    : [{ command: `git push ${pushTo} ${tag}`, why: `the tag is local until ${pushTo} has it` }];
   if (target.name === null || target.isPrivate) return push;
   const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
   if (place.ahead === 0) return [...push, { command: publish, why: publishes }];
@@ -663,7 +666,10 @@ export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEA
   if (pushed?.outcome === 'failed') throw new CommandExit(pushed.exitCode, `❌ ${pushed.sentence}`);
   const place: TagPlace = { ahead: decision.ahead, branch: config.releaseBranch };
   const target = readPublishTarget(inputs.version.text);
-  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place, pushed !== null);
+  const pushTo = pushed === null
+    ? trackedRemote(git, config.releaseBranch)
+    : null;
+  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place, pushTo);
   return pushed === null
     ? { inputs, written: decision, followUps }
     : { inputs, written: decision, followUps, pushed };

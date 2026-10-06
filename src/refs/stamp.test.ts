@@ -460,7 +460,7 @@ describe('the refs block codec: what it refuses', () => {
   });
 
   it('refuses a new stamp on an issue, here or on another repository', () => {
-    expect(refusal(copyWith('refs:', '  - kind: issue', '    text: "#7"', '    stamp: new'))).toContain('entry 1: a issue is not stamped new');
+    expect(refusal(copyWith('refs:', '  - kind: issue', '    text: "#7"', '    stamp: new'))).toContain('entry 1: an issue is not stamped new');
     expect(refusal(copyWith('refs:', '  - kind: cross-issue', '    text: "o/r#7"', '    stamp: new'))).toContain('entry 1: a cross-issue is not stamped new');
   });
 

@@ -11,11 +11,9 @@ then #593 with #589. New since then: #708, the macOS reading of #485,
 whose `TMPDIR` cause is confirmed and whose fix must let a case's own
 `TMPDIR` win.
 
-Usage has no reading: `rafa usage` always prints "unavailable", and the
-removal in #726 closes #605. Do not run it, ask me for a usage number,
-or wait on usage at any stop. A quota or rate limit shows as a failing
-session, so your halt on one failure seen twice covers it. The removal
-in #726 is a bucket candidate.
+`rafa usage` is removed and refused as an unknown subject (#761).
+Do not run it. A quota or rate limit shows as a failing session, so
+your halt on one failure seen twice covers it.
 
 From the report's self-improvement proposals, I said yes to all six.
 Follow the three behaviours from the start: the capture step in each pit

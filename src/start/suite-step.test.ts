@@ -756,7 +756,7 @@ describe('runTaskStep type-checking the task\'s test files', () => {
   const typeRed = { exitCode: 2, stdout: `${typeError}\n`, stderr: '' };
   const typeGreen = { exitCode: 0, stdout: '', stderr: '' };
   const typeBlocker = 'The runner\'s type step after "second task" found type errors in the task\'s test files that base0000 did not hold. '
-    + 'New errors: src/a.test.ts:3:7 TS2322 Type \'string\' is not assignable to type \'number\'.. '
+    + 'New errors: src/a.test.ts:3:7 TS2322 Type \'string\' is not assignable to type \'number\'. '
     + 'Fix them, then check src/a.test.ts with tsc --noEmit --pretty false -p over a tsconfig outside the checkout '
     + 'that extends its tsconfig.json by absolute path and lists them under files.';
 

@@ -7,10 +7,10 @@
  * branches, `./groups.ts` for Merged, Stale and Not pushed, and
  * `./worktrees.ts` for the worktrees, told which branches are in Merged
  * so a clean worktree on one starts ticked, then `./groups.ts`'s
- * `holdMergedRows` over those worktrees, so a Merged branch a worktree
- * that cannot be ticked holds starts unticked, and last `./runs.ts` for the
- * run records under the project's `.rafa/runs/`. {@link cleanupCounts} is
- * the number of rows in each branch group and in Worktrees, which
+ * `holdBranchRows` over each branch group and those worktrees, so a
+ * branch a worktree that cannot be ticked holds starts unticked naming
+ * it, and last `./runs.ts` for the run records under the project's
+ * `.rafa/runs/`. {@link cleanupCounts} is the number of rows in each branch group and in Worktrees, which
  * `rafa doctor` and `rafa status` print; the run records are listed for
  * `rafa cleanup` alone and are not counted there. Like every module here
  * it prints nothing and deletes nothing; `./steps.ts`, re-exported below,
@@ -45,7 +45,7 @@ import type { PullRequests } from '../pr/types.js';
 import { gitSaid } from '../pr/git.js';
 
 import { readBranches } from './branches.js';
-import { classifyBranches, holdMergedRows, readProviderMerges } from './groups.js';
+import { classifyBranches, holdBranchRows, readProviderMerges } from './groups.js';
 import { readRunRecords } from './runs.js';
 import { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
@@ -244,9 +244,9 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
     ok: true,
     base: groups.base,
     fetched,
-    merged: holdMergedRows(groups.merged, worktrees.worktrees),
-    stale: groups.stale,
-    notPushed: groups.notPushed,
+    merged: holdBranchRows(groups.merged, worktrees.worktrees),
+    stale: holdBranchRows(groups.stale, worktrees.worktrees),
+    notPushed: holdBranchRows(groups.notPushed, worktrees.worktrees),
     worktrees: worktrees.worktrees,
     runs: runs.runs,
     notes: [...notes, ...groups.notes, ...runs.notes],

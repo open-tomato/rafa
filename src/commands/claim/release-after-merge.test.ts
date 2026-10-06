@@ -54,7 +54,7 @@ const INSTALLED: RuntimeIdentity = { kind: 'installed', entry: '/home/u/.rafa/ru
 const SUBJECTS = [{ name: 'effort', summary: 'the effort store' }, { name: 'claim', summary: 'claims' }];
 /** This machine's host id: the rebuild's carry reads it itself, so the mints record it too. */
 const HOST = readHostId();
-const BACKUP_LINE = /kept (?:whole )?at (\S+\.bak)/;
+const BACKUP_LINE = /copied to (\S+\.bak)/;
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-after-merge-')));
 

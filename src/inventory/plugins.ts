@@ -51,8 +51,9 @@
  * `superpowers:brainstorming` in `skills`. So a plugin row's name is
  * `<plugin>:<name its place implies>`, which is also why a plugin item
  * never shares a name with a project or user one. Agents are given the
- * same prefix; no loaded plugin carried an agent in that measurement,
- * so for agents the prefix is the documented form, not a measured one.
+ * same prefix; no loaded plugin carried an agent in the delivery probe on
+ * 2.1.280, so the agent prefix is inferred from skill naming, not measured
+ * directly for agents.
  *
  * What this reader does not read, each a known gap rather than a
  * silent one: a `plugin.json` naming extra `skills` or `agents` paths

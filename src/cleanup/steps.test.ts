@@ -243,6 +243,38 @@ describe('cleanupSteps', () => {
     ]);
   });
 
+  it('withholds a ticked Stale row a dirty worktree holds, never a git branch -D step (#852)', () => {
+    const held: StaleRow = { ...staleRow('old'), heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] } };
+    const plan = cleanupSteps(selection({ stale: [held, staleRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -D other']);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'old', reason: 'checked out in scratch (dirty), which is not removed' },
+    ]);
+  });
+
+  it('withholds a ticked Not-pushed row a locked worktree holds, never a git branch -D step (#852)', () => {
+    const held: NotPushedRow = { ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } };
+    const plan = cleanupSteps(selection({ notPushed: [held] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'local', reason: 'checked out in pinned (locked), which is not removed' },
+    ]);
+  });
+
+  it('still deletes a row a ticked worktree holds after it, beside held Stale and Not-pushed rows', () => {
+    const plan = cleanupSteps(selection({
+      worktrees: [worktreeRow('/w/done', 'done')],
+      merged: [mergedRow('done')],
+      stale: [{ ...staleRow('old'), heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] } }],
+      notPushed: [{ ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } }],
+    }));
+    expect(plan.steps.map((step) => ({ argv: step.argv.join(' '), after: step.after }))).toEqual([
+      { argv: 'git worktree remove /w/done', after: null },
+      { argv: 'git branch -d done', after: '/w/done' },
+    ]);
+    expect(plan.withheld.map((entry) => entry.subject)).toEqual(['old', 'local']);
+  });
+
   it('removes a detached worktree without any branch step', () => {
     const plan = cleanupSteps(selection({ worktrees: [worktreeRow('/w/detached', null)] }));
     expect(plan.steps.map((step) => step.argv.join(' '))).toEqual(['git worktree remove /w/detached']);

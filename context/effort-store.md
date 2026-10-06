@@ -433,20 +433,20 @@ today and in the future.
 ### Store metadata
 
 **`store_meta` is a single-row table (`id = 1`) that identifies the
-store.** The row holds the origin the store stamps (`origin_store`, a
-UUID), the project git reads in the store's directory (or the one the
-row already names when git finds no root commit there), and the host,
-path and file identity the store was minted under. The origin is
-minted on a write open, at most once per store file, behind the first
-migration named `store-meta`; a write open that keeps the existing
-origin asks git nothing. Every write open also rotates the store's
-generation (`store_meta.generation`, added by `store-meta-generation`),
-as **Every write open rotates the generation** below says. The row is
-unminted if it has no value in `origin_store` (the
-column is `NOT NULL` for every runtime, but minting is skipped when git
-finds no project or repository). A read open never reads or writes the
-`store_meta` row, which is why `rafa effort schema` leaves an unminted
-store's bytes unchanged.
+store.** The row holds the store's id (`store_id`, a UUID), which the
+store stamps as `origin_store` on merged rows, the project git reads
+in the store's directory (or the one the row already names when git
+finds no root commit there), and the host, path and file identity the
+store was minted under. The origin is minted on a write open, at most
+once per store file, behind the first migration named `store-meta`; a
+write open that keeps the existing origin asks git nothing. Every write
+open also rotates the store's generation (`store_meta.generation`,
+added by `store-meta-generation`), as **Every write open rotates the
+generation** below says. The row is unminted if it has no value in
+`store_id` (the column is `NOT NULL` for every runtime, but minting is
+skipped when git finds no project or repository). A read open never
+reads or writes the `store_meta` row, which is why `rafa effort schema`
+leaves an unminted store's bytes unchanged.
 
 **The host id is an HMAC-SHA256 of `/etc/machine-id`, the macOS
 platform UUID, or the hostname, never the raw value, since `machine-id(5)`
@@ -491,46 +491,32 @@ exists on every write open.
 
 ### Copy detection
 
-**The collision check in the merge (`store/merge-store.ts`) catches
-every copy by examining the origin pair of each incoming row.** When a
-store is copied — backed up and restored, cloned to a new VM, or moved
-to another device — the merged store will hold two rows with the same
-origin pair: one from the local store (inserted before the copy) and one
-from the incoming store (the same insert, copied). The first detection
-marks the incoming store's origin as a copy: its `store_meta` row's
-filesystem identity (device, inode, path) is found in the local store's
-`merges` table (a log of every completed merge) or it collides on
-`origin_store`. When a copy is detected and merged, the merge refusal
-entry names the copy's origin and what copied it.
+**`settleStoreIdentity` (`store-meta.ts`) mints a new origin when a
+writing open detects a copy, comparing three filesystem facts to what
+`store_meta` records.** When the store is minted, three facts are
+recorded: the host id (an HMAC-SHA256 of the machine id, macOS platform
+UUID, or hostname), the store file's absolute path (through its real
+path, so symlinked spellings do not trigger a mint), and the file's
+device and inode. On a write, the open observes these three facts again.
+Any fact that differs from the recorded one — a different host, path,
+device, or inode — triggers a mint with the corresponding reason: `host`,
+`path`, or `file`. An unminted store mints with the reason `unminted`.
 
-**The generation catches a copy of the store file at the open, on the
-copy's first write.** A copy carries `store_meta.generation` and leaves
-the side record, which sits beside the original's real path as
-`<store file>.generation`, behind. So a copy at another path finds no
-side record, and a store deleted and replaced by a copy taken before
-its last write, or a `.bak` renamed or `cp`'d back over it after a
-write, finds a side record one rotation or more ahead of its row, and
-mints
-with the reason `generation` whether or not the host handed the copy
-the freed inode number. It does not catch a restore of the whole
-directory, the store file and its side record together: the two agree,
-and when the file comes back at its old inode, as `cp` over the existing
-file writes it, the three facts match too and nothing mints (measured
-on tmpfs). A store deleted and replaced by a copy taken after its last
-write holds the generation its side record holds, so only a new inode
-number mints it; with the original gone there is one store again, and
-no origin pair can collide. The merge's collision check above is what
-catches the copies the open misses.
-
-**A development build mints on the first write after copy detection.**
-Between the first plan and the lock in `bringForward`, an open with
-anything to adopt or apply asks `refuseUnownedDevelopmentWrite` for a
-store it does not own. After the lock is taken (in the same transaction),
-if the merge detects a copy, `settleStoreIdentity` is called a second
-time with the detection flag, and it mints a new origin for this store.
-This is why a development build can write copies: it owns stores under
-`tmpdir()` and under `RAFA_EFFORT_DIR` unless one sits in the project's
-own `<root>/.rafa/effort/`.
+**The generation catches a copy that the three facts would miss.** The
+side record `<store file>.generation` sits beside the store at its real
+path. A copy of the store file carries the row's generation and leaves
+the side record behind, so a copy at another path finds no side record,
+and the merge's row and the copy's row differ. A copy restored with `cp`
+over the existing file or a restore of the whole directory are caught by
+the generation differing from the side record, with the reason
+`generation`, once the store has been written since the copy was taken.
+The three facts and the generation together catch every copy except a
+whole-directory restore taken and brought back together; the merge's
+collision check (`store/merge-store.ts`) catches those by examining the
+origin pair of each incoming row, holding two rows with the same pair
+from the local store (inserted before the copy) and the incoming store
+(the same insert, copied), and recording in its refusal entry what
+copied it.
 
 ### Identity through rebuilds
 

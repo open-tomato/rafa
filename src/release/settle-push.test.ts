@@ -33,7 +33,7 @@ import { createGitRunner } from '../pr/git.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
-import { pushSaid, ruleText, SETTLE_PR_SETTING, settleByPush } from './settle-push.js';
+import { PUSH_SAID_NOTHING, pushSaid, ruleText, SETTLE_PR_SETTING, settleByPush } from './settle-push.js';
 import { withSettleWorktree } from './settle-worktree.js';
 
 /** A temporary directory of this file's own. */
@@ -543,6 +543,13 @@ describe('pushSaid', () => {
     });
 
     expect(said).toBe('remote: planted\nerror: failed to push some refs to \'/tmp/origin.git\'\n!\tHEAD:refs/heads/main\t[remote rejected] (pre-receive hook declined)');
+    expect(endsOnDone(said)).toBe(false);
+  });
+
+  it('answers that the push failed when it printed nothing but To and Done', () => {
+    const said = pushSaid({ ok: false, stdout: 'To /tmp/origin.git\nDone\n', stderr: '' });
+
+    expect(said).toBe(PUSH_SAID_NOTHING);
     expect(endsOnDone(said)).toBe(false);
   });
 });

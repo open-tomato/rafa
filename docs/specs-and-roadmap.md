@@ -1086,7 +1086,9 @@ When you merge a pull request that closes an issue, `rafa pr merge`:
 
 So when you merge a member of an epic, both the board and the epic's own
 checklist update, keeping them in sync. The roadmap shows `done/total` on
-each epic line, which stays accurate as members close.
+each epic line, which stays accurate as members close. When the merge is done,
+`rafa next` offers to `settle` waiting release fragments with `rafa release settle`,
+and after settlement, to tag the release with `rafa release tag` if the version is untagged.
 
 ## Hopping between epics with `rafa next --roadmap`
 

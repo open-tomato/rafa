@@ -47,12 +47,13 @@
  * ({@link unheldPastHeadReason}), never a step: `-d` refuses it and
  * `-D` would lose those commits.
  *
- * A Merged row a listed worktree that cannot be ticked holds
- * ({@link MergedRow.heldBy}, `./groups.ts`) starts unticked. Ticked
- * anyway, it is one {@link WithheldRemoval} naming that worktree and its
- * blockers, never a step, so `--dry-run` prints no line for it: git
- * refuses to delete a branch a worktree has checked out, and that
- * worktree is not removed.
+ * A branch row a listed worktree that cannot be ticked holds (its
+ * `heldBy`, `./groups.ts`), Merged, Stale or Not pushed, starts
+ * unticked. Ticked anyway, it is one {@link WithheldRemoval} naming that
+ * worktree and its blockers, never a step, so `--dry-run` prints no line
+ * for it and a Stale or Not-pushed one never becomes a `git branch -D`
+ * (#852): git refuses to delete a branch a worktree has checked out,
+ * and that worktree is not removed.
  *
  * ## The force guard
  *
@@ -258,7 +259,7 @@ interface BranchPick {
   readonly name: string;
   readonly merged: boolean;
   readonly forced: boolean;
-  /** The untickable worktree holding a Merged row, when `./groups.ts` named one. */
+  /** The untickable worktree holding the branch, when `./groups.ts` named one. */
   readonly holder: BranchHolder | null;
   /** A Merged row's commits past its pull request's head when they are not all held, else null. */
   readonly unheld: PastHeadRead | null;
@@ -276,8 +277,13 @@ function branchPicks(selection: CleanupSelection): readonly BranchPick[] {
         ? null
         : row.pastHead,
     })),
-    ...selection.stale.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null, unheld: null })),
-    ...selection.notPushed.map((row) => ({ name: row.branch.name, merged: false, forced: true, holder: null, unheld: null })),
+    ...[...selection.stale, ...selection.notPushed].map((row) => ({
+      name: row.branch.name,
+      merged: false,
+      forced: true,
+      holder: row.heldBy ?? null,
+      unheld: null,
+    })),
   ];
 }
 
@@ -291,7 +297,7 @@ function blockedHolderReason(path: string): string {
   return `held by the worktree at ${path}, which is not removed`;
 }
 
-/** Why a Merged branch an untickable worktree holds is not deleted. */
+/** Why a branch an untickable worktree holds is not deleted. */
 function untickableHolderReason(holder: BranchHolder): string {
   return `${checkedOutReason(holder)}, which is not removed`;
 }
