@@ -17,13 +17,15 @@
  * not planned proves only the first reaches `done`.
  */
 import type { HorizonFacts, StageFacts, StageFragment, StagePullRequest } from './rules.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { Epic } from '../epics.js';
-import type { BoardIssue } from '../roadmap-board.js';
+import type { BoardIssue, BoardIssueLink } from '../roadmap-board.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { readEpics, unknownEpic } from '../epics.js';
+import { createNativeRelations } from '../relations/native.js';
 
 import {
   HORIZON_OPTIONS,
@@ -323,5 +325,82 @@ describe('progressTextOf', () => {
     ];
 
     expect(progressTextOf(readEpic(issues, 40))).toBe('2 / 2');
+  });
+});
+
+/** The board's own repository, for the native rows read below. */
+const NATIVE_BOARD = 'acme/board';
+
+/** A `gh` every call to which fails the case: the native reading reads the listing only. */
+const NO_NATIVE_GH: GhRunner = (args) => {
+  throw new Error(`a native read sent gh ${args.join(' ')}`);
+};
+
+/** Issue `number` as a native link node names it. */
+function nativeLink(number: number): BoardIssueLink {
+  return { number, title: `#${String(number)}`, state: 'OPEN', repository: NATIVE_BOARD };
+}
+
+/** A native-mode row: `parent` is its epic, `subIssues` the epic's members in order. */
+function nativeRow(
+  number: number,
+  labels: readonly string[],
+  fields: Partial<Pick<BoardIssue, 'state' | 'stateReason'>> & { readonly parent?: number; readonly subIssues?: readonly number[] } = {},
+): BoardIssue {
+  const subIssues = fields.subIssues ?? [];
+  return {
+    ...row(number, labels, { state: fields.state ?? 'OPEN', stateReason: fields.stateReason ?? null }),
+    parent: fields.parent === undefined
+      ? null
+      : nativeLink(fields.parent),
+    blockedBy: { nodes: [] },
+    blocking: { nodes: [] },
+    subIssuesSummary: { total: subIssues.length, completed: 0, percentCompleted: 0 },
+    subIssues: { nodes: subIssues.map(nativeLink) },
+  };
+}
+
+describe('spec edge cases', () => {
+  it('is Done for an issue closed by hand with no pull request and no fragment, whatever its labels', () => {
+    const facts = closed('COMPLETED', { labels: ['spec:ready', 'needs-triage'], pullRequests: [] });
+
+    expect(stageOf(facts)).toBe('Done');
+  });
+
+  it('is In review for an open issue whose integration-branch merge added a shipping fragment, over its stage labels', () => {
+    const facts = issue({ labels: ['spec:blocked'], pullRequests: [merged(fragment('minor'))] });
+
+    expect(stageOf(facts)).toBe('In review');
+  });
+
+  it('is Done for a merge into an integration branch whose fragment is `level: none`, even with the issue still open', () => {
+    const facts = issue({ labels: ['rafa:claimed'], pullRequests: [merged(fragment('none'))] });
+
+    expect(stageOf(facts)).toBe('Done');
+  });
+
+  it('is never In review in a repository with no fragments, however many pull requests merged', () => {
+    const noFragments = [merged(), merged(), merged()];
+
+    expect(stageOf(issue({ pullRequests: noFragments }))).toBe('Done');
+    expect(stageOf(closed('COMPLETED', { pullRequests: noFragments }))).toBe('Done');
+  });
+
+  it('writes the Progress of a native-mode epic from its sub-issues, a not-planned one off both sides', () => {
+    const issues = [
+      nativeRow(40, ['type:epic'], { subIssues: [41, 42, 43] }),
+      nativeRow(41, [], { parent: 40, state: 'CLOSED', stateReason: 'COMPLETED' }),
+      nativeRow(42, [], { parent: 40, state: 'CLOSED', stateReason: 'NOT_PLANNED' }),
+      nativeRow(43, [], { parent: 40 }),
+    ];
+    const epic = readEpics({
+      issues,
+      claims: new Set(),
+      today: new Date(2026, 9, 6),
+      relations: createNativeRelations({ gh: NO_NATIVE_GH, repository: NATIVE_BOARD }),
+    }).epics.find((candidate) => candidate.number === 40);
+
+    expect(epic?.order).toBe('sub-issues');
+    expect(progressTextOf(epic ?? null)).toBe('1 / 2');
   });
 });
