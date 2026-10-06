@@ -56,7 +56,7 @@ describe('readCleanup over a scratch repository', () => {
     expect(read.notes).toEqual([]);
   });
 
-  it('puts the merged, squash-merged, gone and clean-worktree branches in Merged, ticked', () => {
+  it('puts the merged, squash-merged, gone and clean-worktree branches in Merged, ticking all but gone', () => {
     const rows = Object.fromEntries(read.merged.map((row) => [row.branch.name, row]));
     expect(Object.keys(rows).sort()).toEqual(['gone', 'merged', 'squashed', 'wt-clean']);
     expect(rows['merged']?.mergedBy).toEqual(['base']);
@@ -64,10 +64,10 @@ describe('readCleanup over a scratch repository', () => {
     expect(rows['squashed']?.mergedBy).toEqual(['pull-request']);
     expect(rows['squashed']?.pullRequest?.number).toBe(7);
     expect(rows['gone']?.mergedBy).toEqual(['gone']);
-    expect(rows['gone']?.reason).toBe('upstream origin/gone is gone');
+    expect(rows['gone']?.reason).toBe('upstream origin/gone is gone; main does not reach its tip');
     for (const row of read.merged) {
       expect(row.group).toBe('merged');
-      expect(row.ticked).toBe(true);
+      expect(row.ticked).toBe(row.branch.name !== 'gone');
     }
   });
 

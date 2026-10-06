@@ -7,17 +7,20 @@
  * the reading rather than assumed to.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
+import type { SessionRecord } from '../loop/sessions.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
+import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { BRANCH_FORMAT } from './branches.js';
@@ -125,6 +128,38 @@ function scripted(
   return { seams, log };
 }
 
+const runRoots: string[] = [];
+
+afterAll(() => {
+  for (const root of runRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+/** One finished record of `plan-a`, started on `day` of September 2026. */
+function finishedRecord(sessionId: string, day: string): SessionRecord {
+  return {
+    sessionId,
+    planStub: 'plan-a',
+    plan: '.plans/PLAN-plan-a.md',
+    branch: 'feat/plan-a',
+    pid: 2_000_000_000,
+    startedAt: `2026-09-${day}T12:00:00.000Z`,
+    state: 'done',
+    task: null,
+  };
+}
+
+/** A project of its own whose `.rafa/runs/` holds `old` with its events file and the newer `new`. */
+function plantedRuns(): string {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-index-runs-')));
+  runRoots.push(root);
+  mkdirSync(runsDir(root), { recursive: true });
+  for (const entry of [finishedRecord('old', '01'), finishedRecord('new', '02')]) {
+    writeFileSync(sessionFilePath(root, entry.sessionId), `${JSON.stringify(entry)}\n`);
+  }
+  writeFileSync(eventsFilePath(root, 'old'), '{}\n');
+  return root;
+}
+
 function settings(overrides: Partial<CleanupSettings> = {}): CleanupSettings {
   return {
     fetch: true,
@@ -164,6 +199,23 @@ describe('readCleanup over scripted seams', () => {
     expect(reading.worktrees.map((row) => [row.path, row.branchMerged, row.ticked])).toEqual([
       [`${CLAUDE}/a`, true, true],
       [`${CLAUDE}/b`, false, false],
+    ]);
+  });
+
+  it('unticks the Merged branch a worktree that cannot be ticked holds, naming it', async () => {
+    const { seams } = scripted();
+    const recentA: CleanupSeams = {
+      ...seams,
+      modifiedAt: (path) => (path.includes('worktrees/a')
+        ? NOW
+        : new Date(NOW.getTime() - 30 * DAY)),
+    };
+    const reading = await readCleanup(recentA, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.worktrees.map((row) => [row.path, row.tickable])).toEqual([[`${CLAUDE}/a`, false], [`${CLAUDE}/b`, true]]);
+    expect(reading.merged.map((row) => [row.branch.name, row.ticked, row.reason])).toEqual([
+      ['done', false, 'merged into main; checked out in a (recent)'],
     ]);
   });
 
@@ -254,6 +306,42 @@ describe('readCleanup over scripted seams', () => {
   });
 });
 
+describe('readCleanup run records', () => {
+  it('lists the older finished record of a plan, with its events file, and keeps the newest', async () => {
+    const root = plantedRuns();
+    const { seams } = scripted();
+    const reading = await readCleanup(seams, settings({ projectRoot: root }));
+    if (!reading.ok) throw new Error(reading.detail);
+
+    const dir = join(root, '.rafa', 'runs');
+    expect(reading.runs.map((row) => [row.sessionId, row.path, row.eventsPath, row.plan, row.ticked])).toEqual([
+      ['old', join(dir, 'old.json'), join(dir, `old${EVENTS_EXTENSION}`), 'plan-a', true],
+    ]);
+    expect(reading.notes).toEqual([]);
+  });
+
+  it('control: a project with no .rafa/runs/ lists no record and says nothing', async () => {
+    const { seams } = scripted();
+    const reading = await readCleanup(seams, settings());
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.runs).toEqual([]);
+    expect(reading.notes).toEqual([]);
+  });
+
+  it('carries a record it cannot read as a note after the groups\' notes', async () => {
+    const root = plantedRuns();
+    const broken = join(root, '.rafa', 'runs', 'broken.json');
+    writeFileSync(broken, 'not json');
+    const { seams } = scripted();
+    const reading = await readCleanup(seams, settings({ projectRoot: root }));
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.notes).toHaveLength(1);
+    expect(reading.notes[0]).toStartWith(`run records: skipped ${broken}: `);
+  });
+});
+
 describe('cleanupCounts', () => {
   it('counts the rows of each group', async () => {
     const { seams } = scripted();
@@ -272,8 +360,19 @@ describe('cleanupCounts', () => {
       stale: [],
       notPushed: [],
       worktrees: [],
+      runs: [],
       notes: [],
     })).toEqual({ merged: 0, stale: 0, notPushed: 0, worktrees: 0 });
+  });
+
+  it('leaves the run records out, as rafa doctor and rafa status print', async () => {
+    const root = plantedRuns();
+    const { seams } = scripted();
+    const reading = await readCleanup(seams, settings({ projectRoot: root }));
+    if (!reading.ok) throw new Error(reading.detail);
+
+    expect(reading.runs).toHaveLength(1);
+    expect(cleanupCounts(reading)).toEqual({ merged: 1, stale: 1, notPushed: 1, worktrees: 2 });
   });
 });
 
@@ -334,7 +433,7 @@ describe('readCleanup over a real clone', () => {
     expect(fetched.fetched).toBe(true);
     expect(fetched.base).toBe('main');
     expect(fetched.merged.map((row) => [row.branch.name, row.reason, row.ticked]))
-      .toEqual([['gone', 'upstream origin/gone is gone', true]]);
+      .toEqual([['gone', 'upstream origin/gone is gone; main does not reach its tip', false]]);
     expect(fetched.notes).toEqual([]);
   });
 });

@@ -14,7 +14,7 @@
  * (`src/commands/pr/merge-followups.ts`).
  *
  * One git command here writes — `git tag <tag> <commit>` — and it is
- * the last thing the run does. Everything before it is a read, and every
+ * the last thing the run does, save the push `--push` asks for after it. Everything before it is a read, and every
  * refusal happens before it, so a refused run leaves the repository
  * exactly as it found it.
  *
@@ -122,8 +122,22 @@
  *
  * The push line is printed beside it for the same reason: the tag this
  * action writes is local until something pushes it, and a release
- * nobody can fetch is not a release. It is text too — nothing here
- * reaches a network.
+ * nobody can fetch is not a release. Without `--push` it is text too,
+ * and nothing here reaches a network.
+ *
+ * ## `--push`
+ *
+ * With `--push` (#736) the run pushes the tag itself once it is written,
+ * through `../../release/tag-push.ts`, to the remote the release branch
+ * tracks, `origin` when it tracks none. A push that went drops the push
+ * line from the follow-ups and adds a `Pushed` line under the `Tagged`
+ * one; json mode carries the push as the result's `pushed`, a key a run
+ * without the flag leaves out, so that run reads exactly as before. A
+ * push that failed exits 1 with git's words and the push to run again,
+ * and keeps the local tag: it names the right commit whether or not the
+ * remote has it, and a second run would refuse on it as `tagged`. The
+ * push is the one network call, and it runs only after the write, so
+ * every refusal above still leaves the repository as it found it.
  *
  * ## What is shared with `release status`
  *
@@ -151,6 +165,7 @@ import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
+import type { TagPushed } from '../../release/tag-push.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -160,15 +175,19 @@ import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
+import { pushTag } from '../../release/tag-push.js';
 import { readManifestVersion } from '../../release/version.js';
-import { expectNoArgument } from '../plan/plan-files.js';
+import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { versionTag } from '../pr/merge-followups.js';
 
 import { readReleaseCommit } from './release-commit.js';
 import { changelogVersions, DEFAULT_RELEASE_SEAMS, readTags } from './status.js';
 
 /** The usage line this action's refusals name. */
-export const RELEASE_TAG_USAGE = 'rafa release tag';
+export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';
+
+/** The flag that pushes the tag once it is written; see the module note. */
+export const PUSH_FLAG = 'push';
 
 /** The branch a release is tagged on when `pr.base` names none. */
 export const DEFAULT_RELEASE_BRANCH = 'main';
@@ -306,6 +325,8 @@ export interface ReleaseTagResult {
   readonly written: TagReady;
   /** What the operator does next. */
   readonly followUps: readonly ReleaseFollowUp[];
+  /** The push `--push` made; left out of a run without the flag. */
+  readonly pushed?: TagPushed;
 }
 
 /** The branch checked out where `git` runs; see the module note on the detached case. */
@@ -417,10 +438,11 @@ export interface TagPlace {
 const ON_HEAD: TagPlace = Object.freeze({ ahead: 0, branch: DEFAULT_RELEASE_BRANCH });
 
 /**
- * What the operator does next once `tag` is written: push it, and
- * publish `version` with `publish`, `release.publishCommand`, when
- * there is something to publish — from the tag when HEAD is past it;
- * see the module note. Pure and total.
+ * What the operator does next once `tag` is written: push it, unless
+ * `pushed` says the run pushed it already, and publish `version` with
+ * `publish`, `release.publishCommand`, when there is something to
+ * publish — from the tag when HEAD is past it; see the module note.
+ * Pure and total.
  */
 export function followUpsFor(
   tag: string,
@@ -428,16 +450,16 @@ export function followUpsFor(
   target: PublishTarget,
   publish: string,
   place: TagPlace = ON_HEAD,
+  pushed = false,
 ): readonly ReleaseFollowUp[] {
-  const push: ReleaseFollowUp = {
-    command: `git push ${RELEASE_REMOTE} ${tag}`,
-    why: `the tag is local until ${RELEASE_REMOTE} has it`,
-  };
-  if (target.name === null || target.isPrivate) return [push];
+  const push: readonly ReleaseFollowUp[] = pushed
+    ? []
+    : [{ command: `git push ${RELEASE_REMOTE} ${tag}`, why: `the tag is local until ${RELEASE_REMOTE} has it` }];
+  if (target.name === null || target.isPrivate) return push;
   const publishes = `publishes ${target.name}@${version} to ${target.registry}`;
-  if (place.ahead === 0) return [push, { command: publish, why: publishes }];
+  if (place.ahead === 0) return [...push, { command: publish, why: publishes }];
   return [
-    push,
+    ...push,
     {
       command: `git switch --detach ${tag} && ${publish} && git switch ${place.branch}`,
       why: `${publishes} from the tagged commit, not HEAD; skip it if ${target.registry} has that version already`,
@@ -592,25 +614,36 @@ export function pastReleaseWarning(written: TagReady, branch: string): string | 
     + ` was set; they are not in ${written.tag}.`;
 }
 
-/** The lines text mode writes for a run that tagged the commit of `branch` that set the version. */
+/**
+ * The lines text mode writes for a run that tagged the commit of
+ * `branch` that set the version: the `Pushed` line when `pushed` is
+ * given, and the `Next:` heading only over follow-ups there are.
+ */
 export function renderTagged(
   written: TagReady,
   branch: string,
   followUps: readonly ReleaseFollowUp[],
+  pushed?: TagPushed,
 ): readonly string[] {
   const where = written.ahead === 0
     ? `the HEAD of ${branch}`
     : `${written.commit.slice(0, SHORT_COMMIT)}, the commit of ${branch} that set ${written.version}`;
+  const next = followUps.length === 0
+    ? []
+    : ['Next:', ...followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`)];
   return [
     `✅ Tagged ${written.tag} at ${where}.`,
-    'Next:',
-    ...followUps.map((followUp) => `${INDENT}${followUp.command} — ${followUp.why}`),
+    ...(pushed === undefined
+      ? []
+      : [`✅ Pushed ${pushed.tag} to ${pushed.remote}.`]),
+    ...next,
   ];
 }
 
 /** One whole run: the readings, the decision, the write it may make, and the lines. */
 export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEASE_SEAMS): ReleaseTagResult {
   expectNoArgument(context.args, RELEASE_TAG_USAGE);
+  const push = readSwitch(PUSH_FLAG, context.flags[PUSH_FLAG], `Usage: ${RELEASE_TAG_USAGE}`);
   const project = projectOf(context);
   const config = tagConfig(project, (message: string) => {
     context.output.warn(message);
@@ -624,10 +657,16 @@ export function runTag(context: RafaContext, seams: ReleaseSeams = DEFAULT_RELEA
   }
 
   writeTag(git, decision.tag, decision.commit);
+  const pushed = push
+    ? pushTag(git, decision.tag, config.releaseBranch)
+    : null;
+  if (pushed?.outcome === 'failed') throw new CommandExit(pushed.exitCode, `❌ ${pushed.sentence}`);
   const place: TagPlace = { ahead: decision.ahead, branch: config.releaseBranch };
   const target = readPublishTarget(inputs.version.text);
-  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place);
-  return { inputs, written: decision, followUps };
+  const followUps = followUpsFor(decision.tag, decision.version, target, config.publishCommand, place, pushed !== null);
+  return pushed === null
+    ? { inputs, written: decision, followUps }
+    : { inputs, written: decision, followUps, pushed };
 }
 
 /** The command, reaching git through `seams`; see the module note. */
@@ -648,15 +687,28 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
       + ' file, the tag list or the history could not be read. After the tag it prints what to run next: the'
       + ' push that puts the tag on the remote, and the publish line for the registry the version file'
       + ' configures, with the command `release.publishCommand` names (`npm publish` by default),'
-      + ' spelled to publish from the tag when HEAD is past it, which it does not run. With'
-      + ' `--output=json` the readings, the decision and the follow-ups are the data of the terminal result'
-      + ' event.',
+      + ' spelled to publish from the tag when HEAD is past it, which it does not run. With `--push` it'
+      + ' pushes the tag itself to the remote the release branch tracks (`origin` when it tracks none) and'
+      + ' drops the push line; a push that fails exits 1 with what git said and keeps the local tag. With'
+      + ' `--output=json` the readings, the decision, the follow-ups and the push are the data of the terminal'
+      + ' result event.',
     args: [],
-    flags: [],
+    flags: [
+      {
+        name: PUSH_FLAG,
+        description: 'Push the tag to the remote the release branch tracks once it is written; a push that'
+          + ' fails exits 1 and keeps the local tag.',
+        type: 'boolean',
+      },
+    ],
     examples: [
       {
         cmd: 'rafa release tag',
         note: 'Tags the merged release and prints the push and publish lines to run next.',
+      },
+      {
+        cmd: 'rafa release tag --push',
+        note: 'Tags the merged release, pushes the tag, and prints the publish line to run next.',
       },
       {
         cmd: 'rafa release tag --output=json',
@@ -673,7 +725,7 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
         return;
       }
       // The release branch IS the branch checked out: a run that got here passed the branch check.
-      const lines = renderTagged(result.written, result.inputs.releaseBranch, result.followUps);
+      const lines = renderTagged(result.written, result.inputs.releaseBranch, result.followUps, result.pushed);
       for (const line of lines) context.output.info(line);
     },
   };

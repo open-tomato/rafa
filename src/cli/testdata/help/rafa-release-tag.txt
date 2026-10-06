@@ -1,0 +1,47 @@
+rafa release tag — tag the commit that set the version both release files agree
+  on
+
+Usage:
+  rafa release tag [--push]
+
+Description:
+  Writes `v<version>` on the release branch — `pr.base`, or `main` — when the
+  version `release.versionFile` declares is the one the newest section of
+  `release.changelog` names. The tag goes on the commit that set that version:
+  HEAD, or, where later commits landed on the branch, the earlier commit, with a
+  warning naming how many commits HEAD is past it. It refuses, and writes
+  nothing, when another branch is checked out, when a tag already names that
+  version, when the two files disagree, when the changelog section of that
+  version carries no `<!-- rafa:fragments -->` receipt and is above the newest
+  version released before settle, when no commit holds the version yet, and when
+  the version file, the tag list or the history could not be read. After the tag
+  it prints what to run next: the push that puts the tag on the remote, and the
+  publish line for the registry the version file configures, with the command
+  `release.publishCommand` names (`npm publish` by default), spelled to publish
+  from the tag when HEAD is past it, which it does not run. With `--push` it
+  pushes the tag itself to the remote the release branch tracks (`origin` when
+  it tracks none) and drops the push line; a push that fails exits 1 with what
+  git said and keeps the local tag. With `--output=json` the readings, the
+  decision, the follow-ups and the push are the data of the terminal result
+  event.
+
+Flags:
+  --push   boolean
+      Push the tag to the remote the release branch tracks once it is written; a
+      push that fails exits 1 and keeps the local tag.
+
+Examples:
+  rafa release tag
+      Tags the merged release and prints the push and publish lines to run next.
+  rafa release tag --push
+      Tags the merged release, pushes the tag, and prints the publish line to
+      run next.
+  rafa release tag --output=json
+      Writes the same tag and gives the readings, the decision and the
+      follow-ups as a result event.
+
+Outputs:
+  text, json
+
+See also:
+  rafa release status, rafa release settle

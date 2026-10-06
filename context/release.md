@@ -71,6 +71,15 @@ are gone (another machine settled them), it stops with exit 0. If new fragments
 arrived, it recomputes and retries once, then stops with exit 1 if that retry
 is refused.
 
+A refusal no retry can change stops at once with exit 1 and the release not
+delivered. A protected branch (GitHub's `GH006`) is answered `protected`, and a
+repository rule (GitHub's `GH013`, a ruleset requiring a status check or a
+review) is answered `rule`, in one line naming the rule GitHub gave, such as
+`Required status check "verify" is expected.`, and
+`set release.settle: pr in .rafa/config.yaml`. No refusal prints a success line:
+`git push --porcelain` ends its output on `Done` even when it refuses, and settle
+drops that line from what it quotes (#765).
+
 **PR delivery** (`release.settle: pr`): Settle pushes the commit to the `rafa/release`
 branch and opens or updates one pending release pull request. Closing that PR
 undoes the release before it lands. This is the delivery method for a protected
@@ -78,6 +87,24 @@ base branch that requires review.
 
 `--dry-run` prints the fragments, their order, the strategy, and the version
 that would settle, and writes nothing to the tree or remote.
+
+A base with no `release.changelog` doesn't stop a settle (#842): the release
+commit creates the file holding `# Changelog` and the settled section
+(`buildSettle`, `src/release/settle.ts`), and settle prints
+`Changelog: <path> is missing, so the release commit creates it under "# Changelog".`
+above its delivery line. A delivery that refused prints no such line. The dry
+run reads the base's tree, not the checkout, and prints the same line. Only an
+absent file is created. A changelog that exists and can't be read, or a
+directory that refuses the new file, still stops the settle with exit 1. The
+parent directory isn't made, so a `release.changelog` under a directory the
+base lacks stops it too.
+
+The readers follow the same line. `rafa doctor`'s release row and
+`rafa release status` (its `untagged` and `audit` cells) read an absent
+changelog as `missing; rafa release settle creates it`, with no problem line
+and their forecasts unchanged; a changelog that exists and can't be read still
+reads as "could not be read". `rafa release tag` still refuses on a missing
+changelog, since a tag names a version a section already holds.
 
 The caller is unspecified and all are equivalent: a person running the command,
 a CI job after each merge, a post-merge hook, or `rafa next` (which runs settle
@@ -110,6 +137,23 @@ joined by `; `, and `{date}` is the UTC date of the newest folded fragment's add
 commit (the commit that ADDED it to the base branch), never the clock. This keeps
 settle deterministic across machines and retries.
 
+### Tag and its push
+
+`rafa release tag [--push]` writes `v<version>` on the commit of the release
+branch that set the version, then prints what to run next: the push of the tag
+and the publish line. Without `--push` it reaches no network and the push is a
+line to copy.
+
+With `--push` (#736) it pushes `refs/tags/v<version>` itself once the tag is
+written (`pushTag`, `src/release/tag-push.ts`), never forced, to the remote the
+release branch tracks (`branch.<pr.base>.remote`), or `origin` when the branch
+tracks none or tracks a local branch. A push that went prints
+`✅ Pushed v<version> to <remote>.` and drops the push line from the follow-ups;
+json mode carries it as the result's `pushed`, a key a run without the flag
+leaves out. A push that fails, a hook or rule refusing it included, exits 1 with
+git's words and the push to run again, and keeps the local tag, since it names
+the right commit whether or not the remote has it.
+
 ### Guards: the preflight check
 
 A preflight item in `rafa pr merge` (read also by `rafa pr triage`) runs the fold
@@ -132,6 +176,17 @@ entry and its commit) and end with the fix command (`rafa pr triage --resolve`).
 to all three failures, and its existing `--resolve` owns the fix: turn a stamped
 changelog section into a fragment and restore the version file to the base
 branch's value, in one commit on the branch.
+
+Settle's own release pull request is not a failure (#843). A head of
+`rafa/release` (`RELEASE_PR_BRANCH`, `src/release/settle-pr.ts`) whose stamp
+the base has neither released nor passed is the delivery
+(`src/release/release-delivery.ts`): `rafa pr merge` prints one line,
+`Release: #<n> is settle's release pull request; merging it lands <version>`,
+in place of the `stale` line, the forecast's no-fragment line and the `fix:`
+line, and merges whatever `pr.versionCollision` says; `rafa pr triage` gives it
+no `conflict-version` class. A `rafa/release` head the base has passed, already
+released or collides with reads as any branch does, fix included, and an
+ordinary branch stamping a version still reads `stale`.
 
 ### Readers: status, list, and doctor
 
@@ -178,7 +233,7 @@ branch) or `pr` (open or update one pending release pull request on
 `rafa/release`). Read by `rafa release settle` and `rafa next`.
 
 **`release.tag`** — Who tags the version: `manual` (default, tag by hand with
-`rafa release tag`) or `settle` (settle tags the commit it pushed). Read by
+`rafa release tag`, which pushes the tag with `--push`) or `settle` (settle tags the commit it pushed). Read by
 `rafa release settle` and `rafa release tag`. Under `release.settle: pr`, the
 tag waits for `rafa release tag` after that pull request merges.
 

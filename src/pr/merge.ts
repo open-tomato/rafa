@@ -61,6 +61,23 @@
  * merge commit, so acting on it sends a merge GitHub is about to refuse
  * (`./types.ts`).
  *
+ * ## Which untracked paths refuse
+ *
+ * A tracked change always refuses: the switch and the pull after the
+ * merge would carry it along or stop on it. An untracked path refuses
+ * only when one of the INCOMING trees holds it — the pull request's
+ * head, or the base's remote-tracking branch — since only then does the
+ * clean-up write a file where it sits and stop on it (`git pull` refuses
+ * to overwrite an untracked file). An untracked path neither holds, such
+ * as an operator's `.claude/settings.local.json`, is left in place and
+ * named in one line ({@link untrackedLeftLine}); it does not refuse
+ * (`open-tomato/rafa#772`). Which paths the trees hold is the caller's
+ * reading, {@link MergeRefusalReading.incoming}, handed in as data like
+ * every other input here; `src/commands/pr/merge-refuse.ts` reads it
+ * with `git ls-tree -r --name-only`. A folded untracked directory
+ * (`?? dir/`, which `git status --porcelain` writes for a directory
+ * holding no tracked file) is held when any incoming path lies under it.
+ *
  * ## Which worktree is "another" one
  *
  * {@link worktreesHolding} compares paths as strings, so
@@ -103,11 +120,14 @@
  *
  * ## What is kept verbatim
  *
- * A {@link WorkingTreeStatus} entry is the porcelain line as git wrote
- * it, quoting included: `git status --porcelain` answered
+ * A {@link WorkingTreeStatus} entry, and a tracked one, is the porcelain
+ * line as git wrote it, quoting included: `git status --porcelain` answered
  * `A  "src/a b.ts"` for a staged path with a space in the same reading
  * above. The refusal prints those lines rather than a re-rendering, so
- * what the operator sees is what `git status` would say. A worktree's
+ * what the operator sees is what `git status` would say. An untracked
+ * entry is also kept as a PATH with git's quoting undone
+ * ({@link unquoteGitPath}), because it is compared with the paths
+ * `git ls-tree` prints, which quotes differently. A worktree's
  * path is likewise git's, and it reaches a pasteable command line
  * through {@link shellQuote} — `./preflight-items.ts` owns the one
  * shell quoter here, and a second one could disagree with it.
@@ -137,23 +157,133 @@ const INDENT = '   ';
 export interface WorkingTreeStatus {
   /** True when git reported nothing at all. */
   readonly clean: boolean;
-  /** The porcelain lines, as git wrote them; see the module note. */
+  /** Every porcelain line, as git wrote it; see the module note. */
   readonly entries: readonly string[];
+  /** The porcelain lines naming a tracked path, as git wrote them. */
+  readonly tracked: readonly string[];
+  /**
+   * The untracked paths, unquoted ({@link unquoteGitPath}). A directory
+   * git folded into one line keeps its trailing `/`.
+   */
+  readonly untracked: readonly string[];
 }
+
+/** How `git status --porcelain` opens an untracked line. */
+const UNTRACKED_PREFIX = '?? ';
 
 /**
  * Parses `git status --porcelain` into a status.
  *
- * Every non-blank line counts, staged, unstaged and untracked alike: a
- * merge switches branches and pulls, and all three are lost or
- * conflicted by that. No line is interpreted — the refusal names how
- * many there are and shows them.
+ * Every non-blank line lands in {@link WorkingTreeStatus.entries}, and
+ * each one in exactly one of the two halves: a `?? ` line is untracked
+ * and its path is unquoted, every other line is tracked and kept as git
+ * wrote it. Which half refuses a merge is {@link readMergeRefusal}'s;
+ * see the module note.
  */
 export function parseWorkingTree(stdout: string): WorkingTreeStatus {
   const entries = stdout.split('\n')
     .map((line) => line.replace(/\r$/, ''))
     .filter((line) => line.trim() !== '');
-  return { clean: entries.length === 0, entries: Object.freeze(entries) };
+  const tracked = entries.filter((line) => !line.startsWith(UNTRACKED_PREFIX));
+  const untracked = entries.filter((line) => line.startsWith(UNTRACKED_PREFIX))
+    .map((line) => unquoteGitPath(line.slice(UNTRACKED_PREFIX.length)));
+  return {
+    clean: entries.length === 0,
+    entries: Object.freeze(entries),
+    tracked: Object.freeze(tracked),
+    untracked: Object.freeze(untracked),
+  };
+}
+
+/** The one-letter escapes git's path quoting writes, and the byte each stands for. */
+const C_ESCAPES: Readonly<Record<string, number>> = {
+  'a': 0x07, 'b': 0x08, 'f': 0x0c, 'n': 0x0a, 'r': 0x0d, 't': 0x09, 'v': 0x0b,
+  '\\': 0x5c, '"': 0x22,
+};
+
+/** An octal escape: three digits after the backslash, one byte. */
+const OCTAL_ESCAPE = /^[0-7]{3}$/;
+
+/**
+ * A path as git printed it, with git's quoting undone. git wraps a path
+ * in double quotes when it holds a character it will not print bare —
+ * `git status --porcelain` for a space, `git ls-tree` for a non-ASCII
+ * byte, which it writes as octal escapes under `core.quotePath` — and
+ * leaves every other path as it is. Measured on git 2.53.0: an
+ * untracked `a b.txt` read `?? "a b.txt"` in porcelain and `a b.txt` in
+ * `ls-tree -r --name-only`, and `é.txt` read `"\303\251.txt"` in both.
+ */
+export function unquoteGitPath(raw: string): string {
+  if (raw.length < 2 || !raw.startsWith('"') || !raw.endsWith('"')) return raw;
+  const body = raw.slice(1, -1);
+  const bytes: number[] = [];
+  const encoder = new TextEncoder();
+  for (let at = 0; at < body.length; at += 1) {
+    const char = body.charAt(at);
+    if (char !== '\\') {
+      bytes.push(...encoder.encode(char));
+      continue;
+    }
+    const octal = body.slice(at + 1, at + 4);
+    if (OCTAL_ESCAPE.test(octal)) {
+      bytes.push(Number.parseInt(octal, 8));
+      at += 3;
+      continue;
+    }
+    const escaped = C_ESCAPES[body.charAt(at + 1)];
+    if (escaped === undefined) {
+      bytes.push(...encoder.encode(char));
+      continue;
+    }
+    bytes.push(escaped);
+    at += 1;
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+/**
+ * Parses `git ls-tree -r --name-only <tree>` into the paths the tree
+ * holds, each unquoted ({@link unquoteGitPath}).
+ */
+export function parseTreePaths(stdout: string): readonly string[] {
+  return Object.freeze(stdout.split('\n')
+    .map((line) => line.replace(/\r$/, ''))
+    .filter((line) => line.trim() !== '')
+    .map(unquoteGitPath));
+}
+
+/**
+ * The untracked paths a merge would bring a file onto: those `incoming`
+ * holds, and a folded directory (`dir/`) when it holds any path under
+ * it. In `untracked`'s order.
+ */
+export function untrackedIncoming(
+  untracked: readonly string[],
+  incoming: readonly string[],
+): readonly string[] {
+  const held = new Set(incoming);
+  return Object.freeze(untracked.filter((path) => path.endsWith('/')
+    ? incoming.some((file) => file.startsWith(path))
+    : held.has(path)));
+}
+
+/**
+ * The one line `rafa pr merge` prints for the untracked paths it leaves
+ * where they are because neither incoming tree holds them, or null when
+ * there are none. At most {@link MAX_LISTED_CHANGES} are named, each
+ * quoted the way {@link shellQuote} quotes a word.
+ */
+export function untrackedLeftLine(paths: readonly string[]): string | null {
+  if (paths.length === 0) return null;
+  const named = paths.slice(0, MAX_LISTED_CHANGES).map((path) => shellQuote(path));
+  const hidden = paths.length - named.length;
+  const more = hidden > 0
+    ? ` and ${hidden} more`
+    : '';
+  const which = paths.length === 1
+    ? 'path'
+    : 'paths';
+  return `Leaving the untracked ${which} the merge does not touch in place: ${named.join(', ')}${more}.`;
 }
 
 /** One checkout in `git worktree list --porcelain`. */
@@ -237,6 +367,14 @@ export interface MergeRefusalReading {
   readonly base: string;
   /** The checkout the merge would run in. */
   readonly tree: WorkingTreeStatus;
+  /**
+   * Every path the incoming trees hold: the pull request's head and the
+   * base's remote-tracking branch, together. An untracked path is
+   * refused only when it is one of these; see the module note. Absent
+   * reads as every untracked path being held, so a caller that read no
+   * trees refuses as before.
+   */
+  readonly incoming?: readonly string[];
   /** What GitHub said about merging it. */
   readonly merge: MergeState;
   /** The verdict over its checks. */
@@ -328,14 +466,39 @@ function noChecksRefusal(number: number): MergeRefusal {
   };
 }
 
-function dirtyTreeRefusal(tree: WorkingTreeStatus): MergeRefusal {
-  const count = plural(tree.entries.length, 'change', 'changes');
+/**
+ * The untracked paths of `reading` the merge would bring a file onto:
+ * those {@link MergeRefusalReading.incoming} holds, or every one when it
+ * is absent.
+ */
+function heldUntracked(reading: Pick<MergeRefusalReading, 'tree' | 'incoming'>): readonly string[] {
+  return reading.incoming === undefined
+    ? reading.tree.untracked
+    : untrackedIncoming(reading.tree.untracked, reading.incoming);
+}
+
+/**
+ * The refusal for tracked changes and for the untracked paths in `held`,
+ * or null when there are neither. It lists the porcelain lines of both
+ * as git wrote them; an untracked path neither incoming tree holds is
+ * not counted and not listed.
+ */
+function dirtyTreeRefusal(tree: WorkingTreeStatus, held: readonly string[]): MergeRefusal | null {
+  const heldSet = new Set(held);
+  const listed = tree.entries.filter((line) => !line.startsWith(UNTRACKED_PREFIX)
+    || heldSet.has(unquoteGitPath(line.slice(UNTRACKED_PREFIX.length))));
+  if (listed.length === 0) return null;
+  const count = plural(listed.length, 'change', 'changes');
+  const untrackedNote = held.length === 0
+    ? []
+    : ['An untracked path listed here is one the merge brings a file onto.'];
   return {
     reason: 'dirty-tree',
     message: [
       `${REFUSAL_PREFIX}: the working tree has ${count}.`,
       'Commit or stash them, then run rafa pr merge again.',
-      ...listChanges(tree.entries),
+      ...untrackedNote,
+      ...listChanges(listed),
     ].join('\n'),
   };
 }
@@ -417,7 +580,8 @@ function worktreeRefusal(branch: string, held: readonly WorktreeEntry[]): MergeR
  * verdict, and what `skipChecks` allows, are in the module note.
  */
 export function readMergeRefusal(reading: MergeRefusalReading): MergeRefusal | null {
-  if (!reading.tree.clean) return dirtyTreeRefusal(reading.tree);
+  const dirty = dirtyTreeRefusal(reading.tree, heldUntracked(reading));
+  if (dirty !== null) return dirty;
   if (reading.merge.mergeable !== 'mergeable') return mergeStateRefusal(reading);
   const checks = checksRefusalOf(reading);
   if (checks !== null) return checks;

@@ -180,7 +180,7 @@ import {
   readBooleanFlag,
   readPullArgument,
 } from './pr-context.js';
-import { readTriageGuard } from './triage-guard.js';
+import { readTriageGuard, triageVerdict } from './triage-guard.js';
 import { readConflictFiles, readFailedLogs, readWorkflowCount } from './triage-read.js';
 import { evidenceOf, renderTriages, workflowCountOf } from './triage-report.js';
 import { resolvePullRequest } from './triage-resolve.js';
@@ -477,9 +477,7 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
     step: logs.chosen?.evidence.step,
     conflictFiles: conflict?.files ?? [],
     workflowCount: workflows?.count ?? null,
-    guard: guard?.ok === true
-      ? guard.verdict
-      : null,
+    guard: triageVerdict(guard),
   });
   const assessed: TriageReading = {
     detail,

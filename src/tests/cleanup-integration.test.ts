@@ -8,7 +8,7 @@
  *    locked ones;
  *  - ticking the Not-pushed branch asks the second question, and `n`
  *    keeps it (answered `y` it is deleted, so the question decides);
- *  - with no terminal the four groups print, exit 0, and nothing is
+ *  - with no terminal the five groups print, exit 0, and nothing is
  *    removed;
  *  - `--dry-run` prints the git commands and removes nothing.
  *
@@ -130,7 +130,7 @@ describe('rafa cleanup over the scratch repository', () => {
     expect(run.stderr).toBe('');
     expect(run.exitCode).toBe(0);
     expect(asked).toHaveLength(1);
-    expect(asked[0]).toBe(cleanupQuestion(DELETED.length, 1));
+    expect(asked[0]).toBe(cleanupQuestion(DELETED.length, 1, 0));
     const left = branches();
     for (const name of DELETED) expect(left).not.toContain(name);
     for (const name of KEPT) expect(left).toContain(name);
@@ -154,7 +154,7 @@ describe('rafa cleanup over the scratch repository', () => {
     expect(run.exitCode).toBe(0);
     expect(asked).toHaveLength(2);
     expect(asked[0]).toContain('unpushed holds 2 commits');
-    expect(asked[1]).toBe(cleanupQuestion(DELETED.length, 1));
+    expect(asked[1]).toBe(cleanupQuestion(DELETED.length, 1, 0));
     const left = branches();
     expect(left).toContain('unpushed');
     for (const name of DELETED) expect(left).not.toContain(name);
@@ -168,12 +168,12 @@ describe('rafa cleanup over the scratch repository', () => {
     expect(branches()).toContain('stale');
   });
 
-  it('prints the four groups and removes nothing without a terminal', async () => {
+  it('prints the five groups and removes nothing without a terminal', async () => {
     const before = branches();
     const { run, asked } = await cleanup([], { isTTY: false });
     expect(run.exitCode).toBe(0);
     expect(asked).toEqual([]);
-    for (const title of ['Merged', 'Stale', 'Not pushed', 'Worktrees']) expect(run.stdout).toContain(title);
+    for (const title of ['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records']) expect(run.stdout).toContain(title);
     for (const name of [...DELETED, ...KEPT.slice(1)]) expect(run.stdout).toContain(name);
     expect(run.stdout).toContain('git push origin --delete stale');
     expect(branches()).toEqual(before);

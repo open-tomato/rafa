@@ -51,6 +51,7 @@ const CONFIG: SeenInput['config'] = {
   cleanupKeep: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
+  loopWorktreeDir: '.rafa/worktrees',
 };
 
 /** A time past `cleanup.worktreeIdleDays` before {@link SCRATCH_NOW}. */
@@ -151,6 +152,48 @@ describe('the housekeeping half of the reading', () => {
 
     expect(log).toContain('worktree list --porcelain');
     expect(log.filter((argv) => REMOTE_COMMANDS.has(argv.split(' ')[0] ?? ''))).toEqual([]);
+  });
+});
+
+describe('the loop worktrees the reading counts', () => {
+  let repo: ScratchRepository;
+  let configured: string;
+  let defaulted: string;
+
+  beforeAll(() => {
+    repo = createScratchRepository();
+    configured = join(repo.clone, 'loop-trees', 'loop-a');
+    defaulted = join(repo.clone, '.rafa', 'worktrees', 'loop-b');
+    repo.git(['worktree', 'add', '--quiet', '-b', 'loop-a', configured]);
+    repo.git(['worktree', 'add', '--quiet', '-b', 'loop-b', defaulted]);
+  });
+
+  afterAll(() => {
+    repo.dispose();
+  });
+
+  /** The idle worktrees of the scratch clone under `loopWorktreeDir`, every path read as old. */
+  async function idleUnder(loopWorktreeDir: string): Promise<readonly string[]> {
+    const reading = await takeSeenSnapshot(
+      { root: repo.clone, home: repo.home, config: { ...CONFIG, loopWorktreeDir } },
+      { worktreeSeams: (cwd) => ({ ...defaultWorktreeSeams(cwd), modifiedAt: () => OLD }), isAlive: () => false, now: () => SCRATCH_NOW },
+    );
+    if (!reading.ok) throw new Error(`no snapshot: ${reading.detail}`);
+    return reading.snapshot.idleWorktrees;
+  }
+
+  it('counts an idle worktree under a configured loop.worktreeDir, and not one under .rafa/worktrees', async () => {
+    const idle = await idleUnder('loop-trees');
+
+    expect(idle).toContain(configured);
+    expect(idle).not.toContain(defaulted);
+  });
+
+  it('counts the one under .rafa/worktrees, and not the other, when the config names the default', async () => {
+    const idle = await idleUnder('.rafa/worktrees');
+
+    expect(idle).toContain(defaulted);
+    expect(idle).not.toContain(configured);
   });
 });
 

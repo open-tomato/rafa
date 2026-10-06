@@ -31,6 +31,14 @@
  * lines after, so a `stale` or `collision` refusal still ENDS with
  * `rafa pr triage <n> --resolve`, the line the reader acts on.
  *
+ * Settle's release pull request (`src/release/release-delivery.ts`) is
+ * met before any of these: a head of `RELEASE_PR_BRANCH` the guard
+ * reads as the delivery prints its one line,
+ * `Release: #<n> is settle's release pull request; merging it lands
+ * <version>`, on stdout, with no forecast and no `fix:` line, and the
+ * merge goes on whatever `pr.versionCollision` says. The report carries
+ * the answer `release` and the reaction `print` (#843).
+ *
  * The guard runs only where the release does: `release.enabled` read as
  * the wrap-up reads it (`src/release/enabled.ts`), so a project with no
  * version file or no changelog under `auto` gets no step, no fetch and
@@ -46,14 +54,18 @@ import { CommandExit } from '../../cli/command.js';
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
 import { guardLines, localPlanNotes } from '../../release/guard.js';
+import { releaseDeliveryLine, releaseDeliveryOf } from '../../release/release-delivery.js';
 
 /** The answers that mean yes to a question spelled `[y/N]`. */
 const YES_ANSWERS: readonly string[] = ['y', 'yes'];
 
 /** What the guard answered, as `pr merge`'s result carries it. */
 export interface MergeGuardReport {
-  /** The guard's answer, or `unread` where it could not read. */
-  readonly answer: GuardAnswer | 'unread';
+  /**
+   * The guard's answer, `unread` where it could not read, or `release`
+   * where the pull request is settle's own release delivery.
+   */
+  readonly answer: GuardAnswer | 'unread' | 'release';
   /** How the merge met it. */
   readonly reaction: GuardReaction;
   /** The lines the guard printed, or would have printed where it was `silent`. */
@@ -154,6 +166,12 @@ export async function guardBeforeMerge(step: MergeGuardStep): Promise<MergeGuard
     now: step.now,
     readNotes: localPlanNotes(root),
   });
+  const delivery = releaseDeliveryOf(reading);
+  if (delivery !== null) {
+    const lines = [releaseDeliveryLine(delivery)];
+    printLines(step, 'print', lines);
+    return { report: { answer: 'release', reaction: 'print', lines }, go: true };
+  }
   const answer = answerOf(reading);
   const reaction = guardReaction(reading, settings);
   const lines = guardLines(reading, settings.releaseVersionFile);

@@ -13,14 +13,17 @@
  * The spec's Design table, applied to each branch in this order, the
  * first that holds deciding:
  *
- *   1. **Merged**, ticked: `git branch --merged refs/heads/<base>` lists
+ *   1. **Merged**, ticked unless a worktree that cannot be ticked holds
+ *      it or the base does not reach a tip no pull request has (both
+ *      below): `git branch --merged refs/heads/<base>` lists
  *      it; OR the provider answers a merged pull request whose head is
  *      the branch AND whose head commit is the branch's tip; OR its
  *      upstream reads `[gone]`. Every reading that holds is kept on the
  *      row ({@link MergedRow.mergedBy}) and in its reason, because the
  *      delete step picks `-d` or `-D` from them: a squash merge is not
  *      reachable, so `-d` refuses it, and `-D` is allowed only for the
- *      pull request whose head commit IS the tip.
+ *      pull request whose head commit IS the tip, or for commits past
+ *      its head that are release fragments the base holds (below).
  *   2. **Not pushed**, unticked: no upstream, or commits ahead of it.
  *      The row carries how many commits deleting it would lose
  *      ({@link NotPushedRow.commits}). It is decided before Stale so a
@@ -31,6 +34,54 @@
  *
  * A branch none of them holds for — pushed, level with its upstream,
  * committed to recently — is somebody's current work and is not listed.
+ *
+ * ## A Merged branch its worktree holds
+ *
+ * Git refuses to delete a branch a worktree has checked out (`error:
+ * cannot delete branch 'w' used by worktree at '<path>'`, `./steps.ts`).
+ * A ticked worktree is removed first and its branch's delete waits for
+ * it. A listed worktree that cannot be ticked (`./worktrees.ts`: dirty,
+ * locked, current, a live session, recent or unreadable) is never
+ * removed, so a Merged branch it holds starts UNticked, carries the
+ * holder ({@link MergedRow.heldBy}), and its reason ends with
+ * `checked out in <worktree name> (<blocker>)`: the name is the last
+ * part of the worktree's path, the blocker every
+ * {@link WorktreeBlockKind} that holds for it, comma-joined. A worktree
+ * the cleanup does not list is somebody's own checkout and holds nothing
+ * here. {@link holdMergedRows} applies the rule, and
+ * {@link classifyBranches} applies it to the worktrees
+ * {@link GroupSettings.worktrees} names; `./index.ts` reads the
+ * worktrees after the groups (they need the Merged names to tick a
+ * clean one), so it applies {@link holdMergedRows} to them after.
+ *
+ * ## A Merged branch the base does not reach (#710, #149)
+ *
+ * A row Merged by its `[gone]` upstream alone — the base does not reach
+ * its tip and no merged pull request has that tip as its head — starts
+ * UNticked: `git branch -d` refuses a branch the base does not reach,
+ * and nothing read says what it holds is merged. Its reason says why:
+ *
+ *   - when a merged pull request naming the branch has a head commit
+ *     the tip descends from (`readPastHead` of `./past-head.ts`, over
+ *     the pull requests in the provider's order, the first that
+ *     descends deciding), the reason ends
+ *     `<n> commits past #<pr>'s head: <subjects>`, the subjects
+ *     comma-joined oldest first ({@link pastHeadReason}), and the row
+ *     carries the reading ({@link MergedRow.pastHead}): the delete step
+ *     answers `-D` only when every commit past the head is a release
+ *     fragment the base already holds, and withholds the delete
+ *     otherwise. The wrap-up's release fragment, committed after the
+ *     pull request's head was taken and never pushed, is that shape.
+ *   - otherwise it ends `<base> does not reach its tip`, or, when the
+ *     base could not be read, `whether <base> reaches its tip could
+ *     not be read`.
+ *
+ * Which files are release fragments, and where the receipts are read,
+ * come from {@link GroupSettings.release}, `release.fragments` and
+ * `release.changelog`. A past-head reading git refuses is a note
+ * ({@link pastHeadUnreadNote}), not a failure: the row keeps the second
+ * reason and no {@link MergedRow.pastHead}, so its delete stays `-d`,
+ * which git refuses for a tip nothing reaches.
  *
  * ## The provider's reading, and its two absences
  *
@@ -74,14 +125,30 @@
  * crashing.
  */
 import type { BranchesRead, BranchesUnread, LocalBranch } from './branches.js';
+import type { PastHeadRead, PastHeadReading, PastHeadSettings } from './past-head.js';
+import type { WorktreeBlockKind, WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest, PullRequests } from '../pr/types.js';
 
+import { basename } from 'node:path';
+
+import { RELEASE_DEFAULTS } from '../config-schema-release.js';
 import { messageOf } from '../config-sections.js';
 import { gitSaid } from '../pr/git.js';
 
+import { readPastHead } from './past-head.js';
+
 /** The wording every Stale and Not-pushed row carries when no provider is configured. */
 export const MERGED_STATE_UNKNOWN = 'merged state unknown';
+
+/** `release.fragments` and `release.changelog`, as `./past-head.ts` reads them. */
+export type ReleasePaths = Omit<PastHeadSettings, 'base'>;
+
+/** The release paths {@link classifyBranches} reads when its settings name none: the config's defaults. */
+export const DEFAULT_RELEASE_PATHS: ReleasePaths = Object.freeze({
+  fragments: RELEASE_DEFAULTS.releaseFragments,
+  changelog: RELEASE_DEFAULTS.releaseChangelog,
+});
 
 /** Milliseconds in one of the days `cleanup.staleDays` counts. */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -103,14 +170,37 @@ interface RowFields {
   readonly reason: string;
 }
 
-/** A branch in Merged: ticked by default. */
+/** The listed worktree that cannot be ticked and holds a Merged branch; see the module note. */
+export interface BranchHolder {
+  /** The worktree's path, as git resolved it. */
+  readonly path: string;
+  /** The last part of {@link path}, the name its reason shows. */
+  readonly name: string;
+  /** Every rule that blocks it, in the worktree row's order; never empty. */
+  readonly blockers: readonly WorktreeBlockKind[];
+}
+
+/**
+ * A branch in Merged: ticked by default, unless a worktree that cannot
+ * be ticked holds it or the base does not reach a tip no pull request
+ * has; see the module note.
+ */
 export interface MergedRow extends RowFields {
   readonly group: 'merged';
-  readonly ticked: true;
+  /** False when {@link heldBy} names a holder or {@link mergedBy} is `gone` alone; true otherwise. */
+  readonly ticked: boolean;
+  /** The listed worktree that cannot be ticked and holds the branch; absent when none does. */
+  readonly heldBy?: BranchHolder;
   /** Every reading that holds, in the order of {@link MergedBy}; never empty. */
   readonly mergedBy: readonly MergedBy[];
   /** The merged pull request whose head commit is the tip, or null when none is. */
   readonly pullRequest: MergedPullRequest | null;
+  /**
+   * For a row Merged by `gone` alone, the commits its tip holds past
+   * the head of the merged pull request it descends from; absent when
+   * no such pull request was read. See the module note.
+   */
+  readonly pastHead?: PastHeadRead;
 }
 
 /** A branch in Stale: unticked by default. */
@@ -147,6 +237,10 @@ export interface GroupSettings {
   readonly staleDays: number;
   /** The clock, read once by the caller. */
   readonly now: Date;
+  /** The listed worktrees, whose untickable ones untick the Merged branches they hold; none when left out. */
+  readonly worktrees?: readonly WorktreeRow[];
+  /** `release.fragments` and `release.changelog`; {@link DEFAULT_RELEASE_PATHS} when left out. */
+  readonly release?: ReleasePaths;
 }
 
 /** The three branch groups, each in the order the branches were read. */
@@ -177,6 +271,17 @@ export function baseUnreadNote(base: string, detail: string): string {
   return `could not read which branches are merged into ${base} (${detail}); none is listed as merged into it`;
 }
 
+/** The one line saying what `branch` holds past `#<pr>`'s head could not be read. */
+export function pastHeadUnreadNote(branch: string, pullRequest: number, detail: string): string {
+  return `could not read the commits ${branch} holds past #${String(pullRequest)}'s head (${detail}); its delete is not forced`;
+}
+
+/** `<n> commits past #<pr>'s head: <subjects>`, the subjects comma-joined oldest first. */
+export function pastHeadReason(reading: PastHeadRead): string {
+  const subjects = reading.commits.map((commit) => commit.subject).join(', ');
+  return `${plural(reading.count, 'commit')} past #${String(reading.pullRequest.number)}'s head: ${subjects}`;
+}
+
 /**
  * Asks `pulls` for its merged pull requests. Null — no provider
  * configured — answers `none`; a provider that throws answers
@@ -193,11 +298,41 @@ export async function readProviderMerges(pulls: PullRequests | null): Promise<Pr
   }
 }
 
+/** The reason a held Merged row's reason ends with: `checked out in <name> (<blockers>)`. */
+export function heldReason(holder: BranchHolder): string {
+  return `checked out in ${holder.name} (${holder.blockers.join(', ')})`;
+}
+
+/**
+ * `rows` with every Merged branch a listed worktree that cannot be
+ * ticked holds unticked, its holder kept and named in its reason; see
+ * the module note. A row no such worktree holds is returned as it came.
+ */
+export function holdMergedRows(rows: readonly MergedRow[], worktrees: readonly WorktreeRow[]): MergedRow[] {
+  const holders = new Map<string, BranchHolder>();
+  for (const row of worktrees) {
+    if (row.tickable || row.branch === null) {
+      continue;
+    }
+    const blockers = [...new Set(row.blockers.map((blocker) => blocker.kind))];
+    holders.set(row.branch, { path: row.path, name: basename(row.path), blockers });
+  }
+  return rows.map((row) => {
+    const holder = holders.get(row.branch.name);
+    return holder === undefined
+      ? row
+      : { ...row, ticked: false, heldBy: holder, reason: `${row.reason}; ${heldReason(holder)}` };
+  });
+}
+
 /**
  * Sorts `read`'s branches into Merged, Stale and Not pushed by the
  * rules in the module note, running `git branch --merged` once, a tip
- * read when a merged pull request names a listed branch, and one
- * `rev-list --count` per Not-pushed branch.
+ * read when a merged pull request names a listed branch, a
+ * `./past-head.ts` reading per pull request naming a branch Merged by
+ * `gone` alone, and one `rev-list --count` per Not-pushed branch. A
+ * Merged branch an untickable worktree of `settings.worktrees` holds,
+ * or Merged by `gone` alone, starts unticked.
  */
 export function classifyBranches(
   git: GitRunner,
@@ -235,12 +370,22 @@ export function classifyBranches(
       ? [baseRef]
       : [],
   };
+  const unreached: UnreachedContext = {
+    git,
+    base: read.base,
+    baseRead: mergedRead.ok,
+    release: settings.release ?? DEFAULT_RELEASE_PATHS,
+    notes,
+  };
   for (const branch of read.branches) {
     const pulls = named.get(branch.name) ?? [];
     const atTip = pulls.find((pull) => pull.headRefOid === tips.get(branch.name)) ?? null;
     const mergedBy = mergedReadings(branch, reachable.has(branch.name), atTip);
     if (mergedBy.length > 0) {
-      merged.push(mergedRow(branch, mergedBy, atTip, read.base));
+      const row = mergedRow(branch, mergedBy, atTip, read.base);
+      merged.push(mergedBy.includes('base') || atTip !== null
+        ? row
+        : unreachedRow(unreached, row, pulls));
       continue;
     }
     const suffix = rowSuffix(context, pulls[0] ?? null);
@@ -258,7 +403,8 @@ export function classifyBranches(
       stale.push({ group: 'stale', branch, ticked: false, idleDays, reason: `no commit in ${plural(idleDays, 'day')}${suffix}` });
     }
   }
-  return { ok: true, base: read.base, merged, stale, notPushed, notes };
+  const held = holdMergedRows(merged, settings.worktrees ?? []);
+  return { ok: true, base: read.base, merged: held, stale, notPushed, notes };
 }
 
 /** What every unmerged row's reason and count read from. */
@@ -267,6 +413,40 @@ interface RowContext {
   readonly unknown: boolean;
   /** The refs whose commits a Not-pushed count does not count as lost. */
   readonly exclude: readonly string[];
+}
+
+/** What {@link unreachedRow} reads through, and the notes it adds to. */
+interface UnreachedContext {
+  readonly git: GitRunner;
+  readonly base: string;
+  /** False when `git branch --merged` could not read the base. */
+  readonly baseRead: boolean;
+  readonly release: ReleasePaths;
+  /** The reading's notes, which a refused past-head reading is pushed onto. */
+  readonly notes: string[];
+}
+
+/**
+ * `row`, Merged by `gone` alone, unticked with its reason saying why;
+ * see the module note. `pulls` are the merged pull requests naming the
+ * branch, read in order until one's head is an ancestor of the tip.
+ */
+function unreachedRow(context: UnreachedContext, row: MergedRow, pulls: readonly MergedPullRequest[]): MergedRow {
+  const settings: PastHeadSettings = { base: context.base, ...context.release };
+  for (const pull of pulls) {
+    const reading: PastHeadReading = readPastHead(context.git, row.branch.name, pull, settings);
+    if (reading.kind === 'past-head') {
+      return { ...row, ticked: false, pastHead: reading, reason: `${row.reason}; ${pastHeadReason(reading)}` };
+    }
+    if (reading.kind === 'unread') {
+      context.notes.push(pastHeadUnreadNote(row.branch.name, pull.number, firstLine(reading.detail)));
+      break;
+    }
+  }
+  const why = context.baseRead
+    ? `${context.base} does not reach its tip`
+    : `whether ${context.base} reaches its tip could not be read`;
+  return { ...row, ticked: false, reason: `${row.reason}; ${why}` };
 }
 
 /** The merged pull requests naming each listed branch, newest created first. */

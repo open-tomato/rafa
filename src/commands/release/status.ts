@@ -203,9 +203,19 @@ export interface UntaggedReading {
   readonly released: readonly string[];
   /** Those of them no tag names, in the same order. */
   readonly versions: readonly string[];
+  /**
+   * True when no file is there, which settle creates (#842): the status
+   * block then prints {@link MISSING_CHANGELOG_CELL} and no problem line.
+   * `problem` still carries the read failure for other readers
+   * (`rafa next`'s epic end).
+   */
+  readonly missing: boolean;
   /** Why the changelog could not be read, or null when it was. */
   readonly problem: string | null;
 }
+
+/** What a missing changelog's cells read as: settle's release commit creates it. */
+export const MISSING_CHANGELOG_CELL = 'missing; rafa release settle creates it';
 
 /** What named the plan the pending notes were read for. */
 export type ReleasePlanSource =
@@ -401,7 +411,11 @@ export function readTags(git: GitRunner): TagReading {
   return { tags, latest: tags[0] ?? null, problem: null };
 }
 
-/** The versions the changelog at `configured` calls released, and which of them carry no tag. */
+/**
+ * The versions the changelog at `configured` calls released, and which
+ * of them carry no tag. An absent file sets `missing` beside its
+ * problem; a file that exists and cannot be read sets the problem only.
+ */
 export function readUntagged(
   root: string,
   configured: string,
@@ -414,11 +428,12 @@ export function readUntagged(
       path: configured,
       released: [],
       versions: [],
+      missing: !existsSync(resolved),
       problem: `the changelog could not be read at ${resolved}`,
     };
   }
   const released = changelogVersions(text);
-  return { path: configured, released, versions: untaggedVersions(released, tags), problem: null };
+  return { path: configured, released, versions: untaggedVersions(released, tags), missing: false, problem: null };
 }
 
 /** The branch checked out where `git` runs, or null when git could not say. */
@@ -524,6 +539,7 @@ function tagCell(reading: TagReading): string {
 
 /** The untagged cell: the versions, or what there was none of. */
 function untaggedCell(reading: UntaggedReading): string {
+  if (reading.missing) return MISSING_CHANGELOG_CELL;
   if (reading.problem !== null) return UNREADABLE;
   if (reading.released.length === 0) return `${NOTHING}, and the changelog names no release`;
   return reading.versions.length === 0
@@ -558,7 +574,9 @@ function problemsOf(reading: ReleaseStatusReading): readonly string[] {
   return [
     reading.versionFile.problem,
     reading.tags.problem,
-    reading.untagged.problem,
+    reading.untagged.missing
+      ? null
+      : reading.untagged.problem,
     reading.plan.problem,
     ...reading.waiting.problems,
   ].filter((problem): problem is string => problem !== null);
@@ -581,7 +599,9 @@ export function renderStatus(reading: ReleaseStatusReading): string {
     untaggedCell(reading.untagged),
     pendingCell(reading.plan),
     waitingCell(reading.waiting) ?? UNREADABLE,
-    auditCell(reading.audit) ?? UNREADABLE,
+    auditCell(reading.audit) ?? (reading.untagged.missing
+      ? MISSING_CHANGELOG_CELL
+      : UNREADABLE),
   ];
   const [versionLine, tagLine, untaggedLine, pendingLine, waitingLine, auditLine] = LABELS
     .map((label, index) => `${INDENT}${label.padEnd(width)}${GAP}${cells[index] ?? ''}`);
