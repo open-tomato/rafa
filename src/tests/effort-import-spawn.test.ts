@@ -163,7 +163,7 @@ describe('rafa effort import, spawned', () => {
     expect(outcome.stdout).toContain(`Merges ${otherPath} (store ${THERE}) into ${path}`);
     expect(outcome.stdout).toContain('  sessions: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict;');
-    expect(outcome.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(outcome.stdout).toContain('✅ Merged. Every row the original held is copied to');
     const [backupName] = readdirSync(effortDir).sort()
       .filter((name) => name !== 'effort.sqlite');
     expect(readdirSync(effortDir).sort()).toEqual([

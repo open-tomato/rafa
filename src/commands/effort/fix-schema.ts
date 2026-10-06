@@ -154,8 +154,8 @@ export function renderFixSchema(result: FixSchemaResult): string[] {
     case 'rebuilt':
       return [
         ...rebuildLines(result),
-        `✅ Rebuilt at this rafa's migrations. The original is kept whole at ${String(result.backupPath)};`
-          + ` rename it back to undo. ${keepsIdLine('rebuild')}`,
+        `✅ Rebuilt at this rafa's migrations. Every row the original held is copied to ${String(result.backupPath)}.`
+          + ` ${keepsIdLine('rebuild')}`,
       ];
   }
 }

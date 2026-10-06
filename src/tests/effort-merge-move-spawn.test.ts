@@ -142,7 +142,7 @@ describe('rafa effort merge, spawned', () => {
     expect(outcome.stdout).toContain(`Merges ${otherPath} (store ${THERE}) into ${path}`);
     expect(outcome.stdout).toContain('  sessions: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict;');
-    expect(outcome.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(outcome.stdout).toContain('✅ Merged. Every row the original held is copied to');
     expect(readdirSync(effortDir).sort()).toEqual([
       'effort.sqlite',
       expect.stringMatching(/^effort\.sqlite\.before-merge-\d{8}T\d{6}Z\.bak$/) as unknown as string,
@@ -249,6 +249,6 @@ describe('rafa effort merge and rafa effort move --to=sqlite, spawned', () => {
     const merged = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath]);
 
     expectExit(merged, 0, scratch);
-    expect(merged.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(merged.stdout).toContain('✅ Merged. Every row the original held is copied to');
   }, SPAWN_TIMEOUT);
 });

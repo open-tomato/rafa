@@ -10,9 +10,11 @@
  * otherwise. The pending migrations are applied to
  * `effort.sqlite.migrate-<stamp>` beside it, checked (the row count of
  * every table, `integrity_check`, this rafa's schema plan), and swapped in
- * with the original kept whole as `effort.sqlite.before-<id>-<stamp>.bak`.
- * The migrated store keeps the store's id; the backup is a copy, so
- * renamed back it takes a new id on its next write. `--dry-run` builds and checks the same file, then deletes it.
+ * once every row the original holds is copied to
+ * `effort.sqlite.before-<id>-<stamp>.bak`. The migrated store keeps the
+ * store's id; the backup is a copy, so renamed back to undo the migration
+ * it takes a new id on its next write. `--dry-run` builds and checks the
+ * same file, then deletes it.
  *
  * The swap is refused, before anything is built, from a development build
  * over a store it does not own, which is any store but a copy under
@@ -95,7 +97,7 @@ export function renderMigrate(result: MigrateResult): string[] {
     case 'migrated':
       return [
         ...builtLines(result),
-        `✅ Migrated. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`
+        `✅ Migrated. Every row the original held is copied to ${String(result.backupPath)}.`
           + ` ${keepsIdLine('migrated store')}`,
       ];
   }

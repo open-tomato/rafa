@@ -195,7 +195,7 @@ describe('rafa effort import', () => {
     expect(outcome.stdout).toContain(`Merges ${testCase.otherPath} (store ${THERE}) into ${testCase.path}, as merge merge-1.`);
     expect(outcome.stdout).toContain('  findings: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict; 0 commit gaps recomputed.');
-    expect(outcome.stdout).toContain(`✅ Merged. The original is kept whole at ${backup}; rename it back to undo.`);
+    expect(outcome.stdout).toContain(`✅ Merged. Every row the original held is copied to ${backup}.`);
     expect(existsSync(backup)).toBe(true);
     expect(findingSessions(testCase.path)).toEqual(['session-a1', 'session-b1']);
     // Control for every byte-identical reading below: an import changes this store's directory.

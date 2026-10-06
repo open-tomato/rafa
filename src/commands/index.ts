@@ -135,7 +135,8 @@
  *   - `effort collect` and `effort report`, whose spelling is phase 0's,
  *     and `effort fix-schema [--dry-run]`, a store this rafa refuses for
  *     a reason a rebuild repairs rebuilt at the migrations this one
- *     knows, with a migration log, the original kept whole, and
+ *     knows, with a migration log, every row of the original copied to
+ *     a backup that takes a new store id when renamed back, and
  *     `effort copy [--to=<dir>]`, the store copied into a scratch
  *     directory for `RAFA_EFFORT_DIR` to point a command at, and
  *     `effort schema [--check]`, whether this rafa can use the store,
