@@ -132,12 +132,14 @@ the next one, so you rarely have to remember it.
    rafa doctor --deep
    ```
 
-   `init` writes `.rafa/config.yaml`, keeps `.rafa/` out of git, and on a
-   GitHub repository offers to set up the board (labels, the spec issue
-   template, a pinned Roadmap issue). `doctor` runs every check
-   `loop start` runs before its first session, and starts nothing: the
-   prerequisites your config and the plan name, `gh` and its login when
-   the repository is on GitHub, and the install itself.
+   `init` writes what is missing of `.rafa/` and `~/.rafa/`, their
+   `config.yaml` files, and directories `specs/`, `plans/`, `runs/`,
+   `effort/`, `instincts/` under `.rafa/`. On a GitHub repository it also
+   offers to set up the board (labels, the spec issue template, a pinned
+   Roadmap issue). `doctor` runs every check `loop start` runs before its
+   first session, and starts nothing: the prerequisites your config and the
+   plan name, `gh` and its login when the repository is on GitHub, and the
+   install itself.
 
 2. **Write a spec.** A spec says what you get, where things stand, the
    design, what can go wrong, the tasks the plan must carry, and how you
