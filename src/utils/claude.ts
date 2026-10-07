@@ -177,7 +177,8 @@
  * after `rafa` and says to declare `spends` on it, with the flag missing
  * for a `with` form and the flag present for an `unless` one. It changes
  * no exit code. In text mode it is a `warn:` line on the output's one
- * stream (`src/adapters/output/text.ts`).
+ * stream (`src/adapters/output/text.ts`); in json mode a `log` event at
+ * level `warn`; in events mode nothing, since that output drops `warn`.
  */
 import type { RunningCommand } from '../cli/running.js';
 import type { ClaudeSettingSource } from '../config.js';

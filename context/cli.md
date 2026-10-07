@@ -2602,8 +2602,9 @@ command is the one the dispatcher recorded with its parsed flags
 The warning is one `warn` line, `⚠️  ` and then a sentence naming the
 command as typed after `rafa` and saying to declare `spends` on it, with
 the flag missing for a `with` form and present for an `unless` one. It
-changes no exit code; in text mode it is a `warn:` line on stdout, the
-text output's one stream. Until 2026-10-07 the guard threw instead, and a
+changes no exit code. In text mode it is a `warn:` line on stdout, the
+text output's one stream; in json mode a `log` event at level `warn`; in
+events mode nothing, since that output drops `warn`. Until 2026-10-07 the guard threw instead, and a
 command an earlier test file left recorded refused every later session
 in the same process (#863).
 
