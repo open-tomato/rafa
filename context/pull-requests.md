@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Seven actions read and control pull requests:
+Eight actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -26,6 +26,10 @@ Seven actions read and control pull requests:
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
+- `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`
+  — open one from a pushed head over `PullRequests.create`, or print the one
+  already open on the head and open none; a missing or empty body file and
+  a head equal to the base are refused
 
 `<n>` defaults to the open PR of the current branch. Every action carries a
 summary, examples and `outputs: [text, json]`; each one in the core roster

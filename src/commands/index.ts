@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the eighty-eight registered so far wrap a
+ * of each is its command. Four of the eighty-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -53,7 +53,7 @@
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
- * the seven `pr` actions, which read, wait on, merge and triage one
+ * the eight `pr` actions, which read, open, wait on, merge and triage one
  * repository's pull requests through the PullRequests port and share
  * `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
@@ -128,7 +128,10 @@
  *     they settle or the deadline passes with nothing written, exiting 0
  *     green, 1 red and on no checks at all, and 3 at the deadline; and
  *     `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`,
- *     one merged and both branches cleaned up after it; and
+ *     one merged and both branches cleaned up after it;
+ *     `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`,
+ *     one opened from a pushed head, or the one already open on the head
+ *     printed and none opened; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each
@@ -392,6 +395,7 @@ import planValidate from './plan/validate.js';
 import prCurrent from './pr/current.js';
 import prList from './pr/list.js';
 import prMerge from './pr/merge.js';
+import prOpen from './pr/open.js';
 import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
@@ -423,7 +427,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
   { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
-  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
+  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; open, list, wait on, merge and triage them' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
@@ -463,6 +467,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prCurrent,
   prShow,
   prView,
+  prOpen,
   prList,
   prWait,
   prMerge,

@@ -9,7 +9,7 @@
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`,
- * the four `claim` actions, the eight `update` actions, `config set` and the seven `pr` actions
+ * the four `claim` actions, the eight `update` actions, `config set` and the eight `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -128,6 +128,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'pr wait': ['text', 'json'],
   'pr merge': ['text', 'json'],
   'pr triage': ['text', 'json'],
+  'pr open': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'effort dashboard': ['text', 'json'],
@@ -218,6 +219,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr wait': [['n'], ['timeout', 'hint']],
   'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
   'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
+  'pr open': [[], ['head', 'base', 'title', 'body-file']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -332,6 +334,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['pr merge 41 --yes --method=squash', 'pr merge', ['41', '--yes', '--method=squash'], ''],
   ['pr triage 41 --no-comment', 'pr triage', ['41', '--no-comment'], ''],
   ['pr wait 41 --timeout=5', 'pr wait', ['41', '--timeout=5'], ''],
+  ['pr open --head=feat/x --base=stretch/9 --title=x --body-file=b.md', 'pr open', ['--head=feat/x', '--base=stretch/9', '--title=x', '--body-file=b.md'], ''],
   ['effort collect --since=2026-09-01 --no-git', 'effort collect', ['--since=2026-09-01', '--no-git'], ''],
   ['efforts report --kind=task', 'effort report', ['--kind=task'], ''],
   ['module list', 'module list', [], ''],
@@ -485,7 +488,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers with pr open after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -511,6 +514,7 @@ describe('the core roster', () => {
       'pr current',
       'pr show',
       'pr view',
+      'pr open',
       'pr list',
       'pr wait',
       'pr merge',
