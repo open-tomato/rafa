@@ -125,7 +125,7 @@ export function verdictOf(run: BranchRun | null): CiVerdict {
 }
 
 /** The `--log-failed` text of run `id`, or null when `gh` no longer holds it. */
-async function readFailedLog(gh: GhRunner, id: number): Promise<string | null> {
+export async function readFailedLog(gh: GhRunner, id: number): Promise<string | null> {
   const args = ['run', 'view', String(id), '--log-failed'];
   const result = await gh(args);
   if (result.ok) return result.stdout;
