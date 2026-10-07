@@ -23,7 +23,7 @@ import { scratchHomeEnv } from '../../src/tests/scratch-home-env.js';
  */
 
 const STRETCH_SH = resolve(import.meta.dir, 'stretch.sh');
-const DEFAULT_PROMPT = resolve(import.meta.dir, 'engineer-prompt-default.md');
+const DEFAULT_PROMPT = resolve(import.meta.dir, '..', '..', 'src', 'bundled', 'stretch', 'engineer-prompt-default.md');
 const CHECK_SH = resolve(import.meta.dir, '..', 'device', 'check.sh');
 
 let base = '';
@@ -98,7 +98,8 @@ function plantRafa(world: World, options: { plugin?: boolean } = {}): { readonly
   mkdirSync(stretchDir, { recursive: true });
   mkdirSync(join(root, '.rafa'), { recursive: true });
   copyFileSync(STRETCH_SH, join(stretchDir, 'stretch.sh'));
-  copyFileSync(DEFAULT_PROMPT, join(stretchDir, 'engineer-prompt-default.md'));
+  mkdirSync(join(root, 'src/bundled/stretch'), { recursive: true });
+  copyFileSync(DEFAULT_PROMPT, join(root, 'src/bundled/stretch/engineer-prompt-default.md'));
   writeFileSync(join(stretchDir, 'engineer-prompt.md'), 'RAFA ONLY: start stretch {{STRETCH}}.\n', 'utf8');
   for (const kind of ['agents', 'skills']) mkdirSync(join(root, 'src/bundled/operators', kind), { recursive: true });
   writeFileSync(join(root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'), 'x', 'utf8');
@@ -261,7 +262,7 @@ describe('stretch.sh', () => {
 
     expect(code).toBe(0);
     expect(out).toContain('Start stretch 2.');
-    expect(out).toContain(`prompt: ${join(rafa.root, 'scripts/stretch/engineer-prompt-default.md')}`);
+    expect(out).toContain(`prompt: ${join(rafa.root, 'src/bundled/stretch/engineer-prompt-default.md')}`);
     expect(out).not.toContain('RAFA ONLY');
   });
 

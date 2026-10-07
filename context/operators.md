@@ -98,8 +98,13 @@ The engineer's opening message is the first of three files, with
 `{{STRETCH}}` and `{{PREVIOUS}}` filled in: the project's own
 `.rafa/stretch/engineer-prompt.md`, then, in the rafa checkout alone,
 `scripts/stretch/engineer-prompt.md`, then
-`scripts/stretch/engineer-prompt-default.md`. So no other project is
-handed rafa's carried work. A first stretch drops each line naming
+`src/bundled/stretch/engineer-prompt-default.md`, which the build ships
+as `bundled/stretch/engineer-prompt-default.md`. So no other project is
+handed rafa's carried work. `src/stretch/prompt.ts` makes the same
+choice for the commands that replace the script, taking the default
+from the installed package and reading a project as the rafa checkout
+when its `package.json` is named `@open-tomato/rafa` and it holds
+`src/rafa.ts`. A first stretch drops each line naming
 `{{PREVIOUS}}`, since there is no report before it. The engineer's
 wrap-up writes the project's own prompt for the next stretch, and the
 person reviews it and adds the proposals they said yes to.

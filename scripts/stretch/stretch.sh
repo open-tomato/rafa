@@ -24,7 +24,7 @@
 #
 # The engineer's prompt is the project's .rafa/stretch/engineer-prompt.md,
 # else rafa's own engineer-prompt.md in the rafa checkout, else
-# engineer-prompt-default.md. A first stretch drops lines naming {{PREVIOUS}}.
+# src/bundled/stretch/engineer-prompt-default.md. A first stretch drops lines naming {{PREVIOUS}}.
 #
 # The operators and the stretch folder are described in context/operators.md.
 set -uo pipefail
@@ -34,7 +34,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 RAFA_ROOT="$(cd "$HERE/../.." && pwd -P)"
 OPERATORS="$RAFA_ROOT/src/bundled/operators"
 RAFA_PROMPT="$HERE/engineer-prompt.md"
-DEFAULT_PROMPT="$HERE/engineer-prompt-default.md"
+DEFAULT_PROMPT="$RAFA_ROOT/src/bundled/stretch/engineer-prompt-default.md"
 PROJECT_PROMPT=".rafa/stretch/engineer-prompt.md"
 # The plugin name the operators load under: --agent and the engineer's
 # skill loads name each operator as <plugin>:<name>.
