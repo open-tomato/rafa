@@ -610,8 +610,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
   ]],
   ['./commands/issue/move.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueRef', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueProject', 'issueRef', 'issueSubjectConfig', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+    ['./move-project.js', ['refreshMovedIssue']],
   ]],
   ['./commands/issue/ready.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner', 'moduleOfLabels', 'typeOfLabels']],
