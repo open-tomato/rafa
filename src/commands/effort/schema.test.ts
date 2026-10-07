@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { runningCommand } from '../../cli/running.js';
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { REFUSAL_REASONS } from '../../effort/store/schema-plan.js';
 import { migrateSchema, SQLITE_MIGRATIONS, withSqliteStore } from '../../effort/store/sqlite.js';
@@ -416,7 +417,14 @@ describe('the refusal reasons and their next steps', () => {
       ...SPAWNED_REFUSALS.map((entry) => ({ ...entry, migrations: SQLITE_MIGRATIONS })),
       ...CATALOGUE_REFUSALS,
     ];
-    const reports = await Promise.all(cases.map(async ({ plant, migrations }) => jsonReport(plant, migrations)));
+    // One dispatch at a time: each records its command and puts back the
+    // one it replaced (`src/cli/running.ts`), which holds only while
+    // dispatches nest. Run together, they finished out of order and left
+    // `effort schema` recorded for every later file in the process.
+    const reports: SchemaReport[] = [];
+    for (const { plant, migrations } of cases) {
+      reports.push(await jsonReport(plant, migrations));
+    }
 
     expect(reports.map(({ status }) => status)).toEqual([...REFUSAL_REASONS]);
     expect(reports.map(({ nextStep }) => nextStep)).toEqual([
@@ -433,6 +441,8 @@ describe('the refusal reasons and their next steps', () => {
       expect(report.refusal?.startsWith(`effort store: ${report.path} `)).toBe(true);
       expect(report.refusal).not.toContain('Next safe step');
     }
+    // Seven dispatches leave no command recorded for a later file to read.
+    expect(runningCommand()).toBeNull();
   });
 
   it('gives a current store the next step none in json', async () => {
