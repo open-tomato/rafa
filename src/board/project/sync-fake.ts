@@ -75,6 +75,8 @@ export interface SyncFakeOptions {
   readonly values?: Readonly<Record<number, Readonly<Record<string, string | number>>>> | null;
   /** How many field-write requests the project answers before refusing every later one as rate-limited. */
   readonly rateLimitAfter?: number;
+  /** The issues the project holds an item for; {@link SYNC_ITEM_ISSUES} when left out. */
+  readonly itemIssues?: readonly number[];
 }
 
 /** The router, the project fake behind it, and what was recorded. */
@@ -125,7 +127,8 @@ export function createSyncFake(options: SyncFakeOptions = {}): SyncFake {
   const values = options.values === undefined
     ? {}
     : options.values;
-  const items: readonly FakeProjectItem[] = SYNC_ITEM_ISSUES.map((number) => ({ number, values: values?.[number] ?? {} }));
+  const itemIssues = options.itemIssues ?? SYNC_ITEM_ISSUES;
+  const items: readonly FakeProjectItem[] = itemIssues.map((number) => ({ number, values: values?.[number] ?? {} }));
   const project = createFakeProjectGh({
     ...options.rateLimitAfter === undefined
       ? {}
