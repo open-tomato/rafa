@@ -59,6 +59,7 @@ your accounts.
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
   | `rafa epic close` | 🪙 one verification planning session and one session per check; nothing while a member is open |
   | `rafa stretch start` | 🪙 one session per operator it starts: the engineer, watchtower and analyst, or the one `--role` names; with `--dry-run`, nothing |
+  | `rafa stretch item` | 🪙 one planning session, unless a plan of the issue is there already, and the loop it starts; with `--dry-run`, nothing |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 

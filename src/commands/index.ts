@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-two registered so far wrap a
+ * of each is its command. Four of the ninety-three registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -85,7 +85,9 @@
  * readers, nor `config set`, which edits the project's config text
  * through `src/config-set.ts`, nor `ci status`, which reads a branch's
  * newest run through the readers under `src/ci/`, nor `stretch start`,
- * which opens a stretch through the readings of `src/stretch/`.
+ * which opens a stretch through the readings of `src/stretch/`, nor
+ * `stretch item`, which runs `plan create`, `loop start` and `loop wait`
+ * as child processes.
  *
  * ## What is registered
  *
@@ -315,6 +317,14 @@
  *     version printed, and the three operators opened in one tmux
  *     session, or the engineer in this terminal without tmux; `--role`
  *     starts that one session here. It spends unless `--dry-run`.
+ *   - `stretch item <issue> [--wait] [--dry-run]`: one item of the
+ *     stretch `pr.base` names planned with `plan create --issue`, a plan
+ *     of the issue already there kept, and its loop started detached
+ *     with `--as-worktree --no-ci-wait`, its events output appended to
+ *     `.rafa/stretch/<n>/loop-<issue>.log`; `--wait` then runs
+ *     `loop wait` on its session. Refused with exit code 1 when
+ *     `pr.base` names no `stretch/<n>` branch. It spends unless
+ *     `--dry-run`.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -432,6 +442,7 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import stretchItem from './stretch/item.js';
 import stretchStart from './stretch/start.js';
 import switchCommand from './switch.js';
 import updateBoard from './update/board.js';
@@ -549,6 +560,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   configSet,
   ciStatus,
   stretchStart,
+  stretchItem,
   status,
   next,
   roadmap,

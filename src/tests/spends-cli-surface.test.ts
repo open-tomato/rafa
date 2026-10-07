@@ -133,7 +133,7 @@ describe('rafa describe --output=json, spawned', () => {
     expect(result?.ok).toBe(true);
 
     const document = result?.data as DescribeDocument;
-    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search', 'stretch start'].sort());
+    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search', 'stretch item', 'stretch start'].sort());
     expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'cleanup')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'status')?.spends).toBeNull();
