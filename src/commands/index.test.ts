@@ -1,12 +1,12 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the eighty-seven commands it registers: what the registry
+ * declarations of the eighty-eight commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
  * `cleanup`, `describe`, `doctor`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `init`, `next`, `roadmap`, `self-update`, `status`, `switch`, `plan list`, `plan show`, `plan validate`, `plan risk`, `plan needs`,
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
- * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
+ * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`,
  * the four `claim` actions, the eight `update` actions and the seven `pr` actions
@@ -121,6 +121,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'issue ready': ['text', 'json'],
   'issue unblock': ['text', 'json'],
   'issue check': ['text', 'json'],
+  'issue edit': ['text', 'json'],
   'pr current': ['text', 'json'],
   'pr show': ['text', 'json'],
   'pr view': ['text', 'json'],
@@ -210,6 +211,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'issue ready': [['n'], ['yes', 'hint']],
   'issue unblock': [['n'], ['all']],
   'issue check': [['n'], ['stamp']],
+  'issue edit': [['n'], ['append-file', 'append', 'reason', 'replace-file', 'title', 'while-in-development', 'dry-run']],
   'pr current': [[], []],
   'pr show': [['n'], []],
   'pr view': [['n'], []],
@@ -323,6 +325,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['issue ready 57', 'issue ready', ['57'], ''],
   ['issues unblock --all', 'issue unblock', ['--all'], ''],
   ['issue check 151 --stamp', 'issue check', ['151', '--stamp'], ''],
+  ['issues edit 57 --append=More --reason=clarified', 'issue edit', ['57', '--append=More', '--reason=clarified'], ''],
   ['pr current', 'pr current', [], ''],
   ['prs show 41', 'pr show', ['41'], ''],
   ['pr view', 'pr view', [], ''],
@@ -482,7 +485,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -505,6 +508,7 @@ describe('the core roster', () => {
       'issue ready',
       'issue unblock',
       'issue check',
+      'issue edit',
       'pr current',
       'pr show',
       'pr view',
@@ -694,7 +698,7 @@ describe('how the command tree routes', () => {
     const unknown = await dispatchRecorded('stop');
 
     expect(bare.stderr).toBe('rafa: "effort" needs an action; one of: collect, report, dashboard, fix-schema, copy, schema, migrate, merge, import, move\n');
-    expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move, ready, unblock, check\n');
+    expect(issue.stderr).toBe('rafa: "issue" needs an action; one of: list, show, create, comment, move, ready, unblock, check, edit\n');
     expect(unknown.stderr).toBe('rafa: unknown subject or command "stop"\n');
     expect([bare.outcome.exitCode, issue.outcome.exitCode, unknown.outcome.exitCode]).toEqual([1, 1, 1]);
     expect([...bare.ran, ...issue.ran, ...unknown.ran]).toEqual([]);

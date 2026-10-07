@@ -59,6 +59,15 @@
  * case and the every-state case here; `released` held open the
  * every-state case alone, since the contract closes no issue as
  * released; the skip reported under `find` the skip case alone.
+ *
+ * Six mutations of `editable` and `edit` were driven on 2026-10-06 over
+ * this file, at 111 pass before, restored byte-identical (sha256) after.
+ * `open` answered true always reddened the contract's closed case and
+ * the every-state case here; `released` held open the every-state case
+ * alone. The empty-edit check dropped reddened its refusal case; the
+ * title ignored reddened the contract's title case and three here; the
+ * state and comments reset on an edit reddened the kept-fields case; and
+ * the ref answered as passed in, not as read, the labels-and-author case.
  */
 import type { LocalIssueRecord, LocalTrackerOptions } from './local.js';
 import type { IssueRef, IssueState, IssueType, Output, Tracker } from '../../ports/index.js';
@@ -178,6 +187,7 @@ runTrackerContract({
   name: 'local',
   expectsProjects: false,
   expectedKind: 'local',
+  editsIssues: true,
   create: async () => {
     contractDir = freshDir('contract');
     return localTracker(contractDir);
@@ -738,6 +748,138 @@ describe('open issues over local issues', () => {
     expect(warned).toEqual([
       `local tracker: the issue at ${join(dir, '2.md')} has no YAML frontmatter block; openIssues skipped it`,
     ]);
+  });
+});
+
+describe('editing a local issue', () => {
+  it('answers no labels and an empty author, with the ref carrying the opt the file holds', async () => {
+    const dir = freshDir('editable');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture({ opt: 260, title: 'Replay window', body: 'Codes stay valid.\n' }));
+
+    expect(await tracker.editable?.({ ...ref, opt: 0 })).toEqual({
+      ref: { opt: 260, kind: 'local', externalId: '1', url: null },
+      title: 'Replay window',
+      body: 'Codes stay valid.\n',
+      open: true,
+      labels: [],
+      author: '',
+    });
+  });
+
+  it('answers open in every state but done, released and cancelled', async () => {
+    const dir = freshDir('editable-states');
+    const tracker = localTracker(dir);
+    const states: readonly IssueState[] = ['backlog', 'todo', 'in-progress', 'in-review', 'done', 'released', 'cancelled'];
+    const opened: Partial<Record<IssueState, boolean>> = {};
+    for (const state of states) {
+      const ref = await tracker.create(draftFixture({ opt: 0, title: `In ${state}` }));
+      await tracker.transition(ref, state);
+      opened[state] = (await tracker.editable?.(ref))?.open;
+    }
+
+    expect(opened).toEqual({
+      'backlog': true,
+      'todo': true,
+      'in-progress': true,
+      'in-review': true,
+      'done': false,
+      'released': false,
+      'cancelled': false,
+    });
+  });
+
+  it('rewrites the body alone, keeping every other field the file holds', async () => {
+    const dir = freshDir('edit-keeps');
+    const ref = await localTracker(dir).create(draftFixture({ blockedBy: [259], specBlocked: true }));
+    const later = localTracker(dir, { fallbackReason: null, now: () => LATER });
+    await later.comment(ref, 'seen again');
+    await later.transition(ref, 'in-review');
+    const before = readIssue(dir, 1);
+
+    await later.edit?.(ref, { body: 'A new body.\n' });
+
+    expect(readIssue(dir, 1)).toEqual({ ...before, draft: { ...before.draft, body: 'A new body.\n' } });
+    expect(before.draft.body).not.toBe('A new body.\n');
+  });
+
+  it('writes a title and a body together', async () => {
+    const dir = freshDir('edit-both');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture());
+
+    await tracker.edit?.(ref, { title: 'Narrow the window', body: 'Narrowed.\n' });
+
+    expect(await tracker.get(ref)).toMatchObject({ title: 'Narrow the window', body: 'Narrowed.\n' });
+  });
+
+  it('reads back byte for byte a body and a title that each hold a frontmatter fence', async () => {
+    const dir = freshDir('edit-fence');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture());
+    const body = '---\nopt: 9\n---\n\nNot frontmatter.\n---\n';
+    const title = 'Fenced\n---\ntitle';
+
+    await tracker.edit?.(ref, { body, title });
+
+    expect(await tracker.editable?.(ref)).toMatchObject({ body, title });
+    expect(readIssue(dir, 1).draft).toMatchObject({ body, title });
+  });
+
+  it('refuses an edit naming neither a body nor a title, leaving the file as it was', async () => {
+    const dir = freshDir('edit-empty');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture());
+    const before = readFileSync(join(dir, '1.md'), 'utf8');
+
+    const empty = {} as unknown as { body: string };
+
+    await expect(tracker.edit?.(ref, empty)).rejects.toThrow(
+      'local tracker: refused an edit naming neither a body nor a title',
+    );
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).toBe(before);
+    await tracker.edit?.(ref, { body: 'Changed.\n' });
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).not.toBe(before);
+  });
+
+  it('refuses a body or a title no read would accept, leaving the file as it was', async () => {
+    const dir = freshDir('edit-invalid');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture());
+    const before = readFileSync(join(dir, '1.md'), 'utf8');
+
+    const badBody = { body: 7 } as unknown as { body: string };
+    const badTitle = { title: null } as unknown as { title: string };
+
+    await expect(tracker.edit?.(ref, badBody)).rejects.toThrow(
+      'local tracker: refused to write an invalid issue: body is 7, expected a string',
+    );
+    await expect(tracker.edit?.(ref, badTitle)).rejects.toThrow(
+      'local tracker: refused to write an invalid issue: title is null, expected a string',
+    );
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).toBe(before);
+  });
+
+  it('refuses a ref of another kind beside the same number read as a local ref', async () => {
+    const dir = freshDir('edit-kind');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture());
+    const foreign: IssueRef = { ...ref, kind: 'github' };
+
+    await expect(tracker.editable?.(foreign)).rejects.toThrow(KIND_REFUSAL);
+    await expect(tracker.edit?.(foreign, { body: 'Changed.\n' })).rejects.toThrow(KIND_REFUSAL);
+    expect((await tracker.editable?.(ref))?.body).toBe(draftFixture().body);
+  });
+
+  it('rejects an issue number with no file, writing none', async () => {
+    const dir = freshDir('edit-missing');
+    const tracker = localTracker(dir);
+    await tracker.create(draftFixture());
+    const missing: IssueRef = { opt: 0, kind: 'local', externalId: '2', url: null };
+
+    await expect(tracker.editable?.(missing)).rejects.toThrow(`local tracker: no issue 2 under ${dir}`);
+    await expect(tracker.edit?.(missing, { body: 'Changed.\n' })).rejects.toThrow(`local tracker: no issue 2 under ${dir}`);
+    expect(readdirSync(dir)).toEqual(['1.md']);
   });
 });
 

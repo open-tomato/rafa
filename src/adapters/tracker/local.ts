@@ -86,6 +86,15 @@
  *     its title and body, lowest number first. An issue file it cannot
  *     read is skipped and reported through `warn`, as `find` skips one,
  *     the report naming `openIssues`.
+ *   - `editable` and `edit`, rafa's own pair, which the source lacks.
+ *     `editable` reads the file the ref names, as `get` does, and
+ *     answers its title and body, open unless its state is one of
+ *     {@link CLOSED_STATES}, with no labels and an empty author, since
+ *     an issue file holds neither. `edit` rewrites that file with the
+ *     body, the title or both the change names, keeping every other
+ *     field, so a later read answers the written text byte for byte. A
+ *     change naming neither is refused with nothing written, as is a
+ *     body or title no read would accept.
  *
  * Kept as the source has them: `preflight` always answers ok, since the
  * file system is the last resort; the capabilities are all false; `find`
@@ -95,8 +104,10 @@
  * first; and `transition` answers `{}`.
  */
 import type {
+  EditableIssue,
   Issue,
   IssueDraft,
+  IssueEdit,
   IssuePriority,
   IssueQuery,
   IssueRef,
@@ -556,6 +567,35 @@ export function createLocalTracker(options: LocalTrackerOptions): Tracker {
       const { number, record } = await read(ref);
       await rewrite(number, { ...record, state });
       return {};
+    },
+
+    editable: async (ref: IssueRef): Promise<EditableIssue> => {
+      const { number, record } = await read(ref);
+      return {
+        ref: refFor(number, record.draft.opt),
+        title: record.draft.title,
+        body: record.draft.body,
+        open: !CLOSED_STATES.has(record.state),
+        labels: [],
+        author: '',
+      };
+    },
+
+    edit: async (ref: IssueRef, change: IssueEdit): Promise<void> => {
+      if (change.body === undefined && change.title === undefined) {
+        throw new TypeError(`${PREFIX}: refused an edit naming neither a body nor a title`);
+      }
+      const { number, record } = await read(ref);
+      const draft = {
+        ...record.draft,
+        ...(change.body === undefined
+          ? {}
+          : { body: change.body }),
+        ...(change.title === undefined
+          ? {}
+          : { title: change.title }),
+      };
+      await rewrite(number, { ...record, draft });
     },
   };
   return Object.freeze(tracker);

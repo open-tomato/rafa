@@ -80,8 +80,27 @@
  * `isGitHubLogin` accepting any non-whitespace string reddened 8 cases
  * there, including the `board.trustedAuthors` refusal in
  * `config.test.ts`.
+ *
+ * The editor check `rafa issue edit` runs — `createGhEditorLogin`,
+ * `readEditorTrust` and `editorRefusalMessage` — brings this file to 61.
+ * Its 14 cases run over a stand-in `gh` (`editorGh` below) answering
+ * `api user` and the collaborators path, and four mutations were driven
+ * on 2026-10-06 the same way, `trust.ts` restored from a scratch copy
+ * and verified with `shasum -c` after each:
+ *
+ *  - a failed permission lookup mapped to `ownership` rather than
+ *    `ownership-unknown`: 2 fail.
+ *  - a failed `gh api user` read as trusted: 2 fail.
+ *  - the editor weighed over an empty allow-list: 1 fail.
+ *  - the login shape check dropped from `createGhEditorLogin`: 1 fail.
  */
-import type { BoardTrust, PermissionReading, Permissions, TrustReading } from './trust.js';
+import type {
+  BoardTrust,
+  EditorTrustReading,
+  PermissionReading,
+  Permissions,
+  TrustReading,
+} from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
@@ -90,10 +109,13 @@ import { CommandExit } from '../cli/command.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {
+  createGhEditorLogin,
   createGhPermissions,
+  editorRefusalMessage,
   ghBoardTrust,
   readAuthorTrust,
   readBoardTrust,
+  readEditorTrust,
   requireTrustedAuthor,
   requireTrustedBoardAuthor,
   TRUSTED_PERMISSIONS,
@@ -674,5 +696,211 @@ describe('requireTrustedBoardAuthor', () => {
     expect(listed.trusted).toBe(true);
     expect(refused).toBeInstanceOf(CommandExit);
     expect(counting.asked()).toEqual(['mallory']);
+  });
+});
+
+/**
+ * A stand-in `gh` for the editor check: `api user` answers `user`, the
+ * collaborators path answers `permissions[login]` (a 404 for a login
+ * nobody planted), and every command is recorded.
+ */
+function editorGh(
+  user: GhResult,
+  permissions: Readonly<Record<string, GhResult>> = {},
+): { run: GhRunner; calls: () => readonly (readonly string[])[] } {
+  let calls: readonly (readonly string[])[] = [];
+  const run: GhRunner = (args) => {
+    calls = [...calls, Object.freeze([...args])];
+    const [verb, path] = args;
+    if (verb === 'api' && path === 'user') return Promise.resolve(user);
+    const login = /^repos\/\{owner\}\/\{repo\}\/collaborators\/([^/]+)\/permission$/.exec(path ?? '')?.[1];
+    if (verb === 'api' && login !== undefined) {
+      return Promise.resolve(permissions[login] ?? failed('gh: Not Found (HTTP 404)'));
+    }
+    return Promise.reject(new Error(`stand-in gh: no route for ${args.join(' ')}`));
+  };
+  return { run, calls: () => calls };
+}
+
+/** What `gh api user` writes for `login`. */
+function userPayload(login: string): GhResult {
+  return wrote(JSON.stringify({ login, id: 1, type: 'User' }));
+}
+
+/** What the collaborators endpoint writes for one permission. */
+function permissionPayload(permission: string): GhResult {
+  return wrote(JSON.stringify({ permission, role_name: permission, user: {} }));
+}
+
+/** The editor reading over one stand-in `gh`, with `trustedAuthors` listed. */
+function editorTrustOver(
+  gh: GhRunner,
+  trustedAuthors: readonly string[] = [],
+): Promise<EditorTrustReading> {
+  return readEditorTrust(ghBoardTrust({ gh, trustedAuthors, repo: REPO }), createGhEditorLogin({ gh }));
+}
+
+/** The permission path `gh` is sent for `login`. */
+function permissionPath(login: string): string {
+  return `repos/{owner}/{repo}/collaborators/${login}/permission`;
+}
+
+describe('createGhEditorLogin', () => {
+  it('sends one gh api user and takes its login field', async () => {
+    const gh = stubGh(userPayload('octocat'));
+
+    const reading = await createGhEditorLogin({ gh: gh.run })();
+
+    expect(gh.calls()).toEqual([['api', 'user']]);
+    expect(reading).toEqual({ login: 'octocat', detail: '' });
+  });
+
+  it('reads no login when gh api user fails, carrying what gh wrote', async () => {
+    const reading = await createGhEditorLogin({ gh: stubGh(failed('gh auth login required')).run })();
+
+    expect(reading).toEqual({ login: null, detail: 'gh api user failed: gh auth login required' });
+  });
+
+  it('reads no login from output that is not JSON, nor from a payload that is no mapping', async () => {
+    const garbled = await createGhEditorLogin({ gh: stubGh(wrote('<html>')).run })();
+    const listed = await createGhEditorLogin({ gh: stubGh(wrote('["octocat"]')).run })();
+
+    expect(garbled.login).toBeNull();
+    expect(garbled.detail).toStartWith('gh api user wrote output that is not JSON: ');
+    expect(listed.login).toBeNull();
+    expect(listed.detail).toContain('expected a mapping');
+  });
+
+  it('reads no login from a payload whose login is missing or not shaped like one', async () => {
+    const missing = await createGhEditorLogin({ gh: stubGh(wrote('{"id":1}')).run })();
+    const traversal = await createGhEditorLogin({ gh: stubGh(userPayload('../../x')).run })();
+
+    expect(missing.login).toBeNull();
+    expect(traversal.login).toBeNull();
+    expect(traversal.detail).toContain('which is not a GitHub login');
+  });
+});
+
+describe('readEditorTrust', () => {
+  it('trusts a write-holder editor and refuses an outsider as ownership over the same gh', async () => {
+    const holderGh = editorGh(userPayload('octocat'), { octocat: permissionPayload('admin') });
+    const outsiderGh = editorGh(userPayload('mallory'), { mallory: permissionPayload('read') });
+
+    const holder = await editorTrustOver(holderGh.run);
+    const outsider = await editorTrustOver(outsiderGh.run);
+
+    expect(holderGh.calls()).toEqual([['api', 'user'], ['api', PATH]]);
+    expect(holder.trusted).toBe(true);
+    expect(holder.refusal).toBeNull();
+    expect(holder.login).toBe('octocat');
+    expect(outsiderGh.calls()).toEqual([['api', 'user'], ['api', permissionPath('mallory')]]);
+    expect(outsider.trusted).toBe(false);
+    expect(outsider.refusal).toBe('ownership');
+    expect(outsider.reading?.refusal).toBe('no-write-access');
+  });
+
+  it('refuses as ownership-unknown when gh api user fails, sending no permission lookup', async () => {
+    const gh = editorGh(failed('gh: To get started with GitHub CLI, please run: gh auth login'), {
+      octocat: permissionPayload('admin'),
+    });
+
+    const reading = await editorTrustOver(gh.run, ['octocat']);
+
+    expect(reading.trusted).toBe(false);
+    expect(reading.refusal).toBe('ownership-unknown');
+    expect(reading.login).toBeNull();
+    expect(reading.reading).toBeNull();
+    expect(reading.detail).toContain('gh api user failed: ');
+    expect(gh.calls()).toEqual([['api', 'user']]);
+  });
+
+  it('refuses as ownership-unknown when the permission lookup fails, never as trusted', async () => {
+    const forbidden = editorGh(userPayload('octocat'), { octocat: failed('gh: Forbidden (HTTP 403)') });
+    // The control: the same login answered by the same lookup is trusted.
+    const answered = editorGh(userPayload('octocat'), { octocat: permissionPayload('write') });
+
+    const refused = await editorTrustOver(forbidden.run);
+    const trusted = await editorTrustOver(answered.run);
+
+    expect(refused.trusted).toBe(false);
+    expect(refused.refusal).toBe('ownership-unknown');
+    expect(refused.reading?.refusal).toBe('lookup-failed');
+    expect(refused.reading?.permission?.detail).toContain('HTTP 403');
+    expect(trusted.trusted).toBe(true);
+  });
+
+  it('refuses as ownership-unknown on a login nobody planted, the 404 a lookup answers', async () => {
+    const reading = await editorTrustOver(editorGh(userPayload('ghost')).run);
+
+    expect(reading.refusal).toBe('ownership-unknown');
+    expect(reading.login).toBe('ghost');
+  });
+
+  it('trusts a listed editor case-insensitively with no permission lookup spent', async () => {
+    const listed = editorGh(userPayload('Rafa-Bot'));
+    // The control: an unlisted editor over the same list is still asked about.
+    const unlisted = editorGh(userPayload('mallory'), { mallory: permissionPayload('read') });
+
+    const bot = await editorTrustOver(listed.run, ['rafa-bot']);
+    const other = await editorTrustOver(unlisted.run, ['rafa-bot']);
+
+    expect(bot.trusted).toBe(true);
+    expect(bot.reading?.source).toBe('allow-list');
+    expect(listed.calls()).toEqual([['api', 'user']]);
+    expect(other.refusal).toBe('ownership');
+    expect(unlisted.calls()).toEqual([['api', 'user'], ['api', permissionPath('mallory')]]);
+  });
+
+  it('weighs the editor by the same reading the author check takes over one board trust', async () => {
+    const gh = editorGh(userPayload('mallory'), { mallory: permissionPayload('triage') });
+    const trust = ghBoardTrust({ gh: gh.run, trustedAuthors: ['hubot'], repo: REPO });
+
+    const editor = await readEditorTrust(trust, createGhEditorLogin({ gh: gh.run }));
+    const author = await readBoardTrust(trust, 'mallory');
+
+    expect(editor.reading).toEqual(author);
+    expect(editor.refusal).toBe('ownership');
+  });
+});
+
+describe('editorRefusalMessage', () => {
+  const item = { kind: 'issue', number: 12, repo: REPO } as const;
+
+  it('names an editor without write access with the access claim the author refusal makes', async () => {
+    const reading = await editorTrustOver(editorGh(userPayload('mallory'), { mallory: permissionPayload('read') }).run);
+
+    expect(editorRefusalMessage(item, reading)).toBe(
+      'issue #12 cannot be edited by mallory, who has no write access to open-tomato/rafa;'
+        + ' a member must make the edit',
+    );
+  });
+
+  it('names a failed permission lookup as unread access rather than no access', async () => {
+    const gh = editorGh(userPayload('octocat'), { octocat: failed('HTTP 502') });
+
+    const reading = await editorTrustOver(gh.run);
+
+    expect(editorRefusalMessage(item, reading)).toBe(
+      'issue #12 cannot be edited by octocat, whose write access to open-tomato/rafa could not be read'
+        + ' (gh api repos/{owner}/{repo}/collaborators/octocat/permission failed: HTTP 502);'
+        + ' a member must make the edit',
+    );
+  });
+
+  it('names an unread login with what gh api user wrote and how to log gh in', async () => {
+    const reading = await editorTrustOver(editorGh(failed('HTTP 401: Bad credentials')).run);
+
+    expect(editorRefusalMessage(item, reading)).toBe(
+      'issue #12 cannot be edited: the account running the edit could not be read'
+        + ' (gh api user failed: HTTP 401: Bad credentials); log gh in with `gh auth login` and run it again',
+    );
+  });
+
+  it('throws for a trusted editor, which has no refusal to name', async () => {
+    const trusted = await editorTrustOver(editorGh(userPayload('octocat'), { octocat: permissionPayload('admin') }).run);
+    const unread: EditorTrustReading = { login: null, trusted: true, refusal: null, reading: null, detail: '' };
+
+    expect(() => editorRefusalMessage(item, trusted)).toThrow(TypeError);
+    expect(() => editorRefusalMessage(item, unread)).toThrow(TypeError);
   });
 });
