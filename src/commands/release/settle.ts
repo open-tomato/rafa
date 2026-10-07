@@ -61,8 +61,22 @@
  * run exiting 0 gives {@link ReleaseSettleResult} as the terminal
  * result's data.
  *
+ * ## The project refresh
+ *
+ * After a delivery that left the base without the folded fragments — a
+ * push, or a push another settle beat to the same fragments — and with
+ * `board.project.number` set, `./settle-project.ts` refreshes on the
+ * repository's project the issues closed by the pull requests whose
+ * fragments were folded, so their Stage moves from In review to Done.
+ * Its lines are printed as warnings after the reading and never change
+ * the exit code; the result carries what it read as `project`, null
+ * where it sent nothing.
+ *
  * It starts no Claude session and declares no `spends`.
  */
+import type { SettleProjectRefresh } from './settle-project.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { RefreshItems } from '../../board/project/add-issue.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { GitRunner, PullRequests } from '../../pr/index.js';
@@ -71,6 +85,7 @@ import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag
 import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleReading, SettleSettings } from '../../release/settle.js';
 
+import { createGhRunner } from '../../adapters/tracker/github.js';
 import { CommandExit } from '../../cli/command.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { settleByPr } from '../../release/settle-pr.js';
@@ -80,6 +95,8 @@ import { withSettleWorktree } from '../../release/settle-worktree.js';
 import { CHANGELOG_TITLE, readSettle, releaseCommitSubject } from '../../release/settle.js';
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch, resolveProjectConfig } from '../plan/plan-files.js';
+
+import { refreshProjectAfterSettle } from './settle-project.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_SETTLE_USAGE = 'rafa release settle [--dry-run]';
@@ -106,6 +123,10 @@ export interface ReleaseSettleSeams {
   readonly pullRequests?: (root: string) => PullRequests;
   /** The `origin` probe `resolvePrProvider` takes. `gitRemoteUrl` when left out. */
   readonly readRemote?: (dir: string) => string | null;
+  /** Makes the `gh` runner the project refresh reads and writes through. `createGhRunner` in the root when left out. */
+  readonly gh?: (root: string) => GhRunner;
+  /** The project refresh. `refreshProjectItems` when left out. */
+  readonly refresh?: RefreshItems;
 }
 
 /** The seams the registered action runs with: the system's own, every one. */
@@ -129,6 +150,8 @@ export interface ReleaseSettleResult {
   readonly problem: string | null;
   /** The text-mode lines, the refusal left out. */
   readonly lines: readonly string[];
+  /** What the project refresh read and warned of, or null where it sent nothing; see the module note. */
+  readonly project: SettleProjectRefresh | null;
 }
 
 /** The project the dispatcher resolved, which it resolves for this action. */
@@ -203,7 +226,7 @@ function resultOf(
   const exitCode = problem === null
     ? 0
     : 1;
-  return { ...base, lines, problem, exitCode };
+  return { ...base, lines, problem, exitCode, project: null };
 }
 
 /** The line naming a changelog the release commit creates rather than inserts into. */
@@ -320,7 +343,15 @@ export async function runSettle(
   });
   if (ran.leftover !== null) context.output.warn(`The settle worktree was not fully removed: ${ran.leftover}`);
   if (!ran.ok) throw new CommandExit(1, `❌ ${ran.problem}`);
-  return ran.value;
+  if (ran.value.delivered === null) return ran.value;
+  const refreshed = await refreshProjectAfterSettle({
+    delivered: ran.value.delivered,
+    branch,
+    config,
+    openGh: () => (seams.gh ?? ((cwd: string) => createGhRunner({ cwd })))(project.root),
+    refresh: seams.refresh,
+  });
+  return { ...ran.value, project: refreshed };
 }
 
 /** The command, reaching git and the provider through `seams`; see the module note. */
@@ -368,12 +399,17 @@ export function createReleaseSettleCommand(seams: ReleaseSettleSeams = DEFAULT_R
     outputs: ['text', 'json'],
     run: async (context) => {
       const result = await runSettle(context, seams);
+      const warnProject = (): void => {
+        for (const line of result.project?.warnings ?? []) context.output.warn(line);
+      };
       if (context.outputMode === 'json') {
+        warnProject();
         if (result.problem !== null) throw new CommandExit(1, result.problem);
         context.output.result(result);
         return;
       }
       for (const line of result.lines) context.output.info(line);
+      warnProject();
       if (result.problem !== null) throw new CommandExit(1, result.problem);
     },
   };

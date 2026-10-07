@@ -225,7 +225,10 @@ sentence replaces nothing.
    `board.relationships: native` step 5 ticks no epic checklist and this
    step prints the open issues the merge freed instead, read through the
    relationships port's `freedBy` over one native board listing, asking
-   nothing and writing nothing (`src/commands/pr/merge-freed.ts`).
+   nothing and writing nothing (`src/commands/pr/merge-freed.ts`). Then,
+   in both modes and with `board.project.number` set, refresh on the
+   project the issues this PR closes and the issues those were blocking
+   (`src/commands/pr/merge-project.ts`); its lines are warnings.
 7. Print the two follow-ups when they apply, under `Follow-ups:`:
    `rafa self-update`, then `rafa release settle` while the fragments
    waiting on `origin/<base>` fold into a version, so settle is the

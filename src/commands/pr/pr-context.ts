@@ -89,6 +89,7 @@
  * that cannot be read, a detached HEAD, a branch with no open pull
  * request, and a provider call that rejected.
  */
+import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { RafaContext } from '../../cli/command.js';
 import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
@@ -225,6 +226,8 @@ export interface PrContext {
   readonly readBranch: () => string;
   /** The `release` settings the release guard reads, with `pr.versionCollision` and `dangerous.acceptVersionCollision`. */
   readonly versionGuard: MergeGuardSettings;
+  /** The keys the project refresh after `pr merge` reads, `board.project.number` among them. */
+  readonly projectRefresh: RefreshConfig;
 }
 
 /** Where a picked pull request number came from. */
@@ -254,6 +257,7 @@ type PrConfig = Pick<
   | 'planDir'
   | 'loopWorktreeDir'
   | keyof MergeGuardSettings
+  | keyof RefreshConfig
 >;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -317,6 +321,12 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     worktreeDir: config.loopWorktreeDir,
     readBranch: () => readBranch(project.root),
     versionGuard: mergeGuardSettings(config),
+    projectRefresh: {
+      boardProjectNumber: config.boardProjectNumber,
+      boardRelationships: config.boardRelationships,
+      roadmapIssue: config.roadmapIssue,
+      releaseFragments: config.releaseFragments,
+    },
   };
 }
 

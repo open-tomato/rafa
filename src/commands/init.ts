@@ -61,7 +61,7 @@
  * `.rafa/config.yaml` this run has just made. The decision, the
  * question and the line are `./init-release.ts`'s; what is decided HERE
  * is that it runs after the scopes and BEFORE the board step, which
- * with the epic guard after it stays the last thing `init` does. Like
+ * with the steps after it stays the last thing `init` does. Like
  * the board step it refuses nothing: a config it cannot read or write
  * is a warning.
  *
@@ -77,7 +77,7 @@
  * and the pinned Roadmap issue `src/board/setup.ts` makes. The decision,
  * the question and the lines are `./init-board.ts`'s; what is decided
  * HERE is that it runs LAST, after the scopes are on disk, followed
- * only by the epic guard step that needs a board that ran. The
+ * only by the steps below, each needing a board that ran. The
  * `roadmap.issue` it may write goes into the `.rafa/config.yaml` this
  * run has just made, and nothing it asks or sends can keep the project
  * from being set up: a `gh` that is not installed, a repository nobody
@@ -95,13 +95,19 @@
  * script; the order it decides in is `./init-board.ts`'s. Its flag is
  * read at the top of the run with `--board`'s, for the same reason.
  *
- * Last of all, and only when a config layer sets `board.relationships`,
- * the relationships move reads the board for the other mode's marks and
+ * Then, only when a config layer sets `board.relationships`, the
+ * relationships move reads the board for the other mode's marks and
  * offers to move them into the configured mode, printing every write
  * before its one question and asking a second about the old marks; the
  * order it decides in is `./init-board.ts`'s. With the key unset it
  * sends nothing, prints nothing and leaves `relationsMove` out of the
  * json result, so such a run is the run it was before the move existed.
+ *
+ * Last of all, once the board has run, the project step asks its own
+ * question about copying the GitHub project template, linking it and
+ * filling it; `--project` and `--no-project` answer it for a script, read
+ * at the top of the run with `--board`'s. The order it decides in is
+ * `./init-board-project.ts`'s.
  *
  * ## A rerun
  *
@@ -172,6 +178,7 @@
  * stderr, and spawns git and `gh` in the root. The writes go to the
  * disk, under the root and the home the seams name.
  */
+import type { ProjectStepResult } from './init-board-project.js';
 import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } from './init-board.js';
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
@@ -210,6 +217,7 @@ import { DISK_ROOTS_FILE_SYSTEM, gitToplevel, rootCandidates } from '../project/
 import { scaffoldConflicts, writeProjectScope, writeUserScope } from '../project/scaffold.js';
 import { gitRemoteUrl } from '../schema/project-id.js';
 
+import { projectStepChanged, renderProjectStep, runProjectStep } from './init-board-project.js';
 import {
   boardStepChanged,
   epicGuardChanged,
@@ -286,6 +294,8 @@ export interface InitResult {
   readonly epicGuard: EpicGuardStepResult;
   /** What the relationships move came to; left out when `board.relationships` is not set (`./init-board.ts`). */
   readonly relationsMove?: RelationsMoveStepResult;
+  /** What the project step came to: its five parts, or why it did not run (`./init-board-project.ts`). */
+  readonly project: ProjectStepResult;
 }
 
 /** The line every refusal ends with. */
@@ -343,6 +353,19 @@ export function readEpicGuardFlag(value: string | boolean | undefined): boolean 
   if (value === false || value === 'false') return false;
   throw refusal([`rafa init: --epic-guard takes no value, and read "${value}" as one;`
     + ' install the workflow with --epic-guard, or leave it out with --no-epic-guard']);
+}
+
+/**
+ * True for `--project`, false for `--no-project` and null when the line
+ * said neither, which leaves the project step to ask. A value refuses,
+ * for the reason {@link readBoardFlag} gives.
+ */
+export function readProjectFlag(value: string | boolean | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw refusal([`rafa init: --project takes no value, and read "${value}" as one;`
+    + ' create the GitHub project with --project, or leave it out with --no-project']);
 }
 
 /**
@@ -463,7 +486,7 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
 /** What the scopes came to, with the config they were written from. */
 interface ScopesWritten {
   /** The result, but for the two steps that run once these are on disk. */
-  readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'relationsMove' | 'release'>;
+  readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'project' | 'relationsMove' | 'release'>;
   /** The config as it resolved for the root, which the provider is read from. */
   readonly config: RafaConfig;
   /** `board.relationships` when a config layer sets it, null when it is left at its default. */
@@ -514,7 +537,7 @@ function initialise(root: ChosenRoot, start: string, home: string, context: Rafa
 /**
  * The board step for a project whose scopes are written: the provider
  * read off the config and `origin`, then `./init-board.ts`. It runs LAST,
- * but for the epic guard step that follows a board that ran, for two
+ * but for the steps that follow a board that ran, for two
  * reasons — the `roadmap.issue` it may write goes into the
  * `.rafa/config.yaml` this run has just made, and nothing it asks or
  * sends can then keep the project from being set up.
@@ -546,7 +569,7 @@ async function boardStep(
  * project bumps a version and writes a changelog entry with every pull
  * request, decided and written by `./init-release.ts` as
  * `release.enabled` in the `.rafa/config.yaml` this run has just made.
- * It runs before the board step, which with the epic guard after it
+ * It runs before the board step, which with the steps after it
  * stays the last thing `init` does.
  */
 async function releaseStep(
@@ -589,6 +612,7 @@ export function renderInit(result: InitResult): readonly string[] {
     ...renderBoardStep(result.board),
     ...renderEpicGuardStep(result.epicGuard),
     ...renderRelationsMoveStep(result.relationsMove ?? null),
+    ...renderProjectStep(result.project),
   ];
   return result.changed
     ? [head, ...changed, ...steps]
@@ -601,6 +625,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   const wantsBoard = readBoardFlag(context.flags['board']);
   const wantsGuard = readEpicGuardFlag(context.flags['epic-guard']);
   const wantsRelease = readReleaseFlag(context.flags['release']);
+  const wantsProject = readProjectFlag(context.flags['project']);
   const yes = readYesFlag(context.flags['yes']);
   const start = seams.cwd();
   const home = seams.home();
@@ -624,16 +649,26 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,
   });
+  const project = await runProjectStep({
+    wanted: wantsProject,
+    board,
+    root: scopes.written.root,
+    config: scopes.config,
+    openGh: () => seams.gh(scopes.written.root),
+    isTerminal: seams.isTerminal,
+    openPrompter: seams.openPrompter,
+  });
   const result: InitResult = {
     ...scopes.written,
     changed: scopes.written.changed || release.changed || boardStepChanged(board) || epicGuardChanged(epicGuard)
-      || relationsMoveChanged(relationsMove),
+      || relationsMoveChanged(relationsMove) || projectStepChanged(project),
     release,
     board,
     epicGuard,
     ...(relationsMove === null
       ? {}
       : { relationsMove }),
+    project,
   };
 
   if (context.outputMode === 'json') context.output.result(result);
@@ -643,6 +678,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
   for (const line of board.warnings) context.output.warn(line);
   for (const line of epicGuard.warnings) context.output.warn(line);
   for (const line of relationsMove?.warnings ?? []) context.output.warn(line);
+  for (const line of project.warnings) context.output.warn(line);
   for (const line of vendorableAgentWarnings(result.vendorableAgents, result.root)) context.output.warn(line);
 }
 
@@ -671,7 +707,10 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' and comments why; `--epic-guard` and `--no-epic-guard` answer that one. When `board.relationships`'
       + ' is set, the board is then read for relationships held in the other mode: every write that moves'
       + ' them into the configured one is printed and a terminal is asked once, nothing is written on a no,'
-      + ' and once every write went through a second question asks whether to remove the old marks. On a terminal it also asks once whether every pull request bumps the version and gains'
+      + ' and once every write went through a second question asks whether to remove the old marks. Last, once the'
+      + ' board has run, one question asks whether to copy the GitHub project template to the repository\'s'
+      + ' owner, link it, add the issues and fill their fields; `--project` and `--no-project` answer that one.'
+      + ' On a terminal it also asks once whether every pull request bumps the version and gains'
       + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'
       + ' answer that one, and `--yes` leaves it unset. With `--output=json` the'
       + ' root and every path checked are the data of the terminal result event.',
@@ -700,6 +739,14 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
           + ' `.github/workflows/epic-guard.yml`, which removes a second `epic:` label from an issue and'
           + ' comments why. `--no-epic-guard` leaves it out. Without either, a terminal is asked once and a'
           + ' run with no terminal leaves it out. A file already at that path is left as it is.',
+        type: 'boolean',
+      },
+      {
+        name: 'project',
+        description: 'Create the GitHub project without asking, once the board has run: copy'
+          + ' `board.project.template` to the repository\'s owner, link the repository, add its issues, fill'
+          + ' their fields and save `board.project.number`. `--no-project` leaves it out. Without either, a'
+          + ' terminal is asked once and a run with no terminal leaves it out.',
         type: 'boolean',
       },
       {
@@ -736,6 +783,10 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       {
         cmd: 'rafa init --yes --board --epic-guard',
         note: 'Sets up the GitHub board and installs the epic guard workflow, asking nothing.',
+      },
+      {
+        cmd: 'rafa init --yes --board --project',
+        note: 'Sets up the GitHub board and its GitHub project, asking nothing. A second run writes nothing.',
       },
     ],
     outputs: ['text', 'json'],

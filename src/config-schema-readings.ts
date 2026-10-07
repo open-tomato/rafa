@@ -60,6 +60,27 @@
  *     gives, and more: the mode says where a board's links are stored,
  *     so a run that read one board in the other mode would find none.
  *
+ * `board.project.template` and `board.project.number` name the GitHub
+ * project a board is mirrored to: the template `rafa init --board`
+ * copies it from, by URL, and the copy's number under the repository's
+ * owner. `.rafa/specs/rafa-791-github-project-each-repository.md` has
+ * the project as a mirror of the labels and checklists, opt-in. Three
+ * readings it leaves:
+ *
+ *   - `board.project.template` defaults to open-tomato's public "rafa
+ *     board template", the one default the spec names, so a repository
+ *     that opts in has something to copy without writing a URL. A team
+ *     that changed its views points the key at its own copy.
+ *   - `board.project.number` defaults to NULL, and null means "this
+ *     repository has no project", as it means "nobody has said" for
+ *     `roadmap.issue`: a number is only known once a copy is made, and
+ *     `rafa init --board` writes it then. A number that is there but is
+ *     not a whole number above zero is refused naming the key, never
+ *     read as no project.
+ *   - Neither is a `CommandLineSetting`, for the reason the `pr`
+ *     section gives: every command that refreshes the project must
+ *     write the same one, which one run's flag would split.
+ *
  * ## The `roadmap` section
  *
  * `.rafa/specs/rafa-20-pr-commands.md` has `plan create --next` read its

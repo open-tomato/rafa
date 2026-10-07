@@ -86,7 +86,9 @@
  * asked about the guard under it; a script says `--epic-guard` or
  * `--no-epic-guard`.
  *
- * ## The relationships move, asked last
+ * ## The relationships move, asked after the guard
+ *
+ * Only the project step (`./init-board-project.ts`) follows it.
  *
  * When a config layer sets `board.relationships`,
  * {@link runRelationsMoveStep} moves the relationships the board holds in
@@ -153,7 +155,7 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 import { readBoardRepository } from './epic/move-native.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
-const YES_ANSWERS: readonly string[] = ['y', 'yes'];
+export const YES_ANSWERS: readonly string[] = ['y', 'yes'];
 
 /** The question, asked once for the whole board. */
 export const BOARD_QUESTION = 'Set up the GitHub board for this repo? [y/N] ';

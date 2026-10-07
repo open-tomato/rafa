@@ -154,6 +154,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { version } from '../../package.json';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { unlabelledRoadmapMessage } from '../board/boards.js';
+import { createFakeProjectGh, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
 import { BOARD_LIST_FIELDS } from '../board/roadmap-board.js';
 import { ROADMAP_SETTING, ROADMAP_TITLE } from '../board/roadmap.js';
 import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
@@ -189,6 +190,7 @@ import { readPreviousCopies } from './doctor-previous.js';
 import { issueCheckCommand } from './doctor-refs.js';
 import { TIERS_SECTION_TITLE } from './doctor-tiers.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readDeepFlag, readPlanFlag } from './doctor.js';
+import { PROJECT_HEADING } from './init-board-project.js';
 import { BOARD_FIX, BOARD_HEADING } from './init-board.js';
 
 /** A temporary directory of this file's own, its real path. */
@@ -1386,6 +1388,55 @@ describe('the board rows', () => {
     expect(dataOf(run.stdout)?.board?.roadmapIssue).toBe(null);
     expect(control.exitCode).toBe(0);
     expect(dataOf(control.stdout)?.board).toBe(null);
+  });
+
+  it('prints the project rows after the board rows and gives them as json project where board.project.number is set, sending nothing where it is not', async () => {
+    const world = plantWorld(['board:', '  project:', '    number: 6']);
+    const controlWorld = plantWorld();
+    const sent: string[] = [];
+    const openGh: DoctorSeams['openGh'] = () => {
+      const board = fakeGh().run;
+      const project = createFakeProjectGh({ projects: [{ owner: 'open-tomato', number: 6, fields: FAKE_TEMPLATE_FIELDS }], owners: ['open-tomato'] });
+      return (args) => {
+        const line = args.join(' ');
+        if (line === 'auth status --active --json hosts' || line === 'repo view --json nameWithOwner' || args[0] === 'api') sent.push(line);
+        if (line === 'auth status --active --json hosts') {
+          const account = { state: 'success', active: true, host: 'github.com', login: 'someone', scopes: 'project, repo' };
+          return Promise.resolve({ ok: true, stdout: JSON.stringify({ hosts: { 'github.com': [account] } }), stderr: '' });
+        }
+        if (line === 'repo view --json nameWithOwner') return Promise.resolve({ ok: true, stdout: '{"nameWithOwner":"open-tomato/rafa"}', stderr: '' });
+        return args[0] === 'api' && args[1] === 'graphql'
+          ? project.gh(args)
+          : board(args);
+      };
+    };
+
+    const run = await doctor(world, [], { seams: ghSeams(() => GITHUB_ORIGIN, {}, openGh) });
+    const json = await doctor(world, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN, {}, openGh) });
+    const sentByProject = sent.length;
+    const control = await doctor(controlWorld, ['--output=json'], { seams: ghSeams(() => GITHUB_ORIGIN, {}, openGh) });
+    const dataOf = (stdout: string): DoctorResult | undefined => {
+      const result = eventsOf(stdout).find((event) => event.type === 'result') as { data?: DoctorResult } | undefined;
+      return result?.data;
+    };
+
+    expect(run.stderr).toBe('');
+    expect(run.exitCode).toBe(0);
+    const printed = lines(run.stdout);
+    const at = printed.indexOf(PROJECT_HEADING);
+    expect(at).toBeGreaterThan(printed.indexOf(BOARD_HEADING));
+    expect(printed.slice(at, at + 5)).toEqual([
+      PROJECT_HEADING,
+      '  present  project scope',
+      '  present  project 6: https://github.com/orgs/open-tomato/projects/6',
+      '  present  project fields',
+      'Run rafa board sync --dry-run to check the project for drift.',
+    ]);
+    expect(dataOf(json.stdout)?.project?.rows.map((row) => row.outcome)).toEqual(['present', 'present', 'present']);
+    expect(sentByProject).toBeGreaterThan(0);
+    expect(control.exitCode).toBe(0);
+    expect(dataOf(control.stdout)?.project).toBe(null);
+    expect(sent.length).toBe(sentByProject);
   });
 
   it('reports a row it could not read as unknown, where the same command answering reads it', async () => {

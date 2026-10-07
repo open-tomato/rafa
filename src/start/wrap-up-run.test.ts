@@ -461,7 +461,7 @@ function standIn(answers: {
     },
     openRunnerPullRequest: () => {
       calls.push('runner');
-      return Promise.resolve(answers.runner ?? { kind: 'opened', pull: pull(601) });
+      return Promise.resolve(answers.runner ?? { kind: 'opened', pull: pull(601), warnings: [] });
     },
     isInterrupted: () => answers.interruptedAfter !== undefined && retries >= answers.interruptedAfter,
   };
@@ -536,6 +536,18 @@ describe('deliverPullRequest', () => {
     expect(delivery.kind).toBe('delivered');
     expect(delivery.retriesSpent).toBe(0);
     expect(calls).toEqual([`findOpen ${BRANCH}`, 'runner']);
+  });
+
+  it('warns each project refresh line of the runner\'s pull request after the opened line, still delivered', async () => {
+    const line = 'The project was not updated: run `gh auth refresh -s project`.';
+    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: pull(601), warnings: [line] } });
+
+    const delivery = await deliver(seams, false);
+
+    expect(delivery).toMatchObject({ kind: 'delivered', by: 'runner' });
+    expect(informed).toHaveLength(1);
+    expect(warned.at(-1)).toBe(line);
+    expect(warned.filter((warning) => warning === line)).toHaveLength(1);
   });
 
   it('answers a blocked runner attempt with its report and the stopped-record tail', async () => {
@@ -660,7 +672,7 @@ describe('the retarget of each delivered pull request', () => {
     // base and the same path sends no `gh pr edit` and prints nothing.
     const fixture = retargetFixture([{ number: 629, base: RUN_BASE }]);
     const opened = await readBack(fixture.pulls, 629);
-    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: opened } });
+    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: opened, warnings: [] } });
 
     const delivery = await deliverAndRetarget(seams, fixture);
 

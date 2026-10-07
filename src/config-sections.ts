@@ -661,6 +661,45 @@ export const githubLogin: Reader<string> = (raw, at) => isGitHubLogin(raw)
   : refused(at, raw, 'a GitHub login');
 
 /**
+ * The URL `board.project.template` names when no layer does: open-tomato's
+ * public "rafa board template", with the five fields, the three saved
+ * views and every automation off.
+ */
+export const BOARD_PROJECT_TEMPLATE_DEFAULT = 'https://github.com/orgs/open-tomato/projects/6';
+
+/**
+ * A GitHub project's address as the web UI shows it: an organisation's
+ * (`/orgs/<login>/projects/<n>`) or a user's (`/users/<login>/projects/<n>`),
+ * over `https`, with nothing after the number.
+ *
+ * The owner and the number are all a project copy is made from, so the
+ * shape holds those two and nothing else. A view path (`/views/1`), a
+ * query, a fragment or a trailing slash is refused rather than dropped:
+ * a person who pasted a view's address should learn that the view is
+ * not what is copied. The owner takes the {@link GITHUB_LOGIN} shape
+ * without the `[bot]` suffix, as no bot owns a project; the number is
+ * a whole number above zero with no leading zero.
+ */
+const PROJECT_URL = /^https:\/\/github\.com\/(?:orgs|users)\/[A-Za-z0-9][A-Za-z0-9-]*\/projects\/[1-9]\d*$/;
+
+/** Accepts a GitHub project URL, kept as written; see {@link PROJECT_URL}. */
+export const projectUrl: Reader<string> = (raw, at) => typeof raw === 'string' && PROJECT_URL.test(raw)
+  ? accepted(raw)
+  : refused(at, raw, 'a GitHub project URL, https://github.com/orgs/<owner>/projects/<number> or /users/<owner>/…');
+
+/**
+ * Accepts a GitHub project number: a whole number above zero, and no
+ * string spelled like one, for the reasons {@link issueNumber} gives.
+ * It is read apart from `issueNumber` only so a refusal names a
+ * project and not an issue.
+ */
+export const projectNumber: Reader<number> = (raw, at) => typeof raw === 'number'
+  && Number.isSafeInteger(raw)
+  && raw > 0
+  ? accepted(raw)
+  : refused(at, raw, 'a project number, a whole number above zero');
+
+/**
  * Accepts a list whose every entry `item` accepts, answered frozen.
  * Every entry is read, so a list with two unusable entries names both.
  * `expected` names the entries, in the refusal of a value that is not a

@@ -9,13 +9,21 @@
  * (`pr/pull-requests-double.ts`), which refuses any member a case did
  * not name, so a create sent where none should be fails the case.
  *
+ * The project refresh after the create is a recorded seam too: each
+ * blocked case shows it is never asked, the control to the opened case
+ * that asks it for the issue the body closes. {@link refreshClosedIssues}
+ * is driven with a stand-in refresh and a runner opener that counts its
+ * calls, so no case reaches `gh`.
+ *
  * {@link runnerPrSeamsIn}'s tree reading and {@link fragmentNotesIn} are
  * effects, so they run over REAL git and real files under the case's
  * own `mkdtemp` directory, with `GIT_CONFIG_GLOBAL` and
  * `GIT_CONFIG_SYSTEM` at `/dev/null` and the author named by
  * `gitIdentityEnv`, whose variables win over the repo's own config.
  */
-import type { RunnerPrInput, RunnerPrSeams, WorkingTreeReading } from './runner-pr.js';
+import type { ClosedIssuesRefreshOptions, RunnerPrInput, RunnerPrSeams, WorkingTreeReading } from './runner-pr.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
+import type { ProjectRefresh } from '../board/project/refresh.js';
 import type { PullRequestDraft, PullRequestSummary, PushOutcome } from '../pr/index.js';
 
 import { spawnSync } from 'node:child_process';
@@ -31,6 +39,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import {
   fragmentNotesIn,
   openRunnerPullRequest,
+  refreshClosedIssues,
   RELEASE_NOTES_HEADING,
   runnerPrSeamsIn,
   runnerPullRequestBody,
@@ -69,9 +78,17 @@ function seamsWith(answers: {
   readonly tree?: WorkingTreeReading;
   readonly push?: PushOutcome;
   readonly create?: (draft: PullRequestDraft) => Promise<PullRequestSummary>;
-} = {}): { seams: RunnerPrSeams; steps: () => readonly string[]; drafts: () => readonly PullRequestDraft[] } {
+  readonly refresh?: (issues: readonly number[]) => Promise<readonly string[]>;
+} = {}): {
+  seams: RunnerPrSeams;
+  steps: () => readonly string[];
+  drafts: () => readonly PullRequestDraft[];
+  refreshed: () => readonly (readonly number[])[];
+} {
   let steps: readonly string[] = [];
   let drafts: readonly PullRequestDraft[] = [];
+  let refreshed: readonly (readonly number[])[] = [];
+  const refresh = answers.refresh ?? (() => Promise.resolve([]));
   const create = answers.create ?? ((draft) => Promise.resolve(summary(draft)));
   const double = createPullRequestsDouble({
     create: (draft) => {
@@ -89,11 +106,17 @@ function seamsWith(answers: {
       return Promise.resolve(answers.push ?? { ok: true, output: '' });
     },
     pulls: double.pulls,
+    refreshProject: (issues) => {
+      // Recorded with how many creates were sent by then, to read that it ran after the create.
+      refreshed = [...refreshed, [double.sent().length, ...issues]];
+      return refresh(issues);
+    },
   };
   return {
     seams,
     steps: () => [...steps, ...double.sent().map((line) => line.split(' ')[0] ?? '')],
     drafts: () => drafts,
+    refreshed: () => refreshed,
   };
 }
 
@@ -139,7 +162,7 @@ describe('openRunnerPullRequest', () => {
   });
 
   test('is blocked at the dirty tree step naming each uncommitted file, pushing and creating nothing', async () => {
-    const { seams, steps } = seamsWith({ tree: { ok: true, entries: [' M src/start.ts', '?? notes.txt'] } });
+    const { seams, steps, refreshed } = seamsWith({ tree: { ok: true, entries: [' M src/start.ts', '?? notes.txt'] } });
 
     const outcome = await openRunnerPullRequest(INPUT, seams);
 
@@ -152,6 +175,7 @@ describe('openRunnerPullRequest', () => {
     expect(outcome.message).toContain(BRANCH);
     expect(outcome.message).toContain('dirty tree');
     expect(steps()).toEqual(['tree']);
+    expect(refreshed()).toEqual([]);
   });
 
   test('is blocked at the dirty tree step when the tree cannot be read', async () => {
@@ -167,7 +191,7 @@ describe('openRunnerPullRequest', () => {
 
   test('is blocked at the push step with what git said, creating nothing', async () => {
     const said = '! [rejected]        feat/x -> feat/x (non-fast-forward)';
-    const { seams, steps } = seamsWith({ push: { ok: false, output: said } });
+    const { seams, steps, refreshed } = seamsWith({ push: { ok: false, output: said } });
 
     const outcome = await openRunnerPullRequest(INPUT, seams);
 
@@ -178,6 +202,7 @@ describe('openRunnerPullRequest', () => {
     expect(outcome.message).toContain(`for ${BRANCH} at the push step`);
     expect(outcome.message).toContain(said);
     expect(steps()).toEqual(['tree', `push ${BRANCH}`]);
+    expect(refreshed()).toEqual([]);
   });
 
   test('names a push that failed in silence rather than leaving the detail empty', async () => {
@@ -191,7 +216,7 @@ describe('openRunnerPullRequest', () => {
   });
 
   test('is blocked at the create step with what the provider said', async () => {
-    const { seams, steps } = seamsWith({ create: () => Promise.reject(new Error('gh: a pull request already exists')) });
+    const { seams, steps, refreshed } = seamsWith({ create: () => Promise.reject(new Error('gh: a pull request already exists')) });
 
     const outcome = await openRunnerPullRequest(INPUT, seams);
 
@@ -201,6 +226,109 @@ describe('openRunnerPullRequest', () => {
     expect(outcome.detail).toBe('gh: a pull request already exists');
     expect(outcome.message).toContain(`for ${BRANCH} at the create step`);
     expect(steps()).toEqual(['tree', `push ${BRANCH}`, 'create']);
+    expect(refreshed()).toEqual([]);
+  });
+});
+
+describe('the project refresh after the runner opens the pull request', () => {
+  test('refreshes the issue the body closes, once, after the create', async () => {
+    const { seams, refreshed } = seamsWith();
+
+    const outcome = await openRunnerPullRequest(INPUT, seams);
+
+    expect(outcome.kind).toBe('opened');
+    expect(refreshed()).toEqual([[1, 579]]);
+  });
+
+  test('answers an opened pull request with no warning when the refresh answers none', async () => {
+    const { seams } = seamsWith();
+
+    const outcome = await openRunnerPullRequest(INPUT, seams);
+
+    expect(outcome.kind === 'opened'
+      ? outcome.warnings
+      : null).toEqual([]);
+  });
+
+  test('answers the refresh\'s lines with the pull request, never blocking the attempt', async () => {
+    const line = 'The project was not updated: run `gh auth refresh -s project`.';
+    const { seams } = seamsWith({ refresh: () => Promise.resolve([line]) });
+
+    const outcome = await openRunnerPullRequest(INPUT, seams);
+
+    expect(outcome.kind === 'opened'
+      ? [outcome.pull.number, outcome.warnings]
+      : null).toEqual([601, [line]]);
+  });
+
+  test('answers a refresh that rejects as the failed line naming the issue and rafa board sync', async () => {
+    const { seams } = seamsWith({ refresh: () => Promise.reject(new Error('repo view refused')) });
+
+    const outcome = await openRunnerPullRequest(INPUT, seams);
+
+    expect(outcome.kind).toBe('opened');
+    if (outcome.kind !== 'opened') return;
+    expect(outcome.warnings).toHaveLength(1);
+    expect(outcome.warnings[0]).toContain('The project was not updated for #579: repo view refused.');
+    expect(outcome.warnings[0]).toContain('rafa board sync');
+  });
+});
+
+/** A refresh config with `board.project.number` set to `number`. */
+function refreshConfig(number: number | null): ClosedIssuesRefreshOptions['config'] {
+  return { boardProjectNumber: number, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+}
+
+/** A runner that refuses every call: a case that reaches it sent a `gh` call it should not have. */
+const REFUSING_GH: GhRunner = () => {
+  throw new Error('unplanned gh call');
+};
+
+/** What one {@link refreshClosedIssues} call asked and answered. */
+async function refreshRun(
+  number: number | null,
+  answer: () => Promise<ProjectRefresh>,
+): Promise<{ asked: readonly (readonly number[])[]; opened: number; lines: readonly string[] }> {
+  const asked: (readonly number[])[] = [];
+  let opened = 0;
+  const lines = await refreshClosedIssues({
+    config: refreshConfig(number),
+    openGh: () => {
+      opened += 1;
+      return REFUSING_GH;
+    },
+    refresh: (options, issues) => {
+      expect(options.gh).toBe(REFUSING_GH);
+      asked.push(issues);
+      return answer();
+    },
+  }, [579]);
+  return { asked, opened, lines };
+}
+
+/** A refresh answering `warnings`. */
+function answering(warnings: readonly string[]): () => Promise<ProjectRefresh> {
+  return () => Promise.resolve({ kind: 'skipped', reason: 'no-issues', warnings });
+}
+
+describe('refreshClosedIssues', () => {
+  test('opens no runner and refreshes nothing with board.project.number unset', async () => {
+    const run = await refreshRun(null, answering(['never answered']));
+
+    expect([run.asked, run.opened, run.lines]).toEqual([[], 0, []]);
+  });
+
+  test('control: refreshes the closed issue through the runner it opened with the number set', async () => {
+    const run = await refreshRun(6, answering(['the project was not updated']));
+
+    expect([run.asked, run.opened, run.lines]).toEqual([[[579]], 1, ['the project was not updated']]);
+  });
+
+  test('answers a refresh that rejects with the failed line, never rejecting', async () => {
+    const run = await refreshRun(6, () => Promise.reject(new Error('repo view refused')));
+
+    expect(run.lines).toHaveLength(1);
+    expect(run.lines[0]).toContain('The project was not updated for #579: repo view refused.');
   });
 });
 
@@ -265,7 +393,7 @@ describe('over a real checkout', () => {
   test('reads a committed checkout as a clean tree', () => {
     const dir = repo();
 
-    expect(runnerPrSeamsIn(dir).readWorkingTree()).toEqual({ ok: true, entries: [] });
+    expect(runnerPrSeamsIn(dir, refreshConfig(null)).readWorkingTree()).toEqual({ ok: true, entries: [] });
   });
 
   test('reads an edit and an untracked file as the tree\'s entries', () => {
@@ -273,14 +401,20 @@ describe('over a real checkout', () => {
     writeFileSync(join(dir, 'README.md'), '# edited\n');
     writeFileSync(join(dir, 'new.txt'), 'new\n');
 
-    expect(runnerPrSeamsIn(dir).readWorkingTree()).toEqual({ ok: true, entries: [' M README.md', '?? new.txt'] });
+    expect(runnerPrSeamsIn(dir, refreshConfig(null)).readWorkingTree()).toEqual({ ok: true, entries: [' M README.md', '?? new.txt'] });
   });
 
   test('answers a directory git cannot read as a tree it could not read', () => {
     const dir = mkdtempSync(join(tmpdir(), 'rafa-runner-pr-gone-'));
     rmSync(dir, { recursive: true, force: true });
 
-    expect(runnerPrSeamsIn(dir).readWorkingTree().ok).toBe(false);
+    expect(runnerPrSeamsIn(dir, refreshConfig(null)).readWorkingTree().ok).toBe(false);
+  });
+
+  test('sends no refresh from a checkout whose config sets no board.project.number', async () => {
+    const dir = repo();
+
+    expect(await runnerPrSeamsIn(dir, refreshConfig(null)).refreshProject([579])).toEqual([]);
   });
 
   test('reads the fragment\'s notes from the checkout', () => {

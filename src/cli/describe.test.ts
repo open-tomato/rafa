@@ -237,6 +237,7 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
+    expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('sync');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('copy');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('schema');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('dashboard');
@@ -283,6 +284,7 @@ describe('the document over the core registry', () => {
     expect(actionOf(document, 'epic', 'cancel')?.aliases).toEqual([]);
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
+    expect(spendsOf('board', 'sync')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();

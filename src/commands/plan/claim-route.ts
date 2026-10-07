@@ -68,6 +68,7 @@
  */
 import type { GateIssue } from '../../board/gate.js';
 import type { PlanSpecResolution } from '../../board/plan-spec.js';
+import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { AheadRequest } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
@@ -76,7 +77,7 @@ import type { RafaConfig } from '../../config.js';
 import type { Output } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { createGhIssueBoard } from '../../board/issue-board.js';
+import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
 import { CommandExit } from '../../cli/command.js';
@@ -232,19 +233,21 @@ export async function resolveAndClaim(seams: ClaimRouteSeams): Promise<ClaimedRo
 /**
  * The seams and settings a `plan create` run in `repoRoot` claims
  * through: `git` in the project root, the `gh` issue board when the
- * repository resolves to `pr.provider: gh` and none otherwise, this
+ * repository resolves to `pr.provider: gh` and none otherwise, its label
+ * writes refreshing the issue on the project
+ * (`../../board/project/issue-board-refresh.ts`), this
  * device's store id read under `config.store`, `claims.staleAfter`,
  * `claims.ahead`, and the clock at the call.
  */
 export function createPlanClaimContext(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead'>,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter' | 'claimsAhead'> & RefreshConfig,
 ): PlanClaimContext {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
     git: createGitRunner(repoRoot),
     board: provider === 'gh'
-      ? createGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }) })
+      ? createRefreshingGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }), config })
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
     staleAfter: config.claimsStaleAfter,

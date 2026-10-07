@@ -755,6 +755,19 @@ from GitHub Issues:
   from one mode to the other and remove the old marks. Read
   [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md) under "Board
   relationships" for the full choice and upgrade path.
+- **GitHub project as a board mirror.** `rafa init --board --project` creates
+  a GitHub project in your repository, kept in step with your issues by rafa.
+  The project mirrors the issues' labels, pull requests, close state, and the
+  roadmap checklists: one column per issue (Backlog, Triage, Needs work, Ready,
+  Blocked, Claimed, In development, Waiting for approval, In review, Done,
+  Cancelled), a row per open issue and closed issue with a plan or in review.
+  Five fields track Status, Horizon, Rank, Blocked by and Progress; every
+  command that changes an issue's state refreshes its project row, and
+  `rafa board sync` repairs any drift made outside rafa. Optional per
+  repository: run `rafa init --board` without `--project` to skip the project,
+  or `rafa board sync` adds missing issues and refreshes every item on an
+  existing project. Read [context/board-project.md](context/board-project.md)
+  for the full design and the warnings.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request

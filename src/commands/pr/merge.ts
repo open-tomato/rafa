@@ -161,6 +161,14 @@
  * `afterMerge` is (`src/board/relations/labels.ts`), called here at the
  * two points their own notes name.
  *
+ * ## The project refresh
+ *
+ * Straight after that board reading and before the follow-ups, in both
+ * modes, `./merge-project.ts` refreshes on the repository's project the
+ * issues the pull request closes and the issues those were blocking,
+ * sending nothing with `board.project.number` unset. Its lines are
+ * warnings, and like the tick it never changes the exit code.
+ *
  * ## The ending, on a merge that went through
  *
  * Last of all, after the follow-ups, the command names the one
@@ -191,7 +199,7 @@ import type { MergeStepReport } from './merge-cleanup.js';
 import type { FollowUp } from './merge-followups.js';
 import type { FreedReport } from './merge-freed.js';
 import type { MergeGuardReport } from './merge-guard.js';
-import type { UncheckedMerge } from './merge-unchecked.js';
+import type { UncheckedMerge, UncheckedMergeReport } from './merge-unchecked.js';
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
@@ -200,7 +208,6 @@ import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
-import type { UncheckedCase } from '../../pr/unchecked.js';
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -219,10 +226,11 @@ import {
 import { cleanUpAfterMerge, INDENT, reportFollowUps } from './merge-cleanup.js';
 import { freedAfterMerge } from './merge-freed.js';
 import { guardBeforeMerge } from './merge-guard.js';
+import { refreshProjectAfterMerge } from './merge-project.js';
 import { refuseFromGit } from './merge-refuse.js';
 import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
-import { confirmUncheckedMerge, postUncheckedComment, readUncheckedMerge } from './merge-unchecked.js';
+import { commentIfUnchecked, confirmUncheckedMerge, readUncheckedMerge, uncheckedReport } from './merge-unchecked.js';
 import {
   lineRefusal,
   onProvider,
@@ -235,6 +243,9 @@ import {
 
 /** One clean-up step that ran; `./merge-cleanup.ts` reports it, and the result carries it. */
 export type { MergeStepReport } from './merge-cleanup.js';
+
+/** What `--skip-checks` read and posted; `./merge-unchecked.ts` makes it, and the result carries it. */
+export type { UncheckedMergeReport } from './merge-unchecked.js';
 
 /** The usage line this action's refusals name. */
 const USAGE = PR_USAGE.merge;
@@ -262,16 +273,6 @@ export interface MergeSeams extends PrSeams {
 
 /** The seams the registered command runs with: the system's own, every one. */
 export const DEFAULT_MERGE_SEAMS: MergeSeams = Object.freeze({});
-
-/** What `--skip-checks` read and posted, as the result carries it; see the module note. */
-export interface UncheckedMergeReport {
-  /** The workflow count read, or null where it could not be read. */
-  readonly workflowCount: number | null;
-  /** Which reading of "no checks" that count and the base's workflow files give. */
-  readonly case: UncheckedCase;
-  /** The URL of the comment posted after the merge; null for a declined merge or a comment that would not post. */
-  readonly commentUrl: string | null;
-}
 
 /** What json mode gives as the terminal result's `data`. */
 export interface PrMergeResult {
@@ -529,29 +530,6 @@ async function askToMerge(
   return { go: yes || await confirmed(seams), unchecked };
 }
 
-/** What the result carries for `--skip-checks`, or null without it. */
-function uncheckedReport(unchecked: UncheckedMerge | null, commentUrl: string | null): UncheckedMergeReport | null {
-  return unchecked === null
-    ? null
-    : { workflowCount: unchecked.workflowCount, case: unchecked.reading.case, commentUrl };
-}
-
-/** Posts the unchecked-merge comment where `--skip-checks` was given; its URL, or null. Never throws. */
-async function commentIfUnchecked(
-  context: RafaContext,
-  pr: PrContext,
-  number: number,
-  unchecked: UncheckedMerge | null,
-): Promise<string | null> {
-  if (unchecked === null) return null;
-  const posted = await postUncheckedComment(pr.pulls, number, unchecked, (message) => {
-    context.output.warn(message);
-  });
-  if (posted === null) return null;
-  context.output.info(`Commented on #${number} that it was merged with no checks: ${posted.url}`);
-  return posted.url;
-}
-
 /** Merges the pull request and cleans up after it, reporting each line; see the module note. */
 export async function runMerge(context: RafaContext, seams: MergeSeams): Promise<PrMergeResult> {
   const yes = readBooleanFlag(context.flags, 'yes', USAGE);
@@ -626,17 +604,18 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
     throw refusal([`❌ ${pr.pulls.kind} would not merge #${detail.number}: ${outcome.detail}`]);
   }
   context.output.info(`Merged #${detail.number} into ${detail.baseRefName} (${method}).`);
-  const commentUrl = await commentIfUnchecked(context, pr, detail.number, answer.unchecked);
-  const roadmapTicks = await reportTick(context, pr, seams, detail);
-
   const warn = (message: string): void => {
     context.output.warn(message);
   };
   const info = (message: string): void => {
     context.output.info(message);
   };
+  const commentUrl = await commentIfUnchecked(pr.pulls, detail.number, answer.unchecked, { info, warn });
+  const roadmapTicks = await reportTick(context, pr, seams, detail);
+
   const steps = cleanUpAfterMerge(git, detail, { info, warn });
   const board = await reportAfterCleanUp(context, pr, seams, detail);
+  await refreshProjectAfterMerge({ body: detail.body, config: pr.projectRefresh, openGh: () => openGh(pr, seams), unblocked: board.unblocked, warn });
   const followUps = reportFollowUps(
     {
       root: pr.project.root,
