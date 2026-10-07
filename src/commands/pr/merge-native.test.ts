@@ -22,6 +22,11 @@
  *  - The json result: the `freed` key is present in native and left out
  *    of labels, read with `Object.keys` since `toEqual` passes over an
  *    undefined-valued key.
+ *
+ * The project refresh (`./merge-project.ts`) is read here only as the
+ * command's wiring, in both modes: with `board.project.number` set its
+ * calls follow the board reading. Every case above sets no number and
+ * holds the call list to end at that reading, which is the control.
  */
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -347,5 +352,46 @@ describe('the json result', () => {
 
     expect(Object.keys(data)).toContain('unblocked');
     expect(Object.keys(data)).not.toContain('freed');
+  });
+});
+
+/** `config` with `board.project.number` set, under the `board:` key it already holds or a new one. */
+function withProject(config: string): string {
+  return config.includes('board:\n')
+    ? config.replace('board:\n', 'board:\n  project:\n    number: 6\n')
+    : `${config}board:\n  project:\n    number: 6\n`;
+}
+
+/** The warning lines a run wrote, without their prefix. */
+function warnings(lines: readonly string[]): readonly string[] {
+  return lines.filter((line) => line.startsWith('warn: ')).map((line) => line.slice('warn: '.length));
+}
+
+describe('the project refresh after the board reading (./merge-project.ts)', () => {
+  it('in native mode: after the freed issues, reads the board for it and starts the refresh, keeping exit 0', async () => {
+    const run = await ran({ config: withProject(NATIVE_CONFIG) });
+    const calls = run.gh.ran();
+
+    expect(run.exitCode).toBe(0);
+    expect(calls.slice(0, 8)).toEqual([
+      BOARDS_LISTING, ROADMAP_READ, ROADMAP_WRITE, REPO_VIEW, NATIVE_LISTING,
+      REPO_VIEW, NATIVE_LISTING,
+      REPO_VIEW,
+    ]);
+    // The stub routes no project call, so the refresh rejects at its first, and that is one warning naming every issue.
+    expect(calls.slice(8).every((line) => line.startsWith('api graphql'))).toBe(true);
+    expect(calls.length).toBeGreaterThan(8);
+    expect(warnings(run.lines)).toHaveLength(1);
+    expect(warnings(run.lines)[0]).toStartWith('The project was not updated for #20, #12, #13: ');
+    expect(run.lines.findIndex((line) => line.startsWith('warn: The project'))).toBeGreaterThan(at(run.lines, `${INDENT}#12 Sign-in page`));
+  });
+
+  it('in labels mode: after the unblock listing, reads the board for it and starts the refresh, keeping exit 0', async () => {
+    const run = await ran({ config: withProject(LABELS_CONFIG) });
+    const calls = run.gh.ran();
+
+    expect(run.exitCode).toBe(0);
+    expect(calls.slice(0, 7)).toEqual([EPIC_LISTING, BOARDS_LISTING, ROADMAP_READ, ROADMAP_WRITE, BLOCKED_LISTING, EPIC_LISTING, REPO_VIEW]);
+    expect(warnings(run.lines)).toEqual([expect.stringMatching(/^The project was not updated for #20: /u)]);
   });
 });

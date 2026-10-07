@@ -710,9 +710,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge-freed.js', ['freedAfterMerge']],
     ['./merge-guard.js', ['guardBeforeMerge']],
     ['./merge-loop-worktree.js', ['defaultLoopWorktreeSeams', 'freeLoopHolderBeforeMerge']],
+    ['./merge-project.js', ['refreshProjectAfterMerge']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
-    ['./merge-unchecked.js', ['confirmUncheckedMerge', 'postUncheckedComment', 'readUncheckedMerge']],
+    ['./merge-unchecked.js', ['commentIfUnchecked', 'confirmUncheckedMerge', 'readUncheckedMerge', 'uncheckedReport']],
     ['./pr-context.js', [
       'lineRefusal',
       'onProvider',
