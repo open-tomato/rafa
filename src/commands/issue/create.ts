@@ -62,6 +62,16 @@
  * result's `data` is an {@link IssueCreateResult}: the tracker and the
  * ref.
  *
+ * ## The project
+ *
+ * An issue the `github` tracker filed is added to the repository's
+ * project and refreshed there once its own lines are written
+ * (`addAndRefreshIssue`, `../../board/project/add-issue.ts`), with
+ * `board.project.number` set; unset, or on another tracker, no call is
+ * sent. Every line the add or the refresh answers is written at `warn`
+ * after the command's own output, and none changes the exit code: the
+ * issue is filed, and `rafa board sync` catches the project up.
+ *
  * ## Refusals
  *
  * Exit code 1, as `issue-tracker.ts` words them: an argument, a
@@ -78,7 +88,9 @@ import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index.js';
 
+import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
+import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { messageOf } from '../../config-sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 import { expectNoArgument } from '../plan/plan-files.js';
@@ -87,6 +99,8 @@ import { readSpecLine, settleSpecLine } from './create-blocked.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueName,
+  issueProject,
+  issueSubjectConfig,
   lineRefusal,
   onTracker,
   readChoiceFlag,
@@ -197,6 +211,36 @@ async function settledDraft(read: IssueDraft, tracker: Tracker, context: RafaCon
   return settled.draft;
 }
 
+/**
+ * The issue number of `ref` when the `github` tracker filed it, else
+ * null: only a GitHub issue can be an item of the project.
+ */
+export function projectIssueNumber(ref: Pick<IssueRef, 'kind' | 'externalId'>): number | null {
+  if (ref.kind !== 'github' || !/^[1-9]\d*$/u.test(ref.externalId)) return null;
+  const number = Number(ref.externalId);
+  return Number.isSafeInteger(number)
+    ? number
+    : null;
+}
+
+/**
+ * Adds the issue `ref` names to the project and refreshes it, writing
+ * each warning line at `warn`; nothing for an issue another tracker
+ * filed, or with `board.project.number` unset. See the module note.
+ */
+export async function addCreatedToProject(context: RafaContext, seams: IssueSeams, ref: IssueRef): Promise<void> {
+  const issue = projectIssueNumber(ref);
+  if (issue === null) return;
+  const project = issueProject(context);
+  // Its warnings dropped: `resolveIssueTracker` already wrote them for the same config.
+  const config = issueSubjectConfig(project, () => undefined);
+  const lines = await addAndRefreshIssue({
+    config,
+    openGh: () => seams.gh ?? createGhRunner({ cwd: project.root }),
+  }, issue);
+  for (const line of lines) context.output.warn(line);
+}
+
 /** The command, resolving the chain with `seams`; see the module note. */
 export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): RafaCommand {
   const command: RafaCommand = {
@@ -210,7 +254,8 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
       + ' `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. The body is'
       + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
       + ' carries a `Blocked by: #24` line is filed blocked, and refused when the line names no issue, the'
-      + ' issue itself or an issue the board does not hold. Prints the'
+      + ' issue itself or an issue the board does not hold. With `board.project.number` set, a GitHub issue is'
+      + ' added to the project and its fields filled, any failure there a warning that keeps the exit code. Prints the'
       + ' tracker and id of the issue filed, and its URL when there is one. With `--output=json` the tracker'
       + ' and the ref are the data of the terminal result event.',
     args: [],
@@ -267,11 +312,9 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
     run: async (context) => {
       const created = await createIssue(context, seams);
       if (created.ref.warning !== undefined) context.output.warn(`${issueName(created.ref)}: ${created.ref.warning}`);
-      if (context.outputMode === 'json') {
-        context.output.result(created);
-        return;
-      }
-      for (const line of renderCreated(created.ref)) context.output.info(line);
+      if (context.outputMode === 'json') context.output.result(created);
+      else for (const line of renderCreated(created.ref)) context.output.info(line);
+      await addCreatedToProject(context, seams, created.ref);
     },
   };
   return Object.freeze(command);

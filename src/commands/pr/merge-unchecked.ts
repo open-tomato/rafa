@@ -27,7 +27,10 @@
  *     to answer, prints the warning and asks nothing. The warning is
  *     printed EVERY time, `--yes` or not: the spec answers "the flag
  *     becomes a habit" with a warning that is never skipped.
- *  3. {@link postUncheckedComment}, once the provider has merged.
+ *  3. {@link commentIfUnchecked}, once the provider has merged, which
+ *     posts through {@link postUncheckedComment} and prints the URL.
+ *
+ * What the result carries for the flag is {@link uncheckedReport}'s.
  *
  * ## The two refusals, and their order
  *
@@ -95,7 +98,7 @@
  */
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { GitRunner, PullRequestComment, PullRequests } from '../../pr/index.js';
-import type { BaseWorkflowReading, UncheckedReading } from '../../pr/unchecked.js';
+import type { BaseWorkflowReading, UncheckedCase, UncheckedReading } from '../../pr/unchecked.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
@@ -309,4 +312,39 @@ export async function postUncheckedComment(
     warn(commentProblemLine(number, messageOf(error), body));
     return null;
   }
+}
+
+/** What `--skip-checks` read and posted, as `pr merge`'s result carries it. */
+export interface UncheckedMergeReport {
+  /** The workflow count read, or null where it could not be read. */
+  readonly workflowCount: number | null;
+  /** Which reading of "no checks" that count and the base's workflow files give. */
+  readonly case: UncheckedCase;
+  /** The URL of the comment posted after the merge; null for a declined merge or a comment that would not post. */
+  readonly commentUrl: string | null;
+}
+
+/** What `pr merge`'s result carries for `--skip-checks`, or null without it. */
+export function uncheckedReport(unchecked: UncheckedMerge | null, commentUrl: string | null): UncheckedMergeReport | null {
+  return unchecked === null
+    ? null
+    : { workflowCount: unchecked.workflowCount, case: unchecked.reading.case, commentUrl };
+}
+
+/**
+ * Posts the unchecked-merge comment where `--skip-checks` was given and
+ * says so through `report.info`; its URL, or null without the flag or
+ * where it would not post. Never throws.
+ */
+export async function commentIfUnchecked(
+  pulls: PullRequests,
+  number: number,
+  unchecked: UncheckedMerge | null,
+  report: { readonly info: (message: string) => void; readonly warn: (message: string) => void },
+): Promise<string | null> {
+  if (unchecked === null) return null;
+  const posted = await postUncheckedComment(pulls, number, unchecked, report.warn);
+  if (posted === null) return null;
+  report.info(`Commented on #${number} that it was merged with no checks: ${posted.url}`);
+  return posted.url;
 }

@@ -283,11 +283,11 @@ function freshProject(label: string): { readonly root: string; readonly home: st
 }
 
 /**
- * Dispatches `rafa init --no-release --board --no-epic-guard` in text
- * mode over `project`, `gh` and the prompter named. Every case here
- * answers the release, board and epic guard steps on the line, so none
- * of the three asks anything: only the relationships move can open the
- * prompter it is handed.
+ * Dispatches `rafa init --no-release --board --no-epic-guard
+ * --no-project` in text mode over `project`, `gh` and the prompter
+ * named. Every case here answers the release, board, epic guard and
+ * project steps on the line, so none of the four asks anything: only
+ * the relationships move can open the prompter it is handed.
  */
 async function initBoard(
   project: { readonly root: string; readonly home: string },
@@ -309,7 +309,7 @@ async function initBoard(
     gh: () => gh,
   };
   const words = [
-    'init', `--root=${project.root}`, '--no-release', '--board', '--no-epic-guard',
+    'init', `--root=${project.root}`, '--no-release', '--board', '--no-epic-guard', '--no-project',
   ];
   const result = await dispatchInProject(words, [], [createInitCommand(seams)], project, { PATH: '/rafa-test-no-such-path' });
   if (result.exitCode !== 0) {

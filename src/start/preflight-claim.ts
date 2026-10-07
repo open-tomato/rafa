@@ -73,6 +73,7 @@
  * warning beside a run that goes on.
  */
 import type { IssueBoard } from '../board/issue-board.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
@@ -81,7 +82,7 @@ import type { GitRunner } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { createGhIssueBoard } from '../board/issue-board.js';
+import { createRefreshingGhIssueBoard } from '../board/project/issue-board-refresh.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue, fetchClaimBranches, pushNewClaimBranch, readClaimBranch, readLocalClaimBranch } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
@@ -107,20 +108,22 @@ export interface StartPreflightClaim {
 /**
  * The seams a `loop start` run in `repoRoot` checks its claim through:
  * `git` in the project root, the `gh` issue board when the repository
- * resolves to `pr.provider: gh` and none otherwise, and this device's
+ * resolves to `pr.provider: gh` and none otherwise, its label writes
+ * refreshing the issue on the project (`../board/project/issue-board-refresh.ts`),
+ * and this device's
  * store id read under `config.store`. Resolving the provider reads
  * `origin` unless `pr.provider` is configured; nothing else is read
  * until the check runs.
  */
 export function createStartPreflightClaim(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store'>,
+  config: Pick<RafaConfig, 'prProvider' | 'store'> & RefreshConfig,
 ): StartPreflightClaim {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
     git: createGitRunner(repoRoot),
     board: provider === 'gh'
-      ? createGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }) })
+      ? createRefreshingGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }), config })
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
   };

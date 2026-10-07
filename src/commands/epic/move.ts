@@ -122,12 +122,21 @@
  * `relationships: native` and leaves out the labels and the checklist
  * edits it has none of.
  *
+ * ## The project refresh
+ *
+ * Once the move landed, with `board.project.number` set,
+ * `./epic-project.ts` refreshes on the repository's project the issue,
+ * both epics with their members, and every item whose Rank shifted. Its
+ * lines are warnings written after the run's own, before json mode's
+ * result, and never change the exit code.
+ *
  * ## What it writes
  *
  * In text mode, the move and what became of each line. In json mode the
  * terminal result's `data` is an {@link EpicMoveResult}. It starts no
  * session, so it declares no `spends`.
  */
+import type { EpicProjectSeams } from './epic-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ChecklistEditResult } from '../../board/epic-checklist.js';
 import type { MembershipChange, OpenWork } from '../../board/epic-trail.js';
@@ -159,6 +168,7 @@ import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
+import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { TO_FLAG, workPhrase } from './horizon-change.js';
 import {
   configuredMoveRelations,
@@ -286,8 +296,8 @@ export interface EpicMoveResult {
   readonly problems: readonly string[];
 }
 
-/** How the command reaches `gh`, `git` and the terminal; each left out is the system's own. */
-export interface EpicMoveSeams {
+/** How the command reaches `gh`, `git`, the terminal and the project refresh; each left out is the system's own. */
+export interface EpicMoveSeams extends EpicProjectSeams {
   readonly gh?: GhRunner;
   readonly git?: GitRunner;
   /** True when a question can be answered. `process.stdin.isTTY` when left out. */
@@ -717,16 +727,15 @@ export function moveFailure(result: EpicMoveResult): CommandExit | null {
 export async function runEpicMove(context: RafaContext, seams: EpicMoveSeams): Promise<void> {
   const result = await moveEpicIssue(context, seams);
   const failure = moveFailure(result);
-  if (context.outputMode === 'json') {
-    if (failure !== null) throw failure;
-    context.output.result(result);
-    return;
+  if (context.outputMode !== 'json') {
+    for (const out of renderEpicMove(result)) {
+      if (out.warn) context.output.warn(out.text);
+      else context.output.info(out.text);
+    }
   }
-  for (const out of renderEpicMove(result)) {
-    if (out.warn) context.output.warn(out.text);
-    else context.output.info(out.text);
-  }
+  await refreshProjectAfterEpic(context, seams, moveTarget(result));
   if (failure !== null) throw failure;
+  if (context.outputMode === 'json') context.output.result(result);
 }
 
 /** The command, reaching `gh`, `git` and the terminal through `seams`; see the module note. */

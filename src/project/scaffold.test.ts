@@ -118,6 +118,7 @@ const VALUELESS: readonly (readonly [string, string])[] = [
   ['hubTokenSecret', 'default'],
   ['prProvider', 'default'],
   ['prBase', 'default'],
+  ['boardProjectNumber', 'default'],
   ['roadmapIssue', 'default'],
 ];
 

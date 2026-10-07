@@ -14,6 +14,9 @@
  * {@link GhRunner} declared in `src/adapters/tracker/github.ts` and
  * taken by the pull request provider (`src/pr/gh.ts`) and the trust
  * reading (`./trust.ts`) already.
+ * Where a board is built for label writes, it is usually built wrapped
+ * (`./project/issue-board-refresh.ts`): the same commands, each label
+ * write followed by a refresh of the issue on the project.
  *
  * {@link IssueBoard.removeLabel} is the one member no gate run reaches:
  * it is here for the unblock run, which takes `spec:blocked` off an

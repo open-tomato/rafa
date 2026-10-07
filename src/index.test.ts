@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, `board sync`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -116,6 +116,7 @@ import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
+  BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_DEFAULTS,
@@ -203,6 +204,7 @@ import * as entry from './index.js';
 
 /** The runtime names the entry exposes, sorted as `sort` sorts them. */
 const RUNTIME_EXPORTS = [
+  'BOARD_PROJECT_TEMPLATE_DEFAULT',
   'BOARD_RELATIONSHIP_MODES',
   'CLAUDE_SETTING_SOURCES',
   'CONFIG_DEFAULTS',
@@ -279,6 +281,7 @@ const RUNTIME_EXPORTS = [
 
 /** Each runtime name, the entry's value for it, and its module's own. */
 const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
+  ['BOARD_PROJECT_TEMPLATE_DEFAULT', entry.BOARD_PROJECT_TEMPLATE_DEFAULT, BOARD_PROJECT_TEMPLATE_DEFAULT],
   ['BOARD_RELATIONSHIP_MODES', entry.BOARD_RELATIONSHIP_MODES, BOARD_RELATIONSHIP_MODES],
   ['CLAUDE_SETTING_SOURCES', entry.CLAUDE_SETTING_SOURCES, CLAUDE_SETTING_SOURCES],
   ['CONFIG_DEFAULTS', entry.CONFIG_DEFAULTS, CONFIG_DEFAULTS],
@@ -580,7 +583,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
   ]],
   ['./commands/issue/create.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
@@ -588,6 +593,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
+      'issueProject',
+      'issueSubjectConfig',
       'lineRefusal',
       'onTracker',
       'readChoiceFlag',
@@ -603,8 +610,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueName', 'issueRef', 'onTracker', 'readRequiredFlag', 'resolveIssueTracker']],
   ]],
   ['./commands/issue/move.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_STATES']],
-    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueRef', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+    ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'expectTwoArguments', 'issueName', 'issueProject', 'issueRef', 'issueSubjectConfig', 'onTracker', 'readChoice', 'resolveIssueTracker']],
+    ['./move-project.js', ['refreshMovedIssue']],
   ]],
   ['./commands/issue/ready.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner', 'moduleOfLabels', 'typeOfLabels']],
@@ -613,6 +622,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
     ['../../board/plan-spec.js', ['boardRepoLabel', 'issueSource']],
+    ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard']],
     ['../../board/readiness.js', ['hasSpecReadyLabel', 'READINESS_REFUSAL_EXIT', 'requireCompleteSpec', 'SPEC_READY_LABEL']],
     ['../../board/trust.js', ['ghBoardTrust', 'requireTrustedBoardAuthor']],
     ['../../cli/command.js', ['CommandExit']],
@@ -628,13 +638,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/blocked.js', ['blockedFaultMessage', 'hasSpecBlockedLabel', 'readBlockedBy', 'SPEC_BLOCKED_LABEL']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
+    ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard', 'refreshFailedWarning', 'refreshIssueItems']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../../config-sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../doctor-blocked.js', ['BLOCKED_LIST_LIMIT', 'KNOWN_LIST_LIMIT']],
     ['../plan/plan-files.js', ['plural']],
-    ['./issue-tracker.js', ['issueProject', 'lineRefusal']],
-    ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'unblockRelationshipsMode']],
+    ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+    ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'refreshNativeUnblock', 'unblockRelationshipsMode']],
   ]],
   ['./commands/issue/check.js', [
     ['../../board/naming.js', ['boardId', 'notesFileName', 'SPEC_EXTENSION']],
@@ -705,9 +716,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge-freed.js', ['freedAfterMerge']],
     ['./merge-guard.js', ['guardBeforeMerge']],
     ['./merge-loop-worktree.js', ['defaultLoopWorktreeSeams', 'freeLoopHolderBeforeMerge']],
+    ['./merge-project.js', ['refreshProjectAfterMerge']],
     ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
-    ['./merge-unchecked.js', ['confirmUncheckedMerge', 'postUncheckedComment', 'readUncheckedMerge']],
+    ['./merge-unchecked.js', ['commentIfUnchecked', 'confirmUncheckedMerge', 'readUncheckedMerge', 'uncheckedReport']],
     ['./pr-context.js', [
       'lineRefusal',
       'onProvider',
@@ -956,6 +968,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
   ]],
   ['./commands/release/settle.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
     ['../../release/settle-pr.js', ['settleByPr']],
@@ -965,6 +978,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/settle.js', ['readSettle', 'releaseCommitSubject']],
     ['../../release/version.js', ['RELEASE_BASE_BRANCH', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
+    ['./settle-project.js', ['refreshProjectAfterSettle']],
   ]],
   ['./commands/release/tag.js', [
     ['../../cli/command.js', ['CommandExit']],
@@ -990,6 +1004,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../switch.js', ['defaultBoardOnce']],
+  ]],
+  ['./commands/board/sync.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
+    ['../../board/project/sync.js', ['syncProject']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/epic/show.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1028,6 +1050,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./epic-project.js', ['newEpicTarget', 'refreshProjectAfterEpic']],
     ['./move-native.js', ['NATIVE_MODE']],
   ]],
   ['./commands/epic/defer.js', [
@@ -1051,6 +1074,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
+    ['./epic-project.js', ['moveTarget', 'refreshProjectAfterEpic']],
     ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
     ['./move-native.js', [
       'configuredMoveRelations',
@@ -1085,6 +1109,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../utils/claude.js', ['claudeArgs', 'spawnClaudeCaptured']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../plan/plan-files.js', ['readSwitch']],
+    ['./epic-project.js', ['closeTarget', 'refreshProjectAfterEpic']],
   ]],
   ['./commands/epic/cancel.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1104,6 +1129,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
+    ['./epic-project.js', ['cancelTarget', 'refreshProjectAfterEpic']],
     ['./move.js', ['applyEpicMove', 'readEpicMove']],
   ]],
   ['./commands/claim/release.js', [
@@ -1257,6 +1283,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../project/roots.js', ['DISK_ROOTS_FILE_SYSTEM', 'gitToplevel', 'rootCandidates']],
     ['../project/scaffold.js', ['scaffoldConflicts', 'writeProjectScope', 'writeUserScope']],
     ['../schema/project-id.js', ['gitRemoteUrl']],
+    ['./init-board-project.js', ['projectStepChanged', 'renderProjectStep', 'runProjectStep']],
     ['./init-board.js', [
       'boardStepChanged',
       'epicGuardChanged',
@@ -1291,6 +1318,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-effort-schema.js', ['effortSchemaRefusal', 'readDoctorEffortSchema', 'writeDoctorEffortSchema']],
     ['./doctor-effort-sync.js', ['effortSyncRefusal', 'readDoctorEffortSync', 'renderDoctorEffortSync']],
     ['./doctor-install.js', ['readInstall', 'writeInstall']],
+    ['./doctor-project.js', ['readDoctorProject', 'renderDoctorProject']],
     ['./doctor-refs.js', ['readDoctorRefs', 'renderDoctorRefs']],
     ['./doctor-release.js', ['readDoctorRelease', 'writeDoctorRelease']],
     ['./doctor-render.js', ['renderDoctor']],
@@ -1530,6 +1558,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/settle.js',
       './commands/release/tag.js',
       './commands/board/list.js',
+      './commands/board/sync.js',
       './commands/epic/show.js',
       './commands/epic/new.js',
       './commands/epic/defer.js',
