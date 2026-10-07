@@ -21,6 +21,7 @@ Quick start:
   rafa claim release 324
   rafa update current --dry-run
   rafa config set pr.base=stretch/9
+  rafa ci status --branch=stretch/9
   rafa status
   rafa next
   rafa roadmap
@@ -62,6 +63,8 @@ Subjects:
              development
   config     set one key in the project's config, keeping every comment, and
              print its old and new values
+  ci         read the newest CI run on a branch: its state, its commit and the
+             cases it failed
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe

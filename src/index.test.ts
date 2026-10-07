@@ -1190,6 +1190,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config.js', ['configFilePath']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
+  ['./commands/ci/status.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../ci/failed-cases.js', ['readFailedCases']],
+    ['../../ci/runs.js', ['readNewestRun']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../issue/issue-tracker.js', ['readNonBlankFlag', 'readRequiredFlag']],
+    ['../plan/plan-files.js', ['requireProject']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
@@ -1561,6 +1570,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/update/next.js',
       './commands/update/latest.js',
       './commands/config/set.js',
+      './commands/ci/status.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

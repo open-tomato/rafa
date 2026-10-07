@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety registered so far wrap a
+ * of each is its command. Four of the ninety-one registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -83,7 +83,8 @@
  * which read an issue's claim branches and push one ownership commit on
  * them through `src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
- * through `src/config-set.ts`.
+ * through `src/config-set.ts`, nor `ci status`, which reads a branch's
+ * newest run through the readers under `src/ci/`.
  *
  * ## What is registered
  *
@@ -299,6 +300,11 @@
  *     and new values printed; exit code 1, with nothing written, for an
  *     argument that is not `<key>=<value>` and for each refusal of
  *     `src/config-set.ts`. It starts no session.
+ *   - `ci status --branch=<branch> [--workflow=<name>]`: the newest run
+ *     on a branch, its state, its short commit and, when it is red, the
+ *     bun cases it failed by file and case; exit code 0 green, 1 red, 2
+ *     no run, 3 running, 4 for a refusal or a `gh` failure. It starts no
+ *     session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -324,7 +330,7 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the fifteen with an action registered: a subject with
+ * The subjects are the sixteen with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -339,6 +345,7 @@ import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import boardList from './board/list.js';
+import ciStatus from './ci/status.js';
 import claimAccept from './claim/accept.js';
 import claimHand from './claim/hand.js';
 import claimRelease from './claim/release.js';
@@ -442,6 +449,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
   { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
   { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
+  { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
 ]);
 
 /** The core commands, in roster order. */
@@ -527,6 +535,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   updateNext,
   updateLatest,
   configSet,
+  ciStatus,
   status,
   next,
   roadmap,
