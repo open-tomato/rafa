@@ -1314,6 +1314,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-effort-schema.js', ['effortSchemaRefusal', 'readDoctorEffortSchema', 'writeDoctorEffortSchema']],
     ['./doctor-effort-sync.js', ['effortSyncRefusal', 'readDoctorEffortSync', 'renderDoctorEffortSync']],
     ['./doctor-install.js', ['readInstall', 'writeInstall']],
+    ['./doctor-project.js', ['readDoctorProject', 'renderDoctorProject']],
     ['./doctor-refs.js', ['readDoctorRefs', 'renderDoctorRefs']],
     ['./doctor-release.js', ['readDoctorRelease', 'writeDoctorRelease']],
     ['./doctor-render.js', ['renderDoctor']],

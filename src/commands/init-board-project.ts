@@ -217,7 +217,7 @@ function refusalOf(error: unknown): string {
 }
 
 /** True when one account of `hosts` is active, logged in, and holds the `project` scope. */
-function holdsProjectScope(hosts: unknown): boolean {
+export function holdsProjectScope(hosts: unknown): boolean {
   if (!isMapping(hosts)) return false;
   return Object.values(hosts).some((accounts) => Array.isArray(accounts) && accounts.some((account) => isMapping(account)
     && account['active'] === true

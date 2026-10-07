@@ -79,6 +79,14 @@
  * four writes to the board or changes the exit code, and a halt prints
  * them before its refusal.
  *
+ * ## The project rows
+ *
+ * A repository whose provider is `gh` and whose `board.project.number`
+ * is set then gets the three rows of its GitHub project — the `project`
+ * scope, the project, its five fields — read through the board's runner
+ * without reading an item (`./doctor-project.ts`), printed after the
+ * board readings. It never changes the exit code.
+ *
  * ## The cleanup row
  *
  * Every repository then gets the counts `rafa cleanup` would list, read
@@ -203,7 +211,7 @@
  * `known-missing:` lines; then the risk total of a plan `--plan` names;
  * then `renderDoctorBoard`'s lines (`./doctor-board.ts`) for a repository that has a GitHub board —
  * its rows, then any blocked issues, then any epic labels — and none for
- * one that has not; then the cleanup row, when there is anything to
+ * one that has not; then the project rows, when `board.project.number` is set; then the cleanup row, when there is anything to
  * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
  * effort sync row; then, under `--deep`,
@@ -238,6 +246,7 @@ import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from './doctor-effort-sync.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
+import type { DoctorProjectReading } from './doctor-project.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
@@ -281,6 +290,7 @@ import { DOCTOR_DESCRIPTION } from './doctor-description.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
 import { effortSyncRefusal, readDoctorEffortSync, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
+import { readDoctorProject, renderDoctorProject } from './doctor-project.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
@@ -384,6 +394,8 @@ export interface DoctorResult {
   readonly marks?: DoctorBoardReadings['marks'];
   /** Every unresolved board owner, unlabelled Roadmap and lost position slot; null for a project with no GitHub board. */
   readonly boards: DoctorBoardReadings['boards'];
+  /** The project rows (`./doctor-project.ts`); null without a `gh` provider or `board.project.number`. */
+  readonly project: DoctorProjectReading | null;
   /** How many rows each group `rafa cleanup` lists holds, read without fetching, or why git refused. */
   readonly cleanup: DoctorCleanupReading;
   /** The suspect, dangling and unknown references of every saved copy under `specs.dir`, or why it could not be listed. */
@@ -402,6 +414,7 @@ export interface DoctorResult {
 
 /** The readings of the GitHub board, each null for a project that has none, and the rows every repository gets. */
 interface BoardReadings extends DoctorBoardReadings {
+  readonly project: DoctorProjectReading | null;
   readonly cleanup: DoctorCleanupReading;
   readonly refs: DoctorRefsReading;
   readonly release: DoctorReleaseReading;
@@ -644,6 +657,7 @@ function resultOf(preflight: DoctorPreflight, install: InstallReadings, readings
     epics: readings.epics,
     boards: readings.boards,
     ...relationsResultOf(readings),
+    project: readings.project,
     cleanup: readings.cleanup,
     refs: readings.refs,
     release: readings.release,
@@ -695,10 +709,12 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const effortSync = await readDoctorEffortSync({ root: project.root, home: project.home, resolved: preflight.resolved }, seams);
     const modeSet = preflight.resolved.sources.boardRelationships !== 'default';
     const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue, preflight.config.boardRelationships, modeSet);
-    const readings: BoardReadings = { ...board, cleanup, refs, release, tiers, effortSchema, effortSync };
+    const { boardProjectNumber: number, boardProjectTemplate: template } = preflight.config;
+    const projectRows = await readDoctorProject({ gh, number, template });
+    const readings: BoardReadings = { ...board, project: projectRows, cleanup, refs, release, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);
-    const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
+    const repository = [...renderDoctorBoard(readings), ...renderDoctorProject(projectRows), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeDoctorRelease(context, release);
     writeText(context, renderDoctorTiers(readings.tiers));
