@@ -9,7 +9,7 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
-## 0.39.0 — 2026-10-07, The 12 macOS test failures of 0.36.0, each fixed; Stretches run on rafa lines alone; Planned under assumptions; Bug sweep 14 — the loop's ending tells the truth; Bug sweep 15 — merge, cleanup, status and release do their step; Bug sweep 16 — pages, notes and messages say what the code does; Bug sweep 18 — the type step runs in a loop worktree; Stretch operators run each rafa line as one command; Monorepo survey, the unattended part
+## 0.39.0 — 2026-10-07, The 12 macOS test failures of 0.36.0, each fixed; Stretches run on rafa lines alone; Bug sweep 11 — type-check the test files a task touches; Bug sweep 12 — spawned runs assert their exit code through expectExit; Bug sweep 13 — a plan rafa plan create writes runs as written; Bug sweep 14 — the loop's ending tells the truth; Bug sweep 15 — merge, cleanup, status and release do their step; Bug sweep 16 — pages, notes and messages say what the code does; Bug sweep 18 — the type step runs in a loop worktree; Stretch operators run each rafa line as one command; Monorepo survey, the unattended part
 <!-- rafa:fragments rafa-lock-0-38-0 fix-mac-test-failures rafa-816-spec-rafa-stretch-start rafa-818-bug-sweep-11 rafa-819-bug-sweep-12 rafa-820-bug-sweep-13 rafa-821-bug-sweep-14 rafa-822-bug-sweep-15 rafa-823-bug-sweep-16 rafa-839-bug-sweep-18 rafa-841-stretch-operators-run-each rafa-862-monorepo-survey -->
 
 - Effort store: on macOS the host id reads `/usr/sbin/ioreg` by its full path, so a run under a PATH without `/usr/sbin` no longer falls back to the hostname, reads its own store as a copy and mints it a new store id.
