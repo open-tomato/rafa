@@ -106,6 +106,16 @@
  * reads as `labels`, so it meets the same refusals in the same order as
  * before; a `labels` run's output and `gh` calls are unchanged.
  *
+ * ## The project refresh
+ *
+ * Once the epic and its board line are written, with
+ * `board.project.number` set, `./epic-project.ts` adds the epic to the
+ * repository's project and refreshes it, its members and every item
+ * whose Rank its new line shifted. Its lines are warnings written after
+ * the run's own lines, before json mode's result, and never change the
+ * exit code. A run refused after the epic was created, its board line
+ * `failed`, sends nothing; `rafa board sync` adds the epic.
+ *
  * ## What it writes
  *
  * In text mode, the created epic with its labels, where its line went,
@@ -118,6 +128,7 @@
  * It starts no session, so it declares no `spends`, and it asks nothing,
  * so it reads no terminal.
  */
+import type { EpicProjectSeams } from './epic-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ChecklistEditResult } from '../../board/epic-checklist.js';
 import type { CreatedIssue, IssueBoard } from '../../board/issue-board.js';
@@ -145,6 +156,7 @@ import { messageOf } from '../../config-sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 
+import { newEpicTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { NATIVE_MODE } from './move-native.js';
 
 /** The usage line a refusal names. */
@@ -209,8 +221,8 @@ export interface NativeEpicNewResult {
 /** What json mode gives as the terminal result's `data`, in the mode the run read. */
 export type EpicNewResult = LabelsEpicNewResult | NativeEpicNewResult;
 
-/** How the command reaches `gh`; the system's own when left out. */
-export interface EpicNewSeams {
+/** How the command reaches `gh` and the project refresh; the system's own when left out. */
+export interface EpicNewSeams extends EpicProjectSeams {
   readonly gh?: GhRunner;
 }
 
@@ -491,11 +503,11 @@ export function renderEpicNew(result: EpicNewResult): string[] {
 /** Runs one `epic new` line with `seams`, writing it in the line's output mode. */
 export async function runEpicNew(context: RafaContext, seams: EpicNewSeams): Promise<void> {
   const result = await createEpic(context, seams);
-  if (context.outputMode === 'json') {
-    context.output.result(result);
-    return;
+  if (context.outputMode !== 'json') {
+    for (const text of renderEpicNew(result)) context.output.info(text);
   }
-  for (const text of renderEpicNew(result)) context.output.info(text);
+  await refreshProjectAfterEpic(context, seams, newEpicTarget(result));
+  if (context.outputMode === 'json') context.output.result(result);
 }
 
 /** The command, reaching `gh` through `seams`; see the module note. */

@@ -10,8 +10,8 @@
  *
  * With `board.project.number` unset the refresh answers `no-project` at
  * once, having sent no call, so a caller never checks whether the
- * repository opted in. An empty list of issues answers `no-issues` the
- * same way.
+ * repository opted in. An empty list of issues with nothing to widen it
+ * (see below) answers `no-issues` the same way.
  *
  * ## What one refresh reads, in order
  *
@@ -37,6 +37,29 @@
  *     which the refresh does not print.
  *
  * Steps 4 and 5 are skipped when no issue asked for is on the project.
+ *
+ * ## Widening: an epic's members, and the items whose Rank shifted
+ *
+ * A caller that changed the home board's order or an epic's membership
+ * (the `rafa epic` actions, `src/commands/epic/epic-project.ts`) cannot
+ * name every issue that change reached, so it hands a
+ * {@link RefreshWidening}, and the board of step 5 is then read before
+ * the facts, once, to widen the issues asked for:
+ *
+ *  - {@link RefreshWidening.membersOf} adds each named epic's members as
+ *    that board reads them, in the epic's member order, so a member the
+ *    caller's write just moved in is read off the listing it changed;
+ *  - {@link RefreshWidening.shiftedRanks} adds every item of this
+ *    repository whose Rank on the project is not the one the home
+ *    board's order gives, lowest number first, compared as the writes
+ *    compare it (`projectChangesOf`). Against a project that was in step
+ *    before the caller's write, those are the items whose Rank the write
+ *    shifted; an item that drifted for another reason is caught up too.
+ *    With the Rank field skipped (renamed, or of another type) none is
+ *    added.
+ *
+ * The widened issues follow the ones asked for, each once; a member with
+ * no item on the project is answered in {@link ProjectRefreshed.missing}.
  *
  * ## What it writes
  *
@@ -72,7 +95,7 @@
  * no default board rejects as `resolveDefaultBoard` does.
  */
 import type { IssueFacts } from './facts.js';
-import type { FieldMismatch, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
+import type { FieldMismatch, MatchedField, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
 import type { ProjectWritesResult, ProjectWritesSeams } from './writes.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -98,7 +121,7 @@ import {
   scopeWarning,
   skippedFieldWarning,
 } from './refresh-warnings.js';
-import { ranksOf } from './rules.js';
+import { rankOf, ranksOf } from './rules.js';
 import { writeProjectFields } from './writes.js';
 
 /** What every refusal of this module opens with. */
@@ -114,6 +137,14 @@ export interface RefreshOptions {
   readonly gh: GhRunner;
   /** The pause between two write requests; `Bun.sleep` when left out. */
   readonly sleep?: ProjectWritesSeams['sleep'];
+}
+
+/** What a refresh adds to the issues it is asked for; see the module note. */
+export interface RefreshWidening {
+  /** The epics whose members, as the refresh's own board reading reads them, are refreshed too. */
+  readonly membersOf?: readonly number[];
+  /** True to refresh too every item whose Rank on the project is not the one the home board's order gives. */
+  readonly shiftedRanks?: boolean;
 }
 
 /** A refresh that sent no call. */
@@ -146,11 +177,11 @@ export interface ProjectRefreshRefused {
 export interface ProjectRefreshed {
   readonly kind: 'refreshed';
   readonly project: ProjectRef;
-  /** Every value that differed, by issue in the order asked, then in field order. */
+  /** Every value that differed, by issue in the order asked and widened, then in field order. */
   readonly changes: readonly ProjectChange[];
   /** How the writes of {@link ProjectRefreshed.changes} went. */
   readonly writes: ProjectWritesResult;
-  /** The issues asked for that have no item on the project, in the order asked. */
+  /** The issues asked for, or added as an epic's members, that have no item on the project, in that order. */
   readonly missing: readonly number[];
   /** The template's fields the project does not hold as expected, none written. */
   readonly skipped: readonly FieldMismatch[];
@@ -223,17 +254,18 @@ async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository:
   };
 }
 
-/** The changes the issues on the project need, by issue in the order asked. */
+/** The changes the issues on the project need, by issue in the order asked; `read` is the board when it was read already. */
 async function changesFor(
   options: RefreshOptions,
   repository: string,
   project: Project,
   present: ReadonlyMap<number, ProjectItem>,
+  read: RefreshBoard | null,
 ): Promise<readonly ProjectChange[]> {
   const { config, gh } = options;
   const numbers = [...present.keys()];
   const facts: ReadonlyMap<number, IssueFacts> = await readIssueFacts({ gh, fragments: config.releaseFragments }, numbers);
-  const board = await readRefreshBoard(config, gh, repository);
+  const board = read ?? await readRefreshBoard(config, gh, repository);
   const { matched } = matchProjectFields(project);
   return numbers.flatMap((issue) => {
     const read = facts.get(issue);
@@ -243,14 +275,56 @@ async function changesFor(
   });
 }
 
-/** The refresh of `numbers` on the project `ref` names, once the repository is read. */
-async function refreshOn(options: RefreshOptions, repository: string, ref: ProjectRef, numbers: readonly number[]): Promise<ProjectRefresh> {
-  const { gh } = options;
+/** True when `item` holds another Rank than `rank`, compared as a write would compare it. */
+function rankShifted(issue: number, item: ProjectItem, rankField: MatchedField, rank: number | null): boolean {
+  const values = { stage: null, horizon: null, rank, blockedBy: null, progress: null };
+  return projectChangesOf(issue, item, values, [rankField]).length > 0;
+}
+
+/** `numbers`, then what `widening` adds off `board` and the project's `items`, each once; see the module note. */
+function widenedIssues(
+  numbers: readonly number[],
+  widening: RefreshWidening,
+  board: RefreshBoard,
+  items: ReadonlyMap<number, ProjectItem>,
+  project: Project,
+): readonly number[] {
+  const members = (widening.membersOf ?? []).flatMap((epic) => (board.epics.get(epic)?.members ?? []).map(({ number }) => number));
+  const rankField = matchProjectFields(project).matched.find(({ template }) => template.key === 'rank');
+  const shifted = widening.shiftedRanks !== true || rankField === undefined
+    ? []
+    : [...items]
+      .filter(([issue, item]) => rankShifted(issue, item, rankField, rankOf(board.ranks, issue)))
+      .map(([issue]) => issue)
+      .sort((a, b) => a - b);
+  return [...new Set([...numbers, ...members, ...shifted])];
+}
+
+/** True when `widening` asks for anything past the issues named. */
+function widens(widening: RefreshWidening): boolean {
+  return (widening.membersOf ?? []).length > 0 || widening.shiftedRanks === true;
+}
+
+/** The refresh of `asked` on the project `ref` names, widened by `widening`, once the repository is read. */
+async function refreshOn(
+  options: RefreshOptions,
+  repository: string,
+  ref: ProjectRef,
+  asked: readonly number[],
+  widening: RefreshWidening,
+): Promise<ProjectRefresh> {
+  const { config, gh } = options;
   const port: ProjectPort = createGhProjectPort(gh);
   const project = await port.find(ref);
   if (project === null) return { kind: 'not-found', project: ref, warnings: [notFoundWarning(ref)] };
 
   const items = issueItems(await port.items(project.id), repository);
+  const board = widens(widening)
+    ? await readRefreshBoard(config, gh, repository)
+    : null;
+  const numbers = board === null
+    ? asked
+    : widenedIssues(asked, widening, board, items, project);
   const present = new Map(numbers.flatMap((issue) => {
     const item = items.get(issue);
     return item === undefined
@@ -261,7 +335,7 @@ async function refreshOn(options: RefreshOptions, repository: string, ref: Proje
   const { mismatched: skipped } = matchProjectFields(project);
   const changes = present.size === 0
     ? []
-    : await changesFor(options, repository, project, present);
+    : await changesFor(options, repository, project, present, board);
   const writes = changes.length === 0
     ? NOTHING_WRITTEN
     : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), options.sleep === undefined
@@ -277,25 +351,31 @@ async function refreshOn(options: RefreshOptions, repository: string, ref: Proje
 }
 
 /**
- * Brings the project's items for `issues` in step with what rafa reads of
- * them, writing only the values that differ; with no
- * `board.project.number` it sends no call. The four failures of the
- * spec's "What can go wrong" table are answered in `warnings`, never
+ * Brings the project's items for `issues`, and those `widening` adds, in
+ * step with what rafa reads of them, writing only the values that differ;
+ * with no `board.project.number` it sends no call. The four failures of
+ * the spec's "What can go wrong" table are answered in `warnings`, never
  * thrown. See the module note.
  *
- * Throws a `RangeError`, having sent nothing, for an entry of `issues`
- * that is not a positive whole number.
+ * Throws a `RangeError`, having sent nothing, for an entry of `issues` or
+ * of `widening.membersOf` that is not a positive whole number.
  */
-export async function refreshProjectItems(options: RefreshOptions, issues: readonly number[]): Promise<ProjectRefresh> {
+export async function refreshProjectItems(
+  options: RefreshOptions,
+  issues: readonly number[],
+  widening: RefreshWidening = {},
+): Promise<ProjectRefresh> {
   const { config, gh } = options;
   const numbers = issueNumbers(issues);
+  const membersOf = issueNumbers(widening.membersOf ?? []);
+  const widened: RefreshWidening = { membersOf, shiftedRanks: widening.shiftedRanks === true };
   if (config.boardProjectNumber === null) return { kind: 'skipped', reason: 'no-project', warnings: [] };
-  if (numbers.length === 0) return { kind: 'skipped', reason: 'no-issues', warnings: [] };
+  if (numbers.length === 0 && !widens(widened)) return { kind: 'skipped', reason: 'no-issues', warnings: [] };
 
   const repository = await readBoardRepository(gh);
   const ref: ProjectRef = { owner: repository.split('/')[0] ?? '', number: config.boardProjectNumber };
   try {
-    return await refreshOn(options, repository, ref, numbers);
+    return await refreshOn(options, repository, ref, numbers, widened);
   } catch (error) {
     if (isMissingProjectScope(error)) return { kind: 'refused', reason: 'scope', project: ref, warnings: [scopeWarning()] };
     throw error;

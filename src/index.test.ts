@@ -1036,6 +1036,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
+    ['./epic-project.js', ['newEpicTarget', 'refreshProjectAfterEpic']],
     ['./move-native.js', ['NATIVE_MODE']],
   ]],
   ['./commands/epic/defer.js', [
@@ -1059,6 +1060,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
+    ['./epic-project.js', ['moveTarget', 'refreshProjectAfterEpic']],
     ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
     ['./move-native.js', [
       'configuredMoveRelations',
@@ -1093,6 +1095,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../utils/claude.js', ['claudeArgs', 'spawnClaudeCaptured']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../plan/plan-files.js', ['readSwitch']],
+    ['./epic-project.js', ['closeTarget', 'refreshProjectAfterEpic']],
   ]],
   ['./commands/epic/cancel.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1112,6 +1115,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
+    ['./epic-project.js', ['cancelTarget', 'refreshProjectAfterEpic']],
     ['./move.js', ['applyEpicMove', 'readEpicMove']],
   ]],
   ['./commands/claim/release.js', [

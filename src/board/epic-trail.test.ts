@@ -125,7 +125,7 @@ describe('renderCloseComment', () => {
 describe('renderCancelComment', () => {
   test('lists what became of each dependent in order', () => {
     const comment = renderCancelComment('superseded by #60', [
-      { issue: 12, answer: { kind: 'moved', to: 40 } },
+      { issue: 12, answer: { kind: 'moved', from: 30, to: 40 } },
       { issue: 13, answer: { kind: 'unblocked' } },
       { issue: 14, answer: { kind: 'cancelled' } },
     ]);

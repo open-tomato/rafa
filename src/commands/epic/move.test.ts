@@ -56,6 +56,7 @@ import { parseBoardListing } from '../../board/roadmap-board.js';
 import { TICK_ATTEMPTS } from '../../board/roadmap-tick.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
+import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 import moveCommand, { applyEpicMove, createEpicMoveCommand, moveFailure, readEpicMove, readMoveLine, renderEpicMove } from './move.js';
 
 /** A temporary directory of this file's own. */
@@ -222,11 +223,18 @@ interface CaseSetup {
   readonly answers?: readonly (string | null)[] | null;
   /** Wraps the relationships made over the planted `gh`, handed in as a seam; the config's when left out. */
   readonly relations?: (made: BoardRelations) => BoardRelations;
+  /** The project's config; {@link LOCAL_CONFIG} when left out. */
+  readonly config?: string;
+  /** The project refresh; the system's own when left out. */
+  readonly projectRefresh?: EpicMoveSeams['projectRefresh'];
 }
 
-/** A fresh project. */
-function plantCase(): PlantedProject {
-  return plantProject(mkdtempSync(join(tempBase, 'case-')), 'tracker:\n  default: local\n');
+/** The config every case runs with but those opting into a project. */
+const LOCAL_CONFIG = 'tracker:\n  default: local\n';
+
+/** A fresh project whose config is `config`. */
+function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
+  return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
 /** Dispatches `rafa epic move <words>` over a planted `gh`, `git` and terminal. */
@@ -243,9 +251,12 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     ...setup.relations === undefined
       ? {}
       : { relations: setup.relations(createLabelsRelations({ gh: planted.gh })) },
+    ...setup.projectRefresh === undefined
+      ? {}
+      : { projectRefresh: setup.projectRefresh },
   };
   const commands: RafaCommand[] = [createEpicMoveCommand(seams)];
-  const outcome = await dispatchInProject(['epic', 'move', ...words], [EPIC_SUBJECT], commands, plantCase());
+  const outcome = await dispatchInProject(['epic', 'move', ...words], [EPIC_SUBJECT], commands, plantCase(setup.config));
   return {
     ...outcome,
     calls: planted.calls,
@@ -651,5 +662,56 @@ describe('the declaration', () => {
     expect(moveCommand.spends).toBeUndefined();
     expect(moveCommand.name).toBe('epic move');
     expect(Object.isFrozen(moveCommand)).toBe(true);
+  });
+});
+
+describe('rafa epic move, and the project', () => {
+  /** What every landed move of #12 to epic #50 asks the refresh for. */
+  const MOVE_12_REFRESH = { number: EPIC_PROJECT_NUMBER, issues: [40, 50, 12], widening: { membersOf: [40, 50], shiftedRanks: true } };
+
+  it('refreshes both epics with their members, the issue and the shifted Ranks, its warning after the move\'s lines', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['12', '--to=50', '--reason=belongs with billing'], { config: withProjectNumber(LOCAL_CONFIG), projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([MOVE_12_REFRESH]);
+    expect(result.stdout).toEndWith('Its open work stays as it is: branch feat/rafa-12-login, pull request #7.\nwarn: a project warning\n');
+  });
+
+  it('calls no refresh for the same move with board.project.number unset, the control of the case above', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['12', '--to=50', '--reason=belongs with billing'], { projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([]);
+    expect(result.stdout).not.toContain('a project warning');
+  });
+
+  it('refreshes a move whose body write failed and keeps its exit code 1', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['12', '--to=50', '--reason=x'], {
+      planted: { failWrite: [40] },
+      config: withProjectNumber(LOCAL_CONFIG),
+      projectRefresh: recorded.refresh,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(recorded.calls()).toEqual([MOVE_12_REFRESH]);
+    expect(result.stdout).toEndWith('warn: a project warning\n');
+    expect(result.stderr).toContain('by hand: take its line off epic #40\'s checklist.');
+  });
+
+  it('calls no refresh for a failed swap, which changed nothing, nor for a move with no reason and no terminal', async () => {
+    const recorded = recordingEpicRefresh();
+    const config = withProjectNumber(LOCAL_CONFIG);
+
+    const swap = await run(['12', '--to=50', '--reason=x'], { planted: { failSwap: true }, config, projectRefresh: recorded.refresh });
+    const unasked = await run(['12', '--to=50'], { config, projectRefresh: recorded.refresh });
+
+    expect([swap.exitCode, unasked.exitCode]).toEqual([1, 0]);
+    expect(recorded.calls()).toEqual([]);
   });
 });

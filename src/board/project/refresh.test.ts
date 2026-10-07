@@ -488,3 +488,107 @@ describe('refreshProjectItems: a renamed field is skipped while the other four a
     expect(await heldValues({ ...wired, project: renamed })).toEqual(withoutRank);
   });
 });
+
+describe('refreshProjectItems: widened by an epic\'s members and the items whose Rank shifted', () => {
+  /** Every change as `issue, field, from, to`. */
+  function changeRows(refresh: Awaited<ReturnType<typeof refreshProjectItems>>): readonly (readonly unknown[])[] {
+    return refresh.kind === 'refreshed'
+      ? refresh.changes.map(({ issue, name, from, to }) => [issue, name, from, to])
+      : [];
+  }
+
+  it('refreshes the epic\'s members as the board reads them beside the epic asked for', async () => {
+    const wired = wire(items());
+
+    await refreshProjectItems(wired.options, [20], { membersOf: [20] });
+
+    const held = await heldValues(wired);
+    expect([held[20], held[21], held[22]]).toEqual([EXPECTED[20], EXPECTED[21], EXPECTED[22]]);
+    expect(held[10]).toEqual({});
+  });
+
+  it('leaves the members untouched for the same epic asked for with no widening, the control of the case above', async () => {
+    const wired = wire(items());
+
+    await refreshProjectItems(wired.options, [20]);
+
+    const held = await heldValues(wired);
+    expect(held[20]).toEqual(EXPECTED[20]);
+    expect([held[21], held[22]]).toEqual([{}, {}]);
+  });
+
+  it('adds every item whose Rank is not the board\'s, lowest first, and writes only their Ranks', async () => {
+    const wired = wire(items({ ...EXPECTED, 30: { ...EXPECTED[30], Rank: 9 }, 22: { ...EXPECTED[22], Rank: 7 } }));
+
+    const refresh = await refreshProjectItems(wired.options, [], { shiftedRanks: true });
+
+    expect(refresh.kind).toBe('refreshed');
+    expect(changeRows(refresh)).toEqual([[22, 'Rank', '7', '4'], [30, 'Rank', '9', '5']]);
+    expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+
+  it('writes nothing for the same drifted Ranks without shiftedRanks, the control of the case above', async () => {
+    const wired = wire(items({ ...EXPECTED, 30: { ...EXPECTED[30], Rank: 9 }, 22: { ...EXPECTED[22], Rank: 7 } }));
+
+    const refresh = await refreshProjectItems(wired.options, [10]);
+
+    expect(refresh.kind).toBe('refreshed');
+    expect(changeRows(refresh)).toEqual([]);
+    expect(writeCalls(wired.calls())).toEqual([]);
+  });
+
+  it('counts an item holding no Rank as shifted, and clears the Rank of an item on no line', async () => {
+    const planted = [...items({ ...EXPECTED, 21: { Stage: 'Ready' } }), { number: 40, values: { Rank: 6 } }];
+    const wired = wire(planted);
+
+    const refresh = await refreshProjectItems(wired.options, [], { shiftedRanks: true });
+
+    expect(changeRows(refresh)).toEqual([[21, 'Rank', null, '3'], [40, 'Stage', null, 'Triage'], [40, 'Rank', '6', null]]);
+  });
+
+  it('adds no item while the project holds no Rank field as the template has it', async () => {
+    const fields = FAKE_TEMPLATE_FIELDS.map((field) => (field.name === 'Rank'
+      ? { ...field, name: 'Order' }
+      : field));
+    const renamed = createFakeProjectGh({ projects: [{ owner: OWNER, number: NUMBER, fields, items: items({ 30: { Order: 9 } }) }] });
+    const wired = wire(items());
+    const gh: GhRunner = (args) => (args[0] === 'api' && !args.includes('owner={owner}')
+      ? renamed.gh(args)
+      : wired.options.gh(args));
+
+    const refresh = await refreshProjectItems({ ...wired.options, gh }, [], { shiftedRanks: true });
+
+    expect(refresh.kind === 'refreshed' && refresh.skipped.map(({ template }) => template.name)).toEqual(['Rank']);
+    expect(changeRows(refresh)).toEqual([]);
+  });
+
+  it('reads the board listing once though it widens before the facts', async () => {
+    const wired = wire(items());
+
+    await refreshProjectItems(wired.options, [10], { membersOf: [20], shiftedRanks: true });
+
+    expect(wired.calls().filter((args) => args.join(' ').startsWith('issue list --state all'))).toHaveLength(1);
+  });
+
+  it('names a member with no item as missing, after the issues asked for', async () => {
+    const wired = wire(items().filter(({ number }) => number !== 22));
+
+    const refresh = await refreshProjectItems(wired.options, [40], { membersOf: [20] });
+
+    expect(refresh.kind === 'refreshed' && refresh.missing).toEqual([40, 22]);
+  });
+
+  it('refuses a membersOf entry that is no issue number before any call', async () => {
+    const wired = wire(items());
+
+    expect(refreshProjectItems(wired.options, [10], { membersOf: [-2] })).rejects.toThrow('board project refresh: -2 is not an issue number');
+    expect(wired.calls()).toEqual([]);
+  });
+
+  it('answers no-issues and sends no call for an empty list with nothing to widen it', async () => {
+    const wired = wire(items());
+
+    expect(await refreshProjectItems(wired.options, [], { membersOf: [], shiftedRanks: false })).toEqual({ kind: 'skipped', reason: 'no-issues', warnings: [] });
+    expect(wired.calls()).toEqual([]);
+  });
+});

@@ -69,12 +69,21 @@
  * request listing, the plan dir) is a `warn` line saying the open work
  * named may be short.
  *
+ * ## The project refresh
+ *
+ * After a run that moved the epic, with `board.project.number` set,
+ * `./epic-project.ts` refreshes on the repository's project the epic,
+ * its members and every item whose Rank shifted. Its lines are warnings
+ * written after the run's own lines, before json mode's result, and
+ * never change the exit code. A run that changed nothing sends nothing.
+ *
  * ## What it writes
  *
  * In text mode, the move and where the work stands. In json mode the
  * terminal result's `data` is an {@link EpicHorizonResult}. It starts no
  * session, so neither command declares `spends`.
  */
+import type { EpicProjectSeams } from './epic-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicOpenWork, HorizonChangeReading } from '../../board/epic-horizon.js';
 import type { HorizonChange } from '../../board/epic-trail.js';
@@ -106,6 +115,8 @@ import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 import { plansDirAt } from '../plan/plan-files.js';
+
+import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';
 
 /** The flag naming the horizon the epic moves to. */
 export const TO_FLAG = 'to';
@@ -198,8 +209,8 @@ export interface EpicHorizonResult {
   readonly problems: readonly string[];
 }
 
-/** How the commands reach `gh`, `git`, the plan dir and the terminal; each left out is the system's own. */
-export interface EpicHorizonSeams {
+/** How the commands reach `gh`, `git`, the plan dir, the terminal and the project refresh; each left out is the system's own. */
+export interface EpicHorizonSeams extends EpicProjectSeams {
   readonly gh?: GhRunner;
   readonly git?: GitRunner;
   /** Reads the file names in the plan dir. `createPlanDirNames` when left out. */
@@ -467,14 +478,13 @@ export function closeFailure(result: EpicHorizonResult): CommandExit | null {
 export async function runEpicHorizon(context: RafaContext, action: HorizonAction, seams: EpicHorizonSeams): Promise<void> {
   const result = await changeEpicHorizon(context, action, seams);
   const failure = closeFailure(result);
-  if (context.outputMode === 'json') {
-    if (failure !== null) throw failure;
-    context.output.result(result);
-    return;
+  if (context.outputMode !== 'json') {
+    for (const line of renderEpicHorizon(result)) {
+      if (line.warn) context.output.warn(line.text);
+      else context.output.info(line.text);
+    }
   }
-  for (const line of renderEpicHorizon(result)) {
-    if (line.warn) context.output.warn(line.text);
-    else context.output.info(line.text);
-  }
+  await refreshProjectAfterEpic(context, seams, horizonTarget(result));
   if (failure !== null) throw failure;
+  if (context.outputMode === 'json') context.output.result(result);
 }

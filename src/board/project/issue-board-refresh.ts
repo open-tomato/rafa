@@ -20,8 +20,9 @@
  * | `src/commands/issue/unblock.ts` | labels-mode `rafa issue unblock` |
  *
  * The `epic` actions build their own boards and are refreshed through
- * their own helper, and native-mode `issue unblock` writes no label
- * through a board and refreshes through `refreshNativeUnblock`
+ * their own helper (`src/commands/epic/epic-project.ts`), and
+ * native-mode `issue unblock` writes no label through a board and
+ * refreshes through `refreshNativeUnblock`
  * (`src/commands/issue/unblock-native.ts`), so neither is built here.
  *
  * ## The write first, then the refresh
@@ -55,7 +56,7 @@
  * second changes again. Each refresh reads the repository, the project,
  * its items and the board; that cost was not measured here.
  */
-import type { ProjectRefresh, RefreshConfig, RefreshOptions } from './refresh.js';
+import type { ProjectRefresh, RefreshConfig, RefreshOptions, RefreshWidening } from './refresh.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../issue-board.js';
 
@@ -92,13 +93,14 @@ export interface RefreshingGhIssueBoardOptions {
 
 /**
  * {@link refreshProjectItems}, for a caller that refreshes with no board
- * write (native-mode `rafa issue unblock`). Reached through this module
- * so the caller adds no import of `./refresh.ts`: imported from a module
- * this directory's import cycle loads, that import reads `./port.ts`'s
- * bindings before they are initialized.
+ * write (native-mode `rafa issue unblock`, the `rafa epic` actions, which
+ * hand a `widening`). Reached through this module so the caller adds no
+ * import of `./refresh.ts`: imported from a module this directory's
+ * import cycle loads, that import reads `./port.ts`'s bindings before
+ * they are initialized.
  */
-export function refreshIssueItems(options: RefreshOptions, issues: readonly number[]): Promise<ProjectRefresh> {
-  return refreshProjectItems(options, issues);
+export function refreshIssueItems(options: RefreshOptions, issues: readonly number[], widening: RefreshWidening = {}): Promise<ProjectRefresh> {
+  return refreshProjectItems(options, issues, widening);
 }
 
 /** The line a refresh that rejected after `issue` was labelled is answered as. */
