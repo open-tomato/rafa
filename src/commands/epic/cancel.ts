@@ -94,6 +94,14 @@
  * member it waited on, and `readBlockedBy` reads the first such line,
  * never the note below it, so the dependents query keeps listing it.
  *
+ * ## The project refresh
+ *
+ * After a run that went ahead, with `board.project.number` set,
+ * `./epic-project.ts` refreshes on the repository's project the epic,
+ * each epic a dependent moved from or to, their members, every dependent
+ * answered and every item whose Rank shifted, its lines warnings that
+ * never change the exit code. A run that changed nothing sends nothing.
+ *
  * ## What it writes
  *
  * Every line goes through the command's output, `info` or `warn`, in text
@@ -101,6 +109,7 @@
  * the terminal result's `data`. It starts no session, so it declares no
  * `spends`.
  */
+import type { EpicProjectSeams } from './epic-project.js';
 import type { EpicMoveReading } from './move.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicDependent } from '../../board/epic-dependents.js';
@@ -139,6 +148,7 @@ import { createGitRunner } from '../../pr/git.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';
+import { cancelTarget, refreshProjectAfterEpic } from './epic-project.js';
 import { applyEpicMove, readEpicMove } from './move.js';
 
 /** The exit code every refusal of a cancel ends the command with. */
@@ -237,8 +247,8 @@ export interface EpicCancelResult {
   readonly left: readonly string[];
 }
 
-/** How the command reaches `gh`, `git`, the clock and the terminal; each left out is the system's own. */
-export interface EpicCancelSeams {
+/** How the command reaches `gh`, `git`, the clock, the terminal and the project refresh; each left out is the system's own. */
+export interface EpicCancelSeams extends EpicProjectSeams {
   readonly gh?: GhRunner;
   readonly git?: GitRunner;
   /** True when a question can be answered. `process.stdin.isTTY` when left out. */
@@ -471,7 +481,7 @@ async function commentOn(writes: CancelWrites, issue: number, body: string): Pro
 /** Runs the move `reading` holds, with the cancel's reason. */
 async function applyMove(input: ApplyInput, dependent: EpicDependent, reading: EpicMoveReading): Promise<DependentApplied> {
   const { change } = reading;
-  const base = { issue: change.issue, waitsOn: dependent.waitsOn, answer: { kind: 'moved', to: change.to } as const };
+  const base = { issue: change.issue, waitsOn: dependent.waitsOn, answer: { kind: 'moved', from: change.from, to: change.to } as const };
   try {
     const writes = { board: input.writes.board, relations: input.writes.moves, issues: input.issues };
     const outcome = await applyEpicMove(writes, reading, cancelMoveReason(input.epic));
@@ -730,6 +740,7 @@ export function cancelFailure(result: EpicCancelResult): CommandExit | null {
 /** Runs one `epic cancel` line with `seams`; json mode ends on the result. */
 export async function runEpicCancel(context: RafaContext, seams: EpicCancelSeams): Promise<void> {
   const result = await cancelEpic(context, seams);
+  await refreshProjectAfterEpic(context, seams, cancelTarget(result));
   const failure = cancelFailure(result);
   if (failure !== null) throw failure;
   if (context.outputMode === 'json') context.output.result(result);

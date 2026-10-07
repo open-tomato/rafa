@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the eighty-seven registered so far wrap a
+ * of each is its command. Four of the eighty-nine registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -23,16 +23,18 @@
  * `loop/loop-sessions.ts`, `wait` following the run's events file through
  * `src/loop/events-file.ts` too, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
- * `src/preflight/` and starts no run, nor the eight `issue` actions,
- * five of which act on the tracker the chain resolves while `ready` and
+ * `src/preflight/` and starts no run, nor the nine `issue` actions,
+ * six of which act on the tracker the chain resolves while `ready` and
  * `unblock` read and label issues on the GitHub board and `check` reads
- * the references of a spec's saved copy, all eight sharing
+ * the references of a spec's saved copy, all nine sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
  * `src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
- * `src/board/owner-resolve.ts`, nor `self-update`, which installs the
+ * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
+ * repository's GitHub project in step through
+ * `src/board/project/sync.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -119,6 +121,9 @@
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.
+ *   - `issue edit <n>`, a dated update appended to one issue's body, or
+ *     its body or title replaced, on the tracker the chain resolves,
+ *     after four gates refusing with exit code 2; it never re-plans.
  *   - `pr current`, the open pull request of the branch checked out at the
  *     project root on one line; `pr show [<n>]`, that pull request in full
  *     with its checks and its last triage; `pr view [<n>]`, it opened in
@@ -216,6 +221,11 @@
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
  *     did not confirm it, its epic count, and `current` and `home` on
  *     the boards this checkout's position holds; writing nothing.
+ *   - `board sync [--dry-run]`, every item of the repository's GitHub
+ *     project refreshed and every open issue missing from it added, one
+ *     line per change and per issue added, then a closing count;
+ *     `--dry-run` writing nothing, exit code 1 with no
+ *     `board.project.number` and 2 for a sync that could not finish.
  *   - `status`, top-level: where the project stands in six sections,
  *     branch and plan, loops, pull request, board, claims and housekeeping, a
  *     section that cannot be read one warning; exit code 1 only for a
@@ -324,6 +334,7 @@ import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import boardList from './board/list.js';
+import boardSync from './board/sync.js';
 import claimAccept from './claim/accept.js';
 import claimHand from './claim/hand.js';
 import claimRelease from './claim/release.js';
@@ -357,6 +368,7 @@ import instinctShow from './instinct/show.js';
 import issueCheck from './issue/check.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
+import issueEdit from './issue/edit.js';
 import issueList from './issue/list.js';
 import issueMove from './issue/move.js';
 import issueReady from './issue/ready.js';
@@ -411,7 +423,7 @@ import updateSelf from './update/self.js';
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
-  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
+  { name: 'issue', summary: 'the tracker: list, show, create, edit, comment on and move issues; mark one ready, unblock it and check its references' },
   { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
@@ -419,7 +431,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
-  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
+  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home; sync the GitHub project' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
   { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
@@ -448,6 +460,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   issueReady,
   issueUnblock,
   issueCheck,
+  issueEdit,
   prCurrent,
   prShow,
   prView,
@@ -486,6 +499,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseSettle,
   releaseTag,
   boardList,
+  boardSync,
   epicShow,
   epicNew,
   epicDefer,

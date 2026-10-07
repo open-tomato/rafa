@@ -161,6 +161,7 @@ import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import { TRIAGE_DEFAULTS, TRIAGE_SETTINGS } from './config-schema-triage.js';
 import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
 import {
+  BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   busyTimeoutMs,
   claimsAhead,
@@ -177,6 +178,8 @@ import {
   listOf,
   oneOf,
   OUTPUT_MODES,
+  projectNumber,
+  projectUrl,
   recurrenceCount,
   skillResolverName,
   STORE_BACKENDS,
@@ -273,6 +276,17 @@ export interface RafaConfig
    * `board.relationships`.
    */
   boardRelationships: BoardRelationshipMode;
+  /**
+   * The GitHub project `rafa init --board` copies the board's project
+   * from, by URL. `board.project.template`.
+   */
+  boardProjectTemplate: string;
+  /**
+   * The number of the GitHub project the board is mirrored to, under the
+   * repository's owner, or null for a repository with no project.
+   * `board.project.number`.
+   */
+  boardProjectNumber: number | null;
   /**
    * The issue whose task list `plan create --next` reads its order off,
    * or null for the issue titled `Roadmap`. `roadmap.issue`.
@@ -380,6 +394,8 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
   boardRelationships: 'labels',
+  boardProjectTemplate: BOARD_PROJECT_TEMPLATE_DEFAULT,
+  boardProjectNumber: null,
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -489,6 +505,8 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
     read: oneOf(BOARD_RELATIONSHIP_MODES),
     cli: false,
   },
+  boardProjectTemplate: { key: 'board.project.template', read: projectUrl, cli: false },
+  boardProjectNumber: { key: 'board.project.number', read: projectNumber, cli: false },
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
   claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
   claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },

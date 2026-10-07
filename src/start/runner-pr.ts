@@ -51,16 +51,37 @@
  * text alike. A fragment that is absent or that `parseFragment` refuses
  * gives no notes.
  *
+ * ## The project refresh
+ *
+ * Once the pull request is created, the issue its body closes is
+ * refreshed on the repository's project
+ * (`.rafa/specs/rafa-791-github-project-each-repository.md`, "Who calls
+ * it": "the loop's wrap-up opening a pull request — the issues it
+ * closes"), so its Stage reads the open pull request. The refresh is a
+ * mirror's catch-up and never the attempt's failure: its lines come back
+ * in {@link RunnerPrOpened.warnings} for the caller to print after its
+ * own, and a refresh that rejects is answered by `refreshFailedWarning`'s
+ * line naming the issue and `rafa board sync`. A blocked attempt opened
+ * nothing and refreshes nothing. {@link refreshClosedIssues} is the real
+ * refresh: with `board.project.number` unset it opens no `gh` runner and
+ * answers no line, so a repository that never opted in sees the attempt
+ * alone.
+ *
  * Every effect goes through {@link RunnerPrSeams}, so a test drives each
  * step's failure with no git, no network and no `gh`;
  * {@link runnerPrSeamsIn} holds the real ones over a checkout.
  */
+import type { GhRunner } from '../adapters/tracker/github.js';
+import type { RefreshItems } from '../board/project/add-issue.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
 import type { PullRequests, PullRequestSummary, PushOutcome } from '../pr/index.js';
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { createGhRunner } from '../adapters/tracker/github.js';
 import { pullRequestTitle } from '../board/naming.js';
+import { refreshFailedWarning, refreshIssueItems } from '../board/project/issue-board-refresh.js';
 import { messageOf } from '../config-sections.js';
 import { createGitRunner, ghPullRequestsIn, gitSaid, parseWorkingTree, pushBranch } from '../pr/index.js';
 import { parseFragment } from '../release/fragment.js';
@@ -93,6 +114,8 @@ export interface RunnerPrSeams {
   readonly pushBranch: (branch: string) => Promise<PushOutcome>;
   /** The provider the pull request is created through. */
   readonly pulls: Pick<PullRequests, 'create'>;
+  /** Refreshes `issues` on the project once the pull request is open, answering its warning lines. */
+  readonly refreshProject: (issues: readonly number[]) => Promise<readonly string[]>;
 }
 
 /** What one runner-opened pull request is made from. */
@@ -114,6 +137,8 @@ export interface RunnerPrOpened {
   readonly kind: 'opened';
   /** The pull request as the provider answered it. */
   readonly pull: PullRequestSummary;
+  /** The project refresh's warning lines, for the caller to print after its own; empty for none. */
+  readonly warnings: readonly string[];
 }
 
 /** An attempt a step stopped; see the module note. */
@@ -132,8 +157,33 @@ export interface RunnerPrBlocked {
 /** How one {@link openRunnerPullRequest} ended. */
 export type RunnerPrOutcome = RunnerPrOpened | RunnerPrBlocked;
 
-/** The real seams, each made in `dir`, the run's checkout. */
-export function runnerPrSeamsIn(dir: string): RunnerPrSeams {
+/** What {@link refreshClosedIssues} reads and refreshes through. */
+export interface ClosedIssuesRefreshOptions {
+  /** The config keys the refresh reads. */
+  readonly config: RefreshConfig;
+  /** Opens the runner the refresh sends through; called only with `board.project.number` set. */
+  readonly openGh: () => GhRunner;
+  /** The refresh; `refreshIssueItems` when left out. */
+  readonly refresh?: RefreshItems;
+}
+
+/**
+ * Refreshes `issues`, the ones the opened pull request closes, on the
+ * project, answering every warning line; never rejects, and opens no
+ * runner with `board.project.number` unset. See the module note.
+ */
+export async function refreshClosedIssues(options: ClosedIssuesRefreshOptions, issues: readonly number[]): Promise<readonly string[]> {
+  const { config, openGh, refresh = refreshIssueItems } = options;
+  if (config.boardProjectNumber === null || issues.length === 0) return [];
+  try {
+    return (await refresh({ config, gh: openGh() }, issues)).warnings;
+  } catch (error) {
+    return [refreshFailedWarning(issues[0] ?? 0, error)];
+  }
+}
+
+/** The real seams, each made in `dir`, the run's checkout, the refresh reading `config`. */
+export function runnerPrSeamsIn(dir: string, config: RefreshConfig): RunnerPrSeams {
   const git = createGitRunner(dir);
   return {
     readWorkingTree: () => {
@@ -143,6 +193,7 @@ export function runnerPrSeamsIn(dir: string): RunnerPrSeams {
     },
     pushBranch: (branch) => Promise.resolve(pushBranch(dir, branch)),
     pulls: ghPullRequestsIn(dir),
+    refreshProject: (issues) => refreshClosedIssues({ config, openGh: () => createGhRunner({ cwd: dir }) }, issues),
   };
 }
 
@@ -194,10 +245,19 @@ function dirtyDetail(entries: readonly string[]): string {
   ].join('\n');
 }
 
+/** The refresh of `issue` through `seams`, a rejection answered as its failed line; never rejects. */
+async function refreshAfterOpen(seams: RunnerPrSeams, issue: number): Promise<readonly string[]> {
+  try {
+    return await seams.refreshProject([issue]);
+  } catch (error) {
+    return [refreshFailedWarning(issue, error)];
+  }
+}
+
 /**
  * Opens the run's pull request: the tree read, the branch pushed, the
- * pull request created, each only once the one before succeeded. See
- * the module note.
+ * pull request created, each only once the one before succeeded, then
+ * the issue it closes refreshed on the project. See the module note.
  */
 export async function openRunnerPullRequest(input: RunnerPrInput, seams: RunnerPrSeams): Promise<RunnerPrOutcome> {
   const { branch } = input;
@@ -214,15 +274,16 @@ export async function openRunnerPullRequest(input: RunnerPrInput, seams: RunnerP
     return blocked(branch, 'push', said);
   }
 
+  let pull: PullRequestSummary;
   try {
-    const pull = await seams.pulls.create({
+    pull = await seams.pulls.create({
       head: branch,
       base: input.base,
       title: pullRequestTitle(input.issue, input.planTitle),
       body: runnerPullRequestBody(input.issue, input.notes),
     });
-    return { kind: 'opened', pull };
   } catch (error) {
     return blocked(branch, 'create', messageOf(error));
   }
+  return { kind: 'opened', pull, warnings: await refreshAfterOpen(seams, input.issue) };
 }

@@ -3,10 +3,14 @@
  * lock records to the installed rafa (#714).
  *
  * `current` keeps a project within `~` of its version: the same major
- * and minor, the same patch or a newer one. A project with no lock is
- * adopted at the installed version, since every project set up before
- * the lock existed has none. A newer minor or major is another action's
- * (`rafa update next`, `rafa update latest`, #716), and an installed
+ * and minor, the same patch or a newer one. Below 1.0.0 it also crosses
+ * newer minors, so `0.34.1` moves to `0.36.0`: rafa ships a minor per
+ * stretch, and with `next` still a stub (#716) a lock would otherwise
+ * fall behind on every one. A project with no lock is adopted at the
+ * installed version, since every project set up before the lock existed
+ * has none. From 1.0.0 on, a newer minor is `rafa update next`'s, and a
+ * newer major, `0.x` to `1.0.0` included, is `rafa update latest`'s
+ * (#716). An installed
  * rafa older than the lock is a downgrade, which nothing allows before
  * 1.0.0 (#715, #718). Versions order by semver precedence, so a release
  * moves a lock past its own release candidate, and a release candidate
@@ -23,6 +27,7 @@ export type CurrentRange =
   | { readonly kind: 'adopt'; readonly to: string }
   | { readonly kind: 'same'; readonly to: string }
   | { readonly kind: 'patch'; readonly from: string; readonly to: string }
+  | { readonly kind: 'minor'; readonly from: string; readonly to: string }
   | { readonly kind: 'refused'; readonly reason: RangeRefusal; readonly message: string };
 
 function refused(reason: RangeRefusal, message: string): CurrentRange {
@@ -44,6 +49,7 @@ export function readCurrentRange(recorded: string | null, installed: string): Cu
   if (to.major !== from.major) {
     return refused('newer-major', `the installed rafa ${installed} is a newer major than the project's ${recorded}; that move is rafa update latest`);
   }
+  if (to.minor !== from.minor && to.major === 0) return { kind: 'minor', from: recorded, to: installed };
   if (to.minor !== from.minor) {
     return refused('newer-minor', `the installed rafa ${installed} is a newer minor than the project's ${recorded}; that move is rafa update next`);
   }

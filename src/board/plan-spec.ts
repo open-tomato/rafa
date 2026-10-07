@@ -229,6 +229,12 @@
  * beside the spec — null under `--spec=<file>`, which has no labels to
  * move and nothing to comment on.
  *
+ * Handed {@link PlanSpecOptions.projectConfig}, the gate's board and the
+ * one the `issue ready` offer swaps through are the refreshing board
+ * (`./project/issue-board-refresh.ts`): each label swap refreshes the
+ * issue on the project, each line it answers at `warn`, and a refresh
+ * never fails the swap.
+ *
  * ## The relationships mode `--next` walks in
  *
  * Which epic a line is in and what a pick waits on are read in the mode
@@ -249,7 +255,9 @@
  */
 import type { AlternativeOffer } from './blocked-line.js';
 import type { GateIssue } from './gate.js';
+import type { IssueBoard } from './issue-board.js';
 import type { SpecIssue } from './issue.js';
+import type { RefreshConfig } from './project/refresh.js';
 import type { RefreshOffer } from './snapshot-settle.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
 import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
@@ -268,6 +276,7 @@ import { readConfiguredRelations } from './configured-relations.js';
 import { createGhIssueBoard } from './issue-board.js';
 import { createGhSpecIssueReader } from './issue.js';
 import { requireNoLeak } from './leak.js';
+import { createRefreshingGhIssueBoard } from './project/issue-board-refresh.js';
 import { hasSpecReadyLabel, requireCompleteSpec, requireSpecReadyLabel } from './readiness.js';
 import { createGhBoardListing } from './roadmap-board.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
@@ -314,6 +323,8 @@ export interface ReadyOfferRequest {
   readonly trust: BoardTrust;
   /** Where the offer's own lines go. */
   readonly output: Output;
+  /** Makes the label swap; one made over `gh` when left out. */
+  readonly board?: IssueBoard;
 }
 
 /**
@@ -478,6 +489,13 @@ export interface PlanSpecOptions {
   readonly git?: GitRunner;
   /** Where the lines go; the active output when left out. */
   readonly output?: Output;
+  /**
+   * The keys the project refresh reads (`./project/refresh.ts`): with
+   * them, the label swaps of the gate and the offer refresh the issue on
+   * the project (`./project/issue-board-refresh.ts`), each line at
+   * `warn`. No refresh is sent when left out.
+   */
+  readonly projectConfig?: RefreshConfig;
 }
 
 /** What a resolution answers: one spec with its issue, or the reason it stopped. */
@@ -507,6 +525,12 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
   const gh = options.gh ?? createGhRunner({ cwd: repoRoot });
   const git = options.git ?? createGitRunner(repoRoot);
   const output = options.output ?? activeOutput();
+  const { projectConfig } = options;
+  const issueBoard = (): IssueBoard => projectConfig === undefined
+    ? createGhIssueBoard({ gh })
+    : createRefreshingGhIssueBoard({ gh, config: projectConfig, warn: (line) => {
+      output.warn(line);
+    } });
   // Made when an issue is read and not before: `--spec=<file>` reads
   // none, and the label is a `git remote get-url origin` that route
   // must not spend. Made ONCE, because a `--next` run checks two
@@ -531,7 +555,7 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
   const offerReady = options.offerReady ?? null;
   const offer = offerReady === null || options.dryRun
     ? undefined
-    : (issue: SpecIssue): Promise<boolean> => offerReady({ issue, gh, trust: trust(), output });
+    : (issue: SpecIssue): Promise<boolean> => offerReady({ issue, gh, trust: trust(), output, board: issueBoard() });
 
   // The question `--next` asks about a blocked line, under the same two
   // rules: a run with nobody to ask is handed none, and a `--dry-run`
@@ -590,6 +614,6 @@ export async function resolvePlanSpec(options: PlanSpecOptions): Promise<PlanSpe
     spec,
     gate: spec.issue === null
       ? null
-      : Object.freeze({ number: spec.issue, board: createGhIssueBoard({ gh }), trust: trust() }),
+      : Object.freeze({ number: spec.issue, board: issueBoard(), trust: trust() }),
   });
 }

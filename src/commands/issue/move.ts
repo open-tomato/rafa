@@ -24,6 +24,13 @@
  * the result in json mode, and the exit code stays 0: the tracker holds
  * the move it could make.
  *
+ * ## The project refresh
+ *
+ * On the `github` tracker with `board.project.number` set, the moved
+ * issue is refreshed on the project after the move, and the refresh's
+ * warning lines print after the moved line, the exit code unchanged; see
+ * `./move-project.ts`. The `local` tracker sends no call.
+ *
  * ## What it writes
  *
  * In text mode, `Moved <kind> issue <id> to <state>.` In json mode the
@@ -38,20 +45,26 @@
  * an id no issue holds.
  */
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
+import type { MoveProjectOptions } from './move-project.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { IssueRef, IssueState } from '../../ports/index.js';
 
+import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES } from '../../adapters/tracker/issue-values.js';
 
 import {
   DEFAULT_ISSUE_SEAMS,
   expectTwoArguments,
   issueName,
+  issueProject,
   issueRef,
+  issueSubjectConfig,
   onTracker,
   readChoice,
   resolveIssueTracker,
 } from './issue-tracker.js';
+import { refreshMovedIssue } from './move-project.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa issue move <id> <state>';
@@ -75,6 +88,16 @@ export async function moveIssue(context: RafaContext, seams: IssueSeams): Promis
   const ref = issueRef(tracker, id);
   const moved = await onTracker(tracker, `move issue ${id} to ${state}`, () => tracker.transition(ref, state));
   return { tracker: data, ref, state, warning: moved.warning ?? null };
+}
+
+/** The refresh's options for the project the line runs in; its config warnings are dropped, as the chain's reading already printed them. */
+function moveProjectOptions(context: RafaContext, seams: IssueSeams): MoveProjectOptions {
+  const project = issueProject(context);
+  const { gh } = seams;
+  return {
+    config: issueSubjectConfig(project, () => undefined),
+    openGh: (): GhRunner => gh ?? createGhRunner({ cwd: project.root }),
+  };
 }
 
 /** The command, resolving the chain with `seams`; see the module note. */
@@ -119,8 +142,10 @@ export function createIssueMoveCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
     outputs: ['text', 'json'],
     run: async (context) => {
       const moved = await moveIssue(context, seams);
+      const refreshed = await refreshMovedIssue(moved.tracker.kind, moved.ref.externalId, moveProjectOptions(context, seams));
       const warn = (): void => {
         if (moved.warning !== null) context.output.warn(`${issueName(moved.ref)}: ${moved.warning}`);
+        for (const line of refreshed) context.output.warn(line);
       };
       if (context.outputMode === 'json') {
         warn();

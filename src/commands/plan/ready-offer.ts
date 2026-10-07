@@ -122,6 +122,9 @@ export function createPlanReadyOffer(seams: ReadyOfferSeams = DEFAULT_OFFER_SEAM
         // The issue the route read a moment ago: no second read, and
         // the body checked here is the body the plan is written from.
         readIssue: () => Promise.resolve(issue),
+        ...request.board === undefined
+          ? {}
+          : { board: request.board },
       });
       writeOffer(request, report);
       return report.status === 'marked';

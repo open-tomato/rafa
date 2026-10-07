@@ -115,6 +115,12 @@
  *     `type:` label, which `get` reads as `code`, is not listed for
  *     `code`, as `find` by type does not find it either. A type the
  *     port does not name is refused before anything is sent.
+ *   - `editable` and `edit`, rafa's own pair, which the source lacks:
+ *     one `gh issue view --json title,body,state,labels,author`, and one
+ *     `gh issue edit` with the body handed to `gh` on stdin through
+ *     `--body-file -`. `github-edit.ts` holds the pair and its note; the
+ *     runner hands `gh` a `stdin` when one is given, and keeps stdin
+ *     closed otherwise.
  *
  * Kept as the source has them: `create` makes every label it sends with
  * `gh label create --force` before `gh issue create`, because the source
@@ -150,6 +156,7 @@ import type {
 
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 
+import { createGithubEditMembers } from './github-edit.js';
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 
 /** What every refusal opens with. */
@@ -166,8 +173,10 @@ export interface GhResult {
 /**
  * Runs `gh` with the arguments after its name. A command that fails,
  * or could not be run, answers `ok` false rather than rejecting.
+ * `stdin`, when given, is the whole of what `gh` reads on its standard
+ * input; left out, `gh` reads a closed one.
  */
-export type GhRunner = (args: readonly string[]) => Promise<GhResult>;
+export type GhRunner = (args: readonly string[], stdin?: string) => Promise<GhResult>;
 
 /** What the runner spawning `gh` is made with. */
 export interface GhRunnerOptions {
@@ -257,8 +266,9 @@ const REST_STATES = {
 } satisfies Record<IssueState, 'open' | 'closed'>;
 
 /**
- * Makes the runner that spawns `gh` in `options.cwd`, with stdin closed
- * and stdout and stderr read to their end.
+ * Makes the runner that spawns `gh` in `options.cwd`, with stdin closed,
+ * or holding the `stdin` a command is handed, encoded as UTF-8, and
+ * stdout and stderr read to their end.
  *
  * Measured on bun 1.3.14: `Bun.spawn` throws, rather than answering an
  * exit code, when the executable is not found (`Executable not found in
@@ -285,7 +295,7 @@ const REST_STATES = {
  */
 export function createGhRunner(options: GhRunnerOptions): GhRunner {
   const { cwd, command = 'gh', env, timeoutMs } = options;
-  return async (args) => {
+  return async (args, stdin) => {
     const executable = env === undefined
       ? command
       : Bun.which(command, { PATH: env.PATH ?? '', cwd });
@@ -298,7 +308,9 @@ export function createGhRunner(options: GhRunnerOptions): GhRunner {
         ...(env === undefined
           ? {}
           : { env: { ...env } }),
-        stdin: 'ignore',
+        stdin: stdin === undefined
+          ? 'ignore'
+          : new TextEncoder().encode(stdin),
         stdout: 'pipe',
         stderr: 'pipe',
       });
@@ -671,9 +683,9 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
   // Labels this tracker made or found made, for its life.
   let knownLabels: ReadonlySet<string> = new Set();
 
-  /** What `args` wrote to stdout. Rejects, naming `command`, when it failed. */
-  async function run(args: readonly string[], command: string): Promise<string> {
-    const result = await gh(args);
+  /** What `args` wrote to stdout, handed `stdin` when given. Rejects, naming `command`, when it failed. */
+  async function run(args: readonly string[], command: string, stdin?: string): Promise<string> {
+    const result = await gh(args, stdin);
     if (!result.ok) throw new Error(`${PREFIX}: ${command} failed: ${detailOf(result)}`);
     return result.stdout;
   }
@@ -837,6 +849,8 @@ export function createGithubTracker(options: GithubTrackerOptions): Tracker {
           + ` holds no ${state} state, so get reads it back as ${readBack}`,
       };
     },
+
+    ...createGithubEditMembers({ run, issueNumberOf: issueNumberOfRef, parseJson, labelNames }),
   };
   return Object.freeze(tracker);
 }

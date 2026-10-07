@@ -34,8 +34,8 @@ Subjects:
   plan       create plans from specs; list, show and validate them; read their
              risk and needs 🪙
   loop       start a plan; stop, pause, resume, show and list its sessions 🪙
-  issue      the tracker: list, show, create, comment on and move issues; mark
-             one ready, unblock it and check its references
+  issue      the tracker: list, show, create, edit, comment on and move issues;
+             mark one ready, unblock it and check its references
   pr         the pull request of a branch: one line, in full or in the browser;
              list, wait on, merge and triage them 🪙
   effort     collect session and commit rows; report per plan; read and repair
@@ -51,7 +51,7 @@ Subjects:
   release    read the release state of the project; settle the waiting fragments
              into a version; tag the commit that set it
   board      list the boards with their owner, epic count, and which is current
-             and home
+             and home; sync the GitHub project
   epic       show one epic's issues as the Roadmap table; create an epic; defer
              or promote it; move an issue to it; close it through the gate or
              cancel it 🪙

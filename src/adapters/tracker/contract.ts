@@ -46,6 +46,17 @@
  *     none. Order is the adapter's, so ids are compared sorted. An
  *     adapter run with `readsOpenIssues: false` is held to leaving the
  *     reading out instead, by one case in place of the three.
+ *   - `editable` and `edit`: rafa's own optional pair, which the source
+ *     lacks, with five cases of their own. `editable` answers a created
+ *     issue's title, body and open state, with labels and an author
+ *     whatever the tracker holds of them, and answers an issue moved to
+ *     `done` or to `cancelled` as closed. `edit` writes a body that
+ *     `editable` and `get` read back byte for byte, leaving the title
+ *     and every other issue as they were; writes a title alone, leaving
+ *     the body; and both members reject an unknown ref. Unlike
+ *     `openIssues`, the pair is held only when an adapter is run with
+ *     `editsIssues: true`; one run without it is held to leaving both
+ *     out instead, by one case in place of the five.
  *   - The cases are also answered as a list, by
  *     {@link trackerContractCases}, each a name and a function that
  *     rejects when the adapter breaks the case. {@link runTrackerContract}
@@ -53,7 +64,15 @@
  *     adapters to hold which cases reject: the control that each case can
  *     fail. Case names hold no apostrophe, which `eslint --fix` escapes.
  */
-import type { IssueDraft, IssueRef, IssueState, IssueType, Tracker, TrackerKind } from '../../ports/index.js';
+import type {
+  EditableIssue,
+  IssueDraft,
+  IssueRef,
+  IssueState,
+  IssueType,
+  Tracker,
+  TrackerKind,
+} from '../../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -81,6 +100,12 @@ export interface TrackerContractOptions {
   readonly unknownExternalId?: string;
   /** Whether the adapter implements the optional `openIssues` reading. True when left out. */
   readonly readsOpenIssues?: boolean;
+  /**
+   * Whether the adapter implements the optional `editable` and `edit`
+   * pair. False when left out, so an adapter declares the pair it edits
+   * through rather than being held to one it never wrote.
+   */
+  readonly editsIssues?: boolean;
 }
 
 /** One contract case: its name, and a run that rejects when the adapter breaks it. */
@@ -188,6 +213,126 @@ function openIssuesCases(options: TrackerContractOptions): readonly TrackerContr
         await tracker.create(draftFixture());
 
         expect(await openIssuesOf(tracker)('chore')).toEqual([]);
+      },
+    },
+  ];
+}
+
+/** The `editable` and `edit` pair of a tracker. Throws when the tracker lacks either. */
+function editMembersOf(tracker: Tracker): {
+  editable: NonNullable<Tracker['editable']>;
+  edit: NonNullable<Tracker['edit']>;
+} {
+  const { editable, edit } = tracker;
+  if (editable === undefined || edit === undefined) {
+    throw new Error(`the ${tracker.kind} tracker has no editable and edit pair`);
+  }
+  return { editable, edit };
+}
+
+/** A body for the edit cases: markdown, a non-ASCII letter, an inner blank line and a trailing newline. */
+const EDITED_BODY = '## Context\n\nCodes stay valid one step too long.\n\n**Updated 2026-10-06, café notes:**\n\nNarrow the window.\n';
+
+/** What a case compares of an editable issue: everything but the ref, and the ref's id and kind. */
+function editableRow(issue: EditableIssue): Omit<EditableIssue, 'ref'> & { readonly id: string; readonly kind: string } {
+  const { ref, ...rest } = issue;
+  return { ...rest, id: ref.externalId, kind: ref.kind };
+}
+
+/** The cases of the optional `editable` and `edit` pair, or the one case holding it left out. */
+function editCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
+  const { create } = options;
+  if (options.editsIssues !== true) {
+    return [
+      {
+        name: 'leaves out the editable and edit pair it is run without',
+        run: async () => {
+          const tracker = await create();
+
+          expect(tracker.editable).toBeUndefined();
+          expect(tracker.edit).toBeUndefined();
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'editable answers the title, body and open state of a created issue',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const ref = await tracker.create(draftFixture({ opt: 0, title: 'Replay window', body: 'Codes stay valid.\n' }));
+
+        const row = editableRow(await editMembersOf(tracker).editable(ref));
+
+        expect(row).toMatchObject({ id: ref.externalId, kind: tracker.kind, title: 'Replay window' });
+        expect(row).toMatchObject({ body: 'Codes stay valid.\n', open: true });
+        expect(typeof row.author).toBe('string');
+        expect(Array.isArray(row.labels) && row.labels.every((label) => typeof label === 'string')).toBe(true);
+      },
+    },
+    {
+      name: 'editable answers an issue moved to done or to cancelled as closed',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const done = await tracker.create(draftFixture({ opt: 0, title: 'Fixed' }));
+        const cancelled = await tracker.create(draftFixture({ opt: 0, title: 'Not planned' }));
+        const { editable } = editMembersOf(tracker);
+
+        expect([(await editable(done)).open, (await editable(cancelled)).open]).toEqual([true, true]);
+        await tracker.transition(done, 'done');
+        await tracker.transition(cancelled, 'cancelled');
+
+        expect([(await editable(done)).open, (await editable(cancelled)).open]).toEqual([false, false]);
+      },
+    },
+    {
+      name: 'edit writes a body read back byte for byte, leaving the title and every other issue',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const edited = await tracker.create(draftFixture({ opt: 0, title: 'Replay window' }));
+        const other = await tracker.create(draftFixture({ opt: 0, title: 'Signing keys', body: 'Keys never rotate.\n' }));
+        const { editable, edit } = editMembersOf(tracker);
+
+        await edit(edited, { body: EDITED_BODY });
+
+        expect((await editable(edited)).body).toBe(EDITED_BODY);
+        expect((await tracker.get(edited)).body).toBe(EDITED_BODY);
+        expect((await editable(edited)).title).toBe('Replay window');
+        expect(await editable(other)).toMatchObject({ title: 'Signing keys', body: 'Keys never rotate.\n' });
+      },
+    },
+    {
+      name: 'edit writes a title alone, leaving the body',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const ref = await tracker.create(draftFixture({ opt: 0, title: 'Replay window', body: 'Codes stay valid.\n' }));
+        const { editable, edit } = editMembersOf(tracker);
+
+        await edit(ref, { title: 'Narrow the replay window' });
+
+        expect(await editable(ref)).toMatchObject({ title: 'Narrow the replay window', body: 'Codes stay valid.\n' });
+        expect((await tracker.get(ref)).title).toBe('Narrow the replay window');
+      },
+    },
+    {
+      name: 'editable and edit reject for an unknown ref',
+      run: async () => {
+        const tracker = await create();
+        const unknown: IssueRef = {
+          opt: 999,
+          kind: tracker.kind,
+          externalId: options.unknownExternalId ?? '999',
+          url: null,
+        };
+        const { editable, edit } = editMembersOf(tracker);
+
+        await expect(editable(unknown)).rejects.toThrow();
+        await expect(edit(unknown, { body: EDITED_BODY })).rejects.toThrow();
       },
     },
   ];
@@ -400,6 +545,7 @@ export function trackerContractCases(options: TrackerContractOptions): readonly 
       },
     },
     ...openIssuesCases(options),
+    ...editCases(options),
   ];
 }
 

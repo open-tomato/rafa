@@ -59,6 +59,8 @@ back into every turn and the split would save nothing.
   lore and hindsight, and how prose introduces them.
 - `context/release.md` — fragments and the fold, settle and its deliveries,
   the receipt rule with adoption boundary, the guards, readers, and seven keys.
+- `context/board-project.md` — the template, the five fields, the Stage
+  outline and its rules, the refresh and its callers, and the warnings.
 - `context/notices.md` — the alpha and skip-permissions notices: where they
   are shown, how they are dismissed, and what a test's HOME must hold.
 - `context/operators.md` — the alpha operators under `bundled/operators/`:
