@@ -12,10 +12,10 @@ verify	UNKNOWN STEP	2026-10-07T03:09:38.0487478Z 215 |     if (value !== null) r
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0488068Z 216 |     if (Date.now() >= deadline) throw new Error('timed out waiting for a condition to hold');
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0488605Z                                                 ^
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0488923Z error: timed out waiting for a condition to hold
-verify	UNKNOWN STEP	2026-10-07T03:09:38.0489476Z       at waitUntil (/home/runner/work/rafa/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0489476Z       at waitUntil (/work/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0490226Z 
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0513311Z ##[error]
-verify	UNKNOWN STEP	      at waitUntil (/home/runner/work/rafa/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
+verify	UNKNOWN STEP	      at waitUntil (/work/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0522605Z (fail) two rafa loop start --as-worktree runs, spawned at once over one project > write both task reports to the one shared store, which rafa effort report rolls up together [45062.89ms]
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0639972Z 
 verify	UNKNOWN STEP	2026-10-07T03:09:38.0640850Z ##[endgroup]
