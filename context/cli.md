@@ -30,7 +30,7 @@ module's note is the long form.
 | `src/commands/instinct/instinct-records.ts` | what `instinct list` and `instinct show` share: the scopes read, which files in them are records, and the id lookup |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the audit of the changelog's released history (`src/release/audit.ts`), writing nothing; `release settle`, below; and `release tag`, which puts `v<version>` on the release branch's HEAD and prints the push and publish lines rather than running them |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery, the tag and the project refresh as the terminal result's data. With `board.project.number` set, a push that left the base without the folded fragments is followed by the project refresh of `settle-project.ts`: the issues closed by the pull requests that added them, read off `associatedPullRequests` through `gh api graphql`, each line a warning that keeps the exit code. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
-| `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing |
+| `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing; `board sync [--dry-run]`, every item of the repository's GitHub project refreshed and every open issue missing from it added, over `src/board/project/sync.ts` |
 | `src/board/relations/port.ts` | the `BoardRelations` interface and its adapters: `mode` (one of `labels` or `native`), the three reading functions (`epicOf`, `membersOf`, `blockersOf` with their truncation reading, `freedBy`), the three writing functions' types (to be called through the `GhRunner` seam), and the per-mode listing fields that `BOARD_LIST_FIELDS` carries to the cache |
 | `src/board/relations/labels.ts` | the `labels` adapter, delivering `labels` mode: membership from `epic:<slug>` labels, order from the epic's checklist, waiting from `spec:blocked` labels and `Blocked by:` lines with the four faults, and `readUnblockableIssues` read by the unblock step of `pr merge` |
 | `src/board/relations/native.ts` | the `native` adapter, delivering `native` mode: membership from the `parent` field, order from the `subIssues` array if `gh` answers it (the checklist otherwise), waiting from `blockedBy` nodes each with their state, and `readFreedIssues` read by `pr merge` to print what a merge freed |
@@ -359,7 +359,7 @@ New; it replaces no earlier text. What a row or an action added to
   `effort collect`, `effort report`, `effort dashboard`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
-  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release settle`, `release tag`, `board list`, `epic show`, aliased
+  `instinct show`, `instinct flag`, `instinct promote`, `release status`, `release settle`, `release tag`, `board list`, `board sync`, `epic show`, aliased
   `epic` for good; `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `claim release`,
   `claim hand`, `claim accept`, `claim take`, `update current` with the
   stubs `update self`, `update project`, `update board`, `update next`,
@@ -2067,7 +2067,7 @@ New; it replaces no earlier text. What a row or an action added to
   naming no target, an unusable config and a file that cannot be written,
   with 1. It declares no `spends`.
 - **`rafa board list` lists the open boards**
-  (`src/commands/board/list.ts`), the one action of the `board` subject.
+  (`src/commands/board/list.ts`), the first action of the `board` subject.
   It reads the board listing once, as `switch` does, and ranks the
   default board over that listing through `defaultBoardOnce`, which it imports from
   `src/commands/switch.ts`, and `openBoards`, from
@@ -2093,6 +2093,22 @@ New; it replaces no earlier text. What a row or an action added to
   board at all among them, is refused with exit code 2; a stray word and
   an unusable config, with 1. An owner that does not resolve is a
   column, not a failure. It declares no `spends`.
+- **`rafa board sync [--dry-run]` brings the GitHub project in step**
+  (`src/commands/board/sync.ts` over `syncProject`,
+  `src/board/project/sync.ts`). One refresh widened by `everyItem` and
+  `openIssues` (`RefreshWidening`, `src/board/project/refresh.ts`)
+  refreshes every item of the repository on the project and answers the
+  open issues with no item; each is then added and a second refresh fills
+  it. A line per change, `#<n> <field>: <from> → <to>` with `(empty)` for
+  no value, a line per issue added, then a closing count. `--dry-run`
+  sets the refresh's `dryRun`: the same lines, no write and no add. Json
+  mode's result is `BoardSyncResult`, the changes without their write
+  ids. Exit code 1 for a stray word, an unusable config and an unset
+  `board.project.number`, which names `rafa init --board --project`; 2 for
+  a missing `project` scope, a number naming no project, a rate-limit
+  refusal (after the lines of what was read) and any `gh` failure. A
+  field the project holds otherwise than the template is a `warn` line,
+  exit 0. It declares no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading
@@ -2619,7 +2635,10 @@ message naming the command as typed after `rafa` and saying to declare
   See also names every other `issue` action, so registering one moves
   that file. Registering the `board` subject with `board list`
   reddened the same three and moved `rafa.txt` alone, by one Quick start
-  line and one Subjects entry (measured on 2026-09-28).
+  line and one Subjects entry (measured on 2026-09-28). Adding `board
+  sync` with `board`'s summary lengthened reddened the same three and
+  moved `rafa.txt` alone, by the one wrapped Subjects line (measured on
+  2026-10-07).
 
 ### Describe
 

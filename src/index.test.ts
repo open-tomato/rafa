@@ -26,7 +26,7 @@
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
  * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, the five plan readers, `plan list`, `plan show`,
+ * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, `board sync`, the five plan readers, `plan list`, `plan show`,
  * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
  * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
  * `issue` actions, and `module list` and `module exec` are held to be the
@@ -1001,6 +1001,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../switch.js', ['defaultBoardOnce']],
   ]],
+  ['./commands/board/sync.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
+    ['../../board/project/sync.js', ['syncProject']],
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
+  ]],
   ['./commands/epic/show.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
@@ -1543,6 +1551,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/release/settle.js',
       './commands/release/tag.js',
       './commands/board/list.js',
+      './commands/board/sync.js',
       './commands/epic/show.js',
       './commands/epic/new.js',
       './commands/epic/defer.js',

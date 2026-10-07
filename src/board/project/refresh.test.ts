@@ -592,3 +592,53 @@ describe('refreshProjectItems: widened by an epic\'s members and the items whose
     expect(wired.calls()).toEqual([]);
   });
 });
+
+describe('refreshProjectItems: widened to the whole project, and a dry run', () => {
+  /** The issues `refresh`'s changes name, each once, in order. */
+  function changedIssues(refresh: Awaited<ReturnType<typeof refreshProjectItems>>): readonly number[] {
+    return refresh.kind === 'refreshed'
+      ? [...new Set(refresh.changes.map(({ issue }) => issue))]
+      : [];
+  }
+
+  it('refreshes every item of the repository, lowest first, with no issue named', async () => {
+    const wired = wire([...items(), { number: 5, repository: 'open-tomato/other' }]);
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true });
+
+    expect(changedIssues(refresh)).toEqual([10, 20, 21, 22, 30]);
+    expect(refresh.kind === 'refreshed' && refresh.missing).toEqual([]);
+    expect(await heldValues(wired)).toEqual({ ...EXPECTED, 5: {} });
+  });
+
+  it('names every open issue on the listing with no item as missing, after the items', async () => {
+    const wired = wire(items());
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true, openIssues: true });
+
+    expect(changedIssues(refresh)).toEqual([10, 20, 21, 22, 30]);
+    expect(refresh.kind === 'refreshed' && refresh.missing).toEqual([1, 40]);
+  });
+
+  it('answers the changes a write would make on a dry run, and sends no write', async () => {
+    const wired = wire(items());
+
+    const dry = await refreshProjectItems({ ...wired.options, dryRun: true }, [], { everyItem: true });
+
+    expect(changedIssues(dry)).toEqual([10, 20, 21, 22, 30]);
+    expect(dry.kind === 'refreshed' && dry.writes).toEqual({ written: 0, notUpdated: 0, rateLimited: false, detail: '' });
+    expect(writeCalls(wired.calls())).toEqual([]);
+    expect(await heldValues(wired)).toEqual({ 10: {}, 20: {}, 21: {}, 22: {}, 30: {} });
+  });
+
+  it('writes those same changes without the dry run, the control of the case above', async () => {
+    const wired = wire(items());
+    const dry = await refreshProjectItems({ ...wired.options, dryRun: true }, [], { everyItem: true });
+
+    const written = await refreshProjectItems(wired.options, [], { everyItem: true });
+
+    expect(written.kind === 'refreshed' && written.changes).toEqual(dry.kind === 'refreshed' && dry.changes);
+    expect(writeCalls(wired.calls()).length).toBeGreaterThan(0);
+    expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});

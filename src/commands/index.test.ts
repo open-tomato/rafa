@@ -1,6 +1,6 @@
 /**
  * Tests for the core roster (`src/commands/index.ts`) and the
- * declarations of the eighty-seven commands it registers: what the registry
+ * declarations of the eighty-eight commands it registers: what the registry
  * holds, how each spelling of the command tree routes, with the
  * deprecation line each alias prints, and that each command wrapping a
  * phase 0 command declares the flags its phase 0 module reads.
@@ -8,7 +8,7 @@
  * `loop stop`, `loop pause`, `loop resume`, `loop status`, `loop list`, `loop wait`,
  * the eight `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
- * `release status`, `release settle`, `release tag`, `board list`,
+ * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
  * the four `claim` actions, the eight `update` actions and the seven `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
@@ -175,6 +175,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'release settle': ['text', 'json'],
   'release tag': ['text', 'json'],
   'board list': ['text', 'json'],
+  'board sync': ['text', 'json'],
   'claim release': ['text', 'json'],
   'claim hand': ['text', 'json'],
   'claim accept': ['text', 'json'],
@@ -238,6 +239,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'release settle': [[], ['dry-run']],
   'release tag': [[], []],
   'board list': [[], []],
+  'board sync': [[], ['dry-run']],
   'status': [[], []],
   'next': [[], ['dry-run', 'roadmap', 'claim-ahead', 'yes']],
   'roadmap': [[], ['all', 'full', 'check', 'labels', 'texts', 'refresh', 'type', 'module', 'search', 'limit']],
@@ -383,6 +385,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
   ['boards list', 'board list', [], ''],
+  ['board sync --dry-run', 'board sync', ['--dry-run'], ''],
   ['self-update', 'self-update', [], ''],
   ['describe', 'describe', [], ''],
 ];
@@ -482,7 +485,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -543,6 +546,7 @@ describe('the core roster', () => {
       'release settle',
       'release tag',
       'board list',
+      'board sync',
       'epic show',
       'epic new',
       'epic defer',

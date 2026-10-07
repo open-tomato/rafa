@@ -58,8 +58,16 @@
  *    With the Rank field skipped (renamed, or of another type) none is
  *    added.
  *
- * The widened issues follow the ones asked for, each once; a member with
- * no item on the project is answered in {@link ProjectRefreshed.missing}.
+ *  - {@link RefreshWidening.everyItem} adds every item of this
+ *    repository on the project, lowest number first, which is how
+ *    `rafa board sync` refreshes the whole project;
+ *  - {@link RefreshWidening.openIssues} adds every open issue on that
+ *    board's listing, lowest number first, so an open issue with no item
+ *    is answered in {@link ProjectRefreshed.missing} for the sync to add.
+ *
+ * The widened issues follow the ones asked for, each once, in that order
+ * of the widenings; a member or an open issue with no item on the project
+ * is answered in {@link ProjectRefreshed.missing}.
  *
  * ## What it writes
  *
@@ -70,6 +78,11 @@
  * refresh over unchanged facts therefore sends no write. A field the
  * project does not hold as the template has it is skipped and named in
  * {@link ProjectRefreshed.skipped}; the other fields are still written.
+ *
+ * With {@link RefreshOptions.dryRun} set, everything above is read and
+ * the changes are answered as they would be written, but no write is
+ * sent: `writes` counts none written and none refused. That is
+ * `rafa board sync --dry-run`.
  *
  * ## Failures, answered as warning lines
  *
@@ -137,6 +150,8 @@ export interface RefreshOptions {
   readonly gh: GhRunner;
   /** The pause between two write requests; `Bun.sleep` when left out. */
   readonly sleep?: ProjectWritesSeams['sleep'];
+  /** True to read and answer the changes and send no write; see the module note. */
+  readonly dryRun?: boolean;
 }
 
 /** What a refresh adds to the issues it is asked for; see the module note. */
@@ -145,6 +160,10 @@ export interface RefreshWidening {
   readonly membersOf?: readonly number[];
   /** True to refresh too every item whose Rank on the project is not the one the home board's order gives. */
   readonly shiftedRanks?: boolean;
+  /** True to refresh too every item of this repository on the project. */
+  readonly everyItem?: boolean;
+  /** True to refresh too every open issue on the board listing, one with no item answered as missing. */
+  readonly openIssues?: boolean;
 }
 
 /** A refresh that sent no call. */
@@ -177,11 +196,11 @@ export interface ProjectRefreshRefused {
 export interface ProjectRefreshed {
   readonly kind: 'refreshed';
   readonly project: ProjectRef;
-  /** Every value that differed, by issue in the order asked and widened, then in field order. */
+  /** Every value that differed, by issue in the order asked and widened, then in field order; not written on a dry run. */
   readonly changes: readonly ProjectChange[];
   /** How the writes of {@link ProjectRefreshed.changes} went. */
   readonly writes: ProjectWritesResult;
-  /** The issues asked for, or added as an epic's members, that have no item on the project, in that order. */
+  /** The issues asked for, or added as an epic's members or as open issues, that have no item on the project, in that order. */
   readonly missing: readonly number[];
   /** The template's fields the project does not hold as expected, none written. */
   readonly skipped: readonly FieldMismatch[];
@@ -224,8 +243,14 @@ function homeRow(number: number, listing: readonly BoardIssue[], boards: readonl
   return row;
 }
 
+/** The board of a widened refresh: what the values are computed against, and the open issues on its listing. */
+interface WidenedBoard extends RefreshBoard {
+  /** Every open issue on the listing, lowest number first. */
+  readonly open: readonly number[];
+}
+
 /** The board every issue's values are computed against, read once; see the module note. */
-async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository: string): Promise<RefreshBoard> {
+async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository: string): Promise<WidenedBoard> {
   const mode = config.boardRelationships;
   const listing = await createGhBoardListing({ gh, mode })();
   const boards = await createGhBoardLister({ gh, mode })();
@@ -251,6 +276,10 @@ async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository:
         ? { kind: 'none', issue }
         : reading.blockersOf(row);
     },
+    open: listing
+      .filter(({ state }) => state === 'OPEN')
+      .map(({ number }) => number)
+      .sort((a, b) => a - b),
   };
 }
 
@@ -285,7 +314,7 @@ function rankShifted(issue: number, item: ProjectItem, rankField: MatchedField, 
 function widenedIssues(
   numbers: readonly number[],
   widening: RefreshWidening,
-  board: RefreshBoard,
+  board: WidenedBoard,
   items: ReadonlyMap<number, ProjectItem>,
   project: Project,
 ): readonly number[] {
@@ -297,12 +326,21 @@ function widenedIssues(
       .filter(([issue, item]) => rankShifted(issue, item, rankField, rankOf(board.ranks, issue)))
       .map(([issue]) => issue)
       .sort((a, b) => a - b);
-  return [...new Set([...numbers, ...members, ...shifted])];
+  const every = widening.everyItem === true
+    ? [...items.keys()].sort((a, b) => a - b)
+    : [];
+  const open = widening.openIssues === true
+    ? board.open
+    : [];
+  return [...new Set([...numbers, ...members, ...shifted, ...every, ...open])];
 }
 
 /** True when `widening` asks for anything past the issues named. */
 function widens(widening: RefreshWidening): boolean {
-  return (widening.membersOf ?? []).length > 0 || widening.shiftedRanks === true;
+  return (widening.membersOf ?? []).length > 0
+    || widening.shiftedRanks === true
+    || widening.everyItem === true
+    || widening.openIssues === true;
 }
 
 /** The refresh of `asked` on the project `ref` names, widened by `widening`, once the repository is read. */
@@ -336,7 +374,7 @@ async function refreshOn(
   const changes = present.size === 0
     ? []
     : await changesFor(options, repository, project, present, board);
-  const writes = changes.length === 0
+  const writes = changes.length === 0 || options.dryRun === true
     ? NOTHING_WRITTEN
     : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), options.sleep === undefined
       ? {}
@@ -368,7 +406,12 @@ export async function refreshProjectItems(
   const { config, gh } = options;
   const numbers = issueNumbers(issues);
   const membersOf = issueNumbers(widening.membersOf ?? []);
-  const widened: RefreshWidening = { membersOf, shiftedRanks: widening.shiftedRanks === true };
+  const widened: RefreshWidening = {
+    membersOf,
+    shiftedRanks: widening.shiftedRanks === true,
+    everyItem: widening.everyItem === true,
+    openIssues: widening.openIssues === true,
+  };
   if (config.boardProjectNumber === null) return { kind: 'skipped', reason: 'no-project', warnings: [] };
   if (numbers.length === 0 && !widens(widened)) return { kind: 'skipped', reason: 'no-issues', warnings: [] };
 
