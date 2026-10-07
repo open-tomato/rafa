@@ -15,12 +15,22 @@ describe('readCurrentRange', () => {
     expect(readCurrentRange('0.34.0', '0.34.2')).toEqual({ kind: 'patch', from: '0.34.0', to: '0.34.2' });
   });
 
-  it('refuses a newer minor, naming update next', () => {
-    const reading = readCurrentRange('0.33.1', '0.34.0');
+  it('crosses newer minors while both versions are below 1.0.0', () => {
+    expect(readCurrentRange('0.34.1', '0.36.0')).toEqual({ kind: 'minor', from: '0.34.1', to: '0.36.0' });
+  });
+
+  it('refuses a newer minor from 1.0.0 on, naming update next', () => {
+    const reading = readCurrentRange('1.2.0', '1.3.0');
 
     expect(reading.kind).toBe('refused');
     expect(reading.kind === 'refused' && reading.reason).toBe('newer-minor');
     expect(reading.kind === 'refused' && reading.message).toContain('rafa update next');
+  });
+
+  it('refuses an older minor below 1.0.0 as a downgrade', () => {
+    const reading = readCurrentRange('0.36.0', '0.34.1');
+
+    expect(reading.kind === 'refused' && reading.reason).toBe('older');
   });
 
   it('refuses a newer major, naming update latest', () => {

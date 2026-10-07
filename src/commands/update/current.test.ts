@@ -64,9 +64,9 @@ interface World {
   readonly questions: string[];
 }
 
-function seamsOf(world: World, options: { held?: readonly string[]; terminal?: boolean; answer?: string | null; remote?: string | null; lockRoot?: string; refuseCreate?: boolean } = {}): UpdateCurrentSeams {
+function seamsOf(world: World, options: { held?: readonly string[]; terminal?: boolean; answer?: string | null; remote?: string | null; lockRoot?: string; refuseCreate?: boolean; installed?: string } = {}): UpdateCurrentSeams {
   return {
-    installed: INSTALLED,
+    installed: options.installed ?? INSTALLED,
     openGh: () => standInGh(options.held ?? [], world.gh, options.refuseCreate ?? false),
     readRemote: () => (options.remote === undefined
       ? GITHUB_REMOTE
@@ -167,12 +167,23 @@ describe('rafa update current', () => {
     expect(world.questions).toEqual([]);
   });
 
-  it('refuses a newer minor, naming update next, and an older installed rafa as a downgrade', async () => {
+  it('moves a lock across newer minors below 1.0.0', async () => {
+    const held = plantComplete();
     writeProjectLock(project.root, '0.33.4');
-    const minor = await update(['current', '--yes'], seamsOf(newWorld()));
+    const run = await update(['current', '--yes'], seamsOf(newWorld(), { held }));
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`update 0.33.4 → ${INSTALLED}`);
+    expect(readFileSync(join(project.root, LOCK_FILE), 'utf8')).toBe(projectLockText(INSTALLED));
+  });
+
+  it('refuses a newer minor from 1.0.0 on, naming update next, and an older installed rafa as a downgrade', async () => {
+    writeProjectLock(project.root, '1.2.0');
+    const minor = await update(['current', '--yes'], seamsOf(newWorld(), { installed: '1.3.0' }));
 
     expect(minor.exitCode).toBe(1);
     expect(minor.stderr).toContain('rafa update next');
+    expect(readFileSync(join(project.root, LOCK_FILE), 'utf8')).toBe(projectLockText('1.2.0'));
 
     writeProjectLock(project.root, '0.34.3');
     const older = await update(['current', '--yes'], seamsOf(newWorld()));
