@@ -173,6 +173,26 @@
  * read was refused. What varies is the item and the remedy
  * ({@link REMEDY}); the claim about access is one spelling for both.
  *
+ * ## The editor check
+ *
+ * `rafa issue edit <n>` asks a question the six routes above do not:
+ * not who WROTE a body, but who is about to WRITE one. Its first gate
+ * reads the login `gh` is authenticated as — {@link createGhEditorLogin},
+ * one `gh api user`, whose `login` field it takes — and weighs it with
+ * {@link readBoardTrust} over the SAME {@link BoardTrust}
+ * {@link requireTrustedBoardAuthor} is handed, so the editor and the
+ * issue's author are held to one rule, one allow-list and one lookup.
+ * {@link readEditorTrust} answers the reading; it refuses nothing and
+ * writes nothing, and the command turns a refusal into
+ * `CommandExit(2, {@link editorRefusalMessage})`.
+ *
+ * Its refusals are named for the command's gate rather than the rule's:
+ * `ownership` when GitHub answered and the login holds no write access,
+ * and `ownership-unknown` when nobody answered — `gh api user` failed,
+ * answered no login, or the permission lookup behind it failed. The
+ * reasoning is the failed-lookup section's above: a login that cannot be
+ * read is never read as trusted.
+ *
  * ## What this module does not do
  *
  * It does not decide what a caller does with an untrusted reading. An
@@ -537,4 +557,132 @@ export function trustRefusalMessage(item: BoardItem, reading: TrustReading): str
 export function requireTrustedAuthor(item: BoardItem, reading: TrustReading): void {
   if (reading.trusted) return;
   throw new CommandExit(TRUST_REFUSAL_EXIT, trustRefusalMessage(item, reading));
+}
+
+/** What `gh api user` answered about the account running a command. */
+export interface EditorLoginReading {
+  /** The authenticated account's login, or null when none was read. */
+  readonly login: string | null;
+  /** Why no login was read. Empty when one was. */
+  readonly detail: string;
+}
+
+/**
+ * Reads the login `gh` is authenticated as. Like {@link Permissions}, a
+ * lookup that fails answers a reading carrying the failure and never
+ * rejects.
+ */
+export type EditorLogin = () => Promise<EditorLoginReading>;
+
+/** What {@link createGhEditorLogin} is made with. */
+export interface GhEditorLoginOptions {
+  /** Runs the one `gh api user` command the lookup sends. */
+  readonly gh: GhRunner;
+}
+
+/** Why an editor is refused; see the module note's editor check. */
+export type EditorRefusal = 'ownership' | 'ownership-unknown';
+
+/** Whether the account running an edit may change the repository. */
+export interface EditorTrustReading {
+  /** The login `gh api user` answered, or null when none was read. */
+  readonly login: string | null;
+  /** True when the editor may write into a board body. */
+  readonly trusted: boolean;
+  /** Why it is not trusted, or null when it is. */
+  readonly refusal: EditorRefusal | null;
+  /** The rule's reading over the login, or null when no login was read. */
+  readonly reading: TrustReading | null;
+  /** Why no login was read. Empty when one was. */
+  readonly detail: string;
+}
+
+/** The command the editor's login is read with. */
+const USER_COMMAND = 'gh api user';
+
+/** A login reading that read none, carrying why. */
+function noLogin(detail: string): EditorLoginReading {
+  return { login: null, detail };
+}
+
+/**
+ * The editor login over `options.gh`: one `gh api user`, its `login`
+ * field taken when it is shaped like a GitHub login.
+ */
+export function createGhEditorLogin(options: GhEditorLoginOptions): EditorLogin {
+  const { gh } = options;
+
+  return async (): Promise<EditorLoginReading> => {
+    const result = await gh(['api', 'user']);
+    if (!result.ok) return noLogin(detailOf(result, USER_COMMAND));
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(result.stdout) as unknown;
+    } catch (error) {
+      return noLogin(`${USER_COMMAND} wrote output that is not JSON: ${messageOf(error)}`);
+    }
+    if (!isMapping(payload)) {
+      return noLogin(`${USER_COMMAND} answered ${describeValue(payload)}, expected a mapping`);
+    }
+
+    const login = payload['login'];
+    return typeof login === 'string' && isGitHubLogin(login)
+      ? { login, detail: '' }
+      : noLogin(`${USER_COMMAND} answered ${describeValue(login)} as its login, which is not a GitHub login`);
+  };
+}
+
+/**
+ * Whether the account running an edit may write into a board body: the
+ * login `editor` reads, weighed by {@link readBoardTrust} over `trust`.
+ * A login that cannot be read, and a permission lookup that fails, both
+ * refuse as `ownership-unknown`.
+ */
+export async function readEditorTrust(trust: BoardTrust, editor: EditorLogin): Promise<EditorTrustReading> {
+  const read = await editor();
+  if (read.login === null) {
+    return { login: null, trusted: false, refusal: 'ownership-unknown', reading: null, detail: read.detail };
+  }
+
+  const reading = await readBoardTrust(trust, read.login);
+  return {
+    login: read.login,
+    trusted: reading.trusted,
+    refusal: editorRefusalOf(reading),
+    reading,
+    detail: '',
+  };
+}
+
+/** The editor refusal a rule reading maps to, or null for a trusted one. */
+function editorRefusalOf(reading: TrustReading): EditorRefusal | null {
+  if (reading.trusted) return null;
+  return reading.refusal === 'lookup-failed'
+    ? 'ownership-unknown'
+    : 'ownership';
+}
+
+/**
+ * The sentence an untrusted editor `reading` is refused with, naming
+ * `item`: the access claim is {@link trustRefusalClause}'s, so an editor
+ * and an author refused over the same answer are told the same thing.
+ *
+ * Throws a `TypeError` for a trusted reading, as
+ * {@link trustRefusalMessage} does.
+ */
+export function editorRefusalMessage(item: BoardItem, reading: EditorTrustReading): string {
+  const what = `${item.kind} #${String(item.number)}`;
+  if (reading.reading !== null) {
+    const because = trustRefusalClause(item.repo, reading.reading);
+    return `${what} cannot be edited by ${reading.reading.login}, ${because}; a member must make the edit`;
+  }
+  if (reading.trusted) {
+    throw new TypeError('board trust: a trusted editor has no refusal to name');
+  }
+  const detail = reading.detail === ''
+    ? UNREPORTED
+    : reading.detail;
+  return `${what} cannot be edited: the account running the edit could not be read (${detail}); `
+    + 'log gh in with `gh auth login` and run it again';
 }

@@ -414,9 +414,9 @@ rejected.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. SIX routes ask the question. Two are
+someone allowed to change the repo. SEVEN routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
-the pull request's author for `pr triage --resolve`. Three are
+the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
 `src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
 the repo label. Two of those are `plan create`'s: `src/board/plan-spec.ts`'s
@@ -449,6 +449,12 @@ trusted account wrote; the refused ones are reported by id and author
 through the gate's warnings and left alone, and the gaps go in a comment
 posted beside them. The trust is the one check 0 already built, carried on
 `GateIssue` beside the number and the board.
+
+The SEVENTH is `rafa issue edit <n>` (`src/commands/issue/issue-tracker.ts`),
+which amends the issue body in place. It gates on two ownership checks
+through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
+answers) and whose issue (the issue's author). A lookup that fails refuses
+as `ownership-unknown`, exit 2, before the issue is written.
 
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`

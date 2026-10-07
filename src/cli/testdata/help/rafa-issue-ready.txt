@@ -43,4 +43,4 @@ Outputs:
 
 See also:
   rafa issue list, rafa issue show, rafa issue create, rafa issue comment, rafa
-  issue move, rafa issue unblock, rafa issue check
+  issue move, rafa issue unblock, rafa issue check, rafa issue edit
