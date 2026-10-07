@@ -28,6 +28,8 @@ import type { ProjectFieldValue, ProjectItem } from './port.js';
 import type { FakeProjectGh, FakeProjectItem } from './project-fake.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
+import { BOARD_LABELS } from '../setup.js';
+
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY } from './project-fake.js';
@@ -56,6 +58,13 @@ const ISSUES: readonly SyncIssue[] = [
   { number: 30, state: 'CLOSED', stateReason: 'COMPLETED', labels: ['type:spec'], closedBy: [31] },
   { number: 40, state: 'OPEN', labels: ['type:spec', 'needs-triage'] },
 ];
+
+/** `gh auth status --active --json hosts` for one account logged in with the `project` scope. */
+const AUTH_WITH_PROJECT_SCOPE = {
+  hosts: {
+    'github.com': [{ state: 'success', active: true, host: 'github.com', login: 'test', tokenSource: 'keyring', scopes: 'project, repo', gitProtocol: 'ssh' }],
+  },
+};
 
 /** The issues the project holds an item for. */
 export const SYNC_ITEM_ISSUES: readonly number[] = Object.freeze([10, 20, 21, 22, 30]);
@@ -145,6 +154,8 @@ export function createSyncFake(options: SyncFakeOptions = {}): SyncFake {
     recorded.push(args);
     const line = args.join(' ');
     if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
+    if (line === 'auth status --active --json hosts') return Promise.resolve(answered(AUTH_WITH_PROJECT_SCOPE));
+    if (line.startsWith('label list ')) return Promise.resolve(answered(BOARD_LABELS.map(({ name }) => ({ name }))));
     if (line.startsWith('issue list --label type:roadmap --state open')) {
       return Promise.resolve(answered(issues.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
     }
