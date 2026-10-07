@@ -209,7 +209,8 @@
  * then `renderDoctorBoard`'s lines (`./doctor-board.ts`) for a repository that has a GitHub board —
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the cleanup row, when there is anything to
- * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the `Skill tiers` rows
+ * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the
+ * stretch row (`./doctor-stretch.ts`), when `pr.base` names a `stretch/*` branch; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
  * effort sync row; then, under `--deep`,
  * `renderDeep`'s sections. A halt
@@ -289,6 +290,7 @@ import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
+import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
 
@@ -706,6 +708,7 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const repository = [...renderDoctorBoard(readings), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeDoctorRelease(context, release);
+    writeDoctorStretch(context, project.root, preflight.config.prBase);
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
     writeText(context, renderDoctorEffortSync(effortSync));
