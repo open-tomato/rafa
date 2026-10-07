@@ -108,6 +108,12 @@ describe('coverageLine', () => {
       'Coverage: 0 of 2 tracked files read (src/ and packages/*/src/). Not read: `a.ts`, `c.ts`.',
     );
   });
+
+  it('names another scope when one is passed', () => {
+    expect(coverageLine(['context/a.md'], ['context/a.md', 'context/b.md'], 'context/')).toBe(
+      'Coverage: 1 of 2 tracked files read (context/). Not read: `context/b.md`.',
+    );
+  });
 });
 
 describe('scope and kinds', () => {

@@ -144,14 +144,16 @@ export function listTrackedFiles(root: string): TrackedFiles {
  *
  * @param read - The paths the script read, in any order.
  * @param tracked - The tracked files in scope (`TrackedFiles.all`).
+ * @param scope - The scope's name in the line, `SCOPE_LABEL` unless the
+ *   script reads another scope (`context/` for the decision sources).
  * @returns One line of markdown.
  */
-export function coverageLine(read: Iterable<string>, tracked: readonly string[]): string {
+export function coverageLine(read: Iterable<string>, tracked: readonly string[], scope = SCOPE_LABEL): string {
   const readSet = new Set(read);
   const trackedSorted = [...new Set(tracked)].sort();
   const unread = trackedSorted.filter((path) => !readSet.has(path));
   const readCount = trackedSorted.length - unread.length;
-  const head = `Coverage: ${readCount} of ${trackedSorted.length} tracked files read (${SCOPE_LABEL}).`;
+  const head = `Coverage: ${readCount} of ${trackedSorted.length} tracked files read (${scope}).`;
   if (unread.length === 0) {
     return head;
   }
