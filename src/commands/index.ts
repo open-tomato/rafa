@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the eighty-nine registered so far wrap a
+ * of each is its command. Four of the ninety registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -53,9 +53,9 @@
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
- * the eight `pr` actions, which read, open, wait on, merge and triage one
- * repository's pull requests through the PullRequests port and share
- * `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * the nine `pr` actions, which read, open, retarget, wait on, merge and
+ * triage one repository's pull requests through the PullRequests port
+ * and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s readers, nor
  * `release settle`, which folds the waiting fragments in a scratch
@@ -131,7 +131,9 @@
  *     one merged and both branches cleaned up after it;
  *     `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`,
  *     one opened from a pushed head, or the one already open on the head
- *     printed and none opened; and
+ *     printed and none opened;
+ *     `pr retarget <n> --base=<branch>`, one moved onto another base, or
+ *     none sent when it is already on it; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each
@@ -396,6 +398,7 @@ import prCurrent from './pr/current.js';
 import prList from './pr/list.js';
 import prMerge from './pr/merge.js';
 import prOpen from './pr/open.js';
+import prRetarget from './pr/retarget.js';
 import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
@@ -468,6 +471,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prShow,
   prView,
   prOpen,
+  prRetarget,
   prList,
   prWait,
   prMerge,

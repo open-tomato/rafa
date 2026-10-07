@@ -30,6 +30,10 @@ Eight actions read and control pull requests:
   — open one from a pushed head over `PullRequests.create`, or print the one
   already open on the head and open none; a missing or empty body file and
   a head equal to the base are refused
+- `pr retarget <n> --base=<branch>` — move one onto another base over
+  `PullRequests.editBase`, printing the line `retargetedLine` builds; `<n>`
+  is required here, never the branch's; one already on that base is a
+  no-op, exit 0
 
 `<n>` defaults to the open PR of the current branch. Every action carries a
 summary, examples and `outputs: [text, json]`; each one in the core roster

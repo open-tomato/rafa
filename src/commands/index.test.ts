@@ -129,6 +129,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'pr merge': ['text', 'json'],
   'pr triage': ['text', 'json'],
   'pr open': ['text', 'json'],
+  'pr retarget': ['text', 'json'],
   'effort collect': ['text', 'json'],
   'effort report': ['text', 'json'],
   'effort dashboard': ['text', 'json'],
@@ -220,6 +221,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'pr merge': [['n'], ['yes', 'skip-checks', 'method', 'hint']],
   'pr triage': [['n'], ['comment', 'resolve', 'max-attempts', 'hint']],
   'pr open': [[], ['head', 'base', 'title', 'body-file']],
+  'pr retarget': [['n'], ['base']],
   'module list': [[], []],
   'module exec': [['module', 'action'], []],
   'agent vendor': [['name'], ['force']],
@@ -488,7 +490,7 @@ describe('the core roster', () => {
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers with pr open after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the eight issue actions, the four pr readers with pr open and pr retarget after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -515,6 +517,7 @@ describe('the core roster', () => {
       'pr show',
       'pr view',
       'pr open',
+      'pr retarget',
       'pr list',
       'pr wait',
       'pr merge',

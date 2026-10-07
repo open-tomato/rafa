@@ -220,8 +220,8 @@ function plantRepo(project: PlantedProject, branch: string): void {
 }
 
 describe('the usage lines', () => {
-  it('names all eight actions, the five taking a number carrying an optional one, and is frozen', () => {
-    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait', 'open'] as const;
+  it('names all nine actions, the five taking a number carrying an optional one, and is frozen', () => {
+    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait', 'open', 'retarget'] as const;
 
     expect(Object.keys(PR_USAGE)).toEqual([...actions]);
     expect(actions.map((action) => PR_USAGE[action].startsWith(`rafa pr ${action}`))).toEqual(actions.map(() => true));

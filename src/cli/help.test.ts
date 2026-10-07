@@ -364,8 +364,8 @@ const SPENDING = createCommandRegistry({
 describe('the spend mark', () => {
   it('ends the pr roster\'s triage line with its condition, 🪙 with --resolve', () => {
     expect(blockOf(helpFor(CORE_REGISTRY, 'pr'), 'Actions').slice(-2)).toEqual([
-      '  triage    assess a pull request: its class, the evidence, and a follow-up',
-      '            prompt 🪙 with --resolve',
+      '  triage     assess a pull request: its class, the evidence, and a follow-up',
+      '             prompt 🪙 with --resolve',
     ]);
   });
 
