@@ -106,14 +106,14 @@ async function readBoard(access: BoardAccess): Promise<BoardReading> {
 
 function lockChangeOf(range: AllowedRange): LockChange {
   if (range.kind === 'adopt') return 'created';
-  return range.kind === 'patch'
-    ? 'updated'
-    : 'unchanged';
+  return range.kind === 'same'
+    ? 'unchanged'
+    : 'updated';
 }
 
 /** The version the lock records, as the range read it. */
 function fromOf(range: AllowedRange): string | null {
-  if (range.kind === 'patch') return range.from;
+  if (range.kind === 'patch' || range.kind === 'minor') return range.from;
   if (range.kind === 'same') return range.to;
   return null;
 }

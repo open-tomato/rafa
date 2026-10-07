@@ -842,10 +842,11 @@ creates the `.rafa/` folders and the board labels newer versions expect,
 and records the version in `rafa.lock` at the repository root, a small
 JSON file meant to be committed. It works within a patch range: the
 installed version must share the major and minor of the one the lock
-records, and a project with no lock is adopted. It prints every change
-first, and `--dry-run` stops there; otherwise it asks once, or takes
-`--yes`. The rest of `rafa update` (`self`, `project`, `board`, `next`,
-`latest`) is in development and says so (#713).
+records. Below 1.0.0 it also crosses newer minors, so a lock at 0.34.1
+moves to 0.36.0, and a project with no lock is adopted. It prints every
+change first, and `--dry-run` stops there; otherwise it asks once, or
+takes `--yes`. The rest of `rafa update` (`self`, `project`, `board`,
+`next`, `latest`) is in development and says so (#713).
 
 ## Runtime
 
