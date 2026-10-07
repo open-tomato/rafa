@@ -20,6 +20,7 @@ Quick start:
   rafa epic show
   rafa claim release 324
   rafa update current --dry-run
+  rafa config set pr.base=stretch/9
   rafa status
   rafa next
   rafa roadmap
@@ -59,6 +60,8 @@ Subjects:
              or withdraw the offer; accept a handover; take over a stale claim
   update     bring this project to the installed rafa; the other updates are in
              development
+  config     set one key in the project's config, keeping every comment, and
+             print its old and new values
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe

@@ -1173,6 +1173,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/update/latest.js', [
     ['./stub.js', ['createUpdateStub']],
   ]],
+  ['./commands/config/set.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../config-sections.js', ['messageOf']],
+    ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
+    ['../../config.js', ['configFilePath']],
+    ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
@@ -1541,6 +1548,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/update/board.js',
       './commands/update/next.js',
       './commands/update/latest.js',
+      './commands/config/set.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',
