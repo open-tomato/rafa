@@ -100,8 +100,11 @@ interface World {
   readonly land: (files: Readonly<Record<string, string>>, message: string) => void;
 }
 
-/** Builds a {@link World} whose caller holds `.rafa/config.yaml` with `extra` appended. */
-function world(extra = ''): World {
+/**
+ * Builds a {@link World} whose caller holds `.rafa/config.yaml` with
+ * `extra` appended; `main` holds no changelog when `changelog` is false.
+ */
+function world(extra = '', changelog = true): World {
   worldCount += 1;
   const dir = join(tempBase, `world-${String(worldCount)}`);
   const home = join(dir, 'home');
@@ -125,7 +128,7 @@ function world(extra = ''): World {
   git(dir, ['init', '-q', '--bare', '--initial-branch=main', origin]);
   git(dir, ['clone', '-q', origin, other]);
   writeFileSync(join(other, 'package.json'), MANIFEST);
-  writeFileSync(join(other, 'CHANGELOG.md'), CHANGELOG);
+  if (changelog) writeFileSync(join(other, 'CHANGELOG.md'), CHANGELOG);
   git(other, ['add', '-A']);
   git(other, ['commit', '-q', '-m', 'first']);
   git(other, ['push', '-q', 'origin', 'main']);
@@ -186,9 +189,11 @@ function built(): SettleBuilt {
     }],
     version: '0.5.0',
     section: '## 0.5.0',
+    changelogMissing: false,
     release: 'c'.repeat(40),
     deleted: ['.changes/rafa-9.md'],
     insertPoint: 'before-next-heading',
+    createdChangelog: null,
   };
 }
 
@@ -211,6 +216,31 @@ describe('settledResult, the outcomes rendered from literals', () => {
       'Version: 0.4.0 → 0.5.0',
       '✅ Pushed "chore: release 0.5.0" (cccccccccccc) to main.',
     ]);
+  });
+
+  it('names a changelog the release commit created, above the push line', () => {
+    const build: SettleBuilt = { ...built(), changelogMissing: true, insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.lines.slice(-2)).toEqual([
+      'Changelog: CHANGELOG.md is missing, so the release commit creates it under "# Changelog".',
+      '✅ Pushed "chore: release 0.5.0" (cccccccccccc) to main.',
+    ]);
+    // The control: the same rendering of a build that inserted names no changelog.
+    const inserted = settledResult({ delivery: 'push', outcome: { outcome: 'pushed', exitCode: 0, attempts: 1, build: built() } }, NO_TAG, 'origin/main', 'main');
+    expect(inserted.lines.some((line) => line.startsWith('Changelog:'))).toBe(false);
+  });
+
+  it('names no created changelog when the push was refused, since nothing landed', () => {
+    const build: SettleBuilt = { ...built(), changelogMissing: true, insertPoint: 'file-end', createdChangelog: 'CHANGELOG.md' };
+    const delivered: SettleDelivered = { delivery: 'push', outcome: { outcome: 'protected', exitCode: 1, attempts: 1, build, sentence: 'main is protected' } };
+
+    const result = settledResult(delivered, NO_TAG, 'origin/main', 'main');
+
+    expect(result.exitCode).toBe(1);
+    expect(result.lines.some((line) => line.startsWith('Changelog:'))).toBe(false);
   });
 
   it('says a push was retried once after a rebuild', () => {
@@ -296,6 +326,31 @@ describe('rafa release settle --dry-run', () => {
     expect(status).toContain('package.json');
   });
 
+  it('says it will create a changelog main lacks, and writes nothing', async () => {
+    const w = world('', false);
+    landTwo(w);
+    const before = w.git(w.origin, ['rev-parse', 'main']);
+
+    const run = await settle(w, ['--dry-run']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('Changelog: CHANGELOG.md is missing, so the release commit creates it under "# Changelog".');
+    expect(run.stdout).toContain('Dry run: settle would commit "chore: release 0.5.0" on main; nothing was written.');
+    expect(w.git(w.origin, ['rev-parse', 'main'])).toBe(before);
+    expect(() => w.git(w.origin, ['cat-file', '-e', 'main:CHANGELOG.md'])).toThrow();
+  });
+
+  it('names no changelog to create when main holds one', async () => {
+    const w = world();
+    landTwo(w);
+
+    const run = await settle(w, ['--dry-run']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('Dry run: settle would commit');
+    expect(run.stdout).not.toContain('Changelog:');
+  });
+
   it('exits 0 naming nothing to settle when no fragment waits', async () => {
     const w = world();
 
@@ -350,6 +405,20 @@ describe('rafa release settle, the push delivery', () => {
     expect(second.exitCode).toBe(0);
     expect(second.stdout).toContain('Nothing to settle');
     expect(w.git(w.origin, ['rev-parse', 'main'])).toBe(released);
+  });
+
+  it('creates a changelog main lacks in the pushed release commit, under the heading', async () => {
+    const w = world('', false);
+    landTwo(w);
+
+    const run = await settle(w);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('Changelog: CHANGELOG.md is missing, so the release commit creates it under "# Changelog".');
+    expect(run.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
+    const changelog = w.git(w.origin, ['show', 'main:CHANGELOG.md']);
+    expect(changelog).toStartWith('# Changelog\n\n## 0.5.0 — ');
+    expect(changelog).toContain('<!-- rafa:fragments rafa-9 rafa-1 -->');
   });
 
   it('tags the pushed release and pushes the tag under release.tag: settle', async () => {

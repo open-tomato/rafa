@@ -44,7 +44,9 @@
  *      never forced, pushes it. A remote tag of that name naming
  *      another commit is refused by git, and the answer is `failed`,
  *      exit 1, with `written` true: the local tag stays, and the
- *      sentence says what git said.
+ *      sentence says what git said, read through `pushSaid`
+ *      (`./settle-push.ts`) so the `Done` line a refused porcelain push
+ *      still ends on is not quoted as success (#855).
  *
  * ## What git prints, measured
  *
@@ -69,6 +71,8 @@ import type { ReleaseTagMode } from '../config-readers.js';
 
 import { versionTag } from '../commands/pr/merge-followups.js';
 import { gitSaid } from '../pr/git.js';
+
+import { pushSaid } from './settle-push.js';
 
 /** The command that tags what settle leaves untagged. */
 export const RELEASE_TAG_COMMAND = 'rafa release tag';
@@ -152,7 +156,7 @@ function writeAndPush(worktree: SettleWorktree, tag: string, commit: string): Se
   const ref = `refs/tags/${tag}`;
   const pushed = worktree.git(['push', '--porcelain', worktree.remote, `${ref}:${ref}`]);
   if (!pushed.ok) {
-    return failed(tag, commit, true, `${tag} is written on ${short} but could not be pushed to ${worktree.remote}: ${gitSaid(pushed)}`);
+    return failed(tag, commit, true, `${tag} is written on ${short} but could not be pushed to ${worktree.remote}: ${pushSaid(pushed)}`);
   }
   return { outcome: 'tagged', exitCode: 0, tag, commit, sentence: `${tag} names ${short} and is pushed to ${worktree.remote}` };
 }

@@ -176,7 +176,7 @@ import { readBinPath } from '../project/bin-path.js';
 import { writePositionFile } from '../project/position.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
 import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';
-import { eventsOf, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 
 import { BLOCKED_HEADING } from './doctor-blocked.js';
@@ -371,7 +371,7 @@ const PASSED: ProbeRun = { exitCode: 0, stderr: '', timedOut: false };
 /** The probe of `item`, which every automatic item carries. */
 function probeOf(item: PrerequisiteItem): string {
   const { probe } = item;
-  if (probe === undefined) throw new Error(`${item.name} carries no probe`);
+  if (probe === undefined || probe === null) throw new Error(`${item.name} carries no probe`);
   return probe;
 }
 
@@ -1100,7 +1100,7 @@ describe('json mode', () => {
 
     expect(run.exitCode).toBe(0);
     expect(events.filter((event) => event.type === 'log').map((event) => (event as { message?: string }).message))
-      .toContain(warning);
+      .toContain(warning as string);
     expect(result?.data?.previousCopies).toEqual({ count: 51, warning });
   });
 
@@ -1840,10 +1840,10 @@ describe('the registered command', () => {
     const failed = runRafa(failing, failing.repo, ['doctor']);
     const passed = runRafa(passing, passing.repo, ['doctor'], { RAFA_DOCTOR_MARKER: 'set' });
 
-    expect(failed.exitCode).toBe(1);
+    expectExit(failed, 1, failing);
     expect(failed.stderr).toContain(`  tool "needed": probe \`${MISSING_TOOL_PROBE}\` exited 127: sh: needed: not found\n`);
     expect(passed.stderr).toBe('');
-    expect(passed.exitCode).toBe(0);
+    expectExit(passed, 0, passing);
     expect(passed.stdout).toContain('\n  pass    optional env "RAFA_DOCTOR_MARKER", presence check, ');
     expect(passed.stdout).toContain('\nPreflight passed: rafa loop start would go on to its first session.\n');
     expect(passed.stdout).toContain(`\nwarn: ${join(passing.home, '.rafa', 'bin')} is not on PATH;`);
@@ -1856,7 +1856,7 @@ describe('the registered command', () => {
 
     const run = runRafa(scratch, scratch.repo, ['doctor', '--plan=.plans/PLAN-risk.md']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('🛡  Risk: ');
     expect(run.stdout).toContain('— rafa plan risk .plans/PLAN-risk.md');
   }, SPAWN_TIMEOUT);

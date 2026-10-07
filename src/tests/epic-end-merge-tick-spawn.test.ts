@@ -59,7 +59,7 @@ import { YES_FLAG } from '../next/ceiling.js';
 import { epicEndLines } from '../next/epic-end.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -215,7 +215,7 @@ describe('rafa next --dry-run on a fixture whose current epic ran dry, spawned',
 
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('⏹ --dry-run: nothing ran.');
     const expected = epicEndLines(EPIC, { changelog: 'CHANGELOG.md', versions: ['0.9.0'], problem: null });
     expect(tailOf(run.stdout, expected.length)).toBe(expected.join('\n'));
@@ -228,7 +228,7 @@ describe('rafa next --dry-run on a fixture whose current epic ran dry, spawned',
 
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const expected = epicEndLines(EPIC, { changelog: 'CHANGELOG.md', versions: [], problem: null });
     expect(tailOf(run.stdout, expected.length)).toBe(expected.join('\n'));
     expect(run.stdout).not.toContain('rafa release tag');
@@ -394,7 +394,7 @@ describe('rafa pr merge ticks a fixture member\'s line on its epic beside the ro
 
     const run = runRafa(scratch, scratch.repo, ['pr', 'merge', String(PR_NUMBER), '--yes', '--no-hint']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const lines = run.stdout.split('\n').filter((line) => line !== '');
     const epicLine = epicTickSentence({ issue: EPIC, status: 'edited', attempts: 1, problem: '', members: [SPEC] });
     const roadmapLine = tickSentence({ roadmap: ROADMAP_ISSUE, status: 'ticked', ticked: [SPEC], already: [], absent: [], attempts: 1, problem: '' });
@@ -479,7 +479,7 @@ describe('a project with no epic: rafa next and rafa pr merge print byte-identic
         + ` or type --${YES_FLAG}=sync,wait,unblock,plan to allow those steps unasked.`,
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
   }, SPAWN_TIMEOUT);
 
@@ -513,7 +513,7 @@ describe('a project with no epic: rafa next and rafa pr merge print byte-identic
       `main is checked out and pulled, and ${BRANCH} is gone locally and on origin.`,
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
   }, SPAWN_TIMEOUT);
 });

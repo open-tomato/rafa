@@ -49,7 +49,7 @@ import type { RafaContext } from '../cli/command.js';
 import type { RafaConfig } from '../config.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createGitRunner } from '../pr/index.js';
@@ -96,9 +96,18 @@ export interface TopHeadingReading {
   readonly path: string;
   /** The version of its first heading naming one, or null when none does or it could not be read. */
   readonly version: string | null;
+  /**
+   * True when no file is there: settle creates it (#842), so the row
+   * says {@link MISSING_CHANGELOG} and prints no problem line for it.
+   * False when the file was read or exists and could not be read.
+   */
+  readonly missing: boolean;
   /** Why the file could not be read, or null when it was. */
   readonly problem: string | null;
 }
+
+/** What a missing changelog reads as: settle's release commit creates it. */
+export const MISSING_CHANGELOG = 'missing; rafa release settle creates it';
 
 /** The row's reading: nothing for a project whose release is off. */
 export type DoctorReleaseReading =
@@ -115,14 +124,23 @@ export type DoctorReleaseReading =
     readonly topHeading: TopHeadingReading;
   };
 
-/** The top heading's version of the changelog at `configured` under `root`. */
+/**
+ * The top heading's version of the changelog at `configured` under `root`.
+ * An absent file sets `missing`; every failed read, absent or not,
+ * carries its "could not be read" problem for the caller to word.
+ */
 export function readTopHeading(root: string, configured: string): TopHeadingReading {
   const resolved = join(root, configured);
   try {
     const text = readFileSync(resolved, 'utf8');
-    return { path: configured, version: changelogVersions(text)[0] ?? null, problem: null };
+    return { path: configured, version: changelogVersions(text)[0] ?? null, missing: false, problem: null };
   } catch {
-    return { path: configured, version: null, problem: `the changelog could not be read at ${resolved}` };
+    return {
+      path: configured,
+      version: null,
+      missing: !existsSync(resolved),
+      problem: `the changelog could not be read at ${resolved}`,
+    };
   }
 }
 
@@ -160,6 +178,7 @@ function tagPart(latestTag: string | null, tagProblem: string | null): string {
 
 /** The top heading part. */
 function headingPart(heading: TopHeadingReading): string {
+  if (heading.missing) return `${heading.path} ${MISSING_CHANGELOG}`;
   if (heading.problem !== null) return `${heading.path} tops at ${UNREAD}`;
   return heading.version === null
     ? `${heading.path} names no version`
@@ -201,7 +220,7 @@ export function releaseProblemLines(reading: DoctorReleaseReading): readonly str
     ...(reading.tagProblem === null
       ? []
       : [reading.tagProblem]),
-    ...(reading.topHeading.problem === null
+    ...(reading.topHeading.problem === null || reading.topHeading.missing
       ? []
       : [reading.topHeading.problem]),
   ];

@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Seven actions read and control pull requests:
+Eight actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -26,6 +26,14 @@ Seven actions read and control pull requests:
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
+- `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`
+  — open one from a pushed head over `PullRequests.create`, or print the one
+  already open on the head and open none; a missing or empty body file and
+  a head equal to the base are refused
+- `pr retarget <n> --base=<branch>` — move one onto another base over
+  `PullRequests.editBase`, printing the line `retargetedLine` builds; `<n>`
+  is required here, never the branch's; one already on that base is a
+  no-op, exit 0
 
 `<n>` defaults to the open PR of the current branch. Every action carries a
 summary, examples and `outputs: [text, json]`; each one in the core roster
@@ -155,8 +163,16 @@ sentence replaces nothing.
 
 ### The merge flow
 
-1. Refuse on a dirty working tree, on a PR that is not green or not
-   mergeable (the refusal names which; `pending` and `red` point at
+1. Refuse on a tracked change in the working tree, or on an untracked
+   path the merge would write a file onto — one the pull request's head
+   commit or `origin/<base>` holds, read with `git ls-tree -r --name-only`
+   over both only when the tree has an untracked path (a folded `?? dir/`
+   counts when either holds a path under it). Any other untracked path,
+   such as `.claude/settings.local.json`, is left in place and named in one
+   line when nothing refuses (`src/pr/merge.ts`, "Which untracked paths
+   refuse"; `src/commands/pr/merge-refuse.ts`). A head commit this clone
+   does not have is refused naming the `git fetch` that brings it. Refuse
+   too on a PR that is not green or not mergeable (the refusal names which; `pending` and `red` point at
    `pr triage`, and verdict `none` — no checks at all — points at
    `--skip-checks` instead, since triage has nothing to fix there), and
    when the branch is checked out in another worktree (names it). Before
@@ -176,7 +192,15 @@ sentence replaces nothing.
    `report`, `ask`, `refuse`); `collision` refuses unless
    `dangerous.acceptVersionCollision` is true. Its question comes before the
    merge question, `--yes` does not answer it, and without a TTY `ask`
-   refuses.
+   refuses. Settle's release pull request, a head of `rafa/release`
+   (`RELEASE_PR_BRANCH`) that stamps a version the base has neither
+   released nor passed (`src/release/release-delivery.ts`), is not
+   `stale`: it prints one line on stdout,
+   `Release: #<n> is settle's release pull request; merging it lands <version>`,
+   with no forecast and no `fix:` line, merges whatever
+   `pr.versionCollision` says, and its json `guard` reads answer `release`,
+   reaction `print` (#843). A `rafa/release` head the base has passed or
+   collides with reads as any branch does.
 3. Show `#n title, branch → base, method` and ask `Merge? [y/N]`. `--yes`
    skips the question; without a TTY and without `--yes` it refuses.
 4. `gh pr merge <n> --<method>`, then in code, each step reported: switch to
@@ -297,7 +321,9 @@ Assessment is CODE, not a session:
   `ci-install`, `ci-lint`, `ci-types`, `ci-test`, `ci-other`. The failing STEP
   name decides the `ci-*` class; `conflict-version` is the guard's `stale` or
   `collision` answer (the branch stamped a version) and outranks every other
-  class, a git conflict included; `no-checks` means the PR reports no checks at all (verdict `none`),
+  class, a git conflict included, except on settle's release pull request,
+  which `readTriageGuard` answers as the delivery and which is classed by its
+  checks and conflicts alone, so `--resolve` never turns it into a fragment; `no-checks` means the PR reports no checks at all (verdict `none`),
   whatever the workflow count; the count, or that it could not be read,
   goes into the reason beside the `--skip-checks` line.
 - SIMPLE, and so eligible for `--resolve`: `conflict-lockfile`,

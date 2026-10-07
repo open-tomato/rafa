@@ -45,13 +45,33 @@
  * `./scratch-repository.test.ts` read red from 2026-09-24 12:00 UTC on,
  * measured on 2026-09-28 in a plain clone and in a linked worktree alike.
  *
+ * ## The past-head set, on request
+ *
+ * `createScratchRepository({ pastHead: true })` adds, to everything
+ * above, the branches `readCleanup` reads for a squash-merged branch
+ * past its pull request's head (#710, #149). The default build leaves
+ * them out, so the readers of the five groups above keep their lists:
+ *
+ * - `wt-held`: pushed and merged into `main` with a merge commit, and
+ *   checked out in `.claude/worktrees/wt-held`, whose file times are
+ *   {@link SCRATCH_LATER}: a reading with that clock finds it `recent`,
+ *   so the worktree cannot be ticked and its branch starts unticked.
+ * - `fragment`: pushed, squash-merged into `main` (which also holds
+ *   `.changes/{@link FRAGMENT_ID}.md`), then one local commit past the
+ *   head adding that same fragment file; its remote branch is deleted,
+ *   so it is `[gone]`. {@link ScratchPastHead.fragmentHead} is its head.
+ * - `source`: the same, but its extra commit touches `src/extra.ts`.
+ *   {@link ScratchPastHead.sourceHead} is its head.
+ *
+ * `gone`, above, is the gone-only branch: no pull request names it.
+ *
  * Git runs with the fixed test identity of `../tests/git-identity.ts`
  * and without the user's or the system's configuration.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
@@ -68,6 +88,36 @@ export const LOCK_REASON = 'scratch lock';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/** How many days past {@link SCRATCH_NOW} {@link SCRATCH_LATER} is. */
+const LATER_DAYS = 30;
+
+/**
+ * The clock a past-head reading runs with: the worktree `wt-held` is
+ * dated to it, so it is no idle at all and reads `recent`.
+ */
+export const SCRATCH_LATER = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
+
+/** The id of the release fragment `main` holds and `fragment` commits past its head. */
+export const FRAGMENT_ID = 'rafa-901';
+
+const FRAGMENT_PATH = `.changes/${FRAGMENT_ID}.md`;
+
+/** What the past-head set adds; see the module note. */
+export interface ScratchPastHead {
+  /** The head commit of `fragment`'s pull request. */
+  readonly fragmentHead: string;
+  /** The head commit of `source`'s pull request. */
+  readonly sourceHead: string;
+  /** The path of the worktree holding `wt-held`. */
+  readonly heldWorktree: string;
+}
+
+/** What {@link createScratchRepository} can be asked for. */
+export interface ScratchOptions {
+  /** Add the past-head set of the module note; false when left out. */
+  readonly pastHead?: boolean;
+}
+
 /** What {@link createScratchRepository} built. */
 export interface ScratchRepository {
   /** The directory everything is under, symlinks resolved. */
@@ -80,6 +130,8 @@ export interface ScratchRepository {
   readonly home: string;
   /** The worktree paths by name. */
   readonly worktrees: Readonly<Record<'clean' | 'dirty' | 'locked', string>>;
+  /** The past-head set; null unless {@link ScratchOptions.pastHead} asked for it. */
+  readonly pastHead: ScratchPastHead | null;
   /** The tip of `squashed`, which a pull request's head commit would be. */
   readonly squashedTip: string;
   /** Runs git in `cwd` (the clone by default) and answers stdout, throwing on failure. */
@@ -89,7 +141,7 @@ export interface ScratchRepository {
 }
 
 /** Builds the repository the module note describes, in a fresh temporary directory. */
-export function createScratchRepository(): ScratchRepository {
+export function createScratchRepository(options: ScratchOptions = {}): ScratchRepository {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-')));
   const bare = join(root, 'remote.git');
   const clone = join(root, 'clone');
@@ -134,6 +186,36 @@ export function createScratchRepository(): ScratchRepository {
     git(['switch', '--quiet', 'main']);
   };
 
+  /** Commits `content` at `path` in the clone, on the branch it is on. */
+  const commitFile = (path: string, content: string, message: string): void => {
+    mkdirSync(dirname(join(clone, path)), { recursive: true });
+    writeFileSync(join(clone, path), content);
+    git(['add', '--', path]);
+    commit(message);
+  };
+  /**
+   * A branch squash-merged into `main` (which gains the fragment file with
+   * it), then one local commit past the head, touching `pastPath`; pushed
+   * before, so its remote branch can be deleted. Answers the head.
+   */
+  const squashedPastHead = (name: string, pastPath: string): string => {
+    git(['switch', '--quiet', '-c', name, 'main']);
+    commitFile(`${name}.txt`, `${name}\n`, `${name} 1`);
+    git(['push', '--quiet', '-u', 'origin', name]);
+    const head = git(['rev-parse', 'HEAD']).trim();
+    git(['switch', '--quiet', 'main']);
+    git(['merge', '--quiet', '--squash', name]);
+    if (name === 'fragment') {
+      commitFile(FRAGMENT_PATH, 'fragment\n', `squash ${name}`);
+    } else {
+      commit(`squash ${name}`);
+    }
+    git(['switch', '--quiet', name]);
+    commitFile(pastPath, `${name} past the head\n`, `${name} past the head`);
+    git(['switch', '--quiet', 'main']);
+    return head;
+  };
+
   try {
     run(['init', '--quiet', '--bare', '--initial-branch=main', bare], root);
     run(['clone', '--quiet', bare, clone], root);
@@ -154,8 +236,20 @@ export function createScratchRepository(): ScratchRepository {
     git(['merge', '--quiet', '--no-ff', '-m', 'merge wt-clean', 'wt-clean']);
     git(['merge', '--quiet', '--squash', 'squashed']);
     commit('squash squashed');
+    let pastHead: Pick<ScratchPastHead, 'fragmentHead' | 'sourceHead'> | null = null;
+    if (options.pastHead === true) {
+      branch('wt-held', 1, true);
+      git(['merge', '--quiet', '--no-ff', '-m', 'merge wt-held', 'wt-held']);
+      pastHead = {
+        fragmentHead: squashedPastHead('fragment', FRAGMENT_PATH),
+        sourceHead: squashedPastHead('source', 'src/extra.ts'),
+      };
+    }
     git(['push', '--quiet', 'origin', 'main']);
     git(['push', '--quiet', 'origin', '--delete', 'gone'], clone);
+    if (pastHead !== null) {
+      git(['push', '--quiet', 'origin', '--delete', 'fragment', 'source'], clone);
+    }
 
     const parent = join(clone, '.claude', 'worktrees');
     mkdirSync(parent, { recursive: true });
@@ -168,12 +262,20 @@ export function createScratchRepository(): ScratchRepository {
     git(['worktree', 'add', '--quiet', worktrees.dirty, 'wt-dirty']);
     git(['worktree', 'add', '--quiet', worktrees.locked, 'wt-locked']);
     writeFileSync(join(worktrees.dirty, 'scratch.txt'), 'uncommitted\n');
+    const heldWorktree = join(parent, 'wt-held');
+    if (pastHead !== null) {
+      git(['worktree', 'add', '--quiet', heldWorktree, 'wt-held']);
+    }
     git(['worktree', 'lock', '--reason', LOCK_REASON, worktrees.locked]);
     // Last, so no git call after it moves a time again; see the module note.
-    for (const path of Object.values(worktrees)) {
+    const datedAt = new Map<string, Date>(Object.values(worktrees).map((path) => [path, SCRATCH_NOW]));
+    if (pastHead !== null) {
+      datedAt.set(heldWorktree, SCRATCH_LATER);
+    }
+    for (const [path, at] of datedAt) {
       const adminDir = git(GIT_DIR, path).trim();
       for (const file of [path, ...ADMIN_FILES.map((name) => join(adminDir, name))]) {
-        utimesSync(file, SCRATCH_NOW, SCRATCH_NOW);
+        utimesSync(file, at, at);
       }
     }
 
@@ -183,6 +285,9 @@ export function createScratchRepository(): ScratchRepository {
       clone,
       home,
       worktrees,
+      pastHead: pastHead === null
+        ? null
+        : { ...pastHead, heldWorktree },
       squashedTip: git(['rev-parse', 'refs/heads/squashed']).trim(),
       git,
       dispose: () => {

@@ -72,7 +72,7 @@ to 20%.
 `rafa plan create --issue` plans from a `type:spec` issue only. So the
 bucket's bugs go into one sweep spec that lists them, as the project's
 bug sweeps already do, and six bug slots can run as one or two loops.
-Filing that spec is a step with no rafa line yet: log it as a gap.
+File that spec with `rafa issue create --type=spec --body-file <path>`.
 
 ## The bucket report
 

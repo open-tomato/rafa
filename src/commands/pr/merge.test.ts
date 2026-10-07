@@ -454,7 +454,11 @@ describe('what it refuses before asking anything', () => {
     const stub = stubPulls();
     const project = freshProject();
     const seams = caseSeams(stub.pulls, project, {
-      git: { 'status --porcelain': ok(' M src/pr/merge.ts\n?? notes.md\n') },
+      git: {
+        'status --porcelain': ok(' M src/pr/merge.ts\n?? notes.md\n'),
+        // The head adds notes.md, so the untracked path is weighed in.
+        'ls-tree -r --name-only 1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b': ok('notes.md\nsrc/pr/merge.ts\n'),
+      },
     });
     const { run } = await ran(seams.seams, project, ['41']);
 

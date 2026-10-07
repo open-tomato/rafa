@@ -126,7 +126,8 @@ export interface SuiteFailure {
   readonly name: string;
   /**
    * The first line of its JUnit failure's message; absent when the
-   * report gave none. Never compared: see the module note.
+   * report gave none. Compared by `src/triage/inherited.ts` when present to
+   * identify inherited failures.
    */
   readonly message?: string;
 }

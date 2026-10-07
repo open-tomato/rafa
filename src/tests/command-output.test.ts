@@ -17,7 +17,7 @@
  *
  * Each runs `bun src/rafa.ts` in a scratch git repository holding the
  * `.rafa/config.yaml` `rafa init` writes, with a HOME of its own, under a
- * PATH holding git's directory alone, in an environment
+ * PATH holding git's directory and the system tools' alone, in an environment
  * holding nothing else but the bun cache variables
  * `./scratch-home-env.ts` sets beside that HOME and what the case names, so no `RAFA_OUTPUT` the
  * suite runs under reaches a text case. A json run is held to NDJSON:
@@ -56,7 +56,7 @@ import type { CliEvent } from '../ports/index.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -64,6 +64,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { consoleAndExitUses } from './source-uses.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -143,11 +144,9 @@ function plant(): Scratch {
 
 /** Runs `bun src/rafa.ts` over `words` in the scratch repository; see the module note. */
 function rafa(scratch: Scratch, words: readonly string[], env: Readonly<Record<string, string>> = {}): Run {
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const proc = Bun.spawnSync([process.execPath, RAFA_ENTRY, ...words], {
     cwd: scratch.repo,
-    env: { TMPDIR: tmpdir(), PATH: dirname(gitBinary), ...scratchHomeEnv(scratch.home), ...env },
+    env: { TMPDIR: tmpdir(), PATH: hostToolDirs().join(delimiter), ...scratchHomeEnv(scratch.home), ...env },
   });
   return { exitCode: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
 }

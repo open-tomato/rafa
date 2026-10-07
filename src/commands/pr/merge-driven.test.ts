@@ -241,18 +241,22 @@ const NO_HINT = '--no-hint';
 describe('what it refuses, read off a real repository', () => {
   it('refuses a dirty working tree, listing what git wrote, and merges nothing', async () => {
     const repo = plantMergeRepo();
-    writeFileSync(join(repo.work, 'stray.txt'), 'oops\n', 'utf8');
+    // A modified tracked file: an untracked one neither incoming tree
+    // holds no longer refuses (`src/pr/merge.ts`, "Which untracked paths
+    // refuse").
+    writeFileSync(join(repo.work, 'README.md'), 'edited\n', 'utf8');
     const stub = stubPulls();
 
     const run = await ran(repo, stub.pulls, [String(NUMBER)]);
 
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('rafa pr merge refuses: the working tree has 1 change.');
-    expect(run.stderr).toContain('?? stray.txt');
+    expect(run.stderr).toContain(' M README.md');
     expect(stub.sent()).toEqual([`get ${NUMBER}`, `checks ${NUMBER}`]);
     expect(run.asked).toEqual([]);
-    // Nothing was touched: the stray file is exactly where it was left.
-    expect(git(repo.work, repo.home, 'status', '--porcelain').stdout).toBe('?? stray.txt');
+    // Nothing was touched: the edit is exactly where it was left (the
+    // runner trims git's leading space).
+    expect(git(repo.work, repo.home, 'status', '--porcelain').stdout).toBe('M README.md');
   });
 
   it('refuses a pull request GitHub reports as conflicting, leaving the branch untouched', async () => {

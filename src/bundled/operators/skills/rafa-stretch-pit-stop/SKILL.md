@@ -31,7 +31,7 @@ of course, and never a reason to chase one issue down a rabbit hole.
 | Bugs | `rafa issue list --type=bug --limit=200` | the open count rising, or bugs filed during this loop that repeat an open one |
 | Delivery | `rafa loop status`, `rafa pr list` | the run is done with no pull request, or its pull request did not merge |
 | Conflicts | `rafa pr show <pr>` | the pull request conflicts with the integration branch |
-| CI | `gh run list --branch stretch/<n> --workflow verify.yml --limit 1` | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
+| CI | `rafa ci status --branch=stretch/<n>` | the run failed (use `gh run view <id> --log-failed` to see why), or is still running |
 
 A CI failure already red in the local runs is inherited and noted in the pit-stop entry.
 A new failure is filed as one bug after a search for an existing one. A run still in progress

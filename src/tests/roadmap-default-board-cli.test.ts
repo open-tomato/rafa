@@ -47,7 +47,7 @@ import { renderRoadmapTable } from '../commands/issue/roadmap-table.js';
 import { createGitRunner } from '../pr/git.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -172,7 +172,7 @@ describe('rafa roadmap over a repository with one Roadmap-titled issue and no la
 
   it('prints a capture byte-identical to the in-process capture of the pre-change renderer', async () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(await preChangeCapture());
   });
 });
@@ -199,7 +199,7 @@ describe('rafa roadmap when a labelled board and an unlabelled "Roadmap" both ex
 
   it('reads the labelled board, not the unlabelled issue titled Roadmap', () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`Roadmap: #${String(LABELLED_BOARD)}`);
     expect(run.stdout).not.toContain(`#${String(UNLABELLED_ROADMAP)}`);
   });
@@ -227,7 +227,7 @@ describe('rafa roadmap over two labelled boards with no roadmap.issue configured
 
   it('reads the lower-numbered labelled board', () => {
     const run = runRafa(scratch, scratch.repo, ['roadmap']);
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`Roadmap: #${String(LOWER_BOARD)}`);
     expect(run.stdout).not.toContain(`#${String(HIGHER_BOARD)}`);
   });

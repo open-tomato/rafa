@@ -58,6 +58,8 @@ your accounts.
   | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
   | `rafa epic close` | 🪙 one verification planning session and one session per check; nothing while a member is open |
+  | `rafa stretch start` | 🪙 one session per operator it starts: the engineer, watchtower and analyst, or the one `--role` names; with `--dry-run`, nothing |
+  | `rafa stretch item` | 🪙 one planning session, unless a plan of the issue is there already, and the loop it starts; with `--dry-run`, nothing |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 
@@ -132,12 +134,14 @@ the next one, so you rarely have to remember it.
    rafa doctor --deep
    ```
 
-   `init` writes `.rafa/config.yaml`, keeps `.rafa/` out of git, and on a
-   GitHub repository offers to set up the board (labels, the spec issue
-   template, a pinned Roadmap issue). `doctor` runs every check
-   `loop start` runs before its first session, and starts nothing: the
-   prerequisites your config and the plan name, `gh` and its login when
-   the repository is on GitHub, and the install itself.
+   `init` writes what is missing of `.rafa/` and `~/.rafa/`, their
+   `config.yaml` files, and directories `specs/`, `plans/`, `runs/`,
+   `effort/`, `instincts/` under `.rafa/`. On a GitHub repository it also
+   offers to set up the board (labels, the spec issue template, a pinned
+   Roadmap issue). `doctor` runs every check `loop start` runs before its
+   first session, and starts nothing: the prerequisites your config and the
+   plan name, `gh` and its login when the repository is on GitHub, and the
+   install itself.
 
 2. **Write a spec.** A spec says what you get, where things stand, the
    design, what can go wrong, the tasks the plan must carry, and how you

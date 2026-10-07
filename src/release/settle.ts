@@ -24,8 +24,9 @@
  * It answers one of five {@link SettleReading} outcomes, each naming the
  * strategy the settle runs under:
  *
- *   - `unread`: the tree or the base version could not be read. Nothing
- *     was folded.
+ *   - `unread`: the tree or the base version could not be read, or —
+ *     after a fold that answered — the tree could not be listed for
+ *     `release.changelog`. Nothing is written.
  *   - `malformed`: a fragment on the base does not parse. Settle REFUSES
  *     the whole batch rather than folding the rest: a fragment left out
  *     would release later, out of the order the base received it, and
@@ -39,7 +40,10 @@
  *     fragments stay until a release commit that ships something
  *     deletes them with the rest of its batch.
  *   - `folded`: the version and the section the fold answered, with the
- *     base version and the fragments in fold order.
+ *     base version and the fragments in fold order, and whether
+ *     `release.changelog` is missing from that commit's tree
+ *     ({@link SettleFolded.changelogMissing}), so a dry run can say the
+ *     settle will create it.
  *
  * ## The build
  *
@@ -50,7 +54,15 @@
  *      (`writeManifestVersion`, `./version.ts`), refusing a file whose
  *      version on disk is not the one the reading folded from;
  *   2. inserts the section at the changelog's insert point
- *      (`insertChangelogEntry`, `./changelog.ts`);
+ *      (`insertChangelogEntry`, `./changelog.ts`), or — when
+ *      `release.changelog` does not exist — creates it holding
+ *      {@link CHANGELOG_TITLE} and the section, and says so in
+ *      {@link SettleBuilt.createdChangelog} (#842). Only a file that is
+ *      absent is created: one that exists and cannot be read, or a
+ *      directory the file cannot be written in, still answers
+ *      `unbuilt`. The parent directory is not made, so a
+ *      `release.changelog` under a directory the base lacks is a
+ *      problem too;
  *   3. stages both files and `git rm`s every folded fragment, `none`
  *      ones included, since the receipt names them all;
  *   4. commits `chore: release <version>` ({@link releaseCommitSubject}),
@@ -78,6 +90,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { messageOf } from '../config-sections.js';
+import { errorCode } from '../loop/sessions.js';
 import { gitSaid } from '../pr/git.js';
 
 import { insertChangelogEntry } from './changelog.js';
@@ -150,6 +163,12 @@ export interface SettleFolded extends SettleBasis {
   readonly version: string;
   /** The changelog section, receipt included, with no trailing newline. */
   readonly section: string;
+  /**
+   * True when `release.changelog` is absent from the tree at
+   * {@link SettleBasis.commit}, so a build will create it rather than
+   * insert into it.
+   */
+  readonly changelogMissing: boolean;
 }
 
 /** What {@link readSettle} answers; see the module note. */
@@ -169,12 +188,17 @@ export interface SettleBuilt extends Omit<SettleFolded, 'outcome'> {
   readonly release: string;
   /** The fragment paths the commit deleted, in fold order. */
   readonly deleted: readonly string[];
-  /** Where the section went in the changelog. */
+  /** Where the section went in the changelog; `file-end` for one the build created. */
   readonly insertPoint: ChangelogInsertPoint;
+  /** `release.changelog` as configured when the build created it, or null when it inserted into one that existed. */
+  readonly createdChangelog: string | null;
 }
 
 /** What {@link buildSettle} answers: a reading that wrote nothing, or the build. */
 export type SettleBuild = Exclude<SettleReading, SettleFolded> | SettleUnbuilt | SettleBuilt;
+
+/** The heading a changelog the build creates opens with, above the settled section. */
+export const CHANGELOG_TITLE = '# Changelog';
 
 /** The subject of the commit a settle builds. */
 export function releaseCommitSubject(version: string): string {
@@ -230,7 +254,22 @@ export function readSettle(git: GitRunner, tree: string, settings: SettleSetting
   const folded = foldWithStrategy(strategy, base.version, fragments);
   if (!folded.ok) return { ...basis, outcome: 'failed', line: folded.line };
   if (folded.result === null) return { ...basis, outcome: 'nothing' };
-  return { ...basis, outcome: 'folded', version: folded.result.version, section: folded.result.section };
+
+  const changelog = changelogMissingAt(git, commit, settings.releaseChangelog);
+  if (typeof changelog === 'object') return { outcome: 'unread', strategy: strategy.name, problem: changelog.problem };
+  return { ...basis, outcome: 'folded', version: folded.result.version, section: folded.result.section, changelogMissing: changelog };
+}
+
+/**
+ * Whether `changelog` is absent from the tree at `commit`, read as a
+ * tree listing so it writes nothing; the sentence when git could not
+ * list it.
+ */
+function changelogMissingAt(git: GitRunner, commit: string, changelog: string): boolean | { readonly problem: string } {
+  const path = gitPathOf(changelog);
+  const listed = git(['ls-tree', '--name-only', commit, '--', path]);
+  if (!listed.ok) return { problem: `${commit}:${path} could not be listed: ${gitSaid(listed)}` };
+  return listed.stdout.trim() === '';
 }
 
 /** The reading as `unbuilt`, with `problem`. */
@@ -248,26 +287,39 @@ function writeVersion(root: string, reading: SettleFolded, versionFile: string):
   return null;
 }
 
-/** Inserts the section into the changelog; answers where, or the problem. */
-function writeChangelog(
-  root: string,
-  reading: SettleFolded,
-  changelog: string,
-): { readonly point: ChangelogInsertPoint } | { readonly problem: string } {
+/** What {@link writeChangelog} answers: where the section went and whether the file was made, or the problem. */
+type ChangelogWrite =
+  | { readonly point: ChangelogInsertPoint; readonly created: boolean }
+  | { readonly problem: string };
+
+/**
+ * Inserts the section into the changelog, or creates the changelog
+ * holding {@link CHANGELOG_TITLE} and the section when it does not
+ * exist; answers where the section went and whether the file was
+ * created, or the problem. Only `ENOENT` reads as absent: any other
+ * read error is a problem, as is a write the directory refuses.
+ */
+function writeChangelog(root: string, reading: SettleFolded, changelog: string): ChangelogWrite {
   const path = join(root, gitPathOf(changelog));
   let text: string;
+  let created = false;
   try {
     text = readFileSync(path, 'utf8');
   } catch (error) {
-    return { problem: `${changelog} could not be read: ${messageOf(error)}` };
+    if (errorCode(error) !== 'ENOENT') return { problem: `${changelog} could not be read: ${messageOf(error)}` };
+    text = `${CHANGELOG_TITLE}\n`;
+    created = true;
   }
   const inserted = insertChangelogEntry(text, reading.section);
+  const verb = created
+    ? 'created'
+    : 'written';
   try {
     writeFileSync(path, inserted.text);
   } catch (error) {
-    return { problem: `${changelog} could not be written: ${messageOf(error)}` };
+    return { problem: `${changelog} could not be ${verb}: ${messageOf(error)}` };
   }
-  return { point: inserted.point };
+  return { point: inserted.point, created };
 }
 
 /** Stages the two files, deletes the fragments and commits; answers the release hash or the problem. */
@@ -322,5 +374,8 @@ export function buildSettle(
     release: committed.release,
     deleted: reading.fragments.map((each) => each.path),
     insertPoint: changelog.point,
+    createdChangelog: changelog.created
+      ? settings.releaseChangelog
+      : null,
   };
 }

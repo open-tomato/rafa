@@ -53,7 +53,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { name as PACKAGE_NAME, version as PACKAGE_VERSION } from '../../package.json';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** A temporary directory of this file's own, holding one scratch repository per case. */
@@ -193,7 +193,7 @@ describe('rafa --version, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['loop', '--version']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stdout).toBe('');
     expect(run.stderr).toBe('rafa: "--version" is typed alone and takes no other word; got "loop"\n');
   }, RUN_TIMEOUT);
@@ -203,7 +203,7 @@ describe('rafa --version, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['-V']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stderr).toBe('');
     expect(run.stdout).not.toContain(`rafa ${PACKAGE_VERSION}`);
     expect(run.stdout).toContain('Usage');
@@ -214,7 +214,7 @@ describe('rafa --version, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['--version']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stderr).toBe('');
     expect(run.stdout).toBe(`rafa ${PACKAGE_VERSION}\n`);
   }, RUN_TIMEOUT);
@@ -228,7 +228,7 @@ describe('rafa self-update, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['self-update']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, scratch);
     expect(run.stderr).toContain(`REFUSED — ${runtimeDir} already holds version ${RUNTIME_VERSION}`);
     expect(existsSync(marker)).toBe(true);
   }, RUN_TIMEOUT);
@@ -240,7 +240,7 @@ describe('rafa self-update, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['self-update', '--force']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(existsSync(marker)).toBe(false);
     expect(existsSync(join(runtimeDir, 'cli.js'))).toBe(true);
     expect(readlinkSync(join(scratch.home, '.rafa', 'bin', 'rafa'))).toBe(join(runtimeDir, 'cli.js'));
@@ -252,18 +252,18 @@ describe('rafa release status and release tag, spawned', () => {
     const scratch = plantReleaseRepo();
 
     const before = runRafa(scratch, scratch.repo, ['release', 'status']);
-    expect(before.exitCode).toBe(0);
+    expectExit(before, 0, scratch);
     expect(cellOf(before.stdout, 'version file')).toBe(`package.json: ${RELEASE_VERSION}`);
     expect(cellOf(before.stdout, 'latest tag')).toBe('none, of 0 release tags');
     expect(cellOf(before.stdout, 'untagged')).toBe(RELEASE_VERSION);
 
     const tagged = runRafa(scratch, scratch.repo, ['release', 'tag']);
-    expect(tagged.exitCode).toBe(0);
+    expectExit(tagged, 0, scratch);
     expect(tagged.stdout).toContain(`Tagged ${RELEASE_TAG} at the HEAD of main.`);
     expect(git(scratch.repo, scratch.home, ['tag', '--list']).trim()).toBe(RELEASE_TAG);
 
     const after = runRafa(scratch, scratch.repo, ['release', 'status']);
-    expect(after.exitCode).toBe(0);
+    expectExit(after, 0, scratch);
     expect(cellOf(after.stdout, 'latest tag')).toBe(`${RELEASE_TAG}, of 1 release tags`);
     expect(cellOf(after.stdout, 'untagged')).toBe('none');
   }, RUN_TIMEOUT);
@@ -273,12 +273,12 @@ describe('rafa release status and release tag, spawned', () => {
     git(scratch.repo, scratch.home, ['tag', RELEASE_TAG, 'HEAD']);
 
     const status = runRafa(scratch, scratch.repo, ['release', 'status']);
-    expect(status.exitCode).toBe(0);
+    expectExit(status, 0, scratch);
     expect(cellOf(status.stdout, 'latest tag')).toBe(`${RELEASE_TAG}, of 1 release tags`);
     expect(cellOf(status.stdout, 'untagged')).toBe('none');
 
     const tag = runRafa(scratch, scratch.repo, ['release', 'tag']);
-    expect(tag.exitCode).toBe(1);
+    expectExit(tag, 1, scratch);
     expect(tag.stderr).toContain(`${RELEASE_TAG} already names ${RELEASE_VERSION}`);
     expect(git(scratch.repo, scratch.home, ['tag', '--list']).trim()).toBe(RELEASE_TAG);
   }, RUN_TIMEOUT);
@@ -288,13 +288,13 @@ describe('rafa release status and release tag, spawned', () => {
     const scratch = plantReleaseRepo(branch);
 
     const tag = runRafa(scratch, scratch.repo, ['release', 'tag']);
-    expect(tag.exitCode).toBe(1);
+    expectExit(tag, 1, scratch);
     expect(tag.stderr).toContain(branch);
     expect(tag.stderr).toContain('main');
     expect(git(scratch.repo, scratch.home, ['tag', '--list']).trim()).toBe('');
 
     const status = runRafa(scratch, scratch.repo, ['release', 'status']);
-    expect(status.exitCode).toBe(0);
+    expectExit(status, 0, scratch);
     expect(cellOf(status.stdout, 'version file')).toBe(`package.json: ${RELEASE_VERSION}`);
     expect(cellOf(status.stdout, 'latest tag')).toBe('none, of 0 release tags');
   }, RUN_TIMEOUT);

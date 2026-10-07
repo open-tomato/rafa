@@ -89,6 +89,19 @@
  * Both session cases run under `--inject=full`, so no injection fallback
  * warning sits among the lines they read.
  *
+ * ## The preserved line
+ *
+ * A wrap-up session that exits 0 ends with a line read from a lookup of
+ * the branch's open pull request made after it (`start/wrap-up.ts`).
+ * No scratch repository has an `origin`, so every spawned run above
+ * reads the no-pull-request line. Both readings are pinned by calling
+ * `preserveProgress` in-process over a scratch checkout, with its
+ * lookup and spawner answered through its seams: the no-pull-request
+ * case first, then a lookup answering a number only after the session
+ * ended, so a line built from the lookup made BEFORE it would fail. A
+ * failed session is the control: it prints neither line and makes no
+ * second lookup.
+ *
  * ## Readings
  *
  * A probe over the same plantings, spawning `loop start` in both modes,
@@ -136,12 +149,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { CONFIG_DEFAULTS } from '../config.js';
 import { parsePlan } from '../plan/index.js';
+import { preserveProgress } from '../start/wrap-up.js';
 
+import { expectExit } from './cli-capture.js';
 import { PLAN_DONE, PLAN_FLAG, PLAN_OPEN, RUN_TIMEOUT, runLoopStart, scratchPlanter, SESSION_FLAGS, STUB, TASK } from './loop-scratch.js';
+import { sinkOutput } from './output-sinks.js';
 import { consoleAndExitUses } from './source-uses.js';
 
 /** The `src/` directory. */
@@ -206,13 +223,22 @@ const SESSION_STDOUT = 'session line one\n\nsession line two';
 const SESSION_LINES: readonly string[] = ['info:session line one', 'info:', 'info:session line two'];
 
 /** The line announcing the wrap-up session. */
-const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote progress.txt findings, sync with main, then commit, push and open the PR.';
+const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote the listed lessons, sync with main, then commit, push and open the PR.';
 
 /** The line after it, saying the wrap-up is one quiet session. */
 const WRAP_UP_QUIET = '   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.';
 
-/** The line a wrap-up session that exited 0 ends with. */
-const PROGRESS_PRESERVED = '\n✅ Progress preserved; PR opened or updated on this branch.';
+/**
+ * The line a wrap-up session that exited 0 ends with when the lookup
+ * made after it finds no open pull request: every scratch repository
+ * here has no `origin`, so the spawned runs below all read this one.
+ */
+const PROGRESS_PRESERVED_NO_PR = '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.';
+
+/** The line it ends with when that lookup answers pull request `number`. */
+function progressPreservedOpen(number: number): string {
+  return `\n✅ Progress preserved; pull request #${number} is open on this branch.`;
+}
 
 /**
  * The three lines the release stage adds around that session in a
@@ -347,7 +373,7 @@ describe('loop start refusing', () => {
 
     expect(text).toEqual({ exitCode: 1, stdout: '', stderr: `${refusal(textScratch)}\n` });
 
-    expect(json.exitCode).toBe(1);
+    expectExit(json, 1, { ...jsonScratch });
     expect(json.stderr).toBe('');
     expect(eventsOf(json.stdout)).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
@@ -372,7 +398,7 @@ describe('loop start refusing', () => {
 
     const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait', '--create-branch']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { ...scratch });
     // The offer's opening line, written before its first step runs.
     expect(run.stdout).toBe(`\n🌿 Creating feat/${STUB} from the latest origin/main.\n`);
     expect(run.stderr.split('\n').slice(0, 2)).toEqual([
@@ -391,7 +417,7 @@ describe('loop start with no --plan', () => {
 
     const run = runLoopStart(scratch, 'text', ['--no-ci-wait']);
 
-    expect(run.exitCode).toBe(1);
+    expectExit(run, 1, { ...scratch });
     expect(run.stdout).toBe('');
     expect(run.stderr.startsWith('\n❌ Refusing to run a plan on `main`.\n')).toBe(true);
     expect(existsSync(scratch.callLog)).toBe(false);
@@ -436,7 +462,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
     ['info', WRAP_UP_STARTING],
     ['info', WRAP_UP_QUIET],
     ['info', NO_RELEASE_PREPARED],
-    ['info', PROGRESS_PRESERVED],
+    ['info', PROGRESS_PRESERVED_NO_PR],
     ['info', NO_RELEASE_REPORTED],
     ['info', NO_RELEASE_BODY],
   ];
@@ -448,7 +474,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
  * `warn: ` or `error: ` prefix, split on the newlines the message
  * itself carries. A message written as a pattern stays one line.
  */
-function textLines(level: 'info' | 'warn' | 'error', message: string | RegExp): readonly unknown[] {
+function textLines(level: 'info' | 'warn' | 'error', message: string | RegExp): readonly string[] {
   if (typeof message !== 'string') return [expect.stringMatching(message)];
   const prefix = level === 'info'
     ? ''
@@ -462,7 +488,7 @@ describe('a loop start run with no open task', () => {
 
     const run = runLoopStart(scratch, 'json', [PLAN_FLAG, '--no-ci-wait']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     // The loop's named events (`start/loop-events.ts`) ride beside the log
     // lines; they are read on their own below.
@@ -471,8 +497,8 @@ describe('a loop start run with no open task', () => {
       'event:wrap-up',
       'event:wrap-up',
       'event:wrap-up',
-      'event:no-pr',
       'event:wrap-up',
+      'event:no-pr',
     ]);
     expect(events.filter((event) => event.type !== 'event')).toEqual([
       { type: 'start', command: 'loop start', ts: expect.any(String) },
@@ -498,9 +524,9 @@ describe('a loop start run with no open task', () => {
     // Read line by line rather than as one string: the last line
     // carries the run's own temporary path, so it is the one entry
     // matched as a pattern.
-    const expected = noTaskLines().flatMap(([level, message]) => textLines(level, message));
+    const expected: string[] = noTaskLines().flatMap(([level, message]) => textLines(level, message));
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(run.stdout.split('\n')).toEqual([...expected, '']);
   }, RUN_TIMEOUT);
@@ -514,7 +540,7 @@ describe('a loop start run with no open task', () => {
     // read for "the run went on" is the first one after the guard.
     const firstRunLine = lines.find((line) => line.startsWith('🧭 Task sessions are handed the plan')) ?? '';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stdout).toContain('is alpha software');
     expect(run.stdout).toContain('--dangerously-skip-permissions');
     // No terminal, so nothing was asked and the run went on: its own
@@ -540,7 +566,7 @@ describe('a loop start run whose session fails', () => {
     const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const failure = 'error:\n❌ Task failed (exit 3). Marked as blocked. Run again to retry.';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(existsSync(scratch.callLog)).toBe(true);
     expect(named).toEqual(['event:task-start', 'event:task-blocked']);
@@ -579,7 +605,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
     const labels = events.filter((event) => event.type !== 'event').map(labelOf);
     const steps = events.filter((event) => event.type === 'step');
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(named).toEqual([
       'event:task-start',
@@ -587,8 +613,8 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       'event:wrap-up',
       'event:wrap-up',
       'event:wrap-up',
-      'event:no-pr',
       'event:wrap-up',
+      'event:no-pr',
     ]);
     expect(labels[0]).toBe('start');
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true });
@@ -603,6 +629,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       expect.stringMatching(COMMITTED_LINE),
       expect.stringMatching(NO_REPORT_WARNING),
       expect.stringMatching(/^info:🧹 lint step after .+: no eslint\.config file at the checkout root; nothing to lint\.$/),
+      expect.stringMatching(/^info:🔎 type step after .+: no tsconfig\.json at the checkout root; nothing to type-check\.$/),
       expect.stringMatching(/^info:🧪 task step after .+ exited 1; no summary line$/),
       expect.stringMatching(/^info:🧪 pre-wrap-up step: .+ exited 1; no summary line$/),
       'info:\n✅ All tasks completed!',
@@ -610,7 +637,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:${WRAP_UP_QUIET}`,
       `info:${NO_RELEASE_PREPARED}`,
       ...SESSION_LINES,
-      `info:${PROGRESS_PRESERVED}`,
+      `info:${PROGRESS_PRESERVED_NO_PR}`,
       `info:${NO_RELEASE_REPORTED}`,
       `info:${NO_RELEASE_BODY}`,
       'result',
@@ -623,14 +650,71 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
 
     const run = runLoopStart(scratch, 'text', SESSION_FLAGS);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
-    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED}\n`);
+    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED_NO_PR}\n`);
     expect(run.stdout.split(SESSION_STDOUT)).toHaveLength(3);
     // Read per line: the runner's `🧪 pre-wrap-up step: ...` line carries the words mid-line.
     expect(run.stdout.split('\n').filter((line) => line.startsWith('step: '))).toEqual([]);
     expect(run.stdout.split('\n').filter((line) => line.startsWith('{'))).toEqual([]);
     expect(readFileSync(scratch.callLog, 'utf8')).toBe('called\ncalled\n');
   }, RUN_TIMEOUT);
+});
+
+describe('the line preserveProgress prints once its session exits 0', () => {
+  const infos: string[] = [];
+  const lookups: string[] = [];
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /**
+   * One `preserveProgress` over a scratch checkout, its spawner exiting
+   * `exitCode` and its lookup answering `before` ahead of the session
+   * and `after` once it has ended.
+   */
+  async function preserveWith(exitCode: number, before: number | null, after: number | null): Promise<void> {
+    infos.length = 0;
+    lookups.length = 0;
+    setActiveOutput(sinkOutput({ info: (line) => infos.push(line) }));
+    const scratch = plant({ branch: `feat/${STUB}`, plan: PLAN_DONE });
+    let ended = false;
+    await preserveProgress(PLAN_DONE, ['project'], null, null, null, 'main', scratch.repo, {
+      lookup: (_checkout, branch) => {
+        lookups.push(`${ended
+          ? 'after'
+          : 'before'}:${branch}`);
+        return Promise.resolve(ended
+          ? after
+          : before);
+      },
+      spawn: () => {
+        ended = true;
+        return Promise.resolve({ exitCode, stdout: '' });
+      },
+    });
+  }
+
+  it('says no pull request is open yet when the lookup after the session finds none', async () => {
+    await preserveWith(0, null, null);
+
+    expect(infos).toEqual([PROGRESS_PRESERVED_NO_PR]);
+    expect(lookups).toEqual([`before:feat/${STUB}`, `after:feat/${STUB}`]);
+  });
+
+  it('names the pull request the lookup after the session finds, not the one before it', async () => {
+    await preserveWith(0, null, 612);
+
+    expect(infos).toEqual([progressPreservedOpen(612)]);
+    expect(lookups).toEqual([`before:feat/${STUB}`, `after:feat/${STUB}`]);
+  });
+
+  it('prints neither line and makes no second lookup when the session fails', async () => {
+    await preserveWith(1, null, 612);
+
+    expect(infos).toEqual([]);
+    expect(lookups).toEqual([`before:feat/${STUB}`]);
+  });
 });

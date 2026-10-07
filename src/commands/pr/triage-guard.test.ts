@@ -9,9 +9,10 @@
  * 0.25.0 incident, with a `clean` branch beside it as the control that
  * proves the reading could have come out otherwise.
  */
-import type { TriageGuardInput } from './triage-guard.js';
+import type { TriageGuardInput, TriageGuardReading } from './triage-guard.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
+import type { GuardRead } from '../../release/guard.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,9 +22,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createGitRunner } from '../../pr/index.js';
+import { RELEASE_PR_BRANCH } from '../../release/settle-pr.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
-import { readTriageGuard } from './triage-guard.js';
+import { readTriageGuard, triageVerdict } from './triage-guard.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-triage-guard-')));
@@ -108,8 +110,15 @@ function repo(): Repo {
   return { root, git, commit };
 }
 
+/** The guard reading `reading` is, or null for no reading, an unread one or the release delivery. */
+function readOf(reading: TriageGuardReading): GuardRead | null {
+  return reading !== null && !('kind' in reading) && reading.ok
+    ? reading
+    : null;
+}
+
 /** The triage's input for a pull request whose head is `head`. */
-function inputFor(root: string, git: GitRunner, head: string, number = 412): TriageGuardInput {
+function inputFor(root: string, git: GitRunner, head: string, number = 412, headRefName = `feat/pr-${String(number)}`): TriageGuardInput {
   return {
     git,
     settings: SETTINGS,
@@ -117,7 +126,7 @@ function inputFor(root: string, git: GitRunner, head: string, number = 412): Tri
     pr: {
       number,
       baseRefName: 'main',
-      headRefName: `feat/pr-${String(number)}`,
+      headRefName,
       headRefOid: head,
       isCrossRepository: false,
     },
@@ -189,9 +198,48 @@ describe('the 0.25.0 incident, read off a real repository', () => {
     const stamped = readTriageGuard(inputFor(root, runner, stampedHead));
     const clean = readTriageGuard(inputFor(root, runner, fragmentHead, 413));
 
-    expect(stamped?.ok === true && stamped.verdict.answer).toBe('collision');
-    expect(stamped?.ok === true && stamped.branch.commit).toBe(stampedHead);
-    expect(stamped?.ok === true && stamped.base.ref).toBe('main');
-    expect(clean?.ok === true && clean.verdict.answer).toBe('clean');
+    expect(readOf(stamped)?.verdict.answer).toBe('collision');
+    expect(readOf(stamped)?.branch.commit).toBe(stampedHead);
+    expect(readOf(stamped)?.base.ref).toBe('main');
+    expect(readOf(clean)?.verdict.answer).toBe('clean');
+  });
+});
+
+describe('settle\'s release pull request against an ordinary stamping branch (#843)', () => {
+  /** What settle's release commit stamps: 0.25.0 with its section. */
+  const RELEASE_COMMIT = {
+    'package.json': manifest('0.25.0'),
+    'CHANGELOG.md': changelog(['0.25.0', '- Loop: the settled line'], ['0.24.0', '- Loop: old line']),
+  };
+
+  it('reads the release branch as the delivery, which gives the classifier no verdict', () => {
+    const { root, git, commit } = repo();
+    git(['switch', '-q', '-c', RELEASE_PR_BRANCH]);
+    const head = commit(RELEASE_COMMIT, 'chore: release 0.25.0');
+    git(['switch', '-q', 'main']);
+
+    const reading = readTriageGuard(inputFor(root, createGitRunner(root), head, 722, RELEASE_PR_BRANCH));
+
+    expect(reading).toEqual({ kind: 'release-delivery', pullRequest: 722, version: '0.25.0' });
+    expect(triageVerdict(reading)).toBeNull();
+  });
+
+  it('reads an ordinary branch stamping a version the base has passed as stale, with its verdict kept', () => {
+    const { root, git, commit } = repo();
+    const fork = git(['rev-parse', 'HEAD']);
+    git(['switch', '-q', '-c', 'feat/pr-412']);
+    const head = commit(RELEASE_COMMIT, 'chore: release 0.25.0');
+    git(['switch', '-q', 'main']);
+    expect(git(['merge-base', 'main', head])).toBe(fork);
+    commit({
+      'package.json': manifest('0.26.0'),
+      'CHANGELOG.md': changelog(['0.26.0', '- Loop: a later line'], ['0.24.0', '- Loop: old line']),
+    }, 'chore: release 0.26.0');
+
+    const reading = readTriageGuard(inputFor(root, createGitRunner(root), head));
+
+    const read = readOf(reading);
+    expect(read?.verdict).toMatchObject({ answer: 'stale', relation: 'passed' });
+    expect(triageVerdict(reading)).toBe(read?.verdict ?? 'no reading');
   });
 });

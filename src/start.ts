@@ -117,6 +117,9 @@
  * and stops the run: no further session is spawned, nothing is
  * committed, the checkout is not switched back, and the output names the
  * branch expected, what was found and the one command that restores it.
+ * The guard runs once more inside the dispatch, immediately before the
+ * session is spawned, and halts the same way, so a checkout removed
+ * after the first guard never reaches the spawn.
  * A halt before the commit stores the session's report as `blocked`. The guard
  * also runs before the wrap-up session, marking nothing since the
  * wrap-up has no tracker line, and before the loop's release commit,
@@ -160,10 +163,13 @@
  * for the next open task; before the wrap-up, the full suite runs as the
  * pre-wrap-up step. Once a task is committed `done` and its
  * report stored, the task step runs over what it changed since the
- * commit it was dispatched on, the base its prompt names, and lints the
- * files it changed (`start/lint-step.ts`). A step with failures the
- * baseline does not hold, or a task step with ESLint errors, is red: it
- * inserts a `[BLOCKED]` repair task above the first open task, or blocks
+ * commit it was dispatched on, the base its prompt names, lints the
+ * files it changed (`start/lint-step.ts`), and type-checks the test
+ * files it changed against the same files at that base
+ * (`start/type-step.ts`). A step with failures the baseline does not
+ * hold, or a task step with ESLint errors or a type error its base did
+ * not hold, is red: it inserts a `[BLOCKED]` repair task above the first
+ * open task, or blocks
  * the repair it followed (`start/suite-blocker.ts`), and the run stops as
  * it does after a blocked task, so the next run dispatches that repair
  * handed the failing files. A red pre-wrap-up step inserts its repair
@@ -669,8 +675,17 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         serving,
         handout,
         base,
+        guard: { expected, trackerPath },
       });
       const { exitCode } = dispatch;
+
+      // The loop guard ran again just before the spawn: a checkout gone
+      // since the guard above spawned nothing and marked the task blocked.
+      if (dispatch.halted) {
+        emitLoopEvent({ kind: 'task-blocked', position, reason: 'checkout moved' });
+        emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
+        return;
+      }
 
       // Stored once the task's fate is known, and never before: the
       // outcome goes on every row the report is stored as, and the

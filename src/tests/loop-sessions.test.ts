@@ -82,10 +82,11 @@ import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { readSessions } from '../loop/sessions.js';
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { resultEvent } from './loop-session-fixtures.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The CLI entry every case spawns. */
 const RAFA_ENTRY = fileURLToPath(new URL('../rafa.ts', import.meta.url));
@@ -162,7 +163,7 @@ interface Scratch {
   readonly claude: string;
   /** The file the stand-in appends one line to per call, outside the repository. */
   readonly callLog: string;
-  /** The PATH a spawned run gets: the stand-in's directory, then git's own. */
+  /** The PATH a spawned run gets: the stand-in's directory, then git's own and the system tools' (`hostToolDirs`). */
   readonly path: string;
 }
 
@@ -246,14 +247,12 @@ function plant(planText: string, standIn: (scratch: Scratch) => void = plantStan
   const home = join(root, 'home');
   for (const dir of [repo, bin, home]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const scratch: Scratch = {
     repo,
     home,
     claude: join(bin, 'claude'),
     callLog: join(root, 'calls.log'),
-    path: [bin, dirname(gitBinary)].join(delimiter),
+    path: [bin, ...hostToolDirs()].join(delimiter),
   };
   standIn(scratch);
 
@@ -305,7 +304,7 @@ function spawnLoopStart(scratch: Scratch) {
 function soleSession(repo: string): SessionRecord | null {
   const sessions = readSessions(repo);
   return sessions.length === 1
-    ? sessions[0]
+    ? sessions[0] ?? null
     : null;
 }
 
@@ -386,7 +385,7 @@ describe('rafa loop pause against a run spawned over the same plan', () => {
     try {
       await waitForTask(scratch.repo, TASK1);
       const paused = run(scratch, ['loop', 'pause']);
-      expect(paused.exitCode).toBe(0);
+      expectExit(paused, 0, { ...scratch });
 
       await waitForPausedIdle(scratch.repo);
 
@@ -415,7 +414,7 @@ describe('a stand-in session ending on its budget', () => {
 
     const started = run(scratch, ['loop', 'start', ...RUN_FLAGS]);
 
-    expect(started.exitCode).toBe(0);
+    expectExit(started, 0, { ...scratch });
     const tracker = readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8');
     expect(tracker).toContain(`- [BLOCKED] ${BUDGET_TASK}  <!-- blocked: budget exceeded -->`);
     expect(tracker).toContain(`- [ ] ${TASK2}`);
@@ -430,7 +429,7 @@ describe('a stand-in session that writes no report and leaves no commit', () => 
 
     const started = run(scratch, ['loop', 'start', ...RUN_FLAGS]);
 
-    expect(started.exitCode).toBe(0);
+    expectExit(started, 0, { ...scratch });
     const tracker = readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8');
     expect(tracker).toContain(`- [BLOCKED] ${TASK1}  <!-- blocked: ${NOTHING_REPORTED_OR_COMMITTED} -->`);
     expect(tracker).toContain(`- [ ] ${TASK2}`);
@@ -463,7 +462,7 @@ describe('rafa loop start --runtime, spawned over the same checkout', () => {
 
     const refused = run(scratch, ['loop', 'start', '--runtime=src', ...RUN_FLAGS]);
 
-    expect(refused.exitCode).toBe(1);
+    expectExit(refused, 1, { ...scratch });
     expect(refused.stderr).toContain(`inside ${join(scratch.repo, 'src')}`);
     expect(existsSync(scratch.callLog)).toBe(false);
     expect(existsSync(join(scratch.repo, '.rafa', 'runs'))).toBe(false);

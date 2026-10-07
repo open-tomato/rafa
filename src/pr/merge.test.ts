@@ -54,10 +54,14 @@ import { classifyState } from './checks.js';
 import {
   cleanUpSteps,
   commandLine,
+  parseTreePaths,
   parseWorkingTree,
   parseWorktrees,
   readMergeRefusal,
   remainingFrom,
+  unquoteGitPath,
+  untrackedIncoming,
+  untrackedLeftLine,
   worktreesHolding,
 } from './merge.js';
 
@@ -119,6 +123,74 @@ describe('parseWorkingTree', () => {
 
   it('drops a trailing carriage return rather than keeping it in the line', () => {
     expect(parseWorkingTree('?? a.ts\r\n').entries).toEqual(['?? a.ts']);
+  });
+
+  it('splits the lines into tracked lines as git wrote them and untracked paths', () => {
+    const tree = parseWorkingTree('M  a.ts\n M b.ts\n?? c.ts\n?? .claude/\n');
+    expect(tree.tracked).toEqual(['M  a.ts', ' M b.ts']);
+    expect(tree.untracked).toEqual(['c.ts', '.claude/']);
+  });
+
+  it('reads a quoted untracked path with a space as the path itself', () => {
+    // `?? "a b.txt"` is git 2.53.0's porcelain for an untracked `a b.txt`;
+    // see `unquoteGitPath`.
+    const tree = parseWorkingTree('?? "a b.txt"\n');
+    expect(tree.untracked).toEqual(['a b.txt']);
+    expect(tree.entries).toEqual(['?? "a b.txt"']);
+  });
+});
+
+describe('unquoteGitPath', () => {
+  it('leaves a path git printed bare as it is', () => {
+    expect(unquoteGitPath('src/a.ts')).toBe('src/a.ts');
+  });
+
+  it('undoes octal escapes into the UTF-8 bytes git wrote them for', () => {
+    // `"\303\251.txt"` is git 2.53.0's spelling of `é.txt`, in porcelain
+    // and in ls-tree alike.
+    expect(unquoteGitPath('"\\303\\251.txt"')).toBe('é.txt');
+  });
+
+  it('undoes an escaped quote, backslash and tab', () => {
+    expect(unquoteGitPath('"a\\"b\\\\c\\td"')).toBe('a"b\\c\td');
+  });
+});
+
+describe('parseTreePaths', () => {
+  it('reads one path per line of ls-tree --name-only, unquoting each', () => {
+    // The four lines git 2.53.0 printed for a tree holding these files.
+    const paths = parseTreePaths('.claude/settings.local.json\na b.txt\nd/t\n"\\303\\251.txt"\n');
+    expect(paths).toEqual(['.claude/settings.local.json', 'a b.txt', 'd/t', 'é.txt']);
+  });
+});
+
+describe('untrackedIncoming', () => {
+  it('names an untracked path an incoming tree holds, and no other', () => {
+    expect(untrackedIncoming(['a.ts', 'b.ts'], ['b.ts', 'c.ts'])).toEqual(['b.ts']);
+  });
+
+  it('holds a folded directory when an incoming path lies under it', () => {
+    expect(untrackedIncoming(['.claude/'], ['.claude/settings.json'])).toEqual(['.claude/']);
+    expect(untrackedIncoming(['.claude/'], ['.claudette'])).toEqual([]);
+  });
+});
+
+describe('untrackedLeftLine', () => {
+  it('answers null when nothing is left', () => {
+    expect(untrackedLeftLine([])).toBeNull();
+  });
+
+  it('names each path, quoting one with a space', () => {
+    expect(untrackedLeftLine(['.claude/settings.local.json', 'a b.txt'])).toBe(
+      'Leaving the untracked paths the merge does not touch in place: .claude/settings.local.json, \'a b.txt\'.',
+    );
+  });
+
+  it('elides past ten paths', () => {
+    const paths = Array.from({ length: 12 }, (_, i) => `f${String(i)}.ts`);
+    const line = untrackedLeftLine(paths) ?? '';
+    expect(line).toContain('f9.ts and 2 more.');
+    expect(line).not.toContain('f10.ts');
   });
 });
 
@@ -196,6 +268,59 @@ describe('readMergeRefusal', () => {
     expect(refusal?.message).toContain('?? f9.ts');
     expect(refusal?.message).not.toContain('?? f10.ts');
     expect(refusal?.message).toContain('... and 4 more');
+  });
+
+  describe('weighing untracked paths against the incoming trees', () => {
+    /** The head adds `feature.ts`; the base holds `README.md`. */
+    const INCOMING = parseTreePaths('README.md\nfeature.ts\n');
+
+    it('refuses a tracked change whatever the incoming trees hold', () => {
+      const refusal = readMergeRefusal({ ...GREEN, tree: parseWorkingTree(' M README.md\n'), incoming: [] });
+      expect(refusal?.reason).toBe('dirty-tree');
+      expect(refusal?.message).toContain(' M README.md');
+    });
+
+    it('refuses an untracked path the pull request\'s head adds', () => {
+      const refusal = readMergeRefusal({ ...GREEN, tree: parseWorkingTree('?? feature.ts\n'), incoming: INCOMING });
+      expect(refusal?.reason).toBe('dirty-tree');
+      expect(refusal?.message).toContain('the working tree has 1 change.');
+      expect(refusal?.message).toContain('?? feature.ts');
+    });
+
+    it('refuses an untracked path the base holds', () => {
+      const refusal = readMergeRefusal({ ...GREEN, tree: parseWorkingTree('?? README.md\n'), incoming: INCOMING });
+      expect(refusal?.reason).toBe('dirty-tree');
+      expect(refusal?.message).toContain('?? README.md');
+    });
+
+    it('reads a quoted untracked path with a space against the trees\' bare spelling', () => {
+      const refusal = readMergeRefusal({
+        ...GREEN,
+        tree: parseWorkingTree('?? "a b.txt"\n'),
+        incoming: parseTreePaths('a b.txt\n'),
+      });
+      expect(refusal?.reason).toBe('dirty-tree');
+      expect(refusal?.message).toContain('?? "a b.txt"');
+    });
+
+    it('passes an untracked path neither tree holds', () => {
+      const reading = { ...GREEN, tree: parseWorkingTree('?? .claude/settings.local.json\n'), incoming: INCOMING };
+      expect(readMergeRefusal(reading)).toBeNull();
+      // Control: the same path, once the head holds it, refuses.
+      expect(readMergeRefusal({ ...reading, incoming: [...INCOMING, '.claude/settings.local.json'] })?.reason)
+        .toBe('dirty-tree');
+    });
+
+    it('lists only the held untracked paths beside the tracked changes', () => {
+      const refusal = readMergeRefusal({
+        ...GREEN,
+        tree: parseWorkingTree(' M README.md\n?? feature.ts\n?? notes.md\n'),
+        incoming: INCOMING,
+      });
+      expect(refusal?.message).toContain('the working tree has 2 changes.');
+      expect(refusal?.message).toContain('?? feature.ts');
+      expect(refusal?.message).not.toContain('notes.md');
+    });
   });
 
   it('refuses a conflicting PR, naming the base and GitHub\'s own word', () => {

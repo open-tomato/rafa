@@ -20,7 +20,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { NO_TERMINAL_TEXT } from '../cli/prompt/terminal.js';
 import { createSkillListCommand } from '../commands/skill/list.js';
 
-import { dispatchInProject, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { dispatchInProject, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-inventory-browse-')));
 
@@ -95,11 +95,11 @@ describe('rafa skill list -i and rafa agent list -i over a planted inventory', (
     const skills = runRafa(scratch, scratch.repo, ['skill', 'list', '-i']);
     const agents = runRafa(scratch, scratch.repo, ['agent', 'list', '-i']);
 
-    expect(skills.exitCode).toBe(1);
+    expectExit(skills, 1, scratch);
     expect(skills.stdout + skills.stderr).toContain(NO_TERMINAL_TEXT);
     expect(skills.stdout + skills.stderr).toContain('rafa skill list --output=json');
     expect(skills.stdout).not.toContain('alpha-skill');
-    expect(agents.exitCode).toBe(1);
+    expectExit(agents, 1, scratch);
     expect(agents.stdout + agents.stderr).toContain('rafa agent list --output=json');
   }, SPAWN_TIMEOUT);
 

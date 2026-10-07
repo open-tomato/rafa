@@ -55,6 +55,10 @@
  * ```
  *
  * and exit 1; a lease naming what the branch held replaced it, exit 0.
+ * A refused push still ends its stdout on a `Done` line, so the sentence
+ * of a `refused` or `unpushed` answer quotes git through `pushSaid`
+ * (`./settle-push.ts`), which drops it and the `To <remote>` line, and
+ * keeps the `!` status line naming the rejection (#855).
  * `git ls-remote --heads <remote> refs/heads/rafa/release` exits 0
  * writing nothing when the branch is absent.
  *
@@ -84,6 +88,7 @@ import type { GitRunner, PullRequestDetail, PullRequestDraft, PullRequests, Pull
 import { messageOf } from '../config-sections.js';
 import { gitSaid } from '../pr/index.js';
 
+import { pushSaid } from './settle-push.js';
 import { buildSettle, releaseCommitSubject } from './settle.js';
 
 /** The branch the `pr` delivery pushes the release commit to. */
@@ -221,7 +226,7 @@ function pushReleaseBranch(worktree: SettleWorktree, build: SettleBuilt, current
   const pushed = worktree.git(['push', '--porcelain', lease, worktree.remote, `${build.release}:${RELEASE_PR_REF}`]);
   if (pushed.ok) return null;
   const subject = releaseCommitSubject(build.version);
-  const said = gitSaid(pushed);
+  const said = pushSaid(pushed);
   if (pushed.stdout.split('\n').some((line) => STALE_LEASE.test(line.trimEnd()))) {
     const read = current === null
       ? 'absent'

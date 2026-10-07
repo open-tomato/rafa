@@ -8,10 +8,11 @@
  * `RAFA_EFFORT_DIR` when it is set, and `<root>/.rafa/effort/effort.sqlite`
  * otherwise. `<file>` is read against the directory the command runs
  * from, and is only ever read. The merged store is built beside this one
- * as `effort.sqlite.merge-<stamp>`, checked, and swapped in with the
- * original kept whole as `effort.sqlite.before-merge-<stamp>.bak`.
- * The merged store keeps this store's id; the backup is a copy, so
- * renamed back it takes a new id on its next write.
+ * as `effort.sqlite.merge-<stamp>`, checked, and swapped in once every
+ * row the original holds is copied to
+ * `effort.sqlite.before-merge-<stamp>.bak`. The merged store keeps this
+ * store's id; the backup is a copy, so renamed back to undo the merge it
+ * takes a new id on its next write.
  * `--dry-run` builds and checks the same file, then deletes it.
  *
  * It prints, for each merged table, the rows added, skipped and in
@@ -108,10 +109,10 @@ function tableLine(entry: TableMerge): string {
 function closingLine(result: MergeResult, command: string): string {
   if (result.status === 'would-merge') {
     return '🔍 Dry run: the merged store was built beside it, checked (row counts, integrity_check, this rafa\'s'
-      + ` schema plan) and deleted. Run \`${command} ${result.otherPath}\` to swap it in; the original would be`
-      + ` kept whole at ${result.path}.before-merge-<stamp>.bak.`;
+      + ` schema plan) and deleted. Run \`${command} ${result.otherPath}\` to swap it in; every row the original`
+      + ` holds would first be copied to ${result.path}.before-merge-<stamp>.bak.`;
   }
-  return `✅ Merged. The original is kept whole at ${String(result.backupPath)}; rename it back to undo.`
+  return `✅ Merged. Every row the original held is copied to ${String(result.backupPath)}.`
     + ` ${keepsIdLine('merged store')}`;
 }
 
@@ -230,7 +231,7 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
       + ' is filled, and any other difference is kept on both sides and recorded in `merge_conflicts`. The gap'
       + ' of each commit brought in, and of the commit after it, is recomputed. The other file is only read.'
       + ' The merged store is built beside this one, checked (each table\'s count plus the rows added,'
-      + ' integrity_check, the schema plan), and swapped in with the original kept whole as'
+      + ' integrity_check, the schema plan), and swapped in once every row the original holds is copied to'
       + ' `effort.sqlite.before-merge-<stamp>.bak`. The merged store keeps this store\'s id; the backup is a copy,'
       + ' so renamed back it takes a new id on its next write. It prints the rows added, skipped and in conflict per table'
       + ' and the backup\'s name. Exit code 2 for another project\'s store, and for a `store: ndjson` project,'

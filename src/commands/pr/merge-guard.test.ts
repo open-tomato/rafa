@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
+import { RELEASE_PR_BRANCH } from '../../release/settle-pr.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
@@ -136,6 +137,8 @@ interface WorldOptions {
   readonly config?: string;
   /** False to leave `CHANGELOG.md` out, so `release.enabled: auto` reads off. */
   readonly changelog?: boolean;
+  /** The head branch's name. {@link BRANCH} when left out. */
+  readonly head?: string;
 }
 
 /**
@@ -156,22 +159,23 @@ function plantWorld(options: WorldOptions): GuardRepo {
     ? first
     : { ...first, 'CHANGELOG.md': changelog(['0.24.0', '- loop: the first note']) };
   commitAndPush(repo, BASE, withChangelog);
-  must(repo.work, repo.home, 'switch', '-q', '-c', BRANCH);
-  commitAndPush(repo, BRANCH, options.branch);
+  const head = options.head ?? BRANCH;
+  must(repo.work, repo.home, 'switch', '-q', '-c', head);
+  commitAndPush(repo, head, options.branch);
   must(repo.work, repo.home, 'switch', '-q', BASE);
   if (options.baseAfter !== undefined) commitAndPush(repo, BASE, options.baseAfter);
   plantProjectConfig(repo.work, options.config ?? GH_CONFIG);
   return repo;
 }
 
-/** A pull request detail for {@link BRANCH} into {@link BASE}. */
-function detail(): PullRequestDetail {
+/** A pull request detail for `head` into {@link BASE}. */
+function detail(head: string): PullRequestDetail {
   return {
     number: NUMBER,
     title: 'a guarded merge',
     url: `https://github.com/open-tomato/rafa/pull/${NUMBER}`,
     state: 'open',
-    headRefName: BRANCH,
+    headRefName: head,
     baseRefName: BASE,
     author: { login: 'octo', isBot: false },
     isCrossRepository: false,
@@ -185,10 +189,10 @@ function detail(): PullRequestDetail {
   };
 }
 
-/** A provider answering `get`, `checks` and `merge`, recording each. */
-function stubPulls(): PullRequestsDouble {
+/** A provider answering `get` for `head`, `checks` and `merge`, recording each. */
+function stubPulls(head: string): PullRequestsDouble {
   return createPullRequestsDouble({
-    get: () => Promise.resolve(detail()),
+    get: () => Promise.resolve(detail(head)),
     checks: () => Promise.resolve({ rows: [], verdict: 'green' as const }),
     merge: () => Promise.resolve({ merged: true, detail: 'Squashed and merged pull request' }),
   }, { refusal: 'the stub provider models get, checks and merge alone' });
@@ -229,6 +233,8 @@ interface RunOptions {
   readonly answers?: readonly string[];
   /** False for a run with no terminal. */
   readonly terminal?: boolean;
+  /** The pull request's head branch. {@link BRANCH} when left out. */
+  readonly head?: string;
 }
 
 /** Dispatches `rafa pr merge <n> ...words --output=json` over `repo`. */
@@ -236,7 +242,7 @@ async function ran(repo: GuardRepo, words: readonly string[], options: RunOption
   const asked: string[] = [];
   const gitRan: string[] = [];
   const answers = [...(options.answers ?? ['y'])];
-  const stub = stubPulls();
+  const stub = stubPulls(options.head ?? BRANCH);
   const runner = (root: string): GitRunner => (args) => {
     gitRan.push(args.join(' '));
     return git(root, repo.home, ...args);
@@ -428,6 +434,62 @@ describe('a branch the guard reads collision', () => {
     expect(run.warned).toContain(`#${NUMBER} merges anyway: dangerous.acceptVersionCollision is true.`);
     expect(run.sent).toContain(MERGE_SENT);
     expect(run.guard).toMatchObject({ answer: 'collision', reaction: 'accept' });
+  });
+});
+
+describe('settle\'s release pull request against an ordinary stamping branch (#843)', () => {
+  /** A config that refuses a stale branch, so a delivery read as stale would stop. */
+  const REFUSE_CONFIG = `${GH_CONFIG}  versionCollision: refuse\n`;
+
+  /** What settle's release commit leaves: 0.25.0 stamped with its section. */
+  const RELEASE_COMMIT = {
+    'package.json': manifest('0.25.0'),
+    'CHANGELOG.md': changelog(['0.25.0', '- loop: the settled note'], ['0.24.0', '- loop: the first note']),
+  };
+
+  /** The base passing 0.25.0 at 0.26.0 after the branch forked. */
+  const BASE_PASSED = {
+    'package.json': manifest('0.26.0'),
+    'CHANGELOG.md': changelog(['0.26.0', '- loop: a later note'], ['0.24.0', '- loop: the first note']),
+  };
+
+  it('prints the one delivery line on stdout, no fix and no warning, and merges under refuse', async () => {
+    const repo = plantWorld({ branch: RELEASE_COMMIT, head: RELEASE_PR_BRANCH, config: REFUSE_CONFIG });
+
+    const run = await ran(repo, ['--yes'], { head: RELEASE_PR_BRANCH });
+
+    expect([run.exitCode, run.warned, run.refusal]).toEqual([0, [], null]);
+    const release = run.printed.filter((line) => line.startsWith('Release'));
+    expect(release).toEqual([`Release: #${NUMBER} is settle's release pull request; merging it lands 0.25.0`]);
+    expect(run.printed.some((line) => line.includes('fix:'))).toBe(false);
+    expect(run.sent).toContain(MERGE_SENT);
+    expect(run.guard).toEqual({ answer: 'release', reaction: 'print', lines: release });
+  });
+
+  it('refuses the same stamp on an ordinary branch the base has passed, reading stale and ending with the fix', async () => {
+    const repo = plantWorld({ branch: RELEASE_COMMIT, baseAfter: BASE_PASSED, config: REFUSE_CONFIG });
+
+    const run = await ran(repo, ['--yes']);
+
+    expect(run.exitCode).toBe(1);
+    const lines = (run.refusal ?? '').split('\n');
+    expect(lines[0]).toBe(`❌ rafa pr merge refuses #${NUMBER}: its release guard reads stale, and pr.versionCollision is refuse.`);
+    expect(lines).toContain(`  Release guard: stale — ${BRANCH} stamps 0.25.0, which origin/${BASE} has passed at 0.26.0`);
+    expect(lines.some((line) => line.startsWith('  Release:'))).toBe(false);
+    expect(lines.at(-1)?.trim()).toBe(FIX_LINE);
+    expect(run.sent).not.toContain(MERGE_SENT);
+  });
+
+  it('reads the release branch as stale with its fix too once the base has passed its version', async () => {
+    const repo = plantWorld({ branch: RELEASE_COMMIT, head: RELEASE_PR_BRANCH, baseAfter: BASE_PASSED, config: REFUSE_CONFIG });
+
+    const run = await ran(repo, ['--yes'], { head: RELEASE_PR_BRANCH });
+
+    expect(run.exitCode).toBe(1);
+    const lines = (run.refusal ?? '').split('\n');
+    expect(lines).toContain(`  Release guard: stale — ${RELEASE_PR_BRANCH} stamps 0.25.0, which origin/${BASE} has passed at 0.26.0`);
+    expect(lines.at(-1)?.trim()).toBe(FIX_LINE);
+    expect(run.sent).not.toContain(MERGE_SENT);
   });
 });
 

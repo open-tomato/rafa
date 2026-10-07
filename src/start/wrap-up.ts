@@ -429,6 +429,18 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * required, as `release` is: a default would spawn the session wherever
  * the loop's process stands.
  *
+ * The line printed when the session exits 0 is read, not assumed: the
+ * branch's open pull request is looked up again once the session has
+ * ended, and {@link progressPreservedLine} names its number, or says
+ * none is open yet. A session that exits 0 may still have opened
+ * nothing, and `start/wrap-up-run.ts` then retries the wrap-up or opens
+ * the pull request itself, which is what the line says.
+ *
+ * `seams` is what the tests answer in place of `gh` and `claude`: the
+ * lookup made both before the session (for the prompt) and after it
+ * (for that line), and the spawner. Left out, they are
+ * {@link openPullRequestNumber} and `spawnClaudeCaptured`.
+ *
  * It answers the session's final message, its captured stdout, whether
  * it succeeded or not: when no pull request is open once it has ended,
  * `start/wrap-up-run.ts` quotes that message to the retry session it
@@ -442,9 +454,11 @@ export async function preserveProgress(
   learning: WrapUpLearning | null,
   base: string,
   checkout: string,
+  seams: PreserveProgressSeams = {},
 ): Promise<string> {
+  const lookup = seams.lookup ?? openPullRequestNumber;
   const branch = getCurrentBranch(checkout);
-  const openPullRequest = await openPullRequestNumber(checkout, branch);
+  const openPullRequest = await lookup(checkout, branch);
   return runWrapUpSession({
     buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons),
     settingSources,
@@ -452,8 +466,30 @@ export async function preserveProgress(
     learning,
     checkout,
     branch,
-    succeeded: '\n✅ Progress preserved; PR opened or updated on this branch.',
+    succeeded: async () => progressPreservedLine(await lookup(checkout, branch)),
+    ...(seams.spawn === undefined
+      ? {}
+      : { spawn: seams.spawn }),
   });
+}
+
+/** What the tests answer in {@link preserveProgress} in place of `gh` and `claude`. */
+export interface PreserveProgressSeams {
+  /** The branch's open pull request lookup; {@link openPullRequestNumber} when left out. */
+  readonly lookup?: (checkout: string, branch: string) => Promise<number | null>;
+  /** The spawner; `spawnClaudeCaptured` when left out. */
+  readonly spawn?: CapturingSpawner;
+}
+
+/**
+ * The line {@link preserveProgress} prints once its session exits 0,
+ * from the lookup made after it: the open pull request's number, or,
+ * for null, that none is open yet and what the loop does next.
+ */
+export function progressPreservedLine(openPullRequest: number | null): string {
+  return openPullRequest === null
+    ? '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.'
+    : `\n✅ Progress preserved; pull request #${openPullRequest} is open on this branch.`;
 }
 
 /** What {@link runWrapUpSession} spawns one wrap-up session from. */
@@ -470,8 +506,11 @@ export interface WrapUpSessionRun {
   readonly checkout: string;
   /** The run's branch, whose PR body the promotion check writes to. */
   readonly branch: string;
-  /** The line printed when the session exits 0. */
-  readonly succeeded: string;
+  /**
+   * The line printed when the session exits 0, or a reading that
+   * answers it, made only then and only after the session has ended.
+   */
+  readonly succeeded: string | (() => Promise<string>);
   /** The spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
 }
@@ -510,7 +549,9 @@ export async function runWrapUpSession(run: WrapUpSessionRun): Promise<string> {
     activeOutput().error(`\n❌ Failed to preserve progress (exit ${session.exitCode}). Please try again.`);
     return session.stdout;
   }
-  activeOutput().info(run.succeeded);
+  activeOutput().info(typeof run.succeeded === 'string'
+    ? run.succeeded
+    : await run.succeeded());
   if (learning === null || git === null) return session.stdout;
   await checkWrapUpAnswer({
     lessons,

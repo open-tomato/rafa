@@ -113,6 +113,13 @@ const HOST_ID_KEY = 'rafa effort store host id';
 /** Where the Linux host id is read from. */
 const MACHINE_ID_PATH = '/etc/machine-id';
 
+/**
+ * Where macOS keeps `ioreg`. Spawned by this path, never by name: a
+ * PATH without `/usr/sbin` would find none, and the hostname fallback
+ * would read the store as a copy from another host.
+ */
+const IOREG_PATH = '/usr/sbin/ioreg';
+
 /** The command whose output holds the macOS platform UUID. */
 const IOREG_ARGS = ['-rd1', '-c', 'IOPlatformExpertDevice'] as const;
 
@@ -164,7 +171,7 @@ export function parseIoregPlatformUuid(output: string): string | null {
 
 /** The macOS platform UUID, or null when `ioreg` cannot be run or prints none. */
 function readIoregPlatformUuid(): string | null {
-  const result = spawnSync('ioreg', [...IOREG_ARGS], { encoding: 'utf8' });
+  const result = spawnSync(IOREG_PATH, [...IOREG_ARGS], { encoding: 'utf8' });
   if (result.error !== undefined || result.status !== 0) return null;
   return parseIoregPlatformUuid(result.stdout);
 }

@@ -85,7 +85,10 @@ export interface SeenSnapshot {
 }
 
 /** The settings the reading takes. */
-export type SeenConfig = Pick<RafaConfig, 'prBase' | 'cleanupKeep' | 'cleanupStaleDays' | 'cleanupWorktreeIdleDays'>;
+export type SeenConfig = Pick<
+  RafaConfig,
+  'prBase' | 'cleanupKeep' | 'cleanupStaleDays' | 'cleanupWorktreeIdleDays' | 'loopWorktreeDir'
+>;
 
 /** What {@link takeSeenSnapshot} reads. */
 export interface SeenInput {

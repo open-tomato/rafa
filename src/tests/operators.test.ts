@@ -6,14 +6,17 @@
  * `bundled/skills`. Each carries the alpha mark, and the skills pass the
  * same check `rafa skill check` runs.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BUNDLED_AGENTS_DIR } from '../inventory/trees.js';
 import { BUNDLED_SKILLS_DIR } from '../schema/tiers.js';
+
+import { expectExit } from './cli-capture.js';
 
 /** The `src/` directory. */
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
@@ -33,6 +36,52 @@ const FILES: readonly string[] = [
 
 /** The line every operator's body opens with. */
 const ALPHA_LINE = 'Alpha: tested on rafa\'s own development, may become a feature.';
+
+/** The agent files, which carry the single-command rule. */
+const AGENT_FILES: readonly string[] = FILES.filter((file) => file.startsWith('agents/'));
+
+/** The opening of the rule, as it reads in every agent file once whitespace is folded. */
+const RULE_OPENING = 'Run every `rafa` line as one command: no `cd … &&`, no `;`, no pipe, no redirect.';
+
+/** The one compound line allowed: the engineer's detached loop start, matched by its own allow rule. */
+const DETACHED_LOOP_START = /^setsid nohup env RAFA_OUTPUT=events rafa loop start\b(?:[^;&|>]|<[^<>\s]*>)* > \S+ 2>&1 &$/;
+
+/** The lines inside ``` fences of a markdown text. */
+const fencedLines = (text: string): string[] => {
+  let inFence = false;
+  const lines: string[] = [];
+
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+    } else if (inFence) {
+      lines.push(line.trim());
+    }
+  }
+
+  return lines;
+};
+
+/**
+ * The fenced lines of `text` that run `rafa` beside `;`, `&&`, `|` or `>`.
+ * Quoted strings and `<placeholders>` are blanked first, `.rafa/` paths are
+ * not the command (the word must stand alone), and the detached loop start
+ * is the exception.
+ */
+const compoundRafaLines = (text: string): string[] => fencedLines(text).filter((line) => {
+  if (DETACHED_LOOP_START.test(line)) {
+    return false;
+  }
+
+  const bare = line.replace(/"[^"]*"|'[^']*'|<[^<>\s]*>/g, '');
+
+  return /(^|\s)rafa(\s|$)/.test(bare) && /;|&&|\||>/.test(bare);
+});
+
+/** A markdown file with `body` in a fence when `fenced`, else as prose. */
+const markdown = (body: string, fenced: boolean): string => (fenced
+  ? `# T\n\n\`\`\`sh\n${body}\n\`\`\`\n`
+  : `# T\n\nRun ${body} sometimes.\n`);
 
 describe('the bundled operators', () => {
   it('ship three agents and three skills, every one named rafa-stretch-*', () => {
@@ -60,17 +109,19 @@ describe('the bundled operators', () => {
     });
 
     expect(`${run.stdout.toString()}${run.stderr.toString()}`).not.toContain('error');
-    expect(run.exitCode).toBe(0);
+    expectExit({ exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() }, 0);
   });
 
   describe('the plugin the launcher loads', () => {
     /** The plugin name in `.claude-plugin/plugin.json`. */
     const pluginName = (JSON.parse(readFileSync(join(OPERATORS, '.claude-plugin', 'plugin.json'), 'utf8')) as { name: string }).name;
 
+    // Read as text, not imported: nothing outside `src/commands/stretch/`
+    // imports `src/stretch/`, so the subject can move whole.
     it('is the name the launcher passes to --agent', () => {
-      const script = readFileSync(join(SRC_DIR, '..', 'scripts', 'stretch', 'stretch.sh'), 'utf8');
+      const launch = readFileSync(join(SRC_DIR, 'stretch', 'launch.ts'), 'utf8');
 
-      expect(script.match(/^PLUGIN="([^"]+)"$/m)?.[1]).toBe(pluginName);
+      expect(launch.match(/^export const OPERATOR_PLUGIN = '([^']+)';$/m)?.[1]).toBe(pluginName);
     });
 
     it('prefixes every skill the engineer loads, and gives the engineer the Skill tool', () => {
@@ -86,30 +137,93 @@ describe('the bundled operators', () => {
     /** A file's text with every run of whitespace folded to one space. */
     const flat = (file: string): string => readFileSync(join(OPERATORS, file), 'utf8').replace(/\s+/g, ' ');
 
-    /** The numbered step of "Run one item" that opens with `n.`, up to the next step. */
-    const runOneItemStep = (n: number): string => {
+    /** The "Run one item" section of the engineer file, whitespace folded. */
+    const runOneItem = (): string => {
       const text = readFileSync(join(OPERATORS, 'agents/rafa-stretch-engineer.md'), 'utf8');
-      const section = text.split(/^### 2\. Run one item$/m)[1]?.split(/^### 3\./m)[0] ?? '';
-      const step = section.split(new RegExp(`^${n}\\. `, 'm'))[1]?.split(/^\d\. /m)[0] ?? '';
 
-      return step.replace(/\s+/g, ' ');
+      return (text.split(/^### 2\. Run one item$/m)[1]?.split(/^### 3\./m)[0] ?? '').replace(/\s+/g, ' ');
     };
 
-    it('puts the 60-second line inside step 3 of "Run one item"', () => {
-      expect(runOneItemStep(3)).toContain('No foreground command waits longer than 60 seconds; longer waits run in the background.');
+    it('runs the item, the wait and the merge through one rafa stretch item line', () => {
+      const section = runOneItem();
+
+      expect(section).toContain('`rafa stretch item <issue> --wait`');
+      expect(section).toContain('merges its pull request into `stretch/<n>` with checks skipped');
     });
 
-    it('names the skip-checks merge for stretch/<n> and the wait for main in step 4', () => {
-      const step = runOneItemStep(4);
+    it('keeps the hand merge and the hand loop start out of "Run one item"', () => {
+      const section = runOneItem();
 
-      expect(step).toContain('Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`');
-      expect(step).toContain('Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>`');
+      expect(section).not.toContain('rafa pr merge');
+      expect(section).not.toContain('setsid');
     });
 
-    it('names verify.yml in the pit stop CI row', () => {
+    it('reads the CI row through rafa ci status', () => {
       const row = flat('skills/rafa-stretch-pit-stop/SKILL.md').match(/\| CI \|[^|]*\|/)?.[0] ?? '';
 
-      expect(row).toContain('gh run list --branch stretch/<n> --workflow verify.yml --limit 1');
+      expect(row).toContain('rafa ci status --branch=stretch/<n>');
+    });
+  });
+
+  describe('the single-command rule', () => {
+    it.each(AGENT_FILES)('opens %s with the rule', (file) => {
+      const text = readFileSync(join(OPERATORS, file), 'utf8').replace(/\s+/g, ' ');
+
+      expect(text).toContain(RULE_OPENING);
+    });
+
+    it.each(FILES)('keeps every fenced rafa line in %s to one command', (file) => {
+      expect(compoundRafaLines(readFileSync(join(OPERATORS, file), 'utf8'))).toEqual([]);
+    });
+
+    describe('the compound-line check on planted files', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'operators-rule-'));
+
+      afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+      /** Plants `text` in the temp dir and runs the check on what is read back. */
+      const check = (name: string, text: string): string[] => {
+        writeFileSync(join(dir, name), text);
+
+        return compoundRafaLines(readFileSync(join(dir, name), 'utf8'));
+      };
+
+      it('passes a compound line in prose', () => {
+        expect(check('prose.md', markdown('`cd x && rafa plan list; rafa status | cat`', false))).toEqual([]);
+      });
+
+      it.each([
+        ['&&', 'cd repo && rafa plan list'],
+        [';', 'rafa plan list; echo done'],
+        ['|', 'rafa plan list | head'],
+        ['>', 'rafa plan list > out.txt'],
+      ])('fails a fenced line with %s', (_op, line) => {
+        expect(check('fence.md', markdown(line, true))).toEqual([line]);
+      });
+
+      it.each([
+        'rafa issue create --body="a > b; c"',
+        'rafa loop wait --until=blocked,quiet:<minutes>,exit',
+        'rafa issue comment <n> --body=\'x | y\'',
+      ])('passes a placeholder or quoted operator: %s', (line) => {
+        expect(check('quoted.md', markdown(line, true))).toEqual([]);
+      });
+
+      it('passes a .rafa/ path beside a redirect', () => {
+        expect(check('path.md', markdown('gh pr create --body-file .rafa/stretch/<n>/report.md > out.txt', true))).toEqual([]);
+      });
+
+      it('passes the detached loop start', () => {
+        const line = 'setsid nohup env RAFA_OUTPUT=events rafa loop start --plan=<plan> --as-worktree > .rafa/stretch/<n>/loop.log 2>&1 &';
+
+        expect(check('detached.md', markdown(line, true))).toEqual([]);
+      });
+
+      it('fails a detached-looking start that also chains another command', () => {
+        const line = 'setsid nohup env RAFA_OUTPUT=events rafa loop start --plan=<plan> > a.log 2>&1 & rafa status | cat';
+
+        expect(check('chained.md', markdown(line, true))).toEqual([line]);
+      });
     });
   });
 });

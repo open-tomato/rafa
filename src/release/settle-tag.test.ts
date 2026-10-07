@@ -14,7 +14,7 @@ import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
 import type { ReleaseTagMode } from '../config-readers.js';
-import type { GitRunner, PullRequestSummary } from '../pr/index.js';
+import type { GitResult, GitRunner, PullRequestSummary } from '../pr/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +27,7 @@ import { createGitRunner } from '../pr/git.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
-import { settleByPush } from './settle-push.js';
+import { PUSH_SAID_NOTHING, settleByPush } from './settle-push.js';
 import { RELEASE_TAG_COMMAND, tagSettle } from './settle-tag.js';
 import { withSettleWorktree } from './settle-worktree.js';
 
@@ -155,11 +155,15 @@ interface SettleAndTagOptions {
   readonly beforePush?: readonly (() => void)[];
   /** Turns the push delivery's answer into what the tag step is given; the push delivery as it answered unless named. */
   readonly deliver?: (pushed: SettleDelivered) => SettleDelivered;
+  /** Answered for the tag step's push in place of running it; git's own answer unless named. */
+  readonly tagPushAnswer?: GitResult;
+  /** Handed what the tag step's push answered. */
+  readonly afterTagPush?: (result: GitResult) => void;
 }
 
 /** Settles by push in a scratch worktree of the caller's `origin/main`, then runs the tag step there. */
 async function settleAndTag(w: World, options: SettleAndTagOptions = {}): Promise<Tagged> {
-  const { mode = 'settle', beforePush = [], deliver = (pushed) => pushed } = options;
+  const { mode = 'settle', beforePush = [], deliver = (pushed) => pushed, tagPushAnswer, afterTagPush } = options;
   let pushes = 0;
   const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (made: SettleWorktree) => {
     const settleGit: GitRunner = (args) => {
@@ -173,7 +177,10 @@ async function settleAndTag(w: World, options: SettleAndTagOptions = {}): Promis
     const tagArgv: string[][] = [];
     const tagGit: GitRunner = (args) => {
       tagArgv.push([...args]);
-      return made.git(args);
+      if (args[0] !== 'push') return made.git(args);
+      const result = tagPushAnswer ?? made.git(args);
+      afterTagPush?.(result);
+      return result;
     };
     return { delivered, tagged: tagSettle({ ...made, git: tagGit }, mode, delivered), tagArgv };
   });
@@ -192,6 +199,11 @@ function tagsIn(w: World, repo: string): string[] {
   return listed === ''
     ? []
     : listed.split('\n');
+}
+
+/** The lines of `text`, each trimmed. */
+function linesOf(text: string): string[] {
+  return text.split('\n').map((line) => line.trim());
 }
 
 /** The commit `tag` names in `repo`. */
@@ -396,5 +408,36 @@ describe('tagSettle, a tag that cannot land', () => {
     expect(run.tagged.sentence).toContain('[rejected] (already exists)');
     expect(tagCommit(w, w.caller, TAG)).toBe(build.release);
     expect(tagCommit(w, w.origin, TAG)).toBe(elsewhere);
+  });
+
+  it('quotes the already-exists rejection without the Done line git ends the refused push on', async () => {
+    const w = world();
+    w.git(w.origin, ['tag', TAG, originMain(w)]);
+    const answered: GitResult[] = [];
+
+    const run = await settleAndTag(w, { afterTagPush: (result) => answered.push(result) });
+
+    // The control: git itself ended the refused push on Done, so the check below could fail.
+    expect(answered).toHaveLength(1);
+    expect(answered[0]?.ok).toBe(false);
+    expect(linesOf(answered[0]?.stdout ?? '')).toContain('Done');
+    expect(run.tagged.outcome).toBe('failed');
+    if (run.tagged.outcome !== 'failed') return;
+    expect(run.tagged.sentence).toContain('[rejected] (already exists)');
+    expect(linesOf(run.tagged.sentence)).not.toContain('Done');
+    expect(run.tagged.sentence).not.toMatch(/Done\s*$/);
+  });
+
+  it('still names a failure when the tag push printed nothing but Done', async () => {
+    const w = world();
+
+    const run = await settleAndTag(w, { tagPushAnswer: { ok: false, stdout: 'Done\n', stderr: '' } });
+
+    const build = pushedBuild(run.delivered);
+    expect(run.tagged).toMatchObject({ outcome: 'failed', exitCode: 1, written: true });
+    if (run.tagged.outcome !== 'failed') return;
+    expect(run.tagged.sentence).toBe(`${TAG} is written on ${build.release.slice(0, 12)} but could not be pushed to origin: ${PUSH_SAID_NOTHING}`);
+    expect(linesOf(run.tagged.sentence)).not.toContain('Done');
+    expect(tagsIn(w, w.origin)).toEqual([]);
   });
 });

@@ -2,8 +2,9 @@
  * `./cleanup.ts` dispatched in-process over a planted project: the
  * grouped checklist driven by scripted keys, the second question a
  * ticked Not-pushed row gets, the final question, the steps run through
- * a recording git, `--dry-run`, and the listing that asks nothing
- * without a terminal or under `--output=json`.
+ * a recording git, the run records removed from a directory of the
+ * case's own, `--dry-run`, and the listing that asks nothing without a
+ * terminal or under `--output=json`.
  *
  * The reading is a literal one handed in through the `read` seam, so a
  * case names exactly which rows exist and which start ticked; the
@@ -20,6 +21,9 @@
  * - The Not-pushed row answered `y` IS deleted with `-D`, and answered
  *   `n` is not, over the same keys: so the second question is proved
  *   to decide, not merely to be printed.
+ * - A ticked run record's files are gone after the final yes, and the
+ *   same files planted again are still there after a no, so the removal
+ *   is proved to follow the answer and the files to have been there.
  * - The listing cases hold the git runner uncalled, the keys never
  *   opened and the prompter never opened, beside the asking cases
  *   where all three are, so "nothing removed" is read against runs that
@@ -33,6 +37,7 @@ import type {
   LocalBranch,
   MergedRow,
   NotPushedRow,
+  RunRow,
   StaleRow,
   WorktreeRow,
 } from '../cleanup/index.js';
@@ -42,7 +47,7 @@ import type { GitResult } from '../pr/git.js';
 import type { PullRequests } from '../pr/types.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -51,7 +56,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 
-import { cleanupData, renderCleanup } from './cleanup-render.js';
+import { cleanupData, renderCleanup, runRowLine } from './cleanup-render.js';
 import {
   CLEANUP_USAGE,
   cleanupGroups,
@@ -143,6 +148,27 @@ const WT_DIRTY: WorktreeRow = {
   reason: '1 untracked',
 };
 
+const RUN: RunRow = {
+  sessionId: 'a1b2c3d4',
+  path: '/repo/.rafa/runs/a1b2c3d4.json',
+  eventsPath: null,
+  plan: 'rafa-12-a-plan',
+  startedAt: '2026-08-01T10:00:00.000Z',
+  ticked: true,
+};
+
+/** A run record and its events file planted under a fresh directory of this file's, as a row naming both. */
+function plantedRun(): RunRow {
+  planted += 1;
+  const dir = join(tempBase, `runs-${String(planted)}`);
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${RUN.sessionId}.json`);
+  const eventsPath = join(dir, `${RUN.sessionId}.events.ndjson`);
+  writeFileSync(path, '{}');
+  writeFileSync(eventsPath, '');
+  return { ...RUN, path, eventsPath };
+}
+
 function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
   return {
     ok: true,
@@ -152,6 +178,7 @@ function reading(overrides: Partial<CleanupRead> = {}): CleanupRead {
     stale: [STALE],
     notPushed: [NOT_PUSHED],
     worktrees: [WT_CLEAN, WT_DIRTY],
+    runs: [],
     notes: [],
     ...overrides,
   };
@@ -273,8 +300,9 @@ const DEFAULT_STEPS = [
 
 describe('cleanupQuestion and notPushedQuestion', () => {
   it('spells the final question with each count and its noun', () => {
-    expect(cleanupQuestion(2, 1)).toBe('Delete 2 branches and remove 1 worktree? [y/N] ');
-    expect(cleanupQuestion(1, 0)).toBe('Delete 1 branch and remove 0 worktrees? [y/N] ');
+    expect(cleanupQuestion(2, 1, 0)).toBe('Delete 2 branches, remove 1 worktree and remove 0 run records? [y/N] ');
+    expect(cleanupQuestion(1, 0, 1)).toBe('Delete 1 branch, remove 0 worktrees and remove 1 run record? [y/N] ');
+    expect(cleanupQuestion(0, 0, 3)).toContain('remove 3 run records?');
   });
 
   it('names the branch and the commits deleting it loses', () => {
@@ -284,10 +312,10 @@ describe('cleanupQuestion and notPushedQuestion', () => {
 });
 
 describe('cleanupGroups and selectionOf', () => {
-  it('gives the four groups in order, each row ticked as read, and an untickable worktree disabled with its reason', () => {
-    const groups = cleanupGroups(reading());
-    expect(groups.map((group) => group.title)).toEqual(['Merged', 'Stale', 'Not pushed', 'Worktrees']);
-    expect(groups.map((group) => group.choices.map((choice) => choice.checked))).toEqual([[true, true], [false], [false], [true, false]]);
+  it('gives the five groups in order, each row ticked as read, and an untickable worktree disabled with its reason', () => {
+    const groups = cleanupGroups(reading({ runs: [RUN] }));
+    expect(groups.map((group) => group.title)).toEqual(['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records']);
+    expect(groups.map((group) => group.choices.map((choice) => choice.checked))).toEqual([[true, true], [false], [false], [true, false], [true]]);
     const [clean, dirty] = groups[3]?.choices ?? [];
     expect(clean?.disabled).toBeUndefined();
     expect(clean?.label).toContain('clean; branch merged');
@@ -295,9 +323,19 @@ describe('cleanupGroups and selectionOf', () => {
     expect(dirty?.label).toBe(`${WT_DIRTY.path}  2026-09-20`);
   });
 
+  it('labels a run record\'s row with its plan and start day, padded to the widest plan', () => {
+    const read = reading({ runs: [RUN] });
+    const [run] = cleanupGroups(read)[4]?.choices ?? [];
+    expect(run?.label).toBe(runRowLine(RUN, RUN.plan.length));
+    expect(run?.label).toStartWith('rafa-12-a-plan ');
+    expect(run?.label).toContain('  2026-08-01  run a1b2c3d4');
+    expect(run?.disabled).toBeUndefined();
+    expect(run?.value).toBe(RUN);
+  });
+
   it('splits ticked rows back into their groups', () => {
-    const selection = selectionOf([WT_CLEAN, MERGED, STALE, NOT_PUSHED]);
-    expect(selection).toEqual({ worktrees: [WT_CLEAN], merged: [MERGED], stale: [STALE], notPushed: [NOT_PUSHED] });
+    const selection = selectionOf([WT_CLEAN, MERGED, STALE, NOT_PUSHED, RUN]);
+    expect(selection).toEqual({ worktrees: [WT_CLEAN], merged: [MERGED], stale: [STALE], notPushed: [NOT_PUSHED], runs: [RUN] });
   });
 });
 
@@ -305,7 +343,7 @@ describe('rafa cleanup with a terminal', () => {
   it('runs the default ticks on Enter then y: the worktree first, then -d for merged and -D for squash-merged', async () => {
     const outcome = await run([], { keys: [ENTER], answers: ['y'] });
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1)]);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0)]);
     expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
     expect(gitLines(outcome.recorded).some((line) => line.includes('--force'))).toBe(false);
     for (const line of DEFAULT_STEPS) expect(outcome.stdout).toContain(`✓ git ${line}`);
@@ -314,7 +352,7 @@ describe('rafa cleanup with a terminal', () => {
   it('runs nothing when the final question is answered n (control)', async () => {
     const outcome = await run([], { keys: [ENTER], answers: ['n'] });
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1)]);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0)]);
     expect(outcome.recorded.git).toEqual([]);
     expect(outcome.stdout).toContain(NOTHING_REMOVED_TEXT);
   });
@@ -323,20 +361,20 @@ describe('rafa cleanup with a terminal', () => {
     const keys = [DOWN, DOWN, DOWN, SPACE, ENTER];
     const outcome = await run([], { keys, answers: ['n', 'y'] });
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(2, 1)]);
+    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(2, 1, 0)]);
     expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
   });
 
   it('deletes the Not-pushed row with -D once the second question is answered y (control)', async () => {
     const keys = [DOWN, DOWN, DOWN, SPACE, ENTER];
     const outcome = await run([], { keys, answers: ['y', 'y'] });
-    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(3, 1)]);
+    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(3, 1, 0)]);
     expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, 'branch -D wip']);
   });
 
   it('deletes a ticked Stale row with -D on the final yes alone', async () => {
     const outcome = await run([], { keys: [DOWN, DOWN, SPACE, ENTER], answers: ['y'] });
-    expect(outcome.recorded.asked).toEqual([cleanupQuestion(3, 1)]);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(3, 1, 0)]);
     expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, 'branch -D old-idea']);
   });
 
@@ -402,6 +440,48 @@ describe('rafa cleanup with a terminal', () => {
     expect(outcome.stdout).toContain('warn: pull requests could not be read');
   });
 
+  it('removes a ticked run record and its events file on the final yes, counting it in the question', async () => {
+    const row = plantedRun();
+    const outcome = await run([], { read: reading({ runs: [row] }), keys: [ENTER], answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 1)]);
+    expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
+    expect(outcome.stdout).toContain(`✓ rm ${row.path} ${String(row.eventsPath)}`);
+    expect(existsSync(row.path)).toBe(false);
+    expect(existsSync(String(row.eventsPath))).toBe(false);
+  });
+
+  it('keeps the run record when the final question is answered n (control)', async () => {
+    const row = plantedRun();
+    const outcome = await run([], { read: reading({ runs: [row] }), keys: [ENTER], answers: ['n'] });
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 1)]);
+    expect(existsSync(row.path)).toBe(true);
+    expect(existsSync(String(row.eventsPath))).toBe(true);
+  });
+
+  it('keeps a run record unticked in the checklist, and leaves it out of the question', async () => {
+    const row = plantedRun();
+    const outcome = await run([], { read: reading({ runs: [row] }), keys: [UP, SPACE, ENTER], answers: ['y'] });
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0)]);
+    expect(existsSync(row.path)).toBe(true);
+  });
+
+  it('prints the run record\'s rm line under --dry-run and removes nothing', async () => {
+    const row = plantedRun();
+    const outcome = await run(['--dry-run'], { read: reading({ runs: [row] }), keys: [ENTER] });
+    expect(outcome.recorded.asked).toEqual([]);
+    expect(outcome.stdout).toContain(`rm ${row.path} ${String(row.eventsPath)}`);
+    expect(existsSync(row.path)).toBe(true);
+    expect(existsSync(String(row.eventsPath))).toBe(true);
+  });
+
+  it('asks over a reading whose only rows are run records', async () => {
+    const outcome = await run([], { read: reading({ merged: [], stale: [], notPushed: [], worktrees: [], runs: [RUN] }), keys: [ESCAPE] });
+    expect(outcome.recorded.keysOpened).toBe(1);
+    expect(outcome.stdout).not.toContain(NOTHING_LISTED_TEXT);
+    expect(outcome.stdout).toContain(NOTHING_REMOVED_TEXT);
+  });
+
   it('asks nothing over a reading with no row', async () => {
     const outcome = await run([], { read: reading({ merged: [], stale: [], notPushed: [], worktrees: [] }), keys: [ENTER] });
     expect(outcome.exitCode).toBe(0);
@@ -411,10 +491,14 @@ describe('rafa cleanup with a terminal', () => {
 });
 
 describe('rafa cleanup listing only', () => {
-  it('prints the four groups with no terminal, exiting 0 and removing nothing', async () => {
-    const outcome = await run([], { isTTY: false, keys: [ENTER], answers: ['y'] });
+  it('prints the five groups with no terminal, exiting 0 and removing nothing', async () => {
+    const row = plantedRun();
+    const read = reading({ runs: [row] });
+    const outcome = await run([], { read, isTTY: false, keys: [ENTER], answers: ['y'] });
     expect(outcome.exitCode).toBe(0);
-    expect(outcome.stdout).toBe(`${renderCleanup(reading()).join('\n')}\n`);
+    expect(outcome.stdout).toBe(`${renderCleanup(read).join('\n')}\n`);
+    expect(outcome.stdout).toContain('Run records (1)');
+    expect(existsSync(row.path)).toBe(true);
     expect(outcome.recorded.keysOpened).toBe(0);
     expect(outcome.recorded.promptersOpened).toBe(0);
     expect(outcome.recorded.git).toEqual([]);
@@ -429,12 +513,14 @@ describe('rafa cleanup listing only', () => {
   });
 
   it('gives the groups as the result data under --output=json, asking nothing even with a terminal', async () => {
-    const outcome = await run(['--output=json'], { keys: [ENTER], answers: ['y'] });
+    const read = reading({ runs: [RUN] });
+    const outcome = await run(['--output=json'], { read, keys: [ENTER], answers: ['y'] });
     expect(outcome.exitCode).toBe(0);
     const events = eventsOf(outcome.stdout);
     const result = events.at(-1);
     expect(result?.type).toBe('result');
-    expect(JSON.stringify(result)).toContain(JSON.stringify(cleanupData(reading())));
+    expect(JSON.stringify(result)).toContain(JSON.stringify(cleanupData(read)));
+    expect(JSON.stringify(result)).toContain('"runs":[{"sessionId":"a1b2c3d4"');
     expect(outcome.recorded.keysOpened).toBe(0);
     expect(outcome.recorded.promptersOpened).toBe(0);
     expect(outcome.recorded.git).toEqual([]);
@@ -457,6 +543,7 @@ describe('rafa cleanup reading', () => {
       cwd: '/repo',
       projectRoot: project.root,
       worktreeDir: join('.rafa', 'worktrees'),
+      release: { fragments: '.changes', changelog: 'CHANGELOG.md' },
     });
   });
 

@@ -34,6 +34,9 @@ default), `tests=module`, or `tests=full` to control what its session checks.
   via JUnit. The prompt names both gate names: `affected tests gate` and
   `always-run sweeps gate`
 - `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
+- `bunx tsc` on touched test files against their base (same `tsconfig.json`
+  with `typeRoots` held absolutely, read below for the scratch recipe and
+  backlog)
 - `bunx eslint <changed files>` (ESLint on changed files only; read below
   for the blocker when changed files are all ignored)
 
@@ -51,7 +54,8 @@ never linted.
 
 **Runner recorded steps** (full suite, recorded at fixed points):
 - `baseline` — Full suite once at plan start (first dispatch)
-- `task` — Full suite after each task's session ends and commits
+- `task` — Scope from `taskStepScope` over the task's diff after
+  each task's session ends and commits
 - `stage` — After a stage's last task: the tests under the `Owns:`
   folders it changed, or `bun test --changed=<since>` with the
   `tests.alwaysRun` files when the plan has no `Owns:` folder
@@ -282,24 +286,44 @@ session sets `CLAUDECODE`, and with it set the runner prints no `(pass)`
 line and no name for a file without a failure; the counts and the exit
 code do not change. `env -u CLAUDECODE bun test` prints every case.
 
-**`check-types` never reads a test file.** `tsconfig.json` excludes
-`**/*.test.ts`, and `bun test` strips types without checking them, so a type
-error in a test is green on every gate. To check one by hand, point a
+**The runner now checks touched test files against their base.** The task
+session's type gate runs `tsc` on files matching `**/*.test.ts` in the diff
+against their base commit. `tsconfig.json` excludes `**/*.test.ts` from the
+main gate, so `bun test` strips types without checking them. A test file
+type error that exists on the base branch is not new and does not block;
+one that first appears in the diff is red. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
 by absolute path (a bare `tsconfig.json` is looked up as a package, the
 repo's options are never applied, and hundreds of TS2802 errors follow),
 never `tsconfig.base.json`, which leaves `module` unset and fails
 `src/plan.ts` and `src/start.ts` on `import.meta` (TS1343), `files` holding
-the test's absolute path, `include` empty, `typeRoots` naming
-`<repo>/node_modules/@types` absolutely (left out, every file reports
-`Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc -p`
-on it. Test files already carry errors no gate ever reported, so compare
-against the base before attributing one to the diff: TS2769 where a
+the test's absolute path, `include` empty, `compilerOptions.typeRoots`
+naming `<repo>/node_modules/@types` absolutely (left out, every file
+reports `Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc
+-p` on it. Test files already carry errors no gate ever reported, so
+compare against the base before attributing one to the diff: TS2769 where a
 `readonly` array reaches `toEqual` (`src/config-schema.test.ts`,
 `src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
 `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in
 `src/ports/index.test.ts`, which runs `ts.createProgram` over probe files.
+
+**Test-file type-error backlog:** A scratch tsconfig over every `*.test.ts`
+with the recipe above reported 460 errors in 144 files at commit
+a64ab15c2756104ae685421cbfe063efa2f845a6. The command was:
+`./node_modules/.bin/tsc -p <scratch-dir>/tsconfig.json --noEmit --pretty
+false`, with the scratch `tsconfig.json` holding `"extends":
+"<repo>/tsconfig.json"` (absolute path), `"files"` listing every `.test.ts`
+by absolute path, `"include": []`, and `"compilerOptions": { "typeRoots":
+["<repo>/node_modules/@types"] }` (absolute path to the repository root's
+`node_modules`; both `bun` and `tsc` resolve imports by walking up the
+filesystem from the worktree, stopping at the main checkout's top level to
+find the shared `node_modules` there).
+A test type error that existed on the task's base commit is a held error:
+backlog rather than a bug, and not reported as out-of-scope. The type
+step's line in the task session output reports the held error count from
+the base, allowing later sweeps to compare against this baseline and measure
+progress on the backlog.
 
 Widening an exported interface reaches every `*.test.ts` literal with no
 gate saying so: grep the type name across the test files and fix each
@@ -359,21 +383,24 @@ delete is not a fault.
 `runRafa`) runs the CLI as a child; `src/commands/plan/validate.test.ts` is
 the reference example. This section replaces nothing.
 
-- `runRafa` gives the child a `PATH` of `scratch.bin` then git's directory
-  and nothing else. Plant an executable (mode 755) in `scratch.bin` to make
-  a program present; leave it out to make it absent.
+- `runRafa` gives the child a `PATH` of `scratch.bin`, then git's
+  directory, `/usr/bin` and `/bin` (`hostToolDirs()` in
+  `src/tests/stand-in-gh.ts`), and nothing else. Plant an executable
+  (mode 755) in `scratch.bin` to make a program present; leave it out of
+  `scratch.bin` to make one absent that those directories do not hold.
 - `runRafa` also sets `RAFA_TEST=1` and the suite's own `TMPDIR` on the
   child, ahead of the case's `env`, so a case naming either overrides it.
   `RAFA_TEST=1` makes the child a test process to the effort store's test
   guard (`src/effort/store/location.ts`), and the `TMPDIR` lets that guard
   judge the scratch project by the directory the suite built it under.
   This replaces nothing.
-- The same `PATH` means a stand-in `claude` script cannot rely on `cat` or
-  other coreutils where git lives outside `/usr/bin`. Print a file with
-  shell builtins: `while IFS= read -r l; do printf '%s\n' "$l"; done < f`.
-  A stand-in that must hang cannot `sleep` either: the call fails at once
-  and a deadline test passes without waiting. Have it
-  `exec "<process.execPath>" -e 'setTimeout(() => {}, 600000)'` instead.
+- macOS keeps `cat`, `mkdir`, `rm` and `sleep` in `/bin` alone, and
+  Linux in `/usr/bin` beside git, so a scratch `PATH` built by hand takes
+  `...hostToolDirs()` after its `bin/`, never git's directory alone: a
+  stand-in calling `cat` under git's directory alone prints nothing on
+  macOS, and the loop holds the task with no report. A stand-in that must
+  hang can still `exec "<process.execPath>" -e 'setTimeout(() => {},
+  600000)'`, which no host directory changes.
 - A scratch project's `origin` is a bare path, so `resolvePrProvider`
   answers `none` and no pull request read calls `gh`. Plant
   `pr.provider: gh` in `.rafa/config.yaml`, and `roadmap.issue` too when
@@ -421,6 +448,10 @@ with the `scratch` argument naming the `ScratchRepo` the case built, so
 all failure output lands in one place a reader can find: the test itself
 names the assertion that failed, and the error message names the scratch
 directory, the exit code, and the streams the child wrote.
+`src/tests/spawned-exit-code.sweep.test.ts` holds the rule: it fails on
+any test file under `src/` asserting a spawned rafa run's exit code with
+a bare `expect(run.exitCode).toBe(n)`. It reads each asserted value back
+to its declaration, so an in-process result asserted bare still passes.
 
 ### Fixture scrub, guard, and path rules
 

@@ -48,7 +48,7 @@ import { hopFilePath } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -255,7 +255,7 @@ describe('rafa status, a hop\'s waiting pull request, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['status']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`waiting on #${String(MEMBER_C)} (owner review)`);
   });
 
@@ -265,7 +265,7 @@ describe('rafa status, a hop\'s waiting pull request, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['status']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).not.toContain('waiting on');
   });
 
@@ -276,8 +276,8 @@ describe('rafa status, a hop\'s waiting pull request, spawned', () => {
     const first = runRafa(scratch, scratch.repo, ['status']);
     const second = runRafa(scratch, scratch.repo, ['status']);
 
-    expect(first.exitCode).toBe(0);
-    expect(second.exitCode).toBe(0);
+    expectExit(first, 0, scratch);
+    expectExit(second, 0, scratch);
     expect(first.stdout).not.toContain('waiting on');
     expect(second.stdout).toBe(first.stdout);
     expect(second.stderr).toBe(first.stderr);

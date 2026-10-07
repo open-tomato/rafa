@@ -63,7 +63,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { positionAt, writePositionFile } from '../project/position.js';
 
-import { plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -262,7 +262,7 @@ describe('rafa epic move, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['epic', 'move', '12', '--to=40', '--reason=Consolidating with billing']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout.split('\n')).toEqual([
       'Moved #12 from epic #10 to #40: Consolidating with billing',
       'Added its line to epic #40\'s checklist.',
@@ -305,7 +305,7 @@ describe('rafa epic defer, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['epic', 'defer', '40', '--to=later', '--reason=waiting on #118']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout.split('\n')).toEqual([
       'Moved epic #40 now → later: waiting on #118',
       'No terminal to ask on, so its open work is kept: branch feat/rafa-42-fix-thing.',
@@ -337,7 +337,7 @@ describe('rafa epic new, spawned', () => {
     const run = runRafa(scratch, scratch.repo, ['epic', 'new', 'Sign-in without passwords', '--slug=passwordless']);
 
     expect(run.stderr).toBe('');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout.split('\n')).toEqual([
       'Created epic #501 Sign-in without passwords, horizon later; created epic:passwordless.',
       'Added its line to board #100.',

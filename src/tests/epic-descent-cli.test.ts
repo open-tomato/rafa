@@ -48,7 +48,7 @@ import { plural } from '../commands/plan/plan-files.js';
 import { DRY_RUN_FLAG as NEXT_DRY_RUN_FLAG } from '../next/lines.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 import { completeSpecBody } from './spec-bodies.js';
 
@@ -221,7 +221,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
       const scratch = plant(issues, listing);
       const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toContain(`#82 is next on the roadmap and carries \`${SPEC_READY_LABEL}\``);
       expect(run.stdout).toContain('create the plan for #82');
     });
@@ -230,7 +230,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
       const scratch = plant(issues, listing);
       const run = runRafa(scratch, scratch.repo, ['plan', 'create', '--next', '--dry-run', '--no-progress']);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toContain(`walking into epic #${String(EPIC)}`);
       expect(run.stdout).toContain('Next on the roadmap: issue #82');
       expect(run.stdout).toContain('would plan from issue #82 "Second thing". Nothing was written.');
@@ -264,7 +264,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
       const scratch = plant(issues, listing, ['feat/rafa-82-taken']);
       const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toContain(`the roadmap, issue #${String(ROADMAP)}, has no line left that is not done or taken (${plural(2, 'line')} passed)`);
       expect(run.stdout).not.toContain('#90');
       expect(run.stdout).not.toContain('#91');
@@ -274,7 +274,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
       const scratch = plant(issues, listing, ['feat/rafa-82-taken']);
       const run = runRafa(scratch, scratch.repo, ['plan', 'create', '--next', '--dry-run', '--no-progress']);
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toContain(`epic #${String(EPIC)} Walk the epic has run dry`);
       expect(run.stdout).toContain('does not move on to another epic');
       expect(run.stdout).not.toContain('#90');
@@ -305,7 +305,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
         `⏹ --${NEXT_DRY_RUN_FLAG}: nothing ran.`,
       ].join('\n') + '\n';
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toBe(expected);
     });
 
@@ -320,7 +320,7 @@ describe('rafa next --dry-run and rafa plan create --next --dry-run, over the ep
         dryRunLine(describeIssue(nextIssue)),
       ].join('\n') + '\n';
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toBe(expected);
     });
   });

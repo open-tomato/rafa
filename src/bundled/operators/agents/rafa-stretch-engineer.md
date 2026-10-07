@@ -10,6 +10,13 @@ stage: alpha
 
 Alpha: tested on rafa's own development, may become a feature.
 
+## Run every rafa line as one command
+
+Run every `rafa` line as one command: no `cd … &&`, no `;`, no pipe, no redirect. The allow
+rules match a single command, and a compound one goes to the auto-mode classifier, which
+reads `--skip-checks` as a CI bypass. The tool returns the output; to keep a record, write
+it with the file tools afterwards.
+
 You are a staff engineer on a team that uses rafa as its main tool for
 agentic development. One session of yours is a *stretch*: you take the
 board as it is, pick the work that makes the next release most stable,
@@ -91,18 +98,10 @@ rafa status
 rafa release status
 ```
 
-Then:
+Then, after `rafa stretch start` has set up the integration branch and set `pr.base`:
 
 1. Write `agent.json` with your session id.
-2. Create the integration branch from `main` and push it, then point
-   `pr.base` in `.rafa/config.yaml` at it. Both are gap entries.
-
-   ```bash
-   git fetch origin
-   git push origin origin/main:refs/heads/stretch/<n>
-   ```
-
-3. **The hook rule.** If any loaded settings file names
+2. **The hook rule.** If any loaded settings file names
    `rafa-tooling-hook`, if a skill named `rafa-hookify` is installed, or if
    any command is denied by a hook, stop and alert the person. Never read
    a permission denial as a hook denial, and never install a hook.
@@ -120,26 +119,10 @@ approval, close the duplicate groups as the skill says.
 
 One loop at a time; never two at once inside a stretch.
 
-1. Plan it: `rafa plan create --issue=<n>`.
-2. Start its loop in its own worktree, detached from your session so it
-   survives you, in the compact output:
-
-   ```bash
-   setsid nohup env RAFA_OUTPUT=events rafa loop start --plan=<plan> --as-worktree --no-ci-wait > .rafa/stretch/<n>/loop-<issue>.log 2>&1 &
-   ```
-
-   `setsid` is Linux's; on macOS start it with `nohup` alone and log the
-   difference as a gap. Detached loops are a gap of their own.
-3. Watch it: `rafa loop wait --until=pr,no-pr,halt,error,exit` reads the
-   `.rafa/runs/<session-id>.events.ndjson` file your loop wrote, not the
-   log. No foreground command waits longer than 60 seconds; longer waits
-   run in the background.
-4. Merge its pull request:
-   - Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks`. The merge push
-     runs `verify` asynchronously; read the result at the pit stop.
-   - Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>` once
-     the checks pass.
-5. Clean up: `rafa cleanup`.
+Run `rafa stretch item <issue> --wait`. It starts the loop as a detached child, logs
+its output to `.rafa/stretch/<n>/loop-<issue>.log`, waits on it, merges its pull
+request into `stretch/<n>` with checks skipped, and polls the run until it ends. Then
+move to the pit stop.
 
 ### 3. Pit stop
 
@@ -149,20 +132,12 @@ to the bucket; it is never a change of course.
 
 ### 4. Wrap-up
 
-1. Open the pull request from the integration branch into `main`. rafa
-   opens pull requests only inside a loop, so this is a gap entry:
-
-   ```bash
-   gh pr create --base main --head stretch/<n> --title "Stretch <n>" --body-file .rafa/stretch/<n>/report.md
-   ```
-
-2. Merge the stretch's pull request into `main` once `verify` is green on
-   it: `rafa pr wait <pr>` then `rafa pr merge <pr>`.
-3. After it, point `pr.base` back at `main`, then
-   `rafa release settle --dry-run`, check the base it names, and
-   `rafa release settle`. Tagging and publishing stay with the person.
-4. Finish `report.md`.
-5. Write the next stretch's opening message to
+1. Run `rafa stretch end`. It opens the pull request from `stretch/<n>` into `main`,
+   waits for it to merge, and puts back the `pr.base` recorded when the stretch started.
+2. Once the merge is done, run `rafa release settle --dry-run`, check the base it names,
+   and `rafa release settle`. Tagging and publishing stay with the person.
+3. Finish `report.md`.
+4. Write the next stretch's opening message to
    `.rafa/stretch/engineer-prompt.md`, which the launcher reads before any
    other prompt. Write `{{STRETCH}}` and `{{PREVIOUS}}` where the numbers
    go, and keep it to what the next engineer needs on top of this report:
@@ -175,7 +150,8 @@ to the bucket; it is never a change of course.
      weigh;
    - a line saying the self-improvement proposals wait for the person's
      yes, so the person adds the ones they approve before the next start.
-   Add reviewing it to "Steps for the person" in the report.
+
+5. Add reviewing the engineer prompt to "Steps for the person" in the report.
 
 ## Halts
 

@@ -48,16 +48,17 @@ import type {
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { TagPushed } from '../../release/tag-push.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseSemanticVersion } from '../../release/version.js';
+import { parseSemanticVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo } from '../../tests/cli-capture.js';
 import { gitIdentityEnv } from '../../tests/git-identity.js';
 
@@ -71,7 +72,6 @@ import {
   readNewestRelease,
   readPublishTarget,
   readVersion,
-  RELEASE_REMOTE,
   RELEASE_TAG_USAGE,
   pastReleaseWarning,
   renderTagged,
@@ -407,6 +407,18 @@ describe('what the operator is told to do next', () => {
   it('names the push alone when the version file names no package to publish', () => {
     expect(followUpsFor(TAG, VERSION, target({ name: null }), DEFAULT_PUBLISH)).toHaveLength(1);
   });
+
+  it('names the remote it is handed in the push line', () => {
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, 'upstream')[0])
+      .toEqual({ command: `git push upstream ${TAG}`, why: 'the tag is local until upstream has it' });
+  });
+
+  it('drops the push line once the run pushed the tag, keeping the publish line', () => {
+    expect(followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null)
+      .map((each) => each.command)).toEqual([DEFAULT_PUBLISH]);
+    expect(followUpsFor(TAG, VERSION, target({ isPrivate: true }), DEFAULT_PUBLISH, { ahead: 0, branch: 'main' }, null))
+      .toEqual([]);
+  });
 });
 
 describe('the decision one run makes', () => {
@@ -573,6 +585,23 @@ describe('the lines a run that tagged prints', () => {
       `  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
     ]);
   });
+
+  it('names the push under the tag once it went, with no push line among the follow-ups', () => {
+    const pushed: TagPushed = { outcome: 'pushed', exitCode: 0, tag: TAG, remote: 'upstream', sentence: '' };
+    const onHead = { ahead: 0, branch: 'main' };
+
+    expect(renderTagged(READY, 'main', followUpsFor(TAG, VERSION, target(), DEFAULT_PUBLISH, onHead, null), pushed))
+      .toEqual([
+        `✅ Tagged ${TAG} at the HEAD of main.`,
+        `✅ Pushed ${TAG} to upstream.`,
+        'Next:',
+        `  ${DEFAULT_PUBLISH} — publishes @open-tomato/rafa@${VERSION} to ${DEFAULT_REGISTRY}`,
+      ]);
+    expect(renderTagged(READY, 'main', [], pushed)).toEqual([
+      `✅ Tagged ${TAG} at the HEAD of main.`,
+      `✅ Pushed ${TAG} to upstream.`,
+    ]);
+  });
 });
 
 describe('a tag written behind HEAD', () => {
@@ -704,6 +733,63 @@ describe('the dispatched action', () => {
     expect(data.inputs.changelog.version).toBe(VERSION);
     expect(data.followUps.map((followUp) => followUp.command))
       .toEqual([`git push ${RELEASE_REMOTE} ${TAG}`, DEFAULT_PUBLISH]);
+    expect(Object.keys(data)).toEqual(['inputs', 'written', 'followUps']);
+  });
+
+  it('sends no push without --push, reading only the remote the push line names', async () => {
+    const seams = recorded(gitTable());
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.calls.filter((call) => call.startsWith('push') || call.startsWith('config')))
+      .toEqual(['config --get branch.main.remote']);
+  });
+
+  it('names the remote a release branch tracking upstream tracks in the push line without --push', async () => {
+    const seams = recorded({ ...gitTable(), 'config --get branch.main.remote': said('upstream\n') });
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`git push upstream ${TAG} — the tag is local until upstream has it`);
+    expect(run.stdout).not.toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
+  });
+
+  it('names origin in the push line when the release branch tracks nothing', async () => {
+    const seams = recorded({ ...gitTable(), 'config --get branch.main.remote': refused('') });
+
+    const run = await ran(seams.seams, releaseProject());
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`git push origin ${TAG} — the tag is local until origin has it`);
+  });
+
+  it('pushes the tag with --push, giving the push as the result\'s pushed in json mode', async () => {
+    const table = {
+      ...gitTable(),
+      'config --get branch.main.remote': said('origin\n'),
+      [`push --porcelain origin refs/tags/${TAG}:refs/tags/${TAG}`]: said(''),
+    };
+    const seams = recorded(table);
+
+    const run = await ran(seams.seams, releaseProject(), ['--push', '--output=json']);
+    const data = dataOf(run.events) as ReleaseTagResult;
+
+    expect(run.exitCode).toBe(0);
+    expect(seams.calls.at(-1)).toBe(`push --porcelain origin refs/tags/${TAG}:refs/tags/${TAG}`);
+    expect(data.pushed?.remote).toBe('origin');
+    expect(data.followUps.map((followUp) => followUp.command)).toEqual([DEFAULT_PUBLISH]);
+  });
+
+  it('refuses a value typed after --push with exit code 1, and makes no git runner', async () => {
+    const seams = recorded(gitTable());
+
+    const run = await ran(seams.seams, releaseProject(), ['--push=yes']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('--push takes no value');
+    expect(seams.roots).toEqual([]);
   });
 
   it('tags the branch pr.base names rather than main', async () => {
@@ -831,6 +917,80 @@ describe('what the default seams reach', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('commit the version before tagging it');
     expect(gitIn(repo.repo, repo.home, ['tag', '--list']).trim()).toBe('');
+  });
+
+  /** A bare origin beside `repo`, its `pre-receive` hook declining when `refusing`. */
+  function bareOrigin(repo: string, home: string, refusing = false): string {
+    const origin = `${repo}-origin.git`;
+    gitIn(repo, home, ['init', '-q', '--bare', origin]);
+    gitIn(origin, home, ['config', 'core.hooksPath', join(origin, 'hooks')]);
+    if (refusing) {
+      mkdirSync(join(origin, 'hooks'), { recursive: true });
+      writeFileSync(join(origin, 'hooks', 'pre-receive'), '#!/bin/sh\necho "tags are frozen here" >&2\nexit 1\n', 'utf8');
+      chmodSync(join(origin, 'hooks', 'pre-receive'), 0o755);
+    }
+    gitIn(repo, home, ['remote', 'add', 'origin', origin]);
+    return origin;
+  }
+
+  /** A real repository on main holding one release commit, with a bare origin; see {@link bareOrigin}. */
+  function releasedRepo(refusing = false): { project: PlantedProject; origin: string; repo: string; home: string } {
+    const repo = plantScratchRepo(scratch());
+    writeFileSync(join(repo.repo, 'package.json'), MANIFEST, 'utf8');
+    writeFileSync(join(repo.repo, 'CHANGELOG.md'), CHANGELOG, 'utf8');
+    gitIn(repo.repo, repo.home, ['checkout', '-q', '-B', DEFAULT_RELEASE_BRANCH]);
+    gitIn(repo.repo, repo.home, ['add', '-A']);
+    gitIn(repo.repo, repo.home, ['commit', '-q', '-m', 'chore: release 0.5.0']);
+    const origin = bareOrigin(repo.repo, repo.home, refusing);
+    return { project: { root: repo.repo, home: repo.home }, origin, repo: repo.repo, home: repo.home };
+  }
+
+  it('pushes nothing to a bare origin without --push, and still names the push line', async () => {
+    const world = releasedRepo();
+
+    const run = await ran({}, world.project);
+
+    expect(run.exitCode).toBe(0);
+    expect(gitIn(world.repo, world.home, ['tag', '--list']).trim()).toBe(TAG);
+    expect(gitIn(world.origin, world.home, ['tag', '--list']).trim()).toBe('');
+    expect(run.stdout).toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
+  });
+
+  it('names the remote main tracks in the push line without --push, in a real repository', async () => {
+    const world = releasedRepo();
+    gitIn(world.repo, world.home, ['config', 'branch.main.remote', 'upstream']);
+
+    const run = await ran({}, world.project);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain(`git push upstream ${TAG}`);
+    expect(run.stdout).not.toContain(`git push origin ${TAG}`);
+  });
+
+  it('puts the tag on the bare origin with --push, on the commit it tagged, and drops the push line', async () => {
+    const world = releasedRepo();
+
+    const run = await ran({}, world.project, ['--push']);
+
+    expect(run.exitCode).toBe(0);
+    expect(gitIn(world.origin, world.home, ['tag', '--list']).trim()).toBe(TAG);
+    expect(gitIn(world.origin, world.home, ['rev-parse', `${TAG}^{commit}`]).trim())
+      .toBe(gitIn(world.repo, world.home, ['rev-parse', 'HEAD']).trim());
+    expect(run.stdout).toContain(`✅ Pushed ${TAG} to origin.`);
+    expect(run.stdout).not.toContain(`git push ${RELEASE_REMOTE} ${TAG}`);
+  });
+
+  it('exits 1 naming what git said when the origin refuses the push, and keeps the local tag', async () => {
+    const world = releasedRepo(true);
+
+    const run = await ran({}, world.project, ['--push']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${TAG} is written and kept locally, but could not be pushed to origin`);
+    expect(run.stderr).toContain('tags are frozen here');
+    expect(run.stdout).not.toContain('✅');
+    expect(gitIn(world.repo, world.home, ['tag', '--list']).trim()).toBe(TAG);
+    expect(gitIn(world.origin, world.home, ['tag', '--list']).trim()).toBe('');
   });
 
   it('refuses on a branch that is not the release branch, in a real repository', async () => {

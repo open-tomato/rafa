@@ -6,12 +6,14 @@
  */
 import type { LocalBranch } from './branches.js';
 import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
-import type { CleanupSelection } from './steps.js';
+import type { PastHeadCommit } from './past-head.js';
+import type { RunRow } from './runs.js';
+import type { CleanupFiles, CleanupSelection } from './steps.js';
 import type { WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,8 +28,10 @@ import {
   dryRunLines,
   forcedFlagRefusal,
   needsForcedDelete,
+  removeRunStep,
   removeWorktreeStep,
   runCleanupSteps,
+  unheldPastHeadReason,
 } from './steps.js';
 
 const NOW = new Date('2026-09-24T12:00:00Z');
@@ -41,6 +45,29 @@ function mergedRow(name: string, mergedBy: readonly MergedBy[] = ['base']): Merg
     ? { number: 7, headRefName: name, headRefOid: 'abc123', mergedAt: '2026-09-20T00:00:00Z' }
     : null;
   return { group: 'merged', ticked: true, branch: localBranch(name), reason: 'merged', mergedBy, pullRequest };
+}
+
+/** A commit past the head, its hash `<letter>` repeated to 40. */
+function pastCommit(letter: string, subject: string, held: boolean): PastHeadCommit {
+  return { hash: letter.repeat(40), subject, paths: [held
+    ? '.changes/x.md'
+    : 'src/x.ts'], held };
+}
+
+/** A Merged row listed by its gone upstream alone, its tip past pull request #21's head by `commits`. */
+function pastHeadRow(name: string, commits: readonly PastHeadCommit[], mergedBy: readonly MergedBy[] = ['gone']): MergedRow {
+  const pullRequest = { number: 21, headRefName: name, headRefOid: 'abc123', mergedAt: '2026-09-20T00:00:00Z' };
+  return {
+    ...mergedRow(name, mergedBy),
+    ticked: false,
+    pastHead: {
+      kind: 'past-head',
+      pullRequest,
+      count: commits.length,
+      commits,
+      held: commits.every((commit) => commit.held),
+    },
+  };
 }
 
 function staleRow(name: string): StaleRow {
@@ -66,6 +93,32 @@ function worktreeRow(path: string, branch: string | null, tickable = true): Work
       ? 'clean'
       : '1 changed file',
   };
+}
+
+/** A run-record row under `/p/.rafa/runs/`, with its events file unless `events` is false. */
+function runRow(sessionId: string, ticked = true, events = true): RunRow {
+  return {
+    sessionId,
+    path: `/p/.rafa/runs/${sessionId}.json`,
+    eventsPath: events
+      ? `/p/.rafa/runs/${sessionId}.events.ndjson`
+      : null,
+    plan: 'demo',
+    startedAt: '2026-09-01T12:00:00.000Z',
+    ticked,
+  };
+}
+
+/** Files that remove nothing, recording every path asked for, and throwing for the paths in `refuse`. */
+function scriptedFiles(refuse: readonly string[] = []): { files: CleanupFiles; removed: string[] } {
+  const removed: string[] = [];
+  const files: CleanupFiles = {
+    remove: (path) => {
+      removed.push(path);
+      if (refuse.includes(path)) throw new Error(`EACCES: permission denied, unlink '${path}'`);
+    },
+  };
+  return { files, removed };
 }
 
 function selection(fields: Partial<CleanupSelection>): CleanupSelection {
@@ -164,6 +217,64 @@ describe('cleanupSteps', () => {
     ]);
   });
 
+  it('withholds, with one warning, a held Merged row ticked anyway, so --dry-run prints no step for it', () => {
+    const held: MergedRow = {
+      ...mergedRow('done'),
+      ticked: false,
+      heldBy: { path: '/repo/.claude/worktrees/cranky', name: 'cranky', blockers: ['recent'] },
+    };
+    const plan = cleanupSteps(selection({ merged: [held, mergedRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d other']);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'done', reason: 'checked out in cranky (recent), which is not removed' },
+    ]);
+  });
+
+  it('withholds a held Merged row once when its untickable worktree is passed too', () => {
+    const held: MergedRow = {
+      ...mergedRow('done'),
+      ticked: false,
+      heldBy: { path: '/w/dirty', name: 'dirty', blockers: ['dirty'] },
+    };
+    const plan = cleanupSteps(selection({ worktrees: [worktreeRow('/w/dirty', 'done', false)], merged: [held] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld.filter((entry) => entry.kind === 'delete-branch')).toEqual([
+      { kind: 'delete-branch', subject: 'done', reason: 'checked out in dirty (dirty), which is not removed' },
+    ]);
+  });
+
+  it('withholds a ticked Stale row a dirty worktree holds, never a git branch -D step (#852)', () => {
+    const held: StaleRow = { ...staleRow('old'), heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] } };
+    const plan = cleanupSteps(selection({ stale: [held, staleRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -D other']);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'old', reason: 'checked out in scratch (dirty), which is not removed' },
+    ]);
+  });
+
+  it('withholds a ticked Not-pushed row a locked worktree holds, never a git branch -D step (#852)', () => {
+    const held: NotPushedRow = { ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } };
+    const plan = cleanupSteps(selection({ notPushed: [held] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld).toEqual([
+      { kind: 'delete-branch', subject: 'local', reason: 'checked out in pinned (locked), which is not removed' },
+    ]);
+  });
+
+  it('still deletes a row a ticked worktree holds after it, beside held Stale and Not-pushed rows', () => {
+    const plan = cleanupSteps(selection({
+      worktrees: [worktreeRow('/w/done', 'done')],
+      merged: [mergedRow('done')],
+      stale: [{ ...staleRow('old'), heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] } }],
+      notPushed: [{ ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } }],
+    }));
+    expect(plan.steps.map((step) => ({ argv: step.argv.join(' '), after: step.after }))).toEqual([
+      { argv: 'git worktree remove /w/done', after: null },
+      { argv: 'git branch -d done', after: '/w/done' },
+    ]);
+    expect(plan.withheld.map((entry) => entry.subject)).toEqual(['old', 'local']);
+  });
+
   it('removes a detached worktree without any branch step', () => {
     const plan = cleanupSteps(selection({ worktrees: [worktreeRow('/w/detached', null)] }));
     expect(plan.steps.map((step) => step.argv.join(' '))).toEqual(['git worktree remove /w/detached']);
@@ -192,6 +303,51 @@ describe('needsForcedDelete', () => {
   it('does not hold when the row names no pull request', () => {
     const row = { ...mergedRow('a', ['pull-request']), pullRequest: null };
     expect(needsForcedDelete(row)).toBe(false);
+  });
+
+  it('holds for a gone row past a pull request\'s head only when every commit past it is held', () => {
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true)]))).toBe(true);
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'source', false)]))).toBe(false);
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true), pastCommit('b', 'source', false)])))
+      .toBe(false);
+  });
+
+  it('does not hold for a held past-head row the base reaches, which -d deletes', () => {
+    expect(needsForcedDelete(pastHeadRow('a', [pastCommit('a', 'fragment', true)], ['base', 'gone']))).toBe(false);
+  });
+});
+
+describe('a Merged row past its pull request\'s head', () => {
+  it('deletes it with -D when the commits past the head are held release fragments', () => {
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('fragment', [pastCommit('a', 'chore: fragment', true)])] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -D fragment']);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('withholds a tick otherwise, naming the commits the base does not hold', () => {
+    const commits = [pastCommit('a', 'chore: fragment', true), pastCommit('b', 'feat: late', false)];
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('source', commits), mergedRow('other')] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d other']);
+    expect(plan.withheld).toEqual([{
+      kind: 'delete-branch',
+      subject: 'source',
+      reason: '1 commit past #21\'s head is not a release fragment the base holds: bbbbbbb feat: late;'
+        + ' deleting it would lose them',
+    }]);
+  });
+
+  it('names every unheld commit, oldest first, when there are several', () => {
+    const { pastHead } = pastHeadRow('source', [pastCommit('a', 'one', false), pastCommit('c', 'two', false)]);
+    if (pastHead === undefined) throw new Error('the fixture carries no past-head reading');
+    expect(unheldPastHeadReason(pastHead)).toBe(
+      '2 commits past #21\'s head are not release fragments the base holds: aaaaaaa one, ccccccc two;'
+        + ' deleting it would lose them',
+    );
+  });
+
+  it('deletes a gone row with no past-head reading with -d, which git refuses for a tip nothing reaches', () => {
+    const plan = cleanupSteps(selection({ merged: [{ ...mergedRow('gone', ['gone']), ticked: false }] }));
+    expect(dryRunLines(plan)).toEqual(['git branch -d gone']);
   });
 });
 
@@ -300,6 +456,92 @@ describe('runCleanupSteps over a scripted git', () => {
   });
 });
 
+describe('run-record steps', () => {
+  it('turns a ticked run row into one step removing the record and its events file', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1')] }));
+    expect(plan.steps).toEqual([{
+      kind: 'remove-run',
+      subject: '/p/.rafa/runs/r1.json',
+      argv: ['rm', '/p/.rafa/runs/r1.json', '/p/.rafa/runs/r1.events.ndjson'],
+      after: null,
+    }]);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('turns an unticked run row into no step and nothing withheld', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1', false)] }));
+    expect(plan.steps).toEqual([]);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('removes the record alone when no events file sits beside it', () => {
+    expect(removeRunStep(runRow('r1', true, false)).argv).toEqual(['rm', '/p/.rafa/runs/r1.json']);
+  });
+
+  it('puts the run records after the worktrees and branches, and the force guard lets them through', () => {
+    const plan = cleanupSteps(selection({
+      runs: [runRow('r1')],
+      worktrees: [worktreeRow('/w/a', 'other')],
+      merged: [mergedRow('done')],
+    }));
+    expect(plan.steps.map((step) => step.kind)).toEqual(['remove-worktree', 'delete-branch', 'remove-run']);
+    expect(plan.steps.map((step) => forcedFlagRefusal(step.argv))).toEqual([null, null, null]);
+  });
+
+  it('prints one --dry-run line per ticked record', () => {
+    const plan = cleanupSteps(selection({ runs: [runRow('r1'), runRow('r2', false), runRow('r3', true, false)] }));
+    expect(dryRunLines(plan)).toEqual([
+      'rm /p/.rafa/runs/r1.json /p/.rafa/runs/r1.events.ndjson',
+      'rm /p/.rafa/runs/r3.json',
+    ]);
+  });
+
+  it('removes both files through the files seam and spawns no git', () => {
+    const { git, calls } = scriptedGit();
+    const { files, removed } = scriptedFiles();
+    const outcomes = runCleanupSteps(git, cleanupSteps(selection({ runs: [runRow('r1')] })), files);
+    expect(calls).toEqual([]);
+    expect(removed).toEqual(['/p/.rafa/runs/r1.json', '/p/.rafa/runs/r1.events.ndjson']);
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok, outcome.command, outcome.said])).toEqual([
+      [true, true, 'rm /p/.rafa/runs/r1.json /p/.rafa/runs/r1.events.ndjson', ''],
+    ]);
+  });
+
+  it('keeps the events file when the record cannot be removed, says why, and runs the next record', () => {
+    const { git } = scriptedGit();
+    const { files, removed } = scriptedFiles(['/p/.rafa/runs/r1.json']);
+    const plan = cleanupSteps(selection({ runs: [runRow('r1'), runRow('r2', true, false)] }));
+    const outcomes = runCleanupSteps(git, plan, files);
+    expect(removed).toEqual(['/p/.rafa/runs/r1.json', '/p/.rafa/runs/r2.json']);
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok])).toEqual([[true, false], [true, true]]);
+    expect(outcomes[0]?.said)
+      .toBe('cannot remove /p/.rafa/runs/r1.json: EACCES: permission denied, unlink \'/p/.rafa/runs/r1.json\'');
+  });
+
+  it('removes both files from the real disk by default, and says so for a file already gone', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-steps-runs-')));
+    try {
+      const record = join(dir, 'r1.json');
+      const events = join(dir, 'r1.events.ndjson');
+      writeFileSync(record, '{}\n');
+      writeFileSync(events, '{}\n');
+      const row = { ...runRow('r1'), path: record, eventsPath: events };
+      expect([existsSync(record), existsSync(events)]).toEqual([true, true]);
+
+      const { git } = scriptedGit();
+      const outcomes = runCleanupSteps(git, cleanupSteps(selection({ runs: [row] })));
+      expect(outcomes.map((outcome) => outcome.ok)).toEqual([true]);
+      expect([existsSync(record), existsSync(events)]).toEqual([false, false]);
+
+      const again = runCleanupSteps(git, cleanupSteps(selection({ runs: [row] })));
+      expect(again.map((outcome) => outcome.ok)).toEqual([false]);
+      expect(again[0]?.said).toStartWith(`cannot remove ${record}: `);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('runCleanupSteps over a real repository', () => {
   const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-steps-')));
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -322,6 +564,9 @@ describe('runCleanupSteps over a real repository', () => {
   sh(repo, 'switch', '-q', 'main');
   sh(repo, 'merge', '-q', '--squash', 'squashed');
   sh(repo, 'commit', '-q', '-m', 'squash');
+  sh(repo, 'switch', '-q', '-c', 'past', 'squashed');
+  sh(repo, 'commit', '-q', '--allow-empty', '-m', 'fragment past the head');
+  sh(repo, 'switch', '-q', 'main');
   sh(repo, 'branch', 'clean');
   sh(repo, 'branch', 'dirty');
   const cleanPath = join(scratch, 'wt-clean');
@@ -359,6 +604,16 @@ describe('runCleanupSteps over a real repository', () => {
     expect(outcomes[5]?.said).toContain('error: the branch \'squashed\' is not fully merged');
     expect([branchExists('clean'), branchExists('dirty'), branchExists('merged'), branchExists('squashed')])
       .toEqual([false, true, false, true]);
+  });
+
+  it('deletes a branch past its pull request\'s head with the -D held fragments allow, which -d refuses', () => {
+    const git = createGitRunner(repo);
+    const refused = runCleanupSteps(git, { steps: [deleteBranchStep('past', false)], withheld: [] });
+    expect(refused[0]?.said).toContain('error: the branch \'past\' is not fully merged');
+    const plan = cleanupSteps(selection({ merged: [pastHeadRow('past', [pastCommit('a', 'fragment past the head', true)])] }));
+    const outcomes = runCleanupSteps(git, plan);
+    expect(outcomes.map((outcome) => [outcome.command, outcome.ok])).toEqual([['git branch -D past', true]]);
+    expect(branchExists('past')).toBe(false);
   });
 
   it('deletes the squash-merged branch with the -D its pull request reading allows', () => {

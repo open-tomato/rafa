@@ -36,6 +36,13 @@
  * shape, an abbreviated base and a refused one, are driven in
  * `task-gate-lines.test.ts`.
  *
+ * Also for `dispatchTask` running the loop guard just before its spawn:
+ * against a real repository and a linked worktree cut from it, a
+ * checkout that held spawns the session as before, and one removed
+ * before the spawn spawns nothing and marks the task `[BLOCKED]` with
+ * the guard's blocker; a dispatch handed no guard spawns into the same
+ * removed checkout, which shows the halt is the guard's.
+ *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
  * in `tests/task-report.test.ts`. Every store here sits under a fresh root
@@ -43,7 +50,8 @@
  * directly. The lines the loop prints go to a sink output set for each
  * case and unset after it.
  */
-import type { TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
+import type { CheckoutExpectation } from './checkout-guard.js';
+import type { DispatchGuard, TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterContext } from '../adapters/registry.js';
@@ -52,7 +60,8 @@ import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -65,10 +74,14 @@ import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
+import { findNextTask } from '../utils/tracker.js';
 
+import { CHECKOUT_MOVED, haltHeadline } from './checkout-guard.js';
+import { openCheckoutExpectation } from './checkout-watch.js';
 import {
   buildTaskPrompt,
   dispatchTask,
+  HALTED_EXIT_CODE,
   NO_TASK_SECTIONS,
   renderProgressForDispatch,
   storeTaskReport,
@@ -1200,5 +1213,160 @@ describe('dispatchTask and renderProgressForDispatch, in the run\'s checkout', (
     expect(renderProgressForDispatch(root, 'demo')).toBe(true);
 
     expect(readFileSync(join(root, 'progress.txt'), 'utf8')).toContain('the finding the store holds');
+  });
+});
+
+describe('dispatchTask, handing out the shipped PROMPT.md', () => {
+  const SHIPPED_PROMPT = readFileSync(join(import.meta.dir, '..', 'PROMPT.md'), 'utf8');
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('hands the session the foreground rule, and a prompt without it carries none', async () => {
+    const root = freshRoot();
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (promptContent: string): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent,
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
+      newSessionId: () => 'session-under-test',
+    });
+    const rule = 'Run every command in the foreground, the full test suite included';
+
+    const shipped = (await dispatchWith(SHIPPED_PROMPT)).prompt;
+    expect(shipped).toContain(rule);
+    expect(shipped).toContain('never start a background command and never wait on a notification');
+    expect(shipped).toContain('end the session only after your `rafa:report` block');
+    expect((await dispatchWith('The loop commits.')).prompt).not.toContain(rule);
+  });
+});
+
+describe('dispatchTask, running the loop guard just before its spawn', () => {
+  const BRANCH = 'feat/rafa-585';
+  const TRACKER = `- [x] The task before\n- [ ] ${LINE}\n`;
+
+  /** Runs git in `cwd` under `LC_ALL=C`. */
+  const git = (cwd: string, args: readonly string[]): void => {
+    execFileSync('git', [...args], { cwd, stdio: 'ignore', env: { ...process.env, LC_ALL: 'C' } });
+  };
+
+  /** A repository on `main` with one commit, and a worktree on {@link BRANCH} beside it, with a tracker. */
+  const plantWorktree = (): { root: string; checkout: string; trackerPath: string } => {
+    const base = freshRoot();
+    const root = join(base, 'repo');
+    mkdirSync(root, { recursive: true });
+    git(root, ['init', '-q', '-b', 'main']);
+    git(root, ['config', 'user.email', 'dispatch@example.invalid']);
+    git(root, ['config', 'user.name', 'dispatch']);
+    writeFileSync(join(root, 'f.txt'), 'one\n');
+    git(root, ['add', 'f.txt']);
+    git(root, ['commit', '-q', '-m', 'one']);
+    git(root, ['branch', BRANCH]);
+    const checkout = join(realpathSync(base), 'worktree');
+    git(root, ['worktree', 'add', '-q', checkout, BRANCH]);
+    const trackerPath = join(base, 'PLAN_TRACKER-demo.md');
+    writeFileSync(trackerPath, TRACKER);
+    return { root: realpathSync(root), checkout, trackerPath };
+  };
+
+  let errors: string[] = [];
+
+  beforeEach(() => {
+    errors = [];
+    setActiveOutput(sinkOutput({ error: (line) => errors.push(line) }));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** The expectation a run opens on `planted`'s worktree, read while it is still there. */
+  function expectationOf(planted: { root: string; checkout: string }): CheckoutExpectation {
+    return openCheckoutExpectation({ projectRoot: planted.root, checkout: planted.checkout, branch: BRANCH });
+  }
+
+  /** Dispatches the tracker's open task into `planted`'s worktree under `guard`, recording each spawn's directory. */
+  const dispatchInto = (
+    planted: { root: string; checkout: string },
+    guard: DispatchGuard | null,
+    spawned: string[],
+  ): ReturnType<typeof dispatchTask> => {
+    const run: TaskSessionRunner = (_prompt, _flags, _id, _sources, _served, cwd) => {
+      spawned.push(cwd);
+      return Promise.resolve({ exitCode: 0, stdout: REPORTED });
+    };
+    return dispatchTask({
+      taskInfo: { task: LINE, lineNum: 1, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: TRACKER,
+      inject: 'full',
+      repoRoot: planted.root,
+      checkout: planted.checkout,
+      home: join(planted.root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      base: null,
+      guard,
+      run,
+      newSessionId: () => 'session-under-test',
+    });
+  };
+
+  it('spawns the session as before when the checkout held', async () => {
+    const planted = plantWorktree();
+    const spawned: string[] = [];
+
+    const dispatch = await dispatchInto(planted, { expected: expectationOf(planted), trackerPath: planted.trackerPath }, spawned);
+
+    expect(spawned).toEqual([planted.checkout]);
+    expect(dispatch.halted).toBe(false);
+    expect(dispatch.exitCode).toBe(0);
+    expect(dispatch.sessionId).toBe('session-under-test');
+    expect(dispatch.output).toBe(REPORTED);
+    expect(readFileSync(planted.trackerPath, 'utf8')).toBe(TRACKER);
+    expect(errors).toEqual([]);
+  });
+
+  it('spawns nothing and blocks the task with the guard\'s text when the checkout was removed before the spawn', async () => {
+    const planted = plantWorktree();
+    const expected = expectationOf(planted);
+    const spawned: string[] = [];
+    rmSync(planted.checkout, { recursive: true, force: true });
+
+    const dispatch = await dispatchInto(planted, { expected, trackerPath: planted.trackerPath }, spawned);
+
+    expect(spawned).toEqual([]);
+    expect(dispatch.halted).toBe(true);
+    expect(dispatch.exitCode).toBe(HALTED_EXIT_CODE);
+    expect(dispatch.sessionId).toBe('');
+    expect(dispatch.output).toBe('');
+    expect(existsSync(planted.checkout)).toBe(false);
+    const task = findNextTask(readFileSync(planted.trackerPath, 'utf8'));
+    expect(task?.status).toBe('blocked');
+    expect(task?.blocker).toBe(CHECKOUT_MOVED);
+    expect(errors[0]).toBe(`\n${haltHeadline(planted.checkout)}`);
+    expect(errors).toContain(`   Found:    no checkout: ${planted.checkout} does not exist`);
+  });
+
+  it('spawns into the removed checkout when handed no guard, so the halt above is the guard\'s', async () => {
+    const planted = plantWorktree();
+    const spawned: string[] = [];
+    rmSync(planted.checkout, { recursive: true, force: true });
+
+    const dispatch = await dispatchInto(planted, null, spawned);
+
+    expect(spawned).toEqual([planted.checkout]);
+    expect(dispatch.halted).toBe(false);
+    expect(readFileSync(planted.trackerPath, 'utf8')).toBe(TRACKER);
   });
 });

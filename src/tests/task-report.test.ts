@@ -21,7 +21,7 @@
  * dispatcher resolves and spawns `claude` off PATH. So it is run as a
  * command, `bun src/rafa.ts start`, in a scratch repository holding
  * `.rafa/config.yaml`, with a HOME of its own, under a PATH holding a
- * stand-in `claude`, a stand-in `gh` and git's own directory. Each run
+ * stand-in `claude`, a stand-in `gh`, git's own directory and the system tools'. Each run
  * first asserts that `claude` and `gh` resolve to the stand-ins on that
  * PATH, so no case can reach a real session or a real `gh`. The stand-in keeps each call's arguments, prompt and the
  * `progress.txt` it found, outside the repository, and answers by the
@@ -151,6 +151,7 @@ import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** What a run with no config spawns every session under, spelled out. */
 const DEFAULT_SOURCE_ARGS = ['--setting-sources', 'project,local'];
@@ -559,9 +560,7 @@ function plantScratch(tasks: readonly string[], refuseCommits = false): Scratch 
   const plan = [`# Plan: ${STUB}`, '', ...tasks.map((task) => `- [ ] ${task}`), ''];
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), plan.join('\n'), 'utf8');
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, calls, home, claude, gh, path: [bin, dirname(gitBinary)].join(delimiter) };
+  return { repo, calls, home, claude, gh, path: [bin, ...hostToolDirs()].join(delimiter) };
 }
 
 /** The command line of every run: the scratch plan, never waiting on CI. */
@@ -808,8 +807,10 @@ describe('rafa start, over a stand-in claude', () => {
 
     expect(run).toMatchObject({ exitCode: 0 });
     expect(callCount(scratch)).toBe(4);
-    const ids = [1, 2, 3].map((n) => requireSessionId(scratch, n));
-    const [reporting, silent, late] = ids;
+    const reporting = requireSessionId(scratch, 1);
+    const silent = requireSessionId(scratch, 2);
+    const late = requireSessionId(scratch, 3);
+    const ids = [reporting, silent, late];
     for (const id of ids) expect(id).toMatch(UUID);
     expect(new Set(ids).size).toBe(3);
     expect(argsOf(scratch, 1)).toEqual([...CLAUDE_BASE_ARGS, ...DEFAULT_SOURCE_ARGS, '--session-id', reporting]);

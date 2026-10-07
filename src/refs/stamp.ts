@@ -552,7 +552,10 @@ function readStamp(entry: unknown, index: number): RefStamp {
   const text = stringField(field(entry, 'text'), `${what}: text`);
   const fingerprint = readFingerprint(entry, what);
   if (!STAMPS_BY_KIND[refKind].includes(fingerprint.kind)) {
-    throw new RefsBlockError(`${what}: a ${refKind} is not stamped ${fingerprintText(fingerprint)}`);
+    const article = /^[aeiou]/.test(refKind)
+      ? 'an'
+      : 'a';
+    throw new RefsBlockError(`${what}: ${article} ${refKind} is not stamped ${fingerprintText(fingerprint)}`);
   }
   return Object.freeze({ kind: refKind, text, fingerprint });
 }

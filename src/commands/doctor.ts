@@ -138,14 +138,16 @@
  * `rafa effort report` lists the halts of `loop start` runs alone. It
  * writes nothing to the board either: the rows are read.
  *
- * ## The three warnings
+ * ## The install readings
  *
  * Each is read before the preflight and written after it, whatever it
  * did, a refusal included, by `./doctor-install.ts`:
  *
+ *   - A store problem when the effort store directories cannot be checked
+ *     (`readLegacyStore` and `readPreInitDirs`), printed as a warning that
+ *     the directories could not be checked, and the error.
  *   - `readLegacyStore` (`effort/store/legacy.ts`): `.ralph/effort/` under
  *     the project root holds a store file and `.rafa/effort/` holds none.
- *     Directories that cannot be checked are warned about instead.
  *   - `readBinPath` (`project/bin-path.ts`): `~/.rafa/bin` of the
  *     project's home is not on the invocation's `PATH` ahead of
  *     `~/.bun/bin`. When it is, text mode says so in an `info` line, so a
@@ -156,8 +158,11 @@
  *     warned about in neither mode, so it reads no line at all. The
  *     config this reads is loaded on its own and its problems are left to
  *     the preflight, which refuses a config `loadConfig` will not give.
+ *   - `readPreviousCopies` (`./doctor-previous.ts`): the count of previous
+ *     copies of issue specs under `specs.dir/previous/`, a warning when it
+ *     exceeds fifty, and the note that they are safe to delete.
  *
- * A warning never changes the exit code.
+ * A reading's warning never changes the exit code.
  *
  * ## The effort store schema row
  *
@@ -212,7 +217,8 @@
  * then `renderDoctorBoard`'s lines (`./doctor-board.ts`) for a repository that has a GitHub board —
  * its rows, then any blocked issues, then any epic labels — and none for
  * one that has not; then the project rows, when `board.project.number` is set; then the cleanup row, when there is anything to
- * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the `Skill tiers` rows
+ * clean; then the references row, when there is a saved copy; then the release row, when the release is on; then the
+ * stretch row (`./doctor-stretch.ts`), when `pr.base` names a `stretch/*` branch; then the `Skill tiers` rows
  * (`./doctor-tiers.ts`), when there is any; then the effort store schema row, when there is a store; then the
  * effort sync row; then, under `--deep`,
  * `renderDeep`'s sections. A halt
@@ -294,6 +300,7 @@ import { readDoctorProject, renderDoctorProject } from './doctor-project.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';
 import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
+import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
 
@@ -717,6 +724,7 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const repository = [...renderDoctorBoard(readings), ...renderDoctorProject(projectRows), ...renderDoctorCleanup(readings.cleanup)];
     writeText(context, [...repository, ...renderDoctorRefs(readings.refs)]);
     writeDoctorRelease(context, release);
+    writeDoctorStretch(context, project.root, preflight.config.prBase);
     writeText(context, renderDoctorTiers(readings.tiers));
     writeDoctorEffortSchema(context, effortSchema);
     writeText(context, renderDoctorEffortSync(effortSync));

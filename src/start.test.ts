@@ -57,6 +57,7 @@ import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { gitIdentityEnv } from './tests/git-identity.js';
 import { scratchHomeEnv } from './tests/scratch-home-env.js';
+import { hostToolDirs } from './tests/stand-in-gh.js';
 import { findNextTask } from './utils/tracker.js';
 
 /** One call inside the branch, as the source writes it. */
@@ -576,7 +577,7 @@ interface Scratch {
   readonly home: string;
   /** Where the stand-in keeps each call's count, arguments and prompt. */
   readonly calls: string;
-  /** The PATH a spawned run gets: the stand-in's `bin/`, git's own directory, then bun's own. */
+  /** The PATH a spawned run gets: the stand-in's `bin/`, git's own directory and the system tools' (`hostToolDirs`), then bun's own. */
   readonly path: string;
 }
 
@@ -653,8 +654,6 @@ function plant(): Scratch {
   const calls = join(root, 'calls');
   for (const dir of [repo, bin, home, calls]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const bunBinary = Bun.which('bun');
   if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
 
@@ -685,7 +684,7 @@ function plant(): Scratch {
   writeFileSync(join(repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');
   plantProjectConfig(repo);
 
-  return { repo, home, calls, path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter) };
+  return { repo, home, calls, path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter) };
 }
 
 /** Runs `rafa loop start` over the planted plan in `scratch`'s repository, waiting for it to finish. */

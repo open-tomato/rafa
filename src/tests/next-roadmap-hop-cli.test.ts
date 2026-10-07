@@ -41,7 +41,7 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -175,7 +175,7 @@ describe('rafa next --roadmap over H blocked by C in another board\'s epic, spaw
       '⏹ --dry-run: nothing ran.',
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
     // A dry run proposes the hop; it never writes the position a real hop would move.
     expect(existsSync(position)).toBe(false);
@@ -191,7 +191,7 @@ describe('rafa next --roadmap over H blocked by C in another board\'s epic, spaw
       '⏹ --dry-run: nothing ran.',
     ].join('\n') + '\n';
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toBe(expected);
     expect(existsSync(positionFilePath(scratch.repo))).toBe(false);
   });

@@ -27,7 +27,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { beginSession } from '../loop/sessions.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-next-beside-loop-')));
@@ -93,7 +93,7 @@ describe('rafa next --dry-run beside a live run with uncommitted task edits', ()
 
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(`session ${SESSION}`);
     expect(run.stdout).toContain('rafa loop status');
     expect(run.stdout).not.toContain('working tree');
@@ -106,7 +106,7 @@ describe('rafa next --dry-run beside a live run with uncommitted task edits', ()
 
     const run = runRafa(scratch, scratch.repo, ['next', '--dry-run']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('the working tree at');
     expect(run.stdout).not.toContain(`session ${SESSION}`);
   });

@@ -434,14 +434,14 @@ The second example above has no `skills=` and is still a valid task declaration.
 * The RUNNER owns the push, the pull request, the merge with the base,
   the wait for CI, and the release fragment creation. After the last
   task it runs a wrap-up session that promotes findings, compacts
-  `progress.txt`, merges `origin/main`, commits, pushes and opens (or
+  `progress.txt`, merges `origin/<base>`, commits, pushes and opens (or
   updates) the PR — and then polls that PR's checks, spending repair sessions
   on a red or conflicting result. So a plan must NOT carry a task that opens
   a PR, resolves a merge conflict, waits on CI, compacts `progress.txt`,
   or writes a release fragment. Two openers race: measured,
   one run cut a second branch and opened a second PR for a single plan. A
   close-out task SHOULD still take the mergeability reading (`git merge-tree
-  --write-tree origin/main HEAD`) and assemble the body material — the gate
+  --write-tree origin/<base> HEAD`) and assemble the body material — the gate
   captures, the test plan, the recorded debt — into the plan's close-out
   notes for that wrap-up session to use.
 

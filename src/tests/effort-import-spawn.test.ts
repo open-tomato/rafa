@@ -25,7 +25,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { bringForward } from '../effort/store/bring-forward.js';
 import { MOVE_TO_SQLITE } from '../effort/store/merge-store.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-effort-import-spawn-')));
 afterAll(() => {
@@ -98,7 +98,7 @@ describe('rafa effort import, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'import', missingOther], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(1);
+    expectExit(outcome, 1, scratch);
     expect(outcome.stderr).toContain('❌ rafa effort import: ');
     expect(outcome.stderr).toContain('the other store');
     expect(snapshot(effortDir)).toEqual(before);
@@ -123,7 +123,7 @@ describe('rafa effort import, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'import', otherPath], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(2);
+    expectExit(outcome, 2, scratch);
     expect(outcome.stderr).toContain('❌ rafa effort import: ');
     expect(outcome.stderr).toContain(`is the effort store of another project (root commit ${OTHER_PROJECT})`);
     expect(snapshot(effortDir)).toEqual(before);
@@ -137,7 +137,7 @@ describe('rafa effort import, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'import', missingOther]);
 
-    expect(outcome.exitCode).toBe(2);
+    expectExit(outcome, 2, scratch);
     expect(outcome.stderr).toContain(`Next safe step: ${MOVE_TO_SQLITE}`);
   }, SPAWN_TIMEOUT);
 
@@ -159,11 +159,11 @@ describe('rafa effort import, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'import', otherPath], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(0);
+    expectExit(outcome, 0, scratch);
     expect(outcome.stdout).toContain(`Merges ${otherPath} (store ${THERE}) into ${path}`);
     expect(outcome.stdout).toContain('  sessions: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict;');
-    expect(outcome.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(outcome.stdout).toContain('✅ Merged. Every row the original held is copied to');
     const [backupName] = readdirSync(effortDir).sort()
       .filter((name) => name !== 'effort.sqlite');
     expect(readdirSync(effortDir).sort()).toEqual([
@@ -175,7 +175,7 @@ describe('rafa effort import, spawned', () => {
 
     const again = runRafa(scratch, scratch.repo, ['effort', 'import', otherPath], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(again.exitCode).toBe(0);
+    expectExit(again, 0, scratch);
     expect(again.stdout).toContain('  sessions: 0 added, 2 skipped, 0 in conflict\n');
     expect(again.stdout).toContain('Total: 0 added, 2 skipped, 0 in conflict;');
   }, SPAWN_TIMEOUT);

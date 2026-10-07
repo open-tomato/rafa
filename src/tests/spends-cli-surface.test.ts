@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { eventsOf, plantScratchRepo, runRafa } from './cli-capture.js';
+import { eventsOf, expectExit, plantScratchRepo, runRafa } from './cli-capture.js';
 
 /** A temporary directory of this file's own, holding one scratch repository per case. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-spends-cli-surface-')));
@@ -52,7 +52,7 @@ describe('rafa --help, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(
       '  plan       create plans from specs; list, show and validate them; read their\n'
       + '             risk and needs 🪙\n',
@@ -66,11 +66,23 @@ describe('rafa --help, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(
       '  epic       show one epic\'s issues as the Roadmap table; create an epic; defer\n'
       + '             or promote it; move an issue to it; close it through the gate or\n'
       + '             cancel it 🪙\n',
+    );
+  }, RUN_TIMEOUT);
+
+  it('marks the stretch subject line, which stretch start spends on unless --dry-run', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const run = runRafa(scratch, scratch.repo, ['--help']);
+
+    expectExit(run, 0, scratch);
+    expect(run.stdout).toContain(
+      '  stretch    open a stretch: its integration branch, pr.base pointed at it, and\n'
+      + '             the operators in tmux 🪙\n',
     );
   }, RUN_TIMEOUT);
 
@@ -79,7 +91,7 @@ describe('rafa --help, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['--help']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('Commands:\n  status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe\n');
   }, RUN_TIMEOUT);
 });
@@ -90,10 +102,10 @@ describe('rafa pr --help, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['pr', '--help']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain(
-      '  triage    assess a pull request: its class, the evidence, and a follow-up\n'
-      + '            prompt 🪙 with --resolve\n',
+      '  triage     assess a pull request: its class, the evidence, and a follow-up\n'
+      + '             prompt 🪙 with --resolve\n',
     );
   }, RUN_TIMEOUT);
 });
@@ -104,7 +116,7 @@ describe('rafa plan create --help, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['plan', 'create', '--help']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     expect(run.stdout).toContain('Spends:\n  🪙 one planning session\n');
   }, RUN_TIMEOUT);
 });
@@ -115,13 +127,13 @@ describe('rafa describe --output=json, spawned', () => {
 
     const run = runRafa(scratch, scratch.repo, ['describe', '--output=json']);
 
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, scratch);
     const events = eventsOf(run.stdout);
     const result = events.find((event) => event.type === 'result') as Extract<CliEvent, { type: 'result' }> | undefined;
     expect(result?.ok).toBe(true);
 
     const document = result?.data as DescribeDocument;
-    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
+    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search', 'stretch item', 'stretch start'].sort());
     expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'cleanup')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'status')?.spends).toBeNull();

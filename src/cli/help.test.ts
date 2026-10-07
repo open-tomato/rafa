@@ -6,10 +6,11 @@
  * ## The snapshots
  *
  * `testdata/help/rafa.txt`, `rafa-loop.txt`, `rafa-loop-start.txt`,
- * `rafa-loop-wait.txt`, `rafa-next.txt`, `rafa-issue-ready.txt` and
- * `rafa-issue-edit.txt` hold what `rafa --help`, `rafa loop --help`,
- * `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`,
- * `rafa issue ready --help` and `rafa issue edit --help` print. Each case
+ * `rafa-loop-wait.txt`, `rafa-next.txt`, `rafa-issue-ready.txt`,
+ * `rafa-issue-edit.txt` and `rafa-release-tag.txt` hold what `rafa --help`,
+ * `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`,
+ * `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help`
+ * and `rafa release tag --help` print. Each case
  * dispatches its line through `dispatch` over `CORE_REGISTRY` with the
  * renderer handed in, an empty environment and streams of its own, so
  * what is compared is the dispatcher's stdout. One more case spawns
@@ -74,6 +75,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_COMMANDS, CORE_REGISTRY, CORE_SUBJECTS } from '../commands/index.js';
+import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 import { commandSpelling } from './command.js';
@@ -98,6 +100,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['next --help', 'rafa-next.txt'],
   ['issue ready --help', 'rafa-issue-ready.txt'],
   ['issue edit --help', 'rafa-issue-edit.txt'],
+  ['release tag --help', 'rafa-release-tag.txt'],
 ];
 
 /** The CLI entry the spawned case runs. */
@@ -276,7 +279,7 @@ describe('the frozen help snapshots', () => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('RAFA_')));
     const run = Bun.spawnSync([process.execPath, RAFA_ENTRY, '--help'], { cwd: tempBase, env: { TMPDIR: tmpdir(), ...env, ...scratchHomeEnv(tempBase) } });
 
-    expect(run.exitCode).toBe(0);
+    expectExit({ exitCode: run.exitCode, stdout: run.stdout.toString(), stderr: run.stderr.toString() }, 0, { tempBase });
     expect(run.stderr.toString()).toBe('');
     expect(run.stdout.toString()).toBe(readSnapshot('rafa.txt'));
   }, 30_000);
@@ -363,8 +366,8 @@ const SPENDING = createCommandRegistry({
 describe('the spend mark', () => {
   it('ends the pr roster\'s triage line with its condition, 🪙 with --resolve', () => {
     expect(blockOf(helpFor(CORE_REGISTRY, 'pr'), 'Actions').slice(-2)).toEqual([
-      '  triage    assess a pull request: its class, the evidence, and a follow-up',
-      '            prompt 🪙 with --resolve',
+      '  triage     assess a pull request: its class, the evidence, and a follow-up',
+      '             prompt 🪙 with --resolve',
     ]);
   });
 

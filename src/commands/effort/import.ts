@@ -119,13 +119,14 @@ export function createImportCommand(seams: ImportCommandSeams = {}): RafaCommand
       + ' whose pull is the merge `rafa effort merge` runs: every row the file holds that this store lacks is'
       + ' added, a matching row is skipped, a set-once field NULL here is filled, and any other difference is'
       + ' kept on both sides and recorded in `merge_conflicts`. It merges whatever `effort.sync` names. The file'
-      + ' is only read; the merged store is built beside this one, checked, and swapped in with the original'
-      + ' kept whole as `effort.sqlite.before-merge-<stamp>.bak`. It prints the rows added, skipped and in'
-      + ' conflict per table and the backup\'s name, as `rafa effort merge` does. Exit code 2 for another'
-      + ' project\'s store, and for a `store: ndjson` project, naming `rafa effort move --to=sqlite`; exit code 1,'
-      + ' changing nothing, for a missing or damaged file, a write in flight, a loop session running or paused,'
-      + ' and a development build over a store it does not own. With `--output=json` the outcome is the data'
-      + ' of the terminal result event. Starts no session.',
+      + ' is only read; the merged store is built beside this one, checked, and swapped in once every row the'
+      + ' original holds is copied to `effort.sqlite.before-merge-<stamp>.bak`. The merged store keeps this'
+      + ' store\'s id; the backup is a copy, so renamed back it takes a new id on its next write. It prints the'
+      + ' rows added, skipped and in conflict per table and the backup\'s name, as `rafa effort merge` does. Exit'
+      + ' code 2 for another project\'s store, and for a `store: ndjson` project, naming'
+      + ' `rafa effort move --to=sqlite`; exit code 1, changing nothing, for a missing or damaged file, a write in'
+      + ' flight, a loop session running or paused, and a development build over a store it does not own. With'
+      + ' `--output=json` the outcome is the data of the terminal result event. Starts no session.',
     args: [
       {
         name: 'file',

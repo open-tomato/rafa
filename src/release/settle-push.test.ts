@@ -10,7 +10,11 @@
  * the push settle then makes is refused by git itself. The protected
  * branch is a `pre-receive` hook in the bare origin printing GitHub's
  * GH006 line, paired with a hook that declines in other words, so the
- * `protected` reading is shown to depend on the wording.
+ * `protected` reading is shown to depend on the wording. A repository
+ * rule is the same hook printing GitHub's GH013 text (#765), read as
+ * `rule` beside GH006 still `protected` and `fetch first` still the
+ * race; a raw `git push --porcelain` to that origin is the control that
+ * git itself ends a refusal's stdout on `Done`, which no sentence may.
  */
 import type { Fragment } from './fragment.js';
 import type { SettlePushOutcome } from './settle-push.js';
@@ -29,7 +33,7 @@ import { createGitRunner } from '../pr/git.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
-import { SETTLE_PR_SETTING, settleByPush } from './settle-push.js';
+import { PUSH_SAID_NOTHING, pushSaid, ruleText, SETTLE_PR_SETTING, settleByPush } from './settle-push.js';
 import { withSettleWorktree } from './settle-worktree.js';
 
 /** A temporary directory of this file's own. */
@@ -62,6 +66,25 @@ const SETUP_DATE = '2026-09-01T12:00:00Z';
 
 /** GitHub's protected-branch line, as a pre-receive hook plants it. */
 const GH006 = 'error: GH006: Protected branch update failed for refs/heads/main.';
+
+/** GitHub's GH013 refusal on stderr, as #765 quotes it, one line per `echo`. */
+const GH013 = [
+  'error: GH013: Repository rule violations found for refs/heads/main.',
+  'Review all repository rules at https://github.com/open-tomato/rafa/rules?ref=refs%2Fheads%2Fmain',
+  '',
+  '- Required status check \\"verify\\" is expected.',
+  '',
+];
+
+/** A `pre-receive` hook printing `lines` to stderr and refusing. */
+function refusingHook(lines: readonly string[]): string {
+  return `#!/bin/sh\n${lines.map((line) => `echo "${line}" >&2`).join('\n')}\nexit 1\n`;
+}
+
+/** True when `sentence` has a line reading `Done`, git's porcelain success marker. */
+function endsOnDone(sentence: string): boolean {
+  return sentence.split('\n').some((line) => line.trim() === 'Done');
+}
 
 /** The environment every setup git runs under, isolated from the operator's config. */
 function isolatedEnv(home: string): Record<string, string> {
@@ -341,6 +364,8 @@ describe('settleByPush, the refused-push rule', () => {
     expect(settled.outcome.attempts).toBe(2);
     expect(settled.outcome.sentence).toStartWith('origin main moved again while settle rebuilt, and the retried push of chore: release 0.5.0 was refused too');
     expect(settled.outcome.sentence).toContain('[rejected]');
+    expect(settled.outcome.sentence).toContain('(fetch first)');
+    expect(endsOnDone(settled.outcome.sentence)).toBe(false);
     expect(pushesOf(settled)).toHaveLength(2);
     expect(w.git(w.origin, ['log', '-1', '--format=%s', 'main'])).toBe('merge rafa-5');
     expect(originFragments(w)).toEqual(['.changes/rafa-1.md', '.changes/rafa-4.md', '.changes/rafa-5.md', '.changes/rafa-9.md']);
@@ -389,6 +414,7 @@ describe('settleByPush, a protected base', () => {
     expect(settled.outcome.sentence).toContain(`set ${SETTLE_PR_SETTING} to deliver it through a pull request`);
     expect(SETTLE_PR_SETTING).toBe('release.settle: pr');
     expect(settled.outcome.sentence).toContain('GH006');
+    expect(endsOnDone(settled.outcome.sentence)).toBe(false);
     expect(pushesOf(settled)).toHaveLength(1);
     expect(originMain(w)).toBe(before);
   });
@@ -422,5 +448,108 @@ describe('settleByPush, a protected base', () => {
     expect(settled.outcome.outcome).toBe('protected');
     expect(settled.outcome.attempts).toBe(2);
     expect(pushesOf(settled)).toHaveLength(2);
+  });
+});
+
+describe('settleByPush, a repository rule', () => {
+  it('exits 1 not delivered, in one line naming the rule GitHub gave and release.settle: pr, without retrying', async () => {
+    const w = world();
+    landTwo(w);
+    const before = originMain(w);
+    w.refuseWith(refusingHook(GH013));
+
+    const settled = await settleIn(w);
+
+    expect(settled.outcome.outcome).toBe('rule');
+    if (settled.outcome.outcome !== 'rule') return;
+    expect(settled.outcome.exitCode).toBe(1);
+    expect(settled.outcome.attempts).toBe(1);
+    expect(settled.outcome.sentence).toBe('origin main refused chore: release 0.5.0 under a repository rule: Required status check "verify" is expected.'
+      + ' No retry can push it, so it is not delivered; set release.settle: pr in .rafa/config.yaml to deliver it through a pull request.');
+    expect(settled.outcome.sentence).not.toContain('\n');
+    expect(pushesOf(settled)).toHaveLength(1);
+    expect(originMain(w)).toBe(before);
+    expect(originFragments(w)).toEqual(['.changes/rafa-1.md', '.changes/rafa-9.md']);
+  });
+
+  it('is the control: git itself ends the refused push\'s porcelain stdout on Done, exiting 1', () => {
+    const w = world();
+    w.refuseWith(refusingHook(GH013));
+    w.git(w.caller, ['commit', '-q', '-am', 'probe']);
+
+    let stdout = '';
+    let status = 0;
+    try {
+      w.git(w.caller, ['push', '--porcelain', 'origin', 'HEAD:refs/heads/main']);
+    } catch (error) {
+      const failure = error as { stdout: string; status: number };
+      stdout = failure.stdout;
+      status = failure.status;
+    }
+
+    expect(status).toBe(1);
+    const lines = stdout.trimEnd().split('\n');
+    expect(lines[lines.length - 1]).toBe('Done');
+    expect(stdout).toContain('[remote rejected] (pre-receive hook declined)');
+  });
+
+  it('reads GH006 as protected and a moved base as the race beside the same GH013 reading', async () => {
+    const guarded = world();
+    landTwo(guarded);
+    guarded.refuseWith(refusingHook([GH006]));
+    const raced = world();
+    landTwo(raced);
+    const race = (): void => {
+      raced.land({ '.changes/rafa-4.md': fragmentText('rafa-4', 'patch', ['- Loop: late']) }, 'merge rafa-4');
+      raced.refuseWith(refusingHook(GH013));
+    };
+
+    const protectedOne = await settleIn(guarded);
+    const racedOne = await settleIn(raced, [race]);
+
+    expect(protectedOne.outcome.outcome).toBe('protected');
+    expect(racedOne.outcome.outcome).toBe('rule');
+    expect(racedOne.outcome.attempts).toBe(2);
+    expect(pushesOf(racedOne)).toHaveLength(2);
+  });
+});
+
+describe('ruleText', () => {
+  it('joins every rule GitHub lists after the GH013 line, remote prefixes and padding dropped', () => {
+    const stderr = [
+      'remote: error: GH013: Repository rule violations found for refs/heads/main.        ',
+      'remote: Review all repository rules at https://github.com/o/r/rules        ',
+      'remote: ',
+      'remote: - Changes must be made through a pull request.        ',
+      'remote: - Required status check "verify" is expected.        ',
+      'remote: ',
+    ].join('\n');
+
+    expect(ruleText(stderr, 'push declined')).toBe('Changes must be made through a pull request. Required status check "verify" is expected.');
+  });
+
+  it('answers the GH013 line when no rule is listed, and the reason when the remote said nothing of a rule', () => {
+    expect(ruleText('remote: error: GH013: Repository rule violations found for refs/heads/main.', 'x')).toBe('error: GH013: Repository rule violations found for refs/heads/main.');
+    expect(ruleText('', 'push declined due to repository rule violations')).toBe('push declined due to repository rule violations');
+  });
+});
+
+describe('pushSaid', () => {
+  it('drops the To and Done lines of a porcelain refusal and keeps stderr and the status line', () => {
+    const said = pushSaid({
+      ok: false,
+      stdout: 'To /tmp/origin.git\n!\tHEAD:refs/heads/main\t[remote rejected] (pre-receive hook declined)\nDone\n',
+      stderr: 'remote: planted\nerror: failed to push some refs to \'/tmp/origin.git\'\n',
+    });
+
+    expect(said).toBe('remote: planted\nerror: failed to push some refs to \'/tmp/origin.git\'\n!\tHEAD:refs/heads/main\t[remote rejected] (pre-receive hook declined)');
+    expect(endsOnDone(said)).toBe(false);
+  });
+
+  it('answers that the push failed when it printed nothing but To and Done', () => {
+    const said = pushSaid({ ok: false, stdout: 'To /tmp/origin.git\nDone\n', stderr: '' });
+
+    expect(said).toBe(PUSH_SAID_NOTHING);
+    expect(endsOnDone(said)).toBe(false);
   });
 });

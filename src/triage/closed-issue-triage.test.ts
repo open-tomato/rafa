@@ -50,6 +50,7 @@ function report(): TaskReport {
     findings: [],
     skillsUsed: [],
     blockers: [],
+    changes: [],
     outOfScopeBugs: [BUG],
     extras: [],
   };

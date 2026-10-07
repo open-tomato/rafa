@@ -15,7 +15,7 @@ import type { Fragment } from './fragment.js';
 import type { SettlePrOutcome } from './settle-pr.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../pr/git.js';
 import type { PullRequestsAnswers, PullRequestsDouble } from '../pr/pull-requests-double.js';
 import type { PullRequestDetail, PullRequestDraft, PullRequestSummary } from '../pr/types.js';
 
@@ -32,6 +32,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';
 import { RELEASE_PR_BRANCH, releasePullBody, settleByPr } from './settle-pr.js';
+import { PUSH_SAID_NOTHING } from './settle-push.js';
 import { withSettleWorktree } from './settle-worktree.js';
 
 /** A temporary directory of this file's own. */
@@ -140,7 +141,8 @@ function world(): World {
   git(other, ['push', '-q', 'origin', 'main']);
 
   git(dir, ['clone', '-q', origin, caller]);
-  for (const [key, value] of [['user.name', 'rafa settle'], ['user.email', 'settle@example.invalid'], ['commit.gpgsign', 'false'], ['core.hooksPath', join(dir, 'no-hooks')]]) {
+  const identity: ReadonlyArray<readonly [string, string]> = [['user.name', 'rafa settle'], ['user.email', 'settle@example.invalid'], ['commit.gpgsign', 'false'], ['core.hooksPath', join(dir, 'no-hooks')]];
+  for (const [key, value] of identity) {
     git(caller, ['config', key, value]);
   }
   git(caller, ['switch', '-q', '-c', 'feat']);
@@ -208,14 +210,28 @@ interface Settled {
   readonly argv: readonly (readonly string[])[];
 }
 
-/** Runs `settleByPr` in a settle worktree of the caller's `origin/main`; `beforePush` runs just before the push. */
-async function settleIn(w: World, double: PullRequestsDouble, beforePush?: () => void): Promise<Settled> {
+/**
+ * Runs `settleByPr` in a settle worktree of the caller's `origin/main`;
+ * `beforePush` runs just before the push, `afterPush` is handed what git
+ * answered it, and `pushAnswer`, when given, is answered in place of
+ * running the push at all.
+ */
+async function settleIn(
+  w: World,
+  double: PullRequestsDouble,
+  beforePush?: () => void,
+  afterPush?: (result: GitResult) => void,
+  pushAnswer?: GitResult,
+): Promise<Settled> {
   const argv: string[][] = [];
   const outcome = await withSettleWorktree({ git: createGitRunner(w.caller), scratchRoot: w.scratchRoot }, (made: SettleWorktree) => {
     const git: GitRunner = (args) => {
       argv.push([...args]);
-      if (args[0] === 'push') beforePush?.();
-      return made.git(args);
+      if (args[0] !== 'push') return made.git(args);
+      beforePush?.();
+      const result = pushAnswer ?? made.git(args);
+      afterPush?.(result);
+      return result;
     };
     return settleByPr({ ...made, git }, SETTINGS, double.pulls);
   });
@@ -230,6 +246,11 @@ function originRef(w: World, ref: string): string {
   } catch {
     return '';
   }
+}
+
+/** The lines of `text`, each trimmed. */
+function linesOf(text: string): string[] {
+  return text.split('\n').map((line) => line.trim());
 }
 
 /** The pushes a settle made. */
@@ -370,6 +391,43 @@ describe('settleByPr, refusals', () => {
     expect(settled.outcome.sentence).toContain('[rejected] (stale info)');
     expect(originRef(w, `refs/heads/${RELEASE_PR_BRANCH}`)).toBe(squatted);
     expect(double.sent()).toEqual(['findOpen rafa/release']);
+  });
+
+  it('quotes the stale-info rejection without the Done line git ends the refused push on', async () => {
+    const w = world();
+    landTwo(w);
+    const double = createPullRequestsDouble(noPull());
+    const answered: GitResult[] = [];
+
+    const settled = await settleIn(w, double, () => {
+      w.squat();
+    }, (result) => {
+      answered.push(result);
+    });
+
+    // The control: git itself ended the refused push on Done, so the check below could fail.
+    expect(answered).toHaveLength(1);
+    expect(answered[0]?.ok).toBe(false);
+    expect(linesOf(answered[0]?.stdout ?? '')).toContain('Done');
+    expect(settled.outcome.outcome).toBe('refused');
+    if (settled.outcome.outcome !== 'refused') return;
+    expect(settled.outcome.sentence).toContain('[rejected] (stale info)');
+    expect(linesOf(settled.outcome.sentence)).not.toContain('Done');
+    expect(settled.outcome.sentence).not.toMatch(/Done\s*$/);
+  });
+
+  it('still names a failure when the push printed nothing but Done', async () => {
+    const w = world();
+    landTwo(w);
+    const double = createPullRequestsDouble(noPull());
+
+    const settled = await settleIn(w, double, undefined, undefined, { ok: false, stdout: 'Done\n', stderr: '' });
+
+    expect(settled.outcome).toMatchObject({ outcome: 'unpushed', exitCode: 1, pushed: false });
+    if (settled.outcome.outcome !== 'unpushed') return;
+    expect(settled.outcome.sentence).toBe(`chore: release 0.5.0 could not be pushed to origin ${RELEASE_PR_BRANCH}: ${PUSH_SAID_NOTHING}`);
+    expect(linesOf(settled.outcome.sentence)).not.toContain('Done');
+    expect(originRef(w, `refs/heads/${RELEASE_PR_BRANCH}`)).toBe('');
   });
 
   it.each([

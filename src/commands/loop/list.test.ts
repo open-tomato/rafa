@@ -29,6 +29,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { SESSION_PHASES } from '../../loop/sessions.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
+  DEMO_TRACKER_PATH,
   LOOP_SUBJECTS,
   loopSeams,
   plantDemoProject,
@@ -156,6 +157,32 @@ describe('rafa loop list', () => {
     ]);
     const phases = (resultEvent(json.stdout) as { data: { sessions: Array<{ phase: SessionPhase }> } }).data.sessions.map(({ phase }) => phase);
     expect(phases).toEqual([...SESSION_PHASES, 'repair']);
+  });
+
+  it('reads a running record in phase task with no task over 54 ticked tasks as wrap-up, and one with an open task as task', async () => {
+    /** A tracker of 54 tasks, the last `last` and every other ticked. */
+    const tracker = (last: string) => [
+      '# Plan: demo',
+      '',
+      '# Stage: one',
+      '',
+      ...Array.from({ length: 53 }, (_, index) => `- [x] Task ${String(index + 1)}`),
+      `- [${last}] Task 54`,
+      '',
+    ].join('\n');
+    const record = sessionRecord({ phase: 'task', task: null });
+    const ticked = plantDemoProject(tempBase);
+    plantFile(ticked.root, DEMO_TRACKER_PATH, tracker('x'));
+    plantSession(ticked.root, record);
+    const open = plantDemoProject(tempBase);
+    plantFile(open.root, DEMO_TRACKER_PATH, tracker(' '));
+    plantSession(open.root, record);
+
+    const tickedRun = await list(ticked);
+    const openRun = await list(open);
+
+    expect(tickedRun.stdout.split('\n')[1]?.split('; ')[1]).toBe('54/54 done (phase wrap-up), 0 blocked, 0 open');
+    expect(openRun.stdout.split('\n')[1]?.split('; ')[1]).toBe('53/54 done (phase task), 0 blocked, 1 open');
   });
 
   it('reads a record holding no phase as task in json mode', async () => {

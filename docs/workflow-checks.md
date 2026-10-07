@@ -2,7 +2,8 @@
 
 A design document behind #118 (config as code), #119 (the step contract) and #120 (the
 fixture harness), and the amendment to #71. The "today" sections were read at `a05e94a`
-(rafa-82 merged); the "proposed" sections are what those issues specify.
+(rafa-82 merged); the "proposed" sections are what those issues specify. `rafa issue ready`
+gained `--yes` in #752 (0.36.0).
 
 Four commands are drawn, because they are the
 ones the chain runs and the ones that own the most checks: `rafa next`, `loop start`,

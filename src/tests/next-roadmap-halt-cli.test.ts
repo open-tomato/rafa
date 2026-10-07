@@ -47,7 +47,7 @@ import { hopFilePath } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -211,7 +211,7 @@ describe('rafa next --roadmap --yes over a halt, spawned', () => {
       const halt = [...haltLines(chain, `#${String(C)} is blocked in turn`), BACK_HOME_A];
       const expected = [...halt, ...haltLines(chain, `#${String(C)} is blocked in turn`), UNCHANGED_STOP].join('\n') + '\n';
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toBe(expected);
       // `home` found the walk already there: nothing ever moved the position away.
       expect(existsSync(position)).toBe(false);
@@ -243,7 +243,7 @@ describe('rafa next --roadmap --yes over a halt, spawned', () => {
       const halt = [...haltLines(chain, why), BACK_HOME_A];
       const expected = [...halt, ...haltLines(chain, why), UNCHANGED_STOP].join('\n') + '\n';
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toBe(expected);
       expect(existsSync(position)).toBe(false);
       expect(existsSync(hopFilePath(scratch.repo))).toBe(false);
@@ -299,7 +299,7 @@ describe('rafa next --roadmap --yes over a halt, spawned', () => {
           + ' so nothing ran; no --yes list allows it, so drop --yes to be asked.',
       ].join('\n') + '\n';
 
-      expect(run.exitCode).toBe(0);
+      expectExit(run, 0, scratch);
       expect(run.stdout).toBe(expected);
 
       // The write that ended the away hop left the position at home, never away.

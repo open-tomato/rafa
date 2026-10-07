@@ -368,7 +368,7 @@ function runProbe(loop: LoopScratch, words: readonly string[]): { readonly event
 }
 
 describe('rafa next --roadmap --yes=hop,plan,start,home, from a fresh hop to a started loop and back home, spawned', () => {
-  it('hops to C, plans C rather than epic Beta\'s own first line, runs the loop, and ends home with the hop waiting', RUN_TIMEOUT, () => {
+  it('hops to C, plans C rather than epic Beta\'s own first line, runs the loop, and ends home with the hop waiting', () => {
     const loop = plantScratch();
 
     const run = runProbe(loop, ['--roadmap', '--yes=hop,plan,start,home', '--output=json']);
@@ -420,5 +420,5 @@ describe('rafa next --roadmap --yes=hop,plan,start,home, from a fresh hop to a s
     expect(session.hop?.blocked).toBe(H);
     expect(session.hop?.target).toBe(C);
     expect(session.plan).toBe(PLAN_PATH);
-  });
+  }, RUN_TIMEOUT);
 });

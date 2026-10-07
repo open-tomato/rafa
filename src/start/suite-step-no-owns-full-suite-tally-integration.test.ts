@@ -56,6 +56,7 @@ import { readSessions } from '../loop/sessions.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { SLOW_SWEEP_SECONDS } from './sweep-timing.js';
 
@@ -172,7 +173,7 @@ interface Scratch {
   readonly claude: string;
   /** Where the stand-in keeps each call's count, arguments and prompt. */
   readonly calls: string;
-  /** The PATH a spawned run gets: the stand-in's `bin/`, git's own directory, then bun's own. */
+  /** The PATH a spawned run gets: the stand-in's `bin/`, git's own directory and the system tools' (`hostToolDirs`), then bun's own. */
   readonly path: string;
 }
 
@@ -291,8 +292,6 @@ function plant(): Scratch {
   const calls = join(root, 'calls');
   for (const dir of [repo, bin, home, calls]) mkdirSync(dir, { recursive: true });
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
   const bunBinary = Bun.which('bun');
   if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
 
@@ -305,7 +304,7 @@ function plant(): Scratch {
     home,
     claude,
     calls,
-    path: [bin, dirname(gitBinary), dirname(bunBinary)].join(delimiter),
+    path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter),
   };
 
   git(repo, home, 'init', '-q', '.');

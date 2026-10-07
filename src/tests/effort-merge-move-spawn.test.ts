@@ -44,7 +44,7 @@ import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { runsDir, sessionFilePath } from '../loop/sessions.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-effort-merge-move-spawn-')));
 afterAll(() => {
@@ -138,11 +138,11 @@ describe('rafa effort merge, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(0);
+    expectExit(outcome, 0, scratch);
     expect(outcome.stdout).toContain(`Merges ${otherPath} (store ${THERE}) into ${path}`);
     expect(outcome.stdout).toContain('  sessions: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('Total: 1 added, 1 skipped, 0 in conflict;');
-    expect(outcome.stdout).toContain('✅ Merged. The original is kept whole at');
+    expect(outcome.stdout).toContain('✅ Merged. Every row the original held is copied to');
     expect(readdirSync(effortDir).sort()).toEqual([
       'effort.sqlite',
       expect.stringMatching(/^effort\.sqlite\.before-merge-\d{8}T\d{6}Z\.bak$/) as unknown as string,
@@ -168,7 +168,7 @@ describe('rafa effort merge, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath, '--dry-run'], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(0);
+    expectExit(outcome, 0, scratch);
     expect(outcome.stdout).toContain('  sessions: 1 added, 1 skipped, 0 in conflict\n');
     expect(outcome.stdout).toContain('🔍 Dry run: the merged store was built beside it');
     expect(snapshot(effortDir)).toEqual(before);
@@ -193,7 +193,7 @@ describe('rafa effort merge, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath], { RAFA_EFFORT_DIR: effortDir });
 
-    expect(outcome.exitCode).toBe(2);
+    expectExit(outcome, 2, scratch);
     expect(outcome.stderr).toContain(`is the effort store of another project (root commit ${OTHER_PROJECT})`);
     expect(snapshot(effortDir)).toEqual(before);
     expect(snapshot(otherDir)).toEqual(otherBefore);
@@ -217,7 +217,7 @@ describe('rafa effort merge, spawned', () => {
 
     const outcome = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath]);
 
-    expect(outcome.exitCode).toBe(1);
+    expectExit(outcome, 1, scratch);
     expect(outcome.stderr).toContain(`loop ${sessionId} (pid ${String(process.pid)}, plan rafa-322-merge-spawn) is running on this store`);
     expect(readFileSync(path)).toEqual(before);
   }, SPAWN_TIMEOUT);
@@ -232,12 +232,12 @@ describe('rafa effort merge and rafa effort move --to=sqlite, spawned', () => {
 
     const refused = runRafa(scratch, scratch.repo, ['effort', 'merge', missingOther]);
 
-    expect(refused.exitCode).toBe(2);
+    expectExit(refused, 2, scratch);
     expect(refused.stderr).toContain(`Next safe step: ${MOVE_TO_SQLITE}`);
 
     const moved = runRafa(scratch, scratch.repo, ['effort', 'move', '--to=sqlite']);
 
-    expect(moved.exitCode).toBe(0);
+    expectExit(moved, 0, scratch);
     expect(moved.stdout).toContain('✅ Set store: sqlite in');
 
     const otherDir = realpathSync(mkdtempSync(join(scope, 'device-b-')));
@@ -248,7 +248,7 @@ describe('rafa effort merge and rafa effort move --to=sqlite, spawned', () => {
 
     const merged = runRafa(scratch, scratch.repo, ['effort', 'merge', otherPath]);
 
-    expect(merged.exitCode).toBe(0);
-    expect(merged.stdout).toContain('✅ Merged. The original is kept whole at');
+    expectExit(merged, 0, scratch);
+    expect(merged.stdout).toContain('✅ Merged. Every row the original held is copied to');
   }, SPAWN_TIMEOUT);
 });

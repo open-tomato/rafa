@@ -1,5 +1,5 @@
 /**
- * Tests for what the seven `pr` actions share (`pr-context.ts`): the usage
+ * Tests for what the eight `pr` actions share (`pr-context.ts`): the usage
  * lines, the readers of a line, the provider check and its exit-2
  * refusal, and the pull request an action acts on.
  *
@@ -220,8 +220,8 @@ function plantRepo(project: PlantedProject, branch: string): void {
 }
 
 describe('the usage lines', () => {
-  it('names all seven actions, the five taking a number carrying an optional one, and is frozen', () => {
-    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait'] as const;
+  it('names all nine actions, the five taking a number carrying an optional one, and is frozen', () => {
+    const actions = ['current', 'show', 'view', 'list', 'merge', 'triage', 'wait', 'open', 'retarget'] as const;
 
     expect(Object.keys(PR_USAGE)).toEqual([...actions]);
     expect(actions.map((action) => PR_USAGE[action].startsWith(`rafa pr ${action}`))).toEqual(actions.map(() => true));

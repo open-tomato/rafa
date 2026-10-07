@@ -61,7 +61,13 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { finishCleanExit, NOTHING_REPORTED_OR_COMMITTED, readReportHolds } from './commit.js';
+import * as backgroundWait from './background-wait.js';
+import {
+  BACKGROUND_WAIT_HOLD,
+  finishCleanExit,
+  NOTHING_REPORTED_OR_COMMITTED,
+  readReportHolds,
+} from './commit.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -97,6 +103,12 @@ const NO_REPORT_HOLD = 'no report: the session wrote no rafa:report block the lo
 
 /** The hold naming the commit its work never made. */
 const NO_COMMIT_HOLD = 'no commit: the task changed no tracked file';
+
+/** The line a session ends its turn on when it backgrounds the suite. */
+const WAIT_LINE = 'The full suite (`bun test`) is running in the background; I will wait for the notification.';
+
+/** A final message that ends on a background wait and writes no report. */
+const BACKGROUND_WAIT = `Edits are in.\n\n${WAIT_LINE}\n`;
 
 /** An output whose last report block is there but unreadable. */
 const UNREADABLE = outputWith('status: blocked', 'feedback: it broke: twice');
@@ -386,6 +398,42 @@ describe('finishCleanExit', () => {
     expect(reported.finished.holds).toEqual(['blocker: LINEAR_API_KEY unset']);
     expect(errors.join('\n')).toContain('Task blocked by its own report');
     expect(errors.join('\n')).not.toContain(NO_REPORT_HOLD);
+  });
+
+  it('names the background wait in place of the bare no-report hold', () => {
+    const waiting = settle(BACKGROUND_WAIT, NOTHING_TO_COMMIT);
+    const hold = `${BACKGROUND_WAIT_HOLD} ${WAIT_LINE}`;
+
+    expect(waiting.finished.outcome).toBe('blocked');
+    expect(waiting.line).toStartWith(`- [BLOCKED] ${FIRST_TASK}`);
+    expect(waiting.finished.holds).toEqual([hold, NO_COMMIT_HOLD]);
+    expect(errors.join('\n')).toContain(`   ${hold}`);
+    expect(errors.join('\n')).not.toContain(NO_REPORT_HOLD);
+
+    // The control: an ordinary held output keeps the bare hold.
+    errors = [];
+    const ordinary = settle('Done, and nothing to report.', NOTHING_TO_COMMIT);
+
+    expect(ordinary.finished.holds).toEqual([NO_REPORT_HOLD, NO_COMMIT_HOLD]);
+    expect(errors.join('\n')).not.toContain(BACKGROUND_WAIT_HOLD);
+  });
+
+  it('never reads a reported or a ticked task for a background wait', () => {
+    const reader = spyOn(backgroundWait, 'readBackgroundWait');
+
+    // Reported: the wait line beside a report that holds the task.
+    const reported = settle(`${WAIT_LINE}\n${DONE_WITH_BLOCKER}`, NOTHING_TO_COMMIT);
+    // Ticked: the wait line with no report, but a commit made.
+    const ticked = settle(BACKGROUND_WAIT, COMMITTED);
+
+    expect(reported.finished.holds).toEqual(['blocker: LINEAR_API_KEY unset']);
+    expect(ticked.line).toBe(`- [x] ${FIRST_TASK}`);
+    expect(reader).not.toHaveBeenCalled();
+
+    // The control: the spy sees the read a held task makes.
+    settle(BACKGROUND_WAIT, NOTHING_TO_COMMIT);
+
+    expect(reader).toHaveBeenCalledWith(BACKGROUND_WAIT);
   });
 
   it('writes what held such a task onto its line, so its next dispatch reads it', () => {

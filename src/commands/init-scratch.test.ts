@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plantScratchRepo, runRafa } from '../tests/cli-capture.js';
+import { expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-init-scratch-')));
@@ -50,7 +50,7 @@ describe('rafa init in a scratch repository', () => {
     const scratch = plantScratchRepo(tempBase, { project: false });
 
     const init = runRafa(scratch, scratch.repo, ['init', '--yes']);
-    expect(init.exitCode).toBe(0);
+    expectExit(init, 0, scratch);
 
     expect(claudePaths(scratch.repo)).toEqual([]);
     expect(claudePaths(scratch.home)).toEqual([]);
@@ -63,7 +63,7 @@ describe('rafa init in a scratch repository', () => {
     const validate = runRafa(scratch, scratch.repo, ['plan', 'validate', '.rafa/plans/PLAN-routed.md']);
 
     expect(validate.stderr).toBe('');
-    expect(validate.exitCode).toBe(0);
+    expectExit(validate, 0, scratch);
     expect(validate.stdout).toContain('no issues');
     expect(claudePaths(scratch.repo)).toEqual([]);
   }, SPAWN_TIMEOUT);

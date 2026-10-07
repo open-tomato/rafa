@@ -27,7 +27,7 @@ import type { Place } from '../project/position.js';
 
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -36,6 +36,7 @@ import { locateBlockerEpic } from '../board/blocker-epic.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { createGhOpenPullRequests, createRoadmapReadings } from '../board/roadmap.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { hostToolDirs } from '../tests/stand-in-gh.js';
 
 import { decideHop } from './hop-chain.js';
 
@@ -53,7 +54,7 @@ const RUN_TIMEOUT = { timeout: 30_000 };
 const HOME: Place = { board: 10, epic: 20 };
 
 /** Where `#40 far` sits, across boards from home. */
-const FAR: Place = { board: 11, epic: 40 };
+const FAR = { board: 11, epic: 40 } satisfies Place;
 
 /** H: the issue every `decideHop` case here blocks, not itself on the listing. */
 const BLOCKED = 900;
@@ -137,9 +138,7 @@ function plantWorld(): ScratchWorld {
   ].join('\n'), 'utf8');
   chmodSync(gh, 0o755);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  return { repo, bin, path: [bin, dirname(gitBinary)].join(':') };
+  return { repo, bin, path: [bin, ...hostToolDirs()].join(':') };
 }
 
 /** A `SpecIssueReader` no case here ever calls: `decideHop`'s taken readings read state off the listing, not this reader. */
@@ -156,7 +155,7 @@ async function boardView(gh: ReturnType<typeof createGhRunner>): Promise<BoardVi
 }
 
 describe('locateBlockerEpic, over a real board listing spanning two boards', () => {
-  it('places #101 in epic #40 on board #11, across boards from home', RUN_TIMEOUT, async () => {
+  it('places #101 in epic #40 on board #11, across boards from home', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -164,11 +163,11 @@ describe('locateBlockerEpic, over a real board listing spanning two boards', () 
     const located = await locateBlockerEpic({ blocker: 101, home: HOME, view });
 
     expect(located).toEqual({ kind: 'located', blocker: 101, epic: FAR.epic, slug: 'far', board: FAR.board });
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('decideHop, halt, over a real board listing', () => {
-  it('halts with the chain when C (#102) has an open blocker B (#103)', RUN_TIMEOUT, async () => {
+  it('halts with the chain when C (#102) has an open blocker B (#103)', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -184,9 +183,9 @@ describe('decideHop, halt, over a real board listing', () => {
       to: FAR,
       fault: null,
     });
-  });
+  }, RUN_TIMEOUT);
 
-  it('halts on the mutual block when C (#104) is blocked by H itself', RUN_TIMEOUT, async () => {
+  it('halts on the mutual block when C (#104) is blocked by H itself', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -202,11 +201,11 @@ describe('decideHop, halt, over a real board listing', () => {
       to: FAR,
       fault: null,
     });
-  });
+  }, RUN_TIMEOUT);
 });
 
 describe('decideHop, wait, over a real open pull request list', () => {
-  it('waits when an open pull request (#55) closes C (#106)', RUN_TIMEOUT, async () => {
+  it('waits when an open pull request (#55) closes C (#106)', async () => {
     const world = plantWorld();
     const gh = createGhRunner({ cwd: world.repo, env: { TMPDIR: tmpdir(), PATH: world.path, ...scratchHomeEnv(world.repo) } });
     const view = await boardView(gh);
@@ -227,5 +226,5 @@ describe('decideHop, wait, over a real open pull request list', () => {
       board: FAR.board,
       taken: { by: 'pull-request', pullRequest: 55 },
     });
-  });
+  }, RUN_TIMEOUT);
 });

@@ -297,6 +297,8 @@
  * repo, it compiled clean, and a planted TS2322 in a second file of the
  * same program was reported.
  */
+import type { ScratchPaths } from './cli-capture.js';
+
 import {
   chmodSync,
   cpSync,
@@ -328,8 +330,9 @@ import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js'
 import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
 
-import { plantProjectConfig } from './cli-capture.js';
+import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -643,11 +646,16 @@ function plantPlanScratch(name: string): PlanScratch {
 
   const git = Bun.which('git');
   if (git === null) throw new Error('git is not on the PATH this suite runs under');
-  const path = [bin, dirname(git)].join(delimiter);
+  const path = [bin, ...hostToolDirs()].join(delimiter);
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 
   return { root, repo, prompt, args, env: { TMPDIR: tmpdir(), PATH: path, ...scratchHomeEnv(home) } };
+}
+
+/** The paths of `scratch` a red plan run prints beside its streams. */
+function planScratchPaths(scratch: PlanScratch): ScratchPaths {
+  return { root: scratch.root, repo: scratch.repo, prompt: scratch.prompt, args: scratch.args };
 }
 
 /** The arguments the stand-in keeps for a plan session under `sources`, one per line. */
@@ -782,7 +790,7 @@ describe('the built CLI', () => {
     const fromBuild = run([cli, '--help'], tempRoot, withBunOnPath());
 
     expect(readFileSync(cli, 'utf8').split('\n')[0]).toBe('#!/usr/bin/env bun');
-    expect(fromSource.exitCode).toBe(0);
+    expectExit(fromSource, 0, { cwd: tempRoot });
     expect(fromSource.stdout).toContain('rafa <subject> <action> [args] [flags]\n');
     expect(fromBuild).toEqual(fromSource);
   }, 30_000);
@@ -798,7 +806,7 @@ describe('the built CLI', () => {
     const fromSource = run([process.execPath, join(REPO_ROOT, 'src', 'rafa.ts'), 'describe'], tempRoot, env);
     const fromBuild = run([process.execPath, join(copy, 'cli.js'), 'describe'], tempRoot, env);
 
-    expect(fromSource.exitCode).toBe(0);
+    expectExit(fromSource, 0, { cwd: tempRoot });
     expect(existsSync(join(copy, '..', 'package.json'))).toBe(false);
     expect((JSON.parse(fromBuild.stdout) as { version?: unknown }).version).toBe(readManifest()['version']);
     expect(fromBuild).toEqual(fromSource);
@@ -972,7 +980,7 @@ describe('the prompt templates in the build', () => {
 
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
-    expect(plan.exitCode).toBe(1);
+    expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
   it('spawns rafa plan under the setting sources a user config names', () => {
@@ -982,7 +990,7 @@ describe('the prompt templates in the build', () => {
 
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
-    expect(plan.exitCode).toBe(1);
+    expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
   it('refuses rafa plan on a config it cannot run on, before any session starts', () => {
@@ -990,7 +998,7 @@ describe('the prompt templates in the build', () => {
     plantUserConfig(scratch, 'loop:\n  settingSources: everyone\n');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(plan.exitCode).toBe(1);
+    expectExit(plan, 1, planScratchPaths(scratch));
     expect(plan.stderr).toContain('Refusing to generate a plan on this configuration');
     expect(plan.stderr).toContain('loop.settingSources is "everyone"');
     expect(existsSync(scratch.prompt)).toBe(false);
@@ -1019,7 +1027,7 @@ describe('the prompt templates in the build', () => {
     expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
     expect(existsSync(join(copy, '..', 'src'))).toBe(false);
     expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
-    expect(plan.exitCode).toBe(1);
+    expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
   it('refuses before any session when the template is missing beside the bundle', () => {

@@ -91,7 +91,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -121,6 +121,7 @@ import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
 import { completeSpecBody } from './spec-bodies.js';
+import { hostToolDirs } from './stand-in-gh.js';
 
 /** This suite's directory, `src/tests/`, one level under the modules the probe imports. */
 const TESTS_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -386,9 +387,7 @@ function plantScratch(config: string, probeSource: string = PROBE): Scratch {
   git(['remote', 'add', 'origin', origin], repo);
   plantProjectConfig(repo, config);
 
-  const gitBinary = Bun.which('git');
-  if (gitBinary === null) throw new Error('git is not on the PATH this suite runs under');
-  const path = [bin, dirname(gitBinary)].join(delimiter);
+  const path = [bin, ...hostToolDirs()].join(delimiter);
   const resolved = Bun.which('claude', { PATH: path });
   if (resolved !== claude) throw new Error(`claude resolves to ${String(resolved)}, not the stand-in`);
 

@@ -5,14 +5,16 @@
  * records are read from git itself rather than from this file's script.
  */
 import type { BranchesRead, LocalBranch } from './branches.js';
-import type { BranchGroups, BranchGroupsReading, ProviderMerges } from './groups.js';
+import type { BranchGroups, BranchGroupsReading, MergedRow, ProviderMerges } from './groups.js';
+import type { PastHeadRead } from './past-head.js';
+import type { WorktreeBlocker, WorktreeRow } from './worktrees.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -25,6 +27,9 @@ import {
   MERGED_STATE_UNKNOWN,
   baseUnreadNote,
   classifyBranches,
+  holdBranchRows,
+  pastHeadReason,
+  pastHeadUnreadNote,
   readProviderMerges,
   unreachableNote,
 } from './groups.js';
@@ -142,11 +147,41 @@ describe('classifyBranches: Merged', () => {
     }]);
   });
 
-  it('ticks a branch whose upstream is gone', () => {
+  it('starts a branch Merged by its gone upstream alone unticked, saying the base does not reach its tip', () => {
     const { git } = scriptedGit({ [MERGED_CALL]: said('') });
     const gone = branch('gone', { gone: true, ahead: null });
-    expect(rows(classifyBranches(git, reading(gone), NO_MERGES, SETTINGS)))
-      .toEqual([{ group: 'merged', name: 'gone', ticked: true, reason: 'upstream origin/gone is gone' }]);
+    expect(rows(classifyBranches(git, reading(gone), NO_MERGES, SETTINGS))).toEqual([{
+      group: 'merged',
+      name: 'gone',
+      ticked: false,
+      reason: 'upstream origin/gone is gone; main does not reach its tip',
+    }]);
+  });
+
+  it('says the base does not reach a gone branch whose tip descends from no merged pull request\'s head', () => {
+    const { git, calls } = scriptedGit({
+      [MERGED_CALL]: said(''),
+      [TIPS_CALL]: said('gone\tnew456\n'),
+      'rev-parse --verify --quiet old123^{commit}': refused(''),
+    });
+    const provider: ProviderMerges = { state: 'read', pullRequests: [pull(9, 'gone', 'old123')] };
+    const answer = groups(classifyBranches(git, reading(branch('gone', { gone: true, ahead: null })), provider, SETTINGS));
+    expect(answer.merged.map(({ ticked, reason, pastHead }) => ({ ticked, reason, pastHead }))).toEqual([{
+      ticked: false,
+      reason: 'upstream origin/gone is gone; main does not reach its tip',
+      pastHead: undefined,
+    }]);
+    expect(answer.notes).toEqual([]);
+    expect(calls).toContain('rev-parse --verify --quiet old123^{commit}');
+  });
+
+  it('ticks a gone branch the base reaches, or whose tip a merged pull request has as its head', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('reached\n'), [TIPS_CALL]: said('at-tip\tabc\n') });
+    const provider: ProviderMerges = { state: 'read', pullRequests: [pull(5, 'at-tip', 'abc')] };
+    const reached = branch('reached', { gone: true, ahead: null });
+    const atTip = branch('at-tip', { gone: true, ahead: null });
+    expect(rows(classifyBranches(git, reading(atTip, reached), provider, SETTINGS)).map((row) => [row.name, row.ticked]))
+      .toEqual([['at-tip', true], ['reached', true]]);
   });
 
   it('keeps every reading that holds, in order, and names each in the reason', () => {
@@ -236,6 +271,139 @@ describe('classifyBranches: Stale', () => {
   });
 });
 
+/** A listed worktree on `branch`, untickable when `blockers` holds any. */
+function worktree(path: string, branch: string | null, blockers: readonly WorktreeBlocker[] = []): WorktreeRow {
+  const tickable = blockers.length === 0;
+  return {
+    path,
+    branch,
+    lastModified: NOW,
+    branchMerged: true,
+    blockers,
+    tickable,
+    ticked: tickable,
+    reason: tickable
+      ? 'clean'
+      : blockers.map((blocker) => blocker.reason).join('; '),
+  };
+}
+
+describe('classifyBranches: a Merged branch its worktree holds', () => {
+  const holders: readonly (readonly [string, WorktreeBlocker])[] = [
+    ['dirty', { kind: 'dirty', reason: '1 untracked file' }],
+    ['locked', { kind: 'locked', reason: 'locked' }],
+    ['current', { kind: 'current', reason: 'rafa cleanup runs from it' }],
+    ['running', { kind: 'session', reason: 'loop session s1 is running in it' }],
+    ['recent', { kind: 'recent', reason: 'modified today, within cleanup.worktreeIdleDays (7)' }],
+  ];
+
+  for (const [label, blocker] of holders) {
+    it(`starts it unticked when a ${label} worktree holds it, naming the worktree and its blocker`, () => {
+      const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+      const holder = worktree('/repo/.claude/worktrees/cranky-antonelli', 'done', [blocker]);
+      const settings = { ...SETTINGS, worktrees: [holder] };
+      const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, settings));
+      expect(read.merged).toEqual([{
+        group: 'merged',
+        branch: branch('done'),
+        ticked: false,
+        heldBy: { path: '/repo/.claude/worktrees/cranky-antonelli', name: 'cranky-antonelli', blockers: [blocker.kind] },
+        mergedBy: ['base'],
+        pullRequest: null,
+        reason: `merged into main; checked out in cranky-antonelli (${blocker.kind})`,
+      }]);
+    });
+  }
+
+  it('names every blocker of the holder, once each', () => {
+    const holder = worktree('/w/busy', 'done', [
+      { kind: 'dirty', reason: '1 uncommitted change' },
+      { kind: 'session', reason: 'loop session a is running in it' },
+      { kind: 'session', reason: 'loop session b is paused in it' },
+      { kind: 'recent', reason: 'modified today' },
+    ]);
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const answer = classifyBranches(git, reading(branch('done')), NO_MERGES, { ...SETTINGS, worktrees: [holder] });
+    expect(rows(answer)).toEqual([
+      { group: 'merged', name: 'done', ticked: false, reason: 'merged into main; checked out in busy (dirty, session, recent)' },
+    ]);
+  });
+
+  it('leaves it ticked when the worktree holding it can be ticked, so its delete waits for the removal', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const settings = { ...SETTINGS, worktrees: [worktree('/w/clean', 'done')] };
+    const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, settings));
+    expect(read.merged.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason })))
+      .toEqual([{ ticked: true, heldBy: undefined, reason: 'merged into main' }]);
+  });
+
+  it('leaves ticked a Merged branch an untickable worktree does not hold', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\nother\n') });
+    const dirty = { kind: 'dirty', reason: '1 untracked file' } as const;
+    const settings = {
+      ...SETTINGS,
+      worktrees: [worktree('/w/old', 'old', [dirty]), worktree('/w/detached', null, [dirty])],
+    };
+    const answer = classifyBranches(git, reading(branch('done')), NO_MERGES, settings);
+    expect(rows(answer)).toEqual([
+      { group: 'merged', name: 'done', ticked: true, reason: 'merged into main' },
+    ]);
+  });
+
+  it('holdBranchRows returns a row no untickable worktree holds as it came', () => {
+    const { git } = scriptedGit({ [MERGED_CALL]: said('done\n') });
+    const read = groups(classifyBranches(git, reading(branch('done')), NO_MERGES, SETTINGS));
+    const [row] = holdBranchRows(read.merged, [worktree('/w/x', 'elsewhere', [{ kind: 'locked', reason: 'locked' }])]);
+    expect(row).toBe(read.merged[0]);
+  });
+});
+
+describe('classifyBranches: a Stale or Not-pushed branch its worktree holds (#852)', () => {
+  const old = branch('old', { lastCommit: new Date(NOW.getTime() - 40 * DAY) });
+  const local = branch('local', { upstream: null, ahead: null });
+  const answers = { [MERGED_CALL]: said(''), [countCall('local')]: said('2\n') };
+
+  it('names a dirty holder on a Stale row and a locked holder on a Not-pushed row, both unticked', () => {
+    const { git } = scriptedGit(answers);
+    const settings = {
+      ...SETTINGS,
+      worktrees: [
+        worktree('/w/scratch', 'old', [{ kind: 'dirty', reason: '1 untracked file' }]),
+        worktree('/w/pinned', 'local', [{ kind: 'locked', reason: 'locked' }]),
+      ],
+    };
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, settings));
+    expect(read.stale.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason }))).toEqual([{
+      ticked: false,
+      heldBy: { path: '/w/scratch', name: 'scratch', blockers: ['dirty'] },
+      reason: 'no commit in 40 days; checked out in scratch (dirty)',
+    }]);
+    expect(read.notPushed.map(({ ticked, heldBy, reason }) => ({ ticked, heldBy, reason }))).toEqual([{
+      ticked: false,
+      heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] },
+      reason: 'no upstream; 2 commits not on any remote; checked out in pinned (locked)',
+    }]);
+  });
+
+  it('names no holder when the worktree on the branch can be ticked', () => {
+    const { git } = scriptedGit(answers);
+    const settings = { ...SETTINGS, worktrees: [worktree('/w/clean', 'old'), worktree('/w/clean2', 'local')] };
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, settings));
+    expect([...read.stale, ...read.notPushed].map(({ heldBy, reason }) => ({ heldBy, reason }))).toEqual([
+      { heldBy: undefined, reason: 'no commit in 40 days' },
+      { heldBy: undefined, reason: 'no upstream; 2 commits not on any remote' },
+    ]);
+  });
+
+  it('holdBranchRows holds a Stale row read without worktrees, as `./index.ts` applies it', () => {
+    const { git } = scriptedGit(answers);
+    const read = groups(classifyBranches(git, reading(old, local), NO_MERGES, SETTINGS));
+    const [row] = holdBranchRows(read.stale, [worktree('/w/scratch', 'old', [{ kind: 'dirty', reason: 'dirty' }])]);
+    expect(row?.heldBy?.name).toBe('scratch');
+    expect(row?.reason).toBe('no commit in 40 days; checked out in scratch (dirty)');
+  });
+});
+
 describe('classifyBranches: the provider\'s absences', () => {
   const branches = reading(
     branch('done'),
@@ -293,9 +461,28 @@ describe('classifyBranches: git failures', () => {
       baseUnreadNote('main', 'git branch --merged failed: fatal: malformed object name refs/heads/main'),
     ]);
     expect(rows(answer)).toEqual([
-      { group: 'merged', name: 'gone', ticked: true, reason: 'upstream origin/gone is gone' },
+      { group: 'merged', name: 'gone', ticked: false, reason: 'upstream origin/gone is gone; whether main reaches its tip could not be read' },
       { group: 'not-pushed', name: 'local', ticked: false, reason: 'no upstream; 4 commits not on any remote' },
     ]);
+  });
+
+  it('notes a past-head reading git refuses, and leaves the row unticked with no reading on it', () => {
+    const { git } = scriptedGit({
+      [MERGED_CALL]: said(''),
+      [TIPS_CALL]: said('gone\tnew456\n'),
+      'rev-parse --verify --quiet old123^{commit}': said('old123\n'),
+      'merge-base --is-ancestor old123 refs/heads/gone': refused('fatal: bad object\n'),
+    });
+    const provider: ProviderMerges = { state: 'read', pullRequests: [pull(9, 'gone', 'old123')] };
+    const answer = groups(classifyBranches(git, reading(branch('gone', { gone: true, ahead: null })), provider, SETTINGS));
+    expect(answer.notes).toEqual([
+      pastHeadUnreadNote('gone', 9, 'git merge-base --is-ancestor failed: fatal: bad object'),
+    ]);
+    expect(answer.merged.map(({ ticked, reason, pastHead }) => ({ ticked, reason, pastHead }))).toEqual([{
+      ticked: false,
+      reason: 'upstream origin/gone is gone; main does not reach its tip',
+      pastHead: undefined,
+    }]);
   });
 
   it('answers why when the tips cannot be read', () => {
@@ -303,6 +490,22 @@ describe('classifyBranches: git failures', () => {
     const provider: ProviderMerges = { state: 'read', pullRequests: [pull(1, 'feature', 'abc')] };
     expect(classifyBranches(git, reading(branch('feature')), provider, SETTINGS))
       .toEqual({ ok: false, detail: 'git for-each-ref failed: fatal: broken' });
+  });
+});
+
+describe('pastHeadReason', () => {
+  const commit = (subject: string): PastHeadRead['commits'][number] => ({ hash: 'f'.repeat(40), subject, paths: [], held: true });
+  const pullRequest = pull(12, 'done', 'abc');
+
+  it('counts one commit and names its subject', () => {
+    const reading: PastHeadRead = { kind: 'past-head', pullRequest, count: 1, commits: [commit('chore: fragment')], held: true };
+    expect(pastHeadReason(reading)).toBe('1 commit past #12\'s head: chore: fragment');
+  });
+
+  it('counts several and joins their subjects oldest first', () => {
+    const commits = [commit('one'), commit('two')];
+    const reading: PastHeadRead = { kind: 'past-head', pullRequest, count: 2, commits, held: true };
+    expect(pastHeadReason(reading)).toBe('2 commits past #12\'s head: one, two');
   });
 });
 
@@ -396,7 +599,7 @@ describe('classifyBranches over a real clone', () => {
 
     expect(groups(answer).notes).toEqual([]);
     expect(rows(answer)).toEqual([
-      { group: 'merged', name: 'gone', ticked: true, reason: 'upstream origin/gone is gone' },
+      { group: 'merged', name: 'gone', ticked: false, reason: 'upstream origin/gone is gone; main does not reach its tip' },
       { group: 'merged', name: 'merged', ticked: true, reason: 'merged into main' },
       { group: 'merged', name: 'squashed', ticked: true, reason: 'pull request #7 merged' },
       { group: 'stale', name: 'stale', ticked: false, reason: expect.stringMatching(/^no commit in \d+ days$/) as unknown as string },
@@ -407,5 +610,76 @@ describe('classifyBranches over a real clone', () => {
     // pushed, level and recent, so nothing git says would list it.
     const alone = classifyBranches(git, read, { state: 'none' }, { staleDays: 30, now: new Date() });
     expect(rows(alone).map((row) => row.name)).toEqual(['gone', 'merged', 'stale', 'local']);
+  });
+
+  it('reads a gone branch past its merged pull request\'s head: the commits, and whether the base holds them', async () => {
+    const remote = join(tempBase, 'past.git');
+    const work = join(tempBase, 'past');
+    run(tempBase, ['init', '-q', '--bare', '-b', 'main', remote]);
+    run(tempBase, ['clone', '-q', remote, work]);
+    run(work, ['commit', '-q', '--allow-empty', '-m', 'first']);
+    run(work, ['push', '-q', '-u', 'origin', 'main']);
+    run(work, ['remote', 'set-head', 'origin', 'main']);
+    const commitFile = (path: string, subject: string): void => {
+      mkdirSync(dirname(join(work, path)), { recursive: true });
+      writeFileSync(join(work, path), `${subject}\n`);
+      run(work, ['add', '--', path]);
+      run(work, ['commit', '-q', '-m', subject]);
+    };
+    /** A branch pushed at its head, one commit made past it, then deleted remotely; answers the head. */
+    const pastHead = (name: string, path: string, subject: string): string => {
+      run(work, ['switch', '-q', '-c', name, 'origin/main']);
+      commitFile(`src/${name}.ts`, `${name} work`);
+      run(work, ['push', '-q', '-u', 'origin', name]);
+      const head = run(work, ['rev-parse', 'HEAD']);
+      commitFile(path, subject);
+      run(work, ['push', '-q', 'origin', '--delete', name]);
+      return head;
+    };
+    const fragmentHead = pastHead('fragment', '.changes/fragment.md', 'chore: add release fragment');
+    const sourceHead = pastHead('source', 'src/late.ts', 'feat: late work');
+    run(work, ['switch', '-q', 'main']);
+    // The squash merge of `fragment` lands its fragment on main.
+    commitFile('.changes/fragment.md', 'squash fragment');
+    run(work, ['fetch', '-q', '--prune']);
+
+    const git = createGitRunner(work);
+    const read = readBranches(git, { base: null, keep: [] });
+    if (!read.ok) {
+      throw new Error(read.detail);
+    }
+    const provider: ProviderMerges = {
+      state: 'read',
+      pullRequests: [pull(21, 'fragment', fragmentHead), pull(22, 'source', sourceHead)],
+    };
+    const answer = groups(classifyBranches(git, read, provider, { staleDays: 30, now: new Date() }));
+    const byName = (merged: readonly MergedRow[]): Record<string, MergedRow> => Object.fromEntries(
+      merged.map((row) => [row.branch.name, row]),
+    );
+    const merged = byName(answer.merged);
+
+    expect(answer.notes).toEqual([]);
+    expect(Object.keys(merged).sort()).toEqual(['fragment', 'source']);
+    expect(merged['fragment']).toMatchObject({
+      ticked: false,
+      mergedBy: ['gone'],
+      pullRequest: null,
+      reason: 'upstream origin/fragment is gone; 1 commit past #21\'s head: chore: add release fragment',
+      pastHead: { count: 1, held: true, pullRequest: { number: 21 } },
+    });
+    expect(merged['source']).toMatchObject({
+      ticked: false,
+      reason: 'upstream origin/source is gone; 1 commit past #22\'s head: feat: late work',
+      pastHead: { count: 1, held: false, pullRequest: { number: 22 } },
+    });
+
+    // Control: with another fragments directory the same commit is not held,
+    // so the setting is what decides it.
+    const elsewhere = groups(classifyBranches(git, read, provider, {
+      staleDays: 30,
+      now: new Date(),
+      release: { fragments: 'elsewhere', changelog: 'CHANGELOG.md' },
+    }));
+    expect(byName(elsewhere.merged)['fragment']?.pastHead?.held).toBe(false);
   });
 });

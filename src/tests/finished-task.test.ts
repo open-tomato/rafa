@@ -487,3 +487,53 @@ describe('a finished task that changed no tracked file', () => {
     expect(lineAt(committedTracker, committedInfo.lineNum)).toBe(`- [x] ${FIRST_TASK}`);
   });
 });
+
+describe('a session output that ends on a background wait', () => {
+  const BACKGROUND_LINE = 'The full suite is running in the background (bun test --coverage); I will wait for the notification.';
+  const WAITING = ['Started the suite.', '', BACKGROUND_LINE, ''].join('\n');
+  const FENCE = '```';
+  const REPORT = [
+    `${FENCE}rafa:report`,
+    'status: done',
+    'feedback: |',
+    '  Finished.',
+    'findings: []',
+    'skills_used: []',
+    'blockers: []',
+    'out_of_scope_bugs: []',
+    'changes: []',
+    FENCE,
+    '',
+  ].join('\n');
+
+  /** Plants a repo whose session wrote only an ignored file, and settles `output`. */
+  function settle(output: string) {
+    const dir = plantRepo();
+    const trackerPath = plantTracker(dir);
+    const taskInfo = nextTask(trackerPath);
+    write(dir, 'progress.txt', 'a finding\n');
+    const finished = finishCleanExit({ trackerPath, taskInfo, repoRoot: dir, output });
+    return { finished, trackerPath, taskInfo };
+  }
+
+  it('marks the tracker line [BLOCKED] and prints a hold naming the background command', () => {
+    const { finished, trackerPath, taskInfo } = settle(WAITING);
+
+    expect(finished.attempt.outcome).toBe('nothing-to-commit');
+    expect(finished.outcome).toBe('blocked');
+    expect(lineAt(trackerPath, taskInfo.lineNum)).toStartWith(`- [BLOCKED] ${FIRST_TASK}`);
+    expect(finished.holds.join('\n')).toContain(BACKGROUND_LINE);
+    expect(errors.join('\n')).toContain(BACKGROUND_LINE);
+    expect(errors.join('\n')).toContain('running in the background');
+    expect(errors.join('\n')).not.toContain('the session wrote no rafa:report block the loop could read');
+  });
+
+  it('ticks the task when the same output carries a rafa:report block', () => {
+    const { finished, trackerPath, taskInfo } = settle(`${WAITING}${REPORT}`);
+
+    expect(finished.outcome).toBe('done');
+    expect(finished.holds).toEqual([]);
+    expect(lineAt(trackerPath, taskInfo.lineNum)).toBe(`- [x] ${FIRST_TASK}`);
+    expect(errors).toEqual([]);
+  });
+});

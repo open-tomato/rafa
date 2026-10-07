@@ -30,9 +30,9 @@
  *   When the chain holds `github`, the repository that adapter files on
  *   is named too: it passes no `--repo`, so `gh` resolves the
  *   repository of the directory it runs in, which `gh repo view --json
- *   nameWithOwner` with no argument reads. The chain is NOT resolved:
- *   that runs each adapter's preflight, and this reading makes no
- *   tracker.
+ *   nameWithOwner,visibility` with no argument reads. The chain is NOT
+ *   resolved: that runs each adapter's preflight, and this reading makes
+ *   no tracker.
  * - **The pull request provider** is `resolvePrProvider`'s answer over
  *   the configured `pr.provider` and `origin`'s fetch URL, read through
  *   the same git seam. Under `gh` the repository `gh` resolves is named,
