@@ -3,8 +3,10 @@
  * stretch from planning to a running loop (#816). It replaces the hand
  * steps the engineer operator took per item: `rafa plan create --issue`,
  * then a `setsid nohup` loop start with its events output redirected into
- * the stretch folder. What happens once the loop has a pull request is
- * `item-merge.ts`'s.
+ * the stretch folder. What happens once `loop wait` has ended, the merge
+ * of the loop's pull request into the integration branch, the wait for
+ * CI on it, the ledger line and the pit-stop readings, is
+ * `./item-merge.ts`'s.
  *
  * `stretch item` decides nothing: it runs the steps and prints what they
  * read. The pit-stop skill decides what to do with them.
@@ -44,13 +46,17 @@
  *      written no record yet, and exits 0 with the log's path: the child
  *      is still running;
  *   4. with `--wait`, `rafa loop wait --session-id=<id>` on this
- *      terminal; its exit code is the item's, so a caller reads the same
- *      reason codes `loop wait` documents.
+ *      terminal, then `./item-merge.ts`'s half: the merge, the CI wait,
+ *      the ledger line and the pit-stop readings once the loop opened a
+ *      pull request, else the reason it opened none and `loop wait`'s
+ *      exit code, so a caller reads the same reason codes `loop wait`
+ *      documents.
  *
  * ## `--dry-run`
  *
  * Every step is printed, in the same order, and none is run: no plan
- * session, no folder, no log and no loop. The readings that decide which
+ * session, no folder, no log and no loop; with `--wait`, the merge half's
+ * lines follow (`mergeDryRunLines`). The readings that decide which
  * steps there are still run: the config, `plan.dir` and the session
  * records. With no plan of the issue yet, the loop line names the plan
  * as `PLAN-rafa-<issue>-<slug>.md`, the slug being the issue title's,
@@ -61,11 +67,13 @@
  *
  * 0 for a loop started and a dry run, 1 for each refusal above, 2 when a
  * step failed or a reading of the session records did, `plan create`'s
- * own code when it ends non-zero, and `loop wait`'s under `--wait`.
+ * own code when it ends non-zero, and under `--wait` the codes
+ * `./item-merge.ts` names.
  *
  * Every process goes through {@link StretchItemSeams}, so no test runs
  * `rafa`, a planning session or a loop.
  */
+import type { ItemMergeSeams } from './item-merge.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { PlansDir } from '../plan/plan-files.js';
@@ -73,6 +81,7 @@ import type { PlansDir } from '../plan/plan-files.js';
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
+import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { boardId } from '../../board/naming.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
@@ -88,6 +97,7 @@ import {
   stubOfPlanFile,
 } from '../plan/plan-files.js';
 
+import { afterLoopWait, ghFiledAt, mergeDryRunLines } from './item-merge.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -130,19 +140,12 @@ export interface LaunchedLoop {
   readonly exitCode: () => number | null;
 }
 
-/** The processes and clock the command reaches through; see the module note. */
-export interface StretchItemSeams {
-  /** Runs a rafa line on this terminal and answers its exit code, or null when it could not start. */
-  readonly runRafa: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>) => Promise<number | null>;
+/** The processes and clock the command reaches through, the merge half's among them; see the module note. */
+export interface StretchItemSeams extends ItemMergeSeams {
   /** Starts a line detached in its own session, both streams appended to `logPath`; null when it could not start. */
   readonly launch: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>, logPath: string) => LaunchedLoop | null;
   /** The pid probe the session records are read with. */
   readonly isAlive: PidProbe;
-  /** Waits `ms` milliseconds. */
-  readonly sleep: (ms: number) => Promise<void>;
-  readonly now: () => Date;
-  /** The program words that run rafa. */
-  readonly rafa: readonly string[];
 }
 
 /** What one line asks for. */
@@ -368,15 +371,34 @@ function launchStep(context: RafaContext, root: string, plan: string, log: strin
   return { launched, offset };
 }
 
-/** Step 4: `rafa loop wait` on the session, its exit code the command's. */
-async function waitStep(context: RafaContext, root: string, sessionId: string, seams: StretchItemSeams): Promise<void> {
-  const argv = [...seams.rafa, 'loop', 'wait', `--session-id=${sessionId}`];
+/** What the wait step needs of the item. */
+interface WaitInput {
+  readonly root: string;
+  readonly n: number;
+  readonly issue: number;
+  readonly stub: string;
+  readonly record: SessionRecord;
+  readonly log: string;
+}
+
+/** Step 4: `rafa loop wait` on the session, then the merge half over its exit code. */
+async function waitStep(context: RafaContext, wait: WaitInput, seams: StretchItemSeams): Promise<void> {
+  const { root, record } = wait;
+  const argv = [...seams.rafa, 'loop', 'wait', `--session-id=${record.sessionId}`];
   context.output.info(lineText(argv));
-  const exitCode = await seams.runRafa(argv, root, childEnv(context));
+  const env = childEnv(context);
+  const exitCode = await seams.runRafa(argv, root, env);
   if (exitCode === null) throw failure(`${lineText(argv)} could not start; the loop still runs.`);
-  if (exitCode !== 0) {
-    throw new CommandExit(exitCode, `❌ ${COMMAND_NAME}: ${lineText(argv)} ended with exit code ${String(exitCode)}`);
-  }
+  await afterLoopWait(context, {
+    root,
+    n: wait.n,
+    issue: wait.issue,
+    stub: wait.stub,
+    sessionId: record.sessionId,
+    startedAt: record.startedAt,
+    log: wait.log,
+    env,
+  }, exitCode, seams);
 }
 
 /** Runs the line; see the module note. */
@@ -404,7 +426,10 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
   const placeholder = posix.join(plans.label, `PLAN-${boardId(line.issue)}-<slug>.md`);
   info(loopLineText(seams.rafa, plan, placeholder, log));
   if (plan === null || line.dryRun) {
-    if (line.wait) info(`${lineText([...seams.rafa, 'loop', 'wait'])} --session-id=<session id>`);
+    if (line.wait) {
+      info(`${lineText([...seams.rafa, 'loop', 'wait'])} --session-id=<session id>`);
+      for (const step of mergeDryRunLines(seams.rafa, root, n)) info(step);
+    }
     info(`dry run: would start the loop of #${issue} for ${STRETCH_BRANCH_PREFIX}${String(n)}; nothing was run`);
     return;
   }
@@ -424,7 +449,7 @@ export async function runStretchItem(context: RafaContext, seams: StretchItemSea
     info(`wait on it with: rafa loop wait --session-id=${record.sessionId}`);
     return;
   }
-  await waitStep(context, root, record.sessionId, seams);
+  await waitStep(context, { root, n, issue: line.issue, stub, record, log }, seams);
 }
 
 /** Runs `argv` on this terminal; null when it could not start. */
@@ -462,12 +487,15 @@ function spawnDetached(argv: readonly string[], cwd: string, env: Readonly<Recor
   }
 }
 
-/** The real processes, pid probe and clock. */
+/** The real processes, pid probe, `gh`, tracker and clock. */
 export function defaultStretchItemSeams(): StretchItemSeams {
   return {
     runRafa: spawnOnTerminal,
     launch: spawnDetached,
     isAlive: isPidAlive,
+    gh: (root) => createGhRunner({ cwd: root }),
+    tracker: (gh) => createGithubTracker({ gh }),
+    filedAt: ghFiledAt,
     sleep: (ms) => Bun.sleep(ms),
     now: () => new Date(),
     rafa: DEFAULT_RAFA_COMMAND,
@@ -486,19 +514,27 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
       + ' already in `plan.dir` instead, and starts `rafa loop start --plan=<plan> --as-worktree --no-ci-wait`'
       + ' detached with `RAFA_OUTPUT=events`, its output appended to `.rafa/stretch/<n>/loop-<issue>.log`.'
       + ' It waits for the loop\'s session record and prints its id. With `--wait` it then runs'
-      + ' `rafa loop wait --session-id=<id>` and exits with its code. `--dry-run` prints every step in order'
-      + ' and runs none. Exit code 1 for a refusal, 2 for a step that failed, and `plan create`\'s own code'
-      + ' when it fails.',
+      + ' `rafa loop wait --session-id=<id>`; once the loop has opened a pull request it refuses one whose base'
+      + ' is not a `stretch/*` branch, runs `rafa pr merge <pr> --skip-checks --yes`, waits for the run on the'
+      + ' merge commit to end, appends the item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop'
+      + ' readings. A loop that opened no pull request has its reason printed, merges nothing and exits with'
+      + ' `loop wait`\'s code. `--dry-run` prints every step in order and runs none. Exit code 1 for a refusal,'
+      + ' 2 for a step that failed, and the code of `plan create`, `loop wait` or `pr merge` when it fails.',
     args: [
       { name: 'issue', description: 'The number of the `type:spec` issue to plan and run.', type: 'string', required: true },
     ],
     flags: [
-      { name: 'wait', description: 'Wait on the loop through `rafa loop wait` once it runs, and exit with its code.', type: 'boolean' },
+      {
+        name: 'wait',
+        description: 'Wait on the loop through `rafa loop wait`, then merge its pull request into the integration branch'
+          + ' with checks skipped, wait for CI and print the pit-stop readings.',
+        type: 'boolean',
+      },
       { name: 'dry-run', description: 'Print every step in order, and run none of them.', type: 'boolean' },
     ],
     examples: [
       { cmd: 'rafa stretch item 812 --dry-run', note: 'Prints the plan create line and the detached loop line.' },
-      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop and waits on it.' },
+      { cmd: 'rafa stretch item 812 --wait', note: 'Plans #812, starts its loop, waits on it and merges its pull request.' },
     ],
     outputs: ['text'],
     spends: { when: 'unless', flag: '--dry-run', what: 'one planning session and the loop it starts' },

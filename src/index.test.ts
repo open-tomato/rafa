@@ -1242,6 +1242,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
   ]],
   ['./commands/stretch/item.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner', 'createGithubTracker']],
     ['../../board/naming.js', ['boardId']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
@@ -1256,6 +1257,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'resolveProjectConfig',
       'stubOfPlanFile',
     ]],
+    ['./item-merge.js', ['afterLoopWait', 'ghFiledAt', 'mergeDryRunLines']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/status.js', [

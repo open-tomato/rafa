@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { beginSession } from '../../loop/sessions.js';
+import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
 import {
@@ -78,6 +79,7 @@ interface Case {
   readonly project: PlantedProject;
   readonly rafaCalls: { argv: string[]; env: Record<string, string> }[];
   readonly launches: { argv: string[]; env: Record<string, string>; log: string; cwd: string }[];
+  readonly ghCalls: string[][];
   readonly seams: StretchItemSeams;
 }
 
@@ -105,6 +107,7 @@ function plant(options: CaseOptions = {}): Case {
   const project = plantProject(caseDir, options.config ?? STRETCH_CONFIG);
   const rafaCalls: Case['rafaCalls'] = [];
   const launches: Case['launches'] = [];
+  const ghCalls: string[][] = [];
   let clock = START;
   const seams: StretchItemSeams = {
     runRafa: async (argv, _cwd, env) => {
@@ -123,6 +126,14 @@ function plant(options: CaseOptions = {}): Case {
       return { pid: LOOP_PID, exitCode: () => options.loopExit ?? null };
     },
     isAlive: (pid) => pid === LOOP_PID,
+    gh: () => async (args) => {
+      ghCalls.push([...args]);
+      // A pull request into the default branch, so the merge half refuses it before it merges; its cases are item-merge.test.ts's.
+      const row = { baseRefName: 'main', body: '', headRefName: 'feat/rafa-812-pit-readings', mergeCommit: null, number: Number(args[2]), state: 'OPEN' };
+      return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
+    },
+    tracker: () => ({ openIssues: async () => Promise.resolve([]) }),
+    filedAt: () => undefined,
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();
@@ -130,7 +141,7 @@ function plant(options: CaseOptions = {}): Case {
     now: () => new Date(clock),
     rafa: ['rafa'],
   };
-  return { project, rafaCalls, launches, seams };
+  return { project, rafaCalls, launches, ghCalls, seams };
 }
 
 /** Dispatches `stretch item` with `words` in the case's project. */
@@ -242,13 +253,18 @@ describe('rafa stretch item, a full run', () => {
     expect(outcome.stderr).toContain('ended with exit code 10');
   });
 
-  it('with --wait and a loop wait answering pr, exits 0', async () => {
+  it('with --wait and a loop wait answering pr, hands the pull request the events file names to the merge half', async () => {
     const planted = plant();
+    mkdirSync(join(planted.project.root, '.rafa', 'runs'), { recursive: true });
+    const prEvent = { name: 'pr', summary: 'pr #901 opened', data: { number: 901 }, ts: '2026-10-07T09:10:00.000Z' };
+    writeFileSync(eventsFilePath(planted.project.root, SESSION_ID), `${JSON.stringify(prEvent)}\n`);
 
     const outcome = await run(planted, ['812', '--wait']);
 
-    expect(outcome.exitCode).toBe(0);
     expect(planted.rafaCalls).toHaveLength(2);
+    expect(planted.ghCalls[0]?.slice(0, 3)).toEqual(['pr', 'view', '901']);
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('#901 opens into main, not a stretch/* branch');
   });
 
   it('reads a record started before the launch as another run, and waits for the new one', async () => {

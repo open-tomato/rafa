@@ -86,8 +86,8 @@
  * through `src/config-set.ts`, nor `ci status`, which reads a branch's
  * newest run through the readers under `src/ci/`, nor `stretch start`,
  * which opens a stretch through the readings of `src/stretch/`, nor
- * `stretch item`, which runs `plan create`, `loop start` and `loop wait`
- * as child processes.
+ * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
+ * and `pr merge` as child processes.
  *
  * ## What is registered
  *
@@ -322,8 +322,12 @@
  *     of the issue already there kept, and its loop started detached
  *     with `--as-worktree --no-ci-wait`, its events output appended to
  *     `.rafa/stretch/<n>/loop-<issue>.log`; `--wait` then runs
- *     `loop wait` on its session. Refused with exit code 1 when
- *     `pr.base` names no `stretch/<n>` branch. It spends unless
+ *     `loop wait` on its session and, once the loop has a pull request,
+ *     merges it with `pr merge --skip-checks --yes` into a `stretch/*`
+ *     base only, waits for the run on the merge commit, appends the
+ *     item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop
+ *     readings (`./stretch/item-merge.ts`). Refused with exit code 1
+ *     when `pr.base` names no `stretch/<n>` branch. It spends unless
  *     `--dry-run`.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
