@@ -20,6 +20,7 @@ repository name: the repository is public. The outputs under
 | `provenance.ts` | `.rafa/survey/provenance.json`, `.rafa/survey/provenance.md` | `bun scripts/survey/provenance.ts` | added |
 | `concepts.ts` | `.rafa/survey/concepts.json`, `.rafa/survey/concepts.md` | `bun scripts/survey/concepts.ts` | added |
 | `test-timing.ts` | `.rafa/survey/test-timing.json`, `.rafa/survey/test-timing.md` | `bun scripts/survey/test-timing.ts [--report <path>]` | added |
+| `decisions.ts` | `.rafa/survey/decision-sources.json`, `.rafa/survey/decision-sources.md` | `bun scripts/survey/decisions.ts [--board <path>]` | added |
 
 A `planned` row names a script its own task adds; that task turns the row
 to `added` in the same commit.
@@ -75,6 +76,20 @@ else its directory's most common, else `none`, from
 tracked test file the report holds no case for is named as missed.
 A case the report marks with a `<failure>` or `<error>` child is listed
 under "Failed cases", its seconds not timings to trust.
+
+`decisions.ts` collects the decisions rafa already stands on, as
+written, for the guideline sheet: the tenet lines (a line naming the
+tenets, with the list after its colon or below it split into items), the
+"Rejected" sections (`Rejected`, `Rejected alternatives`, `Rejected for
+now`, `Alternatives rejected`, … as a heading, in bold, or plain with its
+colon) of every `type:spec` body in `.rafa/cache/board.json`, and the
+rule lines of the tracked `context/*.md` pages (a sentence saying
+`never`, `always` or `must` outside a code span, or a long bold lead
+closing on a period). Each reading keeps its source and line; it judges
+nothing. The coverage line counts the context pages; the spec bodies are
+not tracked files, so the summary counts them apart and names each spec
+with no rejected section. `--board <path>` reads another checkout's
+cache, as for `provenance.ts`.
 
 Each script sits beside its colocated `*.test.ts`. Unit tests use small
 in-memory inputs or a temporary git repository, never the live one:
