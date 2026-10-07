@@ -9,6 +9,13 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.37.0 — 2026-10-07, rafa issue edit — amend an issue body behind the ownership gates; rafa update current crosses minors below 1.0.0
+<!-- rafa:fragments rafa-812-spec-rafa-issue-edit update-current-0x-minors -->
+
+- CLI: Added `rafa issue edit`, which appends a dated update to an issue body, or replaces its body or title, after four gates: who edits, whose issue, the text, and the spec's state.
+- CLI: `rafa update current` now moves a project's `rafa.lock` across newer minor versions while both versions are below 1.0.0, so a lock at 0.34.1 moves to 0.36.0. From 1.0.0 on, a newer minor is still refused and left to `rafa update next`.
+- documentation: Listed `rafa issue edit` as the seventh Trust route in the pull-requests page, and mapped `gh issue edit --body-file` to it in the rafa-tooling skill and its pack copy.
+
 ## 0.36.0 — 2026-10-05, Close the tooling hook's dead ends — specs and closing issues through rafa, gap reports from sessions; rafa loop wait — wait on a running loop for one event, on awake time; Bug sweep 6 — macOS failures print their cause; Bug sweep 7 — scoped test steps without `Owns:`, a repaired pre-wrap-up, exact blocker paths; Bug sweep 8 — the run's base everywhere, claim branches that catch up, worktree sessions collected, `issue ready --yes`; Bug sweep 9 — the reference check refuses only drift; Bug sweep 10 — real-repository tests that bring their own git identity
 <!-- rafa:fragments rafa-468-close-tooling-hook-s rafa-639-rafa-loop-wait rafa-766-bug-sweep-6 rafa-767-bug-sweep-7 rafa-768-bug-sweep-8 rafa-787-bug-sweep-9 rafa-799-bug-sweep-10 -->
 
