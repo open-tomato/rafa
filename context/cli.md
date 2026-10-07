@@ -891,8 +891,9 @@ New; it replaces no earlier text. What a row or an action added to
   it cannot read or edit is a warning. It runs after the scopes and
   before the board step. `--release=<value>` is refused at the top of
   the run, while nothing has been written.
-- **The board step runs last, but for the epic guard and the
-  relationships move after it, and only where there is a board**
+- **The board step runs last, but for the epic guard, the
+  relationships move and the project step after it, and only where
+  there is a board**
   (`src/commands/init-board.ts`). The provider is resolved from
   `pr.provider` and the root's `origin` (`src/pr/provider.ts`), and
   anything but `gh` ends the step before a runner is opened, with a
@@ -970,6 +971,22 @@ New; it replaces no earlier text. What a row or an action added to
   kept `native` listing (`invalidateRows`). The result prints under
   `Board relationships, <from> to <to>:` as `sent`, `left`, `removed`
   and `kept` rows, and json mode carries it as `relationsMove`.
+- **The project step runs last of all, after a board that ran**
+  (`runProjectStep` in `src/commands/init-board-project.ts`; its five
+  parts are `setUpProject`'s in the same module). It follows the
+  relationships move so the Blocked by values are read in the mode the
+  move has just left the board in. The first answer wins: a board that
+  did not run leaves it `not-run`, warning only when `--project` asked;
+  `--no-project` declines; `--project` runs it; no terminal leaves it
+  `unasked` with the line naming `rafa init --board --project`;
+  otherwise the question `Also create a GitHub project with roadmap and
+  kanban views? [y/N]` is asked. The `gh` runner is opened only once
+  it runs, and the `roadmap.issue` the board step may just have written
+  is read back off the file first. Its rows print under
+  `GitHub project:`, a created part counts as a change, a refused part
+  (the `project` scope among them) refuses nothing and exits 0, and json
+  mode carries it as `project`. `--project=<value>` is refused at the
+  top of the run.
 - **`doctor` checks what `loop start` would, and starts no run**
   (`src/commands/doctor.ts`). In text mode it prints `rafa <version>`
   first, before anything is checked, so the build that answered is read

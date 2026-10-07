@@ -6,10 +6,25 @@
  * the issues' labels, pull requests and the Roadmap checklists; the
  * issues stay the source of truth.
  *
- * {@link setUpProject} is the whole of it. Whether it runs at all — the
- * `--project` and `--no-project` flags, the one question on a terminal
- * after the board step and the epic guard — is `src/commands/init.ts`'s
- * to decide; this module runs once that is decided.
+ * {@link setUpProject} is the whole of it, and {@link runProjectStep}
+ * decides whether it runs at all. `src/commands/init.ts` reads
+ * `--project` and `--no-project` as it reads `--epic-guard`, and calls
+ * the step last, after the board step, the epic guard and the
+ * relationships move, so the Blocked by values are read in the mode the
+ * move has just left the board in. The first answer wins:
+ *
+ *   - The board step did not run: nothing is read, asked or sent, and a
+ *     line that said `--project` is told so through the warnings.
+ *   - `--no-project`: declined, nothing read.
+ *   - `--project`: run, asking nothing.
+ *   - No terminal: not asked and not run, and the line naming
+ *     `rafa init --board --project` is printed.
+ *   - Otherwise its own `[y/N]` question ({@link PROJECT_QUESTION}),
+ *     read as the board's is: anything but `y` or `yes` declines.
+ *
+ * The `gh` runner is opened only once the step runs, and the
+ * `roadmap.issue` the board step may have just written is read back off
+ * the file first, since `init` resolved its config before that write.
  *
  * ## Five parts, each `created`, `present` or `refused`
  *
@@ -93,7 +108,9 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
 import type { ProjectRefresh, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
+import type { Prompter } from '../cli/prompt/confirm.js';
 import type { RafaConfig } from '../config.js';
+import type { BoardStepResult } from './init-board.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
@@ -101,10 +118,12 @@ import { PROJECT_WRITE_PAUSE_MS } from '../board/project/port.js';
 import { isMissingProjectScope, PROJECT_SCOPE_FIX, rateLimitWarning } from '../board/project/refresh-warnings.js';
 import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.js';
 import { rankOf, stageOf } from '../board/project/rules.js';
+import { readRoadmapSetting } from '../board/setup-config.js';
 import { isMapping, messageOf } from '../config-sections.js';
 
 import { readBoardRepository } from './epic/move-native.js';
 import { PROJECT_NUMBER_SETTING, writeProjectNumber } from './init-board-project-setting.js';
+import { YES_ANSWERS } from './init-board.js';
 
 /** The line that runs the step again, named by a refusal. */
 export const PROJECT_STEP_FIX = 'rafa init --board --project';
@@ -443,4 +462,122 @@ export function projectPartLine(part: ProjectPart): string {
 /** The lines text mode writes for the step: the heading, a row per part, then each problem. */
 export function renderProjectSetup(report: ProjectSetupReport): readonly string[] {
   return [PROJECT_HEADING, ...report.parts.map((part) => projectPartLine(part)), ...report.problems];
+}
+
+/** The step's one question, asked after the board, the epic guard and the relationships move. */
+export const PROJECT_QUESTION = 'Also create a GitHub project with roadmap and kanban views? [y/N] ';
+
+/** What the project step came to. */
+export type ProjectStepStatus =
+  /** {@link setUpProject} ran, and `report` says what each part came to. */
+  | 'ran'
+  /** `--no-project`, or its question answered with anything but yes. */
+  | 'declined'
+  /** Nobody said and there was no terminal to ask on. */
+  | 'unasked'
+  /** The board step did not run, so neither did this one. */
+  | 'not-run';
+
+/** What one run of {@link runProjectStep} came to. */
+export interface ProjectStepResult {
+  readonly status: ProjectStepStatus;
+  /** True when its question was put to an operator. */
+  readonly asked: boolean;
+  /** What the five parts came to, or null when the step did not run. */
+  readonly report: ProjectSetupReport | null;
+  /** A sentence per flag the step could not act on. */
+  readonly warnings: readonly string[];
+}
+
+/** What {@link runProjectStep} is asked. */
+export interface ProjectStepOptions {
+  /** True for `--project`, false for `--no-project`, null when the line said neither. */
+  readonly wanted: boolean | null;
+  /** What the board step came to; the project runs only after a board that ran. */
+  readonly board: BoardStepResult;
+  /** The project root: where `roadmap.issue` is read back and `board.project.number` written. */
+  readonly root: string;
+  /** The config as `init` resolved it before the board step wrote `roadmap.issue`. */
+  readonly config: ProjectSetupConfig;
+  /** Opens the runner every `gh` command goes through. Called only once the step runs. */
+  readonly openGh: () => GhRunner;
+  /** True when a question can be answered. */
+  readonly isTerminal: () => boolean;
+  /** Opens the prompter the question is asked through. Called only to ask. */
+  readonly openPrompter: () => Prompter;
+  /** Sets the project up; {@link setUpProject} when left out. */
+  readonly setUp?: (options: ProjectSetupOptions) => Promise<ProjectSetupReport>;
+}
+
+/** What a line asking for `--project` is told when the board step did not run. */
+export const PROJECT_NO_BOARD_WARNING = '--project creates the GitHub project with the GitHub board,'
+  + ` and the board step did not run, so no project was created; run ${PROJECT_STEP_FIX}.`;
+
+/** A project step that set nothing up. */
+function noProject(status: ProjectStepStatus, asked: boolean, warnings: readonly string[] = []): ProjectStepResult {
+  return { status, asked, report: null, warnings: Object.freeze([...warnings]) };
+}
+
+/** Asks the step's question; true only for `y` or `yes`, and the prompter closed either way. */
+async function askProject(openPrompter: () => Prompter): Promise<boolean> {
+  const prompter = openPrompter();
+  try {
+    const answer = await prompter.ask(PROJECT_QUESTION);
+    return answer !== null && YES_ANSWERS.includes(answer.trim().toLowerCase());
+  } finally {
+    prompter.close();
+  }
+}
+
+/**
+ * `config` with the `roadmap.issue` the board step may just have written
+ * read back off the file, so the Ranks come off the Roadmap issue this
+ * run opened rather than a search for it.
+ */
+function withWrittenRoadmap(root: string, config: ProjectSetupConfig): ProjectSetupConfig {
+  const written = readRoadmapSetting(root).issue;
+  return written === null
+    ? config
+    : { ...config, roadmapIssue: written };
+}
+
+/**
+ * The project step of `rafa init`, having decided whether to run it and
+ * asked when nobody said. The first answer wins: a board that did not
+ * run (warning only when `--project` asked), `--no-project`,
+ * `--project`, no terminal, then the question. Never throws for a `gh`
+ * call that failed: {@link setUpProject} reports those as refused parts.
+ */
+export async function runProjectStep(options: ProjectStepOptions): Promise<ProjectStepResult> {
+  const { wanted, board, root, isTerminal, openPrompter } = options;
+  if (board.status !== 'ran') {
+    return noProject('not-run', false, wanted === true
+      ? [PROJECT_NO_BOARD_WARNING]
+      : []);
+  }
+  if (wanted === false) return noProject('declined', false);
+
+  const run = async (asked: boolean): Promise<ProjectStepResult> => {
+    const setUp = options.setUp ?? setUpProject;
+    const report = await setUp({ root, config: withWrittenRoadmap(root, options.config), gh: options.openGh() });
+    return { status: 'ran', asked, report, warnings: [] };
+  };
+  if (wanted === true) return run(false);
+  if (!isTerminal()) return noProject('unasked', false);
+  return await askProject(openPrompter)
+    ? run(true)
+    : noProject('declined', true);
+}
+
+/** True when the project step created any part. */
+export function projectStepChanged(result: ProjectStepResult): boolean {
+  return result.report !== null && projectSetupChanged(result.report);
+}
+
+/** The lines text mode writes for the project step, and none when it has nothing to say. */
+export function renderProjectStep(result: ProjectStepResult): readonly string[] {
+  if (result.report !== null) return renderProjectSetup(result.report);
+  if (result.status === 'declined') return [`The GitHub project was left out; run ${PROJECT_STEP_FIX} to create it.`];
+  if (result.status === 'unasked') return [`The GitHub project question needs a terminal; run ${PROJECT_STEP_FIX} to create it.`];
+  return [];
 }

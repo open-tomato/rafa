@@ -32,8 +32,8 @@
  * and the other four are still compared.
  */
 import type { IssueFacts } from './facts.js';
+import type { HorizonOption, StageOption } from './options.js';
 import type { MatchedField, ProjectFieldKey, ProjectFieldValue, ProjectItem } from './port.js';
-import type { HorizonOption, StageOption } from './rules.js';
 import type { ProjectFieldWrite, ProjectWriteValue } from './writes.js';
 import type { Epic } from '../epics.js';
 import type { BlockersReading } from '../relations/port.js';

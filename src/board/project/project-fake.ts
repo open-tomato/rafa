@@ -65,7 +65,7 @@
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
-import { HORIZON_OPTIONS, STAGE_OPTIONS } from './rules.js';
+import { HORIZON_OPTIONS, STAGE_OPTIONS } from './options.js';
 
 /** The repository an item's content belongs to when none is given. */
 export const FAKE_PROJECT_REPOSITORY = 'open-tomato/rafa';

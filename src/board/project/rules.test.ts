@@ -27,13 +27,8 @@ import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { readEpics, unknownEpic } from '../epics.js';
 import { createNativeRelations } from '../relations/native.js';
 
-import {
-  HORIZON_OPTIONS,
-  horizonOptionOf,
-  progressTextOf,
-  stageOf,
-  STAGE_OPTIONS,
-} from './rules.js';
+import { HORIZON_OPTIONS, STAGE_OPTIONS } from './options.js';
+import { horizonOptionOf, progressTextOf, stageOf } from './rules.js';
 
 /** An open issue with no label and no pull request, overridden by `facts`. */
 function issue(facts: Partial<StageFacts> = {}): StageFacts {

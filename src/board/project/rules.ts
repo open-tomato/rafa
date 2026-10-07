@@ -7,7 +7,7 @@
  * ## Stage
  *
  * {@link stageOf} places an issue in one of the eleven
- * {@link STAGE_OPTIONS}, spelled exactly as the template names its
+ * `STAGE_OPTIONS` (`./options.ts`), spelled exactly as the template names its
  * options, because the project is matched by name. The rightmost matching
  * column wins, so the checks run from the right:
  *
@@ -32,7 +32,7 @@
  * ## Horizon
  *
  * {@link horizonOptionOf} places an epic in one of the five
- * {@link HORIZON_OPTIONS}, by the template's exact names: Cancelled when
+ * `HORIZON_OPTIONS` (`./options.ts`), by the template's exact names: Cancelled when
  * closed as not planned or duplicate, Done when closed otherwise, else the
  * option its one `horizon:now|next|later` label names. An open epic whose
  * `horizon:` labels name no single known horizon — none, two or more, or
@@ -110,6 +110,7 @@ import type { Blocker, BlockersReading } from '../relations/port.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { Horizon } from '../roadmap-epic-rows.js';
 import type { RoadmapLine } from '../roadmap.js';
+import type { HorizonOption, StageOption } from './options.js';
 
 import { GITHUB_LABELS } from '../../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
@@ -121,24 +122,6 @@ import { SPEC_NEEDS_WORK_LABEL } from '../gate.js';
 import { SPEC_READY_LABEL } from '../readiness.js';
 import { isWaiting } from '../relations/port.js';
 import { HORIZONS } from '../roadmap-epic-rows.js';
-
-/** The Stage field's options, left to right, by the template's exact names. */
-export const STAGE_OPTIONS = Object.freeze([
-  'Backlog',
-  'Triage',
-  'Needs work',
-  'Ready',
-  'Blocked',
-  'Claimed',
-  'In development',
-  'Waiting for approval',
-  'In review',
-  'Done',
-  'Cancelled',
-] as const);
-
-/** One option of the Stage field. */
-export type StageOption = (typeof STAGE_OPTIONS)[number];
 
 /** The close reason `gh` writes for an issue closed as a duplicate. */
 export const DUPLICATE_REASON = 'DUPLICATE';
@@ -239,18 +222,6 @@ export function stageOf(facts: StageFacts): StageOption | null {
     ? closedStage(facts)
     : openStage(facts);
 }
-
-/** The Horizon field's options, left to right, by the template's exact names. */
-export const HORIZON_OPTIONS = Object.freeze([
-  'Later',
-  'Next',
-  'Now',
-  'Done',
-  'Cancelled',
-] as const);
-
-/** One option of the Horizon field. */
-export type HorizonOption = (typeof HORIZON_OPTIONS)[number];
 
 /** The option each `horizon:` label's value names. */
 const HORIZON_LABEL_OPTIONS: Readonly<Record<Horizon, HorizonOption>> = Object.freeze({

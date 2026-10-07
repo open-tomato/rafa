@@ -251,7 +251,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'epic close': [['n'], ['accept-unchecked']],
   'epic cancel': [['n'], ['reason']],
   'switch': [['target'], ['rehome']],
-  'init': [[], ['root', 'yes', 'board', 'epic-guard', 'release']],
+  'init': [[], ['root', 'yes', 'board', 'epic-guard', 'project', 'release']],
   'doctor': [[], ['plan', 'deep']],
   'cleanup': [[], ['dry-run']],
   'effort fix-schema': [[], ['dry-run']],

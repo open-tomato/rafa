@@ -16,17 +16,16 @@
  * ## Why the warning lines are imported late
  *
  * `./refresh-warnings.ts` is imported once the static imports have
- * loaded, never first: a file that loads `./port.ts` before `./gh.ts`
- * meets the import cycle `./port.ts` → `./rules.ts` → `../epic-context.ts`
- * → … → `./refresh.ts` → `./gh.ts` → `./port.ts`, and `./gh.ts` reads
- * `PROJECT_PAGE_SIZE` before `./port.ts` set it (`ReferenceError: Cannot
- * access 'PROJECT_PAGE_SIZE' before initialization`). `./port.test.ts`,
- * `./refresh-warnings.test.ts`, `./rules.test.ts`, `./rules-rank.test.ts`,
- * `./refresh-values.test.ts` and `./facts.test.ts` each fail run alone,
- * and pass inside a larger `bun test --changed` run (measured on
- * 2026-10-07). Run alone at this file's base commit, `./port.test.ts`
- * failed the same way, and `./rules.test.ts` and `./facts.test.ts` on the
- * same cycle with `STAGE_OPTIONS` in its place.
+ * loaded, never first. When this file was written, a file that loaded
+ * `./port.ts` before `./gh.ts` met the import cycle `./port.ts` →
+ * `./rules.ts` → `../epic-context.ts` → … → `./refresh.ts` → `./gh.ts`
+ * → `./port.ts`, and `./gh.ts` read `PROJECT_PAGE_SIZE` before
+ * `./port.ts` set it (`ReferenceError: Cannot access 'PROJECT_PAGE_SIZE'
+ * before initialization`), so six test files of this directory failed
+ * run alone. The Stage and Horizon option lists have since moved to the
+ * leaf `./options.ts`, which closes the port's edge of that cycle;
+ * `./options.test.ts` loads `./rules.ts` and `./port.ts` each first and
+ * alone. The late import is kept, as it costs nothing.
  */
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { SyncFake } from './sync-fake.js';

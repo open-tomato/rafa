@@ -21,9 +21,9 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { createGhProjectPort, findArgs, itemsArgs } from './gh.js';
+import { STAGE_OPTIONS } from './options.js';
 import { matchProjectFields, PROJECT_PAGE_SIZE, ProjectPortError } from './port.js';
 import { createFakeProjectGh, fakeItemId, fakeOptionId, fakeProjectId } from './project-fake.js';
-import { STAGE_OPTIONS } from './rules.js';
 
 /** The template project, as the fake holds it. */
 const TEMPLATE: FakeProject = { owner: 'open-tomato', number: 6, title: 'rafa board template', public: true };

@@ -37,7 +37,7 @@
  * rafa finds the five fields of the template (`board.project.template`)
  * and their select options by their EXACT names: no case folding, no
  * trimming. {@link PROJECT_FIELDS} names them, Stage's and Horizon's
- * options spelled once in `./rules.ts` ({@link STAGE_OPTIONS},
+ * options spelled once in `./options.ts` ({@link STAGE_OPTIONS},
  * {@link HORIZON_OPTIONS}). {@link matchProjectFields} reads a project's
  * fields against them: a field matches when one of that name has the
  * expected type and every expected option; any other is a
@@ -63,7 +63,7 @@
  * null rather than rejecting: a write naming an owner, a repository or an
  * issue that is not there rejects.
  */
-import { HORIZON_OPTIONS, STAGE_OPTIONS } from './rules.js';
+import { HORIZON_OPTIONS, STAGE_OPTIONS } from './options.js';
 
 /**
  * GitHub's largest page for a GraphQL connection: a project's fields, a

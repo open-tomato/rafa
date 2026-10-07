@@ -14,6 +14,7 @@ import type { Project, ProjectField } from './port.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { HORIZON_OPTIONS, STAGE_OPTIONS } from './options.js';
 import {
   fieldByName,
   matchProjectFields,
@@ -22,7 +23,6 @@ import {
   PROJECT_PORT_PREFIX,
   ProjectPortError,
 } from './port.js';
-import { HORIZON_OPTIONS, STAGE_OPTIONS } from './rules.js';
 
 /** A single-select field named `name` with `options`, ids by index. */
 function select(name: string, options: readonly string[]): ProjectField {
