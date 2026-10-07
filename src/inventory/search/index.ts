@@ -43,9 +43,8 @@
  *     that failed is not read as having answered.
  *
  * Every outcome carries the ranking, so a command can always print it.
- * A spawner that throws, the spend guard's refusal included, rejects
- * the run with that error once the copy is removed; it is not a
- * fallback, because nothing ran.
+ * A spawner that throws rejects the run with that error once the copy
+ * is removed; it is not a fallback, because nothing ran.
  *
  * ## Which records rank
  *

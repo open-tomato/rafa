@@ -32,19 +32,20 @@
  * ## The three cases
  *
  *   - An undeclared command's `run` calls `spawnClaude`: the dispatch
- *     fails as `command_error`, its stderr line naming the command and
- *     saying to declare `spends`, and the stand-in is never reached.
- *   - The planted `pr triage`, dispatched without `--resolve`: refused
- *     the same way, naming the missing flag, the stand-in unreached.
+ *     ends 0 with a `warn:` line on stdout (text mode's one stream)
+ *     naming the command and saying to declare `spends`, and the
+ *     stand-in runs once. Usage is never a gate.
+ *   - The planted `pr triage`, dispatched without `--resolve`: warned
+ *     the same way, naming the missing flag, the stand-in run once.
  *   - The SAME planted `pr triage`, dispatched WITH `--resolve`: the
- *     control that says the case above was a refusal and not a command
- *     that could never have reached the stand-in at all. It ends 0, and
- *     the stand-in's log holds exactly one line.
+ *     control that says the warning above came from the declaration and
+ *     not from every session. It ends 0 with no warning, and the
+ *     stand-in's log holds exactly one line.
  *
- * "Reached the stand-in" is read off a log file the stand-in itself
- * appends to, never off a resolved promise: a guard checked after the
- * spawn, or a stand-in that ran without being asked to log, would both
- * leave that file empty in the case that should have written to it.
+ * "Ran the stand-in" is read off a log file the stand-in itself appends
+ * to, never off a resolved promise: a stand-in that ran without being
+ * asked to log would leave that file empty in the case that should have
+ * written to it.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
@@ -174,27 +175,28 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
     return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
   }
 
-  it('fails an undeclared command with the named error before any spawn, and reaches the stand-in never', async () => {
+  it('warns about an undeclared command and still runs its session, exiting 0', async () => {
     const outcome = await run(['plan', 'create']);
 
-    expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain('rafa plan create started a Claude session but declares no spends');
-    expect(outcome.stderr).toContain('declare spends on the command');
-    expect(standInCalls()).toBe(0);
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('warn: ⚠️  rafa plan create started a Claude session but declares no spends');
+    expect(outcome.stdout).toContain('declare spends on the command');
+    expect(standInCalls()).toBe(1);
   });
 
-  it('refuses the planted pr triage dispatched without --resolve, its with check having no production path of its own', async () => {
+  it('warns about the planted pr triage dispatched without --resolve, its with check having no production path of its own', async () => {
     const outcome = await run(['pr', 'triage']);
 
-    expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain('rafa pr triage started a Claude session without --resolve');
-    expect(standInCalls()).toBe(0);
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('warn: ⚠️  rafa pr triage started a Claude session without --resolve');
+    expect(standInCalls()).toBe(1);
   });
 
-  it('reaches the stand-in once for the SAME command dispatched with --resolve, the liveness control', async () => {
+  it('warns nothing for the SAME command dispatched with --resolve, the control', async () => {
     const outcome = await run(['pr', 'triage', '--resolve']);
 
     expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).not.toContain('started a Claude session');
     expect(outcome.stderr).toBe('');
     expect(standInCalls()).toBe(1);
   });

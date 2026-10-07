@@ -153,14 +153,14 @@
  *
  * ## The spend guard
  *
- * Both doors refuse to start a session for a running command whose
- * `spends` declaration (`src/cli/spends.ts`) does not cover the run. The
- * running command is the one the dispatcher recorded with its parsed
- * flags (`src/cli/running.ts`). The check runs once per session, before
- * `Bun.spawn`, so a refused run starts no process: {@link spawnClaude}
- * in json mode hands its session to the same unguarded spawner
- * {@link spawnClaudeCaptured} uses rather than to that door, and so is
- * not checked a second time.
+ * Both doors warn when the running command's `spends` declaration
+ * (`src/cli/spends.ts`) does not cover the session they start, and start
+ * it anyway: usage is never a gate. The running command is the one the
+ * dispatcher recorded with its parsed flags (`src/cli/running.ts`). The
+ * check runs once per session, before `Bun.spawn`: {@link spawnClaude}
+ * in json mode hands its session to the same unchecked spawner
+ * {@link spawnClaudeCaptured} uses rather than to that door, and so does
+ * not warn a second time.
  *
  * A run is covered when its command declares `always` or `through`, a
  * `with` declaration and the run carries the flag, or an `unless`
@@ -170,13 +170,14 @@
  * A flag is matched by its name without the dashes, and `--no-<name>`
  * also as the parser keys it, `<name>` set to `false`; a flag recorded
  * as `false` is not carried. With no command recorded, as for a caller
- * that never went through the dispatcher, nothing is refused.
+ * that never went through the dispatcher, nothing is warned.
  *
- * A refusal throws {@link UndeclaredSpendError}, whose message names
- * the command as typed after `rafa` and says to declare `spends` on it,
- * with the flag missing for a `with` form and the flag present for an
- * `unless` one. Thrown from a command's `run`, it ends the invocation as
- * `command_error` with exit 1 (`src/cli/dispatch.ts`).
+ * The warning is one `warn` line at the active output, `⚠️  ` and then
+ * {@link spendWarning}'s sentence, which names the command as typed
+ * after `rafa` and says to declare `spends` on it, with the flag missing
+ * for a `with` form and the flag present for an `unless` one. It changes
+ * no exit code. In text mode it is a `warn:` line on the output's one
+ * stream (`src/adapters/output/text.ts`).
  */
 import type { RunningCommand } from '../cli/running.js';
 import type { ClaudeSettingSource } from '../config.js';
@@ -281,14 +282,6 @@ export function interruptClaudeSessions(): number {
 }
 
 /**
- * Refused to start a session: the running command's `spends` declaration
- * does not cover this run. See "The spend guard" in the module note.
- */
-export class UndeclaredSpendError extends Error {
-  override readonly name = 'UndeclaredSpendError';
-}
-
-/**
  * True when `flags` carry `flag`, written as typed with its dashes: its
  * name is recorded as anything but `false`, or, for a `--no-<name>`
  * flag, `<name>` is recorded as `false`, which is how the parser keys it.
@@ -301,10 +294,10 @@ export function carriesFlag(flags: RunningCommand['flags'], flag: string): boole
 }
 
 /**
- * Why `running` may not start a session, as a sentence, or null when
- * its declaration covers the run or nothing is recorded.
+ * Why `running`'s declaration does not cover the session it starts, as a
+ * sentence, or null when it does or nothing is recorded.
  */
-export function spendRefusal(running: RunningCommand | null): string | null {
+export function spendWarning(running: RunningCommand | null): string | null {
   if (running === null) return null;
   const { command, flags } = running;
   const spend = command.spends;
@@ -322,10 +315,10 @@ export function spendRefusal(running: RunningCommand | null): string | null {
   return null;
 }
 
-/** Throws {@link UndeclaredSpendError} when the running command may not start a session. */
+/** Warns at the active output when the running command's declaration does not cover the session; the session runs either way. */
 function guardSpend(): void {
-  const refusal = spendRefusal(runningCommand());
-  if (refusal !== null) throw new UndeclaredSpendError(refusal);
+  const warning = spendWarning(runningCommand());
+  if (warning !== null) activeOutput().warn(`⚠️  ${warning}`);
 }
 
 /**
@@ -342,8 +335,8 @@ function guardSpend(): void {
  * answers — is reported as 1, because every caller here treats a
  * non-zero as a failed session and a killed one is not a success.
  *
- * Rejects with {@link UndeclaredSpendError}, spawning nothing, when the
- * running command's `spends` does not cover the run; see the module note.
+ * Warns, and spawns anyway, when the running command's `spends` does not
+ * cover the run; see the module note.
  */
 export async function spawnClaude(
   args: readonly string[],
@@ -533,8 +526,8 @@ async function teeToOperator(
  * until it was killed 3s later. Rejecting at once would hand the loop
  * back a tree that a session is still changing.
  *
- * Rejects with {@link UndeclaredSpendError}, spawning nothing, when the
- * running command's `spends` does not cover the run; see the module note.
+ * Warns, and spawns anyway, when the running command's `spends` does not
+ * cover the run; see the module note.
  */
 export async function spawnClaudeCaptured(
   args: readonly string[],
@@ -545,7 +538,7 @@ export async function spawnClaudeCaptured(
   return spawnCaptured(args, prompt, options);
 }
 
-/** {@link spawnClaudeCaptured} past its guard, which both doors spawn through. */
+/** {@link spawnClaudeCaptured} past its spend guard, which both doors spawn through. */
 async function spawnCaptured(
   args: readonly string[],
   prompt: string,

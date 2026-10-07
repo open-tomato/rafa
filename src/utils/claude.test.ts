@@ -139,21 +139,25 @@
  * The guard cases run each door, with its default spawner, against a
  * stand-in that appends one line to a file per session it runs, under a
  * running command recorded through `src/cli/running.ts` and put back
- * after the case. A refusal reads as an `UndeclaredSpendError` and no
- * line in that file, so a guard that checked after the spawn reddens;
- * each refused form is paired in its case with the same command reaching
- * the stand-in once under a run its declaration covers, the control that
- * the stand-in could have been reached. The once-per-session case counts
- * reads of the command's `spends` through a getter while `spawnClaude`
- * hands a json-mode session to the capturing spawner.
+ * after the case, with the active output's `warn` lines collected. An
+ * uncovered run reads as one warning naming the command and one line in
+ * that file, since usage is never a gate and the session runs anyway;
+ * each warned form is paired in its case with the same command under a
+ * run its declaration covers, the control that warns nothing. The
+ * once-per-session case counts reads of the command's `spends` through a
+ * getter while `spawnClaude` hands a json-mode session to the capturing
+ * spawner.
  *
- * Seven mutations of `claude.ts` were driven against this file on
- * 2026-09-23, each restored sha256-identical, and every one reddened at
- * least one case: `spawnClaude` without its guard (5 of 58), its json
- * mode delegating to the guarded `spawnClaudeCaptured` (1), the captured
- * door's guard moved after its spawn (3), a `with` form ignoring its
- * flag (2), `--no-<name>` not read as `<name>` set to `false` (3),
- * nothing recorded refusing (15) and `through` refusing (2).
+ * Until 2026-10-07 the guard refused instead, throwing before the spawn;
+ * a command left recorded by an earlier file then refused every
+ * stand-in case here (#863). Eight mutations of `claude.ts` were driven
+ * against this file and `src/tests/spend-guard-dispatch.test.ts` on
+ * 2026-10-07, each restored sha256-identical, and every one reddened at
+ * least one of the 71 cases: `spawnClaude` without its guard (7),
+ * `spawnClaudeCaptured` without it (3), json mode delegating to the
+ * guarded `spawnClaudeCaptured` (1), a `with` form ignoring its flag (3),
+ * `--no-<name>` not read as `<name>` set to `false` (3), nothing recorded
+ * warning (7), `through` warning (2) and the guard throwing again (9).
  */
 import type {
   CapturedSession,
@@ -185,7 +189,6 @@ import {
   SETTING_SOURCES_FLAG,
   spawnClaude,
   spawnClaudeCaptured,
-  UndeclaredSpendError,
 } from './claude.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
 import { sessionSpawnEnv } from './session-env.js';
@@ -1258,6 +1261,8 @@ describe('carriesFlag', () => {
 describe('the spend guard, against a stand-in claude on PATH', () => {
   /** The file the stand-in appends one line to per session it runs. */
   let callsFile = '';
+  /** What the active output was handed at `warn` during the case, in order. */
+  let warnings: string[] = [];
 
   /** How many sessions the stand-in ran, 0 when the file was never written. */
   function standInCalls(): number {
@@ -1277,6 +1282,8 @@ describe('the spend guard, against a stand-in claude on PATH', () => {
     };
     spyOn(process.stdout, 'write').mockImplementation(() => true);
     standInClaude(['/bin/cat > /dev/null', `printf 'session\\n' >> '${callsFile}'`]);
+    warnings = [];
+    setActiveOutput(sinkOutput({ warn: (message) => warnings.push(message) }));
   });
 
   afterEach(() => {
@@ -1288,91 +1295,87 @@ describe('the spend guard, against a stand-in claude on PATH', () => {
     rmSync(binDir, { recursive: true, force: true });
   });
 
-  /** Runs `door` under `command` with `flags`, and answers what it rejected with, or null once it resolved 0. */
+  /** Runs `door` under `command` with `flags`, expecting the session to end 0. */
   async function spawnUnder(
     door: GuardedDoor,
     command: RafaCommand | null,
     flags: Record<string, string | boolean> = {},
-  ): Promise<unknown> {
+  ): Promise<void> {
     if (command !== null) setRunningCommand(command, flags);
-    try {
-      expect(await door.spawn(claudeArgs(DEFAULT_SOURCES), 'guarded prompt')).toBe(0);
-      return null;
-    } catch (error: unknown) {
-      return error;
-    }
-  }
-
-  /** The refusal `error` is, with its class checked. */
-  function refusal(error: unknown): UndeclaredSpendError {
-    if (!(error instanceof UndeclaredSpendError)) throw new Error(`expected an UndeclaredSpendError, got ${String(error)}`);
-    expect(error.name).toBe('UndeclaredSpendError');
-    return error;
+    expect(await door.spawn(claudeArgs(DEFAULT_SOURCES), 'guarded prompt')).toBe(0);
   }
 
   for (const door of GUARDED_DOORS) {
     describe(door.name, () => {
-      it('refuses an undeclared command before any spawn, naming it and saying to declare spends', async () => {
-        const error = refusal(await spawnUnder(door, spender('plan', 'create')));
+      it('warns once for an undeclared command, naming it and saying to declare spends, and still runs the session', async () => {
+        await spawnUnder(door, spender('plan', 'create'));
 
-        expect(error.message).toContain('rafa plan create');
-        expect(error.message).toContain('declare spends on the command');
-        expect(standInCalls()).toBe(0);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toContain('rafa plan create');
+        expect(warnings[0]).toContain('declare spends on the command');
+        expect(standInCalls()).toBe(1);
       });
 
-      it('reaches the stand-in once for a declared always', async () => {
+      it('reaches the stand-in once for a declared always, warning nothing', async () => {
         const always = spender('plan', 'create', { when: 'always', what: 'one planning session' });
 
-        expect(await spawnUnder(door, always)).toBeNull();
+        await spawnUnder(door, always);
+        expect(warnings).toEqual([]);
         expect(standInCalls()).toBe(1);
       });
 
-      it('refuses a with run missing its flag, naming the flag, and reaches the stand-in once it is carried', async () => {
+      it('warns for a with run missing its flag, naming the flag, and warns nothing once it is carried', async () => {
         const triage = spender('pr', 'triage', { when: 'with', flag: '--resolve', what: 'runs a small fixed plan' });
 
-        const error = refusal(await spawnUnder(door, triage, { resolve: false }));
-        expect(error.message).toContain('rafa pr triage');
-        expect(error.message).toContain('without --resolve');
-        expect(standInCalls()).toBe(0);
-
-        expect(await spawnUnder(door, triage, { resolve: true })).toBeNull();
+        await spawnUnder(door, triage, { resolve: false });
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toContain('rafa pr triage');
+        expect(warnings[0]).toContain('without --resolve');
         expect(standInCalls()).toBe(1);
+
+        await spawnUnder(door, triage, { resolve: true });
+        expect(warnings).toHaveLength(1);
+        expect(standInCalls()).toBe(2);
       });
 
-      it('refuses an unless run carrying its flag, naming the flag, and reaches the stand-in without it', async () => {
+      it('warns for an unless run carrying its flag, naming the flag, and warns nothing without it', async () => {
         const scan = spender('skill', 'scan', { when: 'unless', flag: '--no-model', what: 'one session' });
 
-        const error = refusal(await spawnUnder(door, scan, { model: false }));
-        expect(error.message).toContain('rafa skill scan');
-        expect(error.message).toContain('with --no-model');
-        expect(standInCalls()).toBe(0);
-
-        expect(await spawnUnder(door, scan)).toBeNull();
+        await spawnUnder(door, scan, { model: false });
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toContain('rafa skill scan');
+        expect(warnings[0]).toContain('with --no-model');
         expect(standInCalls()).toBe(1);
+
+        await spawnUnder(door, scan);
+        expect(warnings).toHaveLength(1);
+        expect(standInCalls()).toBe(2);
       });
 
-      it('reaches the stand-in once under a through declaration', async () => {
+      it('reaches the stand-in once under a through declaration, warning nothing', async () => {
         const next = spender('next', 'next', { when: 'through', what: 'when the step it runs is one of the above' });
 
-        expect(await spawnUnder(door, next)).toBeNull();
+        await spawnUnder(door, next);
+        expect(warnings).toEqual([]);
         expect(standInCalls()).toBe(1);
       });
 
-      it('reaches the stand-in once with no command recorded', async () => {
-        expect(await spawnUnder(door, null)).toBeNull();
+      it('reaches the stand-in once with no command recorded, warning nothing', async () => {
+        await spawnUnder(door, null);
+        expect(warnings).toEqual([]);
         expect(standInCalls()).toBe(1);
       });
     });
   }
 
   it('names the top-level command by its subject alone', async () => {
-    const error = refusal(await spawnUnder(GUARDED_DOORS[0] as GuardedDoor, spender('next', 'next')));
+    await spawnUnder(GUARDED_DOORS[0] as GuardedDoor, spender('next', 'next'));
 
-    expect(error.message).toStartWith('rafa next started a Claude session');
+    expect(warnings[0]).toContain('rafa next started a Claude session');
   });
 
   it('reads the declaration once for a json-mode session spawnClaude hands to the capturing spawner', async () => {
-    setActiveOutput(sinkOutput({}), 'json');
+    setActiveOutput(sinkOutput({ warn: (message) => warnings.push(message) }), 'json');
     let reads = 0;
     const always: CommandSpend = { when: 'always', what: 'one session' };
     const counted = Object.defineProperty(spender('plan', 'create'), 'spends', {
@@ -1382,8 +1385,9 @@ describe('the spend guard, against a stand-in claude on PATH', () => {
       },
     });
 
-    expect(await spawnUnder(GUARDED_DOORS[0] as GuardedDoor, counted)).toBeNull();
+    await spawnUnder(GUARDED_DOORS[0] as GuardedDoor, counted);
 
+    expect(warnings).toEqual([]);
     expect(standInCalls()).toBe(1);
     expect(reads).toBe(1);
   });
