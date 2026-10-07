@@ -372,7 +372,7 @@ New; it replaces no earlier text. What a row or an action added to
   `claim hand`, `claim accept`, `claim take`, `update current` with the
   stubs `update self`, `update project`, `update board`, `update next`,
   `update latest` and the hidden `update rafa` and `update port`,
-  `config set`, `ci status`, `stretch start`, `stretch item`, `roadmap`, `switch`, `next`, `init`,
+  `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board`, `epic`,
@@ -487,11 +487,11 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`, `skill list`, `skill show`,
   `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
   `instinct flag`, `instinct promote`, the `release` commands, `board list`, the `epic` commands, the
-  `claim` commands, the `update` commands, `config set`, `ci status`, `stretch start`, `stretch item`, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
+  `claim` commands, the `update` commands, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
   `describe` reads the registry off its context, and `init`, `doctor`, `status`, `cleanup`,
   `self-update`, each plan reader, each `loop` session action, each `issue` action, each remaining
   `effort` command, `module list`, `module exec`, each `agent`, `skill`, `instinct`, `release`, `epic`,
-  `claim`, `update` and `pr` action, `config set`, `ci status`, `stretch start`, `stretch item`, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
+  `claim`, `update` and `pr` action, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,

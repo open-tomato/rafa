@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-three registered so far wrap a
+ * of each is its command. Four of the ninety-four registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -87,7 +87,9 @@
  * newest run through the readers under `src/ci/`, nor `stretch start`,
  * which opens a stretch through the readings of `src/stretch/`, nor
  * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
- * and `pr merge` as child processes.
+ * and `pr merge` as child processes, nor `stretch end`, which opens its
+ * pull request through `pr open`'s `openPull` and puts `pr.base` back
+ * through `src/config-set.ts`.
  *
  * ## What is registered
  *
@@ -329,6 +331,14 @@
  *     readings (`./stretch/item-merge.ts`). Refused with exit code 1
  *     when `pr.base` names no `stretch/<n>` branch. It spends unless
  *     `--dry-run`.
+ *   - `stretch end [--dry-run]`: the stretch `pr.base` names opened from
+ *     `stretch/<n>` into the default branch through the `pr open` logic,
+ *     its body `.rafa/stretch/<n>/report.md` with every ledger item's
+ *     `Closes` lines appended; once that pull request has merged, a
+ *     later run puts back the `pr.base` recorded in `stretch.json`
+ *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
+ *     names no `stretch/<n>` branch or there is no `report.md`. It
+ *     starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -446,6 +456,7 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import stretchEnd from './stretch/end.js';
 import stretchItem from './stretch/item.js';
 import stretchStart from './stretch/start.js';
 import switchCommand from './switch.js';
@@ -565,6 +576,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   ciStatus,
   stretchStart,
   stretchItem,
+  stretchEnd,
   status,
   next,
   roadmap,
