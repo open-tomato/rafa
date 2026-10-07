@@ -3,7 +3,7 @@
  * from, and the text it becomes once `{{STRETCH}}` and `{{PREVIOUS}}`
  * are filled in (#816).
  *
- * The rules are the ones `scripts/stretch/stretch.sh` follows, with one
+ * The rules are the ones `scripts/stretch/stretch.sh` followed, with one
  * change: the default comes from the installed package, never from a
  * checkout's `scripts/`.
  *

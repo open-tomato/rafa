@@ -66,24 +66,25 @@ the integration branch reaches `main`.
 
 ### Starting them
 
-`scripts/stretch/stretch.sh` starts the operators on the loop host,
-from the main checkout of the project the stretch runs in;
-`bun run stretch <command>` is the same line in rafa. Another project
-has no such script, so it runs `bash <rafa>/scripts/stretch/stretch.sh`
-by its path: the project is the checkout the shell stands in, and the
-operators and prompts are the rafa checkout's the script sits in.
-`engineer`, `watchtower` and `analyst` start one session each, and
-`start` opens all three in one tmux session,
+`rafa stretch start` starts the operators on the loop host, from the
+main checkout of the project the stretch runs in, with the operators of
+the installed package, so no project needs a rafa checkout.
+`scripts/stretch/stretch.sh` (`bun run stretch <command>` in rafa) is
+a wrapper over it for one release: it prints a deprecation line and
+runs `rafa stretch start`, adding `--role=<role>` for `engineer`,
+`watchtower` and `analyst`, passing `--stretch=<n>` as `--n=<n>` and
+every other flag as it is. `--role` starts one session in this
+terminal, and without it `start` opens all three in one tmux session,
 `stretch-<project>-<n>`, named after the project's folder so two
 projects' stretches on one machine never meet. tmux reads a bare `-t`
 as a prefix, so every target is written `=<name>`, the exact match.
 The Claude sessions are named `<project> stretch <n> <role>`.
 
-The first session of a stretch copies the operators from the rafa
-checkout into `.rafa/stretch/<n>/operators/`, once, and every session
-of that stretch loads that copy. A pull, a worktree switch or a
-`rafa self-update` in the rafa checkout therefore never changes a
-stretch that runs; the next one takes the new files. Since the copy
+The first session of a stretch copies the operators from the
+installed package into `.rafa/stretch/<n>/operators/`, once, and every
+session of that stretch loads that copy. A `rafa self-update`
+therefore never changes a stretch that runs; the next one takes the
+new files. Since the copy
 makes the folder, the next stretch is the highest folder while it has
 no `agent.json`, and one more than it after. `start` warns about
 operators still linked into `~/.claude` by the launcher before the

@@ -116,10 +116,12 @@ describe('the bundled operators', () => {
     /** The plugin name in `.claude-plugin/plugin.json`. */
     const pluginName = (JSON.parse(readFileSync(join(OPERATORS, '.claude-plugin', 'plugin.json'), 'utf8')) as { name: string }).name;
 
+    // Read as text, not imported: nothing outside `src/commands/stretch/`
+    // imports `src/stretch/`, so the subject can move whole.
     it('is the name the launcher passes to --agent', () => {
-      const script = readFileSync(join(SRC_DIR, '..', 'scripts', 'stretch', 'stretch.sh'), 'utf8');
+      const launch = readFileSync(join(SRC_DIR, 'stretch', 'launch.ts'), 'utf8');
 
-      expect(script.match(/^PLUGIN="([^"]+)"$/m)?.[1]).toBe(pluginName);
+      expect(launch.match(/^export const OPERATOR_PLUGIN = '([^']+)';$/m)?.[1]).toBe(pluginName);
     });
 
     it('prefixes every skill the engineer loads, and gives the engineer the Skill tool', () => {

@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
@@ -7,23 +7,22 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { scratchHomeEnv } from '../../src/tests/scratch-home-env.js';
 
 /**
- * The two operator shell scripts: `scripts/stretch/stretch.sh`, which
- * starts the stretch operators on the loop host, and
+ * The two operator shell scripts: `scripts/stretch/stretch.sh`, the
+ * deprecated wrapper that runs `rafa stretch start`, and
  * `scripts/device/check.sh`, which takes a gate reading on another device
  * and posts it.
  *
  * Every case runs the real script under bash, in a planted repository
- * with a HOME of its own, under a PATH of stand-ins for `claude`, `tmux`
- * and `gh` ahead of the system directories. No case starts a session, a
- * tmux server or a post: `stretch.sh` cases read `--dry-run`, and the
- * stand-ins record their arguments.
+ * with a HOME of its own, under a PATH of stand-ins for `rafa` and `gh`
+ * ahead of the system directories. No case starts a session or a post:
+ * the stand-ins record their arguments, `rafa` one word to a line so a
+ * case reads exactly the words the wrapper passed.
  *
  * `TMPDIR` is passed through on purpose: a spawned run that drops it
  * judges paths by `/tmp` on macOS, which is #708.
  */
 
 const STRETCH_SH = resolve(import.meta.dir, 'stretch.sh');
-const DEFAULT_PROMPT = resolve(import.meta.dir, '..', '..', 'src', 'bundled', 'stretch', 'engineer-prompt-default.md');
 const CHECK_SH = resolve(import.meta.dir, '..', 'device', 'check.sh');
 
 let base = '';
@@ -52,26 +51,19 @@ function standIn(bin: string, name: string, code = 0): void {
   writeScript(join(bin, name), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${bin}/${name}.calls'\nexit ${code}\n`);
 }
 
-function git(cwd: string, env: Record<string, string>, ...words: string[]): void {
-  const run = Bun.spawnSync(['git', ...words], { cwd, env });
-  if (run.exitCode !== 0) throw new Error(`git ${words.join(' ')}: ${run.stderr.toString()}`);
+/** A stand-in `rafa` that writes each argument on its own line, then `--end--`, to `<bin>/rafa.calls`, and exits `code`. */
+function rafaStandIn(bin: string, code = 0): void {
+  writeScript(join(bin, 'rafa'), `#!/bin/sh\nfor word in "$@"; do printf '%s\\n' "$word" >> '${bin}/rafa.calls'; done\necho --end-- >> '${bin}/rafa.calls'\nexit ${code}\n`);
 }
 
-/** A main checkout with `.rafa/stretch/1/agent.json`, a HOME, and stand-ins. */
-function plantWorld(): World {
+/** A repository, a HOME, and a bin of stand-ins for `rafa` and `gh`, unless `rafa` is false. */
+function plantWorld(options: { rafa?: boolean } = {}): World {
   const repo = join(base, 'repo');
   const home = join(base, 'home');
   const bin = join(base, 'bin');
   for (const dir of [repo, home, bin]) mkdirSync(dir, { recursive: true });
-  standIn(bin, 'claude');
+  if (options.rafa !== false) rafaStandIn(bin);
   standIn(bin, 'gh');
-  writeScript(join(bin, 'tmux'), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${bin}/tmux.calls'\n[ "$1" = has-session ] && exit 1\nexit 0\n`);
-
-  const env = spawnEnv({ repo, home, bin });
-  git(repo, env, 'init', '-q', '-b', 'main');
-  git(repo, env, 'commit', '-q', '--allow-empty', '-m', 'root');
-  mkdirSync(join(repo, '.rafa', 'stretch', '1'), { recursive: true });
-  writeFileSync(join(repo, '.rafa', 'stretch', '1', 'agent.json'), '{}\n', 'utf8');
   return { repo, home, bin };
 }
 
@@ -80,38 +72,17 @@ function spawnEnv(world: World): Record<string, string> {
   return { PATH: path, TMPDIR: tmpdir(), ...scratchHomeEnv(world.home) };
 }
 
-function run(world: World, script: string, words: string[], cwd = world.repo): { code: number; out: string } {
-  const child = Bun.spawnSync(['bash', script, ...words], { cwd, env: spawnEnv(world) });
-  return { code: child.exitCode, out: `${child.stdout.toString()}${child.stderr.toString()}` };
+interface Run {
+  readonly code: number;
+  readonly out: string;
+  readonly err: string;
 }
 
-/**
- * A stand-in rafa checkout beside the project: a git main checkout with
- * `.rafa/`, the script and both prompts under `scripts/stretch/`, rafa's
- * own prompt marked so a case can tell it from the default, and one
- * operator of each kind beside the plugin manifest, unless `plugin` is
- * false. Answers the copied script's path.
- */
-function plantRafa(world: World, options: { plugin?: boolean } = {}): { readonly root: string; readonly script: string } {
-  const root = join(base, 'rafa');
-  const stretchDir = join(root, 'scripts', 'stretch');
-  mkdirSync(stretchDir, { recursive: true });
-  mkdirSync(join(root, '.rafa'), { recursive: true });
-  copyFileSync(STRETCH_SH, join(stretchDir, 'stretch.sh'));
-  mkdirSync(join(root, 'src/bundled/stretch'), { recursive: true });
-  copyFileSync(DEFAULT_PROMPT, join(root, 'src/bundled/stretch/engineer-prompt-default.md'));
-  writeFileSync(join(stretchDir, 'engineer-prompt.md'), 'RAFA ONLY: start stretch {{STRETCH}}.\n', 'utf8');
-  for (const kind of ['agents', 'skills']) mkdirSync(join(root, 'src/bundled/operators', kind), { recursive: true });
-  writeFileSync(join(root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'), 'x', 'utf8');
-  mkdirSync(join(root, 'src/bundled/operators/skills/rafa-stretch-sweep'));
-  if (options.plugin !== false) {
-    mkdirSync(join(root, 'src/bundled/operators/.claude-plugin'));
-    writeFileSync(join(root, 'src/bundled/operators/.claude-plugin/plugin.json'), '{"name":"rafa-operators"}\n', 'utf8');
-  }
-  const env = spawnEnv(world);
-  git(root, env, 'init', '-q', '-b', 'main');
-  git(root, env, 'commit', '-q', '--allow-empty', '-m', 'root');
-  return { root, script: join(stretchDir, 'stretch.sh') };
+function run(world: World, script: string, words: string[], cwd = world.repo): Run & { readonly all: string } {
+  const child = Bun.spawnSync(['bash', script, ...words], { cwd, env: spawnEnv(world) });
+  const out = child.stdout.toString();
+  const err = child.stderr.toString();
+  return { code: child.exitCode, out, err, all: `${out}${err}` };
 }
 
 function calls(world: World, name: string): string {
@@ -120,181 +91,97 @@ function calls(world: World, name: string): string {
   return readFileSync(path, 'utf8');
 }
 
+/** The argument lists the stand-in `rafa` was called with, one list per call. */
+function rafaCalls(world: World): string[][] {
+  const text = calls(world, 'rafa');
+  if (text === '') return [];
+  const lists = text.split('--end--\n').filter((call) => call !== '');
+  return lists.map((call) => call.split('\n').filter((word) => word !== ''));
+}
+
 describe('stretch.sh', () => {
-  it('prints its usage for --help and exits 0', () => {
+  it('prints its usage for --help and exits 0, running nothing', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['--help']);
+    const { code, all } = run(world, STRETCH_SH, ['--help']);
 
     expect(code).toBe(0);
-    expect(out).toContain('stretch.sh start');
-    expect(out).toContain('--remote-control');
+    expect(all).toContain('rafa stretch start --role=engineer');
+    expect(all).toContain('--stretch=<n>');
+    expect(rafaCalls(world)).toEqual([]);
   });
 
-  it('starts the engineer of the next stretch with its prompt filled in, under a session name', () => {
+  it('prints its usage with exit 2 when given no command', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
+    const { code, all } = run(world, STRETCH_SH, []);
+
+    expect(code).toBe(2);
+    expect(all).toContain('deprecated');
+    expect(rafaCalls(world)).toEqual([]);
+  });
+
+  it('runs rafa stretch start for start, with a deprecation line on stderr naming that line', () => {
+    const world = plantWorld();
+    const { code, out, err } = run(world, STRETCH_SH, ['start', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain(`claude --plugin-dir ${join(world.repo, '.rafa/stretch/2/operators')} --agent rafa-operators:rafa-stretch-engineer -n repo\\ stretch\\ 2\\ engineer`);
-    expect(out).toContain('Start stretch 2.');
-    expect(out).toContain('.rafa/stretch/1/report.md');
-    expect(out).not.toContain('{{');
-    expect(calls(world, 'claude')).toBe('');
+    expect(rafaCalls(world)).toEqual([['stretch', 'start', '--dry-run']]);
+    expect(err).toContain('stretch.sh is deprecated');
+    expect(err).toContain('run: rafa stretch start --dry-run');
+    expect(out).toBe('');
   });
 
-  it('names the session through --remote-control instead of -n when asked', () => {
+  for (const role of ['engineer', 'watchtower', 'analyst']) {
+    it(`passes --role=${role} for ${role}`, () => {
+      const world = plantWorld();
+      const { code } = run(world, STRETCH_SH, [role]);
+
+      expect(code).toBe(0);
+      expect(rafaCalls(world)).toEqual([['stretch', 'start', `--role=${role}`]]);
+    });
+  }
+
+  it('passes --stretch=<n> as --n=<n>, and --remote-control and --dry-run as they are, in order', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--remote-control', '--dry-run']);
+    const { code } = run(world, STRETCH_SH, ['watchtower', '--stretch=5', '--remote-control', '--dry-run']);
 
     expect(code).toBe(0);
-    expect(out).toContain('--remote-control repo\\ stretch\\ 2\\ engineer');
-    expect(out).not.toContain(' -n ');
+    expect(rafaCalls(world)).toEqual([['stretch', 'start', '--role=watchtower', '--n=5', '--remote-control', '--dry-run']]);
   });
 
-  it('starts the watchtower on the newest stretch with an agent.json, with /loop', () => {
+  it('passes any other flag on word for word, leaving its refusal to rafa', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['watchtower', '--dry-run']);
+    const { code } = run(world, STRETCH_SH, ['start', '--frobnicate', '--odd=two words']);
 
     expect(code).toBe(0);
-    expect(out).toContain('--agent rafa-operators:rafa-stretch-watchtower -n repo\\ stretch\\ 1\\ watchtower /loop');
+    expect(rafaCalls(world)).toEqual([['stretch', 'start', '--frobnicate', '--odd=two words']]);
   });
 
-  it('starts the analyst on that stretch, naming its folder in the opening message', () => {
+  it('exits with rafa\'s exit code', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['analyst', '--dry-run']);
+    rafaStandIn(world.bin, 3);
+    const { code } = run(world, STRETCH_SH, ['engineer']);
 
-    expect(code).toBe(0);
-    expect(out).toContain('--agent rafa-operators:rafa-stretch-analyst -n repo\\ stretch\\ 1\\ analyst');
-    expect(out).toContain('Read\\ .rafa/stretch/1/');
-    expect(out).not.toContain('{{');
+    expect(code).toBe(3);
+    expect(rafaCalls(world)).toEqual([['stretch', 'start', '--role=engineer']]);
   });
 
-  it('opens one tmux session whose watchtower and analyst windows wait for the new stretch', () => {
+  it('refuses an unknown command with exit 1, running nothing', () => {
     const world = plantWorld();
-    const { code, out } = run(world, STRETCH_SH, ['start', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('tmux new-session -d -s stretch-repo-2');
-    expect(out).toContain('tmux new-window -t =stretch-repo-2:');
-    expect(out).toContain('watchtower\\ --stretch=2');
-    expect(out).toContain('analyst\\ --stretch=2');
-    expect(out).toContain('dry run: would start stretch 2 in tmux session stretch-repo-2');
-    expect(calls(world, 'tmux')).toBe('has-session -t =stretch-repo-2\n');
-  });
-
-  it('refuses in a worktree, naming the main checkout', () => {
-    const world = plantWorld();
-    const worktree = join(base, 'wt');
-    git(world.repo, spawnEnv(world), 'worktree', 'add', '-q', worktree);
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run'], worktree);
+    const { code, all } = run(world, STRETCH_SH, ['link']);
 
     expect(code).toBe(1);
-    expect(out).toContain('run this from the main checkout, not a worktree');
+    expect(all).toContain('unknown command: link');
+    expect(rafaCalls(world)).toEqual([]);
   });
 
-  it('refuses a rafa checkout whose operators carry no plugin manifest', () => {
-    const world = plantWorld();
-    const rafa = plantRafa(world, { plugin: false });
-    const { code, out } = run(world, rafa.script, ['engineer', '--dry-run']);
+  it('refuses with exit 1 when no rafa is on PATH, naming the line to run', () => {
+    const world = plantWorld({ rafa: false });
+    expect(Bun.which('rafa', { PATH: spawnEnv(world).PATH })).toBeNull();
+    const { code, all } = run(world, STRETCH_SH, ['analyst', '--stretch=2']);
 
     expect(code).toBe(1);
-    expect(out).toContain('.claude-plugin/plugin.json is missing');
-  });
-
-  it('copies the operators into the stretch folder once, and loads that copy', () => {
-    const world = plantWorld();
-    const rafa = plantRafa(world);
-    const copy = join(world.repo, '.rafa/stretch/2/operators');
-
-    expect(run(world, rafa.script, ['engineer']).code).toBe(0);
-    expect(readFileSync(join(copy, '.claude-plugin/plugin.json'), 'utf8')).toContain('rafa-operators');
-    expect(calls(world, 'claude')).toContain(`--plugin-dir ${copy} --agent rafa-operators:rafa-stretch-engineer`);
-
-    writeFileSync(join(rafa.root, 'src/bundled/operators/agents/rafa-stretch-engineer.md'), 'pulled', 'utf8');
-    writeFileSync(join(world.repo, '.rafa/stretch/2/agent.json'), '{}\n', 'utf8');
-    expect(run(world, rafa.script, ['watchtower', '--stretch=2']).code).toBe(0);
-    expect(readFileSync(join(copy, 'agents/rafa-stretch-engineer.md'), 'utf8')).toBe('x');
-  });
-
-  it('copies nothing under --dry-run', () => {
-    const world = plantWorld();
-    const { out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
-
-    expect(out).toContain('cp -R');
-    expect(existsSync(join(world.repo, '.rafa/stretch/2'))).toBe(false);
-  });
-
-  it('reopens a stretch whose folder holds the copy but no agent.json', () => {
-    const world = plantWorld();
-    mkdirSync(join(world.repo, '.rafa/stretch/2/operators'), { recursive: true });
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('Start stretch 2.');
-    expect(out).not.toContain('cp -R');
-  });
-
-  it('names sessions after the project, so another project\'s stretch never shares one', () => {
-    const world = plantWorld();
-    const other = join(base, 'other project');
-    mkdirSync(join(other, '.rafa'), { recursive: true });
-    git(other, spawnEnv(world), 'init', '-q', '-b', 'main');
-    const { out } = run(world, STRETCH_SH, ['start', '--dry-run'], other);
-
-    expect(out).toContain('tmux new-session -d -s stretch-other-project-1');
-  });
-
-  it('warns at start about operators an earlier launcher linked into ~/.claude', () => {
-    const world = plantWorld();
-    mkdirSync(join(world.home, '.claude/agents'), { recursive: true });
-    symlinkSync(STRETCH_SH, join(world.home, '.claude/agents/rafa-stretch-engineer.md'));
-    const { code, out } = run(world, STRETCH_SH, ['start', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('linked operators found');
-    expect(out).toContain('.claude/agents/rafa-stretch-engineer.md');
-  });
-
-  it('gives another project the default prompt, never rafa\'s own', () => {
-    const world = plantWorld();
-    const rafa = plantRafa(world);
-    const { code, out } = run(world, rafa.script, ['engineer', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('Start stretch 2.');
-    expect(out).toContain(`prompt: ${join(rafa.root, 'src/bundled/stretch/engineer-prompt-default.md')}`);
-    expect(out).not.toContain('RAFA ONLY');
-  });
-
-  it('gives the rafa checkout its own prompt', () => {
-    const world = plantWorld();
-    const rafa = plantRafa(world);
-    const { code, out } = run(world, rafa.script, ['engineer', '--dry-run'], rafa.root);
-
-    expect(code).toBe(0);
-    expect(out).toContain('RAFA\\ ONLY:\\ start\\ stretch\\ 1.');
-  });
-
-  it('prefers the project\'s own .rafa/stretch/engineer-prompt.md', () => {
-    const world = plantWorld();
-    const rafa = plantRafa(world);
-    writeFileSync(join(world.repo, '.rafa/stretch/engineer-prompt.md'), 'MINE {{STRETCH}} after {{PREVIOUS}}\n', 'utf8');
-    const { code, out } = run(world, rafa.script, ['engineer', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('MINE\\ 2\\ after\\ 1');
-    expect(out).not.toContain('Start stretch');
-  });
-
-  it('leaves the previous-report line out of a project\'s first stretch', () => {
-    const world = plantWorld();
-    rmSync(join(world.repo, '.rafa', 'stretch'), { recursive: true });
-    const { code, out } = run(world, STRETCH_SH, ['engineer', '--dry-run']);
-
-    expect(code).toBe(0);
-    expect(out).toContain('Start stretch 1.');
-    expect(out).not.toContain('stretch/0');
-    expect(out).not.toContain('{{');
+    expect(all).toContain('rafa is not on PATH');
+    expect(all).toContain('rafa stretch start --role=analyst --n=2');
   });
 });
 
@@ -364,7 +251,7 @@ describe('device/check.sh', () => {
 
     const result = run(world, CHECK_SH, [`--from-log=${log}`, `--out=${out}`, '--issue=708']);
 
-    expect(result.out).toContain('posted on #708');
+    expect(result.all).toContain('posted on #708');
     expect(calls(world, 'gh')).toBe(`issue comment 708 --body-file ${join(out, 'report.md')}\n`);
   });
 
@@ -399,7 +286,7 @@ describe('device/check.sh', () => {
     const result = run(world, CHECK_SH, [`--from-log=${log}`, `--out=${join(base, 'out')}`, '--issue=708']);
 
     expect(result.code).toBe(3);
-    expect(result.out).toContain('posting on #708 failed');
+    expect(result.all).toContain('posting on #708 failed');
   });
 
   it('refuses an --issue that is not a number, with exit 2', () => {
@@ -407,6 +294,6 @@ describe('device/check.sh', () => {
     const result = run(world, CHECK_SH, ['--issue=abc']);
 
     expect(result.code).toBe(2);
-    expect(result.out).toContain('--issue takes a number');
+    expect(result.all).toContain('--issue takes a number');
   });
 });

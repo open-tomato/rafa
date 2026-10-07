@@ -3,7 +3,7 @@
  * rafa version they ship with, the one copy each stretch makes of them,
  * and the links an older launcher left in `~/.claude` (#816).
  *
- * The rules are the ones `scripts/stretch/stretch.sh` follows, with one
+ * The rules are the ones `scripts/stretch/stretch.sh` followed, with one
  * change: the operators come from the installed package, never from a
  * checkout's `src/`.
  *

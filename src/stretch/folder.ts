@@ -2,7 +2,7 @@
  * The stretch folder: `.rafa/stretch/<n>/` numbering, the engineer's
  * `agent.json`, and whether a stretch of this project is live (#816).
  *
- * The rules are the ones `scripts/stretch/stretch.sh` follows, so the
+ * The rules are the ones `scripts/stretch/stretch.sh` followed, so the
  * commands that replace it number and find stretches the same way:
  *
  *   - **Numbers.** Only a folder whose whole name is digits counts, so

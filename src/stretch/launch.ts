@@ -3,7 +3,7 @@
  * operator session runs, and the tmux lines that open the engineer,
  * watchtower and analyst windows (#816).
  *
- * The rules are the ones `scripts/stretch/stretch.sh` follows, with one
+ * The rules are the ones `scripts/stretch/stretch.sh` followed, with one
  * change: each window runs `rafa stretch start --role=<role> --n=<n>`
  * where the script ran itself.
  *
