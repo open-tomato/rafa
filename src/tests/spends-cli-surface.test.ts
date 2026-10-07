@@ -104,8 +104,8 @@ describe('rafa pr --help, spawned', () => {
 
     expectExit(run, 0, scratch);
     expect(run.stdout).toContain(
-      '  triage    assess a pull request: its class, the evidence, and a follow-up\n'
-      + '            prompt 🪙 with --resolve\n',
+      '  triage     assess a pull request: its class, the evidence, and a follow-up\n'
+      + '             prompt 🪙 with --resolve\n',
     );
   }, RUN_TIMEOUT);
 });
