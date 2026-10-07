@@ -962,6 +962,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./status-fragments.js', ['readWaiting', 'waitingCell', 'waitingLines', 'waitingSettingsOf']],
   ]],
   ['./commands/release/settle.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
     ['../../release/settle-pr.js', ['settleByPr']],
@@ -971,6 +972,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../release/settle.js', ['readSettle', 'releaseCommitSubject']],
     ['../../release/version.js', ['RELEASE_BASE_BRANCH', 'RELEASE_REMOTE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
+    ['./settle-project.js', ['refreshProjectAfterSettle']],
   ]],
   ['./commands/release/tag.js', [
     ['../../cli/command.js', ['CommandExit']],

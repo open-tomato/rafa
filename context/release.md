@@ -79,6 +79,15 @@ base branch that requires review.
 `--dry-run` prints the fragments, their order, the strategy, and the version
 that would settle, and writes nothing to the tree or remote.
 
+**The project refresh**: with `board.project.number` set, a push delivery that
+landed (or that another settle beat to the same fragments) is followed by a
+refresh of the repository's project: the issues closed by the pull requests
+whose commits added the folded fragments, so their Stage moves from In review to
+Done (`src/commands/release/settle-project.ts`). A dry run and a PR delivery
+send no call, since the fragments are still on the base; `rafa board sync`
+catches up the issues a release pull request ships. Its lines are warnings and
+never change settle's exit code.
+
 The caller is unspecified and all are equivalent: a person running the command,
 a CI job after each merge, a post-merge hook, or `rafa next` (which runs settle
 after its merge step). `rafa pr merge` does not call settle itself; instead, it
