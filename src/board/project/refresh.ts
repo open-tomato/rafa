@@ -243,14 +243,29 @@ function homeRow(number: number, listing: readonly BoardIssue[], boards: readonl
   return row;
 }
 
-/** The board of a widened refresh: what the values are computed against, and the open issues on its listing. */
-interface WidenedBoard extends RefreshBoard {
+/** The board of a widened refresh: what the values are computed against, and the issues on its listing. */
+export interface WidenedBoard extends RefreshBoard {
   /** Every open issue on the listing, lowest number first. */
   readonly open: readonly number[];
+  /** Every closed issue on the listing, lowest number first; `rafa init --board --project` adds those with a Rank. */
+  readonly closed: readonly number[];
 }
 
-/** The board every issue's values are computed against, read once; see the module note. */
-async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository: string): Promise<WidenedBoard> {
+/** The numbers of the rows of `listing` in `state`, lowest first. */
+function numbersIn(listing: readonly BoardIssue[], state: BoardIssue['state']): readonly number[] {
+  return listing
+    .filter((issue) => issue.state === state)
+    .map(({ number }) => number)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * The board every issue's values are computed against, read once; see
+ * the module note. Exported for the project step of `rafa init --board`
+ * (`src/commands/init-board-project.ts`), which picks the issues to add
+ * off the same reading.
+ */
+export async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository: string): Promise<WidenedBoard> {
   const mode = config.boardRelationships;
   const listing = await createGhBoardListing({ gh, mode })();
   const boards = await createGhBoardLister({ gh, mode })();
@@ -276,10 +291,8 @@ async function readRefreshBoard(config: RefreshConfig, gh: GhRunner, repository:
         ? { kind: 'none', issue }
         : reading.blockersOf(row);
     },
-    open: listing
-      .filter(({ state }) => state === 'OPEN')
-      .map(({ number }) => number)
-      .sort((a, b) => a - b),
+    open: numbersIn(listing, 'OPEN'),
+    closed: numbersIn(listing, 'CLOSED'),
   };
 }
 
