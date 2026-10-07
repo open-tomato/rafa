@@ -116,10 +116,12 @@ describe('the bundled operators', () => {
     /** The plugin name in `.claude-plugin/plugin.json`. */
     const pluginName = (JSON.parse(readFileSync(join(OPERATORS, '.claude-plugin', 'plugin.json'), 'utf8')) as { name: string }).name;
 
+    // Read as text, not imported: nothing outside `src/commands/stretch/`
+    // imports `src/stretch/`, so the subject can move whole.
     it('is the name the launcher passes to --agent', () => {
-      const script = readFileSync(join(SRC_DIR, '..', 'scripts', 'stretch', 'stretch.sh'), 'utf8');
+      const launch = readFileSync(join(SRC_DIR, 'stretch', 'launch.ts'), 'utf8');
 
-      expect(script.match(/^PLUGIN="([^"]+)"$/m)?.[1]).toBe(pluginName);
+      expect(launch.match(/^export const OPERATOR_PLUGIN = '([^']+)';$/m)?.[1]).toBe(pluginName);
     });
 
     it('prefixes every skill the engineer loads, and gives the engineer the Skill tool', () => {
@@ -135,30 +137,31 @@ describe('the bundled operators', () => {
     /** A file's text with every run of whitespace folded to one space. */
     const flat = (file: string): string => readFileSync(join(OPERATORS, file), 'utf8').replace(/\s+/g, ' ');
 
-    /** The numbered step of "Run one item" that opens with `n.`, up to the next step. */
-    const runOneItemStep = (n: number): string => {
+    /** The "Run one item" section of the engineer file, whitespace folded. */
+    const runOneItem = (): string => {
       const text = readFileSync(join(OPERATORS, 'agents/rafa-stretch-engineer.md'), 'utf8');
-      const section = text.split(/^### 2\. Run one item$/m)[1]?.split(/^### 3\./m)[0] ?? '';
-      const step = section.split(new RegExp(`^${n}\\. `, 'm'))[1]?.split(/^\d\. /m)[0] ?? '';
 
-      return step.replace(/\s+/g, ' ');
+      return (text.split(/^### 2\. Run one item$/m)[1]?.split(/^### 3\./m)[0] ?? '').replace(/\s+/g, ' ');
     };
 
-    it('puts the 60-second line inside step 3 of "Run one item"', () => {
-      expect(runOneItemStep(3)).toContain('No foreground command waits longer than 60 seconds; longer waits run in the background.');
+    it('runs the item, the wait and the merge through one rafa stretch item line', () => {
+      const section = runOneItem();
+
+      expect(section).toContain('`rafa stretch item <issue> --wait`');
+      expect(section).toContain('merges its pull request into `stretch/<n>` with checks skipped');
     });
 
-    it('names the skip-checks merge for stretch/<n> and the wait for main in step 4', () => {
-      const step = runOneItemStep(4);
+    it('keeps the hand merge and the hand loop start out of "Run one item"', () => {
+      const section = runOneItem();
 
-      expect(step).toContain('Into `stretch/<n>`: `rafa pr merge <pr> --skip-checks --yes`');
-      expect(step).toContain('Into `main`: `rafa pr wait <pr>` then `rafa pr merge <pr>`');
+      expect(section).not.toContain('rafa pr merge');
+      expect(section).not.toContain('setsid');
     });
 
-    it('names verify.yml in the pit stop CI row', () => {
+    it('reads the CI row through rafa ci status', () => {
       const row = flat('skills/rafa-stretch-pit-stop/SKILL.md').match(/\| CI \|[^|]*\|/)?.[0] ?? '';
 
-      expect(row).toContain('gh run list --branch stretch/<n> --workflow verify.yml --limit 1');
+      expect(row).toContain('rafa ci status --branch=stretch/<n>');
     });
   });
 

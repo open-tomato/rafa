@@ -20,6 +20,9 @@ Quick start:
   rafa epic show
   rafa claim release 324
   rafa update current --dry-run
+  rafa config set pr.base=stretch/9
+  rafa ci status --branch=stretch/9
+  rafa stretch start --dry-run
   rafa status
   rafa next
   rafa roadmap
@@ -37,7 +40,7 @@ Subjects:
   issue      the tracker: list, show, create, comment on and move issues; mark
              one ready, unblock it and check its references
   pr         the pull request of a branch: one line, in full or in the browser;
-             list, wait on, merge and triage them 🪙
+             open, list, wait on, merge and triage them 🪙
   effort     collect session and commit rows; report per plan; read and repair
              the store: its schema, a copy for testing, migrations, and fixes;
              merge or import another device's store; move an NDJSON store to
@@ -59,6 +62,12 @@ Subjects:
              or withdraw the offer; accept a handover; take over a stale claim
   update     bring this project to the installed rafa; the other updates are in
              development
+  config     set one key in the project's config, keeping every comment, and
+             print its old and new values
+  ci         read the newest CI run on a branch: its state, its commit and the
+             cases it failed
+  stretch    open a stretch: its integration branch, pr.base pointed at it, and
+             the operators in tmux 🪙
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe
