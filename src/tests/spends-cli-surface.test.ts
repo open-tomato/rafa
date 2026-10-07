@@ -74,6 +74,18 @@ describe('rafa --help, spawned', () => {
     );
   }, RUN_TIMEOUT);
 
+  it('marks the stretch subject line, which stretch start spends on unless --dry-run', () => {
+    const scratch = plantScratchRepo(tempBase);
+
+    const run = runRafa(scratch, scratch.repo, ['--help']);
+
+    expectExit(run, 0, scratch);
+    expect(run.stdout).toContain(
+      '  stretch    open a stretch: its integration branch, pr.base pointed at it, and\n'
+      + '             the operators in tmux 🪙\n',
+    );
+  }, RUN_TIMEOUT);
+
   it('lists the top-level commands with next alone marked, roadmap among the unmarked', () => {
     const scratch = plantScratchRepo(tempBase);
 
@@ -121,7 +133,7 @@ describe('rafa describe --output=json, spawned', () => {
     expect(result?.ok).toBe(true);
 
     const document = result?.data as DescribeDocument;
-    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search'].sort());
+    expect(spendersOf(document).sort()).toEqual(['agent search', 'epic close', 'loop start', 'next', 'plan create', 'pr triage', 'skill backfill', 'skill search', 'stretch start'].sort());
     expect(document.commands.find((command) => command.name === 'roadmap')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'cleanup')?.spends).toBeNull();
     expect(document.commands.find((command) => command.name === 'status')?.spends).toBeNull();

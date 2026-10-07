@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-one registered so far wrap a
+ * of each is its command. Four of the ninety-two registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -84,7 +84,8 @@
  * them through `src/claims/git.ts` and share `claim/release.ts`'s
  * readers, nor `config set`, which edits the project's config text
  * through `src/config-set.ts`, nor `ci status`, which reads a branch's
- * newest run through the readers under `src/ci/`.
+ * newest run through the readers under `src/ci/`, nor `stretch start`,
+ * which opens a stretch through the readings of `src/stretch/`.
  *
  * ## What is registered
  *
@@ -305,6 +306,15 @@
  *     bun cases it failed by file and case; exit code 0 green, 1 red, 2
  *     no run, 3 running, 4 for a refusal or a `gh` failure. It starts no
  *     session.
+ *   - `stretch start [--n=<n>] [--remote-control] [--role=<role>]
+ *     [--dry-run]`: a stretch opened, refused while another of the
+ *     project is live or a loop of it runs: `stretch/<n>` pushed from the
+ *     default branch, the `pr.base` found recorded in
+ *     `.rafa/stretch/<n>/stretch.json` and `pr.base` set to the branch,
+ *     the operators copied from the installed package once with the
+ *     version printed, and the three operators opened in one tmux
+ *     session, or the engineer in this terminal without tmux; `--role`
+ *     starts that one session here. It spends unless `--dry-run`.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -330,7 +340,7 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the sixteen with an action registered: a subject with
+ * The subjects are the seventeen with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -422,6 +432,7 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import stretchStart from './stretch/start.js';
 import switchCommand from './switch.js';
 import updateBoard from './update/board.js';
 import updateCurrent from './update/current.js';
@@ -450,6 +461,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
   { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
   { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
+  { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
 ]);
 
 /** The core commands, in roster order. */
@@ -536,6 +548,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   updateLatest,
   configSet,
   ciStatus,
+  stretchStart,
   status,
   next,
   roadmap,
