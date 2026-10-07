@@ -66,34 +66,64 @@ the integration branch reaches `main`.
 
 ### Starting them
 
-`rafa stretch start` starts the operators on the loop host, from the
+`rafa stretch start` launches the operators on the loop host from the
 main checkout of the project the stretch runs in, with the operators of
 the installed package, so no project needs a rafa checkout.
-`scripts/stretch/stretch.sh` (`bun run stretch <command>` in rafa) is
-a wrapper over it for one release: it prints a deprecation line and
-runs `rafa stretch start`, adding `--role=<role>` for `engineer`,
-`watchtower` and `analyst`, passing `--stretch=<n>` as `--n=<n>` and
-every other flag as it is. `--role` starts one session in this
-terminal, and without it `start` opens all three in one tmux session,
-`stretch-<project>-<n>`, named after the project's folder so two
-projects' stretches on one machine never meet. tmux reads a bare `-t`
-as a prefix, so every target is written `=<name>`, the exact match.
+`rafa stretch start [--n=<n>] [--remote-control] [--dry-run]` picks the
+next stretch number from `.rafa/stretch/`, makes the folder, pushes
+`stretch/<n>` from `origin/<default>`, copies the operators once into
+`.rafa/stretch/<n>/operators/`, records the old `pr.base` in
+`stretch.json`, and sets `pr.base` to `stretch/<n>` in the local config.
+It refuses when another stretch of this project is live (an `agent.json`
+whose pid or tmux session is running) or a loop of the project runs.
+`--role` starts one session in this terminal; without it, `start` opens
+all three in one tmux session, `stretch-<project>-<n>`, named after the
+project's folder so two projects' stretches on one machine never meet.
 The Claude sessions are named `<project> stretch <n> <role>`.
+`--remote-control` starts each session with Remote Control, so another
+device drives it from claude.ai; `--dry-run` prints what would run. `start`
+warns about operators still linked into `~/.claude` by the launcher before
+the copies, since no new stretch reads them and one started with them may.
 
-The first session of a stretch copies the operators from the
-installed package into `.rafa/stretch/<n>/operators/`, once, and every
-session of that stretch loads that copy. A `rafa self-update`
-therefore never changes a stretch that runs; the next one takes the
-new files. Since the copy
-makes the folder, the next stretch is the highest folder while it has
-no `agent.json`, and one more than it after. `start` warns about
-operators still linked into `~/.claude` by the launcher before the
-copies: no new stretch reads them, and one started with them may.
-The watchtower and analyst windows
-wait for the new stretch's `agent.json`, since both find the engineer's
-stretch by it. `--remote-control` starts each session with Remote
-Control, so another device drives it from claude.ai; `--dry-run` prints
-what would run.
+`rafa stretch item <issue> [--wait] [--dry-run]` handles one item from
+loop start to its pit-stop readings. It takes the integration branch from
+`pr.base` (which must name a `stretch/<n>` branch), runs
+`rafa plan create --issue`, and starts the loop detached with
+`RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
+With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
+has a pull request, `item` merges it with `--skip-checks` into the
+integration branch, frees the worktree, waits for `verify` on the new head,
+appends the ledger line and prints the pit-stop readings: the failed cases
+by file and case, the open-bug count, and the bugs filed since the last
+item. It decides nothing; the pit stop does.
+
+`rafa stretch end [--dry-run]` opens the integration branch into the
+default branch with `report.md` as its body and every merged item's `Closes`
+lines appended, and once that pull request has merged, puts back the
+`pr.base` recorded in `stretch.json`.
+
+The item ledger, `.rafa/stretch/<n>/items.ndjson`, is one line per item:
+issue, plan, pull request, merge commit, its `Closes` lines, and a
+timestamp. `rafa stretch item` appends one line after merging, and
+`rafa stretch end` reads all lines to build the integration pull request's
+`Closes` block.
+
+`stretch.json` records the `pr.base` `start` found, so `end` can restore it
+when the integration branch has merged into the default branch.
+
+`scripts/stretch/stretch.sh` (`bun run stretch <command>` in rafa) is a
+wrapper over `rafa stretch start` for one release: it prints a deprecation
+line and runs `rafa stretch start`, passing `--role=<role>` for
+`engineer`, `watchtower` and `analyst`, and every other flag as it is.
+
+The first session of a stretch copies the operators from the installed
+package into `.rafa/stretch/<n>/operators/`, once, and every session of
+that stretch loads that copy. A `rafa self-update` therefore never changes
+a stretch that runs; the next one takes the new files. Since the copy makes
+the folder, the next stretch is the highest folder while it has no
+`agent.json`, and one more than it after. The watchtower and analyst
+windows wait for the new stretch's `agent.json`, which the engineer writes
+when its session opens, since both find the engineer's stretch by it.
 
 The engineer's opening message is the first of three files, with
 `{{STRETCH}}` and `{{PREVIOUS}}` filled in: the project's own
@@ -115,6 +145,13 @@ another device, such as a Mac: it runs `bun test` and `bunx eslint .`,
 writes a report with each failure's own output, and with `--issue=<n>`
 posts it through `gh`, so no terminal output is copied between
 machines. `--from-log=<file>` builds the report from a saved log.
+
+Every operator agent carries the single-command rule: run every `rafa` line
+as one command, no `cd … &&`, `;`, pipe or redirect. The allow rules match
+a single command, and a compound one goes to the auto-mode classifier. For
+example, `rafa pr merge <pr> && rafa cleanup` is denied; run them as two
+separate commands instead. The detached loop start that once needed a
+redirect is now `rafa stretch item`.
 
 ### The events output
 
