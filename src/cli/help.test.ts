@@ -6,10 +6,11 @@
  * ## The snapshots
  *
  * `testdata/help/rafa.txt`, `rafa-loop.txt`, `rafa-loop-start.txt`,
- * `rafa-loop-wait.txt`, `rafa-next.txt`, `rafa-issue-ready.txt` and
- * `rafa-release-tag.txt` hold what `rafa --help`, `rafa loop --help`,
- * `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`,
- * `rafa issue ready --help` and `rafa release tag --help` print. Each case
+ * `rafa-loop-wait.txt`, `rafa-next.txt`, `rafa-issue-ready.txt`,
+ * `rafa-issue-edit.txt` and `rafa-release-tag.txt` hold what `rafa --help`,
+ * `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`,
+ * `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help`
+ * and `rafa release tag --help` print. Each case
  * dispatches its line through `dispatch` over `CORE_REGISTRY` with the
  * renderer handed in, an empty environment and streams of its own, so
  * what is compared is the dispatcher's stdout. One more case spawns
@@ -98,6 +99,7 @@ const SNAPSHOTS: readonly (readonly [line: string, file: string])[] = [
   ['loop wait --help', 'rafa-loop-wait.txt'],
   ['next --help', 'rafa-next.txt'],
   ['issue ready --help', 'rafa-issue-ready.txt'],
+  ['issue edit --help', 'rafa-issue-edit.txt'],
   ['release tag --help', 'rafa-release-tag.txt'],
 ];
 

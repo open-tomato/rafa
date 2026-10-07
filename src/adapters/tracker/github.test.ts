@@ -177,6 +177,7 @@ runTrackerContract({
   },
   readComments: async (ref) => contractFake.issue(ref.externalId)?.comments ?? [],
   transitionableStates: TRANSITIONABLE,
+  editsIssues: true,
 });
 
 describe('creating an issue', () => {
@@ -903,6 +904,17 @@ describe('the gh runner', () => {
       ].join('\n'),
       stderr: 'to stderr\n',
     });
+  });
+
+  it('hands a given stdin over byte for byte, beside the closed stdin of a command handed none', async () => {
+    const text = '--web\n\n## Context\n\ncafé, two words\n\n';
+    const run = createGhRunner({ cwd: tempDir, command: 'sh' });
+
+    const handed = await run(['-c', 'cat'], text);
+    const none = await run(['-c', 'cat; printf end']);
+
+    expect(handed).toEqual({ ok: true, stdout: text, stderr: '' });
+    expect(none).toEqual({ ok: true, stdout: 'end', stderr: '' });
   });
 
   it('answers ok false with what the command wrote when it exits non-zero', async () => {

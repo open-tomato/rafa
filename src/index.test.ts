@@ -648,6 +648,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/refs-check.js', ['createPlanRefsVerifier']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
+  ['./commands/issue/edit.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['./edit-run.js', ['editIssue', 'renderEditReport']],
+  ]],
   ['./commands/pr/current.js', [
     ['../../config-sections.js', ['messageOf']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
@@ -1591,6 +1595,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/issue/ready.js',
       './commands/issue/unblock.js',
       './commands/issue/check.js',
+      './commands/issue/edit.js',
       './commands/pr/current.js',
       './commands/pr/show.js',
       './commands/pr/view.js',

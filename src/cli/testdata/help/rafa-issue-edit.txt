@@ -1,0 +1,71 @@
+rafa issue edit — append a dated update to an issue body, or replace its body or
+  title, after four gates
+
+Usage:
+  rafa issue edit <n> [--append-file=<string>] [--append=<string>]
+    [--reason=<string>] [--replace-file=<string>] [--title=<string>]
+    [--while-in-development] [--dry-run]
+
+Description:
+  Edits one issue on the tracker the chain lands on, after four gates weighed in
+  order, the first refusal ending the run with nothing written and exit code 2:
+  the account editing must have write access or be in board.trustedAuthors; so
+  must the issue's author; the text added must leak nothing, and a complete spec
+  must stay complete; and the issue must be open, its labels and saved spec
+  copies allowing the edit. An append (`--append-file` or `--append`, with
+  `--reason`) adds a block `**Updated <YYYY-MM-DD>, <reason>:**` below the body,
+  leaving the original part byte for byte; the same block already closing the
+  body answers `already`. `--replace-file` replaces the body and `--title` the
+  title. After the write the issue is read again: a body that no longer holds
+  what was written answers `conflict` with exit code 1, the bodies read before
+  and after saved under `.rafa/scratch/`. An append on an issue already planned
+  answers `stale-copy` and names `rafa plan create --issue=<n> --refresh`, which
+  it never runs. `--dry-run` prints each gate's reading and the added part and
+  writes nothing. With `--output=json` the report and the tracker are the data
+  of the terminal result event.
+
+Arguments:
+  n   string, required
+      The issue number on the tracker.
+
+Flags:
+  --append-file            string
+      A file holding the text to append, read whole; `-` reads standard input.
+      Needs --reason. Not with --append, --replace-file or --title.
+  --append                 string
+      The text to append. Needs --reason. Not with --append-file, --replace-file
+      or --title.
+  --reason                 string
+      Why the update was made, written into its heading. Required with an
+      append, refused otherwise.
+  --replace-file           string
+      A file holding the new body, read whole; `-` reads standard input. Not
+      with an append.
+  --title                  string
+      The new title, alone or beside --replace-file. Not with an append.
+  --while-in-development   boolean
+      Allows an append on an issue a loop has claimed, answering stale-copy.
+      Only with an append.
+  --dry-run                boolean
+      Prints the added part and each gate's reading and writes nothing; a
+      refusal still exits 2.
+
+Examples:
+  rafa issue edit 57 --append-file=update.md --reason="scope narrowed"
+      Appends what update.md holds to #57 below a dated heading naming the
+      reason.
+  rafa issue edit 57 --append="Also covers --dry-run." --reason=clarified --dry-run
+      Prints each gate's reading and the block it would append, and writes
+      nothing.
+  rafa issue edit 57 --title="Faster plan show"
+      Changes the title of #57 and leaves its body alone.
+  rafa issue edit 57 --replace-file=spec.md --output=json
+      Replaces the body of #57; the report and the tracker are the data of the
+      result event.
+
+Outputs:
+  text, json
+
+See also:
+  rafa issue list, rafa issue show, rafa issue create, rafa issue comment, rafa
+  issue move, rafa issue ready, rafa issue unblock, rafa issue check

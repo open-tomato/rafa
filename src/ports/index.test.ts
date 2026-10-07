@@ -121,6 +121,18 @@
  * refusal was written it reddened nothing, since a narrower parameter
  * is refused either way. `OpenIssue` left unexported reddened the name
  * list and the unknown-type call, which names it.
+ *
+ * The optional `editable` and `edit` pair arrived on 2026-10-06 with
+ * the names `EditableIssue` and `IssueEdit`, a third tracker in the
+ * conforming probe that implements the pair, a call writing a body, a
+ * title and both, and three refusals. Five mutations of the entry were
+ * driven that day against this file, restored from a scratch copy and
+ * verified with `shasum -a 256 -c`, at 39 pass unmutated. `IssueEdit`
+ * opened to an edit naming neither field, `author` made optional and a
+ * synchronous `edit` allowed each reddened its own refusal alone.
+ * `editable` made required reddened the clean probe and the refusal of
+ * a tracker with no `transition`, whose readings it changed.
+ * `EditableIssue` left unexported reddened the name list alone.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -154,6 +166,7 @@ const TYPE_EXPORTS = [
   'CliEventStart',
   'CliEventStep',
   'CommitEffortRow',
+  'EditableIssue',
   'EffortKeyProjections',
   'EffortRow',
   'EffortRowByKind',
@@ -162,6 +175,7 @@ const TYPE_EXPORTS = [
   'InstinctRecord',
   'Issue',
   'IssueDraft',
+  'IssueEdit',
   'IssuePriority',
   'IssueQuery',
   'IssueRef',
@@ -256,6 +270,25 @@ function trackerLiteral(kind: string, transition: string | null, openIssues: str
 /** An `openIssues` answering one open issue of the type it is handed. */
 const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b" }]';
 
+/**
+ * A tracker literal as {@link trackerLiteral} writes it, under `name`,
+ * with `editable` and `edit` as given.
+ */
+function editingTrackerLiteral(editable: string, edit: string, name = 'tracker'): string[] {
+  return [
+    ...trackerLiteral('"local"', 'async () => ({})', null, name).slice(0, -1),
+    `  editable: ${editable},`,
+    `  edit: ${edit},`,
+    '};',
+  ];
+}
+
+/** An `editable` answering every field the port names. */
+const EDITABLE = 'async (ref) => ({ ref, title: "t", body: "b", open: true, labels: ["spec:ready"], author: "" })';
+
+/** An `edit` that writes nothing. */
+const EDIT = 'async () => {}';
+
 /** An instinct literal carrying the signal given. */
 function instinctLiteral(signal: string): string {
   return [
@@ -274,6 +307,12 @@ const CONFORMING_PROBE = probeSource(
   `import { mergeStore } from ${specifierOf('effort', 'store', 'merge-store.js')};`,
   ...trackerLiteral('"obsidian"', 'async () => ({})'),
   ...trackerLiteral('"local"', 'async () => ({})', OPEN_ISSUES, 'reader'),
+  ...editingTrackerLiteral(EDITABLE, EDIT, 'editor'),
+  'export async function rewrite(tracker: P.Tracker, ref: P.IssueRef): Promise<void> {',
+  '  await tracker.edit?.(ref, { body: "b" });',
+  '  await tracker.edit?.(ref, { title: "t" });',
+  '  await tracker.edit?.(ref, { body: "b", title: "t" });',
+  '}',
   'export const ndjson: P.Store = openNdjsonStore("/nonexistent");',
   'export const sqlite: P.Store = openSqliteStore("/nonexistent");',
   `export const instinct: P.InstinctRecord = ${instinctLiteral('"silent"')};`,
@@ -422,6 +461,34 @@ const REFUSALS: readonly Refusal[] = [
     ),
     code: 2345,
     names: '"feature"',
+  },
+  {
+    title: 'a tracker whose editable answers no author',
+    file: 'tracker-editable-no-author.ts',
+    source: probeSource(...editingTrackerLiteral(
+      'async (ref) => ({ ref, title: "t", body: "b", open: true, labels: [] })',
+      EDIT,
+    )),
+    code: 2322,
+    names: 'Property \'author\' is missing',
+  },
+  {
+    title: 'a tracker whose edit answers without a promise',
+    file: 'tracker-sync-edit.ts',
+    source: probeSource(...editingTrackerLiteral(EDITABLE, '() => undefined')),
+    code: 2322,
+    names: 'Promise<void>',
+  },
+  {
+    title: 'an edit naming neither a body nor a title',
+    file: 'tracker-empty-edit.ts',
+    source: probeSource(
+      'export async function blank(tracker: P.Tracker, ref: P.IssueRef): Promise<void> {',
+      '  await tracker.edit?.(ref, {});',
+      '}',
+    ),
+    code: 2345,
+    names: 'IssueEdit',
   },
   {
     title: 'a tracker kind that is not a string',
