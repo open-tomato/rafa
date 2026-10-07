@@ -583,7 +583,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueRef', 'onTracker', 'resolveIssueTracker', 'urlLines']],
   ]],
   ['./commands/issue/create.js', [
+    ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
+    ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
@@ -591,6 +593,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
+      'issueProject',
+      'issueSubjectConfig',
       'lineRefusal',
       'onTracker',
       'readChoiceFlag',

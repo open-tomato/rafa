@@ -24,6 +24,16 @@
  * lacks or no issue at all is refused with the issue count unchanged,
  * the last before any `gh` runs.
  *
+ * The project step is driven on the gh fake with `board.project.number`
+ * set, every `gh api` call routed to the strict project fake
+ * (`../../board/project/project-fake.ts`): the issue filed lands on the
+ * project as an item, and a number naming no project is answered by its
+ * warning line, each with exit code 0 and the warning written after the
+ * create's own lines. The project fake models no facts query, so the
+ * refresh asked after the add rejects at the facts read and is answered
+ * by its one failed line, which is how the case sees it was asked. Beside them, the same line with the number unset sends no
+ * `gh api` call, and a `local` issue sends no `gh` at all.
+ *
  * The spawned case runs `bun src/rafa.ts issue create` in a scratch
  * repository whose config names `github` first, under a PATH holding a
  * stand-in `gh` that logs its arguments and exits 1. So the registered
@@ -33,6 +43,7 @@
  * then lists it.
  */
 import type { LineFlags } from './issue-tracker.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -45,6 +56,9 @@ import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { SPEC_LABEL } from '../../board/issue.js';
+import { createGhProjectPort } from '../../board/project/gh.js';
+import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from '../../board/project/project-fake.js';
+import { notFoundWarning } from '../../board/project/refresh-warnings.js';
 import { CommandExit } from '../../cli/command.js';
 import {
   dispatchInProject,
@@ -58,6 +72,7 @@ import {
 import { KNOWN_LIST_LIMIT } from './create-blocked.js';
 import {
   createIssueCreateCommand,
+  projectIssueNumber,
   readBodyFile,
   readBodyFileFlag,
   readIssueDraft,
@@ -566,4 +581,91 @@ describe('rafa issue create, spawned', () => {
     expect(readFileSync(ghLog, 'utf8')).toBe('auth status\nauth status\n');
     expect(existsSync(join(scratch.repo, '.rafa', 'issues', '1.md'))).toBe(true);
   }, SPAWN_TIMEOUT);
+});
+
+/** The owner of the fake's repository, and of its project. */
+const PROJECT_OWNER = FAKE_PROJECT_REPOSITORY.split('/')[0] ?? '';
+
+/** The project's number on the fake. */
+const PROJECT_NUMBER = 6;
+
+/** {@link GITHUB_CONFIG} with `board.project.number` set to `number`. */
+function projectConfig(number: number): string {
+  return `${GITHUB_CONFIG}board:\n  project:\n    number: ${String(number)}\n`;
+}
+
+/** The tracker's gh fake and the project fake behind one runner: `gh api` to the project, the rest to the tracker. */
+function projectGh(): { readonly gh: GhRunner; readonly fake: ReturnType<typeof createFakeGh>; readonly project: ReturnType<typeof createFakeProjectGh>; readonly apiCalls: () => number } {
+  const fake = createFakeGh();
+  const project = createFakeProjectGh({
+    projects: [{ owner: PROJECT_OWNER, number: PROJECT_NUMBER }],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: [1] }],
+  });
+  let apiCalls = 0;
+  const gh: GhRunner = (args) => {
+    if (args[0] !== 'api') return fake.run(args);
+    apiCalls += 1;
+    return project.gh(args);
+  };
+  return { gh, fake, project, apiCalls: () => apiCalls };
+}
+
+describe('rafa issue create and the project', () => {
+  it('answers the issue number of a github ref only', () => {
+    expect(projectIssueNumber({ kind: 'github', externalId: '41' })).toBe(41);
+    expect(projectIssueNumber({ kind: 'local', externalId: '41' })).toBeNull();
+    expect(projectIssueNumber({ kind: 'github', externalId: '0' })).toBeNull();
+    expect(projectIssueNumber({ kind: 'github', externalId: 'abc' })).toBeNull();
+  });
+
+  it('sends no gh api call with board.project.number unset', async () => {
+    const wired = projectGh();
+    const project = plantCase(GITHUB_CONFIG);
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(wired.apiCalls()).toBe(0);
+  });
+
+  it('adds the new issue to the project, then asks the refresh, whose failure is a warning after its own lines and exit 0', async () => {
+    const wired = projectGh();
+    const project = plantCase(projectConfig(PROJECT_NUMBER));
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+    const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
+    const lines = outcome.stdout.split('\n');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines.slice(0, 2)).toEqual(['Created github issue 1.', 'URL: https://github.com/open-tomato/rafa/issues/1']);
+    expect(wired.fake.issue('1')).toMatchObject({ title: 'Timeouts in plan show', state: 'OPEN' });
+    expect(items.map((item) => item.content)).toEqual([{ kind: 'issue', repository: FAKE_PROJECT_REPOSITORY, number: 1 }]);
+    // The project fake models no facts query, so the refresh asked after the add rejects there, answered as one line.
+    expect(lines[2]).toStartWith('warn: The project was not updated for #1: board project facts: ');
+    expect(lines[2]).toContain('rafa board sync');
+  });
+
+  it('writes the not-found line after its own lines and exits 0 for a number naming no project', async () => {
+    const wired = projectGh();
+    const project = plantCase(projectConfig(PROJECT_NUMBER + 1));
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toBe([
+      'Created github issue 1.',
+      'URL: https://github.com/open-tomato/rafa/issues/1',
+      `warn: ${notFoundWarning({ owner: PROJECT_OWNER, number: PROJECT_NUMBER + 1 })}`,
+      '',
+    ].join('\n'));
+  });
+
+  it('sends no gh for a local issue, with the number set', async () => {
+    const project = plantCase(`${LOCAL_CONFIG}board:\n  project:\n    number: ${String(PROJECT_NUMBER)}\n`);
+    const gh: GhRunner = () => Promise.reject(new Error('no gh call was planted'));
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh })], project);
+
+    expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
+  });
 });
