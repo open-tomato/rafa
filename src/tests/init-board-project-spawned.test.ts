@@ -47,7 +47,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { syncAddCalls, syncWriteCalls } from '../board/project/sync-fake.js';
 
-import { plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
+import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
 import { callsLogged, plantStandInGh } from './project-stand-in-spawn.js';
 
 /** This suite's temporary directory, removed once every case has run. */
@@ -96,7 +96,7 @@ function firstRunLeftProject(): { scratch: ScratchRepo; files: StandInFiles } {
   plantProjectConfig(scratch.repo, INIT_CONFIG);
   const files = plantStandInGh(scratch);
   const filled = runRafa(scratch, scratch.repo, ['board', 'sync']);
-  expect(filled.exitCode).toBe(0);
+  expectExit(filled, 0, scratch);
   return { scratch, files };
 }
 
@@ -108,7 +108,7 @@ describe('rafa init --board --project, a second run, spawned over a stand-in gh'
     const init = runRafa(scratch, scratch.repo, ['init', '--board', '--project', '--yes']);
     const initCalls = callsLogged(files).slice(beforeInit);
 
-    expect(init.exitCode).toBe(0);
+    expectExit(init, 0, scratch);
     expect(init.stderr).toBe('');
     for (const row of PRESENT_ROWS) {
       expect(init.stdout.split('\n')).toContain(row);

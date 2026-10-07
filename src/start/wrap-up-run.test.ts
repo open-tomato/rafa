@@ -829,7 +829,7 @@ describe('the pull request event in each output mode', () => {
 
   it('emits one pr event with the number the runner opened, in json mode', async () => {
     setActiveOutput(sinkOutput({ event: (event) => events.push(event) }), 'json');
-    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: pull(629) } });
+    const { seams } = standIn({ readings: [null], runner: { kind: 'opened', pull: pull(629), warnings: [] } });
 
     const delivery = await deliverAndEmit(seams, null);
 
@@ -968,7 +968,7 @@ async function runOverFake(opening: Opening): Promise<CarriedRun> {
       const runner = opening.byRunner;
       if (runner === undefined || runner === 'blocked') return { kind: 'blocked', message: '❌ the push was refused' };
       plantOpen(runner);
-      return { kind: 'opened', pull: await readBack(pulls, runner) };
+      return { kind: 'opened', pull: await readBack(pulls, runner), warnings: [] };
     },
     isInterrupted: () => false,
   };
