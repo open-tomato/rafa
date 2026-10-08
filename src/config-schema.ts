@@ -19,8 +19,9 @@
  * `config-schema-tests.ts` the `tests` section and its reader,
  * `config-schema-triage.ts` the `triage` section and its readers,
  * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
- * and `config-schema-loop-retries.ts` `loop.retries` and its reader,
- * all five spread in here. `config-schema-hub.ts` holds the `hub`
+ * `config-schema-loop-retries.ts` `loop.retries` and its reader, and
+ * `config-schema-loop-continue.ts` the four keys `loop start --continue`
+ * reads and their readers, all six spread in here. `config-schema-hub.ts` holds the `hub`
  * section, its readers and the refusal of `effort.sync: service` with
  * no `hub.url`, spread in after `effort.sync`.
  *
@@ -80,7 +81,8 @@
  * `config-schema-tests.ts` for a `tests` key,
  * `config-schema-triage.ts` for a `triage` key,
  * `config-schema-wrap-up.ts` for a `loop.wrapUp` key,
- * `config-schema-loop-retries.ts` for `loop.retries` —
+ * `config-schema-loop-retries.ts` for `loop.retries`,
+ * `config-schema-loop-continue.ts` for a `--continue` key —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
@@ -108,6 +110,7 @@ import type {
   PrerequisiteItem,
 } from './config-items.js';
 import type { HubSettings } from './config-schema-hub.js';
+import type { LoopContinueSettings } from './config-schema-loop-continue.js';
 import type { LoopRetriesSettings } from './config-schema-loop-retries.js';
 import type {
   DangerousReleaseSettings,
@@ -152,6 +155,7 @@ import {
   trackerKind,
 } from './config-readers.js';
 import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
+import { LOOP_CONTINUE_DEFAULTS, LOOP_CONTINUE_SETTINGS } from './config-schema-loop-continue.js';
 import { LOOP_RETRIES_DEFAULTS, LOOP_RETRIES_SETTINGS } from './config-schema-loop-retries.js';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
@@ -211,11 +215,13 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * `dangerousAcceptVersionCollision` is {@link DangerousReleaseSettings}',
  * the `tests` fields are {@link TestsSettings}', the `triage` fields are
  * {@link TriageSettings}', `loopRetries` is {@link LoopRetriesSettings}',
- * and `loopWrapUpRetries` is {@link WrapUpSettings}'.
+ * the `--continue` fields are {@link LoopContinueSettings}', and
+ * `loopWrapUpRetries` is {@link WrapUpSettings}'.
  */
 export interface RafaConfig
   extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
-  TestsSettings, TriageSettings, LoopRetriesSettings, WrapUpSettings {
+  TestsSettings, TriageSettings, LoopRetriesSettings, LoopContinueSettings,
+  WrapUpSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -395,6 +401,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   settingSources: Object.freeze<ClaudeSettingSource[]>(['project', 'local']),
   loopWorktreeDir: join('.rafa', 'worktrees'),
   ...LOOP_RETRIES_DEFAULTS,
+  ...LOOP_CONTINUE_DEFAULTS,
   ...WRAP_UP_DEFAULTS,
   ...PR_DEFAULTS,
   boardTrustedAuthors: Object.freeze([]),
@@ -499,6 +506,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   },
   loopWorktreeDir: { key: 'loop.worktreeDir', read: directory, cli: false },
   ...LOOP_RETRIES_SETTINGS,
+  ...LOOP_CONTINUE_SETTINGS,
   ...WRAP_UP_SETTINGS,
   ...PR_SETTINGS,
   boardTrustedAuthors: {

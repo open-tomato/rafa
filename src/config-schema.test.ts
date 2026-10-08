@@ -59,6 +59,10 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
   ['loopRetries', 'loop.retries'],
+  ['loopRetriesOnContinue', 'loop.retriesOnContinue'],
+  ['loopContinueCriteria', 'loop.continue.criteria'],
+  ['loopContinueCriteriaMode', 'loop.continue.criteriaMode'],
+  ['loopForceWrapUpMaxNewFailures', 'loop.forceWrapUp.maxNewFailures'],
   ['loopWrapUpRetries', 'loop.wrapUp.retries'],
   ['prProvider', 'pr.provider'],
   ['prMergeMethod', 'pr.mergeMethod'],
@@ -207,6 +211,8 @@ describe('SECTIONS', () => {
       'learning.bless',
       'learning.promote',
       'loop',
+      'loop.continue',
+      'loop.forceWrapUp',
       'loop.wrapUp',
       'output',
       'plan',
@@ -261,7 +267,11 @@ describe('knownKeysAbove', () => {
       'dangerous',
       ['acceptStaleRefs', 'acceptVersionCollision', 'selfUpdateDuringLoop'],
     ]);
-    expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir', 'retries', 'wrapUp']]);
+    expect(knownKeysAbove('loop.worktreeDirs')).toEqual([
+      'loop',
+      ['settingSources', 'worktreeDir', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
+    ]);
+    expect(knownKeysAbove('loop.continue.mode')).toEqual(['loop.continue', ['criteria', 'criteriaMode']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
     expect(knownKeysAbove('learning.promote.afters')).toEqual([
       'learning.promote',
