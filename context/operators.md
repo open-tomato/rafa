@@ -181,8 +181,9 @@ rafa· error            ❌ Task failed (exit 1). Marked as blocked. Run again t
 went back into its loop after a stop instead of halting, which retry of
 how many, under `--retry` or `loop.retries` (`src/start/retry-budget.ts`);
 it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
-it, and a `task-blocked` line written just before it does not mean the
-run stopped. An `inherited` line names
+it. A stop it retries writes no `task-blocked` line: a task stop writes
+one only once no retry is granted, so a `task-blocked` line still means
+the run stopped. An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as
 (`src/start/triage.ts`): nothing was filed for it. A task's tokens are input,
 cache creation and output from its session log, read as

@@ -299,7 +299,9 @@
  * step before a session or after a task, a session that exited nonzero
  * but not on its budget, and a clean exit held only on leaving neither
  * a report nor a commit; each retry writes a warning and a `retry`
- * event (`start/retry-budget.ts`).
+ * event (`start/retry-budget.ts`), and no `task-blocked` event, which
+ * a task stop emits only once no retry is granted, so the run really
+ * stops. The attempt's report is stored either way.
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -737,9 +739,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (exitCode !== 0) {
         updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
-        emitLoopEvent({ kind: 'task-blocked', position, reason: `session exited ${exitCode}` });
+        // Stored on every attempt, retried or not. The retry is asked
+        // after the store, so an interrupt during it refuses the retry,
+        // and nothing is awaited between a grant and the loop's top.
+        // `task-blocked` is the stop's alone: a retried one emits `retry`.
         await storeReport('failed');
         if (retries.retry(`session exited ${exitCode}`)) continue;
+        emitLoopEvent({ kind: 'task-blocked', position, reason: `session exited ${exitCode}` });
         return;
       }
 
@@ -761,8 +767,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       expected = advanceExpectation(expected, finished.attempt);
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') {
-        emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit')) continue;
+        emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
         return;
       }
       const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));

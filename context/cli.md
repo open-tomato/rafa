@@ -487,9 +487,11 @@ New; it replaces no earlier text. What a row or an action added to
   commit, a moved checkout, a report left unstored, a pause, an interrupt
   and every refusal before the loop halt as before. Each retry writes one
   warning, `🔁 Retrying (retry <i> of <n>) after the stop: <reason>.`, and one
-  `retry` loop event after the stop's own lines and events, `task-blocked`
-  included; a SIGINT received refuses every retry left, and once the budget
-  is spent the next such stop halts.
+  `retry` loop event after the stop's own lines and its stored report, and
+  no `task-blocked` event: a task stop emits that only once its retry is
+  refused, so `loop wait --until=blocked` never answers a run still going.
+  A SIGINT received refuses every retry left, and once the budget is spent
+  the next such stop halts.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.

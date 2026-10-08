@@ -36,6 +36,14 @@
  * task session for the repair ahead of it: no suite step runs before
  * that session, so none is recorded and the stand-in is called once more.
  *
+ * ## The retried run
+ *
+ * One more describe spawns a run under `--retry=1` whose first session
+ * exits 1 and whose second blocks its task in its report, and reads the
+ * run's events file: the granted retry emits `retry` and no
+ * `task-blocked`, which only the stop the run halts on emits, so
+ * `rafa loop wait --until=blocked` never answers a run still going.
+ *
  * ## The controls
  *
  * A reader that found nothing would pass a "calls nothing else" claim on
@@ -43,6 +51,8 @@
  * on any. So a PLANTED branch that still makes a release call of its own
  * beside the hand-over is read as making both.
  */
+import type { EventLine } from './loop/events-file.js';
+
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,6 +62,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
 import { readSessions } from './loop/sessions.js';
 import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
@@ -435,9 +446,11 @@ describe('where start.ts retries a stop', () => {
     ]);
   });
 
-  it('guards each retry with the reading that tells its stop apart, and continues on a grant', () => {
-    expect(START).toContain('        await storeReport(\'failed\');\n        if (retries.retry(`session exited ${exitCode}`)) continue;\n        return;\n');
-    expect(START).toContain('        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n        return;\n');
+  it('guards each retry with the reading that tells its stop apart, continues on a grant, and emits task-blocked only on a refusal', () => {
+    expect(START).toContain('        await storeReport(\'failed\');\n        if (retries.retry(`session exited ${exitCode}`)) continue;\n'
+      + '        emitLoopEvent({ kind: \'task-blocked\', position, reason: `session exited ${exitCode}` });\n        return;\n');
+    expect(START).toContain('        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n'
+      + '        emitLoopEvent({ kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' });\n        return;\n');
     expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red'\)\) continue;/g)).toHaveLength(2);
   });
 
@@ -701,7 +714,7 @@ function standInScript(calls: string): string {
  * {@link GREETING_FILE}. `.plans/`, `.rafa/` and `progress.txt` are
  * gitignored, as a real project's are.
  */
-function plant(): Scratch {
+function plant(script: (calls: string) => string = standInScript): Scratch {
   const root = mkdtempSync(join(tempRoot, 'run-'));
   const repo = join(root, 'repo');
   const bin = join(root, 'bin');
@@ -713,7 +726,7 @@ function plant(): Scratch {
   if (bunBinary === null) throw new Error('bun is not on the PATH this suite runs under');
 
   const claude = join(bin, 'claude');
-  writeFileSync(claude, standInScript(calls), 'utf8');
+  writeFileSync(claude, script(calls), 'utf8');
   chmodSync(claude, 0o755);
 
   git(repo, home, 'init', '-q', '.');
@@ -742,10 +755,10 @@ function plant(): Scratch {
   return { repo, home, calls, path: [bin, ...hostToolDirs(), dirname(bunBinary)].join(delimiter) };
 }
 
-/** Runs `rafa loop start` over the planted plan in `scratch`'s repository, waiting for it to finish. */
-function runLoopStart(scratch: Scratch): number | null {
+/** Runs `rafa loop start` over the planted plan in `scratch`'s repository, with `flags` after its own, waiting for it to finish. */
+function runLoopStart(scratch: Scratch, flags: readonly string[] = []): number | null {
   const entry = fileURLToPath(new URL('./rafa.ts', import.meta.url));
-  const run = Bun.spawnSync([process.execPath, entry, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full'], {
+  const run = Bun.spawnSync([process.execPath, entry, 'loop', 'start', `--plan=.plans/PLAN-${STUB}.md`, '--no-ci-wait', '--inject=full', ...flags], {
     cwd: scratch.repo,
     env: { RAFA_TEST: '1', TMPDIR: tmpdir(), PATH: scratch.path, ...scratchHomeEnv(scratch.home) },
     timeout: RUN_TIMEOUT_MS,
@@ -760,6 +773,40 @@ function callCount(scratch: Scratch): number {
   } catch {
     return 0;
   }
+}
+
+/**
+ * A stand-in `claude` whose first call runs `first`, shell lines run in
+ * the checkout, and exits 1, and whose every later call touches nothing
+ * and answers `blocked`: a run that retries the first call stops on the
+ * second, a report that blocks its task, which no retry is asked for.
+ */
+function failingFirstStandIn(first: readonly string[]): (calls: string) => string {
+  return (calls) => [
+    '#!/bin/sh',
+    `calls='${calls}'`,
+    'n=$(/bin/cat "$calls/count" 2>/dev/null || echo 0)',
+    'n=$((n + 1))',
+    'echo "$n" > "$calls/count"',
+    '/bin/cat > /dev/null',
+    'if [ "$n" -eq 1 ]; then',
+    ...first.map((line) => `  ${line}`),
+    '  exit 1',
+    'fi',
+    ...printLines(reportLines('blocked', 'read the blocked line the retry dispatched')),
+    'exit 0',
+    '',
+  ].join('\n');
+}
+
+/** Every loop event the scratch repository's runs wrote, in run order and then file order. */
+function runEvents(scratch: Scratch): readonly EventLine[] {
+  return readSessions(scratch.repo).flatMap((record) => {
+    const read = readEventsFrom(eventsFileOf(scratch.repo, record), 0);
+    return read.kind === 'read'
+      ? read.events
+      : [];
+  });
 }
 
 /** The kinds of every suite step recorded for the scratch repository's runs, in order. */
@@ -807,5 +854,26 @@ describe('a run whose task step goes red, over a real bun test', () => {
     expect(readFileSync(join(scratch.calls, '2.args'), 'utf8')).toContain('--agent\nbuild-error-resolver\n');
     expect(stepKinds(scratch)).not.toContain('stage');
     expect(stepKinds(scratch).filter((kind) => kind === 'task')).toHaveLength(1);
+  }, CASE_TIMEOUT_MS);
+});
+
+describe('a run that retries a session that exited nonzero, over a real loop', () => {
+  it('emits only the retry for the stop it retries, and task-blocked once, for the stop it halts on', () => {
+    const scratch = plant(failingFirstStandIn([]));
+
+    // The first session exits 1 and is retried; the second blocks its
+    // task in its report, a stop no retry is asked for, and the run halts.
+    expect(runLoopStart(scratch, ['--retry=1'])).toBe(0);
+    expect(callCount(scratch)).toBe(2);
+
+    const told = runEvents(scratch)
+      .filter((event) => ['task-start', 'task-blocked', 'retry', 'halt'].includes(event.name))
+      .map((event) => [event.name, event.data['reason'] ?? null]);
+    expect(told).toEqual([
+      ['task-start', null],
+      ['retry', 'session exited 1'],
+      ['task-start', null],
+      ['task-blocked', 'status: blocked'],
+    ]);
   }, CASE_TIMEOUT_MS);
 });
