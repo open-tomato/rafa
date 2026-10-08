@@ -69,7 +69,10 @@
  * between tasks, its record `stopped` (`start/session.ts`) and no task
  * marked. An interrupted baseline, which was not written, stops the run
  * the same way at the call that took it, and every later call of the
- * run answers false without running a step.
+ * run answers false without running a step. Either way
+ * {@link RunSuiteSteps.stoppedOnSignal} answers true from then on, so
+ * `start.ts` never retries such a stop as it may a red one
+ * (`start/retry-budget.ts`).
  *
  * ## A step that throws
  *
@@ -161,6 +164,12 @@ export interface RunSuiteSteps {
   readonly beforeSession: (taskInfo: TaskInfo | null) => Promise<BeforeSessionAnswer>;
   /** After `taskInfo` committed `done` from `base`; false stops the run. */
   readonly afterTask: (taskInfo: TaskInfo, base: string) => Promise<boolean>;
+  /**
+   * True once a step or the baseline of this run was read as stopped by
+   * SIGINT, so the stop the loop is acting on is an interrupt and never a
+   * red step; see "A step stopped by SIGINT" in the module note.
+   */
+  readonly stoppedOnSignal: () => boolean;
 }
 
 /** The baseline, `off` when ensuring it threw, or `interrupted` when SIGINT stopped it. */
@@ -250,10 +259,18 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
       : { isInterrupted: options.isInterrupted }),
   };
 
+  // Set once a step or the baseline is read as stopped by SIGINT.
+  let signalled = false;
+  const goesOnNoting = (outcome: StepOutcome | null): boolean => {
+    if (outcome?.interrupted === true) signalled = true;
+    return goesOn(outcome);
+  };
+
   let held: Promise<BaselineHeld> | null = null;
   const baseline = (): Promise<BaselineHeld> => {
     held ??= guarded('suite baseline', () => calls.ensureBaseline(context)).then((outcome) => {
       if (outcome?.interrupted === true) {
+        signalled = true;
         announceInterrupted();
         return 'interrupted';
       }
@@ -277,7 +294,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
       announceRedAgain();
       return 'stop';
     }
-    return answerOf(goesOn(outcome));
+    return answerOf(goesOnNoting(outcome));
   };
 
   const beforeSession = async (taskInfo: TaskInfo | null): Promise<BeforeSessionAnswer> => {
@@ -287,7 +304,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     if (taskInfo === null) return preWrapUp(known);
     if (taskInfo.status === 'blocked') return 'go-on';
     const stages = await guarded('stage steps', () => calls.runDueStageSteps(context, known));
-    return answerOf((stages ?? []).every((outcome) => goesOn(outcome)));
+    return answerOf((stages ?? []).every((outcome) => goesOnNoting(outcome)));
   };
 
   const afterTask = async (taskInfo: TaskInfo, base: string): Promise<boolean> => {
@@ -296,8 +313,8 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     if (known === 'off') return true;
     const { text, declaration } = parseTaskDeclaration(taskInfo.task);
     const input: TaskStepInput = { baseline: known, base, declared: readTestScope(declaration), task: text };
-    return goesOn(await guarded('task step', () => calls.runTaskStep(context, input)));
+    return goesOnNoting(await guarded('task step', () => calls.runTaskStep(context, input)));
   };
 
-  return { beforeSession, afterTask };
+  return { beforeSession, afterTask, stoppedOnSignal: () => signalled };
 }

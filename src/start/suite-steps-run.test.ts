@@ -402,6 +402,37 @@ describe('a step stopped by SIGINT', () => {
   });
 });
 
+describe('stoppedOnSignal', () => {
+  // What `start.ts` reads before it retries a suite stop: a stop SIGINT
+  // made is never retried (`start/retry-budget.ts`), a red one may be.
+  it('answers false for a fresh run and after a red step, whose stop a retry may follow', async () => {
+    const { calls } = scripted({ runDueStageSteps: () => Promise.resolve([outcome('stage', true, 9)]) });
+    const steps = stepsWith(calls);
+
+    expect(steps.stoppedOnSignal()).toBe(false);
+    expect(await steps.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect(steps.stoppedOnSignal()).toBe(false);
+  });
+
+  it('answers true once an interrupted stage step or task step has stopped the run', async () => {
+    const stage = stepsWith(scripted({ runDueStageSteps: () => Promise.resolve([stopped('stage')]) }).calls);
+    const task = stepsWith(scripted({ runTaskStep: () => Promise.resolve(stopped('task')) }).calls);
+
+    expect(await stage.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect(await task.afterTask(taskAt('second task', 8), BASE)).toBe(false);
+    expect([stage.stoppedOnSignal(), task.stoppedOnSignal()]).toEqual([true, true]);
+  });
+
+  it('answers true after an interrupted pre-wrap-up step and an interrupted baseline', async () => {
+    const preWrapUp = stepsWith(scripted({ runPreWrapUpStep: () => Promise.resolve(stopped('pre-wrap-up')) }).calls);
+    const baseline = stepsWith(scripted({ ensureBaseline: () => Promise.resolve({ baseline: BASELINE, step: null, interrupted: true }) }).calls);
+
+    expect(await preWrapUp.beforeSession(null)).toBe('stop');
+    expect(await baseline.beforeSession(taskAt('second task', 8))).toBe('stop');
+    expect([preWrapUp.stoppedOnSignal(), baseline.stoppedOnSignal()]).toEqual([true, true]);
+  });
+});
+
 describe('a step that throws', () => {
   it('turns every step of the run off when the baseline throws, warning once', async () => {
     const { calls, seen } = scripted({ ensureBaseline: () => Promise.reject(new RangeError('not a PLAN or PLAN_TRACKER file')) });
