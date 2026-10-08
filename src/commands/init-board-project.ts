@@ -51,17 +51,29 @@
  *     read only for the closed issues the first two leave out that the
  *     project does not hold already, so a second run reads none it has
  *     added. Each missing issue is added through `ProjectPort.addItem`,
- *     lowest number first, {@link PROJECT_WRITE_PAUSE_MS} apart as the
+ *     lowest number first, `board.project.writePauseMs` apart as the
  *     field writes are paced; `present` when none was missing. An add
  *     refused part way is a refused part naming how many went through;
- *     the adds are idempotent, so a second run finishes them.
+ *     the adds are idempotent, so a second run finishes them. Given
+ *     {@link ProjectSetupOptions.progress}, the adds are the
+ *     `adding issues` phase (`../board/project/progress.ts`): its total
+ *     is the missing issues, it advances after each add, and its end
+ *     counts those added and, as refused, those the refused add left
+ *     unadded. The pause between two adds prints no wait line.
  *  4. **Fill the fields** ({@link FIELDS_PART}): `refreshProjectItems`
  *     over every item, which writes only the values that differ:
  *     `created` when it wrote any, `present` when none differed, and
  *     `refused` on a rate-limit refusal, a missing scope, or a project
- *     that is not there. A field the project does not hold as the
- *     template has it is skipped and its line kept in
+ *     that is not there. An issue whose facts could not be read is
+ *     refused alone: its `#<n> not refreshed: <reason>` line is listed
+ *     under the part ({@link ProjectPart.listed}), and the part still
+ *     reads `created` or `present` for the items that were filled. It
+ *     reads `refused` only when no item could be: every issue the
+ *     project holds was refused. A field the project does not hold as
+ *     the template has it is skipped and its line kept in
  *     {@link ProjectSetupReport.problems}; the other fields are written.
+ *     The progress feed is handed on to the refresh, which feeds the
+ *     `reading facts` and `writing fields` phases.
  *  5. **Save the number** ({@link PROJECT_NUMBER_SETTING}):
  *     `board.project.number` written into `.rafa/config.yaml`
  *     (`./init-board-project-setting.ts`); `present` when it already
@@ -103,10 +115,19 @@
  * way `setUpBoard` does: the caller decides what a refusal costs. Every
  * call goes through the one `GhRunner`; every case in
  * `./init-board-project.test.ts` drives a recorded fake.
+ * {@link runProjectStep} opens that runner retrying
+ * (`../board/project/project-runner.ts`), so a call that failed on a
+ * network error is sent again, each retry reported to the step's
+ * `onRetry` before its wait, before it counts as a refusal. It hands the
+ * step's `progress` feed on to {@link setUpProject}, so the adds, the
+ * facts reads and the field writes print their phases where the command
+ * renders them (`../board/project/progress.ts`).
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
-import type { ProjectRefresh, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
+import type { ProgressFeed } from '../board/project/progress.js';
+import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
+import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { RafaConfig } from '../config.js';
@@ -114,8 +135,15 @@ import type { BoardStepResult } from './init-board.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
-import { PROJECT_WRITE_PAUSE_MS } from '../board/project/port.js';
-import { isMissingProjectScope, PROJECT_SCOPE_FIX, rateLimitWarning } from '../board/project/refresh-warnings.js';
+import { openPhase } from '../board/project/progress.js';
+import { openProjectRunner } from '../board/project/project-runner.js';
+import {
+  isMissingProjectScope,
+  notRefreshedWarning,
+  PROJECT_SCOPE_FIX,
+  rateLimitWarning,
+  skippedFieldWarning,
+} from '../board/project/refresh-warnings.js';
 import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.js';
 import { rankOf, stageOf } from '../board/project/rules.js';
 import { readRoadmapSetting } from '../board/setup-config.js';
@@ -161,6 +189,8 @@ export interface ProjectPart {
   readonly outcome: BoardOutcome;
   /** One sentence: what was made or found, or why it was not. */
   readonly detail: string;
+  /** The lines listed under the part's row: the fields part's refused issues, one each. */
+  readonly listed?: readonly string[];
 }
 
 /** What a whole run of {@link setUpProject} came to. */
@@ -185,6 +215,8 @@ export interface ProjectSetupOptions {
   readonly gh: GhRunner;
   /** The pause between two adds and between two write requests; `Bun.sleep` when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears the adds, facts and writes phases; silent when left out. See the module note. */
+  readonly progress?: ProgressFeed;
 }
 
 /** One part, as the parts are built. */
@@ -315,47 +347,69 @@ function issueCount(count: number): string {
     : `${String(count)} issues`;
 }
 
-/** The issues the project should hold and does not, lowest number first; see the module note. */
-async function missingIssues(options: ProjectSetupOptions, repository: string, project: Project): Promise<readonly number[]> {
+/** What the issues the project should hold came to: those it holds, and those it does not, lowest number first. */
+interface IssuesWanted {
+  readonly held: ReadonlySet<number>;
+  readonly missing: readonly number[];
+}
+
+/** The issues the project holds, and those it should hold and does not; see the module note. */
+async function missingIssues(options: ProjectSetupOptions, repository: string, project: Project): Promise<IssuesWanted> {
   const { config, gh } = options;
   const board = await readRefreshBoard(config, gh, repository);
   const held = heldIssues(await createGhProjectPort(gh).items(project.id), repository);
   const ranked = board.closed.filter((issue) => rankOf(board.ranks, issue) !== null);
   const unread = board.closed.filter((issue) => rankOf(board.ranks, issue) === null && !held.has(issue));
-  const facts = await readIssueFacts({ gh, fragments: config.releaseFragments }, unread);
+  const { facts } = await readIssueFacts({ gh, fragments: config.releaseFragments }, unread);
   const inReview = unread.filter((issue) => {
     const read = facts.get(issue);
     return read !== undefined && stageOf(read) === 'In review';
   });
-  return [...new Set([...board.open, ...ranked, ...inReview])]
+  const missing = [...new Set([...board.open, ...ranked, ...inReview])]
     .filter((issue) => !held.has(issue))
     .sort((a, b) => a - b);
+  return { held, missing };
+}
+
+/**
+ * What the add part came to: the part, and how many issues the project
+ * holds after it, or null when the project's items could not be read.
+ */
+interface ItemsStep {
+  readonly part: ProjectPart;
+  readonly holds: number | null;
 }
 
 /** The add-the-issues part over `project`; see the module note. */
-async function itemsStep(options: ProjectSetupOptions, repository: string, project: Project): Promise<ProjectPart> {
+async function itemsStep(options: ProjectSetupOptions, repository: string, project: Project): Promise<ItemsStep> {
   const sleep = options.sleep ?? ((ms: number) => Bun.sleep(ms));
-  let missing: readonly number[];
+  let wanted: IssuesWanted;
   try {
-    missing = await missingIssues(options, repository, project);
+    wanted = await missingIssues(options, repository, project);
   } catch (error) {
-    return partOf('items', ITEMS_PART, 'refused', `the issues to add could not be read: ${refusalOf(error)}`);
+    return { part: partOf('items', ITEMS_PART, 'refused', `the issues to add could not be read: ${refusalOf(error)}`), holds: null };
   }
-  if (missing.length === 0) return partOf('items', ITEMS_PART, 'present', 'the project holds every issue it shows');
+  const { held, missing } = wanted;
+  if (missing.length === 0) return { part: partOf('items', ITEMS_PART, 'present', 'the project holds every issue it shows'), holds: held.size };
 
   const port = createGhProjectPort(options.gh);
+  const phase = openPhase(options.progress, 'adds', missing.length);
   let added = 0;
   try {
     for (const number of missing) {
-      if (added > 0) await sleep(PROJECT_WRITE_PAUSE_MS);
+      if (added > 0) await sleep(options.config.boardProjectWritePauseMs);
       await port.addItem(project.id, { repository, number });
       added += 1;
+      phase.advance(added);
     }
   } catch (error) {
+    phase.end({ done: added, refused: missing.length - added });
     const went = `${issueCount(added)} of ${String(missing.length)} added`;
-    return partOf('items', ITEMS_PART, 'refused', `${went}, then #${String(missing[added])} was refused: ${refusalOf(error)}; run \`${PROJECT_STEP_FIX}\` to add the rest`);
+    const why = `${went}, then #${String(missing[added])} was refused: ${refusalOf(error)}; run \`${PROJECT_STEP_FIX}\` to add the rest`;
+    return { part: partOf('items', ITEMS_PART, 'refused', why), holds: held.size + added };
   }
-  return partOf('items', ITEMS_PART, 'created', `added ${issueCount(added)} to the project`);
+  phase.end({ done: added, refused: 0 });
+  return { part: partOf('items', ITEMS_PART, 'created', `added ${issueCount(added)} to the project`), holds: held.size + added };
 }
 
 /** What the fill part came to: the part, and the lines of the fields it skipped. */
@@ -364,12 +418,59 @@ interface FieldsStep {
   readonly problems: readonly string[];
 }
 
-/** The fill-the-fields part: the refresh over every item of `project`; see the module note. */
-async function fieldsStep(options: ProjectSetupOptions, project: Project): Promise<FieldsStep> {
+/** `part` with `listed` under it, or `part` alone when `listed` is empty. */
+function withListed(part: ProjectPart, listed: readonly string[]): ProjectPart {
+  return listed.length === 0
+    ? part
+    : { ...part, listed };
+}
+
+/** What the fill part says of the issues it refused: nothing, or how many were not refreshed. */
+function refusedClause(refused: number): string {
+  return refused === 0
+    ? ''
+    : `; ${issueCount(refused)} not refreshed`;
+}
+
+/** The fill part over a refresh that read the project; see the module note. */
+function refreshedPart(refreshed: ProjectRefreshed, holds: number | null): ProjectPart {
+  const { writes, changes, skipped, refused } = refreshed;
+  const listed = refused.map(notRefreshedWarning);
+  if (writes.rateLimited) return withListed(partOf('fields', FIELDS_PART, 'refused', rateLimitWarning(writes.notUpdated)), listed);
+  if (changes.length === 0 && refused.length > 0 && (holds === null || holds <= refused.length)) {
+    return withListed(partOf('fields', FIELDS_PART, 'refused', `no item was filled: ${issueCount(refused.length)} not refreshed`), listed);
+  }
+  if (changes.length === 0) {
+    const held = skipped.length === 0
+      ? 'every value is as the rules give it'
+      : 'every value written is as the rules give it';
+    return withListed(partOf('fields', FIELDS_PART, 'present', `${held}${refusedClause(refused.length)}`), listed);
+  }
+  const issues = new Set(changes.map(({ issue }) => issue)).size;
+  const values = writes.written === 1
+    ? '1 value'
+    : `${String(writes.written)} values`;
+  return withListed(partOf('fields', FIELDS_PART, 'created', `wrote ${values} to ${issueCount(issues)}${refusedClause(refused.length)}`), listed);
+}
+
+/**
+ * The fill-the-fields part: the refresh over every item of `project`,
+ * which holds `holds` issues, or an unknown number when null; see the
+ * module note.
+ */
+async function fieldsStep(options: ProjectSetupOptions, project: Project, holds: number | null): Promise<FieldsStep> {
   const config: RefreshConfig = { ...options.config, boardProjectNumber: project.number };
-  const refreshOptions: RefreshOptions = options.sleep === undefined
-    ? { config, gh: options.gh }
-    : { config, gh: options.gh, sleep: options.sleep };
+  const { sleep, progress } = options;
+  const refreshOptions: RefreshOptions = {
+    config,
+    gh: options.gh,
+    ...(sleep === undefined
+      ? {}
+      : { sleep }),
+    ...(progress === undefined
+      ? {}
+      : { progress }),
+  };
   let refreshed: ProjectRefresh;
   try {
     refreshed = await refreshProjectItems(refreshOptions, [], { everyItem: true });
@@ -380,32 +481,15 @@ async function fieldsStep(options: ProjectSetupOptions, project: Project): Promi
   if (refreshed.kind !== 'refreshed') {
     return { part: partOf('fields', FIELDS_PART, 'refused', refreshed.warnings.join(' ') || 'the refresh sent no call'), problems: [] };
   }
-  const { writes, changes, skipped } = refreshed;
-  const problems = refreshed.warnings.slice(writes.rateLimited
-    ? 1
-    : 0);
-  if (writes.rateLimited) {
-    return { part: partOf('fields', FIELDS_PART, 'refused', rateLimitWarning(writes.notUpdated)), problems };
-  }
-  if (changes.length === 0) {
-    const held = skipped.length === 0
-      ? 'every value is as the rules give it'
-      : 'every value written is as the rules give it';
-    return { part: partOf('fields', FIELDS_PART, 'present', held), problems };
-  }
-  const issues = new Set(changes.map(({ issue }) => issue)).size;
-  const values = writes.written === 1
-    ? '1 value'
-    : `${String(writes.written)} values`;
-  return { part: partOf('fields', FIELDS_PART, 'created', `wrote ${values} to ${issueCount(issues)}`), problems };
+  return { part: refreshedPart(refreshed, holds), problems: refreshed.skipped.map(skippedFieldWarning) };
 }
 
 /** The parts after a copy part that found or made `project`. */
 async function onProject(options: ProjectSetupOptions, repository: string, project: Project): Promise<{ parts: readonly ProjectPart[]; problems: readonly string[] }> {
   const items = await itemsStep(options, repository, project);
-  const fields = await fieldsStep(options, project);
+  const fields = await fieldsStep(options, project, items.holds);
   const setting = writeProjectNumber(options.root, project.number);
-  return { parts: [items, fields.part, setting], problems: fields.problems };
+  return { parts: [items.part, fields.part, setting], problems: fields.problems };
 }
 
 /**
@@ -451,6 +535,9 @@ export const PROJECT_HEADING = 'GitHub project:';
 /** How wide an outcome column is, as the board's rows have it: `created`, `present` and `refused` are each seven. */
 const OUTCOME_WIDTH = 7;
 
+/** How far a listed line sits in: under the part's name, past the outcome column. */
+const LISTED_INDENT = ' '.repeat(2 + OUTCOME_WIDTH + 2);
+
 /** One part as a row: its detail too, unless it was already present, as a board row has it. */
 export function projectPartLine(part: ProjectPart): string {
   const row = `  ${part.outcome.padEnd(OUTCOME_WIDTH, ' ')}  ${part.name}`;
@@ -459,9 +546,14 @@ export function projectPartLine(part: ProjectPart): string {
     : `${row}: ${part.detail}`;
 }
 
-/** The lines text mode writes for the step: the heading, a row per part, then each problem. */
+/** One part's row, then each of its listed lines under its name, whatever its outcome. */
+export function projectPartLines(part: ProjectPart): readonly string[] {
+  return [projectPartLine(part), ...(part.listed ?? []).map((line) => `${LISTED_INDENT}${line}`)];
+}
+
+/** The lines text mode writes for the step: the heading, a row per part with its listed lines, then each problem. */
 export function renderProjectSetup(report: ProjectSetupReport): readonly string[] {
-  return [PROJECT_HEADING, ...report.parts.map((part) => projectPartLine(part)), ...report.problems];
+  return [PROJECT_HEADING, ...report.parts.flatMap((part) => projectPartLines(part)), ...report.problems];
 }
 
 /** The step's one question, asked after the board, the epic guard and the relationships move. */
@@ -507,6 +599,12 @@ export interface ProjectStepOptions {
   readonly openPrompter: () => Prompter;
   /** Sets the project up; {@link setUpProject} when left out. */
   readonly setUp?: (options: ProjectSetupOptions) => Promise<ProjectSetupReport>;
+  /** The wait before a retried call, between two adds and between two write requests; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears each retried call; the active output when left out. */
+  readonly onRetry?: RetryReport;
+  /** Hears the adds, facts and writes phases, handed on to the set-up; silent when left out. */
+  readonly progress?: ProgressFeed;
 }
 
 /** What a line asking for `--project` is told when the board step did not run. */
@@ -541,6 +639,19 @@ function withWrittenRoadmap(root: string, config: ProjectSetupConfig): ProjectSe
     : { ...config, roadmapIssue: written };
 }
 
+/** How the step's runner waits before a retry and reports it: the step's own seams, each only when given. */
+function retrySeamsOf(options: ProjectStepOptions): ProjectRunnerSeams {
+  const { sleep, onRetry } = options;
+  return {
+    ...(sleep === undefined
+      ? {}
+      : { sleep }),
+    ...(onRetry === undefined
+      ? {}
+      : { onRetry }),
+  };
+}
+
 /**
  * The project step of `rafa init`, having decided whether to run it and
  * asked when nobody said. The first answer wins: a board that did not
@@ -559,7 +670,20 @@ export async function runProjectStep(options: ProjectStepOptions): Promise<Proje
 
   const run = async (asked: boolean): Promise<ProjectStepResult> => {
     const setUp = options.setUp ?? setUpProject;
-    const report = await setUp({ root, config: withWrittenRoadmap(root, options.config), gh: options.openGh() });
+    const config = withWrittenRoadmap(root, options.config);
+    const gh = openProjectRunner(options.openGh(), config, retrySeamsOf(options));
+    const { sleep, progress } = options;
+    const report = await setUp({
+      root,
+      config,
+      gh,
+      ...(sleep === undefined
+        ? {}
+        : { sleep }),
+      ...(progress === undefined
+        ? {}
+        : { progress }),
+    });
     return { status: 'ran', asked, report, warnings: [] };
   };
   if (wanted === true) return run(false);

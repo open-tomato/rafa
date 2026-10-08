@@ -206,6 +206,10 @@ describe('rafa issue unblock with a config it cannot use', () => {
 function refreshConfig(number: number | null): NativeUnblockRefreshOptions['config'] {
   return {
     boardProjectNumber: number,
+    boardProjectRetries: false,
+    boardProjectRetryWaitSeconds: 1,
+    boardProjectWriteBatchSize: 5,
+    boardProjectWritePauseMs: 0,
     boardRelationships: 'native',
     roadmapIssue: null,
     releaseFragments: '.changes',

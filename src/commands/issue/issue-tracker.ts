@@ -121,6 +121,8 @@ export interface IssueSeams {
   readonly boardCache?: boolean;
   /** What `issue create --body-file=-` reads standard input through, whole. `Bun.stdin.text()` when left out. */
   readonly stdin?: () => Promise<string>;
+  /** The wait before `issue create` sends a retried project call again. `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** True when a roadmap reading over `seams` keeps its board listing; see {@link IssueSeams.boardCache}. */

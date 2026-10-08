@@ -39,7 +39,10 @@
  * opted in sees the merge's calls alone. Otherwise the listing, after
  * `gh repo view` in `native` mode (that adapter tells a foreign blocker
  * apart by the repository; `labels` reads it off the token), and then
- * the refresh's own calls.
+ * the refresh's own calls, all through the runner opened retrying
+ * (`../../board/project/project-runner.ts`): a call that failed on a
+ * network error is sent again, each retry reported to `retry.onRetry`
+ * before its wait.
  *
  * ## Never a failure of the merge
  *
@@ -62,12 +65,14 @@
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RefreshItems } from '../../board/project/add-issue.js';
+import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { BlockersReading } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { UnblockReport } from '../issue/unblock.js';
 
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
+import { openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
 import { selectBoardRelations } from '../../board/relations/select.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
@@ -89,6 +94,8 @@ export interface MergeProjectOptions {
   readonly warn: (line: string) => void;
   /** The refresh; `refreshProjectItems` when left out. */
   readonly refresh?: RefreshItems;
+  /** How a retried call waits and is reported; `Bun.sleep` and the active output when left out. */
+  readonly retry?: ProjectRunnerSeams;
 }
 
 /** What one refresh after a merge asked for. */
@@ -152,7 +159,7 @@ export async function refreshProjectAfterMerge(options: MergeProjectOptions): Pr
   const closed: readonly number[] = [...new Set(closedIssuesIn(options.body))];
   if (config.boardProjectNumber === null || closed.length === 0) return null;
 
-  const gh = options.openGh();
+  const gh = openProjectRunner(options.openGh(), config, options.retry);
   const wanted = new Set(closed);
   const warnings: string[] = [];
   let listed: readonly number[] = [];

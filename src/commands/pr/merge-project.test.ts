@@ -22,6 +22,9 @@
  *    right on one half alone. Each board holds a decoy the rule must
  *    leave out: a blocker of the same number on another repository, and
  *    in `labels` mode a `Blocked by:` line with no `spec:blocked` label.
+ *  - The listing timed out once is read again only with retries on: the
+ *    same runner under `board.project.retries: false` warns of the
+ *    failure and refreshes the closed issue alone.
  */
 import type { MergeProjectOptions, MergeProjectRefresh } from './merge-project.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -31,6 +34,8 @@ import type { UnblockOutcome, UnblockReport } from '../issue/unblock.js';
 import { describe, expect, it } from 'bun:test';
 
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { retryLine } from '../../board/project/project-runner.js';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
 
 import { blockingProblemLine, refreshProblemLine, refreshProjectAfterMerge } from './merge-project.js';
@@ -147,7 +152,7 @@ function fakeGh(board: readonly object[], listing?: GhResult): FakeGh {
 
 /** The config of a case, in `mode`, with `board.project.number` set to `number`. */
 function config(mode: 'labels' | 'native', number: number | null = PROJECT_NUMBER): RefreshConfig {
-  return { boardProjectNumber: number, boardRelationships: mode, roadmapIssue: null, releaseFragments: '.changes' };
+  return { boardProjectNumber: number, boardProjectRetries: false, boardProjectRetryWaitSeconds: 1, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: mode, roadmapIssue: null, releaseFragments: '.changes' };
 }
 
 /** How one case runs. */
@@ -318,5 +323,48 @@ describe('every failure is a warning', () => {
 
     expect(run.warned).toEqual([refreshProblemLine([20, 12, 13], 'repo view refused')]);
     expect(run.warned[0]).toContain('The project was not updated for #20, #12, #13: repo view refused.');
+  });
+});
+
+describe('a call failing on a network error', () => {
+  /** Runs the refresh over the labels board, its listing timing out once, with `retries` off the config. */
+  async function runFlaky(retries: number | false) {
+    const flaky = flakyGh(fakeGh(LABELS_BOARD).open(), [TIMED_OUT_STDERR], (args) => args.join(' ') === LABELS_LISTING);
+    const recorder = recordRetries();
+    const asked: (readonly number[])[] = [];
+    const warned: string[] = [];
+    await refreshProjectAfterMerge({
+      body: 'Closes #20',
+      config: { ...config('labels'), boardProjectRetries: retries, boardProjectRetryWaitSeconds: 2 },
+      openGh: () => flaky.gh,
+      unblocked: null,
+      warn: (line) => {
+        warned.push(line);
+      },
+      refresh: (_options, issues) => {
+        asked.push(issues);
+        return answering([])();
+      },
+      retry: recorder.seams,
+    });
+    return { flaky, recorder, asked, warned };
+  }
+
+  it('sends the listing again after the wait, reporting the retry, and refreshes the issues #20 was blocking', async () => {
+    const run = await runFlaky(3);
+
+    expect(run.recorder.notices().map(retryLine)).toEqual(['retrying issue list (1 of 3): operation timed out']);
+    expect(run.recorder.waits()).toEqual([2000]);
+    expect(run.asked).toEqual([[20, 12, 13]]);
+    expect(run.warned).toEqual([]);
+  });
+
+  it('control: with board.project.retries false the listing is read once and its failure is the warned line', async () => {
+    const run = await runFlaky(false);
+
+    expect(run.recorder.notices()).toEqual([]);
+    expect(run.flaky.sent()).toHaveLength(1);
+    expect(run.asked).toEqual([[20]]);
+    expect(run.warned[0]).toContain('operation timed out');
   });
 });

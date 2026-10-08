@@ -1,6 +1,7 @@
 /**
  * Tests for the refresh's warning lines (`refresh-warnings.ts`): each of
- * the four lines names its fix, and the scope reading tells the
+ * the four lines of "What can go wrong" names its fix, the not-refreshed
+ * line names the issue and the reason, and the scope reading tells the
  * `project` scope apart from other refusals. The scope refusals here are
  * GitHub's documented wording, NOT readings; see the module note there.
  */
@@ -15,6 +16,7 @@ import {
   INIT_BOARD_FIX,
   isMissingProjectScope,
   notFoundWarning,
+  notRefreshedWarning,
   PROJECT_SCOPE_FIX,
   rateLimitWarning,
   scopeWarning,
@@ -73,8 +75,19 @@ describe('the warning lines', () => {
     expect(skippedFieldWarning(missingRank())).toContain(DOCTOR_FIX);
   });
 
+  it('names the issue and the reason on the not-refreshed line', () => {
+    expect(notRefreshedWarning({ number: 485, reason: 'gh api graphql failed: read: operation timed out' }))
+      .toBe('#485 not refreshed: gh api graphql failed: read: operation timed out');
+  });
+
   it('writes each line on one line', () => {
-    const lines = [scopeWarning(), rateLimitWarning(3), notFoundWarning({ owner: 'acme', number: 1 }), skippedFieldWarning(missingRank())];
+    const lines = [
+      scopeWarning(),
+      rateLimitWarning(3),
+      notFoundWarning({ owner: 'acme', number: 1 }),
+      skippedFieldWarning(missingRank()),
+      notRefreshedWarning({ number: 1, reason: 'a reason' }),
+    ];
     expect(lines.filter((line) => line.includes('\n'))).toEqual([]);
   });
 });

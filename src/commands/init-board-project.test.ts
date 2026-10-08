@@ -43,10 +43,18 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
+import { recordingFeed } from '../board/project/progress-fake.js';
+import { commandProgressFeed } from '../board/project/progress.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
+import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
+import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
+import { callNumber } from '../board/project/retry.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
+import { createBoardSyncCommand } from './board/sync.js';
 import {
   PROJECT_HEADING,
   projectPartLine,
@@ -56,8 +64,6 @@ import {
   renderProjectSetup,
   setUpProject,
 } from './init-board-project.js';
-
-const { PROJECT_WRITE_PAUSE_MS } = await import('../board/project/port.js');
 
 /** The repository's owner, who receives the copy. */
 const OWNER = 'open-tomato';
@@ -96,6 +102,10 @@ const ADDED: readonly number[] = [1, 10, 30, 40, 50];
 /** The config every case reads but where a case says otherwise. */
 const CONFIG: ProjectSetupConfig = {
   boardProjectNumber: null,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardProjectTemplate: TEMPLATE_URL,
   boardRelationships: 'labels',
   roadmapIssue: null,
@@ -156,6 +166,10 @@ interface RouterOptions {
   readonly rateLimitAfter?: number;
   /** Answers the refusal's stderr for a call this refuses, by its argv and how many matching calls came before it. */
   readonly refuse?: (args: readonly string[]) => string | null;
+  /** The issues whose labels list names a cursor it has already read, so their facts are refused. */
+  readonly repeating?: readonly number[];
+  /** Issues planted beyond the board of the module note, open and on no roadmap line. */
+  readonly extraIssues?: readonly PlantedIssue[];
 }
 
 /** The router, the project fake behind it, and what was recorded. */
@@ -167,6 +181,7 @@ interface Router {
 
 /** The router of the module note. */
 function route(options: RouterOptions = {}): Router {
+  const issues = [...ISSUES, ...(options.extraIssues ?? [])];
   const project = createFakeProjectGh({
     ...options.rateLimitAfter === undefined
       ? {}
@@ -178,10 +193,13 @@ function route(options: RouterOptions = {}): Router {
       ...(options.held ?? []).map(({ number, items = [] }) => ({ owner: OWNER, number, items: items.map((issue) => ({ number: issue })) })),
     ],
     owners: [OWNER, TEMPLATE.owner],
-    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: ISSUES.map(({ number }) => number) }],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: issues.map(({ number }) => number) }],
   });
+  const repeating = new Set(options.repeating ?? []);
   const facts = createFakeFactsGh({
-    issues: ISSUES,
+    issues: issues.map((issue) => (repeating.has(issue.number)
+      ? { ...issue, repeatsCursor: 'labels' as const }
+      : issue)),
     pulls: [{ number: 51, state: 'MERGED', baseRefName: 'main', headRefOid: 'head51', files: [{ path: '.changes/rafa-1.md', changeType: 'ADDED' }] }],
     trees: { head51: { '.changes/rafa-1.md': FRAGMENT }, main: { '.changes/rafa-1.md': FRAGMENT } },
   });
@@ -196,9 +214,9 @@ function route(options: RouterOptions = {}): Router {
     }
     if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
     if (line.startsWith('issue list --label type:roadmap --state open')) {
-      return Promise.resolve(answered(ISSUES.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
+      return Promise.resolve(answered(issues.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
     }
-    if (line.startsWith('issue list --state all')) return Promise.resolve(answered(ISSUES.map(listed)));
+    if (line.startsWith('issue list --state all')) return Promise.resolve(answered(issues.map(listed)));
     if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
     if (args[0] === 'api') return project.gh(args);
     return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
@@ -297,17 +315,19 @@ describe('setUpProject, a first run', () => {
     expect(mutations(router.calls()).filter((name) => name === 'addProjectV2ItemById')).toHaveLength(ADDED.length);
   });
 
-  it('paces the adds one write pause apart, with none before the first', async () => {
+  it('paces the adds board.project.writePauseMs apart, with none before the first', async () => {
     const router = route();
     const pausedAfter: number[] = [];
+    const pauses = new Set<number>();
     const sleep = (ms: number): Promise<void> => {
-      expect(ms).toBe(PROJECT_WRITE_PAUSE_MS);
+      pauses.add(ms);
       pausedAfter.push(router.calls().length);
       return Promise.resolve();
     };
 
-    await setUpProject(options(router, rootHolding('paced'), {}, sleep));
+    await setUpProject(options(router, rootHolding('paced'), { boardProjectWritePauseMs: 250 }, sleep));
 
+    expect([...pauses]).toEqual([250]);
     const adds = router.calls().flatMap((args, index) => (args.some((arg) => arg.includes('addProjectV2ItemById('))
       ? [index]
       : []));
@@ -504,6 +524,8 @@ describe('setUpProject, the issues and fields parts', () => {
 
     expect(report.parts[3]?.outcome).toBe('refused');
     expect(report.parts[3]?.detail).toContain('5 issues were not updated');
+    expect(report.parts[3]?.listed).toBeUndefined();
+    expect(report.problems).toEqual([]);
     expect(report.parts[4]?.outcome).toBe('created');
   });
 
@@ -522,6 +544,328 @@ describe('setUpProject, the issues and fields parts', () => {
   });
 });
 
+describe('setUpProject, the fields part over refused issues', () => {
+  /** The part rows `report` renders from the fields part on, up to the number's row. */
+  function fieldsLines(report: ProjectSetupReport): readonly string[] {
+    const lines = renderProjectSetup(report);
+    const from = lines.findIndex((line) => line.includes('project fields'));
+    return lines.slice(from, lines.findIndex((line) => line.includes('board.project.number')));
+  }
+
+  it('reads created with #40 listed under it, filling the four other issues, beside a run refusing none', async () => {
+    const control = await setUpProject(options(route(), rootHolding('none-refused')));
+    const router = route({ repeating: [40] });
+
+    const report = await setUpProject(options(router, rootHolding('one-refused')));
+
+    expect(control.parts[3]?.outcome).toBe('created');
+    expect(control.parts[3]?.listed).toBeUndefined();
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.detail).toEndWith('; 1 issue not refreshed');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#40 not refreshed: ');
+    expect(report.problems).toEqual([]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect([...held.keys()]).toEqual([...ADDED]);
+    expect(held.get(30)?.get('Stage')).toBe('Done');
+    expect(held.get(50)?.get('Stage')).toBe('In review');
+    expect(held.get(40)?.get('Stage')).toBeUndefined();
+    const lines = fieldsLines(report);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toStartWith('  created  project fields: wrote ');
+    expect(lines[1]).toBe(`           ${report.parts[3]?.listed?.[0] ?? ''}`);
+  });
+
+  it('reads present with #40 still listed on a second run that has nothing else to write', async () => {
+    const router = route({ repeating: [40] });
+    const root = rootHolding('refused-again');
+    await setUpProject(options(router, root));
+    expect(mutations(router.calls())).toContain('updateProjectV2ItemFieldValue');
+    const before = router.calls().length;
+
+    const report = await setUpProject(options(router, root, { boardProjectNumber: savedNumber(root) }));
+
+    expect(mutations(router.calls().slice(before))).toEqual([]);
+    expect(projectSetupChanged(report)).toBe(false);
+    expect(report.parts[3]?.outcome).toBe('present');
+    expect(report.parts[3]?.detail).toBe('every value is as the rules give it; 1 issue not refreshed');
+    expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual(['#40 not refreshed']);
+    expect(fieldsLines(report)).toEqual(['  present  project fields', `           ${report.parts[3]?.listed?.[0] ?? ''}`]);
+  });
+
+  it('reads refused only when every issue the project holds was refused, each listed lowest first', async () => {
+    const router = route({ repeating: ISSUES.map(({ number }) => number) });
+
+    const report = await setUpProject(options(router, rootHolding('all-refused')));
+
+    expect(report.parts[2]?.detail).toBe('added 4 issues to the project');
+    expect(report.parts[3]?.outcome).toBe('refused');
+    expect(report.parts[3]?.detail).toBe('no item was filled: 4 issues not refreshed');
+    expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual([1, 10, 30, 40].map((issue) => `#${String(issue)} not refreshed`));
+    expect(mutations(router.calls())).not.toContain('updateProjectV2ItemFieldValue');
+    expect(report.parts[4]?.outcome).toBe('created');
+  });
+});
+
+describe('setUpProject, an add retried over a network timeout', () => {
+  it('retries a timed-out add twice then succeeds, printing both retry lines, with the items part created', async () => {
+    const router = route();
+    const flaky = flakyGh(router.gh, [TIMED_OUT_STDERR, TIMED_OUT_STDERR], (args) => callNumber(args) === 10);
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+    const retryConfig = { boardProjectRetries: 3, boardProjectRetryWaitSeconds: 1 };
+    const gh = openProjectRunner(flaky.gh, retryConfig, { sleep: () => Promise.resolve(), onRetry: retryReporter(output, 'text') });
+    const pacing = paced();
+
+    const report = await setUpProject({ root: rootHolding('retry-add'), config: { ...CONFIG, ...retryConfig }, gh, sleep: pacing.sleep });
+
+    expect(report.parts[2]?.outcome).toBe('created');
+    expect(report.parts[2]?.detail).toBe('added 5 issues to the project');
+    expect(printed).toEqual([
+      'retrying #10 (1 of 3): operation timed out',
+      'retrying #10 (2 of 3): operation timed out',
+    ]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect([...held.keys()]).toEqual([...ADDED]);
+  });
+});
+
+describe('setUpProject, the fields part over a NOT_FOUND facts read', () => {
+  it('refuses #40 alone on NOT_FOUND, fills the rest, and prints no retry line', async () => {
+    const router = route({
+      refuse: (args) => (args.some((arg) => arg.startsWith('query=') && arg.includes('issue(number: 40)'))
+        ? 'GraphQL: Could not resolve to an Issue with the number of 40. (NOT_FOUND)\n'
+        : null),
+    });
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+    const retryConfig = { boardProjectRetries: 3, boardProjectRetryWaitSeconds: 1 };
+    const gh = openProjectRunner(router.gh, retryConfig, { sleep: () => Promise.resolve(), onRetry: retryReporter(output, 'text') });
+    const pacing = paced();
+
+    const report = await setUpProject({ root: rootHolding('not-found'), config: { ...CONFIG, ...retryConfig }, gh, sleep: pacing.sleep });
+
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#40 not refreshed: ');
+    expect(printed).toEqual([]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect(held.get(30)?.get('Stage')).toBe('Done');
+    expect(held.get(50)?.get('Stage')).toBe('In review');
+    expect(held.get(40)?.get('Stage')).toBeUndefined();
+  });
+});
+
+describe('setUpProject and rafa board sync, over an issue of 116 cross-references and one whose cursor repeats', () => {
+  /** The subject `board sync` is dispatched under. */
+  const BOARD_SUBJECT = { name: 'board', summary: 'the boards' };
+
+  it('fills the busy issue, refuses alone and names the one whose cursor repeats, reads the fields part created, and syncs with exit code 0', async () => {
+    const router = route({
+      extraIssues: [
+        { number: 80, state: 'OPEN', labels: ['needs-triage'], issueMentions: 116 },
+        { number: 90, state: 'OPEN', labels: ['needs-triage'] },
+      ],
+      repeating: [90],
+    });
+    const project = plantProject(mkdtempSync(join(tempBase, 'paging-')));
+
+    const report = await setUpProject(options(router, project.root));
+
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#90 not refreshed: ');
+    const held = await heldOn(router, COPY_NUMBER);
+    expect(held.get(80)?.get('Stage')).toBe('Triage');
+    expect(held.get(90)?.get('Stage')).toBeUndefined();
+
+    const sync = await dispatchInProject(
+      ['board', 'sync'],
+      [BOARD_SUBJECT],
+      [createBoardSyncCommand({ gh: router.gh, sleep: () => Promise.resolve() })],
+      project,
+    );
+
+    expect(sync.exitCode).toBe(0);
+    expect(sync.stdout).toContain('#90 not refreshed: ');
+  });
+});
+
+describe('setUpProject, the phases it feeds', () => {
+  /** The start and end lines of `steps`, the progress lines left out. */
+  function bounds(steps: readonly string[]): readonly string[] {
+    return steps.filter((step) => step.includes(' start ') || step.includes(' end '));
+  }
+
+  it('adds the five issues one at a time, then reads their facts and writes their fields as the refresh feeds them', async () => {
+    const router = route();
+    const recording = recordingFeed();
+
+    const report = await setUpProject({ ...options(router, rootHolding('phases')), progress: recording.feed });
+
+    expect(outcomes(report)['items']).toBe('created');
+    expect(recording.steps().filter((step) => step.startsWith('adds '))).toEqual([
+      'adds start 0/5',
+      'adds progress 1/5',
+      'adds progress 2/5',
+      'adds progress 3/5',
+      'adds progress 4/5',
+      'adds progress 5/5',
+      'adds end 5/5 0 refused',
+    ]);
+    const writes = recording.steps().find((step) => step.startsWith('writes start ')) ?? '';
+    const total = writes.slice('writes start 0/'.length);
+    expect(Number(total)).toBeGreaterThan(0);
+    expect(bounds(recording.steps())).toEqual([
+      'adds start 0/5',
+      'adds end 5/5 0 refused',
+      'facts start 0/5',
+      'facts end 5/5 0 refused',
+      `writes start 0/${total}`,
+      `writes end ${total}/${total} 0 refused`,
+    ]);
+  });
+
+  it('ends the adds of a refused add counting the two added and the three left, beside the run above', async () => {
+    let adds = 0;
+    const router = route({ refuse: (args) => {
+      if (!args.some((arg) => arg.includes('addProjectV2ItemById('))) return null;
+      adds += 1;
+      return adds === 3
+        ? 'GraphQL: something went wrong\n'
+        : null;
+    } });
+    const recording = recordingFeed();
+
+    const report = await setUpProject({ ...options(router, rootHolding('phases-refused')), progress: recording.feed });
+
+    expect(report.parts[2]?.outcome).toBe('refused');
+    expect(bounds(recording.steps()).slice(0, 4)).toEqual(['adds start 0/5', 'adds end 2/5 3 refused', 'facts start 0/2', 'facts end 2/2 0 refused']);
+  });
+
+  it('opens no adds phase on a second run with nothing missing, the facts read still fed', async () => {
+    const router = route();
+    const root = rootHolding('phases-second');
+    const first = await setUpProject(options(router, root));
+    const recording = recordingFeed();
+
+    const second = await setUpProject({ ...options(router, root, { boardProjectNumber: first.project?.number ?? null }), progress: recording.feed });
+
+    expect(outcomes(second)['items']).toBe('present');
+    expect(bounds(recording.steps())).toEqual(['facts start 0/5', 'facts end 5/5 0 refused']);
+  });
+});
+
+describe('setUpProject and rafa board sync, the progress of all three phases rendered through the command', () => {
+  /** The subject `board sync` is dispatched under. */
+  const BOARD_SUBJECT = { name: 'board', summary: 'the boards' };
+
+  /** A clock advancing one second on every read, so every advance prints a line at `progressSeconds: 1`. */
+  function steppingClock(): () => number {
+    let at = 0;
+    return () => {
+      at += 1000;
+      return at;
+    };
+  }
+
+  /** The start, middle and end lines of a first run over the board of the module note, every phase timed by {@link steppingClock}. */
+  const PHASE_LINES: readonly string[] = [
+    'adding issues: 5',
+    'adding issues: 1/5, 1s',
+    'adding issues: 2/5, 2s',
+    'adding issues: 3/5, 3s',
+    'adding issues: 4/5, 4s',
+    'adding issues: 5/5, 5s',
+    'adding issues: 5/5, 0 refused, 6s',
+    'reading facts: 5',
+    'reading facts: 5/5, 1s',
+    'reading facts: 5/5, 0 refused, 2s',
+    'writing fields: 7',
+    'writing fields: 5/7, 1s',
+    'writing fields: 7/7, 2s',
+    'writing fields: 7/7, 0 refused, 3s',
+  ];
+
+  /** `PHASE_LINES`, as the json `progress` event's data names each. */
+  const PHASE_EVENT_DATA: readonly Readonly<Record<string, unknown>>[] = [
+    { phase: 'adds', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+    { phase: 'adds', step: 'progress', done: 1, total: 5, elapsedMs: 1000 },
+    { phase: 'adds', step: 'progress', done: 2, total: 5, elapsedMs: 2000 },
+    { phase: 'adds', step: 'progress', done: 3, total: 5, elapsedMs: 3000 },
+    { phase: 'adds', step: 'progress', done: 4, total: 5, elapsedMs: 4000 },
+    { phase: 'adds', step: 'progress', done: 5, total: 5, elapsedMs: 5000 },
+    { phase: 'adds', step: 'end', done: 5, total: 5, elapsedMs: 6000, refused: 0 },
+    { phase: 'facts', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+    { phase: 'facts', step: 'progress', done: 5, total: 5, elapsedMs: 1000 },
+    { phase: 'facts', step: 'end', done: 5, total: 5, elapsedMs: 2000, refused: 0 },
+    { phase: 'writes', step: 'start', done: 0, total: 7, elapsedMs: 0 },
+    { phase: 'writes', step: 'progress', done: 5, total: 7, elapsedMs: 1000 },
+    { phase: 'writes', step: 'progress', done: 7, total: 7, elapsedMs: 2000 },
+    { phase: 'writes', step: 'end', done: 7, total: 7, elapsedMs: 3000, refused: 0 },
+  ];
+
+  /** The lines of `lines` that open with one of the three phase labels. */
+  function phaseLinesOf(lines: readonly string[]): readonly string[] {
+    const labels = ['adding issues: ', 'reading facts: ', 'writing fields: '];
+    return lines.filter((line) => labels.some((label) => line.startsWith(label)));
+  }
+
+  it('prints the start, a middle and the end line of the adds, the facts and the writes phases, driving the init part in text mode', async () => {
+    const router = route();
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+
+    const report = await setUpProject({
+      ...options(router, rootHolding('progress-text')),
+      progress: commandProgressFeed(output, 'text', 1, { now: steppingClock() }),
+    });
+
+    expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
+    expect(printed).toEqual([...PHASE_LINES]);
+  });
+
+  it('writes the same counts as progress events, ahead of nothing else, driving the init part in json mode', async () => {
+    const router = route();
+    const events: { summary?: string; data?: unknown }[] = [];
+    const output = sinkOutput({ event: (event) => events.push(event as { summary?: string; data?: unknown }) });
+
+    const report = await setUpProject({
+      ...options(router, rootHolding('progress-json')),
+      progress: commandProgressFeed(output, 'json', 1, { now: steppingClock() }),
+    });
+
+    expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
+    expect(events.map((event) => event.summary)).toEqual([...PHASE_LINES]);
+    expect(events.map((event) => event.data)).toEqual([...PHASE_EVENT_DATA]);
+  });
+
+  it('drives rafa board sync next, its own facts phase printed the same way, with the same counts between text and json mode', async () => {
+    // The project is already fully in step after the run above, so the sync's writes and adds phases open
+    // nothing to print (`./sync.ts`, `./refresh.ts`: a phase with nothing to write or add is never opened);
+    // its facts phase still reads every item's facts, and prints the start, a middle and the end line.
+    const router = route();
+    const root = rootHolding('progress-sync', 'version: 1\nboard:\n  project:\n    progressSeconds: 1\n');
+    await setUpProject(options(router, root));
+    const project = { root, home: mkdtempSync(join(tempBase, 'progress-sync-home-')) };
+    const command = (): ReturnType<typeof createBoardSyncCommand> => createBoardSyncCommand({ gh: router.gh, sleep: () => Promise.resolve(), now: steppingClock() });
+
+    const text = await dispatchInProject(['board', 'sync'], [BOARD_SUBJECT], [command()], project);
+    const json = await dispatchInProject(['board', 'sync', '--output=json'], [BOARD_SUBJECT], [command()], project);
+
+    expect(text.exitCode).toBe(0);
+    expect(json.exitCode).toBe(0);
+    const textLines = phaseLinesOf(text.stdout.trimEnd().split('\n'));
+    expect(textLines).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 1s',
+      'reading facts: 5/5, 0 refused, 2s',
+    ]);
+    const jsonProgress = eventsOf(json.stdout).filter((event) => event.type === 'event' && event.name === 'progress');
+    expect(jsonProgress.map((event) => (event as { summary?: string }).summary)).toEqual([...textLines]);
+  });
+});
+
 describe('projectRefOf', () => {
   it('reads an organisation\'s and a user\'s project URL, and nothing else', () => {
     expect(projectRefOf('https://github.com/orgs/acme/projects/2')).toEqual({ owner: 'acme', number: 2 });
@@ -532,12 +876,13 @@ describe('projectRefOf', () => {
 });
 
 describe('renderProjectSetup', () => {
-  it('writes the heading, a row per part with the detail of every part not present, then each problem', () => {
+  it('writes the heading, a row per part with the detail of every part not present and its listed lines under it, then each problem', () => {
     const report: ProjectSetupReport = {
       parts: [
         { kind: 'scope', name: 'project scope', outcome: 'present', detail: 'held' },
         { kind: 'project', name: 'project', outcome: 'created', detail: 'copied' },
         { kind: 'items', name: 'project issues', outcome: 'refused', detail: 'why' },
+        { kind: 'fields', name: 'project fields', outcome: 'present', detail: 'unshown', listed: ['#4 not refreshed: a reason'] },
       ],
       project: null,
       problems: ['a skipped field'],
@@ -548,6 +893,8 @@ describe('renderProjectSetup', () => {
       '  present  project scope',
       '  created  project: copied',
       '  refused  project issues: why',
+      '  present  project fields',
+      '           #4 not refreshed: a reason',
       'a skipped field',
     ]);
     expect(projectPartLine({ kind: 'fields', name: 'project fields', outcome: 'present', detail: 'unshown' })).toBe('  present  project fields');

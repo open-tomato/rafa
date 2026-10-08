@@ -89,8 +89,14 @@ fragment is still on the base branch). It runs each value through its rule
 function and calls the project port's write functions to set only the values
 that are different from what the project holds.
 
-Every failure in the refresh becomes a warning line, never an exception. The
-caller keeps its own exit code whatever the warnings say.
+### Lists read to their end
+
+The facts reader reads an issue's labels, closing references and
+cross-references by following each list's `after:` cursor when a list has a
+next page, the way it reads a pull request's files. Only issues with a next
+page cost extra requests. An issue with many cross-references (like rafa's
+issue #485, with 116) is read in full with the cursor. A cursor that
+repeats names the issue and the list and refuses that issue alone.
 
 ### The callers
 
@@ -108,6 +114,42 @@ labels-mode `issue unblock` without editing each caller.
 Native-mode blocker writes do not go through `IssueBoard`, so
 `src/commands/issue/unblock-native.ts` calls the refresh itself.
 
+### Network errors and retry
+
+The project's `GhRunner` seam retries a call that failed on a network error
+before it counts as failed. Retried errors are a timeout (`operation timed
+out`, `i/o timeout`, `TLS handshake timeout`), a reset or closed connection
+(`connection reset`, `EOF`), and an HTTP 502, 503 or 504 from GitHub.
+
+Never retried are answers GitHub gave on purpose: a GraphQL error (`NOT_FOUND`,
+a bad id), a missing scope, or a rate-limit refusal, which keeps its own
+warning from the project spec. An unknown error counts as permanent.
+
+The wait before each retry is `board.project.retryWaitSeconds`, then twice
+that, and so on; each call stops after `board.project.retries`. With the
+defaults one call waits 2 + 4 + 8 = 14 s at most. `retries: false` sends
+every call once.
+
+A retried call prints one line in text mode, `retrying #725 (1 of 3):
+operation timed out`, and one event in json mode. The line names the issue
+when the call carries one, otherwise what the call reads.
+
+The adds, the facts reads, the field writes and `rafa board sync` all go
+through the seam, so all of them retry.
+
+### Progress lines and events
+
+Three phases print progress: adding the issues, reading their facts, and
+writing their fields. Each prints a start line with its total, `adding
+issues: 283`, then a line at most every `board.project.progressSeconds`
+with the count and the time so far, `adding issues: 146/283, 6m 40s`, and
+an end line with the count, the refused count and the time. A pause for
+GitHub's write limit prints `waiting <n> s for GitHub's write limit`.
+
+`progressSeconds: false` drops the lines between; the start and end lines
+stay. In json mode each line is a `progress` event with the phase, done,
+total and elapsed milliseconds. The same lines come from `rafa board sync`.
+
 Commands that call the refresh outside the label wrapper:
 - `rafa issue create` — refresh the new issue
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
@@ -120,9 +162,21 @@ Commands that call the refresh outside the label wrapper:
 - `rafa epic new`, `promote`, `defer`, `move`, `cancel`, `close` — refresh
   the epic, its members and every item whose Rank shifted
 
+### Per-issue refusal and its line
+
+When an issue's facts cannot be read (a call that still failed after its
+retries, or an answer that is not the recorded shape), `refreshProjectItems`
+writes the fields of every issue it has facts for and reports each refused
+issue one line each: `#485 not refreshed: operation timed out`. The init part
+`project fields` reads `created` when at least one item was filled, with the
+refused issues listed under it, and `refused` only when none could be. `rafa
+board sync` exits 0 with the same warning lines, so its next run picks the
+refused issues up.
+
 ### The warnings
 
-Four kinds of failure are turned into warnings that name their fix:
+Five kinds of failure are turned into warnings, each naming its fix where it
+has one:
 
 | Failure | Warning | Fix |
 | --- | --- | --- |
@@ -130,10 +184,12 @@ Four kinds of failure are turned into warnings that name their fix:
 | A write refused by the GitHub rate limit | how many issues were not updated | `rafa board sync` |
 | `board.project.number` names no project | the number and that it was not found | `rafa init --board` |
 | A field or option renamed on the project | which field was skipped | `rafa doctor` |
+| An issue whose facts could not be read | `#<n> not refreshed: <reason>` | none: the next refresh or `rafa board sync` reads it again |
 
 When a field is renamed, the refresh skips that field and writes the other
-four. All four warnings keep the caller's exit code and are printed after the
-command's own output.
+four. When one issue's facts cannot be read, that issue alone is left as it
+was and the others are written. All five warnings keep the caller's exit code
+and are printed after the command's own output.
 
 ### Configuration
 
@@ -143,17 +199,45 @@ own copy of the template, keeping the five field names and their options
 unchanged. `board.project.number` is unset by default and is set by `rafa init
 --board --project` after copying the template to the repository's owner.
 
+The five `board.project.*` keys for retry and progress, all optional, are under
+`board.project.`:
+
+| Key | Counts | Default | Schema |
+|---|---|---|---|
+| `retries` | tries after a failure, per call | 3 | 1 to 10; `false` turns retrying off; 0 and negatives refused |
+| `retryWaitSeconds` | the first wait; each later one doubles | 2 | 1 to 60 |
+| `progressSeconds` | the most time between two progress lines | 10 | 1 to 300; `false` turns the lines off, the start and end lines stay |
+| `writeBatchSize` | field writes per request | 20 | 1 to 100 |
+| `writePauseMs` | the pause between two write requests | 1000 | 0 to 60000 |
+
+`writeBatchSize` and `writePauseMs` replace the two constants in
+`src/board/project/port.ts`, with the same defaults.
+
 Config examples, from empty up:
 
 ```yaml
-# nothing set: init asks once; no project
+# nothing set: 3 retries from a 2 s wait, a progress line at most every
+# 10 s, 20 writes a request, 1 s between requests
+```
 
+```yaml
 board:
   project:
     number: 6        # written by rafa init --board --project
+```
 
+```yaml
 board:
   project:
     template: https://github.com/orgs/acme/projects/2   # the team's copy
     number: 6
+    progressSeconds: 30     # a quieter log for a loop host
+```
+
+```yaml
+board:
+  project:
+    retries: 5
+    retryWaitSeconds: 5     # a slow or flaky network
+    writePauseMs: 2000      # gentler on GitHub's write limit
 ```

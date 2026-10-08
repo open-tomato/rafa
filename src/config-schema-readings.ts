@@ -81,6 +81,11 @@
  *     section gives: every command that refreshes the project must
  *     write the same one, which one run's flag would split.
  *
+ * The five limits of the same section — `board.project.retries`,
+ * `retryWaitSeconds`, `progressSeconds`, `writeBatchSize` and
+ * `writePauseMs` — are argued in `config-schema-board-project.ts`'s
+ * note, beside their fields, defaults, readers and specs.
+ *
  * ## The `roadmap` section
  *
  * `.rafa/specs/rafa-20-pr-commands.md` has `plan create --next` read its

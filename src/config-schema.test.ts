@@ -17,7 +17,7 @@
  * {@link SETTINGS}, so a module that renames a key or drops a section
  * fails rather than agreeing with itself.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { CommandLineSetting, ConfigSetting } from './config-schema.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -73,6 +73,11 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['boardRelationships', 'board.relationships'],
   ['boardProjectTemplate', 'board.project.template'],
   ['boardProjectNumber', 'board.project.number'],
+  ['boardProjectRetries', 'board.project.retries'],
+  ['boardProjectRetryWaitSeconds', 'board.project.retryWaitSeconds'],
+  ['boardProjectProgressSeconds', 'board.project.progressSeconds'],
+  ['boardProjectWriteBatchSize', 'board.project.writeBatchSize'],
+  ['boardProjectWritePauseMs', 'board.project.writePauseMs'],
   ['roadmapIssue', 'roadmap.issue'],
   ['claimsStaleAfter', 'claims.staleAfter'],
   ['claimsAhead', 'claims.ahead'],
@@ -106,7 +111,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
-const COMMAND_LINE: readonly ConfigSetting[] = [
+const COMMAND_LINE: readonly CommandLineSetting[] = [
   'store',
   'inject',
   'planDir',
