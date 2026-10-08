@@ -4,8 +4,11 @@
  * abbreviated commit name taken, and a base that is not a commit name
  * refused; then the always-run line over the `tests.alwaysRun` files,
  * resolved against a stubbed `git ls-files` for the default, `[]` and a
- * glob matching nothing. Where `buildTaskPrompt` places the lines is
- * driven in `dispatch.test.ts`.
+ * glob matching nothing; then the type-check line over the runner's
+ * type step recipe, none without one. Where `buildTaskPrompt` places the
+ * lines is driven in `dispatch.test.ts`, and that a session following
+ * the type-check line as written reads the errors the step reads, over
+ * a real tsc, in `type-step.test.ts`.
  */
 
 import type { Output } from '../ports/index.js';
@@ -23,7 +26,11 @@ import {
   BASE_PROMPT_PREFIX,
   baseLines,
   readAlwaysRunFiles,
+  TYPE_CHECK_FILE,
+  TYPE_CHECK_SCRATCH,
+  typeCheckLines,
 } from './task-gate-lines.js';
+import { scratchTsconfigFields, tscArgv } from './type-step.js';
 
 describe('baseLines, handing the task its base commit', () => {
   const BASE = 'a5a383a0c3f1e2d4b6a798011223344556677889';
@@ -134,5 +141,42 @@ describe('the always-run line, over the tests.alwaysRun files', () => {
 
     expect(files).toEqual([]);
     expect(lines.join('')).toContain('git ls-files did not answer (fatal: not a git repository)');
+  });
+});
+
+describe('the type-check line, over the runner\'s type step recipe', () => {
+  const RECIPE = { checkout: '/work/repo', modules: '/work/node_modules' };
+
+  it('names the scratch tsconfig and the tsc run the type step makes, the session\'s test files in place of the placeholder', () => {
+    expect(typeCheckLines(RECIPE)).toEqual([
+      'Before you report done, type-check the `*.test.ts` files your change adds or edits, if any, as the runner\'s type step will:'
+      + ' write `{"extends":"/work/repo/tsconfig.json","compilerOptions":{"typeRoots":["/work/node_modules/@types"]},'
+      + '"files":["/work/repo/<test file>"],"include":[]}` to `tsconfig.json` in a new directory outside the checkout,'
+      + ' one `files` entry per such file with its path in place of `<test file>`, then run'
+      + ' `/work/node_modules/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` in the checkout.'
+      + ' Fix each error it reports in those files that the base commit did not hold.',
+    ]);
+  });
+
+  it('renders the step\'s own scratch fields and argv, so the line and the step cannot drift', () => {
+    const line = typeCheckLines(RECIPE)[0] ?? '';
+
+    expect(line).toContain(`\`${JSON.stringify(scratchTsconfigFields(RECIPE.checkout, [TYPE_CHECK_FILE], RECIPE.modules))}\``);
+    expect(line).toContain(`\`${tscArgv(RECIPE.modules, TYPE_CHECK_SCRATCH).join(' ')}\``);
+
+    // The control: another node_modules is another tsc and other typeRoots.
+    const other = typeCheckLines({ ...RECIPE, modules: '/elsewhere/node_modules' })[0] ?? '';
+    expect(other).not.toContain('/work/node_modules');
+    expect(other).toContain('`/elsewhere/node_modules/.bin/tsc -p');
+  });
+
+  it('single-quotes a tsc path a shell would split', () => {
+    expect(typeCheckLines({ ...RECIPE, modules: '/my work/node_modules' })[0]).toContain(
+      '`\'/my work/node_modules/.bin/tsc\' -p <that tsconfig.json> --noEmit --pretty false`',
+    );
+  });
+
+  it('gives no line without a recipe, where the type step runs nothing', () => {
+    expect(typeCheckLines(null)).toEqual([]);
   });
 });

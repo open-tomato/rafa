@@ -86,7 +86,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './dispatch.js';
-import { alwaysRunLines, BASE_PROMPT_PREFIX } from './task-gate-lines.js';
+import { alwaysRunLines, BASE_PROMPT_PREFIX, typeCheckLines } from './task-gate-lines.js';
 
 /** A fence, kept out of the template literals. */
 const FENCE = '```';
@@ -1145,6 +1145,62 @@ describe('buildTaskPrompt and dispatchTask, naming the tests.alwaysRun files', (
 
     expect((await dispatchWith([SWEEP])).prompt).toContain(`\`bun test ./${SWEEP}\``);
     expect((await dispatchWith()).prompt).not.toContain('tests.alwaysRun');
+  });
+});
+
+describe('buildTaskPrompt and dispatchTask, naming the type check the runner will run', () => {
+  const TASK = 'Make the widget round';
+  const PROMPT_MD = '# PROMPT.md\nDo the task.';
+  const PLAN = '# Plan\n- [ ] Make the widget round';
+  const BASE = 'a5a383a0c3f1e2d4b6a798011223344556677889';
+  const SWEEP = 'src/tests/repo-hygiene.sweep.test.ts';
+  const RECIPE = { checkout: '/work/repo', modules: '/work/node_modules' };
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  it('places the type-check line right after the always-run line and ahead of the blank line', () => {
+    const lines = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP], RECIPE).split('\n');
+
+    expect(lines[3]).toBe(alwaysRunLines([SWEEP])[0] ?? 'no line');
+    expect(lines[4]).toBe(typeCheckLines(RECIPE)[0] ?? 'no line');
+    expect(lines[4]).toContain('`/work/node_modules/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false`');
+    expect(lines[5]).toBe('');
+  });
+
+  it('holds the prompt unchanged with no recipe, against a recipe that changes it', () => {
+    const before = buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP]);
+
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP], null)).toBe(before);
+    expect(buildTaskPrompt(TASK, PROMPT_MD, PLAN, [], null, NO_TASK_SECTIONS, BASE, [], [SWEEP], RECIPE)).not.toBe(before);
+  });
+
+  it('hands the runner a prompt naming the type check its dispatch was given, and none without one', async () => {
+    const root = freshRoot();
+    setActiveOutput(sinkOutput({}));
+    const dispatchWith = (typeCheck?: typeof RECIPE | null): ReturnType<typeof dispatchTask> => dispatchTask({
+      taskInfo: { task: LINE, lineNum: 0, status: 'unchecked' },
+      promptContent: 'The loop commits.',
+      planContent: `- [ ] ${LINE}\n`,
+      inject: 'full',
+      repoRoot: root,
+      checkout: root,
+      home: join(root, 'home'),
+      settingSources: ['project', 'local'],
+      serving: null,
+      handout: null,
+      base: BASE,
+      ...(typeCheck === undefined
+        ? {}
+        : { typeCheck }),
+      run: () => Promise.resolve({ exitCode: 0, stdout: '' }),
+      newSessionId: () => 'session-under-test',
+    });
+
+    expect((await dispatchWith(RECIPE)).prompt).toContain(typeCheckLines(RECIPE)[0] ?? 'no line');
+    expect((await dispatchWith()).prompt).not.toContain('runner\'s type step will');
+    expect((await dispatchWith(null)).prompt).not.toContain('runner\'s type step will');
   });
 });
 

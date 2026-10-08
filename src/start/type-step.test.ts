@@ -27,15 +27,18 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { realNodeModules } from '../tests/real-node-modules.js';
 
+import { TYPE_CHECK_FILE, TYPE_CHECK_SCRATCH, typeCheckLines } from './task-gate-lines.js';
 import {
   findNodeModules,
   newErrors,
   parseTscOutput,
+  readTypeCheckRecipe,
   readTypeFiles,
   runTsc,
   runTypeStep,
   scratchTsconfig,
   TSC_FLAGS,
+  tscArgv,
   typeBlockerText,
 } from './type-step.js';
 
@@ -279,6 +282,54 @@ interface WalkRun {
   readonly typeRoots: unknown;
   readonly link: string | null;
 }
+
+/** The scratch tsconfig and the tsc argv a session reads off the type-check line, for `file` at `scratch`. */
+function followLine(line: string, file: string, scratch: string): readonly string[] {
+  const [, json = '', command = ''] = /write `(\{.*\})` to `tsconfig\.json`.* then run `([^`]+)` in the checkout/.exec(line) ?? [];
+  writeFileSync(scratch, json.replace(TYPE_CHECK_FILE, file), 'utf8');
+  return command.replace(TYPE_CHECK_SCRATCH, scratch).split(' ');
+}
+
+describe('the recipe a task prompt hands the session (typeCheckLines)', () => {
+  it('is the checkout and the node_modules the step runs through, and none without a tsconfig.json', () => {
+    const recipe = readTypeCheckRecipe(repo, createGitRunner(repo));
+
+    expect(recipe).toEqual({ checkout: repo, modules: findNodeModules(repo, createGitRunner(repo)) ?? 'none found' });
+
+    // The control: with no tsconfig.json at the root the step runs nothing, and the prompt names nothing.
+    rmSync(join(repo, 'tsconfig.json'));
+    expect(readTypeCheckRecipe(repo, createGitRunner(repo))).toBeNull();
+  });
+
+  it('renders the argv the step spawns', async () => {
+    const seen: TypeRunOptions[] = [];
+    await runTypeStep(scriptedInput([['A', 'a.test.ts']], { exitCode: 0, stdout: '', stderr: '' }, seen));
+    const recipe = readTypeCheckRecipe(repo, createGitRunner(repo));
+
+    expect(seen[0]?.argv).toEqual(tscArgv(recipe?.modules ?? 'none found', seen[0]?.argv[2] ?? ''));
+  });
+
+  it('followed as written over a real tsc, reports the error the step reads as new, and none on a clean file', async () => {
+    const base = commit({ 'README.md': ['# planted'] }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE], 'b.test.ts': CLEAN }, 'task');
+    const step = await runTypeStep(realInput(base));
+    expect(step.blocker).toContain(`a.test.ts:6:14 ${TS2322}`);
+
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const red = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      expect(red.stdout).toContain(`a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}`);
+      expect(red.exitCode).not.toBe(0);
+
+      // The control: the same line over the clean file reports nothing.
+      const clean = await runTsc({ cwd: repo, argv: followLine(line, 'b.test.ts', join(scratch, 'tsconfig.json')) });
+      expect([clean.exitCode, clean.stdout]).toEqual([0, '']);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
 
 describe('runTypeStep finds node_modules by the walk', () => {
   let top: string;

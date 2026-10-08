@@ -300,6 +300,8 @@ describe('the two directories start.ts points each call at', () => {
 
     expect(input).toContain('repoRoot,');
     expect(input).toContain('checkout,');
+    // The type step's recipe is read over the checkout the step runs in.
+    expect(input).toContain('typeCheck: readTypeCheckRecipe(checkout, createGitRunner(checkout)),');
     expect(callTo(EVERY, 'renderProgressForDispatch').args).toEqual(['repoRoot', 'planStub', 'checkout']);
   });
 

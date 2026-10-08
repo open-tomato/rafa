@@ -426,6 +426,7 @@ import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
+import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
 import { interruptClaudeSessions } from './utils/claude.js';
 import { parseTaskDeclaration } from './utils/declaration.js';
@@ -785,6 +786,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         knownMissing,
         inherited: runStartFailures(trackerPath),
         alwaysRun: readAlwaysRunFiles(createGitRunner(checkout), runConfig.config.testsAlwaysRun),
+        // The type step's recipe, so the session checks its test files as the step will.
+        typeCheck: readTypeCheckRecipe(checkout, createGitRunner(checkout)),
         serving,
         handout,
         base,

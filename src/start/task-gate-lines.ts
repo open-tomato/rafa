@@ -22,11 +22,27 @@
  * matched against every test file's path (on bun 1.4.2,
  * `bun test start/task-gate-lines` ran this module's test file), and
  * the prefix makes it the one file.
+ *
+ * ## Why the type-check line exists
+ *
+ * The runner's task step type-checks the `*.test.ts` files a task added
+ * or edited (`type-step.ts`), which neither `bun test` nor a
+ * `tsconfig.json` that excludes test files checks. A session that never
+ * ran that check reports done, the step is red, and the run stops on a
+ * repair that a check before the report would have made needless. So
+ * when the checkout holds the `tsconfig.json` the step needs
+ * ({@link TypeCheckRecipe}), one line hands the session the step's own
+ * scratch tsconfig and tsc argv, with {@link TYPE_CHECK_FILE} and
+ * {@link TYPE_CHECK_SCRATCH} where the step puts its files and its
+ * scratch path. With no recipe, no line.
  */
+import type { TypeCheckRecipe } from './type-step.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { gitSaid } from '../pr/index.js';
+
+import { scratchTsconfigFields, TEST_FILE_SUFFIX, tscArgv } from './type-step.js';
 
 /**
  * What opens the prompt line handing a session its task's base commit.
@@ -80,12 +96,16 @@ export function readAlwaysRunFiles(git: GitRunner, globs: readonly string[]): re
   return alwaysRunFiles(globs, result.stdout.split('\0').filter((path) => path !== ''));
 }
 
+/** `word` as one shell word: as it is when shell-safe, single-quoted otherwise. */
+function shellWord(word: string): string {
+  return SHELL_SAFE_PATH.test(word)
+    ? word
+    : `'${word.replaceAll('\'', '\'\\\'\'')}'`;
+}
+
 /** `path` as a `bun test` file argument: `./` first, single-quoted unless shell-safe. */
 function testArgument(path: string): string {
-  const prefixed = `./${path}`;
-  return SHELL_SAFE_PATH.test(prefixed)
-    ? prefixed
-    : `'${prefixed.replaceAll('\'', '\'\\\'\'')}'`;
+  return shellWord(`./${path}`);
 }
 
 /**
@@ -97,4 +117,31 @@ export function alwaysRunLines(files: readonly string[]): string[] {
   if (files.length === 0) return [];
   const args = files.map(testArgument).join(' ');
   return [`Also run \`bun test ${args}\`: these are the \`tests.alwaysRun\` files, content sweeps no changed file selects.`];
+}
+
+/** Where the type-check line's scratch tsconfig lists a file: the session puts each test file's path here. */
+export const TYPE_CHECK_FILE = '<test file>';
+
+/** Where the type-check line's tsc run names the scratch tsconfig the session wrote. */
+export const TYPE_CHECK_SCRATCH = '<that tsconfig.json>';
+
+/**
+ * The prompt line telling the session to type-check the test files its
+ * change adds or edits as the runner's type step will, through `recipe`;
+ * none for no recipe. The module note says why the line exists.
+ */
+export function typeCheckLines(recipe: TypeCheckRecipe | null): string[] {
+  if (recipe === null) return [];
+  const scratch = JSON.stringify(scratchTsconfigFields(recipe.checkout, [TYPE_CHECK_FILE], recipe.modules));
+  const run = tscArgv(recipe.modules, TYPE_CHECK_SCRATCH)
+    .map((word) => word === TYPE_CHECK_SCRATCH
+      ? word
+      : shellWord(word))
+    .join(' ');
+  return [
+    `Before you report done, type-check the \`*${TEST_FILE_SUFFIX}\` files your change adds or edits, if any, as the runner's type step will:`
+    + ` write \`${scratch}\` to \`tsconfig.json\` in a new directory outside the checkout,`
+    + ` one \`files\` entry per such file with its path in place of \`${TYPE_CHECK_FILE}\`, then run \`${run}\` in the checkout.`
+    + ' Fix each error it reports in those files that the base commit did not hold.',
+  ];
 }

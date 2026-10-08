@@ -37,6 +37,14 @@
  * Only errors in the listed files are read: an error tsc reports in a
  * module a test imports is `check-types`'s to report.
  *
+ * The task prompt hands each session the same recipe, so it can check
+ * its test files before it reports done ({@link readTypeCheckRecipe},
+ * `typeCheckLines` in `task-gate-lines.ts`): the scratch fields
+ * ({@link scratchTsconfigFields}) and the argv ({@link tscArgv}) are the
+ * ones the step itself writes and spawns, rendered with placeholders for
+ * the files and the scratch path, so the prompt cannot drift from the
+ * step.
+ *
  * `<modules>` is found by walking up from the checkout to the first
  * directory holding `node_modules/.bin/tsc`, the checkout itself first,
  * as `bun` and `tsc` resolve imports. A loop's worktree under
@@ -310,15 +318,47 @@ export function findNodeModules(checkout: string, git: GitRunner): string | null
   }
 }
 
-/** The scratch tsconfig over `files` (relative to `tree`), its types from `modules`; see the module note. */
-export function scratchTsconfig(tree: string, files: readonly string[], modules: string): string {
+/** The fields of the scratch tsconfig over `files` (relative to `tree`), its types from `modules`; see the module note. */
+export function scratchTsconfigFields(tree: string, files: readonly string[], modules: string): Readonly<Record<string, unknown>> {
   const root = resolve(tree);
-  return `${JSON.stringify({
+  return {
     extends: join(root, 'tsconfig.json'),
     compilerOptions: { typeRoots: [join(resolve(modules), '@types')] },
     files: files.map((file) => join(root, file)),
     include: [],
-  }, null, 2)}\n`;
+  };
+}
+
+/** The scratch tsconfig's text, {@link scratchTsconfigFields} as the step writes them. */
+export function scratchTsconfig(tree: string, files: readonly string[], modules: string): string {
+  return `${JSON.stringify(scratchTsconfigFields(tree, files, modules), null, 2)}\n`;
+}
+
+/** The argv the step spawns: `<modules>/.bin/tsc -p <scratch>` and {@link TSC_FLAGS}. */
+export function tscArgv(modules: string, scratch: string): readonly string[] {
+  return [join(modules, ...TSC_BIN), '-p', scratch, ...TSC_FLAGS];
+}
+
+/** The `node_modules` the step runs tsc from: the walk's ({@link findNodeModules}), else the checkout's own. */
+function modulesFor(checkout: string, git: GitRunner): string {
+  return findNodeModules(checkout, git) ?? join(resolve(checkout), NODE_MODULES);
+}
+
+/** What a session needs to type-check its test files as the step does; see the module note. */
+export interface TypeCheckRecipe {
+  /** The checkout the session runs in, which the scratch tsconfig extends. */
+  readonly checkout: string;
+  /** The `node_modules` tsc and the types come from. */
+  readonly modules: string;
+}
+
+/**
+ * The recipe for `checkout`, or null when it holds no `tsconfig.json` at
+ * its root, where the step runs nothing (the module note's first case).
+ */
+export function readTypeCheckRecipe(checkout: string, git: GitRunner): TypeCheckRecipe | null {
+  if (!existsSync(join(checkout, 'tsconfig.json'))) return null;
+  return { checkout, modules: modulesFor(checkout, git) };
 }
 
 /** The errors tsc printed under `--pretty false`, each file relative to `cwd`. */
@@ -419,10 +459,9 @@ async function checkTree(input: TypeStepInput, modules: string, tree: string, fi
   const scratch = join(scratchDir, SCRATCH_NAME);
   try {
     writeFileSync(scratch, scratchTsconfig(tree, files, modules), 'utf8');
-    const tsc = join(modules, ...TSC_BIN);
     let run: TypeRunResult;
     try {
-      run = await (input.runTypes ?? runTsc)({ cwd: tree, argv: [tsc, '-p', scratch, ...TSC_FLAGS] });
+      run = await (input.runTypes ?? runTsc)({ cwd: tree, argv: tscArgv(modules, scratch) });
     } catch (error) {
       return { kind: 'threw', why: messageOf(error) };
     }
@@ -502,7 +541,7 @@ export async function runTypeStep(input: TypeStepInput): Promise<TypeOutcome> {
   const label = typeLabel(input.task);
   const files = filesToCheck(input, label);
   if (files === null) return NOTHING_RAN;
-  const modules = findNodeModules(input.checkout, input.git) ?? join(resolve(input.checkout), NODE_MODULES);
+  const modules = modulesFor(input.checkout, input.git);
   const head = await checkTree(input, modules, input.checkout, files.map((file) => file.head));
   if (head.kind === 'threw') {
     activeOutput().warn(`⚠️  The ${label} could not run tsc (${head.why}); the run goes on without it.`);
