@@ -624,7 +624,7 @@ describe('setUpProject, an add retried over a network timeout', () => {
       'retrying #10 (2 of 3): operation timed out',
     ]);
     const held = await heldOn(router, COPY_NUMBER);
-    expect([...held.keys()]).toEqual(ADDED);
+    expect([...held.keys()]).toEqual([...ADDED]);
   });
 });
 
