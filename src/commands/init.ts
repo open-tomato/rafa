@@ -107,7 +107,14 @@
  * question about copying the GitHub project template, linking it and
  * filling it; `--project` and `--no-project` answer it for a script, read
  * at the top of the run with `--board`'s. The order it decides in is
- * `./init-board-project.ts`'s.
+ * `./init-board-project.ts`'s. Its three long phases, adding the issues,
+ * reading their facts and writing their fields, print their progress as
+ * they run (`src/board/project/progress.ts`): a start line with the
+ * total, `adding issues: 283`, a line at most every
+ * `board.project.progressSeconds` with the count and the time so far, an
+ * end line with the refused count, and a line for each pause for
+ * GitHub's write limit; in json mode each is one `progress` event ahead
+ * of the terminal result. The phases are timed by the `now` seam.
  *
  * ## A rerun
  *
@@ -198,6 +205,7 @@ import { join, relative, sep } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
+import { commandProgressFeed } from '../board/project/progress.js';
 import { commandRetrySeams } from '../board/project/project-runner.js';
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
@@ -254,6 +262,8 @@ export interface InitSeams {
   readonly gh: (root: string) => GhRunner;
   /** The wait before a retried project call and between two project writes; `Bun.sleep` when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** The clock the project step's progress phases are timed by, in milliseconds; the system's own when left out. */
+  readonly now?: () => number;
 }
 
 /** The seams the registered command runs with. */
@@ -661,6 +671,9 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,
     ...commandRetrySeams(context.output, context.outputMode, seams.sleep),
+    progress: commandProgressFeed(context.output, context.outputMode, scopes.config.boardProjectProgressSeconds, seams.now === undefined
+      ? {}
+      : { now: seams.now }),
   });
   const result: InitResult = {
     ...scopes.written,
@@ -714,6 +727,9 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
       + ' and once every write went through a second question asks whether to remove the old marks. Last, once the'
       + ' board has run, one question asks whether to copy the GitHub project template to the repository\'s'
       + ' owner, link it, add the issues and fill their fields; `--project` and `--no-project` answer that one.'
+      + ' Adding the issues, reading their facts and writing their fields each print a start line with the'
+      + ' total, a progress line at most every board.project.progressSeconds and an end line, one `progress`'
+      + ' event each with `--output=json`.'
       + ' On a terminal it also asks once whether every pull request bumps the version and gains'
       + ' a changelog entry, and writes the answer as `release.enabled`; `--release` and `--no-release`'
       + ' answer that one, and `--yes` leaves it unset. With `--output=json` the'
@@ -750,7 +766,8 @@ export function createInitCommand(seams: InitSeams = DEFAULT_INIT_SEAMS): RafaCo
         description: 'Create the GitHub project without asking, once the board has run: copy'
           + ' `board.project.template` to the repository\'s owner, link the repository, add its issues, fill'
           + ' their fields and save `board.project.number`. `--no-project` leaves it out. Without either, a'
-          + ' terminal is asked once and a run with no terminal leaves it out.',
+          + ' terminal is asked once and a run with no terminal leaves it out. The adds, the facts reads and the'
+          + ' field writes print their progress, as `adding issues: 146/283, 6m 40s`.',
         type: 'boolean',
       },
       {

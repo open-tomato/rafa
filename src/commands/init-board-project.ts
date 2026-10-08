@@ -118,7 +118,10 @@
  * {@link runProjectStep} opens that runner retrying
  * (`../board/project/project-runner.ts`), so a call that failed on a
  * network error is sent again, each retry reported to the step's
- * `onRetry` before its wait, before it counts as a refusal.
+ * `onRetry` before its wait, before it counts as a refusal. It hands the
+ * step's `progress` feed on to {@link setUpProject}, so the adds, the
+ * facts reads and the field writes print their phases where the command
+ * renders them (`../board/project/progress.ts`).
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
@@ -600,6 +603,8 @@ export interface ProjectStepOptions {
   readonly sleep?: (ms: number) => Promise<void>;
   /** Hears each retried call; the active output when left out. */
   readonly onRetry?: RetryReport;
+  /** Hears the adds, facts and writes phases, handed on to the set-up; silent when left out. */
+  readonly progress?: ProgressFeed;
 }
 
 /** What a line asking for `--project` is told when the board step did not run. */
@@ -667,9 +672,18 @@ export async function runProjectStep(options: ProjectStepOptions): Promise<Proje
     const setUp = options.setUp ?? setUpProject;
     const config = withWrittenRoadmap(root, options.config);
     const gh = openProjectRunner(options.openGh(), config, retrySeamsOf(options));
-    const report = await setUp(options.sleep === undefined
-      ? { root, config, gh }
-      : { root, config, gh, sleep: options.sleep });
+    const { sleep, progress } = options;
+    const report = await setUp({
+      root,
+      config,
+      gh,
+      ...(sleep === undefined
+        ? {}
+        : { sleep }),
+      ...(progress === undefined
+        ? {}
+        : { progress }),
+    });
     return { status: 'ran', asked, report, warnings: [] };
   };
   if (wanted === true) return run(false);

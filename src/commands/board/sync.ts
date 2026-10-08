@@ -31,6 +31,18 @@
  * `retrying #725 (1 of 3): operation timed out`, or written as one
  * `retry` event in json mode.
  *
+ * ## Progress
+ *
+ * The sync's long phases print their progress as they run, ahead of the
+ * lines above (`src/board/project/progress.ts`): reading the facts and
+ * writing the fields of each refresh, and adding the missing issues. Each
+ * prints a start line with its total, `reading facts: 283`, a line at
+ * most every `board.project.progressSeconds` with the count and the time
+ * so far, and an end line with the refused count; a pause for GitHub's
+ * write limit prints `waiting 1 s for GitHub's write limit`. In json mode
+ * each line is one `progress` event ahead of the terminal result. The
+ * phases are timed by {@link BoardSyncSeams.now}.
+ *
  * ## Exit codes
  *
  * 1 for a stray word, a config that cannot be used, and a project with no
@@ -54,6 +66,7 @@ import type { ProjectSynced } from '../../board/project/sync.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { commandProgressFeed } from '../../board/project/progress.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { rateLimitWarning } from '../../board/project/refresh-warnings.js';
 import { syncProject } from '../../board/project/sync.js';
@@ -122,6 +135,8 @@ export interface BoardSyncResult {
 export interface BoardSyncSeams {
   readonly gh?: GhRunner;
   readonly sleep?: (ms: number) => Promise<void>;
+  /** The clock the progress phases are timed by, in milliseconds; the system's own when left out. */
+  readonly now?: () => number;
 }
 
 /** `count` and `noun`, the noun in the plural unless the count is one. */
@@ -206,9 +221,12 @@ export async function runBoardSync(context: RafaContext, seams: BoardSyncSeams):
   }
   const gh = openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep));
   const dryRun = context.flags[DRY_RUN_FLAG] === true;
+  const progress = commandProgressFeed(context.output, context.outputMode, config.boardProjectProgressSeconds, seams.now === undefined
+    ? {}
+    : { now: seams.now });
   const synced = await syncProject(seams.sleep === undefined
-    ? { config, gh, dryRun }
-    : { config, gh, dryRun, sleep: seams.sleep }).catch((error: unknown) => {
+    ? { config, gh, dryRun, progress }
+    : { config, gh, dryRun, progress, sleep: seams.sleep }).catch((error: unknown) => {
     throw new CommandExit(BOARD_SYNC_REFUSAL_EXIT, `❌ Could not sync the project: ${messageOf(error)}`);
   });
   if (synced.kind !== 'synced') {
@@ -247,7 +265,10 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
       + ' its body. Prints one line per change and per issue added, then a closing count. With `--dry-run` it'
       + ' prints the same lines and writes nothing. With `--output=json` the changes are the data of the terminal'
       + ' result event. An issue whose facts could not be read is named in a warning, `#<n> not refreshed:'
-      + ' <reason>`, while the others are synced; the exit code stays 0 and the next run reads it again. Refused'
+      + ' <reason>`, while the others are synced; the exit code stays 0 and the next run reads it again. Adding'
+      + ' the issues, reading their facts and writing their fields each print a start line with the total, a'
+      + ' progress line at most every board.project.progressSeconds, as `reading facts: 146/283, 6m 40s`, and an'
+      + ' end line; with `--output=json` each is a `progress` event. Refused'
       + ' with exit code 1 when board.project.number is unset, and with exit code 2 when the token lacks the'
       + ' project scope, the number names no project, or the rate limit stopped the writes.',
     args: [],

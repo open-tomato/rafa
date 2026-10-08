@@ -27,6 +27,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { recordingFeed } from '../board/project/progress-fake.js';
 import { retryLine } from '../board/project/project-runner.js';
 import { answeringGh, flakyGh, recordRetries, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -258,5 +259,26 @@ describe('projectStepChanged and renderProjectStep', () => {
 
     expect(renderProjectStep(ran)).toEqual([PROJECT_HEADING, '  present  part 0', '  refused  part 1: why']);
     expect(renderProjectStep(notRun)).toEqual([]);
+  });
+});
+
+describe('runProjectStep, the progress feed it hands on', () => {
+  it('hands its progress feed to the set-up unchanged, so the set-up\'s phases reach it', async () => {
+    const { record, options } = harness();
+    const recording = recordingFeed();
+
+    await runProjectStep(options({ wanted: true, progress: recording.feed }));
+
+    expect(record.setUps).toHaveLength(1);
+    expect(record.setUps[0]?.progress).toBe(recording.feed);
+  });
+
+  it('control: hands the set-up no feed when given none, so a step run without one stays silent', async () => {
+    const { record, options } = harness();
+
+    await runProjectStep(options({ wanted: true }));
+
+    expect(record.setUps).toHaveLength(1);
+    expect(record.setUps[0] !== undefined && 'progress' in record.setUps[0]).toBe(false);
   });
 });

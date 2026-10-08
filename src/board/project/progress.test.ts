@@ -1,9 +1,20 @@
 import type { PhaseReporterOptions } from './progress.js';
+import type { CliEvent } from '../../ports/index.js';
 
 import { describe, expect, test } from 'bun:test';
 
+import { sinkOutput } from '../../tests/output-sinks.js';
+
 import { recordingFeed } from './progress-fake.js';
-import { formatElapsed, openPhase, phaseReporter, progressEvent, waitLine } from './progress.js';
+import {
+  commandProgressFeed,
+  formatElapsed,
+  openPhase,
+  phaseReporter,
+  progressEvent,
+  progressSink,
+  waitLine,
+} from './progress.js';
 
 /** A clock the test steps by hand, in milliseconds. */
 function steppedClock(startMs = 1_000_000): { readonly now: () => number; readonly step: (ms: number) => void } {
@@ -243,5 +254,100 @@ describe('openPhase', () => {
       phase.wait(10);
       phase.end({ done: 4, refused: 0 });
     }).not.toThrow();
+  });
+});
+
+/** Lines and events written to an output, by kind. */
+interface Captured {
+  readonly info: string[];
+  readonly warn: string[];
+  readonly events: CliEvent[];
+}
+
+/** An output capturing what a progress sink writes. */
+function capture(): { readonly captured: Captured; readonly output: ReturnType<typeof sinkOutput> } {
+  const captured: Captured = { info: [], warn: [], events: [] };
+  const output = sinkOutput({
+    info: (line) => captured.info.push(line),
+    warn: (line) => captured.warn.push(line),
+    event: (event) => captured.events.push(event),
+  });
+  return { captured, output };
+}
+
+/** The stamp every event of the rendering cases carries. */
+const STAMP = new Date('2026-10-08T12:00:00.000Z');
+
+/** The end line of 283 adds, two refused, after 10m 13s. */
+const END_LINE = {
+  text: 'adding issues: 283/283, 2 refused, 10m 13s',
+  data: { phase: 'adds', step: 'end', done: 283, total: 283, elapsedMs: 613_000, refused: 2 },
+} as const;
+
+describe('progressSink', () => {
+  test('writes one info line in text mode, with no warn prefix and no event', () => {
+    const { captured, output } = capture();
+
+    progressSink(output, 'text', () => STAMP)(END_LINE);
+
+    expect(captured).toEqual({ info: ['adding issues: 283/283, 2 refused, 10m 13s'], warn: [], events: [] });
+  });
+
+  test('writes one progress event in json mode, and no line; the same line in text mode is the control', () => {
+    const { captured, output } = capture();
+
+    progressSink(output, 'json', () => STAMP)(END_LINE);
+
+    expect(captured.info).toEqual([]);
+    expect(captured.warn).toEqual([]);
+    expect(captured.events).toEqual([progressEvent(END_LINE, STAMP)]);
+    expect(captured.events[0]).toMatchObject({ type: 'event', name: 'progress', summary: END_LINE.text, ts: STAMP.toISOString() });
+  });
+});
+
+describe('commandProgressFeed', () => {
+  test('renders a phase through the output, timed by the clock it is handed and thinned by progressSeconds', () => {
+    const { captured, output } = capture();
+    const clock = steppedClock(0);
+    const feed = commandProgressFeed(output, 'text', 10, { now: clock.now, stamp: () => STAMP });
+
+    const phase = openPhase(feed, 'facts', 283);
+    clock.step(5_000);
+    phase.advance(10);
+    clock.step(5_000);
+    phase.advance(20);
+    clock.step(30_000);
+    phase.end({ done: 282, refused: 1 });
+
+    expect(feed.progressSeconds).toBe(10);
+    expect(captured.info).toEqual(['reading facts: 283', 'reading facts: 20/283, 10s', 'reading facts: 282/283, 1 refused, 40s']);
+  });
+
+  test('passes progressSeconds false on, so only the start and end lines are written', () => {
+    const { captured, output } = capture();
+    const clock = steppedClock(0);
+    const feed = commandProgressFeed(output, 'json', false, { now: clock.now, stamp: () => STAMP });
+
+    const phase = openPhase(feed, 'writes', 40);
+    clock.step(60_000);
+    phase.advance(20);
+    phase.end({ done: 40, refused: 0 });
+
+    expect(captured.info).toEqual([]);
+    expect(captured.events.map((event) => (event as { summary?: string }).summary)).toEqual([
+      'writing fields: 40',
+      'writing fields: 40/40, 0 refused, 1m 0s',
+    ]);
+  });
+
+  test('times the phases by the system clock when handed none', () => {
+    const { captured, output } = capture();
+    const before = Date.now();
+
+    const at = commandProgressFeed(output, 'text', 10).now();
+
+    expect(at).toBeGreaterThanOrEqual(before);
+    expect(at).toBeLessThanOrEqual(Date.now());
+    expect(captured.info).toEqual([]);
   });
 });

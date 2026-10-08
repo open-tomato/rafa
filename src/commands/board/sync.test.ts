@@ -23,6 +23,13 @@
  * `board.project.retries: false`, refused with exit code 2 and no line,
  * so the recovery is the retry's.
  *
+ * The progress cases time the run by a clock that moves one second on
+ * every read; every other case by one that never moves, so a phase prints
+ * its start and end lines and nothing between. The throttle case's lines
+ * between sit beside the same run at the default of 10 s, which prints
+ * none, and beside `progressSeconds: false`, which drops them while the
+ * start and end lines stay.
+ *
  * The warning lines are imported once the static imports have loaded,
  * for the import cycle `src/board/project/sync.test.ts`'s module note
  * names.
@@ -88,9 +95,23 @@ function plantCase(config = PROJECT_CONFIG): PlantedProject {
   return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
-/** Dispatches `board sync` and `words` from `project` over `fake`. */
-function run(fake: SyncFake, words: readonly string[] = [], project: PlantedProject = plantCase()) {
-  const command = createBoardSyncCommand({ gh: fake.gh, sleep: () => Promise.resolve() });
+/** A clock that never moves, so every phase reads `0s` and prints no line between its start and end. */
+const STILL_CLOCK = (): number => 0;
+
+/** The phase labels a progress line opens with. */
+const PHASE_LABELS = ['adding issues: ', 'reading facts: ', 'writing fields: '];
+
+/** The lines of `stdout` that are not progress lines. */
+function syncOwnLines(stdout: string): readonly string[] {
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .filter((line) => !PHASE_LABELS.some((label) => line.startsWith(label)));
+}
+
+/** Dispatches `board sync` and `words` from `project` over `fake`, timed by `now`. */
+function run(fake: SyncFake, words: readonly string[] = [], project: PlantedProject = plantCase(), now: () => number = STILL_CLOCK) {
+  const command = createBoardSyncCommand({ gh: fake.gh, sleep: () => Promise.resolve(), now });
   return dispatchInProject(['board', 'sync', ...words], [BOARD_SUBJECT], [command], project);
 }
 
@@ -149,7 +170,7 @@ describe('rafa board sync', () => {
     const { fake, project } = setUp();
 
     const result = await run(fake, ['--dry-run'], project);
-    const lines = result.stdout.trimEnd().split('\n');
+    const lines = syncOwnLines(result.stdout);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe('');
@@ -175,9 +196,21 @@ describe('rafa board sync', () => {
 
     expect(first.stdout.split('\n').length).toBeGreaterThan(2);
     expect([dry.exitCode, synced.exitCode, again.exitCode]).toEqual([0, 0, 0]);
-    expect(dry.stdout).toBe('#21 Stage: Ready → Claimed\nDry run on project #6: 1 change and 0 issues to add; nothing written.\n');
-    expect(synced.stdout).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written and 0 issues added.\n');
-    expect(again.stdout).toBe('Dry run on project #6: in step, nothing to change.\n');
+    expect(dry.stdout).toBe([
+      'reading facts: 7',
+      'reading facts: 7/7, 0 refused, 0s',
+      '#21 Stage: Ready → Claimed',
+      'Dry run on project #6: 1 change and 0 issues to add; nothing written.\n',
+    ].join('\n'));
+    expect(synced.stdout).toBe([
+      'reading facts: 7',
+      'reading facts: 7/7, 0 refused, 0s',
+      'writing fields: 1',
+      'writing fields: 1/1, 0 refused, 0s',
+      '#21 Stage: Ready → Claimed',
+      'Synced project #6: 1 change written and 0 issues added.\n',
+    ].join('\n'));
+    expect(syncOwnLines(again.stdout)).toEqual(['Dry run on project #6: in step, nothing to change.']);
   });
 
   it('writes every change, adds the open issues the project lacks and fills them', async () => {
@@ -338,5 +371,124 @@ describe('rafa board sync: a call failing on a network error', () => {
     expect(retries).toHaveLength(1);
     expect(retries[0]).toMatchObject({ summary: expect.stringMatching(RETRY_LINE), data: { attempt: 1, of: 3, reason: 'HTTP 502', waitMs: 2000 } });
     expect(result.stdout).not.toContain('"message":"retrying ');
+  });
+});
+
+describe('rafa board sync: the progress of its phases', () => {
+  /** A clock moving one second forward on every read. */
+  function steppingClock(): () => number {
+    let at = 0;
+    return () => {
+      at += 1000;
+      return at;
+    };
+  }
+
+  /** The start and end lines of a full sync of the fake board, every phase timed by the stepping clock. */
+  const START_AND_END_LINES = [
+    'reading facts: 5',
+    'reading facts: 5/5, 0 refused, 2s',
+    'writing fields: 12',
+    'writing fields: 12/12, 0 refused, 2s',
+    'adding issues: 2',
+    'adding issues: 2/2, 0 refused, 3s',
+    'reading facts: 2',
+    'reading facts: 2/2, 0 refused, 2s',
+    'writing fields: 2',
+    'writing fields: 2/2, 0 refused, 2s',
+  ];
+
+  /** The lines of `stdout` that are progress lines, in order. */
+  function progressLines(stdout: string): readonly string[] {
+    return stdout
+      .trimEnd()
+      .split('\n')
+      .filter((line) => PHASE_LABELS.some((label) => line.startsWith(label)));
+  }
+
+  it('prints each phase\'s start and end lines as plain lines ahead of the sync\'s own, at the default throttle', async () => {
+    const { fake, project } = setUp();
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
+    expect(result.stdout).toStartWith(`${START_AND_END_LINES.join('\n')}\n#10 Stage: (empty) → Blocked\n`);
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+  });
+
+  it('prints a line between start and end on each advance once board.project.progressSeconds have passed', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    progressSeconds: 1\n`);
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(progressLines(result.stdout)).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 1s',
+      'reading facts: 5/5, 0 refused, 2s',
+      'writing fields: 12',
+      'writing fields: 12/12, 1s',
+      'writing fields: 12/12, 0 refused, 2s',
+      'adding issues: 2',
+      'adding issues: 1/2, 1s',
+      'adding issues: 2/2, 2s',
+      'adding issues: 2/2, 0 refused, 3s',
+      'reading facts: 2',
+      'reading facts: 2/2, 1s',
+      'reading facts: 2/2, 0 refused, 2s',
+      'writing fields: 2',
+      'writing fields: 2/2, 1s',
+      'writing fields: 2/2, 0 refused, 2s',
+    ]);
+  });
+
+  // With `false` an advance reads no clock, so the stepping clock moves once per phase and each end reads 1s.
+  it('control: with board.project.progressSeconds false the lines between drop, and the start and end lines stay', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    progressSeconds: false\n`);
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(progressLines(result.stdout)).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 0 refused, 1s',
+      'writing fields: 12',
+      'writing fields: 12/12, 0 refused, 1s',
+      'adding issues: 2',
+      'adding issues: 2/2, 0 refused, 1s',
+      'reading facts: 2',
+      'reading facts: 2/2, 0 refused, 1s',
+      'writing fields: 2',
+      'writing fields: 2/2, 0 refused, 1s',
+    ]);
+  });
+
+  it('writes each line as one progress event in json mode, ahead of the result, and prints no progress line', async () => {
+    const { fake, project } = setUp();
+
+    const result = await run(fake, ['--output=json'], project, steppingClock());
+    const events = eventsOf(result.stdout);
+    const progress = events.filter((event) => event.type === 'event' && event.name === 'progress');
+
+    expect(result.exitCode).toBe(0);
+    expect(progress.map((event) => (event as { summary?: string }).summary)).toEqual(START_AND_END_LINES);
+    expect(progress.map((event) => (event as { data?: unknown }).data)).toEqual([
+      { phase: 'facts', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+      { phase: 'facts', step: 'end', done: 5, total: 5, elapsedMs: 2000, refused: 0 },
+      { phase: 'writes', step: 'start', done: 0, total: 12, elapsedMs: 0 },
+      { phase: 'writes', step: 'end', done: 12, total: 12, elapsedMs: 2000, refused: 0 },
+      { phase: 'adds', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'adds', step: 'end', done: 2, total: 2, elapsedMs: 3000, refused: 0 },
+      { phase: 'facts', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'facts', step: 'end', done: 2, total: 2, elapsedMs: 2000, refused: 0 },
+      { phase: 'writes', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'writes', step: 'end', done: 2, total: 2, elapsedMs: 2000, refused: 0 },
+    ]);
+    expect(events.at(-1)?.type).toBe('result');
+    expect(result.stdout).not.toContain('"message":"reading facts');
   });
 });

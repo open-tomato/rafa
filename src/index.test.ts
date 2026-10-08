@@ -1017,6 +1017,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/board/sync.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/progress.js', ['commandProgressFeed']],
     ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
     ['../../board/project/sync.js', ['syncProject']],
@@ -1376,6 +1377,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
+    ['../board/project/progress.js', ['commandProgressFeed']],
     ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],

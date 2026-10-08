@@ -42,9 +42,23 @@
  * The feeders are the adds (`src/commands/init-board-project.ts`'s items
  * part and `./sync.ts`'s second pass), the facts reads (`./refresh.ts`)
  * and the field writes (`./writes.ts`).
+ *
+ * ## Rendering
+ *
+ * A command renders the lines through {@link commandProgressFeed}, the
+ * feed `rafa init --board --project` (`src/commands/init.ts`) and
+ * `rafa board sync` (`src/commands/board/sync.ts`) hand on: its sink,
+ * {@link progressSink}, writes each line to the command's output as one
+ * `info` line in text mode, with no `warn: ` prefix, and as one named
+ * {@link PROGRESS_EVENT} event in json mode, whose summary is the line
+ * and whose data is {@link ProgressLine.data}. The lines print as the
+ * phases run, ahead of the command's own closing lines or its terminal
+ * result. The clock and the event stamp are the command's seams, the
+ * system's own when left out.
  */
 import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
-import type { CliEventNamed } from '../../ports/index.js';
+import type { OutputMode } from '../../config-sections.js';
+import type { CliEventNamed, Output } from '../../ports/index.js';
 
 /** The name of the json event a progress line is emitted as. */
 export const PROGRESS_EVENT = 'progress';
@@ -241,5 +255,43 @@ export function openPhase(feed: ProgressFeed | undefined, phase: ProgressPhase, 
     end: (result) => {
       feed.sink(reporter.end(result));
     },
+  };
+}
+
+/**
+ * Writes each line to `output`: one `info` line in text mode, one
+ * {@link PROGRESS_EVENT} event stamped `stamp()` in json mode. See the
+ * module note.
+ */
+export function progressSink(output: Output, mode: OutputMode, stamp: () => Date = () => new Date()): ProgressSink {
+  return (line) => {
+    if (mode === 'json') output.emit(progressEvent(line, stamp()));
+    else output.info(line.text);
+  };
+}
+
+/** The clocks a command's progress reads; the system's own when left out. */
+export interface ProgressClocks {
+  /** The clock the phases are timed by, in milliseconds. */
+  readonly now?: () => number;
+  /** The stamp of each json event. */
+  readonly stamp?: () => Date;
+}
+
+/**
+ * The feed a command hands its phases: the lines written to `output` in
+ * `mode` by {@link progressSink}, timed by `clocks.now` and thinned by
+ * `progressSeconds` (`board.project.progressSeconds`).
+ */
+export function commandProgressFeed(
+  output: Output,
+  mode: OutputMode,
+  progressSeconds: BoardProjectProgressSeconds,
+  clocks: ProgressClocks = {},
+): ProgressFeed {
+  return {
+    sink: progressSink(output, mode, clocks.stamp),
+    now: clocks.now ?? (() => Date.now()),
+    progressSeconds,
   };
 }
