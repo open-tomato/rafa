@@ -44,9 +44,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
+import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
+import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
+import { callNumber } from '../board/project/retry.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createBoardSyncCommand } from './board/sync.js';
 import {
@@ -598,6 +602,55 @@ describe('setUpProject, the fields part over refused issues', () => {
     expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual([1, 10, 30, 40].map((issue) => `#${String(issue)} not refreshed`));
     expect(mutations(router.calls())).not.toContain('updateProjectV2ItemFieldValue');
     expect(report.parts[4]?.outcome).toBe('created');
+  });
+});
+
+describe('setUpProject, an add retried over a network timeout', () => {
+  it('retries a timed-out add twice then succeeds, printing both retry lines, with the items part created', async () => {
+    const router = route();
+    const flaky = flakyGh(router.gh, [TIMED_OUT_STDERR, TIMED_OUT_STDERR], (args) => callNumber(args) === 10);
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+    const retryConfig = { boardProjectRetries: 3, boardProjectRetryWaitSeconds: 1 };
+    const gh = openProjectRunner(flaky.gh, retryConfig, { sleep: () => Promise.resolve(), onRetry: retryReporter(output, 'text') });
+    const pacing = paced();
+
+    const report = await setUpProject({ root: rootHolding('retry-add'), config: { ...CONFIG, ...retryConfig }, gh, sleep: pacing.sleep });
+
+    expect(report.parts[2]?.outcome).toBe('created');
+    expect(report.parts[2]?.detail).toBe('added 5 issues to the project');
+    expect(printed).toEqual([
+      'retrying #10 (1 of 3): operation timed out',
+      'retrying #10 (2 of 3): operation timed out',
+    ]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect([...held.keys()]).toEqual(ADDED);
+  });
+});
+
+describe('setUpProject, the fields part over a NOT_FOUND facts read', () => {
+  it('refuses #40 alone on NOT_FOUND, fills the rest, and prints no retry line', async () => {
+    const router = route({
+      refuse: (args) => (args.some((arg) => arg.startsWith('query=') && arg.includes('issue(number: 40)'))
+        ? 'GraphQL: Could not resolve to an Issue with the number of 40. (NOT_FOUND)\n'
+        : null),
+    });
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+    const retryConfig = { boardProjectRetries: 3, boardProjectRetryWaitSeconds: 1 };
+    const gh = openProjectRunner(router.gh, retryConfig, { sleep: () => Promise.resolve(), onRetry: retryReporter(output, 'text') });
+    const pacing = paced();
+
+    const report = await setUpProject({ root: rootHolding('not-found'), config: { ...CONFIG, ...retryConfig }, gh, sleep: pacing.sleep });
+
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#40 not refreshed: ');
+    expect(printed).toEqual([]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect(held.get(30)?.get('Stage')).toBe('Done');
+    expect(held.get(50)?.get('Stage')).toBe('In review');
+    expect(held.get(40)?.get('Stage')).toBeUndefined();
   });
 });
 
