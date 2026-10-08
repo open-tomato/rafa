@@ -12,13 +12,23 @@
  * body already holding {@link PASSED_OVER_HEADING} is left alone, so a
  * re-run writes the section once.
  *
+ * `./wrap-up-run.ts` converts it right after the delivery, BEFORE the
+ * `pr` event: a reader of the events (`rafa loop wait`, an operator, a
+ * json caller) takes a `pr` for a delivered pull request, and a forced
+ * wrap-up's is not one until it is a draft.
+ *
  * The conversion is sent through the `gh` runner rather than the pull
  * request port (`pr/types.ts`), which has no draft member: widening the
  * port reaches every literal that implements it, and this is the one
- * caller. Nothing here throws. The pull request is delivered either way,
- * so a refused conversion or body write is one warning line naming what
- * `gh` said and the command to run by hand; the run goes on to the CI
- * wait as any delivered run does.
+ * caller. {@link markForcedDraft} never throws: a refused conversion is
+ * one warning line naming what `gh` said, and its answer is false. The
+ * caller then emits no `pr` event and ends the run through
+ * {@link refuseUndraftedPullRequest}: a `halt` naming the pull request,
+ * and exit code 20 (`DECISION_STOP_EXIT`, `./continue-exits.ts`) with a
+ * line naming the command to run by hand, so the run's record ends
+ * `stopped`, never `done`, over a pull request left ready for review. A
+ * body that cannot be written is one warning line and nothing more: the
+ * pull request is a draft either way.
  *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
@@ -30,6 +40,9 @@ import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { messageOf } from '../config-sections.js';
 import { ghPullRequestsIn } from '../pr/index.js';
+
+import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';
+import { emitLoopEvent } from './loop-events.js';
 
 /** The heading the passed-over tasks sit under in the pull request body. */
 export const PASSED_OVER_HEADING = '## Passed-over tasks';
@@ -91,14 +104,29 @@ async function writeSection(number: number, tasks: readonly PassedOverTask[], pu
 
 /**
  * Converts the delivered pull request `number` to a draft and writes
- * `tasks` into its body; see the module note. Never throws.
+ * `tasks` into its body; see the module note. True once it is a draft,
+ * false when `gh` refused the conversion. Never throws.
  */
 export async function markForcedDraft(
   number: number,
   tasks: readonly PassedOverTask[],
   seams: ForcedDraftSeams,
-): Promise<void> {
+): Promise<boolean> {
   const drafted = await convertToDraft(number, seams.gh);
   await writeSection(number, tasks, seams.pulls);
   if (drafted) activeOutput().info(`📝 Pull request #${number} is a draft, listing the ${tasks.length} passed-over task(s) in its body.`);
+  return drafted;
+}
+
+/**
+ * Ends a forced wrap-up whose pull request `number` could not be made a
+ * draft: a `halt` naming it, then exit code 20 and the command to run by
+ * hand. See the module note.
+ */
+export function refuseUndraftedPullRequest(number: number): never {
+  emitLoopEvent({ kind: 'halt', reason: `forced draft refused: pull request #${number} is ready for review` });
+  throw new LoopEnd(DECISION_STOP_EXIT, [
+    `⛔ The forced wrap-up's pull request #${number} could not be made a draft, so it is open ready for review with passed-over tasks left.`,
+    `   Run gh pr ready ${number} --undo by hand. The run is recorded stopped, not done, and the CI wait was skipped.`,
+  ].join('\n'));
 }

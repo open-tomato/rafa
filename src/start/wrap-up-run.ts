@@ -46,10 +46,13 @@
  *
  * A `--continue --force-wrap-up` run hands in the tasks it passed over
  * ({@link WrapUpRunInput.passedOver}). Its wrap-up says so in place of
- * "All tasks completed", and once the delivery answers DELIVERED, after
- * the retarget and before the CI wait, the pull request is converted to
- * a draft listing them (`start/forced-draft.ts`); a `none` provider has
- * none to convert, which one line says.
+ * "All tasks completed", and once the delivery answers DELIVERED, before
+ * the `pr` event, the pull request is converted to a draft listing them
+ * (`start/forced-draft.ts`); a `none` provider has none to convert,
+ * which one line says. A conversion `gh` refuses emits no `pr` event:
+ * after the release's write and the retarget, the run ends with a
+ * `halt`, exit code 20 and the command to run by hand, before the CI
+ * wait, and its record ends `stopped`.
  *
  * Whoever opened it, a DELIVERED pull request whose base is not the
  * run's — the `base` resolved once at the top of {@link runWrapUp} —
@@ -72,7 +75,8 @@
  * the delivery and the wait, and returns without marking the session
  * finished, so the run's end writes `stopped`. A delivered pull request
  * or a `none` provider goes on to the wait and marks the session
- * finished, and the run's end writes `done`. Either way the caller ends
+ * finished, and the run's end writes `done`, but for a forced wrap-up's
+ * refused draft (above). Either way the caller ends
  * its loop once this returns.
  *
  * ## The pull request's event
@@ -81,7 +85,9 @@
  * mode and at the same place: the delivery's, after the retries and the
  * runner have had their turn ({@link emitPullRequestEvent}), so a pull
  * request a retry or the runner opened is the one the event names, and
- * the run's events file holds it in text too. It reads the delivered
+ * the run's events file holds it in text too. A forced wrap-up's comes
+ * after its draft conversion, and a refused conversion emits a `halt`
+ * in its place. It reads the delivered
  * number with no lookup, or a lookup of the branch's open pull request
  * made there on the paths with no number: a moved checkout, or a blocked
  * or interrupted delivery. A `none` provider makes no delivery, and its
@@ -111,7 +117,7 @@ import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
-import { forcedDraftSeamsIn, markForcedDraft } from './forced-draft.js';
+import { forcedDraftSeamsIn, markForcedDraft, refuseUndraftedPullRequest } from './forced-draft.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
 import { retargetPullRequest } from './pr-retarget.js';
@@ -251,9 +257,17 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
       deliverySeamsIn({ ...input, base, fragment: finish.fragment }),
     );
-    await emitPullRequestEvent(expected.branch, delivery.kind === 'delivered'
-      ? delivery.pull.number
-      : null, lookup);
+    // A forced wrap-up's pull request becomes a draft listing the tasks
+    // it passed over BEFORE its `pr` event, so no reader of the events
+    // takes it for one ready for review; a refused draft emits none
+    // (`start/forced-draft.ts`).
+    const drafted = delivery.kind !== 'delivered' || passedOver.length === 0
+      || await markForcedDraft(delivery.pull.number, passedOver, forcedDraftSeamsIn(checkout));
+    if (drafted) {
+      await emitPullRequestEvent(expected.branch, delivery.kind === 'delivered'
+        ? delivery.pull.number
+        : null, lookup);
+    }
     if (delivery.kind === 'interrupted') return;
     if (delivery.kind === 'blocked') throw new CommandExit(1, delivery.message);
     // The release's forecast or sentence, written again into the pull
@@ -267,9 +281,9 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     // reads are the ones GitHub runs against the right base. A refused
     // edit is a warning and the run carries on (`start/pr-retarget.ts`).
     await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
-    // A forced wrap-up's pull request becomes a draft listing the tasks
-    // it passed over, before the CI wait (`start/forced-draft.ts`).
-    if (passedOver.length > 0) await markForcedDraft(delivery.pull.number, passedOver, forcedDraftSeamsIn(checkout));
+    // A refused draft ends the run with exit code 20 before the CI wait,
+    // so its record ends `stopped`, never `done`.
+    if (!drafted) refuseUndraftedPullRequest(delivery.pull.number);
   } else {
     // A `none` provider delivers nothing: the event carries its reason, with no lookup.
     await emitPullRequestEvent(expected.branch, null, lookup);

@@ -4,7 +4,7 @@
  *
  * | Code | Name | The run ended because |
  * | --- | --- | --- |
- * | 20 | {@link DECISION_STOP_EXIT} | a decision said `stop` (a `retry` with no retry left, an unreadable decision and a decision session that failed read as one), or `--force-wrap-up` was refused on the pre-wrap-up step's new failures |
+ * | 20 | {@link DECISION_STOP_EXIT} | a decision said `stop` (a `retry` with no retry left, an unreadable decision and a decision session that failed read as one), or `--force-wrap-up` was refused on the pre-wrap-up step's new failures, or its pull request could not be made a draft |
  * | 21 | {@link DECISION_NEEDED_EXIT} | under `--output=json`, a stop needed a decision the line did not name: the `decision-needed` event carries the prompt |
  * | 22 | {@link PASSED_OVER_EXIT} | every task left is one the run passed over, so no wrap-up ran and no pull request was opened |
  *
@@ -15,7 +15,8 @@
  * `loop wait` on it can tell the two apart by code alone.
  * `continue-exits.test.ts` reads that table, not a copy of it.
  *
- * A refused forced wrap-up shares 20 with a decision's `stop`: both
+ * A refused forced wrap-up, and a forced wrap-up whose pull request
+ * `gh` would not make a draft, share 20 with a decision's `stop`: all
  * mean the run halted where a person has to look before it goes on,
  * and the line printed with it, and the `halt` event, name which. A
  * caller that branches on the code takes the same action for both.
@@ -34,7 +35,7 @@
  */
 import { CommandExit } from '../cli/command.js';
 
-/** A decision said `stop`, or a forced wrap-up was refused. */
+/** A decision said `stop`, or a forced wrap-up was refused or its draft refused. */
 export const DECISION_STOP_EXIT = 20;
 
 /** Under `--output=json`, a stop needs a decision the line did not name. */

@@ -16,7 +16,8 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { bodyWithPassedOver, markForcedDraft, PASSED_OVER_HEADING, passedOverSection } from './forced-draft.js';
+import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';
+import { bodyWithPassedOver, markForcedDraft, PASSED_OVER_HEADING, passedOverSection, refuseUndraftedPullRequest } from './forced-draft.js';
 
 /** The two tasks a forced wrap-up passed over. */
 const TASKS: readonly PassedOverTask[] = [
@@ -90,8 +91,9 @@ describe('markForcedDraft', () => {
       editBody: () => Promise.resolve(),
     });
 
-    await markForcedDraft(41, TASKS, { gh: runner.run, pulls: double.pulls });
+    const drafted = await markForcedDraft(41, TASKS, { gh: runner.run, pulls: double.pulls });
 
+    expect(drafted).toBe(true);
     expect(runner.sent).toEqual([['pr', 'ready', '41', '--undo']]);
     expect(double.calls().map((call) => [call.member, call.args[0]])).toEqual([['get', 41], ['editBody', 41]]);
     expect(String(double.calls()[1]?.args[1])).toContain(PASSED_OVER_HEADING);
@@ -107,13 +109,38 @@ describe('markForcedDraft', () => {
     expect(double.calls().map((call) => call.member)).toEqual(['get']);
   });
 
-  it('warns, never throws, when gh refuses the draft or the body cannot be read', async () => {
+  it('answers false, never throwing, when gh refuses the draft, and warns when the body cannot be read', async () => {
     const double = createPullRequestsDouble({});
 
-    await markForcedDraft(41, TASKS, { gh: gh({ ok: false, stdout: '', stderr: 'draft pull requests are not supported' }).run, pulls: double.pulls });
+    const drafted = await markForcedDraft(41, TASKS, { gh: gh({ ok: false, stdout: '', stderr: 'draft pull requests are not supported' }).run, pulls: double.pulls });
 
+    expect(drafted).toBe(false);
     expect(warnings.join('\n')).toContain('draft pull requests are not supported');
     expect(warnings.join('\n')).toContain('gh pr ready 41 --undo');
     expect(warnings.join('\n')).toContain('could not write the passed-over tasks');
+  });
+});
+
+describe('refuseUndraftedPullRequest', () => {
+  it('emits a halt naming the pull request, then ends the run with exit code 20 and the command to run by hand', () => {
+    const events: (readonly [string, unknown])[] = [];
+    setActiveOutput(sinkOutput({
+      event: (event) => {
+        if (event.type === 'event') events.push([event.name, event.data]);
+      },
+    }));
+    let thrown: unknown = null;
+
+    try {
+      refuseUndraftedPullRequest(41);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(LoopEnd);
+    expect((thrown as LoopEnd).exitCode).toBe(DECISION_STOP_EXIT);
+    expect((thrown as LoopEnd).message).toContain('#41');
+    expect((thrown as LoopEnd).message).toContain('gh pr ready 41 --undo');
+    expect(events).toEqual([['halt', { reason: 'forced draft refused: pull request #41 is ready for review' }]]);
   });
 });

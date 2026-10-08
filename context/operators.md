@@ -201,7 +201,9 @@ start again with `--continue --decide=<strategy>`. A `passed over` line
 lists the tasks a run ends with passed over; a `halt` follows it and the
 run ends with exit code 22, unless `--force-wrap-up` goes on to a draft
 pull request. A refused forced wrap-up is a `halt` naming its count,
-with exit code 20. None of these ends on an `error` line.
+with exit code 20, and so is a forced wrap-up whose pull request `gh`
+would not make a draft, its `halt` naming the pull request in place of
+the `pr` line. None of these ends on an `error` line.
 
 An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as

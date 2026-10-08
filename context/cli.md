@@ -575,13 +575,17 @@ New; it replaces no earlier text. What a row or an action added to
     count, ends with exit code 20. The wrap-up then marks the delivered
     pull request a draft with `gh pr ready <n> --undo` and writes a
     `## Passed-over tasks` section into its body (`start/forced-draft.ts`),
-    each a warning when refused.
+    both before the run's `pr` event. A body write refused is a warning;
+    a draft refused emits no `pr` event, and after the release's write
+    and the retarget ends the run with a `halt`, exit code 20 and a line
+    naming the pull request and `gh pr ready <n> --undo` to run by hand,
+    before the CI wait, its record `stopped`.
   - **Exit codes and events** (`start/continue-exits.ts`): 20 for a
-    decision's `stop` and a refused forced wrap-up, 21 for a decision
-    needed, 22 for a run ended on passed-over tasks; from 20 so none
-    meets a code `loop wait` answers (10 to 16, 2) or one every command
-    shares (0 to 3). Each is thrown as a `LoopEnd` once the run has
-    emitted its own events, `decision`, `decision-needed` or
+    decision's `stop`, a refused forced wrap-up and a refused draft, 21
+    for a decision needed, 22 for a run ended on passed-over tasks; from
+    20 so none meets a code `loop wait` answers (10 to 16, 2) or one
+    every command shares (0 to 3). Each is thrown as a `LoopEnd` once
+    the run has emitted its own events, `decision`, `decision-needed` or
     `passed-over` and then the stop's `task-blocked` or `halt`, so the
     run's catch writes no `error` event for it. `context/operators.md`
     shows their lines.
