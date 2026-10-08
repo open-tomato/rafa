@@ -27,7 +27,10 @@
  * (`decision`, `decision-needed` or `passed-over`, then the stop's
  * `task-blocked` or `halt`), so `start()`'s catch writes no `error`
  * event for it: the run did not end on an error, and `rafa loop wait`
- * then answers on the stop's own event.
+ * then answers on the stop's own event. A run SIGINT interrupted
+ * during its decision session ends through one too, with exit code 0,
+ * as an interrupted task does, after the stop's own event naming
+ * `interrupted` (`start/continue-run.ts`).
  */
 import { CommandExit } from '../cli/command.js';
 

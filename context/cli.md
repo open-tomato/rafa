@@ -520,7 +520,9 @@ New; it replaces no earlier text. What a row or an action added to
   the run, `jump` passes the task over for the run
   and `defer` until the task at its `after` line is ticked. An
   unreadable block, a session that exits nonzero and criteria that
-  cannot be read are `stop`; a session SIGINT ended decides nothing.
+  cannot be read are `stop`; a session SIGINT ended decides nothing,
+  emits the stop's own `task-blocked` or `halt` with `interrupted` as
+  its reason, and ends the run with exit code 0.
   Passed-over lines are `findNextTask`'s `skipLines`; the tracker keeps
   them `[BLOCKED]`, and the list is saved on the run record as
   `decisions` and read back by the plan's next `--continue` run on the

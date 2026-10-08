@@ -355,7 +355,7 @@ describe('what each decision does', () => {
     expect(events[0]?.[1]).toMatchObject({ strategy: 'stop', reason: expect.stringContaining(UNREADABLE_PREFIX) as unknown });
   });
 
-  it('halts as before, deciding nothing, when SIGINT ends the decision session', async () => {
+  it('ends the run deciding nothing when SIGINT ends the decision session, its stop\'s event naming interrupted', async () => {
     const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
     const decisions = createRunDecisions({
       ...run.options,
@@ -365,8 +365,28 @@ describe('what each decision does', () => {
       },
     });
 
-    expect(await decisions.atStop(heldReport(run.trackerPath))).toBe(false);
-    expect(events).toEqual([]);
+    const end = await endOf(() => decisions.atStop(heldReport(run.trackerPath)));
+
+    expect(end.exitCode).toBe(0);
+    expect(end.message).toContain('Interrupted during the --continue decision');
+    expect(events).toEqual([['task-blocked', { position: { index: 1, total: 4 }, reason: 'interrupted' }]]);
+    expect(readFileSync(run.trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('names interrupted on a red suite step\'s halt too, when SIGINT ends its decision session', async () => {
+    const run = plant([]);
+    run.refusal = 'spent';
+    const decisions = createRunDecisions({
+      ...run.options,
+      spawn: () => {
+        run.interrupted = true;
+        return Promise.resolve({ exitCode: 130, stdout: '' });
+      },
+    });
+
+    await endOf(() => decisions.atStop({ kind: 'suite-red' }));
+
+    expect(events).toEqual([['halt', { reason: 'interrupted' }]]);
   });
 });
 

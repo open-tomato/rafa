@@ -38,8 +38,11 @@
  * why it stopped, the retries left, every open task, and the criteria
  * `resolveContinueCriteria` reads again for each decision. Its output is
  * read by `parseDecision`, which answers `stop` for anything it cannot
- * read. A session that exits nonzero is read as `stop`; one SIGINT
- * ended halts the run as an interrupt always has, deciding nothing.
+ * read. A session that exits nonzero is read as `stop`. One SIGINT
+ * ended decides nothing: the stop's own event is emitted with
+ * `interrupted` as its reason, in place of the hold that stopped the
+ * task, and the run ends with exit code 0, as an interrupted task does,
+ * the tracker as the stop left it.
  *
  * ## What the loop does with it
  *
@@ -148,6 +151,12 @@ import { addDecision, markDone, remaining, seedFrom, skippedLines, taskRefIn } f
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
 export const SUITE_STEP_RED = 'suite step red';
 
+/** A stop's own event: the `task-blocked` or `halt` emitted once the run stops on it. */
+export type StopEvent = Extract<LoopEvent, { readonly kind: 'task-blocked' | 'halt' }>;
+
+/** The reason the stop's own event gives when SIGINT ended its decision session. */
+const INTERRUPTED = 'interrupted';
+
 /** A stop `start()` hands to {@link RunDecisions.atStop}. */
 export type DecisionStop =
   | {
@@ -156,14 +165,14 @@ export type DecisionStop =
     readonly taskInfo: TaskInfo;
     readonly finished: Pick<FinishedTask, 'attempt' | 'holds'>;
     /** The stop's own event, emitted only when the run stops. */
-    readonly stopEvent: LoopEvent;
+    readonly stopEvent: StopEvent;
   }
   | {
     /** A task session that exited nonzero, past its budget and an interrupt. */
     readonly kind: 'session-exit';
     readonly taskInfo: TaskInfo;
     readonly exitCode: number;
-    readonly stopEvent: LoopEvent;
+    readonly stopEvent: StopEvent;
   }
   | {
     /** A red suite step, not stopped by SIGINT; the task is the line it blocked. */
@@ -253,7 +262,7 @@ const NO_DECISIONS: RunDecisions = Object.freeze({
 interface DecisionSubject {
   readonly taskInfo: TaskInfo;
   readonly holds: readonly string[];
-  readonly stopEvent: LoopEvent;
+  readonly stopEvent: StopEvent;
 }
 
 /** When a stop is decided: at once, once the retries are spent, or never. */
@@ -444,6 +453,12 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     return true;
   };
 
+  /** Ends a run SIGINT interrupted during its decision session; see the module note. */
+  const interruptedDeciding = (subject: DecisionSubject): never => {
+    emitLoopEvent({ ...subject.stopEvent, reason: INTERRUPTED });
+    throw new LoopEnd(0, `\n⚠️  Interrupted during the --continue decision on line ${shownLine(subject.taskInfo)}: nothing was decided, and the task stays [BLOCKED]. Run again to resume.`);
+  };
+
   /** Asks the run's retries first: only a grant writes the approach and emits `retry`; a refusal stops. */
   const retryWith = (decision: ContinueDecision, subject: DecisionSubject): boolean => {
     if (!retries.retry('the decision chose retry')) {
@@ -471,7 +486,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const decide = async (subject: DecisionSubject): Promise<boolean> => {
     const content = readTracker();
     const decision = await decisionFor(subject, content);
-    if (decision === null) return false;
+    if (decision === null) return interruptedDeciding(subject);
     const identity = boundKey(subject.taskInfo, content);
     return apply(bounded(decision, identity), subject, content, identity);
   };
@@ -492,7 +507,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     if (!firstPass) return false;
     firstPass = false;
     if (directive === null || taskInfo?.status !== 'blocked') return false;
-    const stopEvent: LoopEvent = {
+    const stopEvent: StopEvent = {
       kind: 'task-blocked',
       position: taskPosition(trackerContent, taskInfo.lineNum),
       reason: `--decide=${directive.strategy}`,
