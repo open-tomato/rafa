@@ -30,8 +30,8 @@
  * `tsconfig.json` that excludes test files checks. A session that never
  * ran that check reports done, the step is red, and the run stops on a
  * repair that a check before the report would have made needless. So
- * when the checkout holds the `tsconfig.json` the step needs
- * ({@link TypeCheckRecipe}), one line hands the session the step's own
+ * when the checkout holds the `tsconfig.json` and the `tsc` the step
+ * needs ({@link TypeCheckRecipe}), one line hands the session the step's own
  * scratch tsconfig and tsc argv, with {@link TYPE_CHECK_FILE} and
  * {@link TYPE_CHECK_SCRATCH} where the step puts its files and its
  * scratch path. With no recipe, no line.

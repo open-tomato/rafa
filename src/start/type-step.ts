@@ -54,7 +54,8 @@
  * a `node_modules` above the repository is never used. When git does not
  * answer, or the checkout is not under that root, only the checkout is
  * looked at. When the walk finds none, `<modules>` is the checkout's
- * `node_modules`, and the spawn fails as the table below says.
+ * `node_modules`, and the spawn fails as the table below says; the task
+ * prompt then names no recipe.
  *
  * The base is a detached worktree of `<base>` in a temporary directory,
  * its `node_modules` a symlink to `<modules>`, so a test file at the
@@ -353,12 +354,17 @@ export interface TypeCheckRecipe {
 }
 
 /**
- * The recipe for `checkout`, or null when it holds no `tsconfig.json` at
- * its root, where the step runs nothing (the module note's first case).
+ * The recipe for `checkout`, or null where the step cannot run tsc: when
+ * the checkout holds no `tsconfig.json` at its root (the module note's
+ * first case), and when the walk finds no `node_modules/.bin/tsc` (its
+ * fourth), so the prompt never names a binary that is not there.
  */
 export function readTypeCheckRecipe(checkout: string, git: GitRunner): TypeCheckRecipe | null {
   if (!existsSync(join(checkout, 'tsconfig.json'))) return null;
-  return { checkout, modules: modulesFor(checkout, git) };
+  const modules = findNodeModules(checkout, git);
+  return modules === null
+    ? null
+    : { checkout, modules };
 }
 
 /** The errors tsc printed under `--pretty false`, each file relative to `cwd`. */

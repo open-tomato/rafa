@@ -432,6 +432,17 @@ describe('runTypeStep finds node_modules by the walk', () => {
     const wider: GitRunner = () => ({ ok: true, stdout: `${join(top, '.git')}\n`, stderr: '' });
     expect(findNodeModules(main, wider)).toBe(decoy);
   });
+
+  it('hands the prompt no recipe when the walk finds no tsc, and one through the node_modules it finds once one is planted', () => {
+    // A tsconfig.json at the root, a decoy above the repository, and no tsc the walk reaches.
+    plantTsc(top);
+    expect(existsSync(join(main, 'tsconfig.json'))).toBe(true);
+    expect(readTypeCheckRecipe(main, createGitRunner(main))).toBeNull();
+
+    // The control: the same checkout once its own node_modules holds a tsc.
+    const modules = plantTsc(main);
+    expect(readTypeCheckRecipe(main, createGitRunner(main))).toEqual({ checkout: main, modules });
+  });
 });
 
 describe('runTypeStep over scripted seams', () => {

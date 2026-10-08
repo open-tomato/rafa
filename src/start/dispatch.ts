@@ -32,9 +32,10 @@
  * it runs for its scoped test gate. The line after the base line, when
  * the run's `tests.alwaysRun` resolved to any tracked file, tells the
  * session to also run `bun test` over those files (`task-gate-lines.ts`).
- * The line after that, when the checkout holds the `tsconfig.json` the
- * runner's type step needs, tells the session to type-check the test
- * files its change adds or edits as that step will (`typeCheckLines`).
+ * The line after that, when the checkout holds the `tsconfig.json` and
+ * the `tsc` the runner's type step needs, tells the session to
+ * type-check the test files its change adds or edits as that step will
+ * (`typeCheckLines`).
  * Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),

@@ -38,7 +38,8 @@ default), `tests=module`, or `tests=full` to control what its session checks.
   with `typeRoots` held absolutely, read below for the scratch recipe and
   backlog); the task prompt hands the session that recipe as one line,
   the type step's own scratch tsconfig and `tsc` command, whenever the
-  checkout holds a `tsconfig.json`
+  checkout holds a `tsconfig.json` and the step's walk finds a
+  `node_modules/.bin/tsc`
 - `bunx eslint <changed files>` (ESLint on changed files only; read below
   for the blocker when changed files are all ignored)
 
