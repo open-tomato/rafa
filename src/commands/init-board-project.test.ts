@@ -822,7 +822,7 @@ describe('setUpProject and rafa board sync, the progress of all three phases ren
     });
 
     expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
-    expect(printed).toEqual(PHASE_LINES);
+    expect(printed).toEqual([...PHASE_LINES]);
   });
 
   it('writes the same counts as progress events, ahead of nothing else, driving the init part in json mode', async () => {
@@ -836,8 +836,8 @@ describe('setUpProject and rafa board sync, the progress of all three phases ren
     });
 
     expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
-    expect(events.map((event) => event.summary)).toEqual(PHASE_LINES);
-    expect(events.map((event) => event.data)).toEqual(PHASE_EVENT_DATA);
+    expect(events.map((event) => event.summary)).toEqual([...PHASE_LINES]);
+    expect(events.map((event) => event.data)).toEqual([...PHASE_EVENT_DATA]);
   });
 
   it('drives rafa board sync next, its own facts phase printed the same way, with the same counts between text and json mode', async () => {
@@ -862,7 +862,7 @@ describe('setUpProject and rafa board sync, the progress of all three phases ren
       'reading facts: 5/5, 0 refused, 2s',
     ]);
     const jsonProgress = eventsOf(json.stdout).filter((event) => event.type === 'event' && event.name === 'progress');
-    expect(jsonProgress.map((event) => (event as { summary?: string }).summary)).toEqual(textLines);
+    expect(jsonProgress.map((event) => (event as { summary?: string }).summary)).toEqual([...textLines]);
   });
 });
 
