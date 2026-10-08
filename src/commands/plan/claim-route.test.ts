@@ -479,7 +479,7 @@ describe('resolveAndClaim before the claim', () => {
 });
 
 /** The project refresh's keys, no project set: a label write sends no refresh. */
-const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 
 describe('createPlanClaimContext', () => {
   let root = '';

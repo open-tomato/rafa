@@ -147,7 +147,7 @@ function fakeGh(board: readonly object[], listing?: GhResult): FakeGh {
 
 /** The config of a case, in `mode`, with `board.project.number` set to `number`. */
 function config(mode: 'labels' | 'native', number: number | null = PROJECT_NUMBER): RefreshConfig {
-  return { boardProjectNumber: number, boardRelationships: mode, roadmapIssue: null, releaseFragments: '.changes' };
+  return { boardProjectNumber: number, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: mode, roadmapIssue: null, releaseFragments: '.changes' };
 }
 
 /** How one case runs. */

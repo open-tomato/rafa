@@ -16,6 +16,12 @@
  *    reporting every item as not updated fails.
  *  - The scope refusal is read beside a rate-limit one, so a writer
  *    treating every failure as a rate limit fails.
+ *  - The writes are paced by the options a caller passes, read off
+ *    `board.project.writeBatchSize` and `board.project.writePauseMs`:
+ *    the cases hold a batch of {@link BATCH_SIZE} and a pause of
+ *    {@link PAUSE_MS}, and one case paces the same writes at another size
+ *    and pause, so a writer keeping a size or a pause of its own fails.
+ *    Each refused size or pause sits beside the least one accepted.
  */
 import type { FakeProject } from './project-fake.js';
 import type { ProjectFieldWrite } from './writes.js';
@@ -24,14 +30,15 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { createGhProjectPort } from './gh.js';
-import {
-  matchProjectFields,
-  PROJECT_WRITE_BATCH_SIZE,
-  PROJECT_WRITE_PAUSE_MS,
-  ProjectPortError,
-} from './port.js';
+import { matchProjectFields, ProjectPortError } from './port.js';
 import { createFakeProjectGh, FAKE_RATE_LIMIT_MESSAGE, fakeItemId, fakeProjectId } from './project-fake.js';
 import { writeAlias, writeBatchArgs, writeProjectFields } from './writes.js';
+
+/** The field writes per request the cases pass, as `board.project.writeBatchSize`. */
+const BATCH_SIZE = 5;
+
+/** The pause between requests the cases pass, as `board.project.writePauseMs`. */
+const PAUSE_MS = 0;
 
 /** How many items the rate-limited fill writes, three fields each. */
 const FILL_ITEMS = 16;
@@ -85,10 +92,12 @@ function answeringInTurn(results: readonly GhResult[]): { gh: GhRunner; calls: (
   };
 }
 
-/** A sleep recording each pause, waiting for none. */
-function recordingSleep(): { sleep: (ms: number) => Promise<void>; pauses: number[] } {
+/** The cases' pace, {@link BATCH_SIZE} and {@link PAUSE_MS}, with a sleep recording each pause and waiting for none. */
+function recordingSleep(): { batchSize: number; pauseMs: number; sleep: (ms: number) => Promise<void>; pauses: number[] } {
   const pauses: number[] = [];
   return {
+    batchSize: BATCH_SIZE,
+    pauseMs: PAUSE_MS,
     pauses,
     sleep: (ms) => {
       pauses.push(ms);
@@ -176,8 +185,8 @@ describe('writeProjectFields', () => {
     expect([fake.calls(), pacing.pauses]).toEqual([[], []]);
   });
 
-  it('batches the writes and pauses between two requests only', async () => {
-    const project = projectOf(PROJECT_WRITE_BATCH_SIZE * 2 + 1);
+  /** The requests and pauses of `writes` over `project`, each request named by its count of writes, paced at `batchSize` and `pauseMs`. */
+  async function paceOf(project: FakeProject, batchSize: number, pauseMs: number): Promise<{ events: readonly string[]; written: number }> {
     const fake = createFakeProjectGh({ projects: [project] });
     const ids = await idsOf(fake.gh, project);
     const writes = (project.items ?? []).map((_, index) => clearOf(fakeItemId(project, index), ids.field('Stage')));
@@ -190,16 +199,44 @@ describe('writeProjectFields', () => {
       events.push(`pause of ${String(ms)}`);
       return Promise.resolve();
     };
-    const result = await writeProjectFields(gh, fakeProjectId(project), writes, { sleep });
-    expect(result.written).toBe(writes.length);
-    const pause = `pause of ${String(PROJECT_WRITE_PAUSE_MS)}`;
-    expect(events).toEqual([`request of ${String(PROJECT_WRITE_BATCH_SIZE)}`, pause, `request of ${String(PROJECT_WRITE_BATCH_SIZE)}`, pause, 'request of 1']);
+    const result = await writeProjectFields(gh, fakeProjectId(project), writes, { batchSize, pauseMs, sleep });
     expect((await valuesOf(fake.gh, project))[0]).toEqual({ 'Rank': 9, 'Blocked by': '#7' });
+    return { events, written: result.written };
+  }
+
+  it('batches the writes 5 to a request and pauses 0 ms between two requests only', async () => {
+    const project = projectOf(11);
+    expect(await paceOf(project, BATCH_SIZE, PAUSE_MS)).toEqual({
+      events: ['request of 5', 'pause of 0', 'request of 5', 'pause of 0', 'request of 1'],
+      written: 11,
+    });
+  });
+
+  it('paces the same writes at another size and pause when the options name them', async () => {
+    expect(await paceOf(projectOf(11), 4, 250)).toEqual({
+      events: ['request of 4', 'pause of 250', 'request of 4', 'pause of 250', 'request of 3'],
+      written: 11,
+    });
+  });
+
+  it('refuses a batch size below 1 and a pause below 0 with nothing sent, beside the least of each accepted', async () => {
+    const fake = createFakeProjectGh();
+    const writes = [clearOf('I_a')];
+    const sleep = recordingSleep().sleep;
+    await expect(writeProjectFields(fake.gh, 'PVT_1', writes, { batchSize: 0, pauseMs: PAUSE_MS, sleep }))
+      .rejects.toThrow('not a batch size of writes: 0, expected a whole number from 1');
+    await expect(writeProjectFields(fake.gh, 'PVT_1', writes, { batchSize: 1.5, pauseMs: PAUSE_MS, sleep }))
+      .rejects.toThrow('not a batch size of writes: 1.5, expected a whole number from 1');
+    await expect(writeProjectFields(fake.gh, 'PVT_1', writes, { batchSize: BATCH_SIZE, pauseMs: -1, sleep }))
+      .rejects.toThrow('not a pause between write requests: -1, expected a whole number from 0');
+    expect(fake.calls()).toEqual([]);
+    const project = projectOf(2);
+    expect(await paceOf(project, 1, 0)).toEqual({ events: ['request of 1', 'pause of 0', 'request of 1'], written: 2 });
   });
 
   it('checks every write before the first request goes', async () => {
     const fake = createFakeProjectGh();
-    const writes = [...Array.from({ length: PROJECT_WRITE_BATCH_SIZE }, (_, index) => clearOf(`I_${String(index)}`)), clearOf('')];
+    const writes = [...Array.from({ length: BATCH_SIZE }, (_, index) => clearOf(`I_${String(index)}`)), clearOf('')];
     await expect(writeProjectFields(fake.gh, 'PVT_1', writes, recordingSleep())).rejects.toThrow(RangeError);
     expect(fake.calls()).toEqual([]);
   });
@@ -218,19 +255,17 @@ describe('a rate-limit refusal', () => {
     const pacing = recordingSleep();
     const before = fake.calls().length;
     const result = await writeProjectFields(fake.gh, fakeProjectId(project), writes, pacing);
-    const cut = Math.floor(PROJECT_WRITE_BATCH_SIZE / 3);
     expect(result).toEqual({
-      written: PROJECT_WRITE_BATCH_SIZE,
-      notUpdated: FILL_ITEMS - cut,
+      written: BATCH_SIZE,
+      notUpdated: FILL_ITEMS - 1,
       rateLimited: true,
       detail: `gh: ${FAKE_RATE_LIMIT_MESSAGE}`,
     });
-    expect([fake.calls().length - before, pacing.pauses.length]).toEqual([2, 1]);
+    expect([fake.calls().length - before, pacing.pauses]).toEqual([2, [PAUSE_MS]]);
     const values = await valuesOf(fake.gh, project);
     expect(values[0]).toEqual({ 'Stage': 'Triage', 'Rank': 1, 'Blocked by': '#7', 'Progress': '1 / 2' });
-    expect(values[cut - 1]).toEqual({ Stage: 'Triage', Rank: cut, Progress: '1 / 2' });
-    expect(values[cut]).toEqual({ Stage: 'Triage', Rank: cut + 1 });
-    expect(values[cut + 1]).toEqual({});
+    expect(values[1]).toEqual({ Stage: 'Triage', Rank: 2 });
+    expect(values[2]).toEqual({});
   });
 
   it('reads a secondary rate limit off what gh wrote, and rejects any other refusal keeping it', async () => {

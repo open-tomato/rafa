@@ -74,7 +74,9 @@
  * The five values come out of the rules (`./rules.ts`) through
  * `./refresh-values.ts`, which compares them with what each item holds
  * and answers only the values that differ; those, and nothing else, go
- * to `writeProjectFields` (`./writes.ts`), batched and paced. A second
+ * to `writeProjectFields` (`./writes.ts`), batched by
+ * `board.project.writeBatchSize` and paced by `board.project.writePauseMs`,
+ * both read off {@link RefreshOptions.config}. A second
  * refresh over unchanged facts therefore sends no write. A field the
  * project does not hold as the template has it is skipped and named in
  * {@link ProjectRefreshed.skipped}; the other fields are still written.
@@ -110,7 +112,7 @@
 import type { IssueFacts } from './facts.js';
 import type { FieldMismatch, MatchedField, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
-import type { ProjectWritesResult, ProjectWritesSeams } from './writes.js';
+import type { ProjectWritesOptions, ProjectWritesResult } from './writes.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaConfig } from '../../config.js';
 import type { BoardIssue } from '../roadmap-board.js';
@@ -141,7 +143,15 @@ import { writeProjectFields } from './writes.js';
 const PREFIX = 'board project refresh';
 
 /** The config keys the refresh reads. */
-export type RefreshConfig = Pick<RafaConfig, 'boardProjectNumber' | 'boardRelationships' | 'roadmapIssue' | 'releaseFragments'>;
+export type RefreshConfig = Pick<
+  RafaConfig,
+  | 'boardProjectNumber'
+  | 'boardProjectWriteBatchSize'
+  | 'boardProjectWritePauseMs'
+  | 'boardRelationships'
+  | 'roadmapIssue'
+  | 'releaseFragments'
+>;
 
 /** What {@link refreshProjectItems} is made with. */
 export interface RefreshOptions {
@@ -149,9 +159,17 @@ export interface RefreshOptions {
   /** Runs every `gh` call the refresh sends. */
   readonly gh: GhRunner;
   /** The pause between two write requests; `Bun.sleep` when left out. */
-  readonly sleep?: ProjectWritesSeams['sleep'];
+  readonly sleep?: ProjectWritesOptions['sleep'];
   /** True to read and answer the changes and send no write; see the module note. */
   readonly dryRun?: boolean;
+}
+
+/** The pace of the writes: the two `board.project` keys off the config, and the sleep seam when given. */
+function writesOptionsOf(options: RefreshOptions): ProjectWritesOptions {
+  const pace = { batchSize: options.config.boardProjectWriteBatchSize, pauseMs: options.config.boardProjectWritePauseMs };
+  return options.sleep === undefined
+    ? pace
+    : { ...pace, sleep: options.sleep };
 }
 
 /** What a refresh adds to the issues it is asked for; see the module note. */
@@ -389,9 +407,7 @@ async function refreshOn(
     : await changesFor(options, repository, project, present, board);
   const writes = changes.length === 0 || options.dryRun === true
     ? NOTHING_WRITTEN
-    : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), options.sleep === undefined
-      ? {}
-      : { sleep: options.sleep });
+    : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), writesOptionsOf(options));
   const warnings = [
     ...(writes.rateLimited
       ? [rateLimitWarning(writes.notUpdated)]

@@ -175,7 +175,7 @@ function scopelessGh(calls: string[][]): GhRunner {
 }
 
 /** The config the factory's cases read, the number set. */
-const CONFIG: RefreshConfig = { boardProjectNumber: 6, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+const CONFIG: RefreshConfig = { boardProjectNumber: 6, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 
 describe('createRefreshingGhIssueBoard', () => {
   it('sends the edit alone with board.project.number unset', async () => {

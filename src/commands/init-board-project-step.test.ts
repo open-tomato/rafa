@@ -47,6 +47,8 @@ const BOARD_RAN: BoardStepResult = { status: 'ran', asked: false, report: null, 
 /** The config `init` resolved before the board step. */
 const CONFIG: ProjectSetupConfig = {
   boardProjectNumber: null,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardProjectTemplate: 'https://github.com/orgs/open-tomato/projects/6',
   boardRelationships: 'labels',
   roadmapIssue: null,

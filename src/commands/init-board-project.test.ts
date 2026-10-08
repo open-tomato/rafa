@@ -57,8 +57,6 @@ import {
   setUpProject,
 } from './init-board-project.js';
 
-const { PROJECT_WRITE_PAUSE_MS } = await import('../board/project/port.js');
-
 /** The repository's owner, who receives the copy. */
 const OWNER = 'open-tomato';
 
@@ -96,6 +94,8 @@ const ADDED: readonly number[] = [1, 10, 30, 40, 50];
 /** The config every case reads but where a case says otherwise. */
 const CONFIG: ProjectSetupConfig = {
   boardProjectNumber: null,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardProjectTemplate: TEMPLATE_URL,
   boardRelationships: 'labels',
   roadmapIssue: null,
@@ -297,17 +297,19 @@ describe('setUpProject, a first run', () => {
     expect(mutations(router.calls()).filter((name) => name === 'addProjectV2ItemById')).toHaveLength(ADDED.length);
   });
 
-  it('paces the adds one write pause apart, with none before the first', async () => {
+  it('paces the adds board.project.writePauseMs apart, with none before the first', async () => {
     const router = route();
     const pausedAfter: number[] = [];
+    const pauses = new Set<number>();
     const sleep = (ms: number): Promise<void> => {
-      expect(ms).toBe(PROJECT_WRITE_PAUSE_MS);
+      pauses.add(ms);
       pausedAfter.push(router.calls().length);
       return Promise.resolve();
     };
 
-    await setUpProject(options(router, rootHolding('paced'), {}, sleep));
+    await setUpProject(options(router, rootHolding('paced'), { boardProjectWritePauseMs: 250 }, sleep));
 
+    expect([...pauses]).toEqual([250]);
     const adds = router.calls().flatMap((args, index) => (args.some((arg) => arg.includes('addProjectV2ItemById('))
       ? [index]
       : []));

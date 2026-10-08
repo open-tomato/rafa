@@ -146,7 +146,7 @@ function fakeGh(pulls: Readonly<Record<string, readonly PullNode[]>>, answer?: G
 
 /** The config of a case, `board.project.number` set to `number`. */
 function config(number: number | null = 6): RefreshConfig {
-  return { boardProjectNumber: number, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+  return { boardProjectNumber: number, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 }
 
 /** How one case runs. */

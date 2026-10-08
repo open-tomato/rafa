@@ -276,7 +276,7 @@ describe('the project refresh after the runner opens the pull request', () => {
 
 /** A refresh config with `board.project.number` set to `number`. */
 function refreshConfig(number: number | null): ClosedIssuesRefreshOptions['config'] {
-  return { boardProjectNumber: number, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+  return { boardProjectNumber: number, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 }
 
 /** A runner that refuses every call: a case that reaches it sent a `gh` call it should not have. */

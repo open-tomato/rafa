@@ -29,8 +29,8 @@
  * or issue the way a caller holds it, by login, `owner/name` and number,
  * and the adapter reads the node id the mutation needs first, so each
  * write is two `gh` calls. Setting and clearing an item's fields is not
- * here: `./writes.ts` batches them, {@link PROJECT_WRITE_BATCH_SIZE} to a
- * request, {@link PROJECT_WRITE_PAUSE_MS} apart.
+ * here: `./writes.ts` batches them, `board.project.writeBatchSize` to a
+ * request, `board.project.writePauseMs` apart.
  *
  * ## Fields and options by exact name
  *
@@ -72,22 +72,6 @@ import { HORIZON_OPTIONS, STAGE_OPTIONS } from './options.js';
  * budget, read off `rateLimit { cost }` on 2026-10-06.
  */
 export const PROJECT_PAGE_SIZE = 100;
-
-/**
- * How many field writes `./writes.ts` sends in one GraphQL request, each
- * an aliased mutation. Not a reading: whether GitHub counts a request of
- * several mutations once or once per mutation against its per-minute and
- * per-hour write limits was not measured (the spec's "Write volume is
- * unmeasured"), so a first fill of about 400 writes goes as 20 requests.
- */
-export const PROJECT_WRITE_BATCH_SIZE = 20;
-
-/**
- * The pause `./writes.ts` takes between two write requests, in
- * milliseconds: GitHub's documentation on secondary rate limits asks for
- * at least one second between mutating requests. Not a reading either.
- */
-export const PROJECT_WRITE_PAUSE_MS = 1_000;
 
 /** What every refusal opens with. */
 export const PROJECT_PORT_PREFIX = 'board project';

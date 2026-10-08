@@ -45,6 +45,8 @@ const NUMBER = 6;
 /** The config every case reads but the one that unsets the number. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: NUMBER,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',
   roadmapIssue: null,
   releaseFragments: '.changes',
@@ -358,7 +360,8 @@ describe('refreshProjectItems: the failures of "What can go wrong", answered as 
   });
 
   it('answers no rate-limit line when every write lands, the control of the case above', async () => {
-    const wired = wire(items(), CONFIG, { rateLimitAfter: 1 });
+    const requests = Math.ceil(12 / CONFIG.boardProjectWriteBatchSize);
+    const wired = wire(items(), CONFIG, { rateLimitAfter: requests });
 
     const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
 

@@ -38,6 +38,8 @@ const NEW_ISSUE = 41;
 /** The config every case reads but the one that unsets the number. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: NUMBER,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',
   roadmapIssue: null,
   releaseFragments: '.changes',

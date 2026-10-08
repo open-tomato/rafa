@@ -47,6 +47,8 @@ const { notFoundWarning, rateLimitWarning, scopeWarning } = await import('./refr
 /** The config every case reads. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: SYNC_PROJECT_NUMBER,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',
   roadmapIssue: null,
   releaseFragments: '.changes',

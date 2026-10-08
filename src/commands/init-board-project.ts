@@ -51,7 +51,7 @@
  *     read only for the closed issues the first two leave out that the
  *     project does not hold already, so a second run reads none it has
  *     added. Each missing issue is added through `ProjectPort.addItem`,
- *     lowest number first, {@link PROJECT_WRITE_PAUSE_MS} apart as the
+ *     lowest number first, `board.project.writePauseMs` apart as the
  *     field writes are paced; `present` when none was missing. An add
  *     refused part way is a refused part naming how many went through;
  *     the adds are idempotent, so a second run finishes them.
@@ -114,7 +114,6 @@ import type { BoardStepResult } from './init-board.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
-import { PROJECT_WRITE_PAUSE_MS } from '../board/project/port.js';
 import { isMissingProjectScope, PROJECT_SCOPE_FIX, rateLimitWarning } from '../board/project/refresh-warnings.js';
 import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.js';
 import { rankOf, stageOf } from '../board/project/rules.js';
@@ -347,7 +346,7 @@ async function itemsStep(options: ProjectSetupOptions, repository: string, proje
   let added = 0;
   try {
     for (const number of missing) {
-      if (added > 0) await sleep(PROJECT_WRITE_PAUSE_MS);
+      if (added > 0) await sleep(options.config.boardProjectWritePauseMs);
       await port.addItem(project.id, { repository, number });
       added += 1;
     }
