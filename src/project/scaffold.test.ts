@@ -263,7 +263,7 @@ describe('the config files', () => {
     expect([resolved.sources.triageSimilarityThreshold, resolved.sources.triageSimilarityCandidates]).toEqual(['default', 'default']);
   });
 
-  it('carries the loop section, worktreeDir at .rafa/worktrees and wrapUp.retries at 1, which resolve from the file once uncommented', () => {
+  it('carries the loop section, worktreeDir at .rafa/worktrees, retries at false and wrapUp.retries at 1, which resolve from the file once uncommented', () => {
     const loop = CONFIG_SETTINGS_LINES.slice(
       CONFIG_SETTINGS_LINES.indexOf('# loop:'),
       CONFIG_SETTINGS_LINES.indexOf('# pr:'),
@@ -274,10 +274,12 @@ describe('the config files', () => {
       '# loop:',
       '#   settingSources: project,local',
       `#   worktreeDir: ${join('.rafa', 'worktrees')}`,
+      '#   retries: false',
       '#   wrapUp:',
       '#     retries: 1',
     ]);
     expect([resolved.config.loopWorktreeDir, resolved.sources.loopWorktreeDir]).toEqual([join('.rafa', 'worktrees'), 'file']);
+    expect([resolved.config.loopRetries, resolved.sources.loopRetries]).toEqual([false, 'file']);
     expect([resolved.config.loopWrapUpRetries, resolved.sources.loopWrapUpRetries]).toEqual([1, 'file']);
   });
 

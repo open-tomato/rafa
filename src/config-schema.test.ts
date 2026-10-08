@@ -58,6 +58,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
+  ['loopRetries', 'loop.retries'],
   ['loopWrapUpRetries', 'loop.wrapUp.retries'],
   ['prProvider', 'pr.provider'],
   ['prMergeMethod', 'pr.mergeMethod'],
@@ -260,7 +261,7 @@ describe('knownKeysAbove', () => {
       'dangerous',
       ['acceptStaleRefs', 'acceptVersionCollision', 'selfUpdateDuringLoop'],
     ]);
-    expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir', 'wrapUp']]);
+    expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir', 'retries', 'wrapUp']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
     expect(knownKeysAbove('learning.promote.afters')).toEqual([
       'learning.promote',

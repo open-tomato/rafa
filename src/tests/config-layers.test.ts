@@ -178,6 +178,7 @@ const PROJECT_TEXT = [
   'loop:',
   '  settingSources: user, project',
   '  worktreeDir: user-trees',
+  '  retries: 3',
   '  wrapUp:',
   '    retries: 3',
   'pr:',
@@ -283,6 +284,7 @@ const PROJECT_VALUES: RafaConfig = {
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
   loopWorktreeDir: 'user-trees',
+  loopRetries: 3,
   loopWrapUpRetries: 3,
   prProvider: 'none',
   prMergeMethod: 'rebase',
@@ -373,6 +375,7 @@ const USER_TEXT = [
   'loop:',
   '  settingSources: project, local',
   '  worktreeDir: ../project-trees',
+  '  retries: 1',
   '  wrapUp:',
   '    retries: false',
   'pr:',
@@ -463,6 +466,7 @@ const USER_VALUES: RafaConfig = {
   allowList: ['rafa-linear', 'my-output'],
   settingSources: ['project', 'local'],
   loopWorktreeDir: '../project-trees',
+  loopRetries: 1,
   loopWrapUpRetries: false,
   prProvider: 'gh',
   prMergeMethod: 'merge',
@@ -720,6 +724,11 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
   [
     'loop.worktreeDir', 'loop:\n  worktreeDir: []', 'loop.worktreeDir is a list, expected a directory path',
     'loop:\n  worktreeDir: trees', 'loopWorktreeDir', 'trees',
+  ],
+  [
+    'loop.retries', 'loop:\n  retries: 0',
+    'loop.retries is 0, expected false or a whole number from 1 to 3',
+    'loop:\n  retries: 3', 'loopRetries', 3,
   ],
   [
     'loop.wrapUp.retries', 'loop:\n  wrapUp:\n    retries: 4',
