@@ -31,6 +31,7 @@ import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import { readSessions } from '../loop/sessions.js';
 import { BLOCKER_PROMPT_PREFIX } from '../start/dispatch.js';
 
+import { expectExit } from './cli-capture.js';
 import { runLoopStart, scratchPlanter, SESSION_FLAGS, STUB } from './loop-scratch.js';
 
 /** The gate the first task is. */
@@ -162,7 +163,7 @@ describe('loop start --continue over a real loop', () => {
 
     const run = runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']);
 
-    expect(run.exitCode).toBe(22);
+    expectExit(run, 22, { ...scratch });
     expect(callsOf(scratch)).toEqual(['task', 'decision', 'task']);
     expect(promptOf(scratch, 'decision', 1)).toContain('The task stopped at tracker line 3.');
     expect(told(scratch)).toEqual([
@@ -180,7 +181,7 @@ describe('loop start --continue over a real loop', () => {
 
     // A second --continue run opens with that list: the gate stays passed
     // over, no session is spawned, and the run ends on it again.
-    expect(runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']).exitCode).toBe(22);
+    expectExit(runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']), 22, { ...scratch });
     expect(callsOf(scratch)).toHaveLength(3);
   }, CASE_TIMEOUT_MS);
 
@@ -192,7 +193,7 @@ describe('loop start --continue over a real loop', () => {
 
     const run = runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']);
 
-    expect(run.exitCode).toBe(20);
+    expectExit(run, 20, { ...scratch });
     expect(run.stderr).toContain('The task text is contradicted by the code.');
     expect(told(scratch)).toEqual([
       ['task-start', null],
@@ -212,7 +213,7 @@ describe('loop start --continue over a real loop', () => {
 
     const run = runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']);
 
-    expect(run.exitCode).toBe(20);
+    expectExit(run, 20, { ...scratch });
     expect(callsOf(scratch)).toEqual(['task', 'decision', 'task', 'task', 'decision']);
     expect(promptOf(scratch, 'task', 2)).toContain(`${BLOCKER_PROMPT_PREFIX}Read the env file from the fixture.`);
     expect(told(scratch)).toEqual([
@@ -232,7 +233,7 @@ describe('loop start --continue over a real loop', () => {
 
     const first = runLoopStart(scratch, 'json', [...SESSION_FLAGS, '--continue']);
 
-    expect(first.exitCode).toBe(21);
+    expectExit(first, 21, { ...scratch });
     expect(callsOf(scratch)).toEqual(['task']);
     const needed = first.stdout.split('\n')
       .filter((line) => line.includes('"decision-needed"'))
@@ -246,7 +247,7 @@ describe('loop start --continue over a real loop', () => {
     // the later task runs, and the run ends on the gate passed over.
     const second = runLoopStart(scratch, 'json', [...SESSION_FLAGS, '--continue', '--decide=jump']);
 
-    expect(second.exitCode).toBe(22);
+    expectExit(second, 22, { ...scratch });
     expect(callsOf(scratch)).toEqual(['task', 'task']);
     expect(told(scratch)).toEqual([
       ['task-start', null],
@@ -283,13 +284,13 @@ describe('loop start --continue over a real loop', () => {
     expect(run.stdout).toContain('Wrapping up with 1 passed-over task(s) left open (--force-wrap-up)');
     // The scratch project has no pull request provider, so there is no pull request to mark a draft.
     expect(run.stdout + run.stderr).toContain('the forced wrap-up has no pull request to mark as a draft');
-    expect(run.exitCode).toBe(0);
+    expectExit(run, 0, { ...scratch });
   }, CASE_TIMEOUT_MS);
 
   it('halts as it always did without --continue, spawning no decision session', () => {
     const scratch = plant({ tasks: [report('blocked')], decisions: [] });
 
-    expect(runLoopStart(scratch, 'text', SESSION_FLAGS).exitCode).toBe(0);
+    expectExit(runLoopStart(scratch, 'text', SESSION_FLAGS), 0, { ...scratch });
     expect(callsOf(scratch)).toEqual(['task']);
     expect(told(scratch)).toEqual([['task-start', null], ['task-blocked', 'status: blocked']]);
   }, CASE_TIMEOUT_MS);
