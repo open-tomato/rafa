@@ -375,10 +375,11 @@ describe('where start.ts takes the suite steps', () => {
     expect(before).toBeLessThan(indexOf(EVERY, 'dispatchTask'));
   });
 
-  it('stops the run when a step before a session is red, unless it retries, and breaks on an interrupt it ran through', () => {
+  it('stops the run when a step before a session is red, unless it retries or a decision goes on, and breaks on an interrupt it ran through', () => {
     expect(START).toContain(
       'const suiteGate = await suiteSteps.beforeSession(taskInfo);\n      if (suiteGate === \'stop\') {\n'
       + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: \'suite-red\' })) continue;\n'
       + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
     );
   });
@@ -389,7 +390,8 @@ describe('where start.ts takes the suite steps', () => {
     // `beforeSession` answers `repair`.
     expect(START).toContain('      if (interrupted) break;\n      if (suiteGate === \'repair\') continue;\n');
     const turn = START.indexOf('if (suiteGate === \'repair\') continue;');
-    expect(turn).toBeGreaterThan(START.indexOf('const taskInfo = findNextTask(trackerContent);'));
+    expect(turn).toBeGreaterThan(START.indexOf('const taskInfo = findNextTask(trackerContent, { skipLines: decisions.skipLines(trackerContent) });'));
+    expect(START.indexOf('const taskInfo = findNextTask(trackerContent, { skipLines: decisions.skipLines(trackerContent) });')).not.toBe(-1);
     expect(turn).toBeLessThan(START.indexOf('renderProgressForDispatch(repoRoot'));
     expect(turn).toBeLessThan(START.indexOf('await runWrapUp('));
   });
@@ -402,6 +404,7 @@ describe('where start.ts takes the suite steps', () => {
     expect(START).toContain(
       'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n'
       + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: \'suite-red\' })) continue;\n'
       + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
     );
   });
@@ -452,10 +455,15 @@ describe('where start.ts retries a stop', () => {
   });
 
   it('guards each retry with the reading that tells its stop apart, continues on a grant, and emits task-blocked only on a refusal', () => {
-    expect(START).toContain('        await storeReport(\'failed\');\n        if (retries.retry(`session exited ${exitCode}`)) continue;\n'
-      + '        emitLoopEvent({ kind: \'task-blocked\', position, reason: `session exited ${exitCode}` });\n        return;\n');
-    expect(START).toContain('        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n'
-      + '        emitLoopEvent({ kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' });\n        return;\n');
+    expect(START).toContain('        await storeReport(\'failed\');\n'
+      + '        const failed = { kind: \'task-blocked\', position, reason: `session exited ${exitCode}` } as const;\n'
+      + '        if (retries.retry(`session exited ${exitCode}`)) continue;\n'
+      + '        if (await decisions.atStop({ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed })) continue;\n'
+      + '        emitLoopEvent(failed);\n        return;\n');
+    expect(START).toContain('        const held = { kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' } as const;\n'
+      + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n'
+      + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, finished, stopEvent: held })) continue;\n'
+      + '        emitLoopEvent(held);\n        return;\n');
     expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red'\)\) continue;/g)).toHaveLength(2);
   });
 
@@ -478,6 +486,45 @@ describe('where start.ts retries a stop', () => {
     ].join('\n'));
 
     expect(planted.filter((call) => call.name === 'retry')).toHaveLength(2);
+  });
+});
+
+describe('where start.ts hands a stop to a --continue decision', () => {
+  const EVERY = everyCall(START);
+
+  it('makes the run\'s decisions once, after its retries, seeded from the plan\'s last stopped run under --continue alone', () => {
+    const made = EVERY.filter((call) => call.name === 'createRunDecisions');
+
+    expect(made).toHaveLength(1);
+    for (const field of ['continueArgs: continueRun,', 'retries,', 'session,', 'isInterrupted: () => interrupted,']) {
+      expect(made[0]?.args[0]).toContain(field);
+    }
+    expect(made[0]?.args[0]).toContain('seed: continueRun.on\n        ? readPreviousPassOver(repoRoot, { planPath, planStub })\n        : [],');
+    expect(EVERY.indexOf(callTo(EVERY, 'createRunRetries'))).toBeLessThan(EVERY.indexOf(callTo(EVERY, 'createRunDecisions')));
+  });
+
+  it('asks at the four stops a retry is asked at, each right after its retry, and at the held report', () => {
+    expect(EVERY.filter((call) => call.name === 'atStop').map((call) => call.args[0])).toEqual([
+      '{ kind: \'suite-red\' }',
+      '{ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed }',
+      '{ kind: \'clean-exit\', taskInfo, finished, stopEvent: held }',
+      '{ kind: \'suite-red\' }',
+    ]);
+  });
+
+  it('asks at no budget exit, interrupt or moved checkout', () => {
+    for (const from of ['if (isBudgetExit(dispatch)) {', 'if (interrupted) {\n        updateTrackerLine(', 'if (dispatch.halted) {']) {
+      const at = START.indexOf(from);
+      expect(at).not.toBe(-1);
+      expect(START.slice(at, START.indexOf('return;', at))).not.toContain('decisions.atStop(');
+    }
+  });
+
+  it('ends at the plan\'s end on passed-over tasks before the loop guard, and releases defers once a task is done', () => {
+    expect(START).toContain('      if (!taskInfo) decisions.atPlanEnd(trackerContent);\n');
+    expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltIfWrapUpMoved({ expected, before: \'dispatch\' })'));
+    expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeGreaterThan(START.indexOf('emitLoopEvent(held);'));
+    expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeLessThan(START.indexOf('emitLoopEvent({ kind: \'task-done\''));
   });
 });
 

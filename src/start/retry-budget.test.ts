@@ -191,3 +191,37 @@ describe('createRunRetries', () => {
     expect(reads).toBe(1);
   });
 });
+
+describe('createRunRetries readings for --continue', () => {
+  it('counts the retries left, down to none', () => {
+    const retries = createRunRetries({ retries: 2, isInterrupted: () => false, isCheckoutHeld: () => true });
+
+    expect(retries.left()).toBe(2);
+    retries.retry('suite step red');
+    expect(retries.left()).toBe(1);
+    retries.retry('suite step red');
+    retries.retry('suite step red');
+    expect(retries.left()).toBe(0);
+    expect(createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld: () => true }).left()).toBe(0);
+  });
+
+  it('names why the last retry was refused: spent, interrupted or the checkout moved, and none after a grant', () => {
+    let interrupted = false;
+    let held = true;
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => interrupted, isCheckoutHeld: () => held });
+
+    expect(retries.lastRefusal()).toBeNull();
+    interrupted = true;
+    retries.retry('session exited 1');
+    expect(retries.lastRefusal()).toBe('interrupted');
+    interrupted = false;
+    held = false;
+    retries.retry('session exited 1');
+    expect(retries.lastRefusal()).toBe('checkout moved');
+    held = true;
+    retries.retry('session exited 1');
+    expect(retries.lastRefusal()).toBeNull();
+    retries.retry('session exited 1');
+    expect(retries.lastRefusal()).toBe('spent');
+  });
+});

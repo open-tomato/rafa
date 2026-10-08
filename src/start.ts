@@ -270,7 +270,8 @@
  * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
- * `start/suite-step.ts`, `start/suite-steps-run.ts` and `start/retry-budget.ts` write goes
+ * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts` and
+ * `start/continue-run.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -313,6 +314,14 @@
  * from the loop's last commit refuses the retry, spending none: the
  * next pass's loop guard would halt on it and block the task on
  * `checkout moved` in place of its own stop.
+ *
+ * Under `--continue` a stop the retries do not take is handed to a
+ * decision (`start/continue-run.ts`): a report that holds its task at
+ * once, and a retry-safe stop once its retries are spent. A `retry`
+ * writes its approach on the task's line and spends a retry, a `jump`
+ * or `defer` passes the task over (`findNextTask` skips its line), and
+ * a `stop` ends the run with exit code 20. A run left with only
+ * passed-over tasks ends with exit code 22 before the pre-wrap-up step.
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -364,6 +373,7 @@ import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
 import { configuredRetries, refuseUnusableCriteria } from './start/continue-args.js';
 import { LoopEnd } from './start/continue-exits.js';
+import { createRunDecisions } from './start/continue-run.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -399,7 +409,7 @@ import {
   refuseWorktreeWhileTracking,
 } from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
-import { openRunSession } from './start/session.js';
+import { openRunSession, readPreviousPassOver } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { readAlwaysRunFiles } from './start/task-gate-lines.js';
@@ -614,6 +624,26 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       isCheckoutHeld: () => guardCheckout(expected).held,
     });
 
+    // Under `--continue`, a stop the retries do not take is handed to a
+    // decision, and the tasks it passes over are skipped below
+    // (`start/continue-run.ts`); without it, nothing changes. The run
+    // opens with the list the plan's last stopped run saved.
+    const decisions = createRunDecisions({
+      continueArgs: continueRun,
+      repoRoot,
+      checkout,
+      trackerPath,
+      planPath,
+      settings: runConfig.config,
+      settingSources,
+      session,
+      retries,
+      isInterrupted: () => interrupted,
+      seed: continueRun.on
+        ? readPreviousPassOver(repoRoot, { planPath, planStub })
+        : [],
+    });
+
     // Initialize tracker only if it doesn't exist
     if (!fs.existsSync(trackerPath)) {
       activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -636,7 +666,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (interrupted) break;
 
       const trackerContent = fs.readFileSync(trackerPath, 'utf8');
-      const taskInfo = findNextTask(trackerContent);
+      const taskInfo = findNextTask(trackerContent, { skipLines: decisions.skipLines(trackerContent) });
+      // No task left but the ones a `--continue` run passed over: the run
+      // ends here, before the pre-wrap-up step and the wrap-up.
+      if (!taskInfo) decisions.atPlanEnd(trackerContent);
 
       // The loop guard, before anything is written into the checkout: a
       // moved or missing one marks the task `[BLOCKED]`, or before the
@@ -661,6 +694,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const suiteGate = await suiteSteps.beforeSession(taskInfo);
       if (suiteGate === 'stop') {
         if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
+        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: 'suite-red' })) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }
@@ -766,8 +800,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // and nothing is awaited between a grant and the loop's top.
         // `task-blocked` is the stop's alone: a retried one emits `retry`.
         await storeReport('failed');
+        const failed = { kind: 'task-blocked', position, reason: `session exited ${exitCode}` } as const;
         if (retries.retry(`session exited ${exitCode}`)) continue;
-        emitLoopEvent({ kind: 'task-blocked', position, reason: `session exited ${exitCode}` });
+        if (await decisions.atStop({ kind: 'session-exit', taskInfo, exitCode, stopEvent: failed })) continue;
+        emitLoopEvent(failed);
         return;
       }
 
@@ -789,10 +825,13 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       expected = advanceExpectation(expected, finished.attempt);
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') {
+        const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit')) continue;
-        emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
+        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, finished, stopEvent: held })) continue;
+        emitLoopEvent(held);
         return;
       }
+      decisions.taskDone(taskInfo);
       const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));
       emitLoopEvent({ kind: 'task-done', position, durationMs: Date.now() - startedAt, tokens });
       if (!stored) {
@@ -806,6 +845,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // followed, and stops the run.
       if (!(await suiteSteps.afterTask(taskInfo, base))) {
         if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
+        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: 'suite-red' })) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }

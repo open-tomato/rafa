@@ -113,6 +113,9 @@ export interface RunRetriesOptions {
   readonly isCheckoutHeld: () => boolean;
 }
 
+/** Why {@link RunRetries.retry} refused: the run was interrupted, its budget is spent, or its checkout moved. */
+export type RetryRefusal = 'interrupted' | 'spent' | 'checkout moved';
+
 /** The run's retries, asked at each retry-safe stop. */
 export interface RunRetries {
   /**
@@ -121,19 +124,39 @@ export interface RunRetries {
    * halts, with nothing written.
    */
   readonly retry: (reason: string) => boolean;
+  /** The retries still left to take. */
+  readonly left: () => number;
+  /**
+   * Why the last {@link RunRetries.retry} refused, or null when it
+   * granted or none was asked. A `--continue` run decides at a
+   * retry-safe stop only once the answer is `spent`
+   * (`start/continue-run.ts`).
+   */
+  readonly lastRefusal: () => RetryRefusal | null;
 }
 
 /** The retries of one run; see the module note. */
 export function createRunRetries(options: RunRetriesOptions): RunRetries {
   let budget = openRetryBudget(options.retries);
+  let refusal: RetryRefusal | null = null;
+  const refuse = (why: RetryRefusal): false => {
+    refusal = why;
+    return false;
+  };
   const retry = (reason: string): boolean => {
-    if (options.isInterrupted()) return false;
+    if (options.isInterrupted()) return refuse('interrupted');
     const grant = takeRetry(budget);
-    if (!grant.granted || !options.isCheckoutHeld()) return false;
+    if (!grant.granted) return refuse('spent');
+    if (!options.isCheckoutHeld()) return refuse('checkout moved');
     budget = grant.budget;
+    refusal = null;
     activeOutput().warn(retryLine(grant, reason));
     emitLoopEvent({ kind: 'retry', attempt: grant.attempt, of: grant.of, reason });
     return true;
   };
-  return { retry };
+  return {
+    retry,
+    left: () => budget.of - budget.used,
+    lastRefusal: () => refusal,
+  };
 }

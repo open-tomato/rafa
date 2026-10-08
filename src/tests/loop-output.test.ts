@@ -9,7 +9,8 @@
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
- * `src/start/retry-budget.ts`, `src/adapters/tracker/resolve.ts`,
+ * `src/start/retry-budget.ts`, `src/start/continue-run.ts`,
+ * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
@@ -181,6 +182,7 @@ const ROUTED_MODULES: string[] = [
   'start/triage.ts',
   'start/release-stage.ts',
   'start/retry-budget.ts',
+  'start/continue-run.ts',
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
