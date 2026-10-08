@@ -521,7 +521,10 @@ New; it replaces no earlier text. What a row or an action added to
   Passed-over lines are `findNextTask`'s `skipLines`; the tracker keeps
   them `[BLOCKED]`, and the list is saved on the run record as
   `decisions` and read back by the plan's next `--continue` run on the
-  same branch (and worktree, when the record names one). That run drops
+  same branch (and worktree, when the record names one), off the newest
+  record that ended there, stopped or done: a `--force-wrap-up` run ends
+  `done` with its list kept, and a newer run that ended with no list
+  leaves nothing to read. That run drops
   each entry whose task no longer reads `[BLOCKED]` (`seedFrom`): a line
   put back to `- [ ]`, ticked, edited or removed is taken again. A second
   `defer` of a task is applied as a `jump`, and a task passed over that

@@ -298,6 +298,13 @@ describe('loop start --continue over a real loop', () => {
     // The scratch project has no pull request provider, so there is no pull request to mark a draft.
     expect(run.stdout + run.stderr).toContain('the forced wrap-up has no pull request to mark as a draft');
     expectExit(run, 0, { ...scratch });
+
+    // The forced run ended done, with its list on its record: the next
+    // --continue run reads it, passes the gate over again with no session
+    // spawned, and ends on it.
+    expect(readSessions(scratch.repo).map((record) => [record.state, record.decisions?.length ?? 0])).toEqual([['done', 1]]);
+    expectExit(runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']), 22, { ...scratch });
+    expect(callsOf(scratch)).toHaveLength(4);
   }, CASE_TIMEOUT_MS);
 
   it('halts as it always did without --continue, spawning no decision session', () => {

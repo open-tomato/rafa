@@ -66,8 +66,9 @@
  * `halt` for a suite step), which is not emitted otherwise, and ends the
  * run by throwing a `LoopEnd` (`./continue-exits.ts`). The pass-over
  * list is written on the run's record each time it changes
- * (`RunSession.decisionsChanged`). The run opens with the list the
- * plan's newest stopped run on the same branch saved
+ * (`RunSession.decisionsChanged`), a `--force-wrap-up` run's kept on its
+ * record though it ends `done`. The run opens with the list the plan's
+ * newest ended run on the same branch saved
  * (`readPreviousPassOver`), handed in as {@link RunDecisionsOptions.seed},
  * less every entry whose task no longer reads `[BLOCKED]` (`seedFrom`):
  * a line a person put back to `- [ ]` is taken again, and so is one
@@ -189,7 +190,7 @@ export interface RunDecisionsOptions {
   readonly retries: Pick<RunRetries, 'retry' | 'left' | 'lastRefusal'>;
   /** True once the run has received SIGINT. */
   readonly isInterrupted: () => boolean;
-  /** The list the plan's newest stopped run saved; the run opens with the entries still `[BLOCKED]`. */
+  /** The list the plan's newest ended run saved; the run opens with the entries still `[BLOCKED]`. */
   readonly seed: PassOverList;
   /** The decision session's spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;

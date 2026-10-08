@@ -40,8 +40,8 @@
  * Under `--continue`, {@link RunSession.decisionsChanged} writes the
  * run's pass-over list (`./pass-over.ts`) each time it changes, and
  * {@link readPreviousPassOver} reads back the list the plan's newest
- * stopped run on the same branch (and worktree, when its record names
- * one) saved, so the next `--continue` run starts from it.
+ * ended run, stopped or done, on the same branch (and worktree, when its
+ * record names one) saved, so the next `--continue` run starts from it.
  *
  * The open writes no phase, so a record no change has reached yet reads
  * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
@@ -379,11 +379,17 @@ function sameRunPlace(repoRoot: string, record: SessionRecord, plan: PassOverPla
   return plan.checkout !== repoRoot && record.worktree === plan.checkout;
 }
 
+/** The states of a run that has ended, whose saved list a later run reads. */
+const ENDED_STATES: ReadonlySet<SessionRecord['state']> = new Set(['stopped', 'done']);
+
 /**
- * The pass-over list the plan's newest stopped run on the same branch
- * saved on its record, or none: none for a plan with no stopped run
- * there, and none when that run saved no list, whatever an older run
- * saved. A record naming a worktree is read only by a run in that
+ * The pass-over list the plan's newest ended run on the same branch
+ * saved on its record, stopped or done, or none: none for a plan with
+ * no ended run there, and none when that run saved no list, whatever an
+ * older run saved. A `--force-wrap-up` run ends `done` with its tasks
+ * still passed over, and its list is read as a stopped run's is; a run
+ * that ended with no list, done or stopped, is newer than every list
+ * before it. A record naming a worktree is read only by a run in that
  * worktree; one naming none, by any run on its branch. A record stored
  * `running` or `paused` whose pid is gone reads as stopped (`readState`).
  *
@@ -396,9 +402,9 @@ export function readPreviousPassOver(
   seams: SessionReadSeams = {},
 ): PassOverList {
   const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
-  const stopped = readSessions(repoRoot, seams)
-    .filter((record) => record.state === 'stopped' && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan));
-  const newest = stopped.at(-1);
+  const ended = readSessions(repoRoot, seams)
+    .filter((record) => ENDED_STATES.has(record.state) && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan));
+  const newest = ended.at(-1);
   return newest === undefined
     ? []
     : sessionDecisions(newest);

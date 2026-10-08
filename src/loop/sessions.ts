@@ -63,7 +63,8 @@
  *     the field, and read as 1), the strategy, `jump` or `defer`, the
  *     decision's reason, and on a defer alone the task it waits on, as
  *     `after`. A later run of the plan reads it back off the newest
- *     stopped record and matches each task by its text and ordinal.
+ *     ended record, stopped or done, and matches each task by its text
+ *     and ordinal.
  *     The field is additive, as `steps` is: a record carries no
  *     `decisions` key until a change hands a list, an empty list is
  *     written without the key, and

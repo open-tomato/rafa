@@ -2,13 +2,13 @@
  * Tests for the pass-over list on a `loop start` session record
  * (`start/session.ts`): `RunSession.decisionsChanged` writing it, and
  * `readPreviousPassOver` reading back the list of the plan's newest
- * stopped run.
+ * ended run, stopped or done.
  *
  * Each case opens or plants records under a fresh project root in this
  * file's temporary directory, with the liveness of every pid handed in,
  * so no case reads a real process. Each reading of the previous list
- * sits beside a record it must pass over: another plan's, a running
- * one, a done one, an older stopped one.
+ * sits beside a record it must pass over: another plan's, another
+ * branch's, a running one, an older one behind a newer run with no list.
  */
 import type { RunSessionOptions } from './session.js';
 import type { SessionDecision, SessionRecord } from '../loop/sessions.js';
@@ -155,17 +155,38 @@ describe('readPreviousPassOver', () => {
     expect(readPreviousPassOver(root, demoPlan(root), { isAlive: GONE })).toEqual([JUMP]);
   });
 
-  it('passes over a running record, a done one and another plan\'s', () => {
+  it('passes over a running record and another plan\'s', () => {
     const root = freshRoot();
     plant(
       root,
       record({ sessionId: 'session-0001', startedAt: '2026-10-08T08:00:00.000Z', decisions: [JUMP] }),
-      record({ sessionId: 'session-0002', startedAt: '2026-10-08T09:00:00.000Z', state: 'done' }),
       record({ sessionId: 'session-0003', startedAt: '2026-10-08T09:30:00.000Z', planStub: 'other', plan: '.plans/PLAN-other.md', decisions: [DEFER] }),
       record({ sessionId: 'session-0004', startedAt: '2026-10-08T10:00:00.000Z', state: 'running', pid: 7777, decisions: [DEFER] }),
     );
 
     expect(readPreviousPassOver(root, demoPlan(root), { isAlive: (pid) => pid === 7777 })).toEqual([JUMP]);
+  });
+
+  it('reads the list a forced wrap-up run saved, though that run ended done', () => {
+    const root = freshRoot();
+    plant(
+      root,
+      record({ sessionId: 'session-0001', startedAt: '2026-10-08T08:00:00.000Z', decisions: [DEFER] }),
+      record({ sessionId: 'session-0002', startedAt: '2026-10-08T09:00:00.000Z', state: 'done', decisions: [JUMP] }),
+    );
+
+    expect(readPreviousPassOver(root, demoPlan(root), { isAlive: GONE })).toEqual([JUMP]);
+  });
+
+  it('reads nothing past a newer run that ended with no list, done or stopped', () => {
+    const root = freshRoot();
+    plant(
+      root,
+      record({ sessionId: 'session-0001', startedAt: '2026-10-08T08:00:00.000Z', decisions: [JUMP] }),
+      record({ sessionId: 'session-0002', startedAt: '2026-10-08T09:00:00.000Z', state: 'done' }),
+    );
+
+    expect(readPreviousPassOver(root, demoPlan(root), { isAlive: GONE })).toEqual([]);
   });
 
   it('reads a running record whose pid is gone as stopped', () => {
