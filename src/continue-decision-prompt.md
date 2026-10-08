@@ -58,10 +58,16 @@ decides. When none fits, choose `stop`.
 End your answer with exactly one `rafa:decision` block, and write
 nothing after it. Give `reason` in one or two sentences a person can act
 on. Add `approach` only for `retry`, and `after` only for `defer`. Quote
-every text value, as the example does:
+every text value, and write `after` as a bare number, as the examples do:
 
 ```rafa:decision
 strategy: retry
 reason: "The task's gate waits on a background job, which the loop never sees end."
 approach: "Run the suite in the foreground and read its exit code before writing the report."
+```
+
+```rafa:decision
+strategy: defer
+reason: "Line 15 writes the helper this task imports."
+after: 15
 ```
