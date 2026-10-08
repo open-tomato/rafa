@@ -145,6 +145,7 @@ describe('the contract\'s own examples', () => {
     const prompt = readBundledFile(DECISION_PROMPT_FILE, import.meta.dir);
     const examples = readRafaBlocks(prompt).filter((block) => block.kind === 'decision');
 
-    expect(examples.map((block) => parseDecision(`\`\`\`rafa:decision\n${block.body}\n\`\`\``).strategy)).toEqual(['retry', 'defer']);
+    // The retry example sits in the contract's retry section, the jump one in its no-retry section.
+    expect(examples.map((block) => parseDecision(`\`\`\`rafa:decision\n${block.body}\n\`\`\``).strategy)).toEqual(['retry', 'jump', 'defer']);
   });
 });

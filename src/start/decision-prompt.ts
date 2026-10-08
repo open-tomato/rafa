@@ -47,6 +47,20 @@
  * one too. Substitution is one pass with a replacer function, so a
  * `{{task}}` or a `$&` inside a value is inserted verbatim. A template
  * missing a slot throws, naming it.
+ *
+ * ## The retry sections
+ *
+ * The contract marks what it says of `retry` with two sections, each a
+ * marker line opening and closing it: `<!-- retry -->` to
+ * `<!-- /retry -->` (the strategy, the `approach` field and its example)
+ * and `<!-- no-retry -->` to `<!-- /no-retry -->` (the line saying no
+ * retry is offered). While a retry is left the first is kept and the
+ * second dropped; with none left, the other way round. A decision is
+ * made at a retry-safe stop only once its retries are spent, so there a
+ * prompt offering `retry` would offer a strategy the loop reads as
+ * `stop`. Sections are chosen before the slots are filled, so a marker
+ * inside a value is inserted verbatim, and the marker lines never reach
+ * the session.
  */
 import type { ContinueCriteriaMode } from '../config-schema-loop-continue.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -85,6 +99,19 @@ export type DecisionPromptSlot = (typeof DECISION_PROMPT_SLOTS)[number];
 
 /** Any slot, for the one-pass replace. */
 const SLOT_PATTERN = new RegExp(`\\{\\{(${DECISION_PROMPT_SLOTS.join('|')})\\}\\}`, 'gu');
+
+/** A retry section, its opening and closing marker lines and its body; see the module note. */
+const RETRY_SECTION = /^<!-- (retry|no-retry) -->\n([\s\S]*?)^<!-- \/\1 -->\n/gmu;
+
+/** `template` with the retry section kept that `retriesLeft` asks for, the other dropped. */
+function chooseRetrySections(template: string, retriesLeft: number): string {
+  const kept = retriesLeft > 0
+    ? 'retry'
+    : 'no-retry';
+  return template.replace(RETRY_SECTION, (_whole, section: string, body: string) => section === kept
+    ? body
+    : '');
+}
 
 /** What a slot with no hold reads. */
 const NO_HOLDS = '(no reason was recorded)';
@@ -226,8 +253,9 @@ function renderOpenTasks(tasks: readonly PromptTask[]): string {
 }
 
 /**
- * The decision session's prompt: `template` with every slot filled from
- * `input`, in one pass.
+ * The decision session's prompt: `template` with its retry sections
+ * chosen by `input.retriesLeft` and every slot filled from `input`, in
+ * one pass.
  *
  * @throws Error naming the first slot `template` does not carry.
  */
@@ -248,7 +276,8 @@ export function renderDecisionPrompt(template: string, input: DecisionPromptInpu
     openTasks: renderOpenTasks(input.openTasks),
     criteria: input.criteria,
   };
-  return template.replace(SLOT_PATTERN, (_whole, slot: DecisionPromptSlot) => values[slot]);
+  return chooseRetrySections(template, input.retriesLeft)
+    .replace(SLOT_PATTERN, (_whole, slot: DecisionPromptSlot) => values[slot]);
 }
 
 /**

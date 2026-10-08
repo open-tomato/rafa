@@ -36,7 +36,9 @@
  * {@link configuredRetries} is the retry count a run opens when
  * `--retry` is not typed: `loop.retriesOnContinue` under `--continue`
  * and `loop.retries` otherwise; a run without `--continue` never reads
- * the first. {@link refuseUnusableCriteria} reads the criteria a
+ * the first. {@link refuseRetryWithoutBudget} refuses `--decide=retry`
+ * on a run whose count resolves to `false`, before the deferral, since
+ * the retry it names could never be granted. {@link refuseUnusableCriteria} reads the criteria a
  * decision is made by (`start/decision-prompt.ts`) once, at start, and
  * refuses a `--continue` run whose `loop.continue.criteriaMode:
  * replace` names a missing or blank file, or whose criteria path cannot
@@ -191,6 +193,17 @@ export function configuredRetries(
   return continueOn
     ? config.loopRetriesOnContinue
     : config.loopRetries;
+}
+
+/**
+ * Throws `CommandExit` with exit code 1 for `--decide=retry` on a run
+ * whose retry budget, `--retry` over `loop.retriesOnContinue`, is
+ * `false`: the retry it names could never be granted, and would be read
+ * as `stop`. See the module note.
+ */
+export function refuseRetryWithoutBudget(continueArgs: Pick<ContinueArgs, 'directive'>, retries: LoopRetries): void {
+  if (continueArgs.directive?.strategy !== 'retry' || retries !== false) return;
+  refuse(`${DECIDE_FLAG}=retry`, 'the run has no retry to spend: loop.retriesOnContinue is false and --retry names no count. Name one with --retry=<n>, or decide another strategy.');
 }
 
 /**

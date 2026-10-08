@@ -439,7 +439,8 @@ describe('where start.ts retries a stop', () => {
     const made = EVERY.filter((call) => call.name === 'createRunRetries');
 
     expect(made).toHaveLength(1);
-    expect(made[0]?.args[0]).toContain('retries: resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on)),');
+    expect(made[0]?.args[0]).toContain('retries: runRetries,');
+    expect(START).toContain('const runRetries = resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on));');
     expect(made[0]?.args[0]).toContain('isInterrupted: () => interrupted,');
     expect(made[0]?.args[0]).toContain('isCheckoutHeld: () => guardCheckout(expected).held,');
   });
@@ -497,6 +498,13 @@ describe('where start.ts retries a stop', () => {
 
 describe('where start.ts hands a stop to a --continue decision', () => {
   const EVERY = everyCall(START);
+
+  it('refuses a --decide=retry with no retry to spend before the deferral, over the count the retries are made from', () => {
+    const refused = callTo(EVERY, 'refuseRetryWithoutBudget');
+
+    expect(refused.args).toEqual(['continueRun', 'runRetries']);
+    expect(EVERY.indexOf(refused)).toBeLessThan(EVERY.indexOf(callTo(EVERY, 'deferUntil')));
+  });
 
   it('makes the run\'s decisions once, after its retries, seeded from the plan\'s last stopped run under --continue alone', () => {
     const made = EVERY.filter((call) => call.name === 'createRunDecisions');

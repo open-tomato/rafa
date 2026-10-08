@@ -249,6 +249,25 @@ describe('renderDecisionPrompt', () => {
   });
 });
 
+describe('the retry sections', () => {
+  const SECTIONED = ['head', '<!-- retry -->', 'retry offered', '<!-- /retry -->', '<!-- no-retry -->', 'no retry left', '<!-- /no-retry -->', TEMPLATE].join('\n');
+
+  it('keeps the retry section and drops the no-retry one while a retry is left, markers off', () => {
+    const rendered = renderDecisionPrompt(SECTIONED, INPUT);
+
+    expect(rendered.startsWith('head\nretry offered\nplan=[')).toBe(true);
+    expect(rendered).not.toContain('no retry left');
+    expect(rendered).not.toContain('<!--');
+  });
+
+  it('drops the retry section and keeps the no-retry one with no retry left', () => {
+    const rendered = renderDecisionPrompt(SECTIONED, { ...INPUT, retriesLeft: 0 });
+
+    expect(rendered.startsWith('head\nno retry left\nplan=[')).toBe(true);
+    expect(rendered).not.toContain('retry offered');
+  });
+});
+
 describe('buildDecisionPrompt', () => {
   it('renders the real template with nothing left unfilled', () => {
     const prompt = buildDecisionPrompt(INPUT, START_DIR);
@@ -257,5 +276,21 @@ describe('buildDecisionPrompt', () => {
     expect(prompt).toContain('stopped at tracker line 12');
     expect(prompt).toContain('Prefer stop.');
     expect(prompt).not.toMatch(/\{\{\w+\}\}/);
+    expect(prompt).not.toContain('<!--');
+  });
+
+  it('offers retry while one is left, and offers none, its example included, with none left', () => {
+    const offered = buildDecisionPrompt(INPUT, START_DIR);
+    const spent = buildDecisionPrompt({ ...INPUT, retriesLeft: 0 }, START_DIR);
+
+    expect(offered).toContain('- `retry`:');
+    expect(offered).toContain('strategy: retry');
+    expect(offered).not.toContain('`retry` is not offered');
+    expect(spent).not.toContain('- `retry`:');
+    expect(spent).not.toContain('strategy: retry');
+    expect(spent).not.toContain('`approach`');
+    expect(spent).not.toContain('\n\n\n');
+    expect(offered).not.toContain('\n\n\n');
+    expect(spent).toContain('`retry` is not offered');
   });
 });

@@ -234,6 +234,18 @@ describe('where a --continue run decides', () => {
     expect(run.calls[0]?.prompt).toContain('session exited 1');
   });
 
+  it('offers no retry at a retry-safe stop, decided only once the retries are spent', async () => {
+    const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
+    run.left = 0;
+    run.refusal = 'spent';
+    const decisions = createRunDecisions(run.options);
+
+    await decisions.atStop({ ...heldReport(run.trackerPath), kind: 'session-exit', exitCode: 1 } as DecisionStop);
+
+    expect(run.calls[0]?.prompt).toContain('`retry` is not offered');
+    expect(run.calls[0]?.prompt).not.toContain('- `retry`:');
+  });
+
   it('decides a red suite step on the line it blocked, handed that line\'s blocker', async () => {
     const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
     writeFileSync(run.trackerPath, TRACKER.replace(

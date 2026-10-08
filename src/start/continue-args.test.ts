@@ -22,6 +22,7 @@ import {
   DIRECTIVE_REASON,
   configuredRetries,
   readContinueArgs,
+  refuseRetryWithoutBudget,
   refuseUnusableCriteria,
 } from './continue-args.js';
 import { NOTHING_DISPATCHED } from './session.js';
@@ -164,6 +165,25 @@ describe('configuredRetries', () => {
   it('reads loop.retriesOnContinue for a --continue run', () => {
     expect(configuredRetries(config, true)).toBe(1);
     expect(configuredRetries({ loopRetries: 3, loopRetriesOnContinue: false }, true)).toBe(false);
+  });
+});
+
+describe('refuseRetryWithoutBudget', () => {
+  const retry = readContinueArgs(['--continue', '--decide=retry', '--approach=Read the fixture.']);
+
+  it('refuses --decide=retry when the run\'s retry budget is false, naming the keys', () => {
+    const refusal = refusalOf(() => refuseRetryWithoutBudget(retry, false));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain('❌ Refusing --decide=retry');
+    expect(refusal.message).toContain('loop.retriesOnContinue');
+    expect(refusal.message).toContain(NOTHING_DISPATCHED);
+  });
+
+  it('lets --decide=retry through with a retry to spend, and every other directive with none', () => {
+    expect(() => refuseRetryWithoutBudget(retry, 1)).not.toThrow();
+    expect(() => refuseRetryWithoutBudget(readContinueArgs(['--continue', '--decide=jump']), false)).not.toThrow();
+    expect(() => refuseRetryWithoutBudget(readContinueArgs(['--continue']), false)).not.toThrow();
   });
 });
 

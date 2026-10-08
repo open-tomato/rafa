@@ -381,7 +381,7 @@ import {
 } from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
-import { configuredRetries, refuseUnusableCriteria } from './start/continue-args.js';
+import { configuredRetries, refuseRetryWithoutBudget, refuseUnusableCriteria } from './start/continue-args.js';
 import { LoopEnd } from './start/continue-exits.js';
 import { createRunDecisions } from './start/continue-run.js';
 import {
@@ -472,6 +472,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // Under `--continue`, criteria a decision could not be made by refuse
   // the run now rather than at its first decision (`start/continue-args.ts`).
   refuseUnusableCriteria(continueRun, repoRoot, runConfig.config);
+  // So is a `--decide=retry` on a run with no retry to spend.
+  const runRetries = resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on));
+  refuseRetryWithoutBudget(continueRun, runRetries);
   if (startAt) await deferUntil(startAt);
 
   // Default plan: PLAN.md in plan.dir, else at the root (`start/plan-path.ts`).
@@ -629,7 +632,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // names a count (`start/retry-budget.ts`). A checkout moved from
     // `expected`, as it reads at the stop, refuses one.
     const retries = createRunRetries({
-      retries: resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on)),
+      retries: runRetries,
       isInterrupted: () => interrupted,
       isCheckoutHeld: () => guardCheckout(expected).held,
     });

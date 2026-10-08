@@ -544,7 +544,9 @@ New; it replaces no earlier text. What a row or an action added to
     flag, a strategy that is none of the four and an `--after` that is no
     whole number from 1 are refused with exit code 1 by `readRunArgs`,
     before the deferral; so is a `--continue` run whose
-    `loop.continue.criteriaMode: replace` names a missing or blank file.
+    `loop.continue.criteriaMode: replace` names a missing or blank file,
+    and a `--decide=retry` on a run whose retries, `--retry` over
+    `loop.retriesOnContinue`, are `false` (`refuseRetryWithoutBudget`).
   - **json mode**: under `--output=json` no session is spawned. The stop
     emits `decision-needed` (the task, its line, why it stopped, the open
     tasks, the retries left and the rendered prompt), then its own
@@ -597,6 +599,10 @@ New; it replaces no earlier text. What a row or an action added to
   missing or blank. The prompt's contract,
   `src/continue-decision-prompt.md`, is not overridable, so no project
   edit can break the parser; the build copies both files into `dist/`.
+  It marks what it says of `retry` in two sections, `<!-- retry -->` and
+  `<!-- no-retry -->`, and `renderDecisionPrompt` keeps the first while
+  a retry is left and the second with none: a retry-safe stop is decided
+  only once its retries are spent, so its prompt offers no `retry`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
