@@ -2,19 +2,54 @@
  * Tests for the run's retry budget: how many retries `--retry` or
  * `loop.retries` grants one run, and what each call to take one answers.
  *
- * Every function here is pure, so each case hands it a budget and reads
- * the answer, and the budget handed in is read again afterwards to hold
- * that taking a retry never edits it. A budget that granted every call
- * would pass the granting cases alone, so each is paired with the call
- * past its last retry, which must be refused.
+ * The budget's functions are pure, so each case hands one a budget and
+ * reads the answer, and the budget handed in is read again afterwards to
+ * hold that taking a retry never edits it. A budget that granted every
+ * call would pass the granting cases alone, so each is paired with the
+ * call past its last retry, which must be refused.
+ *
+ * {@link createRunRetries} is what `start.ts` asks at each retry-safe
+ * stop. Its cases read the warning line and the `retry` event it writes
+ * through a `sinkOutput` set as the active output, and a refused retry
+ * is read to write neither.
  */
-import { describe, expect, it } from 'bun:test';
+import type { CliEvent } from '../ports/index.js';
+
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
+import { setActiveOutput } from '../adapters/output/active.js';
+import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
+  createRunRetries,
   openRetryBudget,
   resolveRunRetries,
+  retryLine,
   takeRetry,
 } from './retry-budget.js';
+
+/** Lines written at warn level. */
+let warnings: string[] = [];
+
+/** Every event but a log. */
+let events: CliEvent[] = [];
+
+beforeEach(() => {
+  warnings = [];
+  events = [];
+  setActiveOutput(sinkOutput({
+    warn: (message) => {
+      warnings.push(message);
+    },
+    event: (event) => {
+      events.push(event);
+    },
+  }));
+});
+
+afterEach(() => {
+  setActiveOutput(null);
+});
 
 describe('resolveRunRetries', () => {
   it('takes the flag over the config when the flag names a count', () => {
@@ -73,5 +108,52 @@ describe('takeRetry', () => {
     expect(budget).toEqual({ of: 3, used: 0 });
     expect(grant.budget).not.toBe(budget);
     expect(Object.isFrozen(grant.budget)).toBe(true);
+  });
+});
+
+describe('retryLine', () => {
+  it('says it retries, which retry of how many, and the stop', () => {
+    expect(retryLine({ attempt: 1, of: 2 }, 'suite step red')).toBe(
+      '🔁 Retrying (retry 1 of 2) after the stop: suite step red. The loop goes on without a new rafa loop start.',
+    );
+  });
+});
+
+describe('createRunRetries', () => {
+  it('grants n retries, warning and emitting a retry event for each, then refuses', () => {
+    const retries = createRunRetries({ retries: 2, isInterrupted: () => false });
+
+    expect([retries.retry('suite step red'), retries.retry('session exited 1'), retries.retry('suite step red')])
+      .toEqual([true, true, false]);
+    expect(warnings).toEqual([
+      retryLine({ attempt: 1, of: 2 }, 'suite step red'),
+      retryLine({ attempt: 2, of: 2 }, 'session exited 1'),
+    ]);
+    expect(events.map((event) => event.type === 'event'
+      ? [event.name, event.data]
+      : null)).toEqual([
+      ['retry', { attempt: 1, of: 2, reason: 'suite step red' }],
+      ['retry', { attempt: 2, of: 2, reason: 'session exited 1' }],
+    ]);
+  });
+
+  it('refuses every retry under false, writing nothing', () => {
+    const retries = createRunRetries({ retries: false, isInterrupted: () => false });
+
+    expect(retries.retry('suite step red')).toBe(false);
+    expect([warnings, events]).toEqual([[], []]);
+  });
+
+  it('refuses once the run is interrupted, spending nothing of the budget', () => {
+    let interrupted = true;
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => interrupted });
+
+    expect(retries.retry('session exited 130')).toBe(false);
+    expect([warnings, events]).toEqual([[], []]);
+
+    // The control: the same budget grants its one retry once the flag is down.
+    interrupted = false;
+    expect(retries.retry('session exited 1')).toBe(true);
+    expect(warnings).toHaveLength(1);
   });
 });

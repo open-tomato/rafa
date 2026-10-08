@@ -51,7 +51,7 @@ your accounts.
   | Command | Spends usage |
   | --- | --- |
   | `rafa plan create` | 🪙 one planning session |
-  | `rafa loop start` | 🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request, and repair sessions while CI is red |
+  | `rafa loop start` | 🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request, repair sessions while CI is red, and the sessions of up to `--retry` (`loop.retries`) more passes of the loop after a stop it retries |
   | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
   | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |

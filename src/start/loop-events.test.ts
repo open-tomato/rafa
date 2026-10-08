@@ -45,6 +45,7 @@ const SUMMARIES: readonly (readonly [LoopEvent, string])[] = [
   [{ kind: 'pr', number: 612 }, 'pr #612 opened'],
   [{ kind: 'no-pr', reason: 'no open pull request for feat/x' }, 'no pr            no open pull request for feat/x'],
   [{ kind: 'halt', reason: 'checkout moved' }, 'halt             checkout moved'],
+  [{ kind: 'retry', attempt: 1, of: 2, reason: 'suite step red' }, 'retry 1/2        suite step red'],
   [
     { kind: 'inherited', file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' },
     'inherited        src/parse/parse.test.ts > parse > drops the last line',
@@ -71,6 +72,7 @@ describe('summaryOf', () => {
     [{ kind: 'task-blocked', position: AT, reason: 'blocker: suite red\nsecond line of detail\n' }, 'task 3/9 blocked blocker: suite red second line of detail'],
     [{ kind: 'no-pr', reason: 'gh said:\n  not found' }, 'no pr            gh said: not found'],
     [{ kind: 'halt', reason: '\ncheckout moved\n' }, 'halt             checkout moved'],
+    [{ kind: 'retry', attempt: 3, of: 3, reason: 'session exited 1\n' }, 'retry 3/3        session exited 1'],
   ] as const)('folds a multi-line reason onto one line: %o', (event, line) => {
     expect(summaryOf(event)).toBe(line);
   });

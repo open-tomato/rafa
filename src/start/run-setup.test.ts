@@ -27,6 +27,10 @@
  * settings off, or the flag absent with the settings on), so the
  * refusal is shown to be keyed on both.
  *
+ * `--retry` is the one flag `readRunArgs` refuses: each refused value is
+ * read off the `CommandExit` it throws, beside the accepted counts 1 and
+ * 3 as its controls, so a reader refusing every value fails here.
+ *
  * The guard and wiring cases moved here from `tests/plan-stamp.test.ts`
  * with the two functions, unchanged.
  */
@@ -61,6 +65,7 @@ describe('readRunArgs', () => {
       ciTimeoutMin: DEFAULT_CI_TIMEOUT_MIN,
       ciAttempts: DEFAULT_CI_ATTEMPTS,
       roadmap: false,
+      retry: undefined,
     });
   });
 
@@ -72,6 +77,7 @@ describe('readRunArgs', () => {
       '--ci-timeout=5',
       '--ci-attempts=0',
       '--roadmap',
+      '--retry=2',
     ];
 
     expect(readRunArgs(args)).toEqual({
@@ -81,6 +87,7 @@ describe('readRunArgs', () => {
       ciTimeoutMin: 5,
       ciAttempts: 0,
       roadmap: true,
+      retry: 2,
     });
   });
 
@@ -99,6 +106,59 @@ describe('readRunArgs', () => {
     const read = readRunArgs(['--inject=task', '--skills-resolver=none', '--any-branch', '--create-branch']);
 
     expect(read).toEqual(readRunArgs([]));
+  });
+});
+
+/** The `CommandExit` reading `args` threw. Fails when it threw none. */
+function retryRefusal(args: readonly string[]): CommandExit {
+  try {
+    readRunArgs(args);
+  } catch (error) {
+    if (error instanceof CommandExit) return error;
+    throw error;
+  }
+  throw new Error(`expected ${args.join(' ')} to be refused, and nothing was thrown`);
+}
+
+describe('readRunArgs --retry', () => {
+  it.each([[1], [2], [3]])('reads --retry=%p as that count', (count) => {
+    expect(readRunArgs([`--retry=${String(count)}`]).retry).toBe(count);
+  });
+
+  it('takes the last --retry of two, as the parser takes the later flag', () => {
+    expect(readRunArgs(['--retry=1', '--retry=3']).retry).toBe(3);
+  });
+
+  it('reads nothing past a --, where a word is no flag of the run', () => {
+    expect(readRunArgs(['--', '--retry=9']).retry).toBeUndefined();
+  });
+
+  it.each([['0'], ['-1'], ['4'], ['1.5'], ['two'], [''], ['02'], ['false'], ['true']])(
+    'refuses --retry=%p before the run starts, naming the value and the range',
+    (value) => {
+      const refusal = retryRefusal([`--retry=${value}`]);
+
+      expect(refusal.exitCode).toBe(1);
+      expect(refusal.message).toContain(`--retry=${value}`);
+      expect(refusal.message).toContain('a whole number from 1 to 3');
+      expect(refusal.message).toContain(NOTHING_DISPATCHED);
+    },
+  );
+
+  it('refuses a bare --retry, and one whose count is the next word, naming the = spelling', () => {
+    for (const args of [['--retry'], ['--retry', '2']]) {
+      const refusal = retryRefusal(args);
+
+      expect(refusal.message).toContain('--retry=<n>');
+      expect(refusal.exitCode).toBe(1);
+    }
+  });
+
+  it('refuses --no-retry, naming false in loop.retries as how retries are off', () => {
+    const refusal = retryRefusal(['--no-retry']);
+
+    expect(refusal.message).toContain('loop.retries: false');
+    expect(refusal.exitCode).toBe(1);
   });
 });
 

@@ -11,9 +11,20 @@
  * retry answers a new one and leaves the old one as it was, so the
  * count lives in the one `let` of `start()` that holds it.
  *
+ * {@link createRunRetries} is the one `start()` asks: once per run, and
+ * then at each retry-safe stop, where a grant writes one warning line
+ * ({@link retryLine}) and one `retry` loop event (`start/loop-events.ts`)
+ * and `start()` goes back to the top of its loop with `continue`, while
+ * a refusal writes nothing and `start()` halts as it did before. A run
+ * SIGINT has interrupted is refused at once and spends nothing.
+ *
  * Which stops are retry-safe is not this module's to say: its caller
  * asks only at a stop that a blind re-run with nothing changed was
- * measured to pass. The two readings that tell such a stop apart are
+ * measured to pass. `start()` asks at four: a red suite step before a
+ * session and one after a task, a task session that exited nonzero
+ * (past the budget exit and the interrupt, which are never asked), and
+ * a clean exit held only on what it left behind. The two readings that
+ * tell such a stop apart are
  * `stoppedOnSignal` in `start/suite-steps-run.ts`, true for a suite
  * stop SIGINT made and false for a red step, and
  * `heldOnNothingLeftBehind` in `start/commit.ts`, true for a clean exit
@@ -23,6 +34,10 @@
  * repeats each of them.
  */
 import type { LoopRetries } from '../config-schema-loop-retries.js';
+
+import { activeOutput } from '../adapters/output/active.js';
+
+import { emitLoopEvent } from './loop-events.js';
 
 /** What one run may still retry: `of` granted in all, `used` taken so far. */
 export interface RetryBudget {
@@ -68,4 +83,46 @@ export function takeRetry(budget: RetryBudget): RetryGrant {
     of: budget.of,
     budget: Object.freeze({ of: budget.of, used }),
   };
+}
+
+/** A retry {@link takeRetry} granted: which one, of how many. */
+export type GrantedRetry = Pick<Extract<RetryGrant, { granted: true }>, 'attempt' | 'of'>;
+
+/** The warning a granted retry writes: that it retries, which retry of how many, and the stop. */
+export function retryLine(grant: GrantedRetry, reason: string): string {
+  return `🔁 Retrying (retry ${grant.attempt} of ${grant.of}) after the stop: ${reason}.`
+    + ' The loop goes on without a new rafa loop start.';
+}
+
+/** What {@link createRunRetries} needs: the run's count, and its SIGINT flag. */
+export interface RunRetriesOptions {
+  /** The retries the run makes, as {@link resolveRunRetries} answers them. */
+  readonly retries: LoopRetries;
+  /** True once the run has received SIGINT. */
+  readonly isInterrupted: () => boolean;
+}
+
+/** The run's retries, asked at each retry-safe stop. */
+export interface RunRetries {
+  /**
+   * True when the run retries after the stop `reason` names, having
+   * written its warning line and its `retry` event; false when the run
+   * halts, with nothing written.
+   */
+  readonly retry: (reason: string) => boolean;
+}
+
+/** The retries of one run; see the module note. */
+export function createRunRetries(options: RunRetriesOptions): RunRetries {
+  let budget = openRetryBudget(options.retries);
+  const retry = (reason: string): boolean => {
+    if (options.isInterrupted()) return false;
+    const grant = takeRetry(budget);
+    budget = grant.budget;
+    if (!grant.granted) return false;
+    activeOutput().warn(retryLine(grant, reason));
+    emitLoopEvent({ kind: 'retry', attempt: grant.attempt, of: grant.of, reason });
+    return true;
+  };
+  return { retry };
 }

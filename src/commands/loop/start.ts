@@ -33,6 +33,12 @@
  * checks (`src/next/ending.ts`). A run that refused or was interrupted
  * throws out of the inner run and ends with no hint.
  *
+ * `--retry=<n>` is read by `src/start/run-setup.ts` with the other flags
+ * `start()` reads itself, and refused there, before the run is deferred
+ * or its session record opened, for anything but a whole number from 1
+ * to 3. It declares no default: what it outranks is `loop.retries`,
+ * `false` unless a config names a count, and the help says so.
+ *
  * `--runtime=<path|version>` is read by `start/runtime.ts`, right after
  * that refusal. A `--runtime` typed ahead of the subject is read by the
  * dispatcher into the context's `flags` and left out of its `argv`, the
@@ -71,7 +77,10 @@ const wrapped = wrapPhaseZeroCommand({
     + ' the plan, the branch, the pid, the start, the state and the running task, and under `--roadmap`'
     + ' the hop away, when one is. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
-    + ' `resume`, `status` and `list` reach the run through that record. A run holds its terminal: until'
+    + ' `resume`, `status` and `list` reach the run through that record. With `--retry` or'
+    + ' `loop.retries` it goes back into its loop instead of stopping, at most that many times, after a'
+    + ' red suite step, a task session that exited nonzero, or one that left neither a report nor a'
+    + ' commit. A run holds its terminal: until'
     + ' phase 6 it refuses `--detached`. With `--runtime` the whole run goes on in that installed rafa,'
     + ' never in a `src/` directory.',
   args: [],
@@ -124,6 +133,16 @@ const wrapped = wrapPhaseZeroCommand({
         + ' 0 spends none and still reports the verdict.',
       type: 'number',
       default: DEFAULT_CI_ATTEMPTS,
+    },
+    {
+      name: 'retry',
+      description: 'Goes back into the loop instead of stopping, at most this many times, 1 to 3, after a'
+        + ' red suite step, a task session that exited nonzero but not on its budget, or one that left'
+        + ' neither a report nor a commit. A report that blocks its task, a refused commit, a moved'
+        + ' checkout and an interrupt still stop the run. Outranks `loop.retries` in'
+        + ' `.rafa/config.yaml`, `false` unless the config names a count; any other value is refused'
+        + ' before the run starts.',
+      type: 'number',
     },
     {
       name: 'create-branch',
@@ -182,7 +201,9 @@ const wrapped = wrapPhaseZeroCommand({
   outputs: ['text', 'json', 'events'],
   spends: {
     when: 'always',
-    what: 'one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request, and repair sessions while CI is red',
+    what: 'one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request,'
+      + ' repair sessions while CI is red, and the sessions of up to `--retry` (`loop.retries`) more passes of the loop'
+      + ' after a stop it retries',
   },
 }, start);
 

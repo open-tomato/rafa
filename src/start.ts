@@ -235,6 +235,9 @@
  * --ci-attempts repair sessions to spend on a red or conflicting PR
  *               before escalating (default 2; 0 disables repair but
  *               still reports the verdict).
+ * --retry       re-enter the loop up to n times (1 to 3) after a
+ *               retry-safe stop; outranks `loop.retries`, `false` unless
+ *               a config names a count (`start/retry-budget.ts`).
  *
  * After the last task the loop runs its wrap-up branch
  * (`start/wrap-up-run.ts`): a wrap-up session (`start/wrap-up.ts`:
@@ -259,7 +262,7 @@
  * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
- * `start/suite-step.ts` and `start/suite-steps-run.ts` write goes
+ * `start/suite-step.ts`, `start/suite-steps-run.ts` and `start/retry-budget.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -291,7 +294,12 @@
  * A failed task, a blocked one, a checkout that moved, a report left
  * unstored and a red or interrupted suite step still stop the run by
  * returning, which the dispatcher ends as a success, with exit code 0. A
- * triage failure stops nothing.
+ * triage failure stops nothing. Under `--retry` or `loop.retries` four
+ * of those stops `continue` instead while a retry is left: a red suite
+ * step before a session or after a task, a session that exited nonzero
+ * but not on its budget, and a clean exit held only on leaving neither
+ * a report nor a commit; each retry writes a warning and a `retry`
+ * event (`start/retry-budget.ts`).
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -337,7 +345,7 @@ import {
   openCheckoutExpectation,
 } from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
-import { finishCleanExit } from './start/commit.js';
+import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -356,6 +364,7 @@ import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
 import { createStartPreflightDrift } from './start/preflight-drift.js';
 import { runStartPreflight } from './start/preflight.js';
+import { createRunRetries, resolveRunRetries } from './start/retry-budget.js';
 import { announceRiskTotal } from './start/risk-total.js';
 import { settleRunCheckout } from './start/run-checkout.js';
 import {
@@ -421,7 +430,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const { inject: injectMode, settingSources } = runConfig.config;
 
   // Every flag `start()` reads itself, read once (`start/run-setup.ts`).
-  const { startAt, plan, ciWait, ciTimeoutMin, ciAttempts, roadmap } = readRunArgs(args);
+  const { startAt, plan, ciWait, ciTimeoutMin, ciAttempts, roadmap, retry } = readRunArgs(args);
   if (startAt) await deferUntil(startAt);
 
   // Default plan: PLAN.md in plan.dir, else at the root (`start/plan-path.ts`).
@@ -573,6 +582,14 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       isInterrupted: () => interrupted,
     });
 
+    // The retries this run takes in place of a halt, at the four
+    // retry-safe stops below alone: `--retry` over `loop.retries`, none
+    // unless one names a count (`start/retry-budget.ts`).
+    const retries = createRunRetries({
+      retries: resolveRunRetries(retry, runConfig.config.loopRetries),
+      isInterrupted: () => interrupted,
+    });
+
     // Initialize tracker only if it doesn't exist
     if (!fs.existsSync(trackerPath)) {
       activeOutput().info(`📋 Creating new plan tracker at ${path.basename(trackerPath)}...`);
@@ -619,6 +636,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
       const suiteGate = await suiteSteps.beforeSession(taskInfo);
       if (suiteGate === 'stop') {
+        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }
@@ -721,6 +739,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         emitLoopEvent({ kind: 'task-blocked', position, reason: `session exited ${exitCode}` });
         await storeReport('failed');
+        if (retries.retry(`session exited ${exitCode}`)) continue;
         return;
       }
 
@@ -743,6 +762,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') {
         emitLoopEvent({ kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' });
+        if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit')) continue;
         return;
       }
       const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));
@@ -757,6 +777,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // one has inserted a blocked repair task, or blocked the repair it
       // followed, and stops the run.
       if (!(await suiteSteps.afterTask(taskInfo, base))) {
+        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
       }

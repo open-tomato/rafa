@@ -1,6 +1,7 @@
 /**
  * The loop's events: a task's start, its end done or blocked, each phase
- * of the wrap-up, the pull request or its absence, a halt, and each
+ * of the wrap-up, the pull request or its absence, a halt, a retry the
+ * run takes in place of a halt (`start/retry-budget.ts`), and each
  * reported bug triage read as a red test the run started with
  * (`start/triage.ts`). Each is emitted as one named `event` through the
  * active output, which the events output prints as one `rafa· ` line,
@@ -54,6 +55,7 @@ export type LoopEvent =
   | { readonly kind: 'pr'; readonly number: number }
   | { readonly kind: 'no-pr'; readonly reason: string }
   | { readonly kind: 'halt'; readonly reason: string }
+  | { readonly kind: 'retry'; readonly attempt: number; readonly of: number; readonly reason: string }
   | { readonly kind: 'inherited'; readonly file: string; readonly name: string }
   | { readonly kind: 'error'; readonly message: string };
 
@@ -97,6 +99,8 @@ export function summaryOf(event: LoopEvent): string {
       return `${padKind('no pr')}${oneLine(event.reason)}`;
     case 'halt':
       return `${padKind('halt')}${oneLine(event.reason)}`;
+    case 'retry':
+      return `${padKind(`retry ${event.attempt}/${event.of}`)}${oneLine(event.reason)}`;
     case 'inherited':
       return `${padKind('inherited')}${oneLine(`${event.file} > ${event.name}`)}`;
     case 'error':

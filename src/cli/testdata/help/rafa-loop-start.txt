@@ -4,8 +4,9 @@ rafa loop start — run a plan task by task, then wrap up, open the PR and wait
 Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
     [--skills-resolver=<string>] [--runtime=<string>] [--no-ci-wait]
-    [--ci-timeout=<number>] [--ci-attempts=<number>] [--create-branch]
-    [--as-worktree] [--any-branch] [--roadmap] [-d|--detached] [--no-hint]
+    [--ci-timeout=<number>] [--ci-attempts=<number>] [--retry=<number>]
+    [--create-branch] [--as-worktree] [--any-branch] [--roadmap] [-d|--detached]
+    [--no-hint]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -30,13 +31,18 @@ Description:
   state and the running task, and under `--roadmap` the hop away, when one is.
   It refuses a plan whose record names another branch, and a plan a session is
   still running. `rafa loop stop`, `pause`, `resume`, `status` and `list` reach
-  the run through that record. A run holds its terminal: until phase 6 it
-  refuses `--detached`. With `--runtime` the whole run goes on in that installed
-  rafa, never in a `src/` directory.
+  the run through that record. With `--retry` or `loop.retries` it goes back
+  into its loop instead of stopping, at most that many times, after a red suite
+  step, a task session that exited nonzero, or one that left neither a report
+  nor a commit. A run holds its terminal: until phase 6 it refuses `--detached`.
+  With `--runtime` the whole run goes on in that installed rafa, never in a
+  `src/` directory.
 
 Spends:
   🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries`
-  more when it opens no pull request, and repair sessions while CI is red
+  more when it opens no pull request, repair sessions while CI is red, and the
+  sessions of up to `--retry` (`loop.retries`) more passes of the loop after a
+  stop it retries
 
 Flags:
   --plan              string
@@ -65,6 +71,14 @@ Flags:
   --ci-attempts       number, default 2
       Repair sessions to spend on a red or conflicting PR before escalating; 0
       spends none and still reports the verdict.
+  --retry             number
+      Goes back into the loop instead of stopping, at most this many times, 1 to
+      3, after a red suite step, a task session that exited nonzero but not on
+      its budget, or one that left neither a report nor a commit. A report that
+      blocks its task, a refused commit, a moved checkout and an interrupt still
+      stop the run. Outranks `loop.retries` in `.rafa/config.yaml`, `false`
+      unless the config names a count; any other value is refused before the run
+      starts.
   --create-branch     boolean
       On `main` or `master`, creates `feat/<plan-stub>` from the latest
       `origin/<base>` and runs the plan there without asking, or switches to

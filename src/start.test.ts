@@ -360,9 +360,11 @@ describe('where start.ts takes the suite steps', () => {
     expect(before).toBeLessThan(indexOf(EVERY, 'dispatchTask'));
   });
 
-  it('stops the run when a step before a session is red, and breaks on an interrupt it ran through', () => {
+  it('stops the run when a step before a session is red, unless it retries, and breaks on an interrupt it ran through', () => {
     expect(START).toContain(
-      'const suiteGate = await suiteSteps.beforeSession(taskInfo);\n      if (suiteGate === \'stop\') {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
+      'const suiteGate = await suiteSteps.beforeSession(taskInfo);\n      if (suiteGate === \'stop\') {\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
     );
   });
 
@@ -383,7 +385,9 @@ describe('where start.ts takes the suite steps', () => {
     expect(indexOf(EVERY, 'finishCleanExit')).toBeLessThan(after);
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
     expect(START).toContain(
-      'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
+      'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
     );
   });
 
@@ -405,6 +409,57 @@ describe('where start.ts takes the suite steps', () => {
     // hands the whole wrap-up to `runWrapUp` alone (the first describe).
     expect(NAMES).not.toContain('beforeSession');
     expect(NAMES).not.toContain('runPreWrapUpStep');
+  });
+});
+
+describe('where start.ts retries a stop', () => {
+  const EVERY = everyCall(START);
+
+  it('makes the run\'s retries once, from --retry over loop.retries, on the SIGINT flag', () => {
+    const made = EVERY.filter((call) => call.name === 'createRunRetries');
+
+    expect(made).toHaveLength(1);
+    expect(made[0]?.args[0]).toContain('retries: resolveRunRetries(retry, runConfig.config.loopRetries),');
+    expect(made[0]?.args[0]).toContain('isInterrupted: () => interrupted,');
+  });
+
+  it('asks for a retry at the four retry-safe stops alone, in loop order', () => {
+    // Each `retries.retry(...)` is a stop that may `continue`; a fifth
+    // would retry a stop the module note of `start/retry-budget.ts`
+    // never names, such as a moved checkout or a report that blocks.
+    expect(EVERY.filter((call) => call.name === 'retry').map((call) => call.args)).toEqual([
+      ['\'suite step red\''],
+      ['`session exited ${exitCode}`'],
+      ['\'left neither a report nor a commit\''],
+      ['\'suite step red\''],
+    ]);
+  });
+
+  it('guards each retry with the reading that tells its stop apart, and continues on a grant', () => {
+    expect(START).toContain('        await storeReport(\'failed\');\n        if (retries.retry(`session exited ${exitCode}`)) continue;\n        return;\n');
+    expect(START).toContain('        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n        return;\n');
+    expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red'\)\) continue;/g)).toHaveLength(2);
+  });
+
+  it('retries no exit on its budget and no interrupted task, which end before the nonzero exit', () => {
+    const budget = START.indexOf('if (isBudgetExit(dispatch)) {');
+    const interrupt = START.indexOf('if (interrupted) {\n        updateTrackerLine(');
+    const failed = START.indexOf('if (exitCode !== 0) {');
+
+    expect([budget, interrupt].every((at) => at !== -1 && at < failed)).toBe(true);
+    const budgetBranch = START.slice(budget, START.indexOf('}', START.indexOf('return;', budget)));
+    expect(budgetBranch).not.toContain('retries.retry(');
+  });
+
+  it('reads a planted fifth retry as one more, so the list above can fail', () => {
+    const planted = everyCall([
+      'async function run() {',
+      '  if (retries.retry(\'suite step red\')) continue;',
+      '  if (retries.retry(\'checkout moved\')) continue;',
+      '}',
+    ].join('\n'));
+
+    expect(planted.filter((call) => call.name === 'retry')).toHaveLength(2);
   });
 });
 
