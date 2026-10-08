@@ -137,7 +137,7 @@ import { parseDecision } from './decision-parse.js';
 import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.js';
 import { runDecisionSession } from './decision-session.js';
 import { emitLoopEvent, taskPosition } from './loop-events.js';
-import { addDecision, markDone, remaining, skippedLines, taskIdentity } from './pass-over.js';
+import { addDecision, markDone, remaining, skippedLines, taskRefIn } from './pass-over.js';
 
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
 export const SUITE_STEP_RED = 'suite step red';
@@ -260,6 +260,12 @@ function whenOf(stop: DecisionStop): DecisionWhen {
   return heldOnNothingLeftBehind(stop.finished)
     ? 'spent'
     : 'now';
+}
+
+/** The key the run's two bounds hold `taskInfo` under: its text and its ordinal (`./pass-over.ts`). */
+function boundKey(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>, trackerContent: string): string {
+  const ref = taskRefIn(taskInfo, trackerContent);
+  return `${String(ref.ordinal)}:${ref.task}`;
 }
 
 /** A tracker line counted from 1, as the prompt and the events show it. */
@@ -435,7 +441,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     const content = readTracker();
     const decision = await decisionFor(subject, content);
     if (decision === null) return false;
-    const identity = taskIdentity(subject.taskInfo.task);
+    const identity = boundKey(subject.taskInfo, content);
     return apply(bounded(decision, identity), subject, content, identity);
   };
 
@@ -464,7 +470,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   };
 
   const taskDone = (taskInfo: TaskInfo): void => {
-    const next = markDone(list, taskInfo);
+    const next = markDone(list, taskInfo, readTracker());
     if (next.length === list.length) return;
     list = next;
     session.decisionsChanged(list);

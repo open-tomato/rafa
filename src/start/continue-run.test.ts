@@ -348,6 +348,21 @@ describe('the two bounds', () => {
     expect(events[1]?.[1]).toMatchObject({ reason: expect.stringContaining('deferred once already in this run') as unknown });
   });
 
+  it('holds two tasks of the same text apart: a jump of the first does not stop the second', async () => {
+    const jump = decisionOutput('strategy: jump', 'reason: "x"');
+    const run = plant([jump, jump]);
+    writeFileSync(run.trackerPath, '- [BLOCKED] Run the suite\n- [ ] Other\n- [BLOCKED] Run the suite\n', 'utf8');
+    const decisions = createRunDecisions(run.options);
+    const stopOn = (lineNum: number): DecisionStop => ({ ...heldReport(run.trackerPath), taskInfo: { task: 'Run the suite', lineNum, status: 'blocked' } });
+
+    expect(await decisions.atStop(stopOn(0))).toBe(true);
+    expect(await decisions.atStop(stopOn(2))).toBe(true);
+
+    expect(events.map(([, data]) => (data as { strategy: string }).strategy)).toEqual(['jump', 'jump']);
+    expect([...decisions.skipLines(readFileSync(run.trackerPath, 'utf8'))]).toEqual([0, 2]);
+    expect(run.saved.at(-1)?.map((entry) => entry.task.ordinal)).toEqual([1, 2]);
+  });
+
   it('stops a task passed over once already that reaches a decision again', async () => {
     const jump = decisionOutput('strategy: jump', 'reason: "x"');
     const run = plant([jump, jump]);

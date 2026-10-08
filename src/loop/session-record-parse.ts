@@ -268,6 +268,7 @@ function taskRefProblems(ref: unknown, at: string): string[] {
   if (!isObject(ref)) return [`${at} is ${describeValue(ref)}, expected a task`];
   const lineNum = field(ref, 'lineNum');
   const task = field(ref, 'task');
+  const ordinal = field(ref, 'ordinal');
   return [
     isLineIndex(lineNum)
       ? null
@@ -275,6 +276,9 @@ function taskRefProblems(ref: unknown, at: string): string[] {
     isText(task)
       ? null
       : `${at}.task is ${describeValue(task)}, expected a non-empty string`,
+    ordinal === undefined || isPositiveWhole(ordinal)
+      ? null
+      : `${at}.ordinal is ${describeValue(ordinal)}, expected a whole number from 1`,
   ].filter((problem): problem is string => problem !== null);
 }
 
@@ -440,9 +444,15 @@ function stepsEntry(steps: unknown): { readonly steps?: readonly SessionStep[] }
   return { steps: Object.freeze((steps as readonly SessionStep[]).map(freezeStep)) };
 }
 
-/** A frozen task reference already checked, copied to its two fields. */
+/** A frozen task reference already checked, copied to its fields, `ordinal` last and only when it is there. */
 function freezeTaskRef(ref: SessionTaskRef): SessionTaskRef {
-  return Object.freeze({ lineNum: ref.lineNum, task: ref.task });
+  return Object.freeze({
+    lineNum: ref.lineNum,
+    task: ref.task,
+    ...(ref.ordinal === undefined
+      ? {}
+      : { ordinal: ref.ordinal }),
+  });
 }
 
 /** A frozen decision already checked, its fields in the order they are written, `after` last and only on a defer. */

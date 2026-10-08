@@ -1,12 +1,12 @@
 /**
- * Tests for `listOpenTasks` and the lines `findNextTask` is told to
- * skip, which a `--continue` run passes over without writing a byte of
+ * Tests for `listTrackerTasks`, `listOpenTasks` and the lines
+ * `findNextTask` is told to skip, which a `--continue` run passes over without writing a byte of
  * the tracker. Each skip case sits beside the same tracker read with no
  * skip, the control that the line skipped was the one answered before.
  */
 import { describe, expect, it } from 'bun:test';
 
-import { findNextTask, listOpenTasks } from './tracker.js';
+import { findNextTask, listOpenTasks, listTrackerTasks } from './tracker.js';
 
 /** A tracker with a done task, a blocked one, two open ones and a block body. */
 const TRACKER = [
@@ -22,6 +22,17 @@ const TRACKER = [
   '- [ ] Use the helper',
   '',
 ].join('\n');
+
+describe('listTrackerTasks', () => {
+  it('answers every task line in tracker order, done ones included, block bodies left out', () => {
+    expect(listTrackerTasks(TRACKER)).toEqual([
+      { task: 'Done already', lineNum: 2, status: 'done' },
+      { task: 'Gate on .env.local', lineNum: 3, status: 'blocked', blocker: 'needs a person' },
+      { task: 'Write the helper', lineNum: 4, status: 'unchecked' },
+      { task: 'Use the helper', lineNum: 9, status: 'unchecked' },
+    ]);
+  });
+});
 
 describe('listOpenTasks', () => {
   it('answers every blocked and unchecked line in tracker order, block bodies and done lines left out', () => {

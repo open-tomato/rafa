@@ -57,13 +57,16 @@
  *   - `decisions`: the pass-over list of a `loop start --continue` run
  *     (`start/pass-over.ts`), each a {@link SessionDecision}: the task
  *     jumped or deferred, its `lineNum` counted from 0 as the tracker
- *     reader counts it and its text with the blocker comment and
- *     declaration off, the strategy, `jump` or `defer`, the decision's
- *     reason, and on a defer alone the task it waits on, as `after`. A
- *     later run of the plan reads it back off the newest stopped record
- *     and matches each task by its text. The field is additive, as
- *     `steps` is: a record carries no `decisions` key until a change
- *     hands a list, an empty list is written without the key, and
+ *     reader counts it, its text with the blocker comment and
+ *     declaration off, and its `ordinal`, which copy of that text it is
+ *     among the tracker's task lines (left out of a record from before
+ *     the field, and read as 1), the strategy, `jump` or `defer`, the
+ *     decision's reason, and on a defer alone the task it waits on, as
+ *     `after`. A later run of the plan reads it back off the newest
+ *     stopped record and matches each task by its text and ordinal.
+ *     The field is additive, as `steps` is: a record carries no
+ *     `decisions` key until a change hands a list, an empty list is
+ *     written without the key, and
  *     {@link sessionDecisions} reads such a record as holding none. A
  *     change's list replaces the stored one whole
  *     ({@link SessionChange}'s `decisions`); every other write keeps it.
@@ -268,10 +271,16 @@ export interface SessionStep {
 
 /** A task a saved decision names: its zero-based tracker line and its text. */
 export interface SessionTaskRef {
-  /** Counted from 0, as `TaskInfo.lineNum`; a hint, the text being the key. */
+  /** Counted from 0, as `TaskInfo.lineNum`; a hint, the text and the ordinal being the key. */
   readonly lineNum: number;
   /** The task's text, its blocker comment and declaration off. */
   readonly task: string;
+  /**
+   * Which copy of `task` it is among the tracker's task lines, ticked
+   * ones included, counted from 1 in tracker order. Left out of a record
+   * written before the field, which reads as 1.
+   */
+  readonly ordinal?: number;
 }
 
 /** One task a `--continue` run passes over, as its record saves it. See the module note. */

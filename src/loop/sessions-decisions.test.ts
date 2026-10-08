@@ -175,6 +175,13 @@ describe('parseSessionRecord and the decisions field', () => {
     expect(Object.keys(parseSessionRecord(recordText({ decisions: [] }), FILE))).toEqual(PLAIN_KEYS);
   });
 
+  it('keeps a task\'s ordinal, the copy of its text it names, and reads one saved without it as it was', () => {
+    const second = { ...JUMP, task: { lineNum: 9, task: 'Run the suite', ordinal: 2 } };
+
+    expect(sessionDecisions(parseSessionRecord(recordText({ decisions: [second, JUMP] }), FILE))).toEqual([second, JUMP]);
+    expect(sessionDecisions(parseSessionRecord(recordText({ decisions: [JUMP] }), FILE))[0]?.task).toEqual({ lineNum: 3, task: 'Gate on .env.local' });
+  });
+
   it('keeps line 0, the tracker\'s first line', () => {
     const first = { ...JUMP, task: { lineNum: 0, task: 'First' } };
 
@@ -193,6 +200,8 @@ describe('parseSessionRecord and the decisions field', () => {
     ['a defer with no after', [{ ...DEFER, after: undefined }], 'decisions[0].after is missing, expected the task a defer waits on'],
     ['a jump with an after', [{ ...JUMP, after: DEFER.after }], 'decisions[0].after is {"lineNum":4,"task":"Write the helper"}, expected no key on a jump'],
     ['an after with no line', [{ ...DEFER, after: { task: 'x' } }], 'decisions[0].after.lineNum is missing, expected a whole number from 0'],
+    ['an ordinal of 0', [{ ...JUMP, task: { lineNum: 3, task: 'x', ordinal: 0 } }], 'decisions[0].task.ordinal is 0, expected a whole number from 1'],
+    ['a quoted ordinal', [{ ...DEFER, after: { lineNum: 4, task: 'x', ordinal: '2' } }], 'decisions[0].after.ordinal is "2", expected a whole number from 1'],
   ])('refuses a decisions key holding %s, naming the field', (_label, decisions, problem) => {
     const read = (): SessionRecord => parseSessionRecord(recordText({ decisions }), FILE);
 

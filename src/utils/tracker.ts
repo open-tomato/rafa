@@ -212,13 +212,25 @@ function closedBlockLines(trackerContent: string): ReadonlySet<number> {
   return inside;
 }
 
+/** A task line of any status, ticked ones included, as {@link listTrackerTasks} answers it. */
+export interface TrackerTask extends Omit<TaskInfo, 'status'> {
+  status: TaskInfo['status'] | 'done';
+}
+
 /** The record for one task line's capture, its blocker comment taken off. */
-function taskInfoOf(capture: string, lineNum: number, status: TaskInfo['status']): TaskInfo {
+function taskInfoOf(capture: string, lineNum: number, status: TrackerTask['status']): TrackerTask {
   const { text, blocker } = splitBlockerComment(capture.trim());
   return blocker === null
     ? { task: text, lineNum, status }
     : { task: text, lineNum, status, blocker };
 }
+
+/** Each checkbox a task line opens with, and the status it reads as. */
+const TASK_LINE_STATUSES: readonly (readonly [RegExp, TrackerTask['status']])[] = [
+  [/^- \[BLOCKED\] (.+)/, 'blocked'],
+  [/^- \[ \] (.+)/, 'unchecked'],
+  [/^- \[x\] (.+)/, 'done'],
+];
 
 /** What {@link findNextTask} may be told besides the tracker. */
 export interface FindNextTaskOptions {
@@ -301,28 +313,42 @@ export function findNextTask(
 }
 
 /**
- * Every open task of a tracker, blocked or unchecked, in tracker order,
+ * Every task line of a tracker, ticked ones included, in tracker order,
  * read by the rules {@link findNextTask} answers one by: only a line
- * opening `- [ ] ` or `- [BLOCKED] ` counts, never one inside a closed
- * `rafa:*` block, and a blocker comment comes off the text.
+ * opening `- [ ] `, `- [BLOCKED] ` or `- [x] ` counts, never one inside
+ * a closed `rafa:*` block, and a blocker comment comes off the text. A
+ * `--continue` run counts the copies of a repeated task text over these
+ * (`start/pass-over.ts`), so ticking one copy renumbers no other.
  */
-export function listOpenTasks(trackerContent: string): TaskInfo[] {
+export function listTrackerTasks(trackerContent: string): TrackerTask[] {
   const lines = trackerContent.split('\n');
   const inBlock = closedBlockLines(trackerContent);
-  const open: TaskInfo[] = [];
+  const tasks: TrackerTask[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     if (inBlock.has(i)) continue;
-    const blocked = lines[i]!.match(/^- \[BLOCKED\] (.+)/);
-    if (blocked?.[1]) {
-      open.push(taskInfoOf(blocked[1], i, 'blocked'));
-      continue;
+    for (const [pattern, status] of TASK_LINE_STATUSES) {
+      const capture = lines[i]!.match(pattern)?.[1];
+      if (!capture) continue;
+      tasks.push(taskInfoOf(capture, i, status));
+      break;
     }
-    const unchecked = lines[i]!.match(/^- \[ \] (.+)/);
-    if (unchecked?.[1]) open.push(taskInfoOf(unchecked[1], i, 'unchecked'));
   }
 
-  return open;
+  return tasks;
+}
+
+/** True for a task line that is still open, blocked or unchecked. */
+function isOpenTask(task: TrackerTask): task is TaskInfo {
+  return task.status !== 'done';
+}
+
+/**
+ * Every open task of a tracker, blocked or unchecked, in tracker order:
+ * {@link listTrackerTasks} with the ticked lines left out.
+ */
+export function listOpenTasks(trackerContent: string): TaskInfo[] {
+  return listTrackerTasks(trackerContent).filter(isOpenTask);
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   remaining,
   skippedLines,
   taskIdentity,
+  taskRefIn,
 } from './pass-over.js';
 
 /** A tracker with a blocked gate, a helper task and a task using it. */
@@ -71,7 +72,7 @@ describe('addDecision', () => {
 
     expect(EMPTY_PASS_OVER).toEqual([]);
     expect(list).toEqual([
-      { task: { lineNum: 3, task: 'Gate on .env.local' }, strategy: 'jump', reason: 'A person writes .env.local.' },
+      { task: { lineNum: 3, task: 'Gate on .env.local', ordinal: 1 }, strategy: 'jump', reason: 'A person writes .env.local.' },
     ]);
   });
 
@@ -80,10 +81,10 @@ describe('addDecision', () => {
 
     expect(list).toEqual([
       {
-        task: { lineNum: 5, task: 'Use the helper' },
+        task: { lineNum: 5, task: 'Use the helper', ordinal: 1 },
         strategy: 'defer',
         reason: 'Needs the helper.',
-        after: { lineNum: 4, task: 'Write the helper' },
+        after: { lineNum: 4, task: 'Write the helper', ordinal: 1 },
       },
     ]);
   });
@@ -109,7 +110,7 @@ describe('addDecision', () => {
     const deferred = addDecision(EMPTY_PASS_OVER, USER, { strategy: 'defer', reason: 'first', after: 5 }, TRACKER);
     const jumped = addDecision(deferred, USER, { strategy: 'jump', reason: 'second' }, TRACKER);
 
-    expect(jumped).toEqual([{ task: { lineNum: 5, task: 'Use the helper' }, strategy: 'jump', reason: 'second' }]);
+    expect(jumped).toEqual([{ task: { lineNum: 5, task: 'Use the helper', ordinal: 1 }, strategy: 'jump', reason: 'second' }]);
     expect(deferred).toHaveLength(1);
     expect(deferred[0]?.strategy).toBe('defer');
   });
@@ -146,11 +147,40 @@ describe('skippedLines', () => {
     expect([...skippedLines(list, ticked(TRACKER, 3))]).toEqual([]);
   });
 
-  it('matches the nearer of two lines holding the same text', () => {
+  it('names the copy of a repeated text by its place among the tracker\'s lines holding it', () => {
     const twice = '- [ ] Same\n- [ ] Other\n- [ ] Same\n';
     const list = addDecision(EMPTY_PASS_OVER, { task: 'Same', lineNum: 2, status: 'unchecked' }, JUMP, twice);
 
     expect([...skippedLines(list, twice)]).toEqual([2]);
+    // A line of another text inserted above moves both copies, and the second is still the one skipped.
+    expect([...skippedLines(list, `- [ ] Repair the suite\n${twice}`)]).toEqual([3]);
+  });
+
+  it('keeps following the second copy once a person ticks the first, which a count of open lines would lose', () => {
+    const twice = '- [BLOCKED] Run the suite\n- [ ] Other\n- [BLOCKED] Run the suite\n';
+    const second = { task: 'Run the suite', lineNum: 2, status: 'blocked' as const };
+    const list = addDecision(EMPTY_PASS_OVER, second, JUMP, twice);
+    const firstTicked = twice.replace('- [BLOCKED] Run the suite\n- [ ] Other', '- [x] Run the suite\n- [ ] Other');
+
+    expect([...skippedLines(list, twice)]).toEqual([2]);
+    expect([...skippedLines(list, firstTicked)]).toEqual([2]);
+    expect(findNextTask(firstTicked, { skipLines: skippedLines(list, firstTicked) })?.task).toBe('Other');
+  });
+
+  it('reads an entry saved with no ordinal, as a record from before the field holds, as the first copy', () => {
+    const twice = '- [BLOCKED] Run the suite\n- [BLOCKED] Run the suite\n';
+    const saved = [{ task: { lineNum: 1, task: 'Run the suite' }, strategy: 'jump' as const, reason: 'x' }];
+
+    expect([...skippedLines(saved, twice)]).toEqual([0]);
+  });
+});
+
+describe('taskRefIn', () => {
+  it('counts the copy from 1 over every task line holding the text, done ones included', () => {
+    const tracker = '- [x] Run the suite  {model=haiku}\n- [ ] Other\n- [BLOCKED] Run the suite  <!-- blocked: red -->\n';
+
+    expect(taskRefIn({ task: 'Run the suite', lineNum: 2 }, tracker)).toEqual({ lineNum: 2, task: 'Run the suite', ordinal: 2 });
+    expect(taskRefIn({ task: 'Other', lineNum: 1 }, tracker)).toEqual({ lineNum: 1, task: 'Other', ordinal: 1 });
   });
 });
 
@@ -163,7 +193,7 @@ describe('markDone', () => {
       TRACKER,
     );
 
-    const done = markDone(list, HELPER);
+    const done = markDone(list, HELPER, TRACKER);
 
     expect(done).toEqual([list[0]]);
     expect(list).toHaveLength(2);
@@ -172,13 +202,23 @@ describe('markDone', () => {
   it('drops an entry for the done task itself', () => {
     const list = addDecision(EMPTY_PASS_OVER, GATE, JUMP, TRACKER);
 
-    expect(markDone(list, GATE)).toEqual([]);
+    expect(markDone(list, GATE, TRACKER)).toEqual([]);
   });
 
   it('answers the same list when nothing waits on the task', () => {
     const list = addDecision(EMPTY_PASS_OVER, GATE, JUMP, TRACKER);
 
-    expect(markDone(list, HELPER)).toEqual(list);
+    expect(markDone(list, HELPER, TRACKER)).toEqual(list);
+  });
+
+  it('drops only the copy done when two tasks share a text, and keeps the decision on the other', () => {
+    const twice = '- [BLOCKED] Run the suite\n- [ ] Other\n- [BLOCKED] Run the suite\n';
+    const first = { task: 'Run the suite', lineNum: 0, status: 'blocked' as const };
+    const second = { task: 'Run the suite', lineNum: 2, status: 'blocked' as const };
+    const both = addDecision(addDecision(EMPTY_PASS_OVER, first, JUMP, twice), second, { strategy: 'jump', reason: 'second' }, twice);
+
+    expect(both.map((entry) => entry.reason)).toEqual(['A person writes .env.local.', 'second']);
+    expect(markDone(both, first, twice).map((entry) => entry.reason)).toEqual(['second']);
   });
 });
 
@@ -188,12 +228,12 @@ describe('remaining', () => {
     const moved = inserted(TRACKER, 0);
 
     expect(remaining(list, moved)).toEqual([
-      { task: { lineNum: 4, task: 'Gate on .env.local' }, strategy: 'jump', reason: 'A person writes .env.local.' },
+      { task: { lineNum: 4, task: 'Gate on .env.local', ordinal: 1 }, strategy: 'jump', reason: 'A person writes .env.local.' },
       {
-        task: { lineNum: 6, task: 'Use the helper' },
+        task: { lineNum: 6, task: 'Use the helper', ordinal: 1 },
         strategy: 'defer',
         reason: 'x',
-        after: { lineNum: 5, task: 'Write the helper' },
+        after: { lineNum: 5, task: 'Write the helper', ordinal: 1 },
       },
     ]);
   });

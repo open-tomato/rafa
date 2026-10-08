@@ -23,12 +23,17 @@
  *
  * Line numbers shift: the loop inserts a repair task above a red step,
  * and a later run reads a tracker other runs have edited. So an entry
- * names its task by {@link taskIdentity} as well as by line: the task's
- * text with its blocker comment and its declaration off, which is the
- * sentence a person wrote and nothing the loop writes onto the line.
- * An entry is matched against the tracker's open tasks by that text,
- * and among two open tasks with the same text, by the line nearer the
- * one recorded. The recorded line is a hint, never the key.
+ * names its task by {@link taskRefIn}: the task's text with its blocker
+ * comment and its declaration off ({@link taskIdentity}), which is the
+ * sentence a person wrote and nothing the loop writes onto the line,
+ * and its ordinal, which copy of that text it is among the tracker's
+ * task lines, ticked ones included, counted from 1 in tracker order. A
+ * plan that repeats a task ("Run the suite" as a gate after each stage)
+ * holds two tasks the text alone cannot tell apart; the ordinal can,
+ * and since ticked lines are counted, ticking one copy renumbers no
+ * other. A line of another text inserted anywhere moves no ordinal. An
+ * entry saved before the ordinal existed reads as the first copy. The
+ * recorded line is a hint, never the key.
  *
  * ## Reading the tracker
  *
@@ -41,10 +46,10 @@
  * list does not carry entries nothing will read again.
  */
 import type { ContinueDecision } from './decision-parse.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { TaskInfo, TrackerTask } from '../utils/tracker.js';
 
 import { stripTaskDeclaration } from '../utils/declaration.js';
-import { listOpenTasks, splitBlockerComment } from '../utils/tracker.js';
+import { listOpenTasks, listTrackerTasks, splitBlockerComment } from '../utils/tracker.js';
 
 /** A task as an entry names it: its identity and the line it was last read at. */
 export interface TaskRef {
@@ -52,6 +57,8 @@ export interface TaskRef {
   readonly lineNum: number;
   /** {@link taskIdentity} of the task's text. */
   readonly task: string;
+  /** Which copy of `task` it is, counted from 1; see the module note. Read as 1 when left out. */
+  readonly ordinal?: number;
 }
 
 /** The strategies that pass over a task. */
@@ -81,32 +88,56 @@ export function taskIdentity(text: string): string {
   return stripTaskDeclaration(splitBlockerComment(text.trim()).text).trim();
 }
 
-/** The reference an entry keeps for `task`. */
-function refOf(task: PassOverTask): TaskRef {
-  return { lineNum: task.lineNum, task: taskIdentity(task.task) };
+/** The copy of its text `ref` names, 1 for a reference saved without one. */
+function ordinalOf(ref: TaskRef): number {
+  return ref.ordinal ?? 1;
 }
 
-/** The open task `ref` names now, nearest its recorded line, or null. */
-function locate(ref: TaskRef, open: readonly TaskInfo[]): TaskRef | null {
-  let found: TaskRef | null = null;
-  for (const task of open) {
-    if (taskIdentity(task.task) !== ref.task) continue;
-    const nearer = found === null
-      || Math.abs(task.lineNum - ref.lineNum) < Math.abs(found.lineNum - ref.lineNum);
-    if (nearer) found = { lineNum: task.lineNum, task: ref.task };
-  }
-  return found;
+/** True when `a` and `b` name the same task: the same text, the same copy. */
+function sameTask(a: TaskRef, b: TaskRef): boolean {
+  return a.task === b.task && ordinalOf(a) === ordinalOf(b);
+}
+
+/**
+ * The reference an entry keeps for `task` in `trackerContent`: its
+ * identity and its ordinal among the task lines holding that text.
+ */
+export function taskRefIn(task: PassOverTask, trackerContent: string): TaskRef {
+  const identity = taskIdentity(task.task);
+  const copies = listTrackerTasks(trackerContent)
+    .filter((line) => line.lineNum <= task.lineNum && taskIdentity(line.task) === identity);
+  return { lineNum: task.lineNum, task: identity, ordinal: Math.max(1, copies.length) };
+}
+
+/** The task line `ref` names among `tasks`, whatever its status, or null. */
+function locate(ref: TaskRef, tasks: readonly TrackerTask[]): TrackerTask | null {
+  const copies = tasks.filter((task) => taskIdentity(task.task) === ref.task);
+  return copies[ordinalOf(ref) - 1] ?? null;
+}
+
+/** `ref` at the line `task` holds it at now. */
+function movedTo(ref: TaskRef, task: TrackerTask): TaskRef {
+  return { lineNum: task.lineNum, task: ref.task, ordinal: ordinalOf(ref) };
+}
+
+/** The task line `ref` names while it is still open, or null. */
+function locateOpen(ref: TaskRef, tasks: readonly TrackerTask[]): TrackerTask | null {
+  const found = locate(ref, tasks);
+  return found === null || found.status === 'done'
+    ? null
+    : found;
 }
 
 /** `entry` at its current lines while it still passes over its task, or null. */
-function stillPassedOver(entry: PassOverEntry, open: readonly TaskInfo[]): PassOverEntry | null {
-  const task = locate(entry.task, open);
+function stillPassedOver(entry: PassOverEntry, tasks: readonly TrackerTask[]): PassOverEntry | null {
+  const task = locateOpen(entry.task, tasks);
   if (task === null) return null;
-  if (entry.after === undefined) return { ...entry, task };
-  const after = locate(entry.after, open);
+  const moved = { ...entry, task: movedTo(entry.task, task) };
+  if (entry.after === undefined) return moved;
+  const after = locateOpen(entry.after, tasks);
   return after === null
     ? null
-    : { ...entry, task, after };
+    : { ...moved, after: movedTo(entry.after, after) };
 }
 
 /**
@@ -121,8 +152,8 @@ export function addDecision(
   decision: ContinueDecision,
   trackerContent: string,
 ): PassOverList {
-  const ref = refOf(task);
-  const others = list.filter((entry) => entry.task.task !== ref.task);
+  const ref = taskRefIn(task, trackerContent);
+  const others = list.filter((entry) => !sameTask(entry.task, ref));
   const { strategy, reason } = decision;
 
   if (strategy === 'jump') return [...others, { task: ref, strategy, reason }];
@@ -133,16 +164,17 @@ export function addDecision(
     .find((open) => open.lineNum === afterLine && open.lineNum !== task.lineNum);
   return target === undefined
     ? others
-    : [...others, { task: ref, strategy, reason, after: refOf(target) }];
+    : [...others, { task: ref, strategy, reason, after: taskRefIn(target, trackerContent) }];
 }
 
 /**
- * `list` once `task` is done: its own entry dropped, and every defer
- * waiting on it released.
+ * `list` once `task` is done, named in `trackerContent`: its own entry
+ * dropped, and every defer waiting on it released.
  */
-export function markDone(list: PassOverList, task: PassOverTask): PassOverList {
-  const done = taskIdentity(task.task);
-  return list.filter((entry) => entry.task.task !== done && entry.after?.task !== done);
+export function markDone(list: PassOverList, task: PassOverTask, trackerContent: string): PassOverList {
+  const done = taskRefIn(task, trackerContent);
+  const waitsOnDone = (entry: PassOverEntry): boolean => entry.after !== undefined && sameTask(entry.after, done);
+  return list.filter((entry) => !sameTask(entry.task, done) && !waitsOnDone(entry));
 }
 
 /**
@@ -161,6 +193,6 @@ export function skippedLines(list: PassOverList, trackerContent: string): Readon
  */
 export function remaining(list: PassOverList, trackerContent: string): PassOverList {
   if (list.length === 0) return EMPTY_PASS_OVER;
-  const open = listOpenTasks(trackerContent);
-  return list.flatMap((entry) => stillPassedOver(entry, open) ?? []);
+  const tasks = listTrackerTasks(trackerContent);
+  return list.flatMap((entry) => stillPassedOver(entry, tasks) ?? []);
 }
