@@ -469,6 +469,27 @@ New; it replaces no earlier text. What a row or an action added to
   on to the wait. A blocked or interrupted delivery reaches no retarget.
   With `pr.provider: none`, the pull request is never opened; a run ends `ok`
   once the wrap-up finishes.
+- **`loop start --retry=<n>` and `loop.retries` re-enter the loop after a
+  retry-safe stop** (`start/retry-budget.ts`, `config-schema-loop-retries.ts`):
+  the run goes back to the top of its loop with `continue`, where
+  `findNextTask` answers the `[BLOCKED]` line or the inserted repair, instead
+  of returning, at most n times per run. The key is `false` (the default) or
+  a whole number from 1 to 3, and the flag outranks it for one run; any other
+  flag value, a bare `--retry` and `--no-retry` are refused with exit code 1
+  by `readRunArgs` (`start/run-setup.ts`), before the deferral and the
+  session record. Four stops are retried: a red suite step before a session
+  and a red task step after one (never one `stoppedOnSignal` reads as
+  stopped by SIGINT, `start/suite-steps-run.ts`), a task session that exited
+  nonzero (the budget exit and the interrupt end before it is asked), and a
+  clean exit held only on its absences (`heldOnNothingLeftBehind`,
+  `start/commit.ts`: every hold a no-report, background-wait or no-commit
+  hold). A report that says `status: blocked` or lists a blocker, a refused
+  commit, a moved checkout, a report left unstored, a pause, an interrupt
+  and every refusal before the loop halt as before. Each retry writes one
+  warning, `🔁 Retrying (retry <i> of <n>) after the stop: <reason>.`, and one
+  `retry` loop event after the stop's own lines and events, `task-blocked`
+  included; a SIGINT received refuses every retry left, and once the budget
+  is spent the next such stop halts.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
