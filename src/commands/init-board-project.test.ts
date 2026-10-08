@@ -46,7 +46,9 @@ import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
 
+import { createBoardSyncCommand } from './board/sync.js';
 import {
   PROJECT_HEADING,
   projectPartLine,
@@ -158,6 +160,8 @@ interface RouterOptions {
   readonly refuse?: (args: readonly string[]) => string | null;
   /** The issues whose labels list names a cursor it has already read, so their facts are refused. */
   readonly repeating?: readonly number[];
+  /** Issues planted beyond the board of the module note, open and on no roadmap line. */
+  readonly extraIssues?: readonly PlantedIssue[];
 }
 
 /** The router, the project fake behind it, and what was recorded. */
@@ -169,6 +173,7 @@ interface Router {
 
 /** The router of the module note. */
 function route(options: RouterOptions = {}): Router {
+  const issues = [...ISSUES, ...(options.extraIssues ?? [])];
   const project = createFakeProjectGh({
     ...options.rateLimitAfter === undefined
       ? {}
@@ -180,11 +185,11 @@ function route(options: RouterOptions = {}): Router {
       ...(options.held ?? []).map(({ number, items = [] }) => ({ owner: OWNER, number, items: items.map((issue) => ({ number: issue })) })),
     ],
     owners: [OWNER, TEMPLATE.owner],
-    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: ISSUES.map(({ number }) => number) }],
+    repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: issues.map(({ number }) => number) }],
   });
   const repeating = new Set(options.repeating ?? []);
   const facts = createFakeFactsGh({
-    issues: ISSUES.map((issue) => (repeating.has(issue.number)
+    issues: issues.map((issue) => (repeating.has(issue.number)
       ? { ...issue, repeatsCursor: 'labels' as const }
       : issue)),
     pulls: [{ number: 51, state: 'MERGED', baseRefName: 'main', headRefOid: 'head51', files: [{ path: '.changes/rafa-1.md', changeType: 'ADDED' }] }],
@@ -201,9 +206,9 @@ function route(options: RouterOptions = {}): Router {
     }
     if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
     if (line.startsWith('issue list --label type:roadmap --state open')) {
-      return Promise.resolve(answered(ISSUES.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
+      return Promise.resolve(answered(issues.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
     }
-    if (line.startsWith('issue list --state all')) return Promise.resolve(answered(ISSUES.map(listed)));
+    if (line.startsWith('issue list --state all')) return Promise.resolve(answered(issues.map(listed)));
     if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
     if (args[0] === 'api') return project.gh(args);
     return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
@@ -591,6 +596,41 @@ describe('setUpProject, the fields part over refused issues', () => {
     expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual([1, 10, 30, 40].map((issue) => `#${String(issue)} not refreshed`));
     expect(mutations(router.calls())).not.toContain('updateProjectV2ItemFieldValue');
     expect(report.parts[4]?.outcome).toBe('created');
+  });
+});
+
+describe('setUpProject and rafa board sync, over an issue of 116 cross-references and one whose cursor repeats', () => {
+  /** The subject `board sync` is dispatched under. */
+  const BOARD_SUBJECT = { name: 'board', summary: 'the boards' };
+
+  it('fills the busy issue, refuses alone and names the one whose cursor repeats, reads the fields part created, and syncs with exit code 0', async () => {
+    const router = route({
+      extraIssues: [
+        { number: 80, state: 'OPEN', labels: ['needs-triage'], issueMentions: 116 },
+        { number: 90, state: 'OPEN', labels: ['needs-triage'] },
+      ],
+      repeating: [90],
+    });
+    const project = plantProject(mkdtempSync(join(tempBase, 'paging-')));
+
+    const report = await setUpProject(options(router, project.root));
+
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#90 not refreshed: ');
+    const held = await heldOn(router, COPY_NUMBER);
+    expect(held.get(80)?.get('Stage')).toBe('Triage');
+    expect(held.get(90)?.get('Stage')).toBeUndefined();
+
+    const sync = await dispatchInProject(
+      ['board', 'sync'],
+      [BOARD_SUBJECT],
+      [createBoardSyncCommand({ gh: router.gh, sleep: () => Promise.resolve() })],
+      project,
+    );
+
+    expect(sync.exitCode).toBe(0);
+    expect(sync.stdout).toContain('#90 not refreshed: ');
   });
 });
 
