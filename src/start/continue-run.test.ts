@@ -14,7 +14,7 @@
  */
 import type { DecisionStop, RunDecisionsOptions } from './continue-run.js';
 import type { PassedOverTask } from './loop-events.js';
-import type { PassOverList } from './pass-over.js';
+import type { PassOverEntry, PassOverList } from './pass-over.js';
 import type { RetryRefusal } from './retry-budget.js';
 import type { StepOutcome } from './suite-step.js';
 import type { CliEvent } from '../ports/index.js';
@@ -157,7 +157,7 @@ function taskAt(trackerPath: string, lineNum: number): TaskInfo {
 }
 
 /** A clean exit its report held, on the gate on line index 2. */
-function heldReport(trackerPath: string): DecisionStop {
+function heldReport(trackerPath: string): Extract<DecisionStop, { kind: 'clean-exit' }> {
   const taskInfo = taskAt(trackerPath, 2);
   return {
     kind: 'clean-exit',
@@ -449,13 +449,14 @@ describe('the two bounds', () => {
 });
 
 describe('the seed and the end of the plan', () => {
-  const seed: PassOverList = [{ task: { lineNum: 2, task: 'Check the env file a person writes' }, strategy: 'jump', reason: 'A person writes it.' }];
+  const seedEntry: PassOverEntry = { task: { lineNum: 2, task: 'Check the env file a person writes' }, strategy: 'jump', reason: 'A person writes it.' };
+  const seed: PassOverList = [seedEntry];
 
   it('opens with the seed, saving it on the record and skipping its line', () => {
     const run = plant([], 0, seed);
     const decisions = createRunDecisions(run.options);
 
-    expect(run.saved).toEqual([[{ ...seed[0], task: { ...seed[0]?.task, ordinal: 1 } }]]);
+    expect(run.saved).toEqual([[{ ...seedEntry, task: { ...seedEntry.task, ordinal: 1 } }]]);
     expect(decisions.skipLines(TRACKER).has(2)).toBe(true);
   });
 

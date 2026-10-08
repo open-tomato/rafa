@@ -150,7 +150,7 @@ describe('skippedLines', () => {
 
   it('names the copy of a repeated text by its place among the tracker\'s lines holding it', () => {
     const twice = '- [ ] Same\n- [ ] Other\n- [ ] Same\n';
-    const list = addDecision(EMPTY_PASS_OVER, { task: 'Same', lineNum: 2, status: 'unchecked' }, JUMP, twice);
+    const list = addDecision(EMPTY_PASS_OVER, { task: 'Same', lineNum: 2 }, JUMP, twice);
 
     expect([...skippedLines(list, twice)]).toEqual([2]);
     // A line of another text inserted above moves both copies, and the second is still the one skipped.
@@ -196,7 +196,7 @@ describe('markDone', () => {
 
     const done = markDone(list, HELPER, TRACKER);
 
-    expect(done).toEqual([list[0]]);
+    expect(done).toEqual(list.slice(0, 1));
     expect(list).toHaveLength(2);
   });
 
@@ -252,7 +252,7 @@ describe('remaining', () => {
 
 describe('seedFrom', () => {
   /** The list a stopped run left: the gate jumped, and the helper's user deferred until the helper is done. */
-  const SAVED = addDecision(addDecision(EMPTY_PASS_OVER, GATE, JUMP, TRACKER), { ...USER, status: 'blocked' }, { strategy: 'defer', reason: 'x', after: 5 }, TRACKER);
+  const SAVED = addDecision(addDecision(EMPTY_PASS_OVER, GATE, JUMP, TRACKER), USER, { strategy: 'defer', reason: 'x', after: 5 }, TRACKER);
   /** The tracker that run left, the deferred task blocked as its stop left it. */
   const LEFT = TRACKER.replace('- [ ] Use the helper', '- [BLOCKED] Use the helper');
 
