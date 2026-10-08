@@ -44,13 +44,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
 import { recordingFeed } from '../board/project/progress-fake.js';
+import { commandProgressFeed } from '../board/project/progress.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
 import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
 import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { callNumber } from '../board/project/retry.js';
 import { parseConfigText } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
-import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
+import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { createBoardSyncCommand } from './board/sync.js';
@@ -752,6 +753,116 @@ describe('setUpProject, the phases it feeds', () => {
 
     expect(outcomes(second)['items']).toBe('present');
     expect(bounds(recording.steps())).toEqual(['facts start 0/5', 'facts end 5/5 0 refused']);
+  });
+});
+
+describe('setUpProject and rafa board sync, the progress of all three phases rendered through the command', () => {
+  /** The subject `board sync` is dispatched under. */
+  const BOARD_SUBJECT = { name: 'board', summary: 'the boards' };
+
+  /** A clock advancing one second on every read, so every advance prints a line at `progressSeconds: 1`. */
+  function steppingClock(): () => number {
+    let at = 0;
+    return () => {
+      at += 1000;
+      return at;
+    };
+  }
+
+  /** The start, middle and end lines of a first run over the board of the module note, every phase timed by {@link steppingClock}. */
+  const PHASE_LINES: readonly string[] = [
+    'adding issues: 5',
+    'adding issues: 1/5, 1s',
+    'adding issues: 2/5, 2s',
+    'adding issues: 3/5, 3s',
+    'adding issues: 4/5, 4s',
+    'adding issues: 5/5, 5s',
+    'adding issues: 5/5, 0 refused, 6s',
+    'reading facts: 5',
+    'reading facts: 5/5, 1s',
+    'reading facts: 5/5, 0 refused, 2s',
+    'writing fields: 7',
+    'writing fields: 5/7, 1s',
+    'writing fields: 7/7, 2s',
+    'writing fields: 7/7, 0 refused, 3s',
+  ];
+
+  /** `PHASE_LINES`, as the json `progress` event's data names each. */
+  const PHASE_EVENT_DATA: readonly Readonly<Record<string, unknown>>[] = [
+    { phase: 'adds', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+    { phase: 'adds', step: 'progress', done: 1, total: 5, elapsedMs: 1000 },
+    { phase: 'adds', step: 'progress', done: 2, total: 5, elapsedMs: 2000 },
+    { phase: 'adds', step: 'progress', done: 3, total: 5, elapsedMs: 3000 },
+    { phase: 'adds', step: 'progress', done: 4, total: 5, elapsedMs: 4000 },
+    { phase: 'adds', step: 'progress', done: 5, total: 5, elapsedMs: 5000 },
+    { phase: 'adds', step: 'end', done: 5, total: 5, elapsedMs: 6000, refused: 0 },
+    { phase: 'facts', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+    { phase: 'facts', step: 'progress', done: 5, total: 5, elapsedMs: 1000 },
+    { phase: 'facts', step: 'end', done: 5, total: 5, elapsedMs: 2000, refused: 0 },
+    { phase: 'writes', step: 'start', done: 0, total: 7, elapsedMs: 0 },
+    { phase: 'writes', step: 'progress', done: 5, total: 7, elapsedMs: 1000 },
+    { phase: 'writes', step: 'progress', done: 7, total: 7, elapsedMs: 2000 },
+    { phase: 'writes', step: 'end', done: 7, total: 7, elapsedMs: 3000, refused: 0 },
+  ];
+
+  /** The lines of `lines` that open with one of the three phase labels. */
+  function phaseLinesOf(lines: readonly string[]): readonly string[] {
+    const labels = ['adding issues: ', 'reading facts: ', 'writing fields: '];
+    return lines.filter((line) => labels.some((label) => line.startsWith(label)));
+  }
+
+  it('prints the start, a middle and the end line of the adds, the facts and the writes phases, driving the init part in text mode', async () => {
+    const router = route();
+    const printed: string[] = [];
+    const output = sinkOutput({ info: (line) => printed.push(line) });
+
+    const report = await setUpProject({
+      ...options(router, rootHolding('progress-text')),
+      progress: commandProgressFeed(output, 'text', 1, { now: steppingClock() }),
+    });
+
+    expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
+    expect(printed).toEqual(PHASE_LINES);
+  });
+
+  it('writes the same counts as progress events, ahead of nothing else, driving the init part in json mode', async () => {
+    const router = route();
+    const events: { summary?: string; data?: unknown }[] = [];
+    const output = sinkOutput({ event: (event) => events.push(event as { summary?: string; data?: unknown }) });
+
+    const report = await setUpProject({
+      ...options(router, rootHolding('progress-json')),
+      progress: commandProgressFeed(output, 'json', 1, { now: steppingClock() }),
+    });
+
+    expect(outcomes(report)).toMatchObject({ items: 'created', fields: 'created' });
+    expect(events.map((event) => event.summary)).toEqual(PHASE_LINES);
+    expect(events.map((event) => event.data)).toEqual(PHASE_EVENT_DATA);
+  });
+
+  it('drives rafa board sync next, its own facts phase printed the same way, with the same counts between text and json mode', async () => {
+    // The project is already fully in step after the run above, so the sync's writes and adds phases open
+    // nothing to print (`./sync.ts`, `./refresh.ts`: a phase with nothing to write or add is never opened);
+    // its facts phase still reads every item's facts, and prints the start, a middle and the end line.
+    const router = route();
+    const root = rootHolding('progress-sync', 'version: 1\nboard:\n  project:\n    progressSeconds: 1\n');
+    await setUpProject(options(router, root));
+    const project = { root, home: mkdtempSync(join(tempBase, 'progress-sync-home-')) };
+    const command = (): ReturnType<typeof createBoardSyncCommand> => createBoardSyncCommand({ gh: router.gh, sleep: () => Promise.resolve(), now: steppingClock() });
+
+    const text = await dispatchInProject(['board', 'sync'], [BOARD_SUBJECT], [command()], project);
+    const json = await dispatchInProject(['board', 'sync', '--output=json'], [BOARD_SUBJECT], [command()], project);
+
+    expect(text.exitCode).toBe(0);
+    expect(json.exitCode).toBe(0);
+    const textLines = phaseLinesOf(text.stdout.trimEnd().split('\n'));
+    expect(textLines).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 1s',
+      'reading facts: 5/5, 0 refused, 2s',
+    ]);
+    const jsonProgress = eventsOf(json.stdout).filter((event) => event.type === 'event' && event.name === 'progress');
+    expect(jsonProgress.map((event) => (event as { summary?: string }).summary)).toEqual(textLines);
   });
 });
 
