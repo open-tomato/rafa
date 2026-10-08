@@ -28,7 +28,13 @@ import type { ProjectChange } from './refresh-values.js';
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'bun:test';
+
+import { loadConfig } from '../../config-load.js';
 
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
@@ -179,6 +185,16 @@ async function heldValues(wired: Wired): Promise<Readonly<Record<number, Readonl
 /** The calls that wrote a field value. */
 function writeCalls(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
   return calls.filter((args) => args.some((arg) => arg.includes('updateProjectV2ItemFieldValue(') || arg.includes('clearProjectV2ItemFieldValue(')));
+}
+
+/** The mutation text of a write call's argv: its last argument, the `query=` prefix stripped. */
+function queryOf(args: readonly string[]): string {
+  return args.at(-1)?.replace(/^query=/u, '') ?? '';
+}
+
+/** How many aliased writes `args`' mutation holds. */
+function writeCountOf(args: readonly string[]): number {
+  return (queryOf(args).match(/: (?:updateProjectV2ItemFieldValue|clearProjectV2ItemFieldValue)\(/gu) ?? []).length;
 }
 
 describe('refreshProjectItems: nothing without board.project.number', () => {
@@ -643,5 +659,53 @@ describe('refreshProjectItems: widened to the whole project, and a dry run', () 
     expect(written.kind === 'refreshed' && written.changes).toEqual(dry.kind === 'refreshed' && dry.changes);
     expect(writeCalls(wired.calls()).length).toBeGreaterThan(0);
     expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});
+
+describe('refreshProjectItems: paced by board.project.writeBatchSize and writePauseMs, resolved off a real .rafa/config.yaml', () => {
+  it('batches the writes 7 to a request and pauses 0 ms, read off a config file rather than a hand-built RefreshConfig', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rafa-refresh-config-'));
+    try {
+      mkdirSync(join(root, '.rafa'), { recursive: true });
+      writeFileSync(join(root, '.rafa', 'config.yaml'), [
+        'board:',
+        '  project:',
+        `    number: ${String(NUMBER)}`,
+        '    writeBatchSize: 7',
+        '    writePauseMs: 0',
+        '',
+      ].join('\n'));
+
+      const resolved = loadConfig({ root, home: join(root, 'no-such-home') }, {}, () => {});
+      expect(resolved.config.boardProjectNumber).toBe(NUMBER);
+      expect(resolved.config.boardProjectWriteBatchSize).toBe(7);
+      expect(resolved.config.boardProjectWritePauseMs).toBe(0);
+
+      const config: RefreshConfig = {
+        boardProjectNumber: resolved.config.boardProjectNumber,
+        boardProjectWriteBatchSize: resolved.config.boardProjectWriteBatchSize,
+        boardProjectWritePauseMs: resolved.config.boardProjectWritePauseMs,
+        boardRelationships: resolved.config.boardRelationships,
+        roadmapIssue: resolved.config.roadmapIssue,
+        releaseFragments: resolved.config.releaseFragments,
+      };
+      const wired = wire(items(), config);
+      const events: string[] = [];
+      const gh: GhRunner = (args) => {
+        if (writeCalls([args]).length > 0) events.push(`request of ${String(writeCountOf(args))}`);
+        return wired.options.gh(args);
+      };
+      const sleep = (ms: number): Promise<void> => {
+        events.push(`pause of ${String(ms)}`);
+        return Promise.resolve();
+      };
+
+      const refresh = await refreshProjectItems({ ...wired.options, gh, sleep }, [10, 20, 21, 22, 30]);
+
+      expect(refresh.kind === 'refreshed' && refresh.writes).toEqual({ written: 12, notUpdated: 0, rateLimited: false, detail: '' });
+      expect(events).toEqual(['request of 7', 'pause of 0', 'request of 5']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
