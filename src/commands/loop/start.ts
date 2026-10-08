@@ -37,7 +37,8 @@
  * `start()` reads itself, and refused there, before the run is deferred
  * or its session record opened, for anything but a whole number from 1
  * to 3. It declares no default: what it outranks is `loop.retries`,
- * `false` unless a config names a count, and the help says so.
+ * `false` unless a config names a count, and the help says so. The
+ * count is of retries in a row (`src/start/retry-budget.ts`).
  *
  * `--continue`, `--decide=<strategy>`, `--approach=<text>`,
  * `--after=<line>` and `--force-wrap-up` are read by
@@ -86,9 +87,9 @@ const wrapped = wrapPhaseZeroCommand({
     + ' the hop away, when one is. It refuses a plan whose'
     + ' record names another branch, and a plan a session is still running. `rafa loop stop`, `pause`,'
     + ' `resume`, `status` and `list` reach the run through that record. With `--retry` or'
-    + ' `loop.retries` it goes back into its loop instead of stopping, at most that many times, after a'
-    + ' red suite step, a task session that exited nonzero, or one that left neither a report nor a'
-    + ' commit. With `--continue` a stop that would end the run is handed to a decision instead: retry the'
+    + ' `loop.retries` it goes back into its loop instead of stopping, at most that many times in a row,'
+    + ' after a red suite step, a task session that exited nonzero, or one that left neither a report nor'
+    + ' a commit; a later task done, neither the stopped one nor a repair, starts the count over. With `--continue` a stop that would end the run is handed to a decision instead: retry the'
     + ' task with a new approach, stop with exit code 20, jump over it or defer it until a later task is'
     + ' done; a run left with only passed-over tasks ends with exit code 22 and no wrap-up unless'
     + ' `--force-wrap-up`, and under `--output=json` a decision the line does not name ends the run with'
@@ -148,9 +149,10 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'retry',
-      description: 'Goes back into the loop instead of stopping, at most this many times, 1 to 3, after a'
-        + ' red suite step, a task session that exited nonzero but not on its budget, or one that left'
-        + ' neither a report nor a commit. A report that blocks its task, a refused commit, a moved'
+      description: 'Goes back into the loop instead of stopping, at most this many times in a row, 1 to 3,'
+        + ' after a red suite step, a task session that exited nonzero but not on its budget, or one that'
+        + ' left neither a report nor a commit. The count starts over once a later task is done, neither'
+        + ' the stopped one nor a repair. A report that blocks its task, a refused commit, a moved'
         + ' checkout and an interrupt still stop the run. Outranks `loop.retries` in'
         + ' `.rafa/config.yaml`, `false` unless the config names a count; any other value is refused'
         + ' before the run starts.',
@@ -249,7 +251,7 @@ const wrapped = wrapPhaseZeroCommand({
     when: 'always',
     what: 'one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request,'
       + ' repair sessions while CI is red, the sessions of up to `--retry` (`loop.retries`) more passes of the loop'
-      + ' after a stop it retries, and under `--continue` one read-only decision session per decision',
+      + ' in a row after the stops it retries, and under `--continue` one read-only decision session per decision',
   },
 }, start);
 

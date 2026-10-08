@@ -35,7 +35,7 @@
  *
  * One session, spawned through `./decision-session.ts` with read-only
  * tools, handed `buildDecisionPrompt`'s prompt: the task and its line,
- * why it stopped, the retries left, every open task, and the criteria
+ * why it stopped, the retries in a row left, every open task, and the criteria
  * `resolveContinueCriteria` reads again for each decision. Its output is
  * read by `parseDecision`, which answers `stop` for anything it cannot
  * read. A session that exits nonzero is read as `stop`. One SIGINT
@@ -83,7 +83,7 @@
  *
  * Under `--output=json` (`activeOutputMode`) no session is spawned: the
  * stop emits `decision-needed`, holding the task, its line, why it
- * stopped, the open tasks, the retries left and the rendered prompt,
+ * stopped, the open tasks, the retries in a row left and the rendered prompt,
  * then the stop's own event, and the run ends with
  * {@link DECISION_NEEDED_EXIT}, the tracker as the stop left it. The
  * caller decides and starts the run again with `--continue --decide=`.
@@ -154,6 +154,7 @@ import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.
 import { runDecisionSession } from './decision-session.js';
 import { emitLoopEvent, taskPosition } from './loop-events.js';
 import { addDecision, markDone, remaining, seedFrom, skippedLines, taskIdentity, taskRefIn } from './pass-over.js';
+import { retryTaskOf } from './retry-budget.js';
 
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
 export const SUITE_STEP_RED = 'suite step red';
@@ -320,7 +321,7 @@ function boundKey(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>, trackerContent: 
 function refusedRetry(refusal: RetryRefusal | null): string {
   if (refusal === 'checkout moved') return 'retry was chosen, but the checkout has moved from the loop\'s last commit';
   if (refusal === 'interrupted') return 'retry was chosen, but the run was interrupted';
-  return 'retry was chosen with no retry left in this run';
+  return 'retry was chosen with no retry left in a row';
 }
 
 /** A tracker line counted from 1, as the prompt and the events show it. */
@@ -475,9 +476,9 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     throw new LoopEnd(0, `\n⚠️  Interrupted during the --continue decision on line ${shownLine(subject.taskInfo)}: nothing was decided, and the task stays [BLOCKED]. Run again to resume.`);
   };
 
-  /** Asks the run's retries first: only a grant writes the approach and emits `retry`; a refusal stops. */
-  const retryWith = (decision: ContinueDecision, subject: DecisionSubject): boolean => {
-    if (!retries.retry('the decision chose retry')) {
+  /** Asks the run's retries first, on the subject's task: only a grant writes the approach and emits `retry`; a refusal stops. */
+  const retryWith = (decision: ContinueDecision, subject: DecisionSubject, content: string): boolean => {
+    if (!retries.retry('the decision chose retry', retryTaskOf(subject.taskInfo, content))) {
       return stopWith({ strategy: 'stop', reason: `${refusedRetry(retries.lastRefusal())}, so the run stops: ${decision.reason}` }, subject);
     }
     const line = shownLine(subject.taskInfo);
@@ -490,7 +491,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const apply = (decision: ContinueDecision, subject: DecisionSubject, content: string, identity: string): boolean => {
     switch (decision.strategy) {
       case 'retry':
-        return retryWith(decision, subject);
+        return retryWith(decision, subject, content);
       case 'stop':
         return stopWith(decision, subject);
       case 'jump':

@@ -1,7 +1,7 @@
 /**
- * The run's retry budget: how many times `start()` re-enters its own
- * task loop after a retry-safe stop instead of returning, and which
- * retry of how many each re-entry is.
+ * The run's retry budget: how many times in a row `start()` re-enters
+ * its own task loop after a retry-safe stop instead of returning, and
+ * which retry of how many each re-entry is.
  *
  * `--retry=<n>` outranks `loop.retries` for one run
  * ({@link resolveRunRetries}), and `false`, the key's default, opens an
@@ -11,11 +11,36 @@
  * retry answers a new one and leaves the old one as it was, so the
  * count lives in the one `let` of `start()` that holds it.
  *
+ * ## In a row
+ *
+ * The count is of retries in a row, not per run. A task that finishes
+ * `done` sets the spent count back to 0 ({@link settleOnDone}), except
+ * in two cases, which keep it:
+ *
+ *   - the finished task is the task of the last stop: failing and
+ *     passing the same task again is that stop's own way out, not
+ *     progress past it;
+ *   - the finished task is a repair task (`isRepairTask` in
+ *     `start/suite-blocker.ts`): a repair is the red step's own fix.
+ *
+ * So a red task step after a plan task, its repair done, the repair's
+ * own step red again, and the repair done again spend on toward the
+ * cap, and only the next plan task done starts the count over; a task
+ * that keeps failing never resets its own count, and the cap ends it.
+ * A task is told apart by {@link retryTaskOf}: its text without its
+ * declaration and blocker, and which copy of that text it is
+ * (`taskRefIn` in `start/pass-over.ts`), so a repair inserted above it
+ * moves nothing. A stop with no task of its own, a red suite step
+ * before a session, keeps no task, and the next task done resets.
+ *
+ * ## Asking
+ *
  * {@link createRunRetries} is the one `start()` asks: once per run, and
  * then at each retry-safe stop, where a grant writes one warning line
  * ({@link retryLine}) and one `retry` loop event (`start/loop-events.ts`)
  * and `start()` goes back to the top of its loop with `continue`, while
- * a refusal writes nothing and `start()` halts as it did before. A run
+ * a refusal writes nothing and `start()` halts as it did before; and
+ * once each task is done ({@link RunRetries.taskDone}). A run
  * SIGINT has interrupted is refused at once and spends nothing. So is a
  * run whose checkout has moved from the loop's last commit, read only
  * once a retry is left, which writes one warning line ({@link movedLine})
@@ -40,12 +65,15 @@
  * repeats each of them.
  */
 import type { LoopRetries } from '../config-schema-loop-retries.js';
+import type { TaskInfo } from '../utils/tracker.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 
 import { emitLoopEvent } from './loop-events.js';
+import { taskRefIn } from './pass-over.js';
+import { isRepairTask } from './suite-blocker.js';
 
-/** What one run may still retry: `of` granted in all, `used` taken so far. */
+/** What a run may still retry in a row: `of` granted in all, `used` taken since the count last started over. */
 export interface RetryBudget {
   readonly of: number;
   readonly used: number;
@@ -91,12 +119,36 @@ export function takeRetry(budget: RetryBudget): RetryGrant {
   };
 }
 
+/** A task as the retries tell tasks apart; see the module note. */
+export interface RetryTask {
+  /** The task's text and its copy among the lines of that text, as `<ordinal>:<text>`. */
+  readonly key: string;
+  /** True for a repair task, whose finish keeps the count. */
+  readonly repair: boolean;
+}
+
+/** The {@link RetryTask} of `taskInfo`, read in `trackerContent`, the tracker its line number counts in. */
+export function retryTaskOf(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>, trackerContent: string): RetryTask {
+  const ref = taskRefIn(taskInfo, trackerContent);
+  return Object.freeze({ key: `${String(ref.ordinal)}:${ref.task}`, repair: isRepairTask(ref.task) });
+}
+
+/**
+ * The budget once `done` is done: the count set back to 0 when `done`
+ * is neither a repair nor the task whose key `stoppedOn` holds, the last
+ * stop's, and `budget` as it was otherwise. Never edits `budget`.
+ */
+export function settleOnDone(budget: RetryBudget, stoppedOn: string | null, done: RetryTask): RetryBudget {
+  if (done.repair || done.key === stoppedOn) return budget;
+  return Object.freeze({ of: budget.of, used: 0 });
+}
+
 /** A retry {@link takeRetry} granted: which one, of how many. */
 export type GrantedRetry = Pick<Extract<RetryGrant, { granted: true }>, 'attempt' | 'of'>;
 
-/** The warning a granted retry writes: that it retries, which retry of how many, and the stop. */
+/** The warning a granted retry writes: that it retries, which retry in a row of how many, and the stop. */
 export function retryLine(grant: GrantedRetry, reason: string): string {
-  return `🔁 Retrying (retry ${grant.attempt} of ${grant.of}) after the stop: ${reason}.`
+  return `🔁 Retrying (retry ${grant.attempt} of ${grant.of} in a row) after the stop: ${reason}.`
     + ' The loop goes on without a new rafa loop start.';
 }
 
@@ -126,15 +178,19 @@ export interface RunRetriesOptions {
 /** Why {@link RunRetries.retry} refused: the run was interrupted, its budget is spent, or its checkout moved. */
 export type RetryRefusal = 'interrupted' | 'spent' | 'checkout moved';
 
-/** The run's retries, asked at each retry-safe stop. */
+/** The run's retries, asked at each retry-safe stop and told of each task done. */
 export interface RunRetries {
   /**
    * True when the run retries after the stop `reason` names, having
    * written its warning line and its `retry` event; false when the run
-   * halts, with nothing written.
+   * halts, with nothing written. `stopped` is the stop's task, or null
+   * for a stop with none of its own; it becomes the last stop's task
+   * either way.
    */
-  readonly retry: (reason: string) => boolean;
-  /** The retries still left to take. */
+  readonly retry: (reason: string, stopped: RetryTask | null) => boolean;
+  /** Notes that `done` finished `done`, which starts the count over unless the module note says not. */
+  readonly taskDone: (done: RetryTask) => void;
+  /** The retries in a row still left to take. */
   readonly left: () => number;
   /**
    * Why the last {@link RunRetries.retry} refused, or null when it
@@ -149,11 +205,13 @@ export interface RunRetries {
 export function createRunRetries(options: RunRetriesOptions): RunRetries {
   let budget = openRetryBudget(options.retries);
   let refusal: RetryRefusal | null = null;
+  let stoppedOn: string | null = null;
   const refuse = (why: RetryRefusal): false => {
     refusal = why;
     return false;
   };
-  const retry = (reason: string): boolean => {
+  const retry = (reason: string, stopped: RetryTask | null): boolean => {
+    stoppedOn = stopped?.key ?? null;
     if (options.isInterrupted()) return refuse('interrupted');
     const grant = takeRetry(budget);
     if (!grant.granted) return refuse('spent');
@@ -169,6 +227,9 @@ export function createRunRetries(options: RunRetriesOptions): RunRetries {
   };
   return {
     retry,
+    taskDone: (done: RetryTask) => {
+      budget = settleOnDone(budget, stoppedOn, done);
+    },
     left: () => budget.of - budget.used,
     lastRefusal: () => refusal,
   };

@@ -46,6 +46,10 @@
  * A second run there commits in its first session before exiting 1: the
  * checkout has moved from the loop's last commit, so no retry is granted
  * and the task keeps its own stop, never the guard's {@link CHECKOUT_MOVED}.
+ * A third run there breaks the test in each of its two plan tasks and
+ * mends it in each repair: under `--retry=1` both red task steps are
+ * retried, since the second plan task done between them starts the count
+ * of retries in a row over, and the run reaches its wrap-up.
  *
  * ## The controls
  *
@@ -380,7 +384,8 @@ describe('where start.ts takes the suite steps', () => {
     expect(START).toContain(
       'const suiteGate = decisions.gateForcedWrapUp(await suiteSteps.beforeSession(taskInfo), passedOver, suiteSteps.lastPreWrapUp());\n'
       + '      if (suiteGate === \'stop\') {\n'
-      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        // A step before a session is the stop of no task of its own.\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\', null)) continue;\n'
       + '        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: \'suite-red\' })) continue;\n'
       + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
     );
@@ -405,7 +410,7 @@ describe('where start.ts takes the suite steps', () => {
     expect(indexOf(EVERY, 'advanceExpectation')).toBeLessThan(after);
     expect(START).toContain(
       'if (!(await suiteSteps.afterTask(taskInfo, base))) {\n'
-      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
+      + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\', retryTask)) continue;\n'
       + '        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: \'suite-red\' })) continue;\n'
       + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }',
     );
@@ -450,17 +455,27 @@ describe('where start.ts retries a stop', () => {
     // would retry a stop the module note of `start/retry-budget.ts`
     // never names, such as a moved checkout or a report that blocks.
     expect(EVERY.filter((call) => call.name === 'retry').map((call) => call.args)).toEqual([
-      ['\'suite step red\''],
-      ['`session exited ${exitCode}`'],
-      ['\'left neither a report nor a commit\''],
-      ['\'suite step red\''],
+      ['\'suite step red\'', 'null'],
+      ['`session exited ${exitCode}`', 'retryTask'],
+      ['\'left neither a report nor a commit\'', 'retryTask'],
+      ['\'suite step red\'', 'retryTask'],
     ]);
+  });
+
+  it('keys each task stop by the task the loop top read, and tells the retries of a task done right after the decisions', () => {
+    expect(START).toContain('      const retryTask = retryTaskOf(taskInfo, trackerContent);\n');
+    expect(START.indexOf('const retryTask = retryTaskOf(')).toBeLessThan(START.indexOf('const dispatch = await dispatchTask('));
+    expect(START).toContain('      decisions.taskDone(taskInfo);\n'
+      + '      // Another task than the last stop\'s, and no repair, starts the\n'
+      + '      // count of retries in a row over (`start/retry-budget.ts`).\n'
+      + '      retries.taskDone(retryTask);\n');
+    expect(EVERY.filter((call) => call.name === 'taskDone').map((call) => call.args)).toEqual([['taskInfo'], ['retryTask']]);
   });
 
   it('guards each retry with the reading that tells its stop apart, continues on a grant, and emits task-blocked only on a refusal', () => {
     expect(START).toContain('        await storeReport(\'failed\');\n'
       + '        const failed = { kind: \'task-blocked\', position, reason: `session exited ${exitCode}` } as const;\n'
-      + '        if (retries.retry(`session exited ${exitCode}`)) continue;\n'
+      + '        if (retries.retry(`session exited ${exitCode}`, retryTask)) continue;\n'
       + '        if (await decisions.atStop({ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed })) continue;\n'
       + '        activeOutput().error(`\\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);\n'
       + '        emitLoopEvent(failed);\n        return;\n');
@@ -468,10 +483,10 @@ describe('where start.ts retries a stop', () => {
     // run really stops: never ahead of a retry or a decision that goes on.
     expect(START.match(/Run again to retry\./g)).toHaveLength(1);
     expect(START).toContain('        const held = { kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' } as const;\n'
-      + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n'
+      + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\', retryTask)) continue;\n'
       + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, finished, stopEvent: held })) continue;\n'
       + '        emitLoopEvent(held);\n        return;\n');
-    expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red'\)\) continue;/g)).toHaveLength(2);
+    expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red', (?:null|retryTask)\)\) continue;/g)).toHaveLength(2);
   });
 
   it('retries no exit on its budget and no interrupted task, which end before the nonzero exit', () => {
@@ -875,6 +890,34 @@ function failingFirstStandIn(first: readonly string[]): (calls: string) => strin
   ].join('\n');
 }
 
+/**
+ * A stand-in `claude` whose plan tasks (calls 1 and 3) each break
+ * {@link GREETING_TEST_FILE} and answer `done`, whose repairs (calls 2
+ * and 4) each mend it and answer `done`, and whose every later call, the
+ * wrap-up's, touches nothing and answers `done`.
+ */
+function breakAndMendStandIn(calls: string): string {
+  return [
+    '#!/bin/sh',
+    `calls='${calls}'`,
+    'n=$(/bin/cat "$calls/count" 2>/dev/null || echo 0)',
+    'n=$((n + 1))',
+    'echo "$n" > "$calls/count"',
+    '/bin/cat > /dev/null',
+    'case "$n" in',
+    '  1|3)',
+    `    printf '%s\\n' 'export function greeting(): string { return "goodbye"; }' > ${GREETING_FILE}`,
+    '    ;;',
+    '  2|4)',
+    `    printf '%s\\n' 'export function greeting(): string { return "hello"; }' > ${GREETING_FILE}`,
+    '    ;;',
+    'esac',
+    ...printLines(reportLines('done', 'did the task')),
+    'exit 0',
+    '',
+  ].join('\n');
+}
+
 /** Every loop event the scratch repository's runs wrote, in run order and then file order. */
 function runEvents(scratch: Scratch): readonly EventLine[] {
   return readSessions(scratch.repo).flatMap((record) => {
@@ -978,5 +1021,31 @@ describe('a run that retries a session that exited nonzero, over a real loop', (
     expect(task?.status).toBe('blocked');
     expect(task?.task).toBe(BREAKING_TASK);
     expect(task?.blocker ?? '').not.toContain(CHECKOUT_MOVED);
+  }, CASE_TIMEOUT_MS);
+});
+
+describe('a run whose retries count in a row, over a real bun test', () => {
+  it('retries a red task step after each of two plan tasks under --retry=1, and reaches the wrap-up', () => {
+    const scratch = plant(breakAndMendStandIn);
+
+    // Each plan task's step is red and retried, its repair mends the
+    // test; the second plan task done starts the count over, so its own
+    // red step is retried too, where a count per run would halt there.
+    expect(runLoopStart(scratch, ['--retry=1'])).toBe(0);
+
+    const told = runEvents(scratch)
+      .filter((event) => ['task-done', 'task-blocked', 'retry', 'halt', 'wrap-up'].includes(event.name))
+      .map((event) => [event.name, event.data['reason'] ?? event.data['phase'] ?? null]);
+    expect(told.slice(0, 7)).toEqual([
+      ['task-done', null],
+      ['retry', 'suite step red'],
+      ['task-done', null],
+      ['task-done', null],
+      ['retry', 'suite step red'],
+      ['task-done', null],
+      ['wrap-up', 'tests'],
+    ]);
+    expect(told.filter(([name]) => name === 'halt' || name === 'task-blocked')).toEqual([]);
+    expect(stepKinds(scratch).filter((kind) => kind === 'task')).toHaveLength(4);
   }, CASE_TIMEOUT_MS);
 });

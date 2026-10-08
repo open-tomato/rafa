@@ -15,6 +15,13 @@
  * interrupt does, spending nothing; its control is the same budget
  * granting once the checkout reads as held, and a count of the reads
  * holds that a run with no retry left never reads the checkout at all.
+ *
+ * The retries count in a row: a task finishing `done` sets the spent
+ * count back to 0, unless it is the task of the last stop or a repair
+ * task. Each case that reads no reset is paired with a done of another
+ * task that does reset the same budget, so a budget that never reset
+ * would fail the pair, and the repair chain is read to the cap, so one
+ * that reset on every done would fail it too.
  */
 import type { CliEvent } from '../ports/index.js';
 
@@ -29,6 +36,8 @@ import {
   resolveRunRetries,
   movedLine,
   retryLine,
+  retryTaskOf,
+  settleOnDone,
   takeRetry,
 } from './retry-budget.js';
 
@@ -128,7 +137,7 @@ describe('movedLine', () => {
 describe('retryLine', () => {
   it('says it retries, which retry of how many, and the stop', () => {
     expect(retryLine({ attempt: 1, of: 2 }, 'suite step red')).toBe(
-      '🔁 Retrying (retry 1 of 2) after the stop: suite step red. The loop goes on without a new rafa loop start.',
+      '🔁 Retrying (retry 1 of 2 in a row) after the stop: suite step red. The loop goes on without a new rafa loop start.',
     );
   });
 });
@@ -137,7 +146,7 @@ describe('createRunRetries', () => {
   it('grants n retries, warning and emitting a retry event for each, then refuses', () => {
     const retries = createRunRetries({ retries: 2, isInterrupted: () => false, isCheckoutHeld: () => true });
 
-    expect([retries.retry('suite step red'), retries.retry('session exited 1'), retries.retry('suite step red')])
+    expect([retries.retry('suite step red', null), retries.retry('session exited 1', null), retries.retry('suite step red', null)])
       .toEqual([true, true, false]);
     expect(warnings).toEqual([
       retryLine({ attempt: 1, of: 2 }, 'suite step red'),
@@ -154,7 +163,7 @@ describe('createRunRetries', () => {
   it('refuses every retry under false, writing nothing', () => {
     const retries = createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld: () => true });
 
-    expect(retries.retry('suite step red')).toBe(false);
+    expect(retries.retry('suite step red', null)).toBe(false);
     expect([warnings, events]).toEqual([[], []]);
   });
 
@@ -162,12 +171,12 @@ describe('createRunRetries', () => {
     let interrupted = true;
     const retries = createRunRetries({ retries: 1, isInterrupted: () => interrupted, isCheckoutHeld: () => true });
 
-    expect(retries.retry('session exited 130')).toBe(false);
+    expect(retries.retry('session exited 130', null)).toBe(false);
     expect([warnings, events]).toEqual([[], []]);
 
     // The control: the same budget grants its one retry once the flag is down.
     interrupted = false;
-    expect(retries.retry('session exited 1')).toBe(true);
+    expect(retries.retry('session exited 1', null)).toBe(true);
     expect(warnings).toHaveLength(1);
   });
 
@@ -175,14 +184,14 @@ describe('createRunRetries', () => {
     let held = false;
     const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => held });
 
-    expect(retries.retry('session exited 1')).toBe(false);
+    expect(retries.retry('session exited 1', null)).toBe(false);
     expect(warnings).toEqual([movedLine('session exited 1')]);
     expect(events).toEqual([]);
     warnings = [];
 
     // The control: the one retry is still there once the checkout holds.
     held = true;
-    expect(retries.retry('session exited 1')).toBe(true);
+    expect(retries.retry('session exited 1', null)).toBe(true);
     expect(warnings).toEqual([retryLine({ attempt: 1, of: 1 }, 'session exited 1')]);
   });
 
@@ -195,12 +204,12 @@ describe('createRunRetries', () => {
     const none = createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld });
     const interrupted = createRunRetries({ retries: 1, isInterrupted: () => true, isCheckoutHeld });
 
-    expect([none.retry('suite step red'), interrupted.retry('suite step red')]).toEqual([false, false]);
+    expect([none.retry('suite step red', null), interrupted.retry('suite step red', null)]).toEqual([false, false]);
     expect(reads).toBe(0);
 
     // The control: a run with a retry left reads it once per ask.
     const one = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld });
-    expect([one.retry('suite step red'), one.retry('suite step red')]).toEqual([true, false]);
+    expect([one.retry('suite step red', null), one.retry('suite step red', null)]).toEqual([true, false]);
     expect(reads).toBe(1);
   });
 });
@@ -210,10 +219,10 @@ describe('createRunRetries readings for --continue', () => {
     const retries = createRunRetries({ retries: 2, isInterrupted: () => false, isCheckoutHeld: () => true });
 
     expect(retries.left()).toBe(2);
-    retries.retry('suite step red');
+    retries.retry('suite step red', null);
     expect(retries.left()).toBe(1);
-    retries.retry('suite step red');
-    retries.retry('suite step red');
+    retries.retry('suite step red', null);
+    retries.retry('suite step red', null);
     expect(retries.left()).toBe(0);
     expect(createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld: () => true }).left()).toBe(0);
   });
@@ -225,16 +234,132 @@ describe('createRunRetries readings for --continue', () => {
 
     expect(retries.lastRefusal()).toBeNull();
     interrupted = true;
-    retries.retry('session exited 1');
+    retries.retry('session exited 1', null);
     expect(retries.lastRefusal()).toBe('interrupted');
     interrupted = false;
     held = false;
-    retries.retry('session exited 1');
+    retries.retry('session exited 1', null);
     expect(retries.lastRefusal()).toBe('checkout moved');
     held = true;
-    retries.retry('session exited 1');
+    retries.retry('session exited 1', null);
     expect(retries.lastRefusal()).toBeNull();
-    retries.retry('session exited 1');
+    retries.retry('session exited 1', null);
     expect(retries.lastRefusal()).toBe('spent');
+  });
+});
+
+/** A tracker with two copies of one task, a repair between them, and another task. */
+const TRACKER = [
+  '# Plan: retry-in-a-row',
+  '',
+  '- [x] Run the suite',
+  '- [BLOCKED] Repair the red task step at commit 0123456789ab  {agent=build-error-resolver}',
+  '- [ ] Run the suite',
+  '- [ ] Write the docs  {tests=module}',
+  '',
+].join('\n');
+
+/** The task at zero-based `lineNum` of {@link TRACKER}, as `findNextTask` hands one. */
+function taskAt(lineNum: number): { readonly task: string; readonly lineNum: number } {
+  const line = TRACKER.split('\n')[lineNum] ?? '';
+  return { task: line.replace(/^- \[[^\]]*\] /, ''), lineNum };
+}
+
+describe('retryTaskOf', () => {
+  it('keys a task by its text and its copy, its declaration off, and reads a repair task as one', () => {
+    expect(retryTaskOf(taskAt(2), TRACKER)).toEqual({ key: '1:Run the suite', repair: false });
+    expect(retryTaskOf(taskAt(4), TRACKER)).toEqual({ key: '2:Run the suite', repair: false });
+    expect(retryTaskOf(taskAt(5), TRACKER)).toEqual({ key: '1:Write the docs', repair: false });
+    expect(retryTaskOf(taskAt(3), TRACKER)).toEqual({ key: '1:Repair the red task step at commit 0123456789ab', repair: true });
+  });
+
+  it('keys a task the same once a line of another text is inserted above it', () => {
+    const inserted = TRACKER.replace('- [x] Run the suite\n', '- [x] Run the suite\n- [BLOCKED] Repair the red stage step at commit ba9876543210\n');
+
+    expect(retryTaskOf({ task: 'Run the suite', lineNum: 5 }, inserted).key).toBe(retryTaskOf(taskAt(4), TRACKER).key);
+  });
+});
+
+describe('settleOnDone', () => {
+  const spent = Object.freeze({ of: 2, used: 2 });
+  const other = { key: '1:Write the docs', repair: false };
+
+  it('sets the spent count back to 0 when another task than the last stop\'s is done', () => {
+    expect(settleOnDone(spent, '1:Run the suite', other)).toEqual({ of: 2, used: 0 });
+    expect(settleOnDone(spent, null, other)).toEqual({ of: 2, used: 0 });
+  });
+
+  it('keeps the count when the task of the last stop is done, and resets it for another copy of its text', () => {
+    expect(settleOnDone(spent, '1:Run the suite', { key: '1:Run the suite', repair: false })).toBe(spent);
+
+    // The control: the second copy of the same text is another task.
+    expect(settleOnDone(spent, '1:Run the suite', { key: '2:Run the suite', repair: false })).toEqual({ of: 2, used: 0 });
+  });
+
+  it('keeps the count when a repair task is done, its stop\'s own fix', () => {
+    expect(settleOnDone(spent, '1:Run the suite', { key: '1:Repair the red task step at commit 0123456789ab', repair: true })).toBe(spent);
+  });
+
+  it('never edits the budget it is handed', () => {
+    const reset = settleOnDone(spent, null, other);
+
+    expect(spent).toEqual({ of: 2, used: 2 });
+    expect(Object.isFrozen(reset)).toBe(true);
+  });
+});
+
+describe('createRunRetries in a row', () => {
+  const plan = { key: '1:Run the suite', repair: false };
+  const repair = { key: '1:Repair the red task step at commit 0123456789ab', repair: true };
+  const next = { key: '1:Write the docs', repair: false };
+
+  it('grants the full count again once another task is done after a stop', () => {
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => true });
+
+    expect(retries.retry('suite step red', plan)).toBe(true);
+    expect(retries.left()).toBe(0);
+    retries.taskDone(next);
+    expect(retries.left()).toBe(1);
+    expect(retries.retry('suite step red', next)).toBe(true);
+    expect(warnings).toEqual([
+      retryLine({ attempt: 1, of: 1 }, 'suite step red'),
+      retryLine({ attempt: 1, of: 1 }, 'suite step red'),
+    ]);
+  });
+
+  it('keeps the count when the task of the stop is done, so failing and passing it again spends on', () => {
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => true });
+
+    expect(retries.retry('session exited 1', plan)).toBe(true);
+    retries.taskDone(plan);
+    expect(retries.retry('suite step red', plan)).toBe(false);
+    expect(retries.lastRefusal()).toBe('spent');
+  });
+
+  it('reaches the cap across a repair chain, and starts over once the next plan task is done', () => {
+    const retries = createRunRetries({ retries: 2, isInterrupted: () => false, isCheckoutHeld: () => true });
+
+    // The plan task's step is red, its repair is done and its own step
+    // is red, the repair is done again: each repair keeps the count.
+    expect(retries.retry('suite step red', plan)).toBe(true);
+    retries.taskDone(repair);
+    expect(retries.retry('suite step red', repair)).toBe(true);
+    retries.taskDone(repair);
+    expect(retries.retry('suite step red', repair)).toBe(false);
+    expect(retries.lastRefusal()).toBe('spent');
+
+    // The control: the next plan task done gives the whole count back.
+    retries.taskDone(next);
+    expect(retries.left()).toBe(2);
+    expect(retries.retry('suite step red', next)).toBe(true);
+    expect(warnings.at(-1)).toBe(retryLine({ attempt: 1, of: 2 }, 'suite step red'));
+  });
+
+  it('reads a stop with no task as no task of its own, so the next done resets', () => {
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => true });
+
+    expect(retries.retry('suite step red', null)).toBe(true);
+    retries.taskDone(plan);
+    expect(retries.left()).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 /**
- * `loop.retries`, the loop's own retry count: how many times one run
- * re-enters its task loop after a stop a blind re-run is known to pass,
+ * `loop.retries`, the loop's own retry count: how many times in a row one
+ * run re-enters its task loop after a stop a blind re-run is known to pass,
  * with its field, its default, its spec and its reader.
  * `config-schema.ts`'s `RafaConfig` extends {@link LoopRetriesSettings},
  * and its `CONFIG_DEFAULTS` and `SETTINGS` spread the objects below right
@@ -21,13 +21,17 @@
  * ends the run today, and the person runs `rafa loop start` again by
  * hand, which resumes at the `[BLOCKED]` line or the inserted repair.
  * `loop.retries` is how many of those re-runs the loop makes itself,
- * per run, at those stops alone (`start/retry-budget.ts`):
+ * in a row, at those stops alone (`start/retry-budget.ts`): a task done
+ * past the stop, neither the stopped task nor a repair, starts the count
+ * over.
+ *
  *
  *   - It defaults to `false`: no retry, so a run stops where it always
  *     did until a person asks for more.
  *   - It accepts a whole number from 1 to 3. Each retry spends at least
  *     one more session, so the cap of 3 bounds what a run whose stop
- *     keeps coming back can spend before it halts.
+ *     keeps coming back can spend before it halts: a task that keeps
+ *     failing never starts its own count over.
  *   - `false` means no retry. It is spelled `false` and not `0`, so a
  *     number always names retries that run; `0` is refused, as are a
  *     negative number, a fraction and anything above 3. `true` is
@@ -50,14 +54,14 @@ export const LOOP_RETRIES_MIN = 1;
 /** The most retries `loop.retries` accepts. */
 export const LOOP_RETRIES_MAX = 3;
 
-/** How many times one run re-enters its loop after a retry-safe stop, or `false` for none. */
+/** How many times in a row one run re-enters its loop after a retry-safe stop, or `false` for none. */
 export type LoopRetries = number | false;
 
 /** The `loop.retries` setting, resolved. */
 export interface LoopRetriesSettings {
   /**
-   * The retries one run makes after a retry-safe stop, or `false` for
-   * none. `loop.retries`.
+   * The retries in a row one run makes after a retry-safe stop, or
+   * `false` for none. `loop.retries`.
    */
   loopRetries: LoopRetries;
 }

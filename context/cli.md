@@ -473,7 +473,15 @@ New; it replaces no earlier text. What a row or an action added to
   retry-safe stop** (`start/retry-budget.ts`, `config-schema-loop-retries.ts`):
   the run goes back to the top of its loop with `continue`, where
   `findNextTask` answers the `[BLOCKED]` line or the inserted repair, instead
-  of returning, at most n times per run. The key is `false` (the default) or
+  of returning, at most n times in a row. A task that finishes `done` sets
+  the spent count back to 0 (`settleOnDone`) unless it is the task of the
+  last stop, told apart by its text and its copy (`retryTaskOf`, over
+  `taskRefIn` in `start/pass-over.ts`), or a repair task (`isRepairTask`,
+  `start/suite-blocker.ts`): a plan task's red step, its repair done, the
+  repair's own step red again spend on toward n, and only the next plan
+  task done starts the count over, so a task that keeps failing still
+  meets the cap. A red suite step before a session is the stop of no task,
+  and the next task done resets. The key is `false` (the default) or
   a whole number from 1 to 3, and the flag outranks it for one run; any other
   flag value, a bare `--retry` and `--no-retry` are refused with exit code 1
   by `readRunArgs` (`start/run-setup.ts`), before the deferral and the
@@ -486,11 +494,11 @@ New; it replaces no earlier text. What a row or an action added to
   hold). A report that says `status: blocked` or lists a blocker, a refused
   commit, a moved checkout, a report left unstored, a pause, an interrupt
   and every refusal before the loop halt as before. Each retry writes one
-  warning, `🔁 Retrying (retry <i> of <n>) after the stop: <reason>.`, and one
+  warning, `🔁 Retrying (retry <i> of <n> in a row) after the stop: <reason>.`, and one
   `retry` loop event after the stop's own lines and its stored report, and
   no `task-blocked` event: a task stop emits that only once its retry is
   refused, so `loop wait --until=blocked` never answers a run still going.
-  A SIGINT received refuses every retry left, and once the budget is spent
+  A SIGINT received refuses every retry left, and once n are spent in a row
   the next such stop halts. A checkout moved from the loop's last commit,
   read by `guardCheckout` (`start/checkout-guard.ts`) only while a retry is
   left, refuses the retry without spending it, writing one warning line,

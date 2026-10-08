@@ -235,8 +235,8 @@
  * --ci-attempts repair sessions to spend on a red or conflicting PR
  *               before escalating (default 2; 0 disables repair but
  *               still reports the verdict).
- * --retry       re-enter the loop up to n times (1 to 3) after a
- *               retry-safe stop; outranks `loop.retries`, `false` unless
+ * --retry       re-enter the loop up to n times in a row (1 to 3) after
+ *               a retry-safe stop; outranks `loop.retries`, `false` unless
  *               a config names a count, or `loop.retriesOnContinue`, 1
  *               unless a config names another, under `--continue`
  *               (`start/retry-budget.ts`).
@@ -304,7 +304,9 @@
  * unstored and a red or interrupted suite step still stop the run by
  * returning, which the dispatcher ends as a success, with exit code 0. A
  * triage failure stops nothing. Under `--retry` or `loop.retries` four
- * of those stops `continue` instead while a retry is left: a red suite
+ * of those stops `continue` instead while a retry in a row is left
+ * (another task done, neither the stopped one nor a repair, starts the
+ * count over): a red suite
  * step before a session or after a task, a session that exited nonzero
  * but not on its budget, and a clean exit held only on leaving neither
  * a report nor a commit; each retry writes a warning and a `retry`
@@ -402,7 +404,7 @@ import { resolvePlanPath } from './start/plan-path.js';
 import { createStartPreflightClaim } from './start/preflight-claim.js';
 import { createStartPreflightDrift } from './start/preflight-drift.js';
 import { runStartPreflight } from './start/preflight.js';
-import { createRunRetries, resolveRunRetries } from './start/retry-budget.js';
+import { createRunRetries, resolveRunRetries, retryTaskOf } from './start/retry-budget.js';
 import { announceRiskTotal } from './start/risk-total.js';
 import { settleRunCheckout } from './start/run-checkout.js';
 import {
@@ -724,7 +726,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // `loop.forceWrapUp.maxNewFailures` tolerates, and ends past one it does not.
       const suiteGate = decisions.gateForcedWrapUp(await suiteSteps.beforeSession(taskInfo), passedOver, suiteSteps.lastPreWrapUp());
       if (suiteGate === 'stop') {
-        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
+        // A step before a session is the stop of no task of its own.
+        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red', null)) continue;
         if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: 'suite-red' })) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;
@@ -765,6 +768,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // task added is named to the next one.
       const base = expected.head;
       const position = taskPosition(trackerContent, taskInfo.lineNum);
+      // The task as the retries tell it apart, for a stop on it and its done.
+      const retryTask = retryTaskOf(taskInfo, trackerContent);
       const startedAt = Date.now();
       emitLoopEvent({ kind: 'task-start', position, text: parseTaskDeclaration(taskInfo.task).text });
       session.taskStarted(taskInfo);
@@ -833,7 +838,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         // stop's alone: a retried one emits `retry` and its own line.
         await storeReport('failed');
         const failed = { kind: 'task-blocked', position, reason: `session exited ${exitCode}` } as const;
-        if (retries.retry(`session exited ${exitCode}`)) continue;
+        if (retries.retry(`session exited ${exitCode}`, retryTask)) continue;
         if (await decisions.atStop({ kind: 'session-exit', taskInfo, exitCode, stopEvent: failed })) continue;
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         emitLoopEvent(failed);
@@ -859,12 +864,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const stored = await storeReport(finished.outcome);
       if (finished.outcome !== 'done') {
         const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
-        if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit')) continue;
+        if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit', retryTask)) continue;
         if (await decisions.atStop({ kind: 'clean-exit', taskInfo, finished, stopEvent: held })) continue;
         emitLoopEvent(held);
         return;
       }
       decisions.taskDone(taskInfo);
+      // Another task than the last stop's, and no repair, starts the
+      // count of retries in a row over (`start/retry-budget.ts`).
+      retries.taskDone(retryTask);
       const tokens = await unlessText(async () => taskTokens(checkout, dispatch.sessionId));
       emitLoopEvent({ kind: 'task-done', position, durationMs: Date.now() - startedAt, tokens });
       if (!stored) {
@@ -877,7 +885,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // one has inserted a blocked repair task, or blocked the repair it
       // followed, and stops the run.
       if (!(await suiteSteps.afterTask(taskInfo, base))) {
-        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
+        if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red', retryTask)) continue;
         if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: 'suite-red' })) continue;
         emitLoopEvent({ kind: 'halt', reason: 'suite step red' });
         return;

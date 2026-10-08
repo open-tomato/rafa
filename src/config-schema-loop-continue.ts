@@ -23,7 +23,8 @@
  *
  *   - `loop.retriesOnContinue` is the retry budget a `--continue` run
  *     opens when `--retry` is not typed: `false` or a whole number from
- *     1 to 3, default `1`. A run without `--continue` never reads it.
+ *     1 to 3, default `1`, counted in a row as `loop.retries` is
+ *     (`start/retry-budget.ts`). A run without `--continue` never reads it.
  *     It follows `loop.retries`' rules: `false` and not `0` means no
  *     retry, and `0`, a negative number, a fraction, anything above 3,
  *     `true` and a quoted number are refused.

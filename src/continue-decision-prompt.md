@@ -23,7 +23,8 @@ Why it stopped:
 
 {{holds}}
 
-Retries left in this run: {{retriesLeft}}.
+Retries left in a row: {{retriesLeft}}. The count starts over once a
+task other than this one, and other than a repair, is done.
 
 ## The open tasks still in the plan
 
@@ -35,7 +36,7 @@ Each open task is listed with its tracker line number, the number a
 ## The strategies
 
 <!-- no-retry -->
-No retry is left in this run, so `retry` is not offered: a task that a
+No retry in a row is left, so `retry` is not offered: a task that a
 different approach could still finish is a `stop` here, its reason
 saying what that approach is.
 

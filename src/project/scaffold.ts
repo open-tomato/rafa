@@ -133,7 +133,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   '# loop:',
   `#   settingSources: ${CONFIG_DEFAULTS.settingSources.join(',')}   # a comma-separated subset of user, project, local`,
   `#   worktreeDir: ${CONFIG_DEFAULTS.loopWorktreeDir}   # where a loop adds its worktrees, read from the project root`,
-  `#   retries: ${String(CONFIG_DEFAULTS.loopRetries)}               # 1..3 | false, times a run re-enters its loop after a retry-safe stop`,
+  `#   retries: ${String(CONFIG_DEFAULTS.loopRetries)}               # 1..3 | false, times in a row a run re-enters its loop after a retry-safe stop`,
   `#   retriesOnContinue: ${String(CONFIG_DEFAULTS.loopRetriesOnContinue)}         # 1..3 | false, the retries a --continue run opens when --retry is not typed`,
   '#   continue:',
   `#     criteria: ${CONFIG_DEFAULTS.loopContinueCriteria}   # the project's own criteria for a --continue decision`,

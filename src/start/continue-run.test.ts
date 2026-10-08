@@ -92,6 +92,8 @@ interface Planted {
   readonly calls: { args: readonly string[]; prompt: string }[];
   readonly saved: PassOverList[];
   readonly retried: string[];
+  /** The key of the task each retry was asked on, as `retryTaskOf` makes it. */
+  readonly retriedOn: (string | null)[];
   /** The retries left; a granted retry takes one. */
   left: number;
   refusal: RetryRefusal | null;
@@ -105,7 +107,7 @@ function plant(answers: readonly string[], exitCode = 0, seed: PassOverList = []
   const root = mkdtempSync(join(tempRoot, 'run-'));
   const trackerPath = join(root, 'PLAN_TRACKER-continue.md');
   writeFileSync(trackerPath, TRACKER, 'utf8');
-  const planted: Planted = { trackerPath, calls: [], saved: [], retried: [], left: 1, refusal: null, refuseNext: null, interrupted: false };
+  const planted: Planted = { trackerPath, calls: [], saved: [], retried: [], retriedOn: [], left: 1, refusal: null, refuseNext: null, interrupted: false };
   const options: RunDecisionsOptions = {
     continueArgs: { on: true, directive: null, forceWrapUp: false },
     repoRoot: root,
@@ -120,7 +122,8 @@ function plant(answers: readonly string[], exitCode = 0, seed: PassOverList = []
       },
     },
     retries: {
-      retry: (reason) => {
+      retry: (reason, stopped) => {
+        planted.retriedOn.push(stopped?.key ?? null);
         const refusal = planted.refuseNext ?? (planted.left === 0
           ? 'spent'
           : null);
@@ -324,6 +327,8 @@ describe('what each decision does', () => {
 
     expect(await decisions.atStop(heldReport(run.trackerPath))).toBe(true);
     expect(run.retried).toEqual(['the decision chose retry']);
+    // Asked on the stopped task, which a later done of it does not reset.
+    expect(run.retriedOn).toEqual(['1:Check the env file a person writes']);
     expect(findNextTask(readFileSync(run.trackerPath, 'utf8'))?.blocker).toBe('Run the suite in the foreground.');
   });
 
