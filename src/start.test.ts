@@ -561,12 +561,17 @@ describe('the events file start.ts binds around the run', () => {
     expect(finallyOf(STATEMENTS)).toEqual(['unbindEventsFile();', 'session.end();']);
   });
 
-  it('emits an error event carrying what the run threw from its catch, then rethrows it', () => {
+  it('emits an error event carrying what the run threw from its catch, but for a LoopEnd, then rethrows it', () => {
     const caught = catchOf(STATEMENTS);
 
+    // A `LoopEnd` is the end a `--continue` run chose, its own events
+    // emitted before it was thrown (`start/continue-exits.ts`).
     expect(caught).toEqual({
       name: 'error',
-      body: ['emitLoopEvent({ kind: \'error\', message: messageOf(error) });', 'throw error;'],
+      body: [
+        'if (!(error instanceof LoopEnd)) emitLoopEvent({ kind: \'error\', message: messageOf(error) });',
+        'throw error;',
+      ],
     });
   });
 

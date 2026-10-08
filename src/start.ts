@@ -319,7 +319,9 @@
  * bound right after the session record is opened and unbound in the
  * run's `finally`. Anything the run throws past that point, a
  * `CommandExit` included, is first written there as an `error` event
- * and then rethrown unchanged.
+ * and then rethrown unchanged, but for a `LoopEnd`: the end a
+ * `--continue` run chose, with exit code 20, 21 or 22, which emitted
+ * its own events before it was thrown (`start/continue-exits.ts`).
  *
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
@@ -361,6 +363,7 @@ import {
 import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
 import { configuredRetries, refuseUnusableCriteria } from './start/continue-args.js';
+import { LoopEnd } from './start/continue-exits.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -808,7 +811,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       }
     }
   } catch (error) {
-    emitLoopEvent({ kind: 'error', message: messageOf(error) });
+    if (!(error instanceof LoopEnd)) emitLoopEvent({ kind: 'error', message: messageOf(error) });
     throw error;
   } finally {
     unbindEventsFile();
