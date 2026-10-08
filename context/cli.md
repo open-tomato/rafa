@@ -2142,15 +2142,22 @@ New; it replaces no earlier text. What a row or an action added to
   refreshes every item of the repository on the project and answers the
   open issues with no item; each is then added and a second refresh fills
   it. A line per change, `#<n> <field>: <from> → <to>` with `(empty)` for
-  no value, a line per issue added, then a closing count. `--dry-run`
+  no value, a line per issue added, then a closing count, which ends
+  `; <n> issue(s) not refreshed` when issues were refused and never reads
+  `in step` then. `--dry-run`
   sets the refresh's `dryRun`: the same lines, no write and no add. Json
   mode's result is `BoardSyncResult`, the changes without their write
-  ids. Exit code 1 for a stray word, an unusable config and an unset
+  ids and the refused issues as `refused` (`issue`, `reason`). Exit code 1
+  for a stray word, an unusable config and an unset
   `board.project.number`, which names `rafa init --board --project`; 2 for
   a missing `project` scope, a number naming no project, a rate-limit
-  refusal (after the lines of what was read) and any `gh` failure. A
-  field the project holds otherwise than the template is a `warn` line,
-  exit 0. It declares no `spends`.
+  refusal (after the lines of what was read) and any `gh` failure outside
+  one issue's facts. A field the project holds otherwise than the
+  template is a `warn` line, exit 0. So is an issue whose facts could not
+  be read, in either pass: `#<n> not refreshed: <reason>`, the other
+  issues synced and the missing ones added, so a run whose only failures
+  are refused issues exits 0 and the next run reads them again. It
+  declares no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading

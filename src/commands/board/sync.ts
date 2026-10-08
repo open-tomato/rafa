@@ -14,11 +14,13 @@
  * `#<n> <field>: <from> → <to>`, an empty value spelled `(empty)`. Then
  * one line per open issue missing from the project: `#<n> added to the
  * project`, or `#<n> is not on the project: would be added` on a dry run.
- * Then one closing line counting both, saying the project is in step when
- * there was nothing to do, or, when the rate limit stopped the writes,
- * how many of the changes were written. Every warning line of the sync follows as
- * a warning. In json mode the terminal result's `data` is a
- * {@link BoardSyncResult}: the same changes, without the write ids.
+ * Then one closing line counting both and the issues refused, saying the
+ * project is in step when there was nothing to do and none was refused,
+ * or, when the rate limit stopped the writes, how many of the changes were
+ * written. Every warning line of the sync follows as a warning, a refused
+ * issue's as `#<n> not refreshed: <reason>`. In json mode the terminal
+ * result's `data` is a {@link BoardSyncResult}: the same changes, without
+ * the write ids, and the issues refused.
  *
  * `--dry-run` reads everything a sync reads, and sends no write and no
  * add.
@@ -30,9 +32,12 @@
  * {@link BOARD_SYNC_REFUSAL_EXIT} (2) when the sync could not finish: a
  * token without the `project` scope, a number naming no project, a write
  * the rate limit refused (the lines of what was written print first), and
- * any read or write `gh` failed. A field the project does not hold as the
- * template has it is a warning: the other fields are synced and the exit
- * code is 0.
+ * any read or write `gh` failed outside one issue's facts. A field the
+ * project does not hold as the template has it is a warning: the other
+ * fields are synced and the exit code is 0. So is an issue whose facts
+ * could not be read: its line prints, the other issues are synced and the
+ * missing ones added, and the exit code is 0, since the next run reads it
+ * again. A run whose only failures are refused issues therefore exits 0.
  *
  * It starts no session, so it declares no `spends`.
  */
@@ -76,6 +81,13 @@ export interface BoardSyncChange {
   readonly to: string | null;
 }
 
+/** One issue whose facts could not be read, as json mode gives it. */
+export interface BoardSyncRefusal {
+  readonly issue: number;
+  /** What failed, as its warning line names it. */
+  readonly reason: string;
+}
+
 /** What json mode gives as the terminal result's `data`. */
 export interface BoardSyncResult {
   readonly project: ProjectRef;
@@ -85,6 +97,8 @@ export interface BoardSyncResult {
   readonly missing: readonly number[];
   /** Those of them added; none on a dry run. */
   readonly added: readonly number[];
+  /** The issues whose facts could not be read, none written; each has its warning line. */
+  readonly refused: readonly BoardSyncRefusal[];
   /** How many values were written; none on a dry run. */
   readonly written: number;
   /** True when the rate limit stopped the writes. */
@@ -112,6 +126,13 @@ export function changeLine(change: BoardSyncChange): string {
   return `#${String(change.issue)} ${change.name}: ${change.from ?? EMPTY_VALUE} → ${change.to ?? EMPTY_VALUE}`;
 }
 
+/** The closing line's count of the issues refused, or nothing when none was. */
+function refusedPart(result: BoardSyncResult): string {
+  return result.refused.length === 0
+    ? ''
+    : `; ${counted(result.refused.length, 'issue')} not refreshed`;
+}
+
 /** The line closing a run over `result`. */
 export function closingLine(result: BoardSyncResult): string {
   const project = `project #${String(result.project.number)}`;
@@ -120,15 +141,16 @@ export function closingLine(result: BoardSyncResult): string {
     : result.added;
   const changes = counted(result.changes.length, 'change');
   const issues = counted(adds.length, 'issue');
+  const inStep = result.changes.length === 0 && adds.length === 0 && result.refused.length === 0;
   if (result.dryRun) {
-    return result.changes.length === 0 && adds.length === 0
+    return inStep
       ? `Dry run on ${project}: in step, nothing to change.`
-      : `Dry run on ${project}: ${changes} and ${issues} to add; nothing written.`;
+      : `Dry run on ${project}: ${changes} and ${issues} to add${refusedPart(result)}; nothing written.`;
   }
   if (result.rateLimited) return `Stopped on ${project}: ${String(result.written)} of ${changes} written; the rate limit refused the rest.`;
-  return result.changes.length === 0 && adds.length === 0
+  return inStep
     ? `Synced ${project}: in step, nothing to change.`
-    : `Synced ${project}: ${changes} written and ${issues} added.`;
+    : `Synced ${project}: ${changes} written and ${issues} added${refusedPart(result)}.`;
 }
 
 /** Every line text mode prints for `result`, the warnings left out. */
@@ -152,6 +174,7 @@ export function syncResultOf(synced: ProjectSynced): BoardSyncResult {
     changes: synced.changes.map(plainChange),
     missing: synced.missing,
     added: synced.added,
+    refused: synced.refused.map(({ number, reason }) => ({ issue: number, reason })),
     written: synced.writes.written,
     rateLimited: synced.writes.rateLimited,
     notUpdated: synced.writes.notUpdated,
@@ -213,8 +236,10 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
       + ' outside rafa: a label edited in the web UI, an issue closed by hand, the Roadmap issue\'s order edited in'
       + ' its body. Prints one line per change and per issue added, then a closing count. With `--dry-run` it'
       + ' prints the same lines and writes nothing. With `--output=json` the changes are the data of the terminal'
-      + ' result event. Refused with exit code 1 when board.project.number is unset, and with exit code 2 when the'
-      + ' token lacks the project scope, the number names no project, or the rate limit stopped the writes.',
+      + ' result event. An issue whose facts could not be read is named in a warning, `#<n> not refreshed:'
+      + ' <reason>`, while the others are synced; the exit code stays 0 and the next run reads it again. Refused'
+      + ' with exit code 1 when board.project.number is unset, and with exit code 2 when the token lacks the'
+      + ' project scope, the number names no project, or the rate limit stopped the writes.',
     args: [],
     flags: [
       {

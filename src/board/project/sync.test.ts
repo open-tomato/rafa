@@ -12,6 +12,9 @@
  *    every change, over the one fake the sync between them wrote.
  *  - The rate-limited sync that adds nothing is read beside the sync
  *    that adds both missing issues.
+ *  - Each sync refusing one issue is read beside the sync over the same
+ *    board with no cursor that repeats, which refuses none and fills
+ *    every item, so a sync answering no refusal at all would fail it.
  *
  * ## Why the warning lines are imported late
  *
@@ -42,7 +45,7 @@ import {
 } from './sync-fake.js';
 import { syncProject } from './sync.js';
 
-const { notFoundWarning, rateLimitWarning, scopeWarning } = await import('./refresh-warnings.js');
+const { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning } = await import('./refresh-warnings.js');
 
 /** The config every case reads. */
 const CONFIG: RefreshConfig = {
@@ -102,8 +105,39 @@ describe('syncProject', () => {
     expect(issuesOf(synced.changes)).toEqual([10, 20, 21, 22, 30, 1, 40]);
     expect(synced.writes.written).toBe(synced.changes.length);
     expect(syncAddCalls(fake.calls())).toHaveLength(2);
+    expect(synced.refused).toEqual([]);
     expect(synced.warnings).toEqual([]);
     expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, ...ADDED_VALUES });
+  });
+
+  it('refuses alone an issue on the project whose facts cannot be read, writing the others and adding the missing ones', async () => {
+    const fake = createSyncFake({ repeatsCursor: [21] });
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.refused.map(({ number }) => number)).toEqual([21]);
+    expect(synced.refused[0]?.reason).toContain('issue #21.labels answered the cursor');
+    expect(synced.warnings).toEqual(synced.refused.map(notRefreshedWarning));
+    expect(synced.warnings[0]).toStartWith('#21 not refreshed: ');
+    expect(issuesOf(synced.changes)).toEqual([10, 20, 22, 30, 1, 40]);
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.writes).toMatchObject({ written: synced.changes.length, rateLimited: false });
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 21: {}, ...ADDED_VALUES });
+  });
+
+  it('answers an added issue refused in the second pass, on the project with no value filled', async () => {
+    const fake = createSyncFake({ repeatsCursor: [40] });
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.refused.map(({ number }) => number)).toEqual([40]);
+    expect(synced.warnings).toEqual(synced.refused.map(notRefreshedWarning));
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
   });
 
   it('finds nothing on a dry run after a sync, the first dry run having found every change', async () => {

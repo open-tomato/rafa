@@ -12,6 +12,11 @@
  * change of an empty project, so the empty one after is no printer that
  * prints nothing.
  *
+ * The refused-issue cases plant a labels cursor that never moves on #21
+ * (`SyncFakeOptions.repeatsCursor`). Their control is the sync over the
+ * same board without it, which exits 0 with no `warn:` line and every
+ * item filled, so the warning line and the unfilled #21 are the refusal's.
+ *
  * The warning lines are imported once the static imports have loaded,
  * for the import cycle `src/board/project/sync.test.ts`'s module note
  * names.
@@ -62,6 +67,7 @@ const EMPTY: BoardSyncResult = {
   changes: [],
   missing: [],
   added: [],
+  refused: [],
   written: 0,
   rateLimited: false,
   notUpdated: 0,
@@ -106,6 +112,16 @@ describe('changeLine, closingLine and syncLines', () => {
       .toBe('Synced project #6: 2 changes written and 2 issues added.');
     expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE, STAGE_CHANGE], written: 1, rateLimited: true, notUpdated: 1 }))
       .toBe('Stopped on project #6: 1 of 2 changes written; the rate limit refused the rest.');
+  });
+
+  it('counts the issues refused, and never closes on in step while one was refused', () => {
+    const refused = [{ issue: 21, reason: 'a reason' }];
+
+    expect(closingLine({ ...EMPTY, refused })).toBe('Synced project #6: 0 changes written and 0 issues added; 1 issue not refreshed.');
+    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE], added: [40], written: 1, refused: [...refused, { issue: 22, reason: 'b' }] }))
+      .toBe('Synced project #6: 1 change written and 1 issue added; 2 issues not refreshed.');
+    expect(closingLine({ ...EMPTY, dryRun: true, refused }))
+      .toBe('Dry run on project #6: 0 changes and 0 issues to add; 1 issue not refreshed; nothing written.');
   });
 
   it('prints the changes, then each issue to add or added, then the closing line', () => {
@@ -164,9 +180,46 @@ describe('rafa board sync', () => {
     const result = await run(fake, [], project);
 
     expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
     expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
     expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
     expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
+    expect((await fake.heldValues())[21]).toEqual({ Stage: 'Ready', Rank: 3 });
+  });
+
+  it('exits 0 when the only failure is a refused issue, printing its warning line and syncing the rest', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [21] });
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
+    expect(result.stdout).not.toContain('#21 Stage');
+    expect(result.stdout).toContain('Synced project #6: 12 changes written and 2 issues added; 1 issue not refreshed.\n'
+      + 'warn: #21 not refreshed: issue #21.labels answered the cursor');
+    const warnings = result.stdout
+      .trimEnd()
+      .split('\n')
+      .filter((line) => line.startsWith('warn: '));
+    expect(warnings).toHaveLength(1);
+    expect((await fake.heldValues())[21]).toEqual({});
+    expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
+  });
+
+  it('gives a refused issue in the json result and its warning line, exiting 0', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [21] });
+
+    const result = await run(fake, ['--output=json'], project);
+    const ending = eventsOf(result.stdout).find((event) => event.type === 'result') as { data?: BoardSyncResult } | undefined;
+    const refused = ending?.data?.refused ?? [];
+
+    expect(result.exitCode).toBe(0);
+    expect(refused.map(({ issue }) => issue)).toEqual([21]);
+    expect(refused[0]?.reason).toContain('issue #21.labels answered the cursor');
+    expect(ending?.data?.warnings).toEqual([`#21 not refreshed: ${refused[0]?.reason ?? ''}`]);
+    expect(ending?.data?.added).toEqual([1, 40]);
   });
 
   it('gives the changes, the issues and the counts as the json result, without the write ids', async () => {
