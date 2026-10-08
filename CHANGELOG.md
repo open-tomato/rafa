@@ -9,6 +9,15 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.40.0 — 2026-10-08, Fill a long-lived repository's project in one run, with progress
+<!-- rafa:fragments rafa-lock-0-39-0 rafa-924-board-project-fixes -->
+
+- configuration: five new `board.project` keys set the project refresh's retries (`retries`, `retryWaitSeconds`), progress interval (`progressSeconds`), write batch size (`writeBatchSize`) and write pause (`writePauseMs`), replacing the fixed write batch and pause.
+- board: the project refresh reads an issue's labels, closing pull requests and cross-references in full, past GitHub's 100-entry page; an issue that still cannot be read no longer stops the refresh, the rest is written and it is named as `#<n> not refreshed: <reason>`, in `rafa init --board --project` (whose `project fields` part reads `created` with the refused issues listed) and in `rafa board sync` (which exits 0 and lists them as `refused` in json mode).
+- board: project calls that fail on a network error (a timeout, a reset connection, an HTTP 502/503/504) are retried with a doubling wait by every command that writes the project, each retry printing `retrying #<n> (<k> of <m>): <reason>` or one `retry` event in json mode; GitHub's deliberate refusals are never retried.
+- board: `rafa init --board --project` and `rafa board sync` print a start line, throttled progress lines and an end line for adding issues, reading facts and writing fields, or `progress` events with `--output=json`.
+- documentation: `context/board-project.md` covers the full list reads, per-issue refusals, the retry and its classes, the progress lines and the new config keys.
+
 ## 0.39.0 — 2026-10-07, The 12 macOS test failures of 0.36.0, each fixed; Stretches run on rafa lines alone; Bug sweep 11 — type-check the test files a task touches; Bug sweep 12 — spawned runs assert their exit code through expectExit; Bug sweep 13 — a plan rafa plan create writes runs as written; Bug sweep 14 — the loop's ending tells the truth; Bug sweep 15 — merge, cleanup, status and release do their step; Bug sweep 16 — pages, notes and messages say what the code does; Bug sweep 18 — the type step runs in a loop worktree; Stretch operators run each rafa line as one command; Monorepo survey, the unattended part
 <!-- rafa:fragments rafa-lock-0-38-0 fix-mac-test-failures rafa-816-spec-rafa-stretch-start rafa-818-bug-sweep-11 rafa-819-bug-sweep-12 rafa-820-bug-sweep-13 rafa-821-bug-sweep-14 rafa-822-bug-sweep-15 rafa-823-bug-sweep-16 rafa-839-bug-sweep-18 rafa-841-stretch-operators-run-each rafa-862-monorepo-survey -->
 
