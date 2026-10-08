@@ -107,12 +107,14 @@ import { rootCandidates } from '../project/roots.js';
 import { PROJECT_TREE, projectConfigText, userConfigText } from '../project/scaffold.js';
 import { dispatchCaptured, eventsOf, expectExit, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
+import { PROJECT_HEADING, PROJECT_NO_BOARD_WARNING, PROJECT_STEP_FIX, SCOPE_ARGS } from './init-board-project.js';
 import { RELEASE_FIX } from './init-release.js';
 import {
   createInitCommand,
   DEFAULT_INIT_SEAMS,
   readBoardFlag,
   readEpicGuardFlag,
+  readProjectFlag,
   readReleaseFlag,
   readRootFlag,
   readYesFlag,
@@ -500,6 +502,26 @@ describe('choosing the root', () => {
     expect(() => readEpicGuardFlag('later')).toThrow('--epic-guard takes no value');
   });
 
+  it('reads --project as true, --no-project as false and neither as nobody having said, refusing a value', () => {
+    expect([readProjectFlag(undefined), readProjectFlag(true), readProjectFlag('true')]).toEqual([null, true, true]);
+    expect([readProjectFlag(false), readProjectFlag('false')]).toEqual([false, false]);
+    expect(() => readProjectFlag('later')).toThrow('--project takes no value');
+  });
+
+  it('refuses a value read for --project before a root is chosen, writing nothing', async () => {
+    const world = plantWorld();
+
+    const run = await init(world, ['--yes', '--board', '--project=later']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr.split('\n')[0]).toBe(
+      'rafa init: --project takes no value, and read "later" as one;'
+      + ' create the GitHub project with --project, or leave it out with --no-project',
+    );
+    expect(run.stderr.trimEnd().endsWith('Nothing was written.')).toBe(true);
+    expect(existsSync(join(world.repo, '.rafa'))).toBe(false);
+  });
+
   it('reads --release as true, --no-release as false and neither as nobody having said, refusing a value', () => {
     expect([readReleaseFlag(undefined), readReleaseFlag(true), readReleaseFlag('true')]).toEqual([null, true, true]);
     expect([readReleaseFlag(false), readReleaseFlag('false')]).toEqual([false, false]);
@@ -844,10 +866,10 @@ describe('the board step', () => {
     expect(existsSync(join(world.repo, '.github'))).toBe(false);
   });
 
-  it('asks the release question, the board one and the epic guard one on a terminal, and sets both up on a yes', async () => {
+  it('asks the release question, the board one, the epic guard one and the project one on a terminal, and sets both up on a yes', async () => {
     const world = plantWorld();
     const gh = fakeGh();
-    const prompter = scripted(['n', 'y', 'y']);
+    const prompter = scripted(['n', 'y', 'y', 'n']);
 
     const run = await init(world, [`--root=${world.repo}`, '--output=json'], seamsFor(world, {
       readRemote: () => 'https://github.com/acme/widgets.git',
@@ -857,12 +879,14 @@ describe('the board step', () => {
     }));
 
     expect(run.exitCode).toBe(0);
-    expect(prompter.record.asked).toBe(3);
+    expect(prompter.record.asked).toBe(4);
     expect(resultOf(run.stdout).release).toMatchObject({ status: 'set', asked: true, enabled: false });
     expect(resultOf(run.stdout).board).toMatchObject({ status: 'ran', asked: true });
     expect(resultOf(run.stdout).epicGuard).toMatchObject({ status: 'ran', asked: true, part: { outcome: 'created' } });
     expect(existsSync(join(world.repo, '.github', 'workflows', 'epic-guard.yml'))).toBe(true);
+    expect(resultOf(run.stdout).project).toMatchObject({ status: 'declined', asked: true, report: null });
     expect(gh.routes()[0]).toBe('repo view');
+    expect(gh.routes()).not.toContain('auth status');
   });
 
   it('creates nothing on a second run of --board over the board the first one made, byte for byte', async () => {
@@ -888,6 +912,86 @@ describe('the board step', () => {
     expect(gh.routes().slice(sentFirst)).toEqual(['label list']);
     expect(movedSincePast(world.base)).toEqual([]);
     expect(stateOf(world.base).map((entry) => entry.replace(/ \d+(\.\d+)? /, ' '))).toEqual(bytes);
+  });
+});
+
+describe('the project step', () => {
+  /** The seams of `world` over a GitHub `origin` and `gh`, with `overrides`. */
+  const onGitHub = (world: World, gh: ReturnType<typeof fakeGh>, overrides: Partial<InitSeams> = {}) => seamsFor(world, {
+    readRemote: () => 'https://github.com/acme/widgets.git',
+    gh: () => gh.run,
+    ...overrides,
+  });
+  /** The scope read's route, as the fake keeps the first two words. */
+  const scopeRoute = SCOPE_ARGS.slice(0, 2).join(' ');
+
+  it('runs under --project after the board, asking nothing, its parts printed and the scope refusal exiting 0', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+
+    const run = await init(world, ['--yes', '--board', '--no-epic-guard', '--project'], onGitHub(world, gh));
+    const lines = run.stdout.split('\n');
+
+    expect(run.exitCode).toBe(0);
+    expect(gh.routes()).toContain(scopeRoute);
+    expect(gh.routes().indexOf(scopeRoute)).toBeGreaterThan(gh.routes().lastIndexOf('issue pin'));
+    expect(lines).toContain(PROJECT_HEADING);
+    expect(lines.some((line) => line.startsWith('  refused  project scope: '))).toBe(true);
+  });
+
+  it('gives the step as the project of the json result, its five parts there', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+
+    const run = await init(world, ['--yes', '--board', '--no-epic-guard', '--project', '--output=json'], onGitHub(world, gh));
+    const project = resultOf(run.stdout).project;
+
+    expect(run.exitCode).toBe(0);
+    expect(project).toMatchObject({ status: 'ran', asked: false, warnings: [] });
+    expect(project.report?.parts.map((part) => part.outcome)).toEqual(['refused', 'refused', 'refused', 'refused', 'refused']);
+  });
+
+  it('sends nothing under --no-project, and with no terminal names the line that creates it', async () => {
+    const declinedWorld = plantWorld();
+    const unaskedWorld = plantWorld();
+    const declinedGh = fakeGh();
+    const unaskedGh = fakeGh();
+
+    const declined = await init(declinedWorld, ['--yes', '--board', '--no-epic-guard', '--no-project', '--output=json'], onGitHub(declinedWorld, declinedGh));
+    const unasked = await init(unaskedWorld, ['--yes', '--board', '--no-epic-guard'], onGitHub(unaskedWorld, unaskedGh));
+
+    expect(resultOf(declined.stdout).project).toMatchObject({ status: 'declined', asked: false, report: null });
+    expect(declinedGh.routes()).not.toContain(scopeRoute);
+    expect(unasked.exitCode).toBe(0);
+    expect(unasked.stdout).toContain(`The GitHub project question needs a terminal; run ${PROJECT_STEP_FIX} to create it.`);
+    expect(unaskedGh.routes()).not.toContain(scopeRoute);
+  });
+
+  it('runs on a yes to its question on a terminal, asked after the other three', async () => {
+    const world = plantWorld();
+    const gh = fakeGh();
+    const prompter = scripted(['n', 'y', 'n', 'y']);
+
+    const run = await init(world, [`--root=${world.repo}`, '--output=json'], onGitHub(world, gh, {
+      isTerminal: () => true,
+      openPrompter: prompter.open,
+    }));
+
+    expect(prompter.record.asked).toBe(4);
+    expect(resultOf(run.stdout).project).toMatchObject({ status: 'ran', asked: true });
+    expect(gh.routes()).toContain(scopeRoute);
+  });
+
+  it('warns that --project needs the board when the board step did not run, and sends nothing', async () => {
+    const world = plantWorld();
+
+    const run = await init(world, ['--yes', '--no-board', '--project', '--output=json'], seamsFor(world, {
+      readRemote: () => 'https://github.com/acme/widgets.git',
+    }));
+
+    expect(run.exitCode).toBe(0);
+    expect(resultOf(run.stdout).project).toMatchObject({ status: 'not-run', report: null, warnings: [PROJECT_NO_BOARD_WARNING] });
+    expect(JSON.stringify(eventsOf(run.stdout))).toContain('--project creates the GitHub project');
   });
 });
 

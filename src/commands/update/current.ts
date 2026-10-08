@@ -309,14 +309,15 @@ export function createUpdateCurrentCommand(seams: UpdateCurrentSeams = DEFAULT_U
     name: 'update current',
     subject: 'update',
     action: 'current',
-    summary: 'bring this project to the installed rafa, within its patch range',
+    summary: 'bring this project to the installed rafa: a newer patch, or any newer minor below 1.0.0',
     description: 'Brings the project to the installed rafa when the installed version shares the major and'
-      + ` minor of the version \`${LOCK_FILE}\` records at the project root, and is the same patch or newer.`
+      + ` minor of the version \`${LOCK_FILE}\` records at the project root, and is the same patch or newer;`
+      + ' below 1.0.0 it also crosses newer minors, as `0.34.1` to `0.36.0`.'
       + ' A project with no lock is adopted at the installed version. It creates the missing `.rafa/` folders'
       + ' and the missing board labels on a GitHub board, runs the deprecations step (none registered yet),'
       + ` and writes \`${LOCK_FILE}\`. It prints every change first; \`--dry-run\` stops there. Otherwise it`
       + ' warns that the changes cannot be rolled back and asks once, `--yes` answering; with no terminal and'
-      + ' no `--yes` it refuses with exit code 1. A newer minor or major, or an installed rafa older than the'
+      + ' no `--yes` it refuses with exit code 1. A newer minor from 1.0.0 on, a newer major, or an installed rafa older than the'
       + ' lock, refuses with exit code 1, and so does a board label `gh` would not create, once everything'
       + ' else is applied. A lock or config that cannot be read, or a `.rafa/` path holding something else,'
       + ' exits 2 before anything is asked; a folder or the lock that cannot be written exits 2 naming the'

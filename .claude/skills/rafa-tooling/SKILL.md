@@ -191,6 +191,7 @@ Each row pairs the verbose command with the rafa line that replaces it.
 | `gh issue create --title … --label … --body-file …` | `rafa issue create --title=… --type=… --priority=… --body-file=…` |
 | `gh issue comment 12 --body …` | `rafa issue comment 12 --body=…` |
 | `gh issue close 12`, label edits for state | `rafa issue move 12 done` |
+| `gh issue edit 12 --body-file …` | `rafa issue edit 12 --append-file=<file> --reason=<text>` |
 | `gh issue edit 12 --add-label epic:… --remove-label epic:…` | `rafa epic move 12 --to=<epic>` |
 | `gh pr view --json … \| jq …` for the current branch | `rafa pr current` |
 | `gh pr view 41 --json closingIssuesReferences`, `gh pr checks 41` | `rafa pr show 41` |
@@ -201,6 +202,10 @@ Each row pairs the verbose command with the rafa line that replaces it.
 | `git branch --merged`, `git worktree list` + removals | `rafa cleanup` |
 | reading the tag, version files and changelog by hand | `rafa release status` |
 | `git tag v…` from the version files | `rafa release tag` |
+
+When `rafa issue edit` returns `stale-copy`, the issue is already planned:
+follow up with `rafa plan create --issue=<n> --refresh` to rebuild the copy,
+which moves the old one to `previous/`.
 
 Board and roadmap reads have no short `gh` form at all: use `rafa status`,
 `rafa next --dry-run`, `rafa roadmap` and `rafa epic show`.

@@ -14,8 +14,15 @@
  * dry run's clean `git status` is paired with the same probe seeing the
  * caller's own edit, and the refused `pr` delivery is paired with the
  * same world reaching the double when the remote reads as GitHub.
+ *
+ * The project refresh (`./settle-project.ts`) is read here only as the
+ * command's wiring: with `board.project.number` set, a push hands it the
+ * commits that really added the fragments on origin, and its lines come
+ * out as warnings with exit 0. Its controls are the same push with the
+ * number unset and a dry run with it set, each opening no `gh` runner.
  */
 import type { ReleaseSettleSeams } from './settle.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 import type { Fragment } from '../../release/fragment.js';
@@ -489,5 +496,98 @@ describe('rafa release settle, the pr delivery', () => {
     expect(run.exitCode).toBe(2);
     expect(double.sent()).toEqual([]);
     expect(() => w.git(w.origin, ['rev-parse', '--verify', 'refs/heads/rafa/release'])).toThrow();
+  });
+});
+
+describe('rafa release settle, the project refresh (./settle-project.ts)', () => {
+  /** The config of a repository that opted in to the project. */
+  const PROJECT = 'board:\n  project:\n    number: 6\n';
+
+  /** The warning the stand-in refresh answers. */
+  const WARNING = 'The project\'s field "Rank" was skipped.';
+
+  /** A `gh` seam answering commit `brought` with pull request #30 closing #21, and the issues each refresh asked for. */
+  function projectSeams(brought: () => string): { seams: ReleaseSettleSeams; opened: () => number; commits: () => readonly string[]; asked: () => readonly (readonly number[])[] } {
+    let opened = 0;
+    const commits: string[] = [];
+    const asked: (readonly number[])[] = [];
+    const gh: GhRunner = (args) => {
+      const named = args.filter((arg) => /^c\d+=/u.test(arg)).map((arg) => arg.slice(arg.indexOf('=') + 1));
+      commits.push(...named);
+      const pull = { number: 30, state: 'MERGED', baseRefName: 'main', body: 'Closes #21', mergeCommit: { oid: brought() }, closingIssuesReferences: { pageInfo: { hasNextPage: false }, nodes: [] } };
+      const objects = Object.fromEntries(named.map((commit, index) => [`c${String(index)}`, commit === brought()
+        ? { associatedPullRequests: { pageInfo: { hasNextPage: false }, nodes: [pull] } }
+        : null]));
+      return Promise.resolve({ ok: true, stdout: JSON.stringify({ data: { repository: { nameWithOwner: 'open-tomato/demo', ...objects } } }), stderr: '' });
+    };
+    const seams: ReleaseSettleSeams = {
+      gh: () => {
+        opened += 1;
+        return gh;
+      },
+      refresh: (_options, issues) => {
+        asked.push(issues);
+        return Promise.resolve({ kind: 'skipped', reason: 'no-issues', warnings: [WARNING] });
+      },
+    };
+    return { seams, opened: () => opened, commits: () => [...commits], asked: () => [...asked] };
+  }
+
+  /** The commit that added `path` to origin's `main`. */
+  function addedBy(w: World, path: string): string {
+    return w.git(w.origin, ['log', '-1', '--format=%H', '--diff-filter=A', 'main', '--', path]);
+  }
+
+  it('after a push, reads the commits that added the folded fragments, refreshes the issues their pull requests close, and warns, exiting 0', async () => {
+    const w = world(PROJECT);
+    landTwo(w);
+    const nine = addedBy(w, '.changes/rafa-9.md');
+    const one = addedBy(w, '.changes/rafa-1.md');
+    const fake = projectSeams(() => nine);
+
+    const run = await settle(w, [], fake.seams);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('✅ Pushed "chore: release 0.5.0"');
+    expect(fake.commits()).toEqual([nine, one]);
+    expect(fake.asked()).toEqual([[21]]);
+    expect(run.stdout.indexOf(`warn: ${WARNING}`)).toBeGreaterThan(run.stdout.indexOf('✅ Pushed'));
+  });
+
+  it('control: the same push with board.project.number unset opens no runner and asks no refresh', async () => {
+    const w = world();
+    landTwo(w);
+    const fake = projectSeams(() => addedBy(w, '.changes/rafa-9.md'));
+
+    const run = await settle(w, [], fake.seams);
+
+    expect(run.exitCode).toBe(0);
+    expect(originSubject(w)).toBe('chore: release 0.5.0');
+    expect([fake.opened(), fake.asked()]).toEqual([0, []]);
+    expect(run.stdout).not.toContain(WARNING);
+  });
+
+  it('a dry run with the number set opens no runner', async () => {
+    const w = world(PROJECT);
+    landTwo(w);
+    const fake = projectSeams(() => addedBy(w, '.changes/rafa-9.md'));
+
+    const run = await settle(w, ['--dry-run'], fake.seams);
+
+    expect(run.exitCode).toBe(0);
+    expect([fake.opened(), fake.asked()]).toEqual([0, []]);
+  });
+
+  it('carries what the refresh read as the project key of the json result', async () => {
+    const w = world(PROJECT);
+    landTwo(w);
+    const nine = addedBy(w, '.changes/rafa-9.md');
+    const fake = projectSeams(() => nine);
+
+    const run = await settle(w, ['--output=json'], fake.seams);
+
+    expect(run.exitCode).toBe(0);
+    const data = (eventsOf(run.stdout).at(-1) as { data?: { project: { pullRequests: number[]; issues: number[]; warnings: string[] } | null } }).data;
+    expect(data?.project).toEqual(expect.objectContaining({ pullRequests: [30], issues: [21], warnings: [WARNING] }));
   });
 });

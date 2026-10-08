@@ -46,9 +46,11 @@
  *     OPT numbers, CLI and ledger, with three exceptions: {@link TrackerKind}
  *     is opened, {@link IssueType} gains `epic` and `spec`, and the note on
  *     `IssueRef.externalId` names the `local` adapter's issue number
- *     where the source named a file path. One member is rafa's own and
- *     absent from the source: the optional `openIssues` reading, with
- *     the {@link OpenIssue} it answers. Left
+ *     where the source named a file path. Three members are rafa's own
+ *     and absent from the source, all optional: the `openIssues`
+ *     reading, with the {@link OpenIssue} it answers, and the `editable`
+ *     and `edit` pair `rafa issue edit` writes through, with the
+ *     {@link EditableIssue} and {@link IssueEdit} they take and answer. Left
  *     out: `BOARD_COLUMNS`, `CLOSED_STATES` and `GITHUB_ISSUE_TYPES`,
  *     which are values and the GitHub adapter's projections, and
  *     `LedgerEntry`, the local ledger's line. rafa ports no OPT ledger,
@@ -304,6 +306,47 @@ export interface OpenIssue {
   body: string;
 }
 
+/**
+ * One issue as `editable` answers it: what `rafa issue edit` weighs
+ * before it writes, read in one call. rafa's own type, absent from the
+ * source.
+ *
+ * {@link Issue} carries neither labels nor an author, and the edit's
+ * gates read both: the author for whose issue it is, the labels for
+ * whether a plan or a loop is building from it.
+ */
+export interface EditableIssue {
+  readonly ref: IssueRef;
+  readonly title: string;
+  /** The body as the tracker holds it, unnormalised. */
+  readonly body: string;
+  /**
+   * False when the tracker holds the issue closed: `done`, `released`
+   * or `cancelled`, as `openIssues` reads them.
+   */
+  readonly open: boolean;
+  /**
+   * The issue's labels, by name, in the order the tracker answers them.
+   * Empty on a tracker that holds no labels.
+   */
+  readonly labels: readonly string[];
+  /**
+   * The login of the account that opened the issue, or the empty string
+   * on a tracker that holds no accounts, such as `local`.
+   */
+  readonly author: string;
+}
+
+/**
+ * What one `edit` writes: a new body, a new title, or both. Whatever
+ * it leaves out stays as the tracker holds it. A body is written whole:
+ * an append is the caller's, which hands the old body with its update
+ * below it. The union holds an edit to at least one of the two.
+ */
+export type IssueEdit =
+  | { readonly body: string; readonly title?: string }
+  | { readonly body?: string; readonly title: string };
+
 /** What a tracker's platform supports beyond issues themselves. */
 export interface TrackerCapabilities {
   /** Supports project/board grouping (GitHub Projects v2, Linear projects). */
@@ -358,6 +401,21 @@ export interface Tracker {
    * them goes without.
    */
   openIssues?: (type: IssueType) => Promise<OpenIssue[]>;
+  /**
+   * The issue's title, body, open state, labels and author, in one
+   * read. Rejects for a ref the tracker does not hold. rafa's own
+   * member, absent from the source, and optional with {@link edit}: a
+   * tracker without the two cannot have a body edited, and
+   * `rafa issue edit` refuses with a line naming the tracker's kind.
+   */
+  editable?: (ref: IssueRef) => Promise<EditableIssue>;
+  /**
+   * Writes the body, the title or both that `change` names, leaving
+   * the rest of the issue as it was, so that `editable` and `get` read
+   * the written text back unchanged. Rejects when the tracker refuses
+   * the write or does not hold the ref. Optional with {@link editable}.
+   */
+  edit?: (ref: IssueRef, change: IssueEdit) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------

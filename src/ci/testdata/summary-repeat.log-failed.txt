@@ -1,0 +1,39 @@
+verify	UNKNOWN STEP	2026-10-07T03:08:51.4662733Z ##[group]src/tests/loop-wrap-up-claim-lost-spawned.test.ts:
+verify	UNKNOWN STEP	2026-10-07T03:08:52.9700312Z (pass) a loop whose claim is taken over mid-session, spawned > halts the wrap-up push with the claim lost report, keeps device-a's commits on lost/<stub>, leaves the new owner's tip unmoved on origin, and rafa status on both clones names the new owner [1498.65ms]
+verify	UNKNOWN STEP	2026-10-07T03:08:52.9776492Z 
+verify	UNKNOWN STEP	2026-10-07T03:08:52.9777336Z ##[endgroup]
+verify	UNKNOWN STEP	2026-10-07T03:08:52.9778604Z 
+verify	UNKNOWN STEP	2026-10-07T03:08:52.9779196Z ##[group]src/tests/worktree-shared-store-integration.test.ts:
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0485261Z 211 | async function waitUntil<T>(read: () => T | null, timeoutMs: number, pollMs = 50): Promise<T> {
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0486160Z 212 |   const deadline = Date.now() + timeoutMs;
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0486525Z 213 |   while (true) {
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0486793Z 214 |     const value = read();
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0487478Z 215 |     if (value !== null) return value;
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0488068Z 216 |     if (Date.now() >= deadline) throw new Error('timed out waiting for a condition to hold');
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0488605Z                                                 ^
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0488923Z error: timed out waiting for a condition to hold
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0489476Z       at waitUntil (/work/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0490226Z 
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0513311Z ##[error]
+verify	UNKNOWN STEP	      at waitUntil (/work/rafa/src/tests/worktree-shared-store-integration.test.ts:216:43)
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0522605Z (fail) two rafa loop start --as-worktree runs, spawned at once over one project > write both task reports to the one shared store, which rafa effort report rolls up together [45062.89ms]
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0639972Z 
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0640850Z ##[endgroup]
+verify	UNKNOWN STEP	2026-10-07T03:09:38.0641023Z 
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7547417Z ##[group]src/triage/test-failure.test.ts:
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7572428Z (pass) testFailureOf > reads bun's (fail) line: the case without its timing, the file header above it, the error line above it [0.15ms]
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7573967Z (pass) testFailureOf > reads a second failure's evidence from the lines between the first case line and its own [0.14ms]
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7575210Z (pass) testFailureOf > reads a lone (fail) line with the test file named in the what [0.08ms]
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7587428Z 
+verify	UNKNOWN STEP	2026-10-07T03:12:42.7587833Z ##[endgroup]
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9214908Z 
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9214912Z 
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9214998Z 1 tests failed:
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9215733Z (fail) two rafa loop start --as-worktree runs, spawned at once over one project > write both task reports to the one shared store, which rafa effort report rolls up together [45062.89ms]
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9216377Z 
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9216454Z  18328 pass
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9216638Z  45 skip
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9216814Z  1 fail
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9217229Z  52447 expect() calls
+verify	UNKNOWN STEP	2026-10-07T03:14:31.9217471Z Ran 18374 tests across 925 files. [479.51s]
+verify	UNKNOWN STEP	2026-10-07T03:14:32.0584818Z ##[error]Process completed with exit code 1.

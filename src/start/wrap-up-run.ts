@@ -28,7 +28,9 @@
  * final message of the session before it and each followed by the same
  * reading. Still none, or `false` retries, and the runner opens the pull
  * request itself (`start/runner-pr.ts`), titled from the plan's issue and
- * title ({@link runnerPrInputFor}) with the fragment's notes in its body.
+ * title ({@link runnerPrInputFor}) with the fragment's notes in its body,
+ * and the issue it closes refreshed on the project, whose warning lines
+ * follow the opened line.
  * A repository whose `pr.provider` resolves to `none` has no pull request
  * to deliver, and none of this runs: the CI gate's own `none` path
  * pushes the branch as before.
@@ -431,6 +433,7 @@ async function openByRunner(
   const attempt = await seams.openRunnerPullRequest();
   if (attempt.kind === 'blocked') return blockedDelivery(attempt.message, retriesSpent);
   activeOutput().info(`\n✅ The loop opened pull request #${String(attempt.pull.number)} for ${branch}: ${attempt.pull.url}`);
+  for (const line of attempt.warnings) activeOutput().warn(line);
   return { kind: 'delivered', pull: attempt.pull, by: 'runner', retriesSpent };
 }
 
@@ -527,7 +530,7 @@ export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySe
         notes: fragmentNotesIn(checkout, context.fragment),
       });
       if (runnerInput === null) return { kind: 'blocked', message: noIssueReport(expected.branch) };
-      return openRunnerPullRequest(runnerInput, runnerPrSeamsIn(checkout));
+      return openRunnerPullRequest(runnerInput, runnerPrSeamsIn(checkout, context.settings));
     },
     isInterrupted: context.isInterrupted,
   };

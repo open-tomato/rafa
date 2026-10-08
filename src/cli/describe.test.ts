@@ -237,6 +237,7 @@ describe('the document over the core registry', () => {
     expect(document.commands.map((entry) => entry.name)).toContain('status');
     expect(document.subjects.find((subject) => subject.name === 'issue')?.actions.map((action) => action.name)).toContain('check');
     expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('list');
+    expect(document.subjects.find((subject) => subject.name === 'board')?.actions.map((action) => action.name)).toContain('sync');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('copy');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('schema');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('dashboard');
@@ -251,6 +252,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'epic')?.actions.map((action) => action.name)).toEqual(['show', 'new', 'defer', 'promote', 'move', 'close', 'cancel']);
     expect(document.subjects.find((subject) => subject.name === 'claim')?.actions.map((action) => action.name)).toEqual(['release', 'hand', 'accept', 'take']);
     expect(document.subjects.find((subject) => subject.name === 'loop')?.actions.map((action) => action.name)).toEqual(['start', 'stop', 'pause', 'resume', 'status', 'list', 'wait']);
+    expect(document.subjects.find((subject) => subject.name === 'stretch')?.actions.map((action) => action.name)).toContain('start');
   });
 
   it('gives each core command its spends declaration as written, and null for one declaring none', () => {
@@ -278,9 +280,11 @@ describe('the document over the core registry', () => {
     expect(spendsOf('epic', 'close')).toStrictEqual({ when: 'always', what: 'one verification planning session and one session per check' });
     expect(actionOf(document, 'epic', 'close')?.aliases).toEqual([]);
     expect(spendsOf('epic', 'cancel')).toBeNull();
+    expect(spendsOf('stretch', 'start')).toStrictEqual({ when: 'unless', flag: '--dry-run', what: 'one session per operator it starts' });
     expect(actionOf(document, 'epic', 'cancel')?.aliases).toEqual([]);
     expect(command('switch')?.spends).toBeNull();
     expect(spendsOf('board', 'list')).toBeNull();
+    expect(spendsOf('board', 'sync')).toBeNull();
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();

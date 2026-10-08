@@ -107,6 +107,13 @@
  * the check, the commit and the evidence. When #249's ladder lands it
  * routes these bugs; until then they are filed as out-of-scope bugs are.
  *
+ * ## The project refresh
+ *
+ * After the close, with `board.project.number` set, `./epic-project.ts`
+ * refreshes on the repository's project the epic, its members and every
+ * item whose Rank shifted. Its lines are warnings written after the
+ * run's own, before json mode's result, and never change the exit code.
+ *
  * ## What it writes
  *
  * Every line goes through the command's output, `info` or `warn`, in
@@ -120,6 +127,7 @@
  * arrive through {@link EpicCloseSeams}, so `./close.test.ts` starts no
  * Claude session, reaches no `origin` and opens no project's store.
  */
+import type { EpicProjectSeams } from './epic-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ResolveTrackerOptions, TrackerResolution } from '../../adapters/tracker/resolve.js';
 import type { EpicBody } from '../../board/epic-body.js';
@@ -164,6 +172,8 @@ import { namedSecrets, triageReport } from '../../triage/triage.js';
 import { claudeArgs, spawnClaudeCaptured } from '../../utils/claude.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { readSwitch } from '../plan/plan-files.js';
+
+import { closeTarget, refreshProjectAfterEpic } from './epic-project.js';
 
 /** The exit code every refusal of the gate ends the command with. */
 export const EPIC_CLOSE_REFUSAL_EXIT = 2;
@@ -216,8 +226,8 @@ export interface EpicCloseResult {
   readonly estimate: string | null;
 }
 
-/** How the command reaches `gh`, `git`, Claude, the store and the tracker chain; each left out is the system's own. */
-export interface EpicCloseSeams {
+/** How the command reaches `gh`, `git`, Claude, the store, the tracker chain and the project refresh; each left out is the system's own. */
+export interface EpicCloseSeams extends EpicProjectSeams {
   readonly gh?: GhRunner;
   /** A git runner for the operator checkout. */
   readonly git?: GitRunner;
@@ -673,6 +683,7 @@ export async function closeEpic(context: RafaContext, seams: EpicCloseSeams): Pr
 /** Runs one `epic close` line with `seams`; json mode ends on the result. */
 export async function runEpicClose(context: RafaContext, seams: EpicCloseSeams): Promise<void> {
   const result = await closeEpic(context, seams);
+  await refreshProjectAfterEpic(context, seams, closeTarget(result));
   if (context.outputMode === 'json') context.output.result(result);
 }
 

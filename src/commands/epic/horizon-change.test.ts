@@ -51,6 +51,7 @@ import {
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { createEpicDeferCommand } from './defer.js';
+import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 import {
   closeFailure,
   DEFER_ACTION,
@@ -193,11 +194,18 @@ interface CaseSetup {
   readonly planted?: Planted;
   /** The answers typed, or null for no terminal. */
   readonly answers?: readonly (string | null)[] | null;
+  /** The project's config; {@link LOCAL_CONFIG} when left out. */
+  readonly config?: string;
+  /** The project refresh; the system's own when left out. */
+  readonly projectRefresh?: EpicHorizonSeams['projectRefresh'];
 }
 
-/** A fresh project. */
-function plantCase(): PlantedProject {
-  return plantProject(mkdtempSync(join(tempBase, 'case-')), 'tracker:\n  default: local\n');
+/** The config every case runs with but those opting into a project. */
+const LOCAL_CONFIG = 'tracker:\n  default: local\n';
+
+/** A fresh project whose config is `config`. */
+function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
+  return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
 /** Dispatches `rafa epic <words>` over a planted `gh`, `git` and terminal. */
@@ -212,9 +220,12 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     planNames: () => () => [],
     isTerminal: () => answers !== null,
     openPrompter: prompter.open,
+    ...setup.projectRefresh === undefined
+      ? {}
+      : { projectRefresh: setup.projectRefresh },
   };
   const commands: RafaCommand[] = [createEpicDeferCommand(seams), createEpicPromoteCommand(seams)];
-  const outcome = await dispatchInProject(['epic', ...words], [EPIC_SUBJECT], commands, plantCase());
+  const outcome = await dispatchInProject(['epic', ...words], [EPIC_SUBJECT], commands, plantCase(setup.config));
   return { ...outcome, calls: planted.calls, gitCalls: git.calls, asked: prompter.asked, closes: prompter.closed() };
 }
 
@@ -501,5 +512,77 @@ describe('rafa epic promote', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('now → next is a deferral; run rafa epic defer 40 --to=next');
     expect(writesOf(result.calls)).toEqual([]);
+  });
+});
+
+describe('rafa epic promote and defer, and the project', () => {
+  /** The widening every epic action hands the refresh for `epics`. */
+  function widened(epics: readonly number[]): { readonly membersOf: readonly number[]; readonly shiftedRanks: true } {
+    return { membersOf: epics, shiftedRanks: true };
+  }
+
+  it('refreshes the promoted epic with its members and the shifted Ranks, its warnings after the move line', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['promote', '50', '--to=now', '--reason=the customer asked'], {
+      answers: [],
+      config: withProjectNumber(LOCAL_CONFIG),
+      projectRefresh: recorded.refresh,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([{ number: EPIC_PROJECT_NUMBER, issues: [50], widening: widened([50]) }]);
+    expect(result.stdout).toBe('Moved epic #50 next → now: the customer asked\nwarn: a project warning\n');
+  });
+
+  it('calls no refresh for the same promote with board.project.number unset, the control of the case above', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['promote', '50', '--to=now', '--reason=the customer asked'], { answers: [], projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([]);
+    expect(result.stdout).toBe('Moved epic #50 next → now: the customer asked\n');
+  });
+
+  it('refreshes the deferred epic and keeps exit code 1 for a pull request that could not be closed', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['defer', '40', '--to=later', '--reason=x'], {
+      planted: { failClose: [7] },
+      answers: ['no'],
+      config: withProjectNumber(LOCAL_CONFIG),
+      projectRefresh: recorded.refresh,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(recorded.calls()).toEqual([{ number: EPIC_PROJECT_NUMBER, issues: [40], widening: widened([40]) }]);
+    expect(result.stdout).toEndWith('warn: a project warning\n');
+    expect(result.stderr).toContain('#7 could not be closed and stay open');
+  });
+
+  it('calls no refresh for a defer that changed nothing, with no terminal and no --reason', async () => {
+    const recorded = recordingEpicRefresh();
+
+    const result = await run(['defer', '40', '--to=later'], { config: withProjectNumber(LOCAL_CONFIG), projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(writesOf(result.calls)).toEqual([]);
+    expect(recorded.calls()).toEqual([]);
+  });
+
+  it('writes the refresh\'s warning before the json result of a defer', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['defer', '40', '--to=later', '--reason=x', '--output=json'], {
+      config: withProjectNumber(LOCAL_CONFIG),
+      projectRefresh: recorded.refresh,
+    });
+    const events = eventsOf(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toHaveLength(1);
+    expect(events.map((event) => event.type).slice(-2)).toEqual(['log', 'result']);
+    expect(events.at(-2)).toMatchObject({ level: 'warn', message: 'a project warning' });
   });
 });

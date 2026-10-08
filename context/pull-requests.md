@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Seven actions read and control pull requests:
+Eight actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -26,6 +26,14 @@ Seven actions read and control pull requests:
 - `pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=2]` — assess
   it or resolve it when simple
 - `pr wait [<n>] [--timeout=<minutes>]` — poll its checks until they settle
+- `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`
+  — open one from a pushed head over `PullRequests.create`, or print the one
+  already open on the head and open none; a missing or empty body file and
+  a head equal to the base are refused
+- `pr retarget <n> --base=<branch>` — move one onto another base over
+  `PullRequests.editBase`, printing the line `retargetedLine` builds; `<n>`
+  is required here, never the branch's; one already on that base is a
+  no-op, exit 0
 
 `<n>` defaults to the open PR of the current branch. Every action carries a
 summary, examples and `outputs: [text, json]`; each one in the core roster
@@ -217,7 +225,10 @@ sentence replaces nothing.
    `board.relationships: native` step 5 ticks no epic checklist and this
    step prints the open issues the merge freed instead, read through the
    relationships port's `freedBy` over one native board listing, asking
-   nothing and writing nothing (`src/commands/pr/merge-freed.ts`).
+   nothing and writing nothing (`src/commands/pr/merge-freed.ts`). Then,
+   in both modes and with `board.project.number` set, refresh on the
+   project the issues this PR closes and the issues those were blocking
+   (`src/commands/pr/merge-project.ts`); its lines are warnings.
 7. Print the two follow-ups when they apply, under `Follow-ups:`:
    `rafa self-update`, then `rafa release settle` while the fragments
    waiting on `origin/<base>` fold into a version, so settle is the
@@ -429,9 +440,9 @@ rejected.
 ### Trust
 
 Text from the board ends up in an agent's prompt, so its source must be
-someone allowed to change the repo. SIX routes ask the question. Two are
+someone allowed to change the repo. SEVEN routes ask the question. Two are
 `src/commands/pr/triage-trust.ts`'s: the triage marker comment's author, and
-the pull request's author for `pr triage --resolve`. Three are
+the pull request's author for `pr triage --resolve`. Four are
 `requireTrustedBoardAuthor`'s — the board entry point in
 `src/board/trust.ts`, over a `BoardTrust` of the lookup, the allow-list and
 the repo label. Two of those are `plan create`'s: `src/board/plan-spec.ts`'s
@@ -464,6 +475,12 @@ trusted account wrote; the refused ones are reported by id and author
 through the gate's warnings and left alone, and the gaps go in a comment
 posted beside them. The trust is the one check 0 already built, carried on
 `GateIssue` beside the number and the board.
+
+The SEVENTH is `rafa issue edit <n>` (`src/commands/issue/issue-tracker.ts`),
+which amends the issue body in place. It gates on two ownership checks
+through `requireTrustedBoardAuthor`: who edits (the login `gh api user`
+answers) and whose issue (the issue's author). A lookup that fails refuses
+as `ownership-unknown`, exit 2, before the issue is written.
 
 One more reader calls `readAuthorTrust` and is no route, since it reads
 no board text: the Providers reading of `rafa doctor --deep`

@@ -69,6 +69,7 @@ import closeCommand, {
   readCloseLine,
   readEpicToClose,
 } from './close.js';
+import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-close-')));
@@ -251,11 +252,16 @@ interface CaseSetup {
   /** The project to run in; a fresh one when left out. */
   readonly project?: PlantedProject;
   readonly env?: Readonly<Record<string, string>>;
+  /** The project refresh; the system's own when left out. */
+  readonly projectRefresh?: EpicCloseSeams['projectRefresh'];
 }
 
-/** A fresh project whose public tracker is `local`. */
-function plantCase(): PlantedProject {
-  return plantProject(mkdtempSync(join(tempBase, 'case-')), 'tracker:\n  default: local\n');
+/** The config every case runs with but those opting into a project. */
+const LOCAL_CONFIG = 'tracker:\n  default: local\n';
+
+/** A fresh project whose public tracker is `local`, its config `config`. */
+function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
+  return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
 /** Dispatches `rafa epic close <words>` over every planted seam. */
@@ -279,6 +285,9 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
       return plantedStore();
     },
     resolve: () => Promise.resolve({ tracker: publicTracker.tracker, degraded: false, reason: null } as never),
+    ...setup.projectRefresh === undefined
+      ? {}
+      : { projectRefresh: setup.projectRefresh },
   };
   const commands: RafaCommand[] = [createEpicCloseCommand(seams)];
   const outcome = await dispatchInProject(['epic', 'close', ...words], [EPIC_SUBJECT], commands, project, setup.env);
@@ -607,5 +616,38 @@ describe('the declaration', () => {
     expect(closeCommand.spends).toEqual({ when: 'always', what: 'one verification planning session and one session per check' });
     expect(closeCommand.outputs).toEqual(['text', 'json']);
     expect(Object.isFrozen(closeCommand)).toBe(true);
+  });
+});
+
+describe('rafa epic close, and the project', () => {
+  it('refreshes the closed epic with its members and the shifted Ranks, its warning after the cost', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const outcome = await run(['40'], { project: plantCase(withProjectNumber(LOCAL_CONFIG)), projectRefresh: recorded.refresh });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([{ number: EPIC_PROJECT_NUMBER, issues: [40], widening: { membersOf: [40], shiftedRanks: true } }]);
+    expect(outcome.stdout).toEndWith(`${MEMBERSHIP_NOTE}\nwarn: a project warning\n`);
+  });
+
+  it('calls no refresh for the same close with board.project.number unset, the control of the case above', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const outcome = await run(['40'], { projectRefresh: recorded.refresh });
+
+    expect(outcome.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([]);
+    expect(outcome.stdout).toEndWith(`${MEMBERSHIP_NOTE}\n`);
+  });
+
+  it('calls no refresh for a close the gate refused or gh would not make', async () => {
+    const recorded = recordingEpicRefresh();
+    const config = withProjectNumber(LOCAL_CONFIG);
+
+    const open = await run(['41'], { project: plantCase(config), projectRefresh: recorded.refresh });
+    const refused = await run(['40'], { failClose: true, project: plantCase(config), projectRefresh: recorded.refresh });
+
+    expect([open.exitCode, refused.exitCode]).toEqual([EPIC_CLOSE_REFUSAL_EXIT, 1]);
+    expect(recorded.calls()).toEqual([]);
   });
 });

@@ -48,8 +48,12 @@
  *
  * Not recorded, since reading them would write to a repository: what
  * `gh issue create`, `gh issue comment`, `gh issue reopen`,
- * `gh label create` and a `gh api` PATCH write when they succeed, and
- * what they write when they fail. Those answers, and the rules that
+ * `gh issue edit`, `gh label create` and a `gh api` PATCH write when
+ * they succeed, and what they write when they fail, and whether
+ * `gh issue edit --body-file -` writes what it reads on stdin byte for
+ * byte. The fake writes it so, prints the issue URL on a successful
+ * edit, and fails an edit of an issue that does not exist as
+ * `gh issue view` fails for one. Those answers, and the rules that
  * `gh issue create` fails whole on a label that does not exist and that a
  * reopen clears the close reason, are the source's, and every message
  * this module makes up opens with `fake gh:`.
@@ -63,10 +67,17 @@
  * A `--repo` naming another repository than the fake's own is refused
  * the same way.
  *
+ * Stdin is read by `gh issue edit --body-file -` alone, the one command
+ * modelled to read it: a stdin handed to any other command is refused,
+ * and so is that edit handed none, which `gh` would read as an empty
+ * body. `--body-file` naming a file, `--body` beside `--body-file`, and
+ * an edit naming neither a title nor a body are refused too.
+ *
  * ## Recording
  *
  * {@link FakeGh.calls} answers every command handed over, refused ones
- * included, in order, each copied and frozen. {@link FakeGh.update}
+ * included, in order, each copied and frozen, and {@link FakeGh.inputs}
+ * the stdin each was handed, in the same order. {@link FakeGh.update}
  * replaces one issue, so a case can plant what a person could have
  * edited on GitHub.
  */
@@ -106,6 +117,8 @@ export interface FakeGh {
   readonly run: GhRunner;
   /** Every command handed to `run`, in order. */
   readonly calls: () => readonly (readonly string[])[];
+  /** The stdin each command in {@link calls} was handed, undefined for none, in the same order. */
+  readonly inputs: () => readonly (string | undefined)[];
   /** The issue under a number, as `externalId` names it. */
   readonly issue: (number: string) => FakeGhIssue | undefined;
   /** How many issues the repository holds. */
@@ -166,6 +179,7 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['issue list', { values: ['--state', '--json', '--limit', '--label', '--search', '--repo'], switches: [], positionals: 0 }],
   ['issue comment', { values: ['--body', '--repo'], switches: [], positionals: 1 }],
   ['issue reopen', { values: ['--repo'], switches: [], positionals: 1 }],
+  ['issue edit', { values: ['--title', '--body', '--body-file', '--repo'], switches: [], positionals: 1 }],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
 ]);
 
@@ -239,6 +253,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
   let issues: ReadonlyMap<string, FakeGhIssue> = new Map();
   let labels: ReadonlySet<string> = new Set(DEFAULT_LABELS);
   let calls: readonly (readonly string[])[] = [];
+  let inputs: readonly (string | undefined)[] = [];
 
   const urlOf = (number: number): string => `https://github.com/${repo ?? DEFAULT_REPO}/issues/${number}`;
 
@@ -287,7 +302,7 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
   const namedIssue = (number: string): FakeGhIssue | GhResult => issues.get(number)
     ?? failed(`GraphQL: Could not resolve to an issue or pull request with the number of ${number}. (repository.issue)\n`);
 
-  const handlers = new Map<string, (parsed: ParsedCommand) => GhResult>([
+  const handlers = new Map<string, (parsed: ParsedCommand, stdin: string | undefined) => GhResult>([
     ['auth status', () => (authOk
       ? ok(`github.com\n  Logged in to github.com account ${FAKE_LOGIN} (keyring)\n`)
       : failed(NOT_LOGGED_IN))],
@@ -367,6 +382,26 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       return ok(`${urlOf(issue.number)}#issuecomment-fake\n`);
     }],
 
+    ['issue edit', (parsed, stdin) => {
+      const refused = repoProblem(parsed);
+      if (refused !== null) return refused;
+      const title = flagValue(parsed, '--title');
+      const bodyFile = flagValue(parsed, '--body-file');
+      if (bodyFile !== undefined && bodyFile !== '-') return failed('fake gh: issue edit models --body-file - alone\n');
+      if (bodyFile !== undefined && flagValue(parsed, '--body') !== undefined) {
+        return failed('fake gh: issue edit models --body or --body-file, never both\n');
+      }
+      if (bodyFile !== undefined && stdin === undefined) return failed('fake gh: issue edit --body-file - was handed no stdin\n');
+      const body = bodyFile === undefined
+        ? flagValue(parsed, '--body')
+        : stdin;
+      if (title === undefined && body === undefined) return failed('fake gh: issue edit models --title or a body, and was handed neither\n');
+      const issue = namedIssue(parsed.positionals[0] ?? '');
+      if ('ok' in issue) return issue;
+      store({ ...issue, title: title ?? issue.title, body: body ?? issue.body });
+      return ok(`${urlOf(issue.number)}\n`);
+    }],
+
     ['issue reopen', (parsed) => {
       const refused = repoProblem(parsed);
       if (refused !== null) return refused;
@@ -419,21 +454,25 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
     }],
   ]);
 
-  const run: GhRunner = async (args) => {
+  const run: GhRunner = async (args, stdin) => {
     calls = [...calls, Object.freeze([...args])];
+    inputs = [...inputs, stdin];
     const key = commandKey(args);
     const shape = COMMANDS.get(key);
     const handle = handlers.get(key);
     if (shape === undefined || handle === undefined) return failed(`fake gh: unhandled command ${args.join(' ')}\n`);
     const parsed = parseCommand(key, shape, args.slice(key.split(' ').length));
-    return typeof parsed === 'string'
-      ? failed(`${parsed}\n`)
-      : handle(parsed);
+    if (typeof parsed === 'string') return failed(`${parsed}\n`);
+    if (stdin !== undefined && !(key === 'issue edit' && flagValue(parsed, '--body-file') === '-')) {
+      return failed(`fake gh: ${key} reads no stdin, and was handed some\n`);
+    }
+    return handle(parsed, stdin);
   };
 
   const fake: FakeGh = {
     run,
     calls: () => calls,
+    inputs: () => inputs,
     issue: (number) => issues.get(number),
     issueCount: () => issues.size,
     hasLabel: (name) => labels.has(name),

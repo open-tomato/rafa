@@ -63,6 +63,7 @@ import cancelCommand, {
   targetQuestion,
   unaskedCancelMessage,
 } from './cancel.js';
+import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-epic-cancel-')));
@@ -222,11 +223,18 @@ interface CaseSetup {
   readonly planted?: Planted;
   /** The answers typed, or null for no terminal. */
   readonly answers?: readonly (string | null)[] | null;
+  /** The project's config; {@link LOCAL_CONFIG} when left out. */
+  readonly config?: string;
+  /** The project refresh; the system's own when left out. */
+  readonly projectRefresh?: EpicCancelSeams['projectRefresh'];
 }
 
-/** A fresh project. */
-function plantCase(): PlantedProject {
-  return plantProject(mkdtempSync(join(tempBase, 'case-')), 'tracker:\n  default: local\n');
+/** The config every case runs with but those opting into a project. */
+const LOCAL_CONFIG = 'tracker:\n  default: local\n';
+
+/** A fresh project whose config is `config`. */
+function plantCase(config: string = LOCAL_CONFIG): PlantedProject {
+  return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
 /** Dispatches `rafa epic cancel <words>` over a planted `gh`, `git`, clock and terminal. */
@@ -241,9 +249,12 @@ async function run(words: readonly string[], setup: CaseSetup = {}) {
     isTerminal: () => answers !== null,
     openPrompter: prompter.open,
     now: () => new Date(2026, 8, 28, 12),
+    ...setup.projectRefresh === undefined
+      ? {}
+      : { projectRefresh: setup.projectRefresh },
   };
   const commands: RafaCommand[] = [createEpicCancelCommand(seams)];
-  const outcome = await dispatchInProject(['epic', 'cancel', ...words], [EPIC_SUBJECT], commands, plantCase());
+  const outcome = await dispatchInProject(['epic', 'cancel', ...words], [EPIC_SUBJECT], commands, plantCase(setup.config));
   return {
     ...outcome,
     calls: planted.calls,
@@ -384,7 +395,7 @@ describe('rafa epic cancel', () => {
     });
     const note58 = renderUnblockNote(DAY, 40, [14], ['#51']);
     const outcomes: DependentOutcome[] = [
-      { issue: 57, answer: { kind: 'moved', to: 50 } },
+      { issue: 57, answer: { kind: 'moved', from: 90, to: 50 } },
       { issue: 58, answer: { kind: 'unblocked' } },
       { issue: 59, answer: { kind: 'cancelled' } },
     ];
@@ -562,5 +573,64 @@ describe('the declaration', () => {
     expect(cancelCommand.spends).toBeUndefined();
     expect(cancelCommand.name).toBe('epic cancel');
     expect(Object.isFrozen(cancelCommand)).toBe(true);
+  });
+});
+
+describe('rafa epic cancel, and the project', () => {
+  /** The answers moving #57 to epic #50, unblocking #58 and cancelling #59. */
+  const ALL_THREE = ['m', '#50', 'u', 'c'];
+
+  it('refreshes the epic, the epics #57 left and joined, every dependent and the shifted Ranks, its warning last', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['40'], { answers: ALL_THREE, config: withProjectNumber(LOCAL_CONFIG), projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([{
+      number: EPIC_PROJECT_NUMBER,
+      issues: [40, 90, 50, 57, 58, 59],
+      widening: { membersOf: [40, 90, 50], shiftedRanks: true },
+    }]);
+    expect(result.stdout).toEndWith('Closed epic #40 as not planned.\nwarn: a project warning\n');
+  });
+
+  it('calls no refresh for the same cancel with board.project.number unset, the control of the case above', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['40'], { answers: ALL_THREE, projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(0);
+    expect(recorded.calls()).toEqual([]);
+    expect(result.stdout).toEndWith('Closed epic #40 as not planned.\n');
+  });
+
+  it('refreshes an epic nothing waits on, naming it alone', async () => {
+    const recorded = recordingEpicRefresh();
+
+    await run(['80'], { answers: null, config: withProjectNumber(LOCAL_CONFIG), projectRefresh: recorded.refresh });
+
+    expect(recorded.calls()).toEqual([{ number: EPIC_PROJECT_NUMBER, issues: [80], widening: { membersOf: [80], shiftedRanks: true } }]);
+  });
+
+  it('refreshes a cancel whose epic close failed and keeps its exit code 1', async () => {
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await run(['80'], { planted: { failClose: [80] }, config: withProjectNumber(LOCAL_CONFIG), projectRefresh: recorded.refresh });
+
+    expect(result.exitCode).toBe(1);
+    expect(recorded.calls()).toHaveLength(1);
+    expect(result.stdout).toEndWith('warn: a project warning\n');
+  });
+
+  it('calls no refresh for a cancel that changed nothing: no terminal with a dependent, or an input that ended', async () => {
+    const recorded = recordingEpicRefresh();
+    const config = withProjectNumber(LOCAL_CONFIG);
+
+    const unasked = await run(['40'], { answers: null, config, projectRefresh: recorded.refresh });
+    const ended = await run(['40'], { answers: ['c', 'u'], config, projectRefresh: recorded.refresh });
+
+    expect([unasked.exitCode, ended.exitCode]).toEqual([0, 0]);
+    expect(writesOf([...unasked.calls, ...ended.calls])).toEqual([]);
+    expect(recorded.calls()).toEqual([]);
   });
 });

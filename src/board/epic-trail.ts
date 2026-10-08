@@ -227,9 +227,13 @@ export function renderCloseComment(trail: CloseTrail): string {
   return lines.join('\n');
 }
 
-/** What a cancel did with one dependent: an issue in another epic one of this epic's open members blocked. */
+/**
+ * What a cancel did with one dependent: an issue in another epic one of
+ * this epic's open members blocked. A move names the epic it left as well
+ * as the one it joined; the comment names only the one it joined.
+ */
 export type DependentAnswer =
-  | { readonly kind: 'moved'; readonly to: number }
+  | { readonly kind: 'moved'; readonly from: number; readonly to: number }
   | { readonly kind: 'unblocked' }
   | { readonly kind: 'cancelled' };
 

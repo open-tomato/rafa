@@ -215,6 +215,7 @@ export type {
   TierSwitch,
 } from './config-sections.js';
 export {
+  BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
   CONFIG_VERSIONS,
@@ -383,6 +384,8 @@ function readLayer(
     prVersionCollision: read('prVersionCollision'),
     boardTrustedAuthors: read('boardTrustedAuthors'),
     boardRelationships: read('boardRelationships'),
+    boardProjectTemplate: read('boardProjectTemplate'),
+    boardProjectNumber: read('boardProjectNumber'),
     roadmapIssue: read('roadmapIssue'),
     claimsStaleAfter: read('claimsStaleAfter'),
     claimsAhead: read('claimsAhead'),

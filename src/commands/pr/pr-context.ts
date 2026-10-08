@@ -1,8 +1,9 @@
 /**
- * What `rafa pr current`, `show`, `view`, `list`, `merge`, `triage` and
- * `wait` share: the usage line each refuses with, the words and flags
- * each reads off its line, the provider check and its exit-2 refusal,
- * and which pull request an action acts on.
+ * What `rafa pr current`, `show`, `view`, `list`, `merge`, `triage`,
+ * `wait`, `open` and `retarget` share: the usage line each refuses
+ * with, the words and flags each reads off its line, the provider
+ * check and its exit-2 refusal, and which pull request an action acts
+ * on.
  *
  * ## The order an action does things in
  *
@@ -18,7 +19,7 @@
  * `resolvePrProvider` (`src/pr/provider.ts`) with the PROJECT ROOT as
  * the repository, and hands the reading to `requireGhProvider`, which
  * throws `CommandExit(2, PR_NEEDS_GH)` for anything but `gh`. The
- * message is a constant there, so every one of the seven refuses a
+ * message is a constant there, so every one of the nine refuses a
  * repository without a `gh` provider with the same words, whether the
  * config said `none` or `origin` is no GitHub remote.
  *
@@ -88,6 +89,7 @@
  * that cannot be read, a detached HEAD, a branch with no open pull
  * request, and a provider call that rejected.
  */
+import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { RafaContext } from '../../cli/command.js';
 import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
@@ -104,8 +106,8 @@ import { ConfigError } from '../../config.js';
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { mergeGuardSettings } from '../../release/guard-merge.js';
 
-/** One of the seven actions of the `pr` subject. */
-export type PrAction = 'current' | 'show' | 'view' | 'list' | 'merge' | 'triage' | 'wait';
+/** One of the nine actions of the `pr` subject. */
+export type PrAction = 'current' | 'show' | 'view' | 'list' | 'merge' | 'triage' | 'wait' | 'open' | 'retarget';
 
 /**
  * The usage line each action's refusals name.
@@ -124,6 +126,8 @@ export const PR_USAGE: Readonly<Record<PrAction, string>> = Object.freeze({
   merge: 'rafa pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]',
   triage: 'rafa pr triage [<n>] [--no-comment] [--resolve] [--max-attempts=<count>]',
   wait: 'rafa pr wait [<n>] [--timeout=<minutes>]',
+  open: 'rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>',
+  retarget: 'rafa pr retarget <n> --base=<branch>',
 });
 
 /** A pull request number as a line writes it: a whole number from 1. */
@@ -222,6 +226,8 @@ export interface PrContext {
   readonly readBranch: () => string;
   /** The `release` settings the release guard reads, with `pr.versionCollision` and `dangerous.acceptVersionCollision`. */
   readonly versionGuard: MergeGuardSettings;
+  /** The keys the project refresh after `pr merge` reads, `board.project.number` among them. */
+  readonly projectRefresh: RefreshConfig;
 }
 
 /** Where a picked pull request number came from. */
@@ -251,6 +257,7 @@ type PrConfig = Pick<
   | 'planDir'
   | 'loopWorktreeDir'
   | keyof MergeGuardSettings
+  | keyof RefreshConfig
 >;
 
 /** The project the dispatcher resolved, which it resolves for every action of the subject. */
@@ -314,6 +321,12 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     worktreeDir: config.loopWorktreeDir,
     readBranch: () => readBranch(project.root),
     versionGuard: mergeGuardSettings(config),
+    projectRefresh: {
+      boardProjectNumber: config.boardProjectNumber,
+      boardRelationships: config.boardRelationships,
+      roadmapIssue: config.roadmapIssue,
+      releaseFragments: config.releaseFragments,
+    },
   };
 }
 

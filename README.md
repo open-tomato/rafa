@@ -58,6 +58,8 @@ your accounts.
   | `rafa agent search` | 🪙 the same as `rafa skill search`, over agent definitions |
   | `rafa next` | 🪙 when the step it runs is one of the above; it asks before each step |
   | `rafa epic close` | 🪙 one verification planning session and one session per check; nothing while a member is open |
+  | `rafa stretch start` | 🪙 one session per operator it starts: the engineer, watchtower and analyst, or the one `--role` names; with `--dry-run`, nothing |
+  | `rafa stretch item` | 🪙 one planning session, unless a plan of the issue is there already, and the loop it starts; with `--dry-run`, nothing |
 
   The same 🪙 marks appear in `rafa --help` at all levels and in `rafa describe` output.
 
@@ -753,6 +755,19 @@ from GitHub Issues:
   from one mode to the other and remove the old marks. Read
   [docs/specs-and-roadmap.md](docs/specs-and-roadmap.md) under "Board
   relationships" for the full choice and upgrade path.
+- **GitHub project as a board mirror.** `rafa init --board --project` creates
+  a GitHub project in your repository, kept in step with your issues by rafa.
+  The project mirrors the issues' labels, pull requests, close state, and the
+  roadmap checklists: one column per issue (Backlog, Triage, Needs work, Ready,
+  Blocked, Claimed, In development, Waiting for approval, In review, Done,
+  Cancelled), a row per open issue and closed issue with a plan or in review.
+  Five fields track Status, Horizon, Rank, Blocked by and Progress; every
+  command that changes an issue's state refreshes its project row, and
+  `rafa board sync` repairs any drift made outside rafa. Optional per
+  repository: run `rafa init --board` without `--project` to skip the project,
+  or `rafa board sync` adds missing issues and refreshes every item on an
+  existing project. Read [context/board-project.md](context/board-project.md)
+  for the full design and the warnings.
 - **Other trackers.** GitHub Issues is what works today. Linear support
   is being ported from the project rafa grew out of, as an optional
   add-on in a later version. For anything else, open or upvote a request
@@ -831,10 +846,11 @@ creates the `.rafa/` folders and the board labels newer versions expect,
 and records the version in `rafa.lock` at the repository root, a small
 JSON file meant to be committed. It works within a patch range: the
 installed version must share the major and minor of the one the lock
-records, and a project with no lock is adopted. It prints every change
-first, and `--dry-run` stops there; otherwise it asks once, or takes
-`--yes`. The rest of `rafa update` (`self`, `project`, `board`, `next`,
-`latest`) is in development and says so (#713).
+records. Below 1.0.0 it also crosses newer minors, so a lock at 0.34.1
+moves to 0.36.0, and a project with no lock is adopted. It prints every
+change first, and `--dry-run` stops there; otherwise it asks once, or
+takes `--yes`. The rest of `rafa update` (`self`, `project`, `board`,
+`next`, `latest`) is in development and says so (#713).
 
 ## Runtime
 

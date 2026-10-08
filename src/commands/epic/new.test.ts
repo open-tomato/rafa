@@ -32,9 +32,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../../adapters/tracker/github.js';
 import { renderEpicBody } from '../../board/epic-template.js';
+import { createGhProjectPort } from '../../board/project/gh.js';
+import { createFakeProjectGh, fakeProjectId } from '../../board/project/project-fake.js';
 import { writePositionFile } from '../../project/position.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
+import { EPIC_PROJECT_NUMBER, recordingEpicRefresh, withProjectNumber } from './epic-project-fake.js';
 import {
   createEpicNewCommand,
   DEFAULT_HORIZON,
@@ -436,5 +439,73 @@ describe('rafa epic new', () => {
       board: 31,
       line: { issue: 31, status: 'edited', attempts: 1, problem: '' },
     });
+  });
+});
+
+describe('rafa epic new, and the project', () => {
+  /** The repository `gh repo view` answers, which holds the new epic. */
+  const REPOSITORY = 'acme/app';
+
+  /** The planted `gh`, with `gh repo view` and `gh api graphql` routed to a project fake holding the new epic. */
+  function projectRouted(planted: PlantedGh = plantedGh()): { readonly gh: GhRunner; readonly project: ReturnType<typeof createFakeProjectGh>; readonly graphql: () => number } {
+    const project = createFakeProjectGh({
+      projects: [{ owner: 'acme', number: EPIC_PROJECT_NUMBER }],
+      repositories: [{ nameWithOwner: REPOSITORY, issues: [CREATED] }],
+    });
+    let graphql = 0;
+    const gh: GhRunner = (args) => {
+      if (args.join(' ') === 'repo view --json nameWithOwner') {
+        return Promise.resolve({ ok: true, stdout: JSON.stringify({ nameWithOwner: REPOSITORY }), stderr: '' } satisfies GhResult);
+      }
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        graphql += 1;
+        return project.gh(args);
+      }
+      return planted.gh(args);
+    };
+    return { gh, project, graphql: () => graphql };
+  }
+
+  /** Dispatches `rafa epic new <words>` over `gh` and `refresh` in a project whose config is `config`. */
+  async function runWith(words: readonly string[], gh: GhRunner, refresh: ReturnType<typeof recordingEpicRefresh>, config: string) {
+    const project = plantProject(mkdtempSync(join(tempBase, 'case-')), config);
+    const command = createEpicNewCommand({ gh, projectRefresh: refresh.refresh });
+    return dispatchInProject(['epic', 'new', ...words], [EPIC_SUBJECT], [command], project);
+  }
+
+  it('adds the new epic to the project, then refreshes it with its members and the shifted Ranks, its warning last', async () => {
+    const routed = projectRouted();
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await runWith(['Auth', '--slug=auth'], routed.gh, recorded, withProjectNumber('tracker:\n  default: local\n'));
+    const items = await createGhProjectPort(routed.project.gh).items(fakeProjectId({ owner: 'acme', number: EPIC_PROJECT_NUMBER }));
+
+    expect(result.exitCode).toBe(0);
+    expect(items.map(({ content }) => content)).toEqual([{ kind: 'issue', repository: REPOSITORY, number: CREATED }]);
+    expect(recorded.calls()).toEqual([{ number: EPIC_PROJECT_NUMBER, issues: [CREATED], widening: { membersOf: [CREATED], shiftedRanks: true } }]);
+    expect(result.stdout).toEndWith(`${CREATED_URL}\nwarn: a project warning\n`);
+  });
+
+  it('adds nothing and calls no refresh with board.project.number unset, the control of the case above', async () => {
+    const routed = projectRouted();
+    const recorded = recordingEpicRefresh(['a project warning']);
+
+    const result = await runWith(['Auth', '--slug=auth'], routed.gh, recorded, 'tracker:\n  default: local\n');
+
+    expect(result.exitCode).toBe(0);
+    expect(routed.graphql()).toBe(0);
+    expect(recorded.calls()).toEqual([]);
+    expect(result.stdout).toEndWith(`${CREATED_URL}\n`);
+  });
+
+  it('adds nothing and calls no refresh for a board line that did not land, keeping exit code 1', async () => {
+    const routed = projectRouted(plantedGh({ failWrite: true }));
+    const recorded = recordingEpicRefresh();
+
+    const result = await runWith(['Auth', '--slug=auth'], routed.gh, recorded, withProjectNumber('tracker:\n  default: local\n'));
+
+    expect(result.exitCode).toBe(1);
+    expect(routed.graphql()).toBe(0);
+    expect(recorded.calls()).toEqual([]);
   });
 });

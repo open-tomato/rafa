@@ -26,6 +26,7 @@
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { GitRunner } from '../pr/index.js';
 
@@ -51,6 +52,9 @@ const BRANCH = `feat/${STUB}`;
 const PLAN = `/project/.rafa/plans/PLAN-${STUB}.md`;
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
+
+/** The project refresh's keys, no project set: a label write sends no refresh. */
+const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-preflight-claim-')));
 
@@ -450,8 +454,8 @@ describe('createStartPreflightClaim', () => {
   it('holds no board under pr.provider: none and reads the store id under the configured store; gh holds one', () => {
     const root = realpathSync(mkdtempSync(join(scope, 'factory-')));
 
-    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson' });
-    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson' });
+    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson', ...NO_PROJECT });
+    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson', ...NO_PROJECT });
     const storeId = none.readStoreId();
 
     expect(none.board).toBeNull();

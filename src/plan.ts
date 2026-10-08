@@ -605,6 +605,7 @@ export default async function plan(
       trustedAuthors: boardTrustedAuthors,
       relationships: boardRelationships,
       passOver,
+      projectConfig: config,
     }),
     prepare: async (spec) => {
       const stub = argValue(args, '--stub') ?? stubFromSpecPath(path.resolve(repoRoot, spec.path));

@@ -186,6 +186,39 @@ describe('the recorded gh fake', () => {
     expect(fake.issue('1')).toMatchObject({ state: 'OPEN', stateReason: '' });
   });
 
+  it('edits a title and a body read from stdin through --body-file -, recording the stdin', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug'));
+
+    expect(await fake.run(['issue', 'edit', '1', '--title', 'Edited', '--body-file', '-'], 'new\n\nbody\n'))
+      .toEqual({ ok: true, stdout: 'https://github.com/open-tomato/rafa/issues/1\n', stderr: '' });
+    expect(fake.issue('1')).toMatchObject({ title: 'Edited', body: 'new\n\nbody\n', labels: ['bug'] });
+    expect(await fake.run(['issue', 'edit', '1', '--title', 'Again'])).toMatchObject({ ok: true });
+    expect(fake.issue('1')).toMatchObject({ title: 'Again', body: 'new\n\nbody\n' });
+    expect(fake.inputs()).toEqual([undefined, 'new\n\nbody\n', undefined]);
+  });
+
+  it.each([
+    [['issue', 'edit', '1', '--body-file', '-'], undefined, 'fake gh: issue edit --body-file - was handed no stdin\n'],
+    [['issue', 'edit', '1', '--body-file', 'body.md'], undefined, 'fake gh: issue edit models --body-file - alone\n'],
+    [['issue', 'edit', '1', '--body', 'b', '--body-file', '-'], 'b', 'fake gh: issue edit models --body or --body-file, never both\n'],
+    [['issue', 'edit', '1'], undefined, 'fake gh: issue edit models --title or a body, and was handed neither\n'],
+    [['issue', 'edit', '1', '--body', 'b'], 'b', 'fake gh: issue edit reads no stdin, and was handed some\n'],
+    [['issue', 'comment', '1', '--body', 'b'], 'b', 'fake gh: issue comment reads no stdin, and was handed some\n'],
+  ])('refuses the edit %p handed stdin %p, editing nothing', async (args, stdin, stderr) => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug'));
+
+    expect(await fake.run(args, stdin)).toEqual(failure(stderr));
+    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', comments: [] });
+  });
+
+  it('fails an edit of an issue it does not hold as a view of one fails', async () => {
+    expect(await createFakeGh().run(['issue', 'edit', '7', '--title', 't'])).toEqual(failure(
+      'GraphQL: Could not resolve to an issue or pull request with the number of 7. (repository.issue)\n',
+    ));
+  });
+
   it('replaces an issue through update, keeping its number, and throws for one it does not hold', async () => {
     const fake = createFakeGh();
     await fake.run(issueCreate('t', 'bug'));

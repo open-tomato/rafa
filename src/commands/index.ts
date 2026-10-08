@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the eighty-seven registered so far wrap a
+ * of each is its command. Four of the ninety-six registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -23,16 +23,18 @@
  * `loop/loop-sessions.ts`, `wait` following the run's events file through
  * `src/loop/events-file.ts` too, nor `init`, which sets up a project through
  * `src/project/`, nor `doctor`, which checks the preflight through
- * `src/preflight/` and starts no run, nor the eight `issue` actions,
- * five of which act on the tracker the chain resolves while `ready` and
+ * `src/preflight/` and starts no run, nor the nine `issue` actions,
+ * six of which act on the tracker the chain resolves while `ready` and
  * `unblock` read and label issues on the GitHub board and `check` reads
- * the references of a spec's saved copy, all eight sharing
+ * the references of a spec's saved copy, all nine sharing
  * `issue/issue-tracker.ts`, nor `roadmap`, which runs `issue list`'s own
  * run with `--roadmap` set, nor `switch`,
  * which moves the checkout's place through `src/board/place.ts` and
  * `src/project/position.ts`, nor `board list`, which lists the open
  * boards off the same listing through `src/board/board-body.ts` and
- * `src/board/owner-resolve.ts`, nor `self-update`, which installs the
+ * `src/board/owner-resolve.ts`, nor `board sync`, which brings the
+ * repository's GitHub project in step through
+ * `src/board/project/sync.ts`, nor `self-update`, which installs the
  * checkout through `src/runtime/install.ts`, nor `module list` and
  * `module exec`, which read the modules `src/modules/load.ts` loads and
  * the mounts the dispatcher made, nor `agent vendor`, which copies agent
@@ -53,9 +55,9 @@
  * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
- * the seven `pr` actions, which read, wait on, merge and triage one
- * repository's pull requests through the PullRequests port and share
- * `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * the nine `pr` actions, which read, open, retarget, wait on, merge and
+ * triage one repository's pull requests through the PullRequests port
+ * and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s readers, nor
  * `release settle`, which folds the waiting fragments in a scratch
@@ -82,7 +84,14 @@
  * nor the four `claim` actions, `release`, `hand`, `accept` and `take`,
  * which read an issue's claim branches and push one ownership commit on
  * them through `src/claims/git.ts` and share `claim/release.ts`'s
- * readers.
+ * readers, nor `config set`, which edits the project's config text
+ * through `src/config-set.ts`, nor `ci status`, which reads a branch's
+ * newest run through the readers under `src/ci/`, nor `stretch start`,
+ * which opens a stretch through the readings of `src/stretch/`, nor
+ * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
+ * and `pr merge` as child processes, nor `stretch end`, which opens its
+ * pull request through `pr open`'s `openPull` and puts `pr.base` back
+ * through `src/config-set.ts`.
  *
  * ## What is registered
  *
@@ -119,6 +128,9 @@
  *   - `issue check <n> [--stamp]`, the references issue `<n>`'s saved
  *     copy names, each with its state, re-stamped under `--stamp`; it
  *     exits 0 whatever the states are and plans nothing.
+ *   - `issue edit <n>`, a dated update appended to one issue's body, or
+ *     its body or title replaced, on the tracker the chain resolves,
+ *     after four gates refusing with exit code 2; it never re-plans.
  *   - `pr current`, the open pull request of the branch checked out at the
  *     project root on one line; `pr show [<n>]`, that pull request in full
  *     with its checks and its last triage; `pr view [<n>]`, it opened in
@@ -127,7 +139,12 @@
  *     they settle or the deadline passes with nothing written, exiting 0
  *     green, 1 red and on no checks at all, and 3 at the deadline; and
  *     `pr merge [<n>] [--yes] [--skip-checks] [--method=squash|merge|rebase]`,
- *     one merged and both branches cleaned up after it; and
+ *     one merged and both branches cleaned up after it;
+ *     `pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`,
+ *     one opened from a pushed head, or the one already open on the head
+ *     printed and none opened;
+ *     `pr retarget <n> --base=<branch>`, one moved onto another base, or
+ *     none sent when it is already on it; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each
@@ -219,6 +236,11 @@
  *     title, its owner with `(unresolved)` or `(unknown)` when GitHub
  *     did not confirm it, its epic count, and `current` and `home` on
  *     the boards this checkout's position holds; writing nothing.
+ *   - `board sync [--dry-run]`, every item of the repository's GitHub
+ *     project refreshed and every open issue missing from it added, one
+ *     line per change and per issue added, then a closing count;
+ *     `--dry-run` writing nothing, exit code 1 with no
+ *     `board.project.number` and 2 for a sync that could not finish.
  *   - `status`, top-level: where the project stands in six sections,
  *     branch and plan, loops, pull request, board, claims and housekeeping, a
  *     section that cannot be read one warning; exit code 1 only for a
@@ -287,6 +309,46 @@
  *     root (#714). `update self`, `project`, `board`, `next` and `latest`,
  *     with `rafa` and `port` as hidden spellings of `project`, are stubs
  *     refusing with exit code 1 and naming their issue (#713).
+ *   - `config set <key>=<value>`: one setting written into the project's
+ *     `.rafa/config.yaml` by its dotted key, the text edited with every
+ *     comment kept and read back before it is written, and the key's old
+ *     and new values printed; exit code 1, with nothing written, for an
+ *     argument that is not `<key>=<value>` and for each refusal of
+ *     `src/config-set.ts`. It starts no session.
+ *   - `ci status --branch=<branch> [--workflow=<name>]`: the newest run
+ *     on a branch, its state, its short commit and, when it is red, the
+ *     bun cases it failed by file and case; exit code 0 green, 1 red, 2
+ *     no run, 3 running, 4 for a refusal or a `gh` failure. It starts no
+ *     session.
+ *   - `stretch start [--n=<n>] [--remote-control] [--role=<role>]
+ *     [--dry-run]`: a stretch opened, refused while another of the
+ *     project is live or a loop of it runs: `stretch/<n>` pushed from the
+ *     default branch, the `pr.base` found recorded in
+ *     `.rafa/stretch/<n>/stretch.json` and `pr.base` set to the branch,
+ *     the operators copied from the installed package once with the
+ *     version printed, and the three operators opened in one tmux
+ *     session, or the engineer in this terminal without tmux; `--role`
+ *     starts that one session here. It spends unless `--dry-run`.
+ *   - `stretch item <issue> [--wait] [--dry-run]`: one item of the
+ *     stretch `pr.base` names planned with `plan create --issue`, a plan
+ *     of the issue already there kept, and its loop started detached
+ *     with `--as-worktree --no-ci-wait`, its events output appended to
+ *     `.rafa/stretch/<n>/loop-<issue>.log`; `--wait` then runs
+ *     `loop wait` on its session and, once the loop has a pull request,
+ *     merges it with `pr merge --skip-checks --yes` into a `stretch/*`
+ *     base only, waits for the run on the merge commit, appends the
+ *     item to `.rafa/stretch/<n>/items.ndjson` and prints the pit-stop
+ *     readings (`./stretch/item-merge.ts`). Refused with exit code 1
+ *     when `pr.base` names no `stretch/<n>` branch. It spends unless
+ *     `--dry-run`.
+ *   - `stretch end [--dry-run]`: the stretch `pr.base` names opened from
+ *     `stretch/<n>` into the default branch through the `pr open` logic,
+ *     its body `.rafa/stretch/<n>/report.md` with every ledger item's
+ *     `Closes` lines appended; once that pull request has merged, a
+ *     later run puts back the `pr.base` recorded in `stretch.json`
+ *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
+ *     names no `stretch/<n>` branch or there is no `report.md`. It
+ *     starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -312,7 +374,7 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the thirteen with an action registered: a subject with
+ * The subjects are the seventeen with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -327,11 +389,14 @@ import agentSearch from './agent/search.js';
 import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import boardList from './board/list.js';
+import boardSync from './board/sync.js';
+import ciStatus from './ci/status.js';
 import claimAccept from './claim/accept.js';
 import claimHand from './claim/hand.js';
 import claimRelease from './claim/release.js';
 import claimTake from './claim/take.js';
 import cleanup from './cleanup.js';
+import configSet from './config/set.js';
 import describe from './describe.js';
 import doctor from './doctor.js';
 import effortCollect from './effort/collect.js';
@@ -360,6 +425,7 @@ import instinctShow from './instinct/show.js';
 import issueCheck from './issue/check.js';
 import issueComment from './issue/comment.js';
 import issueCreate from './issue/create.js';
+import issueEdit from './issue/edit.js';
 import issueList from './issue/list.js';
 import issueMove from './issue/move.js';
 import issueReady from './issue/ready.js';
@@ -384,6 +450,8 @@ import planValidate from './plan/validate.js';
 import prCurrent from './pr/current.js';
 import prList from './pr/list.js';
 import prMerge from './pr/merge.js';
+import prOpen from './pr/open.js';
+import prRetarget from './pr/retarget.js';
 import prShow from './pr/show.js';
 import prTriage from './pr/triage.js';
 import prView from './pr/view.js';
@@ -400,6 +468,9 @@ import skillList from './skill/list.js';
 import skillSearch from './skill/search.js';
 import skillShow from './skill/show.js';
 import status from './status.js';
+import stretchEnd from './stretch/end.js';
+import stretchItem from './stretch/item.js';
+import stretchStart from './stretch/start.js';
 import switchCommand from './switch.js';
 import updateBoard from './update/board.js';
 import updateCurrent from './update/current.js';
@@ -414,18 +485,21 @@ import updateSelf from './update/self.js';
 export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'plan', summary: 'create plans from specs; list, show and validate them; read their risk and needs' },
   { name: 'loop', summary: 'start a plan; stop, pause, resume, show and list its sessions' },
-  { name: 'issue', summary: 'the tracker: list, show, create, comment on and move issues; mark one ready, unblock it and check its references' },
-  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; list, wait on, merge and triage them' },
+  { name: 'issue', summary: 'the tracker: list, show, create, edit, comment on and move issues; mark one ready, unblock it and check its references' },
+  { name: 'pr', summary: 'the pull request of a branch: one line, in full or in the browser; open, list, wait on, merge and triage them' },
   { name: 'effort', summary: 'collect session and commit rows; report per plan; read and repair the store: its schema, a copy for testing, migrations, and fixes; merge or import another device\'s store; move an NDJSON store to SQLite' },
   { name: 'module', summary: 'list the configured modules; run an action a module provides' },
   { name: 'agent', summary: 'copy an agent definition into the project; list what a session sees' },
   { name: 'skill', summary: 'check a skills directory; list each tier; demote and backfill it' },
   { name: 'instinct', summary: 'check an instincts directory; list, show, flag and promote its records' },
   { name: 'release', summary: 'read the release state of the project; settle the waiting fragments into a version; tag the commit that set it' },
-  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home' },
+  { name: 'board', summary: 'list the boards with their owner, epic count, and which is current and home; sync the GitHub project' },
   { name: 'epic', summary: 'show one epic\'s issues as the Roadmap table; create an epic; defer or promote it; move an issue to it; close it through the gate or cancel it' },
   { name: 'claim', summary: 'give up this device\'s claim on an issue; hand it to another store or withdraw the offer; accept a handover; take over a stale claim' },
   { name: 'update', summary: 'bring this project to the installed rafa; the other updates are in development' },
+  { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
+  { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
+  { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
 ]);
 
 /** The core commands, in roster order. */
@@ -451,9 +525,12 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   issueReady,
   issueUnblock,
   issueCheck,
+  issueEdit,
   prCurrent,
   prShow,
   prView,
+  prOpen,
+  prRetarget,
   prList,
   prWait,
   prMerge,
@@ -489,6 +566,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   releaseSettle,
   releaseTag,
   boardList,
+  boardSync,
   epicShow,
   epicNew,
   epicDefer,
@@ -508,6 +586,11 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   updateBoard,
   updateNext,
   updateLatest,
+  configSet,
+  ciStatus,
+  stretchStart,
+  stretchItem,
+  stretchEnd,
   status,
   next,
   roadmap,

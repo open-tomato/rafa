@@ -150,6 +150,7 @@ import { SPEC_NEEDS_WORK_LABEL } from '../../board/gate.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { boardRepoLabel, issueSource } from '../../board/plan-spec.js';
+import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import {
   hasSpecReadyLabel,
   READINESS_REFUSAL_EXIT,
@@ -459,7 +460,9 @@ export function lazyPrompter(open: () => Prompter): { ask: ReadyAsk; close: () =
  * Runs the marking a line asks for: the line, the project's
  * `board.trustedAuthors`, the repository label off `origin`, and the
  * question through the prompter when there is a terminal and the line
- * did not type `--yes`.
+ * did not type `--yes`. Its board refreshes the issue it labels on the
+ * project (`../../board/project/issue-board-refresh.ts`), each line the
+ * refresh answers written at `warn`.
  */
 export async function markIssueReady(context: RafaContext, seams: ReadySeams): Promise<ReadyReport> {
   const issue = readReadyIssue(context);
@@ -485,6 +488,9 @@ export async function markIssueReady(context: RafaContext, seams: ReadySeams): P
       gh,
       issue,
       trust,
+      board: createRefreshingGhIssueBoard({ gh, config, warn: (line) => {
+        context.output.warn(line);
+      } }),
       relationships: config.boardRelationships,
       yes,
       ask: isTerminal()
