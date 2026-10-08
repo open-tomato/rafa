@@ -37,6 +37,11 @@
  *     pause for usage, a store the progress render cannot open, and
  *     anything thrown. A stopped record keeps the task it stopped at.
  *
+ * Under `--continue`, {@link RunSession.decisionsChanged} writes the
+ * run's pass-over list (`./pass-over.ts`) each time it changes, and
+ * {@link readPreviousPassOver} reads back the list the plan's newest
+ * stopped run saved, so the next `--continue` run starts from it.
+ *
  * The open writes no phase, so a record no change has reached yet reads
  * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
  * `--no-ci-wait` runs no gate, and its record ends in `wrap-up`. The end
@@ -104,11 +109,13 @@
  * A run that is let through prints nothing here but the hop record's
  * warning above.
  */
+import type { PassOverList } from './pass-over.js';
 import type {
   PidProbe,
   SessionChange,
   SessionConflict,
   SessionDraft,
+  SessionReadSeams,
 } from '../loop/sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -122,8 +129,11 @@ import { messageOf } from '../config-sections.js';
 import {
   beginSession,
   errorCode,
+  readSessions,
   runsDir,
+  samePlan,
   SessionConflictError,
+  sessionDecisions,
   sessionFilePath,
   SessionRecordError,
   updateSession,
@@ -178,6 +188,8 @@ export interface RunSession {
   ciStarted(): void;
   /** Writes phase `repair`, as a repair session for the pull request is spawned. */
   repairStarted(): void;
+  /** Writes the run's pass-over list, replacing the stored one; an empty list drops the key. */
+  decisionsChanged(list: PassOverList): void;
   /** Notes that the run reached its end, so {@link RunSession.end} writes `done`. */
   finished(): void;
   /** Writes `done` after {@link RunSession.finished}, and `stopped` otherwise. */
@@ -267,6 +279,7 @@ function sessionHandle(repoRoot: string, sessionId: string): RunSession {
     pullRequestStarted: () => change('the pull-request phase', { phase: 'pull-request' }),
     ciStarted: () => change('the ci phase', { phase: 'ci' }),
     repairStarted: () => change('the repair phase', { phase: 'repair' }),
+    decisionsChanged: (list: PassOverList) => change('the pass-over list', { decisions: list }),
     finished: () => {
       reachedEnd = true;
     },
@@ -343,4 +356,35 @@ export function openRunSession(options: RunSessionOptions): RunSession {
     throw new CommandExit(1, refusal);
   }
   return sessionHandle(repoRoot, draft.sessionId);
+}
+
+/** The plan {@link readPreviousPassOver} reads a list for. */
+export interface PassOverPlan {
+  /** The plan's path, as `start()` resolved it. */
+  readonly planPath: string;
+  /** The plan's stub, or null for a plan whose file name carries none. */
+  readonly planStub: string | null;
+}
+
+/**
+ * The pass-over list the plan's newest stopped run saved on its record,
+ * or none: none for a plan with no stopped run, and none when that run
+ * saved no list, whatever an older run saved. A record stored `running`
+ * or `paused` whose pid is gone reads as stopped (`readState`).
+ *
+ * @throws SessionRecordError when a record under `.rafa/runs/` cannot
+ *   be read, as `readSessions` does.
+ */
+export function readPreviousPassOver(
+  repoRoot: string,
+  plan: PassOverPlan,
+  seams: SessionReadSeams = {},
+): PassOverList {
+  const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
+  const stopped = readSessions(repoRoot, seams)
+    .filter((record) => record.state === 'stopped' && samePlan(record, wanted));
+  const newest = stopped.at(-1);
+  return newest === undefined
+    ? []
+    : sessionDecisions(newest);
 }
