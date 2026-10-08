@@ -220,6 +220,19 @@ function taskInfoOf(capture: string, lineNum: number, status: TaskInfo['status']
     : { task: text, lineNum, status, blocker };
 }
 
+/** What {@link findNextTask} may be told besides the tracker. */
+export interface FindNextTaskOptions {
+  /**
+   * Zero-based lines never answered, blocked or unchecked: the tasks a
+   * `--continue` run passes over (`start/pass-over.ts`). The tracker is
+   * not written; a line holding no open task is ignored.
+   */
+  readonly skipLines?: ReadonlySet<number>;
+}
+
+/** No line skipped. */
+const NO_LINES: ReadonlySet<number> = new Set();
+
 /**
  * Finds the next task to execute in a tracker file.
  *
@@ -269,26 +282,47 @@ function taskInfoOf(capture: string, lineNum: number, status: TaskInfo['status']
  * be dispatched at the loop's defaults with the comment quoted in its
  * prompt, its log line and its commit. The comment comes off an
  * unchecked line too, one an operator unblocked by hand.
+ *
+ * ## Lines a run passes over
+ *
+ * {@link FindNextTaskOptions.skipLines} names lines never answered,
+ * whatever their status, so a `--continue` run can go on past a task it
+ * jumped or deferred while the tracker keeps its `[BLOCKED]` line.
  */
-export function findNextTask(trackerContent: string): TaskInfo | null {
+export function findNextTask(
+  trackerContent: string,
+  options: FindNextTaskOptions = {},
+): TaskInfo | null {
+  const skip = options.skipLines ?? NO_LINES;
+  const open = listOpenTasks(trackerContent).filter((task) => !skip.has(task.lineNum));
+  return open.find((task) => task.status === 'blocked')
+    ?? open.find((task) => task.status === 'unchecked')
+    ?? null;
+}
+
+/**
+ * Every open task of a tracker, blocked or unchecked, in tracker order,
+ * read by the rules {@link findNextTask} answers one by: only a line
+ * opening `- [ ] ` or `- [BLOCKED] ` counts, never one inside a closed
+ * `rafa:*` block, and a blocker comment comes off the text.
+ */
+export function listOpenTasks(trackerContent: string): TaskInfo[] {
   const lines = trackerContent.split('\n');
   const inBlock = closedBlockLines(trackerContent);
+  const open: TaskInfo[] = [];
 
-  // Prefer resuming a blocked task first
   for (let i = 0; i < lines.length; i++) {
     if (inBlock.has(i)) continue;
-    const match = lines[i]!.match(/^- \[BLOCKED\] (.+)/);
-    if (match?.[1]) return taskInfoOf(match[1], i, 'blocked');
+    const blocked = lines[i]!.match(/^- \[BLOCKED\] (.+)/);
+    if (blocked?.[1]) {
+      open.push(taskInfoOf(blocked[1], i, 'blocked'));
+      continue;
+    }
+    const unchecked = lines[i]!.match(/^- \[ \] (.+)/);
+    if (unchecked?.[1]) open.push(taskInfoOf(unchecked[1], i, 'unchecked'));
   }
 
-  // Otherwise find the next unchecked task
-  for (let i = 0; i < lines.length; i++) {
-    if (inBlock.has(i)) continue;
-    const match = lines[i]!.match(/^- \[ \] (.+)/);
-    if (match?.[1]) return taskInfoOf(match[1], i, 'unchecked');
-  }
-
-  return null;
+  return open;
 }
 
 /**
