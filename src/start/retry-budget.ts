@@ -18,7 +18,8 @@
  * a refusal writes nothing and `start()` halts as it did before. A run
  * SIGINT has interrupted is refused at once and spends nothing. So is a
  * run whose checkout has moved from the loop's last commit, read only
- * once a retry is left: a session that committed and then exited
+ * once a retry is left, which writes one warning line ({@link movedLine})
+ * and no event: a session that committed and then exited
  * nonzero leaves HEAD past an expectation only the loop's own commits
  * advance, and a retry would halt at the loop guard of the next pass,
  * blocking the task on `checkout moved` in place of its own stop.
@@ -99,6 +100,15 @@ export function retryLine(grant: GrantedRetry, reason: string): string {
     + ' The loop goes on without a new rafa loop start.';
 }
 
+/**
+ * The warning a retry refused for a moved checkout writes: that no retry
+ * is taken after the stop, and why.
+ */
+export function movedLine(reason: string): string {
+  return `⚠️  No retry after the stop: ${reason}. The checkout has moved from the loop's last commit,`
+    + ' so the task keeps its own stop.';
+}
+
 /** What {@link createRunRetries} needs: the run's count, its SIGINT flag and its checkout's reading. */
 export interface RunRetriesOptions {
   /** The retries the run makes, as {@link resolveRunRetries} answers them. */
@@ -147,7 +157,10 @@ export function createRunRetries(options: RunRetriesOptions): RunRetries {
     if (options.isInterrupted()) return refuse('interrupted');
     const grant = takeRetry(budget);
     if (!grant.granted) return refuse('spent');
-    if (!options.isCheckoutHeld()) return refuse('checkout moved');
+    if (!options.isCheckoutHeld()) {
+      activeOutput().warn(movedLine(reason));
+      return refuse('checkout moved');
+    }
     budget = grant.budget;
     refusal = null;
     activeOutput().warn(retryLine(grant, reason));

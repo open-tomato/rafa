@@ -584,8 +584,10 @@ describe('a loop start run whose session fails', () => {
       `step:${TASK}`,
       `info:\n🔄 Executing task: ${TASK}`,
       ...SESSION_LINES,
-      failure,
+      // The failure line asks for another run, so it is written once the
+      // attempt is stored and no retry or decision goes on.
       expect.stringMatching(NO_REPORT_WARNING),
+      failure,
       'result',
     ]);
     expect(readFileSync(join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`), 'utf8'))

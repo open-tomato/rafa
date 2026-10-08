@@ -310,8 +310,10 @@
  * a report nor a commit; each retry writes a warning and a `retry`
  * event (`start/retry-budget.ts`), and no `task-blocked` event, which
  * a task stop emits only once no retry is granted, so the run really
- * stops. The attempt's report is stored either way. A checkout moved
- * from the loop's last commit refuses the retry, spending none: the
+ * stops. The attempt's report is stored either way, and a session that
+ * exited nonzero says to run again only once the run stops. A checkout
+ * moved from the loop's last commit refuses the retry with one warning
+ * line, spending none: the
  * next pass's loop guard would halt on it and block the task on
  * `checkout moved` in place of its own stop.
  *
@@ -811,15 +813,16 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
       if (exitCode !== 0) {
         updateTrackerLine(trackerPath, taskInfo.lineNum, 'blocked');
-        activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         // Stored on every attempt, retried or not. The retry is asked
         // after the store, so an interrupt during it refuses the retry,
         // and nothing is awaited between a grant and the loop's top.
-        // `task-blocked` is the stop's alone: a retried one emits `retry`.
+        // `task-blocked` and the line asking for another run are the
+        // stop's alone: a retried one emits `retry` and its own line.
         await storeReport('failed');
         const failed = { kind: 'task-blocked', position, reason: `session exited ${exitCode}` } as const;
         if (retries.retry(`session exited ${exitCode}`)) continue;
         if (await decisions.atStop({ kind: 'session-exit', taskInfo, exitCode, stopEvent: failed })) continue;
+        activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         emitLoopEvent(failed);
         return;
       }

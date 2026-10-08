@@ -461,7 +461,11 @@ describe('where start.ts retries a stop', () => {
       + '        const failed = { kind: \'task-blocked\', position, reason: `session exited ${exitCode}` } as const;\n'
       + '        if (retries.retry(`session exited ${exitCode}`)) continue;\n'
       + '        if (await decisions.atStop({ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed })) continue;\n'
+      + '        activeOutput().error(`\\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);\n'
       + '        emitLoopEvent(failed);\n        return;\n');
+    // The line telling the operator to run again is printed only once the
+    // run really stops: never ahead of a retry or a decision that goes on.
+    expect(START.match(/Run again to retry\./g)).toHaveLength(1);
     expect(START).toContain('        const held = { kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' } as const;\n'
       + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\')) continue;\n'
       + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, finished, stopEvent: held })) continue;\n'

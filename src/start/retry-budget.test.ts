@@ -27,6 +27,7 @@ import {
   createRunRetries,
   openRetryBudget,
   resolveRunRetries,
+  movedLine,
   retryLine,
   takeRetry,
 } from './retry-budget.js';
@@ -114,6 +115,16 @@ describe('takeRetry', () => {
   });
 });
 
+describe('movedLine', () => {
+  it('says no retry is taken, the stop, and that the checkout moved', () => {
+    const line = movedLine('session exited 1');
+
+    expect(line).toContain('No retry');
+    expect(line).toContain('session exited 1');
+    expect(line).toContain('checkout has moved');
+  });
+});
+
 describe('retryLine', () => {
   it('says it retries, which retry of how many, and the stop', () => {
     expect(retryLine({ attempt: 1, of: 2 }, 'suite step red')).toBe(
@@ -160,12 +171,14 @@ describe('createRunRetries', () => {
     expect(warnings).toHaveLength(1);
   });
 
-  it('refuses while the checkout has moved, spending nothing of the budget and writing nothing', () => {
+  it('refuses while the checkout has moved, spending nothing of the budget, warning once and emitting nothing', () => {
     let held = false;
     const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => held });
 
     expect(retries.retry('session exited 1')).toBe(false);
-    expect([warnings, events]).toEqual([[], []]);
+    expect(warnings).toEqual([movedLine('session exited 1')]);
+    expect(events).toEqual([]);
+    warnings = [];
 
     // The control: the one retry is still there once the checkout holds.
     held = true;
