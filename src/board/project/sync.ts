@@ -40,6 +40,16 @@
  * else: the other issues are written, the missing ones still added, and
  * the next sync reads the refused one again. An added issue refused in the
  * second pass is on the project with no value filled.
+ *
+ * ## Progress
+ *
+ * Given {@link RefreshOptions.progress}, the second pass's adds are the
+ * `adding issues` phase (`./progress.ts`): its total is the missing
+ * issues, it advances after each add, and its end counts the issues added
+ * and, as refused, those a rejected add left unadded, before the
+ * rejection goes on. Each refresh feeds its own `reading facts` and
+ * `writing fields` phases (`./refresh.ts`), so a sync that adds issues
+ * prints those two phases twice, once per pass.
  */
 import type { FactsRefusal } from './facts.js';
 import type { ProjectPort, ProjectRef } from './port.js';
@@ -57,6 +67,7 @@ import type { ProjectWritesResult } from './writes.js';
 import { readBoardRepository } from '../../commands/epic/move-native.js';
 
 import { createGhProjectPort } from './gh.js';
+import { openPhase } from './progress.js';
 import { isMissingProjectScope, notFoundWarning, scopeWarning } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
 
@@ -101,7 +112,17 @@ async function addIssues(options: RefreshOptions, ref: ProjectRef, issues: reado
   const port: ProjectPort = createGhProjectPort(options.gh);
   const project = await port.find(ref);
   if (project === null) return null;
-  for (const number of issues) await port.addItem(project.id, { repository, number });
+  const phase = openPhase(options.progress, 'adds', issues.length);
+  let added = 0;
+  try {
+    for (const number of issues) {
+      await port.addItem(project.id, { repository, number });
+      added += 1;
+      phase.advance(added);
+    }
+  } finally {
+    phase.end({ done: added, refused: issues.length - added });
+  }
   return issues;
 }
 

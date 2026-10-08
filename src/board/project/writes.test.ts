@@ -31,6 +31,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { createGhProjectPort } from './gh.js';
 import { matchProjectFields, ProjectPortError } from './port.js';
+import { recordingFeed } from './progress-fake.js';
 import { createFakeProjectGh, FAKE_RATE_LIMIT_MESSAGE, fakeItemId, fakeProjectId } from './project-fake.js';
 import { writeAlias, writeBatchArgs, writeProjectFields } from './writes.js';
 
@@ -292,6 +293,65 @@ describe('a rate-limit refusal', () => {
     const writes = [clearOf('I_a'), clearOf('I_b'), clearOf('I_b', 'F_2')];
     expect(await writeProjectFields(runner.gh, 'PVT_1', writes, recordingSleep()))
       .toEqual({ written: 1, notUpdated: 1, rateLimited: true, detail: `gh: ${FAKE_RATE_LIMIT_MESSAGE}` });
+  });
+});
+
+describe('the writing fields phase', () => {
+  /** The writes clearing Stage on every item of `project`, and the ids they name. */
+  async function clearsOf(project: FakeProject): Promise<{ gh: GhRunner; writes: readonly ProjectFieldWrite[] }> {
+    const fake = createFakeProjectGh({ projects: [project] });
+    const ids = await idsOf(fake.gh, project);
+    return { gh: fake.gh, writes: (project.items ?? []).map((_, index) => clearOf(fakeItemId(project, index), ids.field('Stage'))) };
+  }
+
+  it('starts at the writes given, advances by the writes sent after each request, and waits each pause between two', async () => {
+    const project = projectOf(11);
+    const { gh, writes } = await clearsOf(project);
+    const recording = recordingFeed();
+    await writeProjectFields(gh, fakeProjectId(project), writes, { ...recordingSleep(), batchSize: 5, pauseMs: 250, progress: recording.feed });
+    expect(recording.steps()).toEqual([
+      'writes start 0/11',
+      'writes progress 5/11',
+      'writes wait 5/11 250 ms',
+      'writes progress 10/11',
+      'writes wait 10/11 250 ms',
+      'writes progress 11/11',
+      'writes end 11/11 0 refused',
+    ]);
+  });
+
+  it('prints no wait line for a pause of 0, the requests still counted', async () => {
+    const project = projectOf(11);
+    const { gh, writes } = await clearsOf(project);
+    const recording = recordingFeed();
+    await writeProjectFields(gh, fakeProjectId(project), writes, { ...recordingSleep(), progress: recording.feed });
+    expect(recording.steps()).toEqual([
+      'writes start 0/11',
+      'writes progress 5/11',
+      'writes progress 10/11',
+      'writes progress 11/11',
+      'writes end 11/11 0 refused',
+    ]);
+  });
+
+  it('ends a rate-limit refusal counting the writes answered, and the rest refused', async () => {
+    const project = projectOf(4);
+    const fake = createFakeProjectGh({ projects: [project], rateLimitAfter: 1 });
+    const ids = await idsOf(fake.gh, project);
+    const writes = (project.items ?? []).flatMap((_, index): ProjectFieldWrite[] => [
+      clearOf(fakeItemId(project, index), ids.field('Stage')),
+      clearOf(fakeItemId(project, index), ids.field('Rank')),
+    ]);
+    const recording = recordingFeed();
+    const result = await writeProjectFields(fake.gh, fakeProjectId(project), writes, { ...recordingSleep(), progress: recording.feed });
+    expect(result.written).toBe(BATCH_SIZE);
+    expect(recording.steps()).toEqual(['writes start 0/8', 'writes progress 5/8', 'writes end 5/8 3 refused']);
+  });
+
+  it('starts and ends at 0/0 for no writes, sending nothing', async () => {
+    const recording = recordingFeed();
+    await writeProjectFields(createFakeProjectGh().gh, 'PVT_1', [], { ...recordingSleep(), progress: recording.feed });
+    expect(recording.steps()).toEqual(['writes start 0/0', 'writes end 0/0 0 refused']);
   });
 });
 

@@ -93,6 +93,16 @@
  * shape inside an answer that is refuses its own item, with no second
  * request. A pull request whose files or fragment blobs could not be read
  * refuses every issue it closes, the reason naming the pull request.
+ *
+ * ## Progress
+ *
+ * {@link FactsReaderOptions.onRead} hears the count of issues whose first
+ * pages have come back, read or refused, after each request of
+ * {@link ISSUE_BATCH} of them, the same requests as without it. Those
+ * requests are one per batch of issues; the further pages, files and
+ * blobs come after the last, so the count reaches every issue asked
+ * before the read ends. `./refresh.ts` feeds its `reading facts` phase
+ * from it.
  */
 import type { FilesPage, FragmentLookup, IssueList, ListPage } from './facts-query.js';
 import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
@@ -183,6 +193,11 @@ export interface FactsReaderOptions {
   readonly gh: GhRunner;
   /** The fragments directory, as `release.fragments` reads it: `.changes` by default. */
   readonly fragments: string;
+  /**
+   * Hears how many issues' first pages have come back, read or refused,
+   * after each request of them; see the module note's "Progress".
+   */
+  readonly onRead?: (done: number) => void;
 }
 
 /** A pull request as the issues query read it, before its files. */
@@ -470,8 +485,18 @@ const ISSUES: BatchRead<number, IssueFirstPages> = { size: ISSUE_BATCH, argsOf: 
  * page of their lists. An issue that could not be read goes into
  * `refused` and is left out; see the module note.
  */
-async function readIssues(gh: GhRunner, numbers: readonly number[], refused: Refused): Promise<readonly ReadIssue[]> {
-  const firsts = (await readEach(gh, numbers, ISSUES)).flatMap((settled) => {
+async function readIssues(
+  gh: GhRunner,
+  numbers: readonly number[],
+  refused: Refused,
+  onRead: (done: number) => void,
+): Promise<readonly ReadIssue[]> {
+  const settledFirsts: Settled<number, IssueFirstPages>[] = [];
+  for (const batch of batchesOf(numbers, ISSUES.size)) {
+    settledFirsts.push(...await readEach(gh, batch, ISSUES));
+    onRead(settledFirsts.length);
+  }
+  const firsts = settledFirsts.flatMap((settled) => {
     if (settled.ok) return [settled.value];
     refused.set(settled.item, settled.reason);
     return [];
@@ -625,7 +650,7 @@ export async function readIssueFacts(options: FactsReaderOptions, numbers: reado
   const asked = [...new Set(numbers)];
   const refused: Refused = new Map();
   const failed: FailedPulls = new Map();
-  const issues = await readIssues(gh, asked, refused);
+  const issues = await readIssues(gh, asked, refused, options.onRead ?? (() => undefined));
   const pulls = [...new Map(issues.flatMap(({ pulls: read }) => read.map((pull) => [pull.number, pull] as const))).values()];
   const { added, fragments } = await readFragments(gh, pulls, directoryPrefix(options.fragments), failed);
   const factsOf = (pull: ReadPull): FactsPullRequest => {

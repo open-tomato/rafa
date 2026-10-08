@@ -54,7 +54,12 @@
  *     lowest number first, `board.project.writePauseMs` apart as the
  *     field writes are paced; `present` when none was missing. An add
  *     refused part way is a refused part naming how many went through;
- *     the adds are idempotent, so a second run finishes them.
+ *     the adds are idempotent, so a second run finishes them. Given
+ *     {@link ProjectSetupOptions.progress}, the adds are the
+ *     `adding issues` phase (`../board/project/progress.ts`): its total
+ *     is the missing issues, it advances after each add, and its end
+ *     counts those added and, as refused, those the refused add left
+ *     unadded. The pause between two adds prints no wait line.
  *  4. **Fill the fields** ({@link FIELDS_PART}): `refreshProjectItems`
  *     over every item, which writes only the values that differ:
  *     `created` when it wrote any, `present` when none differed, and
@@ -67,6 +72,8 @@
  *     project holds was refused. A field the project does not hold as
  *     the template has it is skipped and its line kept in
  *     {@link ProjectSetupReport.problems}; the other fields are written.
+ *     The progress feed is handed on to the refresh, which feeds the
+ *     `reading facts` and `writing fields` phases.
  *  5. **Save the number** ({@link PROJECT_NUMBER_SETTING}):
  *     `board.project.number` written into `.rafa/config.yaml`
  *     (`./init-board-project-setting.ts`); `present` when it already
@@ -115,6 +122,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
+import type { ProgressFeed } from '../board/project/progress.js';
 import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
@@ -124,6 +132,7 @@ import type { BoardStepResult } from './init-board.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
+import { openPhase } from '../board/project/progress.js';
 import { openProjectRunner } from '../board/project/project-runner.js';
 import {
   isMissingProjectScope,
@@ -203,6 +212,8 @@ export interface ProjectSetupOptions {
   readonly gh: GhRunner;
   /** The pause between two adds and between two write requests; `Bun.sleep` when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears the adds, facts and writes phases; silent when left out. See the module note. */
+  readonly progress?: ProgressFeed;
 }
 
 /** One part, as the parts are built. */
@@ -379,18 +390,22 @@ async function itemsStep(options: ProjectSetupOptions, repository: string, proje
   if (missing.length === 0) return { part: partOf('items', ITEMS_PART, 'present', 'the project holds every issue it shows'), holds: held.size };
 
   const port = createGhProjectPort(options.gh);
+  const phase = openPhase(options.progress, 'adds', missing.length);
   let added = 0;
   try {
     for (const number of missing) {
       if (added > 0) await sleep(options.config.boardProjectWritePauseMs);
       await port.addItem(project.id, { repository, number });
       added += 1;
+      phase.advance(added);
     }
   } catch (error) {
+    phase.end({ done: added, refused: missing.length - added });
     const went = `${issueCount(added)} of ${String(missing.length)} added`;
     const why = `${went}, then #${String(missing[added])} was refused: ${refusalOf(error)}; run \`${PROJECT_STEP_FIX}\` to add the rest`;
     return { part: partOf('items', ITEMS_PART, 'refused', why), holds: held.size + added };
   }
+  phase.end({ done: added, refused: 0 });
   return { part: partOf('items', ITEMS_PART, 'created', `added ${issueCount(added)} to the project`), holds: held.size + added };
 }
 
@@ -442,9 +457,17 @@ function refreshedPart(refreshed: ProjectRefreshed, holds: number | null): Proje
  */
 async function fieldsStep(options: ProjectSetupOptions, project: Project, holds: number | null): Promise<FieldsStep> {
   const config: RefreshConfig = { ...options.config, boardProjectNumber: project.number };
-  const refreshOptions: RefreshOptions = options.sleep === undefined
-    ? { config, gh: options.gh }
-    : { config, gh: options.gh, sleep: options.sleep };
+  const { sleep, progress } = options;
+  const refreshOptions: RefreshOptions = {
+    config,
+    gh: options.gh,
+    ...(sleep === undefined
+      ? {}
+      : { sleep }),
+    ...(progress === undefined
+      ? {}
+      : { progress }),
+  };
   let refreshed: ProjectRefresh;
   try {
     refreshed = await refreshProjectItems(refreshOptions, [], { everyItem: true });

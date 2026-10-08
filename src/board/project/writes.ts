@@ -62,7 +62,17 @@
  * Any other failed request, or an answer that is not the shape above,
  * rejects with a `ProjectPortError` keeping what `gh` wrote, as the
  * port's reads do, so the caller can tell a missing `project` scope apart.
+ *
+ * ## Progress
+ *
+ * Given {@link ProjectWritesOptions.progress}, the writes are the
+ * `writing fields` phase (`./progress.ts`): its total is the writes
+ * given, it advances by the writes sent after each request, a pause
+ * between two requests is a wait line (none for a pause of 0), and its
+ * end counts the writes GitHub answered and, as refused, those a
+ * rate-limit refusal left unwritten. A rejection ends no phase.
  */
+import type { ProgressFeed } from './progress.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 
 import { isMapping } from '../../config-sections.js';
@@ -76,6 +86,7 @@ import {
   written,
 } from './gh.js';
 import { ProjectPortError } from './port.js';
+import { openPhase } from './progress.js';
 
 /** The value a set writes, by the kind of its field. */
 export type ProjectWriteValue =
@@ -108,6 +119,8 @@ export interface ProjectWritesOptions {
   readonly pauseMs: number;
   /** The pause between two requests; `Bun.sleep` when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears the `writing fields` phase; silent when left out. See the module note. */
+  readonly progress?: ProgressFeed;
 }
 
 /** The GraphQL error type GitHub documents for a request over the primary rate limit. */
@@ -267,15 +280,23 @@ export async function writeProjectFields(
   const sleep = options.sleep ?? ((ms: number) => Bun.sleep(ms));
   const batches = batchesOf(writes, batchSize);
   const requests = batches.map((batch) => writeBatchArgs(projectId, batch));
+  const phase = openPhase(options.progress, 'writes', writes.length);
   let sent = 0;
   for (const [index, batch] of batches.entries()) {
-    if (index > 0) await sleep(pauseMs);
+    if (index > 0) {
+      if (pauseMs > 0) phase.wait(pauseMs);
+      await sleep(pauseMs);
+    }
     const outcome = await sendBatch(gh, requests[index] ?? [], batch.length);
     if (outcome.rateLimited) {
       const unwritten = [...batch.filter((_, at) => !outcome.landed.has(at)), ...batches.slice(index + 1).flat()];
-      return { written: sent + outcome.landed.size, notUpdated: itemCount(unwritten), rateLimited: true, detail: outcome.detail };
+      const written = sent + outcome.landed.size;
+      phase.end({ done: written, refused: writes.length - written });
+      return { written, notUpdated: itemCount(unwritten), rateLimited: true, detail: outcome.detail };
     }
     sent += batch.length;
+    phase.advance(sent);
   }
+  phase.end({ done: sent, refused: 0 });
   return { written: sent, notUpdated: 0, rateLimited: false, detail: '' };
 }

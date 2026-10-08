@@ -92,6 +92,16 @@
  * project does not hold as the template has it is skipped and named in
  * {@link ProjectRefreshed.skipped}; the other fields are still written.
  *
+ * ## Progress
+ *
+ * Given {@link RefreshOptions.progress}, the facts read of step 4 is the
+ * `reading facts` phase (`./progress.ts`): its total is the issues on the
+ * project to read, it advances as `readIssueFacts` hears their first
+ * pages come back, and its end counts the issues read and those refused.
+ * The writes are the `writing fields` phase, fed by `writeProjectFields`
+ * (`./writes.ts`). A phase the refresh never enters — no issue on the
+ * project to read, or nothing to write — prints nothing.
+ *
  * With {@link RefreshOptions.dryRun} set, everything above is read and
  * the changes are answered as they would be written, but no write is
  * sent: `writes` counts none written and none refused. That is
@@ -123,6 +133,7 @@
  */
 import type { FactsRefusal } from './facts.js';
 import type { FieldMismatch, MatchedField, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
+import type { ProgressFeed } from './progress.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
 import type { ProjectWritesOptions, ProjectWritesResult } from './writes.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -140,6 +151,7 @@ import { createGhRoadmapSearch, parseRoadmapBody } from '../roadmap.js';
 import { readIssueFacts } from './facts.js';
 import { createGhProjectPort } from './gh.js';
 import { matchProjectFields } from './port.js';
+import { openPhase } from './progress.js';
 import { projectChangesOf, projectValuesOf } from './refresh-values.js';
 import {
   isMissingProjectScope,
@@ -180,14 +192,23 @@ export interface RefreshOptions {
   readonly sleep?: ProjectWritesOptions['sleep'];
   /** True to read and answer the changes and send no write; see the module note. */
   readonly dryRun?: boolean;
+  /** Hears the `reading facts` and `writing fields` phases; silent when left out. See the module note. */
+  readonly progress?: ProgressFeed;
 }
 
-/** The pace of the writes: the two `board.project` keys off the config, and the sleep seam when given. */
+/** The pace of the writes: the two `board.project` keys off the config, and the sleep seam and progress feed when given. */
 function writesOptionsOf(options: RefreshOptions): ProjectWritesOptions {
-  const pace = { batchSize: options.config.boardProjectWriteBatchSize, pauseMs: options.config.boardProjectWritePauseMs };
-  return options.sleep === undefined
-    ? pace
-    : { ...pace, sleep: options.sleep };
+  const { sleep, progress } = options;
+  return {
+    batchSize: options.config.boardProjectWriteBatchSize,
+    pauseMs: options.config.boardProjectWritePauseMs,
+    ...(sleep === undefined
+      ? {}
+      : { sleep }),
+    ...(progress === undefined
+      ? {}
+      : { progress }),
+  };
 }
 
 /** What a refresh adds to the issues it is asked for; see the module note. */
@@ -353,7 +374,9 @@ async function changesFor(
 ): Promise<IssueChanges> {
   const { config, gh } = options;
   const numbers = [...present.keys()];
-  const { facts, refused } = await readIssueFacts({ gh, fragments: config.releaseFragments }, numbers);
+  const phase = openPhase(options.progress, 'facts', numbers.length);
+  const { facts, refused } = await readIssueFacts({ gh, fragments: config.releaseFragments, onRead: phase.advance }, numbers);
+  phase.end({ done: facts.size, refused: refused.length });
   const board = read ?? await readRefreshBoard(config, gh, repository);
   const { matched } = matchProjectFields(project);
   const changes = numbers.flatMap((issue) => {

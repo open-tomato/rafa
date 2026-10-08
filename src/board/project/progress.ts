@@ -31,6 +31,17 @@
  * Time comes from the injected `now`, in milliseconds, and never from
  * `Date.now()` read here, so a test steps the clock and holds the
  * throttle.
+ *
+ * ## Feeding a phase
+ *
+ * A module that runs a phase takes an optional {@link ProgressFeed} on its
+ * options — the sink that hears each line, the clock and
+ * `board.project.progressSeconds` — and opens the phase with
+ * {@link openPhase}, which hands each line the reporter answers to the
+ * sink. With no feed the phase is silent and nothing is read off a clock.
+ * The feeders are the adds (`src/commands/init-board-project.ts`'s items
+ * part and `./sync.ts`'s second pass), the facts reads (`./refresh.ts`)
+ * and the field writes (`./writes.ts`).
  */
 import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
 import type { CliEventNamed } from '../../ports/index.js';
@@ -102,6 +113,30 @@ export interface PhaseReporter {
   /** The line of a pause for GitHub's write limit of `waitMs`, at the last advance's count. */
   readonly wait: (waitMs: number) => ProgressLine;
 }
+
+/** What a phase's caller is fed by: where the lines go, the clock and the throttle. */
+export interface ProgressFeed {
+  /** Hears each line of every phase. */
+  readonly sink: ProgressSink;
+  /** The clock, in milliseconds. */
+  readonly now: () => number;
+  /** `board.project.progressSeconds`. */
+  readonly progressSeconds: BoardProjectProgressSeconds;
+}
+
+/** One opened phase: each call hands the sink the line it answers, if any. */
+export interface PhaseFeed {
+  readonly advance: (done: number) => void;
+  readonly wait: (waitMs: number) => void;
+  readonly end: (result: PhaseEnd) => void;
+}
+
+/** The feed of a phase run with no {@link ProgressFeed}: every call does nothing. */
+const SILENT_PHASE: PhaseFeed = Object.freeze({
+  advance: () => undefined,
+  wait: () => undefined,
+  end: () => undefined,
+});
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -182,6 +217,29 @@ export function phaseReporter(options: PhaseReporterOptions): PhaseReporter {
     wait: (waitMs) => {
       const data = { ...base('wait', doneSoFar, options.now()), waitMs };
       return { text: waitLine(waitMs), data };
+    },
+  };
+}
+
+/**
+ * Opens `phase` over `total` items on `feed`, handing the sink its start
+ * line at once; with no feed, a phase that hands nothing. See the module
+ * note.
+ */
+export function openPhase(feed: ProgressFeed | undefined, phase: ProgressPhase, total: number): PhaseFeed {
+  if (feed === undefined) return SILENT_PHASE;
+  const reporter = phaseReporter({ phase, total, now: feed.now, progressSeconds: feed.progressSeconds });
+  feed.sink(reporter.start());
+  return {
+    advance: (done) => {
+      const line = reporter.advance(done);
+      if (line !== undefined) feed.sink(line);
+    },
+    wait: (waitMs) => {
+      feed.sink(reporter.wait(waitMs));
+    },
+    end: (result) => {
+      feed.sink(reporter.end(result));
     },
   };
 }

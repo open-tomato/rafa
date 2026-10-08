@@ -43,6 +43,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeFactsGh } from '../board/project/facts-fake.js';
 import { createGhProjectPort } from '../board/project/gh.js';
+import { recordingFeed } from '../board/project/progress-fake.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } from '../board/project/project-fake.js';
 import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
 import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
@@ -686,6 +687,71 @@ describe('setUpProject and rafa board sync, over an issue of 116 cross-reference
 
     expect(sync.exitCode).toBe(0);
     expect(sync.stdout).toContain('#90 not refreshed: ');
+  });
+});
+
+describe('setUpProject, the phases it feeds', () => {
+  /** The start and end lines of `steps`, the progress lines left out. */
+  function bounds(steps: readonly string[]): readonly string[] {
+    return steps.filter((step) => step.includes(' start ') || step.includes(' end '));
+  }
+
+  it('adds the five issues one at a time, then reads their facts and writes their fields as the refresh feeds them', async () => {
+    const router = route();
+    const recording = recordingFeed();
+
+    const report = await setUpProject({ ...options(router, rootHolding('phases')), progress: recording.feed });
+
+    expect(outcomes(report)['items']).toBe('created');
+    expect(recording.steps().filter((step) => step.startsWith('adds '))).toEqual([
+      'adds start 0/5',
+      'adds progress 1/5',
+      'adds progress 2/5',
+      'adds progress 3/5',
+      'adds progress 4/5',
+      'adds progress 5/5',
+      'adds end 5/5 0 refused',
+    ]);
+    const writes = recording.steps().find((step) => step.startsWith('writes start ')) ?? '';
+    const total = writes.slice('writes start 0/'.length);
+    expect(Number(total)).toBeGreaterThan(0);
+    expect(bounds(recording.steps())).toEqual([
+      'adds start 0/5',
+      'adds end 5/5 0 refused',
+      'facts start 0/5',
+      'facts end 5/5 0 refused',
+      `writes start 0/${total}`,
+      `writes end ${total}/${total} 0 refused`,
+    ]);
+  });
+
+  it('ends the adds of a refused add counting the two added and the three left, beside the run above', async () => {
+    let adds = 0;
+    const router = route({ refuse: (args) => {
+      if (!args.some((arg) => arg.includes('addProjectV2ItemById('))) return null;
+      adds += 1;
+      return adds === 3
+        ? 'GraphQL: something went wrong\n'
+        : null;
+    } });
+    const recording = recordingFeed();
+
+    const report = await setUpProject({ ...options(router, rootHolding('phases-refused')), progress: recording.feed });
+
+    expect(report.parts[2]?.outcome).toBe('refused');
+    expect(bounds(recording.steps()).slice(0, 4)).toEqual(['adds start 0/5', 'adds end 2/5 3 refused', 'facts start 0/2', 'facts end 2/2 0 refused']);
+  });
+
+  it('opens no adds phase on a second run with nothing missing, the facts read still fed', async () => {
+    const router = route();
+    const root = rootHolding('phases-second');
+    const first = await setUpProject(options(router, root));
+    const recording = recordingFeed();
+
+    const second = await setUpProject({ ...options(router, root, { boardProjectNumber: first.project?.number ?? null }), progress: recording.feed });
+
+    expect(outcomes(second)['items']).toBe('present');
+    expect(bounds(recording.steps())).toEqual(['facts start 0/5', 'facts end 5/5 0 refused']);
   });
 });
 

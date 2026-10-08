@@ -2,7 +2,8 @@ import type { PhaseReporterOptions } from './progress.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { formatElapsed, phaseReporter, progressEvent, waitLine } from './progress.js';
+import { recordingFeed } from './progress-fake.js';
+import { formatElapsed, openPhase, phaseReporter, progressEvent, waitLine } from './progress.js';
 
 /** A clock the test steps by hand, in milliseconds. */
 function steppedClock(startMs = 1_000_000): { readonly now: () => number; readonly step: (ms: number) => void } {
@@ -205,5 +206,42 @@ describe('progressEvent', () => {
       data: { phase: 'adds', step: 'progress', done: 146, total: 283, elapsedMs: 400_000 },
       ts: '2026-10-08T12:00:00.000Z',
     });
+  });
+});
+
+describe('openPhase', () => {
+  test('hands the sink the start line at once, then each line the reporter answers', () => {
+    const recording = recordingFeed();
+    const phase = openPhase(recording.feed, 'writes', 3);
+    expect(recording.steps()).toEqual(['writes start 0/3']);
+    phase.advance(2);
+    phase.wait(1000);
+    phase.end({ done: 3, refused: 0 });
+    expect(recording.steps()).toEqual(['writes start 0/3', 'writes progress 2/3', 'writes wait 2/3 1000 ms', 'writes end 3/3 0 refused']);
+    expect(recording.lines().map(({ text }) => text)).toEqual([
+      'writing fields: 3',
+      'writing fields: 2/3, 1s',
+      'waiting 1 s for GitHub\'s write limit',
+      'writing fields: 3/3, 0 refused, 3s',
+    ]);
+  });
+
+  test('hands no progress line the throttle holds back, and the start, wait and end lines still', () => {
+    const recording = recordingFeed(false);
+    const phase = openPhase(recording.feed, 'adds', 2);
+    phase.advance(1);
+    phase.wait(500);
+    phase.advance(2);
+    phase.end({ done: 2, refused: 0 });
+    expect(recording.steps()).toEqual(['adds start 0/2', 'adds wait 1/2 500 ms', 'adds end 2/2 0 refused']);
+  });
+
+  test('with no feed, every call does nothing and none throws', () => {
+    const phase = openPhase(undefined, 'facts', 4);
+    expect(() => {
+      phase.advance(1);
+      phase.wait(10);
+      phase.end({ done: 4, refused: 0 });
+    }).not.toThrow();
   });
 });

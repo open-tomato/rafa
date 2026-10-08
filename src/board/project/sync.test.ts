@@ -32,9 +32,11 @@
  */
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { SyncFake } from './sync-fake.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { recordingFeed } from './progress-fake.js';
 import {
   createSyncFake,
   SYNC_EXPECTED,
@@ -207,5 +209,71 @@ describe('syncProject', () => {
     expect(await syncProject({ ...options(fake), config: { ...CONFIG, boardProjectNumber: null } }))
       .toEqual({ kind: 'skipped', reason: 'no-project', warnings: [] });
     expect(fake.calls()).toEqual([]);
+  });
+});
+
+describe('syncProject: the phases each pass feeds', () => {
+  /** The values the first pass writes: one per field the rules fill on the five items. */
+  const FIRST_WRITES = Object.values(SYNC_EXPECTED).flatMap((values) => Object.keys(values)).length;
+
+  /** The start and end lines of `steps`, the progress lines left out. */
+  function bounds(steps: readonly string[]): readonly string[] {
+    return steps.filter((step) => step.includes(' start ') || step.includes(' end '));
+  }
+
+  it('reads and writes the five items, adds the two missing issues one at a time, then reads and writes those two', async () => {
+    const fake = createSyncFake();
+    const recording = recordingFeed();
+
+    await syncProject({ ...options(fake), progress: recording.feed });
+
+    expect(bounds(recording.steps())).toEqual([
+      'facts start 0/5',
+      'facts end 5/5 0 refused',
+      `writes start 0/${String(FIRST_WRITES)}`,
+      `writes end ${String(FIRST_WRITES)}/${String(FIRST_WRITES)} 0 refused`,
+      'adds start 0/2',
+      'adds end 2/2 0 refused',
+      'facts start 0/2',
+      'facts end 2/2 0 refused',
+      'writes start 0/2',
+      'writes end 2/2 0 refused',
+    ]);
+    expect(recording.steps().filter((step) => step.startsWith('adds '))).toEqual([
+      'adds start 0/2',
+      'adds progress 1/2',
+      'adds progress 2/2',
+      'adds end 2/2 0 refused',
+    ]);
+  });
+
+  it('ends the adds counting the one added and the one a refused add left, before the rejection goes on', async () => {
+    const fake = createSyncFake();
+    let adds = 0;
+    const gh: GhRunner = (args) => {
+      if (args.some((arg) => arg.includes('addProjectV2ItemById('))) {
+        adds += 1;
+        if (adds === 2) return Promise.resolve({ ok: false, stdout: '', stderr: 'gh: Something went wrong while executing your query.\n' });
+      }
+      return fake.gh(args);
+    };
+    const recording = recordingFeed();
+
+    await expect(syncProject({ ...options(fake), gh, progress: recording.feed })).rejects.toThrow();
+
+    expect(recording.steps().filter((step) => step.startsWith('adds '))).toEqual([
+      'adds start 0/2',
+      'adds progress 1/2',
+      'adds end 1/2 1 refused',
+    ]);
+  });
+
+  it('opens no adds phase on a dry run, the facts read still fed', async () => {
+    const fake = createSyncFake();
+    const recording = recordingFeed();
+
+    await syncProject({ ...options(fake, true), progress: recording.feed });
+
+    expect(bounds(recording.steps())).toEqual(['facts start 0/5', 'facts end 5/5 0 refused']);
   });
 });

@@ -41,6 +41,7 @@ import { loadConfig } from '../../config-load.js';
 
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
+import { recordingFeed } from './progress-fake.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_RATE_LIMIT_MESSAGE, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
 import { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
@@ -738,6 +739,77 @@ describe('refreshProjectItems: widened to the whole project, and a dry run', () 
     expect(written.kind === 'refreshed' && written.changes).toEqual(dry.kind === 'refreshed' && dry.changes);
     expect(writeCalls(wired.calls()).length).toBeGreaterThan(0);
     expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});
+
+describe('refreshProjectItems: the reading facts and writing fields phases', () => {
+  it('reads the five issues\' facts as one phase and writes their twelve values as another, five to a request', async () => {
+    const wired = wire(items());
+    const recording = recordingFeed();
+
+    await refreshProjectItems({ ...wired.options, progress: recording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(recording.steps()).toEqual([
+      'facts start 0/5',
+      'facts progress 5/5',
+      'facts end 5/5 0 refused',
+      'writes start 0/12',
+      'writes progress 5/12',
+      'writes progress 10/12',
+      'writes progress 12/12',
+      'writes end 12/12 0 refused',
+    ]);
+  });
+
+  it('ends the facts phase counting the issue refused apart from the four read, and writes only theirs', async () => {
+    const wrap = (gh: GhRunner): GhRunner => (args) => (args.some((arg) => arg.includes('i21: issue(number: 21)'))
+      ? Promise.resolve({ ok: false, stdout: '', stderr: 'read: operation timed out' })
+      : gh(args));
+    const wired = wire(items(), CONFIG, {}, { wrap });
+    const recording = recordingFeed();
+
+    await refreshProjectItems({ ...wired.options, progress: recording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(recording.steps().filter((step) => step.includes(' start ') || step.includes(' end '))).toEqual([
+      'facts start 0/5',
+      'facts end 4/5 1 refused',
+      'writes start 0/10',
+      'writes end 10/10 0 refused',
+    ]);
+  });
+
+  it('advances the facts phase after each request of twenty issues', async () => {
+    const many = Array.from({ length: 25 }, (_, index): PlantedIssue => ({ number: 101 + index, state: 'OPEN', labels: ['type:spec'] }));
+    const wired = wire(many.map(({ number }) => ({ number, values: { Stage: 'Backlog' } })), CONFIG, {}, { issues: [...ISSUES, ...many] });
+    const recording = recordingFeed();
+
+    const refresh = await refreshProjectItems({ ...wired.options, progress: recording.feed }, many.map(({ number }) => number));
+
+    expect(refresh.kind === 'refreshed' && refresh.changes).toEqual([]);
+    expect(recording.steps()).toEqual(['facts start 0/25', 'facts progress 20/25', 'facts progress 25/25', 'facts end 25/25 0 refused']);
+  });
+
+  it('opens no writes phase when no value differs, nor on a dry run', async () => {
+    const held = wire(items(EXPECTED));
+    const heldRecording = recordingFeed();
+    await refreshProjectItems({ ...held.options, progress: heldRecording.feed }, [10, 20, 21, 22, 30]);
+    const dry = wire(items());
+    const dryRecording = recordingFeed();
+    const dryRefresh = await refreshProjectItems({ ...dry.options, dryRun: true, progress: dryRecording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(heldRecording.steps()).toEqual(['facts start 0/5', 'facts progress 5/5', 'facts end 5/5 0 refused']);
+    expect(dryRecording.steps()).toEqual(heldRecording.steps());
+    expect(dryRefresh.kind === 'refreshed' && dryRefresh.changes).toHaveLength(12);
+  });
+
+  it('opens no phase for an issue with no item, the project read and nothing else', async () => {
+    const wired = wire(items());
+    const recording = recordingFeed();
+
+    const refresh = await refreshProjectItems({ ...wired.options, progress: recording.feed }, [40]);
+
+    expect(refresh.kind === 'refreshed' && refresh.missing).toEqual([40]);
+    expect(recording.steps()).toEqual([]);
   });
 });
 
