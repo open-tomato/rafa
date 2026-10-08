@@ -8,9 +8,13 @@
  *
  * ## Batches and pace
  *
- * The writes go {@link PROJECT_WRITE_BATCH_SIZE} to a request, in the
- * order given, with a pause of {@link PROJECT_WRITE_PAUSE_MS} between two
- * requests and none before the first or after the last. Each write is one
+ * The writes go {@link ProjectWritesOptions.batchSize} to a request, in
+ * the order given, with a pause of {@link ProjectWritesOptions.pauseMs}
+ * between two requests and none before the first or after the last. The
+ * two are `board.project.writeBatchSize` and `board.project.writePauseMs`,
+ * which every caller reads off its config and passes; a size that is not
+ * a whole number from 1 or a pause that is not one from 0 throws a
+ * `RangeError` with nothing sent. Each write is one
  * aliased mutation, `w0` to `w<n>`, naming its item, field and value as
  * GraphQL variables, never spliced into the mutation text. Every write is
  * checked before the first request goes, so a write GitHub could not hold
@@ -58,7 +62,17 @@
  * Any other failed request, or an answer that is not the shape above,
  * rejects with a `ProjectPortError` keeping what `gh` wrote, as the
  * port's reads do, so the caller can tell a missing `project` scope apart.
+ *
+ * ## Progress
+ *
+ * Given {@link ProjectWritesOptions.progress}, the writes are the
+ * `writing fields` phase (`./progress.ts`): its total is the writes
+ * given, it advances by the writes sent after each request, a pause
+ * between two requests is a wait line (none for a pause of 0), and its
+ * end counts the writes GitHub answered and, as refused, those a
+ * rate-limit refusal left unwritten. A rejection ends no phase.
  */
+import type { ProgressFeed } from './progress.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 
 import { isMapping } from '../../config-sections.js';
@@ -71,11 +85,8 @@ import {
   requireNodeId,
   written,
 } from './gh.js';
-import {
-  PROJECT_WRITE_BATCH_SIZE,
-  PROJECT_WRITE_PAUSE_MS,
-  ProjectPortError,
-} from './port.js';
+import { ProjectPortError } from './port.js';
+import { openPhase } from './progress.js';
 
 /** The value a set writes, by the kind of its field. */
 export type ProjectWriteValue =
@@ -100,10 +111,16 @@ export interface ProjectWritesResult {
   readonly detail: string;
 }
 
-/** The seams of {@link writeProjectFields}. */
-export interface ProjectWritesSeams {
+/** What {@link writeProjectFields} is paced by, and its seam. */
+export interface ProjectWritesOptions {
+  /** The field writes sent in one request: `board.project.writeBatchSize`. */
+  readonly batchSize: number;
+  /** The pause between two requests, in milliseconds: `board.project.writePauseMs`. */
+  readonly pauseMs: number;
   /** The pause between two requests; `Bun.sleep` when left out. */
   readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears the `writing fields` phase; silent when left out. See the module note. */
+  readonly progress?: ProgressFeed;
 }
 
 /** The GraphQL error type GitHub documents for a request over the primary rate limit. */
@@ -180,10 +197,20 @@ export function writeBatchArgs(projectId: string, batch: readonly ProjectFieldWr
   return graphqlArgs(query, [['-f', 'project', projectId], ...parts.flatMap((part) => part.fields)]);
 }
 
-/** `writes` cut into requests of {@link PROJECT_WRITE_BATCH_SIZE}, in order. */
-function batchesOf(writes: readonly ProjectFieldWrite[]): readonly (readonly ProjectFieldWrite[])[] {
-  return Array.from({ length: Math.ceil(writes.length / PROJECT_WRITE_BATCH_SIZE) }, (_, index) => writes
-    .slice(index * PROJECT_WRITE_BATCH_SIZE, (index + 1) * PROJECT_WRITE_BATCH_SIZE));
+/** Throws a `RangeError` on a batch size below 1 or a pause below 0, or either not a whole number. */
+function requirePace(batchSize: number, pauseMs: number): void {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1) {
+    throw new RangeError(`not a batch size of writes: ${String(batchSize)}, expected a whole number from 1`);
+  }
+  if (!Number.isSafeInteger(pauseMs) || pauseMs < 0) {
+    throw new RangeError(`not a pause between write requests: ${String(pauseMs)}, expected a whole number from 0`);
+  }
+}
+
+/** `writes` cut into requests of `batchSize`, in order. */
+function batchesOf(writes: readonly ProjectFieldWrite[], batchSize: number): readonly (readonly ProjectFieldWrite[])[] {
+  return Array.from({ length: Math.ceil(writes.length / batchSize) }, (_, index) => writes
+    .slice(index * batchSize, (index + 1) * batchSize));
 }
 
 /** True when a failed request is a rate-limit refusal; see the module note. */
@@ -240,26 +267,36 @@ function itemCount(writes: readonly ProjectFieldWrite[]): number {
 
 /**
  * Sends `writes` to the project whose node id is `projectId`, batched and
- * paced, stopping on a rate-limit refusal; see the module note.
+ * paced by `options`, stopping on a rate-limit refusal; see the module note.
  */
 export async function writeProjectFields(
   gh: GhRunner,
   projectId: string,
   writes: readonly ProjectFieldWrite[],
-  seams: ProjectWritesSeams = {},
+  options: ProjectWritesOptions,
 ): Promise<ProjectWritesResult> {
-  const sleep = seams.sleep ?? ((ms: number) => Bun.sleep(ms));
-  const batches = batchesOf(writes);
+  const { batchSize, pauseMs } = options;
+  requirePace(batchSize, pauseMs);
+  const sleep = options.sleep ?? ((ms: number) => Bun.sleep(ms));
+  const batches = batchesOf(writes, batchSize);
   const requests = batches.map((batch) => writeBatchArgs(projectId, batch));
+  const phase = openPhase(options.progress, 'writes', writes.length);
   let sent = 0;
   for (const [index, batch] of batches.entries()) {
-    if (index > 0) await sleep(PROJECT_WRITE_PAUSE_MS);
+    if (index > 0) {
+      if (pauseMs > 0) phase.wait(pauseMs);
+      await sleep(pauseMs);
+    }
     const outcome = await sendBatch(gh, requests[index] ?? [], batch.length);
     if (outcome.rateLimited) {
       const unwritten = [...batch.filter((_, at) => !outcome.landed.has(at)), ...batches.slice(index + 1).flat()];
-      return { written: sent + outcome.landed.size, notUpdated: itemCount(unwritten), rateLimited: true, detail: outcome.detail };
+      const written = sent + outcome.landed.size;
+      phase.end({ done: written, refused: writes.length - written });
+      return { written, notUpdated: itemCount(unwritten), rateLimited: true, detail: outcome.detail };
     }
     sent += batch.length;
+    phase.advance(sent);
   }
+  phase.end({ done: sent, refused: 0 });
   return { written: sent, notUpdated: 0, rateLimited: false, detail: '' };
 }

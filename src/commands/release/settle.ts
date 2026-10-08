@@ -86,6 +86,7 @@ import type { SettleWorktreeOptions } from '../../release/settle-worktree.js';
 import type { SettleBuild, SettleReading, SettleSettings } from '../../release/settle.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { CommandExit } from '../../cli/command.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { settleByPr } from '../../release/settle-pr.js';
@@ -350,6 +351,7 @@ export async function runSettle(
     config,
     openGh: () => (seams.gh ?? ((cwd: string) => createGhRunner({ cwd })))(project.root),
     refresh: seams.refresh,
+    retry: commandRetrySeams(context.output, context.outputMode),
   });
   return { ...ran.value, project: refreshed };
 }

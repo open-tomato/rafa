@@ -12,6 +12,24 @@
  * change of an empty project, so the empty one after is no printer that
  * prints nothing.
  *
+ * The refused-issue cases plant a labels cursor that never moves on #21
+ * (`SyncFakeOptions.repeatsCursor`). Their control is the sync over the
+ * same board without it, which exits 0 with no `warn:` line and every
+ * item filled, so the warning line and the unfilled #21 are the refusal's.
+ *
+ * The network-error cases plant one `HTTP 502` on the project fake: the
+ * sync sends the call again, prints one `retrying` line (a `retry` event
+ * in json mode) and syncs. Their control is the same failure under
+ * `board.project.retries: false`, refused with exit code 2 and no line,
+ * so the recovery is the retry's.
+ *
+ * The progress cases time the run by a clock that moves one second on
+ * every read; every other case by one that never moves, so a phase prints
+ * its start and end lines and nothing between. The throttle case's lines
+ * between sit beside the same run at the default of 10 s, which prints
+ * none, and beside `progressSeconds: false`, which drops them while the
+ * start and end lines stay.
+ *
  * The warning lines are imported once the static imports have loaded,
  * for the import cycle `src/board/project/sync.test.ts`'s module note
  * names.
@@ -62,6 +80,7 @@ const EMPTY: BoardSyncResult = {
   changes: [],
   missing: [],
   added: [],
+  refused: [],
   written: 0,
   rateLimited: false,
   notUpdated: 0,
@@ -76,9 +95,23 @@ function plantCase(config = PROJECT_CONFIG): PlantedProject {
   return plantProject(mkdtempSync(join(tempBase, 'case-')), config);
 }
 
-/** Dispatches `board sync` and `words` from `project` over `fake`. */
-function run(fake: SyncFake, words: readonly string[] = [], project: PlantedProject = plantCase()) {
-  const command = createBoardSyncCommand({ gh: fake.gh, sleep: () => Promise.resolve() });
+/** A clock that never moves, so every phase reads `0s` and prints no line between its start and end. */
+const STILL_CLOCK = (): number => 0;
+
+/** The phase labels a progress line opens with. */
+const PHASE_LABELS = ['adding issues: ', 'reading facts: ', 'writing fields: '];
+
+/** The lines of `stdout` that are not progress lines. */
+function syncOwnLines(stdout: string): readonly string[] {
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .filter((line) => !PHASE_LABELS.some((label) => line.startsWith(label)));
+}
+
+/** Dispatches `board sync` and `words` from `project` over `fake`, timed by `now`. */
+function run(fake: SyncFake, words: readonly string[] = [], project: PlantedProject = plantCase(), now: () => number = STILL_CLOCK) {
+  const command = createBoardSyncCommand({ gh: fake.gh, sleep: () => Promise.resolve(), now });
   return dispatchInProject(['board', 'sync', ...words], [BOARD_SUBJECT], [command], project);
 }
 
@@ -108,6 +141,16 @@ describe('changeLine, closingLine and syncLines', () => {
       .toBe('Stopped on project #6: 1 of 2 changes written; the rate limit refused the rest.');
   });
 
+  it('counts the issues refused, and never closes on in step while one was refused', () => {
+    const refused = [{ issue: 21, reason: 'a reason' }];
+
+    expect(closingLine({ ...EMPTY, refused })).toBe('Synced project #6: 0 changes written and 0 issues added; 1 issue not refreshed.');
+    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE], added: [40], written: 1, refused: [...refused, { issue: 22, reason: 'b' }] }))
+      .toBe('Synced project #6: 1 change written and 1 issue added; 2 issues not refreshed.');
+    expect(closingLine({ ...EMPTY, dryRun: true, refused }))
+      .toBe('Dry run on project #6: 0 changes and 0 issues to add; 1 issue not refreshed; nothing written.');
+  });
+
   it('prints the changes, then each issue to add or added, then the closing line', () => {
     expect(syncLines({ ...EMPTY, dryRun: true, changes: [STAGE_CHANGE], missing: [40] })).toEqual([
       '#21 Stage: Ready → Claimed',
@@ -127,7 +170,7 @@ describe('rafa board sync', () => {
     const { fake, project } = setUp();
 
     const result = await run(fake, ['--dry-run'], project);
-    const lines = result.stdout.trimEnd().split('\n');
+    const lines = syncOwnLines(result.stdout);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe('');
@@ -153,9 +196,21 @@ describe('rafa board sync', () => {
 
     expect(first.stdout.split('\n').length).toBeGreaterThan(2);
     expect([dry.exitCode, synced.exitCode, again.exitCode]).toEqual([0, 0, 0]);
-    expect(dry.stdout).toBe('#21 Stage: Ready → Claimed\nDry run on project #6: 1 change and 0 issues to add; nothing written.\n');
-    expect(synced.stdout).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written and 0 issues added.\n');
-    expect(again.stdout).toBe('Dry run on project #6: in step, nothing to change.\n');
+    expect(dry.stdout).toBe([
+      'reading facts: 7',
+      'reading facts: 7/7, 0 refused, 0s',
+      '#21 Stage: Ready → Claimed',
+      'Dry run on project #6: 1 change and 0 issues to add; nothing written.\n',
+    ].join('\n'));
+    expect(synced.stdout).toBe([
+      'reading facts: 7',
+      'reading facts: 7/7, 0 refused, 0s',
+      'writing fields: 1',
+      'writing fields: 1/1, 0 refused, 0s',
+      '#21 Stage: Ready → Claimed',
+      'Synced project #6: 1 change written and 0 issues added.\n',
+    ].join('\n'));
+    expect(syncOwnLines(again.stdout)).toEqual(['Dry run on project #6: in step, nothing to change.']);
   });
 
   it('writes every change, adds the open issues the project lacks and fills them', async () => {
@@ -164,9 +219,46 @@ describe('rafa board sync', () => {
     const result = await run(fake, [], project);
 
     expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
     expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
     expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
     expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
+    expect((await fake.heldValues())[21]).toEqual({ Stage: 'Ready', Rank: 3 });
+  });
+
+  it('exits 0 when the only failure is a refused issue, printing its warning line and syncing the rest', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [21] });
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
+    expect(result.stdout).not.toContain('#21 Stage');
+    expect(result.stdout).toContain('Synced project #6: 12 changes written and 2 issues added; 1 issue not refreshed.\n'
+      + 'warn: #21 not refreshed: issue #21.labels answered the cursor');
+    const warnings = result.stdout
+      .trimEnd()
+      .split('\n')
+      .filter((line) => line.startsWith('warn: '));
+    expect(warnings).toHaveLength(1);
+    expect((await fake.heldValues())[21]).toEqual({});
+    expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
+  });
+
+  it('gives a refused issue in the json result and its warning line, exiting 0', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [21] });
+
+    const result = await run(fake, ['--output=json'], project);
+    const ending = eventsOf(result.stdout).find((event) => event.type === 'result') as { data?: BoardSyncResult } | undefined;
+    const refused = ending?.data?.refused ?? [];
+
+    expect(result.exitCode).toBe(0);
+    expect(refused.map(({ issue }) => issue)).toEqual([21]);
+    expect(refused[0]?.reason).toContain('issue #21.labels answered the cursor');
+    expect(ending?.data?.warnings).toEqual([`#21 not refreshed: ${refused[0]?.reason ?? ''}`]);
+    expect(ending?.data?.added).toEqual([1, 40]);
   });
 
   it('gives the changes, the issues and the counts as the json result, without the write ids', async () => {
@@ -224,14 +316,179 @@ describe('rafa board sync', () => {
     expect(syncAddCalls(fake.calls())).toEqual([]);
   });
 
-  it('refuses with exit code 2 naming the failure when gh cannot be read', async () => {
+  it('refuses with exit code 2 naming the failure when gh cannot be read, retrying nothing GitHub refused on purpose', async () => {
     const { fake, project } = setUp();
-    fake.project.failNext('gh: HTTP 502: Bad gateway\n');
+    fake.project.failNext('gh: HTTP 401: Bad credentials\n');
 
     const result = await run(fake, [], project);
 
     expect(result.exitCode).toBe(BOARD_SYNC_REFUSAL_EXIT);
     expect(result.stderr).toStartWith('❌ Could not sync the project: ');
+    expect(result.stderr).toContain('HTTP 401');
+    expect(result.stdout).not.toContain('retrying ');
+  });
+});
+
+describe('rafa board sync: a call failing on a network error', () => {
+  /** The failure every case plants: a gateway error, in the retried class. */
+  const GATEWAY = 'gh: HTTP 502: Bad gateway\n';
+
+  /** The retry line the planted failure prints, past its subject. */
+  const RETRY_LINE = /^retrying \S+ \(1 of 3\): HTTP 502$/mu;
+
+  it('sends the call again, prints one retrying line and syncs as a run with no failure does', async () => {
+    const { fake, project } = setUp();
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(RETRY_LINE);
+    expect(result.stdout.match(/^retrying /gmu)).toHaveLength(1);
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+  });
+
+  it('control: with board.project.retries false the same failure is refused with exit code 2 and no retrying line', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    retries: false\n`);
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(BOARD_SYNC_REFUSAL_EXIT);
     expect(result.stderr).toContain('HTTP 502');
+    expect(result.stdout).not.toContain('retrying ');
+  });
+
+  it('writes the retry as one retry event in json mode, and no retrying line', async () => {
+    const { fake, project } = setUp();
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, ['--output=json'], project);
+    const retries = eventsOf(result.stdout).filter((event) => event.type === 'event' && event.name === 'retry');
+
+    expect(result.exitCode).toBe(0);
+    expect(retries).toHaveLength(1);
+    expect(retries[0]).toMatchObject({ summary: expect.stringMatching(RETRY_LINE), data: { attempt: 1, of: 3, reason: 'HTTP 502', waitMs: 2000 } });
+    expect(result.stdout).not.toContain('"message":"retrying ');
+  });
+});
+
+describe('rafa board sync: the progress of its phases', () => {
+  /** A clock moving one second forward on every read. */
+  function steppingClock(): () => number {
+    let at = 0;
+    return () => {
+      at += 1000;
+      return at;
+    };
+  }
+
+  /** The start and end lines of a full sync of the fake board, every phase timed by the stepping clock. */
+  const START_AND_END_LINES = [
+    'reading facts: 5',
+    'reading facts: 5/5, 0 refused, 2s',
+    'writing fields: 12',
+    'writing fields: 12/12, 0 refused, 2s',
+    'adding issues: 2',
+    'adding issues: 2/2, 0 refused, 3s',
+    'reading facts: 2',
+    'reading facts: 2/2, 0 refused, 2s',
+    'writing fields: 2',
+    'writing fields: 2/2, 0 refused, 2s',
+  ];
+
+  /** The lines of `stdout` that are progress lines, in order. */
+  function progressLines(stdout: string): readonly string[] {
+    return stdout
+      .trimEnd()
+      .split('\n')
+      .filter((line) => PHASE_LABELS.some((label) => line.startsWith(label)));
+  }
+
+  it('prints each phase\'s start and end lines as plain lines ahead of the sync\'s own, at the default throttle', async () => {
+    const { fake, project } = setUp();
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
+    expect(result.stdout).toStartWith(`${START_AND_END_LINES.join('\n')}\n#10 Stage: (empty) → Blocked\n`);
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+  });
+
+  it('prints a line between start and end on each advance once board.project.progressSeconds have passed', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    progressSeconds: 1\n`);
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(progressLines(result.stdout)).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 1s',
+      'reading facts: 5/5, 0 refused, 2s',
+      'writing fields: 12',
+      'writing fields: 12/12, 1s',
+      'writing fields: 12/12, 0 refused, 2s',
+      'adding issues: 2',
+      'adding issues: 1/2, 1s',
+      'adding issues: 2/2, 2s',
+      'adding issues: 2/2, 0 refused, 3s',
+      'reading facts: 2',
+      'reading facts: 2/2, 1s',
+      'reading facts: 2/2, 0 refused, 2s',
+      'writing fields: 2',
+      'writing fields: 2/2, 1s',
+      'writing fields: 2/2, 0 refused, 2s',
+    ]);
+  });
+
+  // With `false` an advance reads no clock, so the stepping clock moves once per phase and each end reads 1s.
+  it('control: with board.project.progressSeconds false the lines between drop, and the start and end lines stay', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    progressSeconds: false\n`);
+
+    const result = await run(fake, [], project, steppingClock());
+
+    expect(result.exitCode).toBe(0);
+    expect(progressLines(result.stdout)).toEqual([
+      'reading facts: 5',
+      'reading facts: 5/5, 0 refused, 1s',
+      'writing fields: 12',
+      'writing fields: 12/12, 0 refused, 1s',
+      'adding issues: 2',
+      'adding issues: 2/2, 0 refused, 1s',
+      'reading facts: 2',
+      'reading facts: 2/2, 0 refused, 1s',
+      'writing fields: 2',
+      'writing fields: 2/2, 0 refused, 1s',
+    ]);
+  });
+
+  it('writes each line as one progress event in json mode, ahead of the result, and prints no progress line', async () => {
+    const { fake, project } = setUp();
+
+    const result = await run(fake, ['--output=json'], project, steppingClock());
+    const events = eventsOf(result.stdout);
+    const progress = events.filter((event) => event.type === 'event' && event.name === 'progress');
+
+    expect(result.exitCode).toBe(0);
+    expect(progress.map((event) => (event as { summary?: string }).summary)).toEqual(START_AND_END_LINES);
+    expect(progress.map((event) => (event as { data?: unknown }).data)).toEqual([
+      { phase: 'facts', step: 'start', done: 0, total: 5, elapsedMs: 0 },
+      { phase: 'facts', step: 'end', done: 5, total: 5, elapsedMs: 2000, refused: 0 },
+      { phase: 'writes', step: 'start', done: 0, total: 12, elapsedMs: 0 },
+      { phase: 'writes', step: 'end', done: 12, total: 12, elapsedMs: 2000, refused: 0 },
+      { phase: 'adds', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'adds', step: 'end', done: 2, total: 2, elapsedMs: 3000, refused: 0 },
+      { phase: 'facts', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'facts', step: 'end', done: 2, total: 2, elapsedMs: 2000, refused: 0 },
+      { phase: 'writes', step: 'start', done: 0, total: 2, elapsedMs: 0 },
+      { phase: 'writes', step: 'end', done: 2, total: 2, elapsedMs: 2000, refused: 0 },
+    ]);
+    expect(events.at(-1)?.type).toBe('result');
+    expect(result.stdout).not.toContain('"message":"reading facts');
   });
 });

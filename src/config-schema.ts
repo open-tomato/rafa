@@ -19,7 +19,9 @@
  * `config-schema-tests.ts` the `tests` section and its reader,
  * `config-schema-triage.ts` the `triage` section and its readers, and
  * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
- * all four spread in here. `config-schema-hub.ts` holds the `hub`
+ * all four spread in here, and `config-schema-board-project.ts` the
+ * `board.project` limits and their readers, spread in after
+ * `board.project.number`. `config-schema-hub.ts` holds the `hub`
  * section, its readers and the refusal of `effort.sync: service` with
  * no `hub.url`, spread in after `effort.sync`.
  *
@@ -78,7 +80,8 @@
  * spec — in `config-schema-release.ts` for a `pr` or `release` key,
  * `config-schema-tests.ts` for a `tests` key,
  * `config-schema-triage.ts` for a `triage` key,
- * `config-schema-wrap-up.ts` for a `loop.wrapUp` key —
+ * `config-schema-wrap-up.ts` for a `loop.wrapUp` key,
+ * `config-schema-board-project.ts` for a `board.project` limit —
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
@@ -105,6 +108,7 @@ import type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
 } from './config-items.js';
+import type { BoardProjectLimitSettings } from './config-schema-board-project.js';
 import type { HubSettings } from './config-schema-hub.js';
 import type {
   DangerousReleaseSettings,
@@ -148,6 +152,10 @@ import {
   tierPins,
   trackerKind,
 } from './config-readers.js';
+import {
+  BOARD_PROJECT_LIMIT_DEFAULTS,
+  BOARD_PROJECT_LIMIT_SETTINGS,
+} from './config-schema-board-project.js';
 import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
 import {
   DANGEROUS_RELEASE_DEFAULTS,
@@ -206,12 +214,13 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * fields are {@link PrSettings}' and {@link ReleaseSettings}',
  * `dangerousAcceptVersionCollision` is {@link DangerousReleaseSettings}',
  * the `tests` fields are {@link TestsSettings}', the `triage` fields are
- * {@link TriageSettings}', and `loopWrapUpRetries` is
- * {@link WrapUpSettings}'.
+ * {@link TriageSettings}', `loopWrapUpRetries` is
+ * {@link WrapUpSettings}', and the `board.project` limits are
+ * {@link BoardProjectLimitSettings}'.
  */
 export interface RafaConfig
   extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
-  TestsSettings, TriageSettings, WrapUpSettings {
+  TestsSettings, TriageSettings, WrapUpSettings, BoardProjectLimitSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -396,6 +405,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   boardRelationships: 'labels',
   boardProjectTemplate: BOARD_PROJECT_TEMPLATE_DEFAULT,
   boardProjectNumber: null,
+  ...BOARD_PROJECT_LIMIT_DEFAULTS,
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -507,6 +517,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   },
   boardProjectTemplate: { key: 'board.project.template', read: projectUrl, cli: false },
   boardProjectNumber: { key: 'board.project.number', read: projectNumber, cli: false },
+  ...BOARD_PROJECT_LIMIT_SETTINGS,
   roadmapIssue: { key: 'roadmap.issue', read: issueNumber, cli: false },
   claimsStaleAfter: { key: 'claims.staleAfter', read: claimsStaleAfter, cli: false },
   claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },

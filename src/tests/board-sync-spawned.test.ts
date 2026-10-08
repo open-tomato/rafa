@@ -36,7 +36,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { syncAddCalls, syncWriteCalls } from '../board/project/sync-fake.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';
-import { callsLogged, editLabelsOutsideRafa, plantStandInGh } from './project-stand-in-spawn.js';
+import { callsLogged, editLabelsOutsideRafa, plantStandInGh, withoutProgressLines } from './project-stand-in-spawn.js';
 
 /** This suite's temporary directory, removed once every case has run. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-board-sync-spawned-')));
@@ -80,13 +80,13 @@ describe('rafa board sync, spawned over a stand-in gh', () => {
 
     expectExit(dry, 0, scratch);
     expect(dry.stderr).toBe('');
-    expect(dry.stdout).toBe('#21 Stage: Ready → Claimed\nDry run on project #6: 1 change and 0 issues to add; nothing written.\n');
+    expect(withoutProgressLines(dry.stdout)).toBe('#21 Stage: Ready → Claimed\nDry run on project #6: 1 change and 0 issues to add; nothing written.\n');
     expectExit(synced, 0, scratch);
     expect(synced.stderr).toBe('');
-    expect(synced.stdout).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written and 0 issues added.\n');
+    expect(withoutProgressLines(synced.stdout)).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written and 0 issues added.\n');
     expectExit(again, 0, scratch);
     expect(again.stderr).toBe('');
-    expect(again.stdout).toBe('Dry run on project #6: in step, nothing to change.\n');
+    expect(withoutProgressLines(again.stdout)).toBe('Dry run on project #6: in step, nothing to change.\n');
 
     expect(syncWriteCalls(dryCalls)).toEqual([]);
     expect(syncWriteCalls(syncCalls)).toHaveLength(1);
