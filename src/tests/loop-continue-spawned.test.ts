@@ -22,7 +22,7 @@
 import type { Scratch } from './loop-scratch.js';
 import type { EventLine } from '../loop/events-file.js';
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
@@ -149,9 +149,14 @@ function told(scratch: Scratch): readonly (readonly [string, unknown])[] {
     .map((event) => [event.name, event.data['strategy'] ?? event.data['reason'] ?? null]);
 }
 
+/** The planted tracker's path. */
+function trackerPath(scratch: Scratch): string {
+  return join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`);
+}
+
 /** The planted tracker's text. */
 function trackerOf(scratch: Scratch): string {
-  return readFileSync(join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`), 'utf8');
+  return readFileSync(trackerPath(scratch), 'utf8');
 }
 
 describe('loop start --continue over a real loop', () => {
@@ -176,13 +181,21 @@ describe('loop start --continue over a real loop', () => {
     ]);
     expect(trackerOf(scratch)).toContain(`- [BLOCKED] ${GATE}`);
     expect(trackerOf(scratch)).toContain(`- [x] ${LATER}`);
-    expect(run.stderr).toContain('passed-over task(s) left open');
+    expect(run.stderr).toContain('passed-over task(s) left [BLOCKED]');
+    expect(run.stderr).toContain('mark its tracker line - [ ]');
     expect(readSessions(scratch.repo)[0]?.decisions?.map((entry) => [entry.task.task, entry.strategy])).toEqual([[GATE, 'jump']]);
 
     // A second --continue run opens with that list: the gate stays passed
     // over, no session is spawned, and the run ends on it again.
     expectExit(runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']), 22, { ...scratch });
     expect(callsOf(scratch)).toHaveLength(3);
+
+    // The gate's line put back to `- [ ]` is the person's "try again": a
+    // third --continue run drops it from the list and dispatches it, its
+    // stand-in holding it again, and its decision unreadable reads as stop.
+    writeFileSync(trackerPath(scratch), trackerOf(scratch).replace(`- [BLOCKED] ${GATE}`, `- [ ] ${GATE}`), 'utf8');
+    expectExit(runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue']), 20, { ...scratch });
+    expect(callsOf(scratch)).toEqual(['task', 'decision', 'task', 'task', 'decision']);
   }, CASE_TIMEOUT_MS);
 
   it('stops with exit 20 on a stop decision, emitting the decision and then the task\'s own blocked event, and no error', () => {

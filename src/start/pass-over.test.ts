@@ -18,6 +18,7 @@ import {
   addDecision,
   markDone,
   remaining,
+  seedFrom,
   skippedLines,
   taskIdentity,
   taskRefIn,
@@ -246,5 +247,39 @@ describe('remaining', () => {
 
   it('answers nothing for an empty list', () => {
     expect(remaining(EMPTY_PASS_OVER, TRACKER)).toEqual([]);
+  });
+});
+
+describe('seedFrom', () => {
+  /** The list a stopped run left: the gate jumped, and the helper's user deferred until the helper is done. */
+  const SAVED = addDecision(addDecision(EMPTY_PASS_OVER, GATE, JUMP, TRACKER), { ...USER, status: 'blocked' }, { strategy: 'defer', reason: 'x', after: 5 }, TRACKER);
+  /** The tracker that run left, the deferred task blocked as its stop left it. */
+  const LEFT = TRACKER.replace('- [ ] Use the helper', '- [BLOCKED] Use the helper');
+
+  it('keeps every entry whose task still reads [BLOCKED], at its current line', () => {
+    expect(seedFrom(SAVED, LEFT)).toEqual(remaining(SAVED, LEFT));
+    expect(seedFrom(SAVED, LEFT)).toHaveLength(2);
+  });
+
+  it('drops an entry a person put back with - [ ], the person\'s "try again"', () => {
+    const putBack = LEFT.replace('- [BLOCKED] Gate on .env.local', '- [ ] Gate on .env.local');
+
+    expect(seedFrom(SAVED, putBack).map((entry) => entry.task.task)).toEqual(['Use the helper']);
+    // The control: the same list over the tracker as the run left it keeps the gate.
+    expect(seedFrom(SAVED, LEFT).map((entry) => entry.task.task)).toEqual(['Gate on .env.local', 'Use the helper']);
+  });
+
+  it('drops an entry whose task was ticked, edited or removed', () => {
+    const ticked = LEFT.replace('- [BLOCKED] Gate on .env.local', '- [x] Gate on .env.local');
+    const edited = LEFT.replace('- [BLOCKED] Gate on .env.local', '- [BLOCKED] Gate on .env.local, written by the setup task');
+    const removed = LEFT.replace('- [BLOCKED] Gate on .env.local  <!-- blocked: needs a person -->\n', '');
+
+    for (const tracker of [ticked, edited, removed]) {
+      expect(seedFrom(SAVED, tracker).map((entry) => entry.task.task)).toEqual(['Use the helper']);
+    }
+  });
+
+  it('drops a defer whose task it waits on is done', () => {
+    expect(seedFrom(SAVED, ticked(LEFT, 4)).map((entry) => entry.task.task)).toEqual(['Gate on .env.local']);
   });
 });

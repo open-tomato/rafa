@@ -505,7 +505,7 @@ describe('where start.ts hands a stop to a --continue decision', () => {
     for (const field of ['continueArgs: continueRun,', 'retries,', 'session,', 'isInterrupted: () => interrupted,']) {
       expect(made[0]?.args[0]).toContain(field);
     }
-    expect(made[0]?.args[0]).toContain('seed: continueRun.on\n        ? readPreviousPassOver(repoRoot, { planPath, planStub })\n        : [],');
+    expect(made[0]?.args[0]).toContain('seed: continueRun.on\n        ? readPreviousPassOver(repoRoot, { planPath, planStub, branch, checkout })\n        : [],');
     expect(EVERY.indexOf(callTo(EVERY, 'createRunRetries'))).toBeLessThan(EVERY.indexOf(callTo(EVERY, 'createRunDecisions')));
   });
 

@@ -102,9 +102,9 @@ function plant(root: string, ...records: SessionRecord[]): void {
   }
 }
 
-/** The plan `readPreviousPassOver` is asked about under `root`. */
+/** The plan `readPreviousPassOver` is asked about under `root`, on `feat/demo` in the main checkout. */
 function demoPlan(root: string) {
-  return { planPath: join(root, '.plans', 'PLAN-demo.md'), planStub: 'demo' };
+  return { planPath: join(root, '.plans', 'PLAN-demo.md'), planStub: 'demo', branch: 'feat/demo', checkout: root };
 }
 
 describe('RunSession.decisionsChanged', () => {
@@ -191,7 +191,30 @@ describe('readPreviousPassOver', () => {
     const root = freshRoot();
     plant(root, record({ planStub: null, plan: 'PLAN.md', decisions: [JUMP] }));
 
-    expect(readPreviousPassOver(root, { planPath: join(root, 'PLAN.md'), planStub: null }, { isAlive: GONE })).toEqual([JUMP]);
-    expect(readPreviousPassOver(root, { planPath: join(root, 'OTHER.md'), planStub: null }, { isAlive: GONE })).toEqual([]);
+    expect(readPreviousPassOver(root, { ...demoPlan(root), planPath: join(root, 'PLAN.md'), planStub: null }, { isAlive: GONE })).toEqual([JUMP]);
+    expect(readPreviousPassOver(root, { ...demoPlan(root), planPath: join(root, 'OTHER.md'), planStub: null }, { isAlive: GONE })).toEqual([]);
+  });
+
+  it('reads no list another branch\'s stopped run of the plan saved', () => {
+    const root = freshRoot();
+    plant(root, record({ branch: 'feat/demo-old', decisions: [JUMP] }));
+
+    expect(readPreviousPassOver(root, demoPlan(root), { isAlive: GONE })).toEqual([]);
+    // The control: the same record on the run's branch is read.
+    expect(readPreviousPassOver(root, { ...demoPlan(root), branch: 'feat/demo-old' }, { isAlive: GONE })).toEqual([JUMP]);
+  });
+
+  it('reads a record naming a worktree only from a run in that worktree, and one naming none from any', () => {
+    const root = freshRoot();
+    const worktree = join(root, 'wt', 'demo');
+    plant(root, record({ worktree, decisions: [JUMP] }));
+
+    expect(readPreviousPassOver(root, demoPlan(root), { isAlive: GONE })).toEqual([]);
+    expect(readPreviousPassOver(root, { ...demoPlan(root), checkout: join(root, 'wt', 'other') }, { isAlive: GONE })).toEqual([]);
+    expect(readPreviousPassOver(root, { ...demoPlan(root), checkout: worktree }, { isAlive: GONE })).toEqual([JUMP]);
+
+    const bare = freshRoot();
+    plant(bare, record({ decisions: [DEFER] }));
+    expect(readPreviousPassOver(bare, { ...demoPlan(bare), checkout: join(bare, 'wt', 'demo') }, { isAlive: GONE })).toEqual([DEFER]);
   });
 });

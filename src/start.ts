@@ -637,7 +637,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // Under `--continue`, a stop the retries do not take is handed to a
     // decision, and the tasks it passes over are skipped below
     // (`start/continue-run.ts`); without it, nothing changes. The run
-    // opens with the list the plan's last stopped run saved.
+    // opens with the list the plan's last stopped run on this branch
+    // saved, less the tasks no longer `[BLOCKED]`.
     const decisions = createRunDecisions({
       continueArgs: continueRun,
       repoRoot,
@@ -650,7 +651,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       retries,
       isInterrupted: () => interrupted,
       seed: continueRun.on
-        ? readPreviousPassOver(repoRoot, { planPath, planStub })
+        ? readPreviousPassOver(repoRoot, { planPath, planStub, branch, checkout })
         : [],
     });
 

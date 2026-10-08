@@ -520,7 +520,10 @@ New; it replaces no earlier text. What a row or an action added to
   cannot be read are `stop`; a session SIGINT ended decides nothing.
   Passed-over lines are `findNextTask`'s `skipLines`; the tracker keeps
   them `[BLOCKED]`, and the list is saved on the run record as
-  `decisions` and read back by the plan's next `--continue` run. A second
+  `decisions` and read back by the plan's next `--continue` run on the
+  same branch (and worktree, when the record names one). That run drops
+  each entry whose task no longer reads `[BLOCKED]` (`seedFrom`): a line
+  put back to `- [ ]`, ticked, edited or removed is taken again. A second
   `defer` of a task is applied as a `jump`, and a task passed over that
   reaches a decision again is stopped, each reason saying so. The
   effort store gets no row for the decision session: `effort/classify.ts`
@@ -545,7 +548,10 @@ New; it replaces no earlier text. What a row or an action added to
   - **The end**: when only passed-over tasks are left open, the run lists
     each with its strategy and reason, emits `passed-over` and a `halt`,
     and ends with exit code 22, before the pre-wrap-up step: no wrap-up
-    and no pull request. `--force-wrap-up` takes the pre-wrap-up step
+    and no pull request. Its last lines say how a task comes back: mark
+    its tracker line `- [ ]` and run again, since a `--continue` run
+    passes a `[BLOCKED]` one over again, or run without `--continue`,
+    which resumes the first `[BLOCKED]` line. `--force-wrap-up` takes the pre-wrap-up step
     instead, its one repair included; a step red after that repair whose
     new failures (the baseline's left out) are within
     `loop.forceWrapUp.maxNewFailures` (`false`, the default, tolerating

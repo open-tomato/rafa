@@ -383,8 +383,28 @@ describe('the seed and the end of the plan', () => {
     const run = plant([], 0, seed);
     const decisions = createRunDecisions(run.options);
 
-    expect(run.saved).toEqual([seed]);
+    expect(run.saved).toEqual([[{ ...seed[0], task: { ...seed[0]?.task, ordinal: 1 } }]]);
     expect(decisions.skipLines(TRACKER).has(2)).toBe(true);
+  });
+
+  it('drops a seeded task a person put back with - [ ], so the run takes it again', () => {
+    const run = plant([], 0, seed);
+    const putBack = TRACKER.replace('- [BLOCKED] Check the env file', '- [ ] Check the env file');
+    writeFileSync(run.trackerPath, putBack, 'utf8');
+    const decisions = createRunDecisions(run.options);
+
+    expect(decisions.skipLines(putBack).size).toBe(0);
+    expect(findNextTask(putBack, { skipLines: decisions.skipLines(putBack) })?.lineNum).toBe(2);
+    expect(run.saved).toEqual([]);
+    expect(lines.join('\n')).toContain('1 task(s) the last --continue run passed over no longer read [BLOCKED]');
+  });
+
+  it('seeds nothing while the tracker is not written yet', () => {
+    const run = plant([], 0, seed);
+    rmSync(run.trackerPath);
+
+    expect(createRunDecisions(run.options).skipLines(TRACKER).size).toBe(0);
+    expect(run.saved).toEqual([]);
   });
 
   it('ends a run left with only passed-over tasks with exit code 22, the passed-over event and a halt', async () => {
@@ -400,6 +420,9 @@ describe('the seed and the end of the plan', () => {
       ['halt', { reason: 'passed over 1 task(s)' }],
     ]);
     expect(lines.join('\n')).toContain('line 3 (jump): Check the env file a person writes');
+    // How to put a task back: a --continue run alone would pass it over again.
+    expect(end.message).toContain('mark its tracker line - [ ]');
+    expect(end.message).toContain('without --continue');
   });
 
   it('lets a plan whose passed-over tasks are all done end as it always did', () => {

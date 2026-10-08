@@ -40,7 +40,8 @@
  * Under `--continue`, {@link RunSession.decisionsChanged} writes the
  * run's pass-over list (`./pass-over.ts`) each time it changes, and
  * {@link readPreviousPassOver} reads back the list the plan's newest
- * stopped run saved, so the next `--continue` run starts from it.
+ * stopped run on the same branch (and worktree, when its record names
+ * one) saved, so the next `--continue` run starts from it.
  *
  * The open writes no phase, so a record no change has reached yet reads
  * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
@@ -116,6 +117,7 @@ import type {
   SessionConflict,
   SessionDraft,
   SessionReadSeams,
+  SessionRecord,
 } from '../loop/sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -358,19 +360,32 @@ export function openRunSession(options: RunSessionOptions): RunSession {
   return sessionHandle(repoRoot, draft.sessionId);
 }
 
-/** The plan {@link readPreviousPassOver} reads a list for. */
+/** The run {@link readPreviousPassOver} reads a list for: its plan, its branch and its checkout. */
 export interface PassOverPlan {
   /** The plan's path, as `start()` resolved it. */
   readonly planPath: string;
   /** The plan's stub, or null for a plan whose file name carries none. */
   readonly planStub: string | null;
+  /** The branch the run is on. */
+  readonly branch: string;
+  /** The run's checkout; a worktree when it is not the project root. */
+  readonly checkout: string;
+}
+
+/** True when `record` was a run of `plan`'s branch, and of its worktree when the record names one. */
+function sameRunPlace(repoRoot: string, record: SessionRecord, plan: PassOverPlan): boolean {
+  if (record.branch !== plan.branch) return false;
+  if (record.worktree === undefined) return true;
+  return plan.checkout !== repoRoot && record.worktree === plan.checkout;
 }
 
 /**
- * The pass-over list the plan's newest stopped run saved on its record,
- * or none: none for a plan with no stopped run, and none when that run
- * saved no list, whatever an older run saved. A record stored `running`
- * or `paused` whose pid is gone reads as stopped (`readState`).
+ * The pass-over list the plan's newest stopped run on the same branch
+ * saved on its record, or none: none for a plan with no stopped run
+ * there, and none when that run saved no list, whatever an older run
+ * saved. A record naming a worktree is read only by a run in that
+ * worktree; one naming none, by any run on its branch. A record stored
+ * `running` or `paused` whose pid is gone reads as stopped (`readState`).
  *
  * @throws SessionRecordError when a record under `.rafa/runs/` cannot
  *   be read, as `readSessions` does.
@@ -382,7 +397,7 @@ export function readPreviousPassOver(
 ): PassOverList {
   const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
   const stopped = readSessions(repoRoot, seams)
-    .filter((record) => record.state === 'stopped' && samePlan(record, wanted));
+    .filter((record) => record.state === 'stopped' && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan));
   const newest = stopped.at(-1);
   return newest === undefined
     ? []

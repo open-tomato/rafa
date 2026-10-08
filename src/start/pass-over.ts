@@ -44,6 +44,15 @@
  * is ticked, whether or not {@link markDone} was called. `markDone`
  * drops what a done task releases from the list itself, so the saved
  * list does not carry entries nothing will read again.
+ *
+ * ## A list read back from an earlier run
+ *
+ * A list saved by an earlier run is a seed, never a standing order: a
+ * person reads the tracker between runs, and a line put back to
+ * `- [ ]` is that person's "try this again". So {@link seedFrom} keeps
+ * only the entries whose task still reads `[BLOCKED]`, as the decision
+ * left it, dropping one a person put back, ticked, edited or removed,
+ * and a defer whose task it waits on is done.
  */
 import type { ContinueDecision } from './decision-parse.js';
 import type { TaskInfo, TrackerTask } from '../utils/tracker.js';
@@ -195,4 +204,16 @@ export function remaining(list: PassOverList, trackerContent: string): PassOverL
   if (list.length === 0) return EMPTY_PASS_OVER;
   const tasks = listTrackerTasks(trackerContent);
   return list.flatMap((entry) => stillPassedOver(entry, tasks) ?? []);
+}
+
+/**
+ * The entries of `list`, a list an earlier run saved, that a new run
+ * opens with over `trackerContent`: each whose task still reads
+ * `[BLOCKED]`, at its current lines. See the module note.
+ */
+export function seedFrom(list: PassOverList, trackerContent: string): PassOverList {
+  if (list.length === 0) return EMPTY_PASS_OVER;
+  const tasks = listTrackerTasks(trackerContent);
+  const isBlocked = (entry: PassOverEntry): boolean => locate(entry.task, tasks)?.status === 'blocked';
+  return list.filter(isBlocked).flatMap((entry) => stillPassedOver(entry, tasks) ?? []);
 }

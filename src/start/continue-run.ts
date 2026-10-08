@@ -66,9 +66,12 @@
  * `halt` for a suite step), which is not emitted otherwise, and ends the
  * run by throwing a `LoopEnd` (`./continue-exits.ts`). The pass-over
  * list is written on the run's record each time it changes
- * (`RunSession.decisionsChanged`), and the run opens with the list the
- * plan's newest stopped run saved (`readPreviousPassOver`), handed in as
- * {@link RunDecisionsOptions.seed}.
+ * (`RunSession.decisionsChanged`). The run opens with the list the
+ * plan's newest stopped run on the same branch saved
+ * (`readPreviousPassOver`), handed in as {@link RunDecisionsOptions.seed},
+ * less every entry whose task no longer reads `[BLOCKED]` (`seedFrom`):
+ * a line a person put back to `- [ ]` is taken again, and so is one
+ * ticked, edited or removed.
  *
  * ## A decision without a session
  *
@@ -126,7 +129,7 @@ import type { ClaudeSettingSource, RafaConfig } from '../config.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
@@ -137,7 +140,7 @@ import { parseDecision } from './decision-parse.js';
 import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.js';
 import { runDecisionSession } from './decision-session.js';
 import { emitLoopEvent, taskPosition } from './loop-events.js';
-import { addDecision, markDone, remaining, skippedLines, taskRefIn } from './pass-over.js';
+import { addDecision, markDone, remaining, seedFrom, skippedLines, taskRefIn } from './pass-over.js';
 
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
 export const SUITE_STEP_RED = 'suite step red';
@@ -186,7 +189,7 @@ export interface RunDecisionsOptions {
   readonly retries: Pick<RunRetries, 'retry' | 'left' | 'lastRefusal'>;
   /** True once the run has received SIGINT. */
   readonly isInterrupted: () => boolean;
-  /** The list the run opens with: the plan's newest stopped run's. */
+  /** The list the plan's newest stopped run saved; the run opens with the entries still `[BLOCKED]`. */
   readonly seed: PassOverList;
   /** The decision session's spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
@@ -262,6 +265,23 @@ function whenOf(stop: DecisionStop): DecisionWhen {
     : 'now';
 }
 
+/**
+ * The list a run opens with: the entries of `seed` whose tasks still
+ * read `[BLOCKED]` (`seedFrom`), none while the tracker is not written
+ * yet, and one line naming how many came back into the run.
+ */
+function openingList(seed: PassOverList, trackerPath: string): PassOverList {
+  if (seed.length === 0) return seed;
+  const kept = existsSync(trackerPath)
+    ? seedFrom(seed, readFileSync(trackerPath, 'utf8'))
+    : [];
+  const back = seed.length - kept.length;
+  if (back > 0) {
+    activeOutput().info(`↩️  ${back} task(s) the last --continue run passed over no longer read [BLOCKED], so this run takes them again.`);
+  }
+  return kept;
+}
+
 /** The key the run's two bounds hold `taskInfo` under: its text and its ordinal (`./pass-over.ts`). */
 function boundKey(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>, trackerContent: string): string {
   const ref = taskRefIn(taskInfo, trackerContent);
@@ -281,15 +301,15 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const mode = options.mode ?? activeOutputMode;
   let directive = options.continueArgs.directive;
   let firstPass = true;
-  let list: PassOverList = options.seed;
+  const readTracker = (): string => readFileSync(trackerPath, 'utf8');
+  let list: PassOverList = openingList(options.seed, trackerPath);
   const deferred = new Set<string>();
   const passedOver = new Set<string>();
   if (list.length > 0) {
     session.decisionsChanged(list);
-    activeOutput().info(`⏭  Passing over ${list.length} task(s) the plan's last stopped --continue run passed over, while they stay open.`);
+    activeOutput().info(`⏭  Passing over ${list.length} task(s) the plan's last --continue run passed over, while they stay [BLOCKED].`);
   }
 
-  const readTracker = (): string => readFileSync(trackerPath, 'utf8');
   const skipLines = (trackerContent: string): ReadonlySet<number> => skippedLines(list, trackerContent);
 
   const subjectOf = (stop: DecisionStop): DecisionSubject | null => {
@@ -497,7 +517,11 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     }
     if (forcing) return tasks;
     emitLoopEvent({ kind: 'halt', reason: `passed over ${tasks.length} task(s)` });
-    throw new LoopEnd(PASSED_OVER_EXIT, `⏭  The run ended with ${tasks.length} passed-over task(s) left open. Run again with --continue once they can go on, or with --force-wrap-up to open a draft pull request.`);
+    throw new LoopEnd(PASSED_OVER_EXIT, [
+      `⏭  The run ended with ${tasks.length} passed-over task(s) left [BLOCKED]. A run with --continue passes them over again.`,
+      '   To put a task back, mark its tracker line - [ ] and run again, or run again without --continue, which resumes the first [BLOCKED] line.',
+      '   Or run again with --continue --force-wrap-up to open a draft pull request listing them.',
+    ].join('\n'));
   };
 
   const gateForcedWrapUp = (
