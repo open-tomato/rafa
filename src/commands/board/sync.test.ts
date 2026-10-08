@@ -17,6 +17,12 @@
  * same board without it, which exits 0 with no `warn:` line and every
  * item filled, so the warning line and the unfilled #21 are the refusal's.
  *
+ * The network-error cases plant one `HTTP 502` on the project fake: the
+ * sync sends the call again, prints one `retrying` line (a `retry` event
+ * in json mode) and syncs. Their control is the same failure under
+ * `board.project.retries: false`, refused with exit code 2 and no line,
+ * so the recovery is the retry's.
+ *
  * The warning lines are imported once the static imports have loaded,
  * for the import cycle `src/board/project/sync.test.ts`'s module note
  * names.
@@ -277,14 +283,60 @@ describe('rafa board sync', () => {
     expect(syncAddCalls(fake.calls())).toEqual([]);
   });
 
-  it('refuses with exit code 2 naming the failure when gh cannot be read', async () => {
+  it('refuses with exit code 2 naming the failure when gh cannot be read, retrying nothing GitHub refused on purpose', async () => {
     const { fake, project } = setUp();
-    fake.project.failNext('gh: HTTP 502: Bad gateway\n');
+    fake.project.failNext('gh: HTTP 401: Bad credentials\n');
 
     const result = await run(fake, [], project);
 
     expect(result.exitCode).toBe(BOARD_SYNC_REFUSAL_EXIT);
     expect(result.stderr).toStartWith('❌ Could not sync the project: ');
+    expect(result.stderr).toContain('HTTP 401');
+    expect(result.stdout).not.toContain('retrying ');
+  });
+});
+
+describe('rafa board sync: a call failing on a network error', () => {
+  /** The failure every case plants: a gateway error, in the retried class. */
+  const GATEWAY = 'gh: HTTP 502: Bad gateway\n';
+
+  /** The retry line the planted failure prints, past its subject. */
+  const RETRY_LINE = /^retrying \S+ \(1 of 3\): HTTP 502$/mu;
+
+  it('sends the call again, prints one retrying line and syncs as a run with no failure does', async () => {
+    const { fake, project } = setUp();
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(RETRY_LINE);
+    expect(result.stdout.match(/^retrying /gmu)).toHaveLength(1);
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+  });
+
+  it('control: with board.project.retries false the same failure is refused with exit code 2 and no retrying line', async () => {
+    const { fake } = setUp();
+    const project = plantCase(`${PROJECT_CONFIG}    retries: false\n`);
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(BOARD_SYNC_REFUSAL_EXIT);
     expect(result.stderr).toContain('HTTP 502');
+    expect(result.stdout).not.toContain('retrying ');
+  });
+
+  it('writes the retry as one retry event in json mode, and no retrying line', async () => {
+    const { fake, project } = setUp();
+    fake.project.failNext(GATEWAY);
+
+    const result = await run(fake, ['--output=json'], project);
+    const retries = eventsOf(result.stdout).filter((event) => event.type === 'event' && event.name === 'retry');
+
+    expect(result.exitCode).toBe(0);
+    expect(retries).toHaveLength(1);
+    expect(retries[0]).toMatchObject({ summary: expect.stringMatching(RETRY_LINE), data: { attempt: 1, of: 3, reason: 'HTTP 502', waitMs: 2000 } });
+    expect(result.stdout).not.toContain('"message":"retrying ');
   });
 });

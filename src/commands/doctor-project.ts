@@ -46,13 +46,20 @@
  * here changes `doctor`'s exit code. A rejection of any call is an
  * `unknown` row, never a throw. Nothing is written. In json mode the
  * reading is the result's `project`, null where there are no rows.
+ *
+ * The three readings go through the board's runner opened retrying
+ * (`../board/project/project-runner.ts`): a call that failed on a
+ * network error is sent again, each retry reported to `retry.onRetry`
+ * before its wait, and only a call that still fails is an `unknown` row.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project } from '../board/project/port.js';
+import type { ProjectRetryConfig, ProjectRunnerSeams } from '../board/project/project-runner.js';
 import type { BoardStatusOutcome } from '../board/status.js';
 
 import { createGhProjectPort } from '../board/project/gh.js';
 import { matchProjectFields } from '../board/project/port.js';
+import { openProjectRunner } from '../board/project/project-runner.js';
 import { isMissingProjectScope, PROJECT_SCOPE_FIX } from '../board/project/refresh-warnings.js';
 import { isMapping, messageOf } from '../config-sections.js';
 
@@ -103,6 +110,10 @@ export interface DoctorProjectInput {
   readonly number: number | null;
   /** `board.project.template`, named by the fields row's fix. */
   readonly template: string;
+  /** `board.project.retries` and `retryWaitSeconds`, the runner is opened retrying with. */
+  readonly config: ProjectRetryConfig;
+  /** How a retried call waits and is reported; `Bun.sleep` and the active output when left out. */
+  readonly retry?: ProjectRunnerSeams;
 }
 
 function rowOf(kind: ProjectRowKind, name: string, outcome: BoardStatusOutcome, detail: string): ProjectRow {
@@ -180,8 +191,9 @@ export function fieldsRow(project: Pick<Project, 'fields'>, template: string): P
 
 /** The rows for the repository, or null where it has none; see the module note. Never a throw. */
 export async function readDoctorProject(input: DoctorProjectInput): Promise<DoctorProjectReading | null> {
-  const { gh, number, template } = input;
-  if (gh === null || number === null) return null;
+  const { number, template } = input;
+  if (input.gh === null || number === null) return null;
+  const gh = openProjectRunner(input.gh, input.config, input.retry);
   const scope = await readScopeRow(gh);
   if (scope.outcome !== 'present') {
     const project = notRead('project', `${PROJECT_ROW} ${String(number)}`, scope);

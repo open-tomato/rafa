@@ -586,6 +586,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
     ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
@@ -707,6 +708,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/pr/merge.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../cli/command.js', ['CommandExit']],
@@ -975,6 +977,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/release/settle.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
     ['../../release/settle-pr.js', ['settleByPr']],
@@ -1014,6 +1017,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/board/sync.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
     ['../../board/project/sync.js', ['syncProject']],
     ['../../cli/command.js', ['CommandExit']],
@@ -1372,6 +1376,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
+    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../config-load.js', ['loadConfig']],
@@ -1399,6 +1404,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [
+    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],

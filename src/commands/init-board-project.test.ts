@@ -96,6 +96,8 @@ const ADDED: readonly number[] = [1, 10, 30, 40, 50];
 /** The config every case reads but where a case says otherwise. */
 const CONFIG: ProjectSetupConfig = {
   boardProjectNumber: null,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
   boardProjectWriteBatchSize: 5,
   boardProjectWritePauseMs: 0,
   boardProjectTemplate: TEMPLATE_URL,

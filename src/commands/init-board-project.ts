@@ -108,9 +108,14 @@
  * way `setUpBoard` does: the caller decides what a refusal costs. Every
  * call goes through the one `GhRunner`; every case in
  * `./init-board-project.test.ts` drives a recorded fake.
+ * {@link runProjectStep} opens that runner retrying
+ * (`../board/project/project-runner.ts`), so a call that failed on a
+ * network error is sent again, each retry reported to the step's
+ * `onRetry` before its wait, before it counts as a refusal.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
+import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
@@ -119,6 +124,7 @@ import type { BoardStepResult } from './init-board.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
+import { openProjectRunner } from '../board/project/project-runner.js';
 import {
   isMissingProjectScope,
   notRefreshedWarning,
@@ -567,6 +573,10 @@ export interface ProjectStepOptions {
   readonly openPrompter: () => Prompter;
   /** Sets the project up; {@link setUpProject} when left out. */
   readonly setUp?: (options: ProjectSetupOptions) => Promise<ProjectSetupReport>;
+  /** The wait before a retried call, between two adds and between two write requests; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Hears each retried call; the active output when left out. */
+  readonly onRetry?: RetryReport;
 }
 
 /** What a line asking for `--project` is told when the board step did not run. */
@@ -601,6 +611,19 @@ function withWrittenRoadmap(root: string, config: ProjectSetupConfig): ProjectSe
     : { ...config, roadmapIssue: written };
 }
 
+/** How the step's runner waits before a retry and reports it: the step's own seams, each only when given. */
+function retrySeamsOf(options: ProjectStepOptions): ProjectRunnerSeams {
+  const { sleep, onRetry } = options;
+  return {
+    ...(sleep === undefined
+      ? {}
+      : { sleep }),
+    ...(onRetry === undefined
+      ? {}
+      : { onRetry }),
+  };
+}
+
 /**
  * The project step of `rafa init`, having decided whether to run it and
  * asked when nobody said. The first answer wins: a board that did not
@@ -619,7 +642,11 @@ export async function runProjectStep(options: ProjectStepOptions): Promise<Proje
 
   const run = async (asked: boolean): Promise<ProjectStepResult> => {
     const setUp = options.setUp ?? setUpProject;
-    const report = await setUp({ root, config: withWrittenRoadmap(root, options.config), gh: options.openGh() });
+    const config = withWrittenRoadmap(root, options.config);
+    const gh = openProjectRunner(options.openGh(), config, retrySeamsOf(options));
+    const report = await setUp(options.sleep === undefined
+      ? { root, config, gh }
+      : { root, config, gh, sleep: options.sleep });
     return { status: 'ran', asked, report, warnings: [] };
   };
   if (wanted === true) return run(false);

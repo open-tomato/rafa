@@ -25,6 +25,12 @@
  * `--dry-run` reads everything a sync reads, and sends no write and no
  * add.
  *
+ * Every call goes through the runner opened retrying
+ * (`src/board/project/project-runner.ts`): a call that failed on a
+ * network error is sent again, each retry printed before its wait as
+ * `retrying #725 (1 of 3): operation timed out`, or written as one
+ * `retry` event in json mode.
+ *
  * ## Exit codes
  *
  * 1 for a stray word, a config that cannot be used, and a project with no
@@ -48,6 +54,7 @@ import type { ProjectSynced } from '../../board/project/sync.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { rateLimitWarning } from '../../board/project/refresh-warnings.js';
 import { syncProject } from '../../board/project/sync.js';
 import { CommandExit } from '../../cli/command.js';
@@ -108,7 +115,10 @@ export interface BoardSyncResult {
   readonly warnings: readonly string[];
 }
 
-/** How the command reaches `gh`, and the pause between write requests; the system's own when left out. */
+/**
+ * How the command reaches `gh`, and the pause between write requests and
+ * the wait before a retried call; the system's own when left out.
+ */
 export interface BoardSyncSeams {
   readonly gh?: GhRunner;
   readonly sleep?: (ms: number) => Promise<void>;
@@ -194,7 +204,7 @@ export async function runBoardSync(context: RafaContext, seams: BoardSyncSeams):
   if (config.boardProjectNumber === null) {
     throw new CommandExit(1, `❌ board.project.number is not set, so there is no project to sync. Run \`${PROJECT_INIT_FIX}\` to create one.`);
   }
-  const gh = seams.gh ?? createGhRunner({ cwd: project.root });
+  const gh = openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep));
   const dryRun = context.flags[DRY_RUN_FLAG] === true;
   const synced = await syncProject(seams.sleep === undefined
     ? { config, gh, dryRun }

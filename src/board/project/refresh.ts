@@ -155,10 +155,15 @@ import { writeProjectFields } from './writes.js';
 /** What every refusal of this module opens with. */
 const PREFIX = 'board project refresh';
 
-/** The config keys the refresh reads. */
+/**
+ * The config keys the refresh reads, and the two retry keys its callers
+ * open the runner with (`./project-runner.ts`).
+ */
 export type RefreshConfig = Pick<
   RafaConfig,
   | 'boardProjectNumber'
+  | 'boardProjectRetries'
+  | 'boardProjectRetryWaitSeconds'
   | 'boardProjectWriteBatchSize'
   | 'boardProjectWritePauseMs'
   | 'boardRelationships'

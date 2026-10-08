@@ -19,6 +19,9 @@
  *  - Each selection rule holds a decoy the rule must leave out: a pull
  *    request that is not merged, one whose merge commit is another, one
  *    into another branch, and a closing reference on another repository.
+ *  - The commit query timed out once is sent again only with retries on:
+ *    the same runner under `board.project.retries: false` answers the
+ *    problem line and asks no refresh.
  */
 import type { SettleProjectOptions, SettleProjectRefresh } from './settle-project.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -27,6 +30,9 @@ import type { SettleDelivered } from '../../release/settle-tag.js';
 import type { SettleBuilt, SettleFragment } from '../../release/settle.js';
 
 import { describe, expect, it } from 'bun:test';
+
+import { retryLine } from '../../board/project/project-runner.js';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
 
 import { COMMIT_BATCH, commitPullsArgs, refreshProjectAfterSettle, releasedCommits, settleProblemLine } from './settle-project.js';
 
@@ -146,7 +152,7 @@ function fakeGh(pulls: Readonly<Record<string, readonly PullNode[]>>, answer?: G
 
 /** The config of a case, `board.project.number` set to `number`. */
 function config(number: number | null = 6): RefreshConfig {
-  return { boardProjectNumber: number, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+  return { boardProjectNumber: number, boardProjectRetries: false, boardProjectRetryWaitSeconds: 1, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 }
 
 /** How one case runs. */
@@ -400,5 +406,42 @@ describe('every failure is a warning', () => {
 
     expect(run.result?.warnings).toEqual([settleProblemLine([21, 22], 'repo view refused')]);
     expect(run.result?.warnings[0]).toContain('The project was not updated for #21, #22: repo view refused.');
+  });
+});
+
+describe('a call failing on a network error', () => {
+  /** Runs the refresh after a push over {@link USUAL}, its commit query timing out once, with `retries` off the config. */
+  async function runFlaky(retries: number | false) {
+    const flaky = flakyGh(fakeGh(USUAL).open(), [TIMED_OUT_STDERR]);
+    const recorder = recordRetries();
+    const asked: (readonly number[])[] = [];
+    const result = await refreshProjectAfterSettle({
+      delivered: pushed(),
+      branch: BRANCH,
+      config: { ...config(), boardProjectRetries: retries, boardProjectRetryWaitSeconds: 2 },
+      openGh: () => flaky.gh,
+      refresh: (_options, issues) => {
+        asked.push(issues);
+        return answering([])();
+      },
+      retry: recorder.seams,
+    });
+    return { flaky, recorder, asked, result };
+  }
+
+  it('sends the commit query again after the wait, reporting the retry, and refreshes the issues it names', async () => {
+    const run = await runFlaky(3);
+
+    expect(run.recorder.notices().map(retryLine)).toEqual(['retrying repository (1 of 3): operation timed out']);
+    expect(run.recorder.waits()).toEqual([2000]);
+    expect(run.asked).toEqual([[21, 22]]);
+    expect(run.result?.warnings).toEqual([]);
+  });
+
+  it('control: with board.project.retries false the query is sent once and its failure is the problem line', async () => {
+    const run = await runFlaky(false);
+
+    expect([run.recorder.notices().length, run.flaky.sent().length, run.asked]).toEqual([0, 1, []]);
+    expect(run.result?.warnings[0]).toContain('operation timed out');
   });
 });

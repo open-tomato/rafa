@@ -70,7 +70,11 @@
  * `board.project.number` set; unset, or on another tracker, no call is
  * sent. Every line the add or the refresh answers is written at `warn`
  * after the command's own output, and none changes the exit code: the
- * issue is filed, and `rafa board sync` catches the project up.
+ * issue is filed, and `rafa board sync` catches the project up. Their
+ * runner is opened retrying (`../../board/project/project-runner.ts`):
+ * a call that failed on a network error is sent again, each retry an
+ * `info` line, `retrying #725 (1 of 3): operation timed out`, or one
+ * `retry` event in json mode.
  *
  * ## Refusals
  *
@@ -91,6 +95,7 @@ import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_PRIORITIES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
+import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { messageOf } from '../../config-sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
 import { expectNoArgument } from '../plan/plan-files.js';
@@ -236,7 +241,7 @@ export async function addCreatedToProject(context: RafaContext, seams: IssueSeam
   const config = issueSubjectConfig(project, () => undefined);
   const lines = await addAndRefreshIssue({
     config,
-    openGh: () => seams.gh ?? createGhRunner({ cwd: project.root }),
+    openGh: () => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, commandRetrySeams(context.output, context.outputMode, seams.sleep)),
   }, issue);
   for (const line of lines) context.output.warn(line);
 }

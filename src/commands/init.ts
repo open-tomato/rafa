@@ -198,6 +198,7 @@ import { join, relative, sep } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
+import { commandRetrySeams } from '../board/project/project-runner.js';
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { loadConfig } from '../config-load.js';
@@ -251,6 +252,8 @@ export interface InitSeams {
   readonly readRemote: (dir: string) => string | null;
   /** Opens the runner the board step sends every `gh` command through, in the root. */
   readonly gh: (root: string) => GhRunner;
+  /** The wait before a retried project call and between two project writes; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** The seams the registered command runs with. */
@@ -657,6 +660,7 @@ async function runInit(context: RafaContext, seams: InitSeams): Promise<void> {
     openGh: () => seams.gh(scopes.written.root),
     isTerminal: seams.isTerminal,
     openPrompter: seams.openPrompter,
+    ...commandRetrySeams(context.output, context.outputMode, seams.sleep),
   });
   const result: InitResult = {
     ...scopes.written,

@@ -211,6 +211,7 @@ import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.j
 import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
@@ -615,7 +616,14 @@ export async function runMerge(context: RafaContext, seams: MergeSeams): Promise
 
   const steps = cleanUpAfterMerge(git, detail, { info, warn });
   const board = await reportAfterCleanUp(context, pr, seams, detail);
-  await refreshProjectAfterMerge({ body: detail.body, config: pr.projectRefresh, openGh: () => openGh(pr, seams), unblocked: board.unblocked, warn });
+  await refreshProjectAfterMerge({
+    body: detail.body,
+    config: pr.projectRefresh,
+    openGh: () => openGh(pr, seams),
+    unblocked: board.unblocked,
+    warn,
+    retry: commandRetrySeams(context.output, context.outputMode),
+  });
   const followUps = reportFollowUps(
     {
       root: pr.project.root,

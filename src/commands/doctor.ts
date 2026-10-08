@@ -270,6 +270,7 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { basename, resolve } from 'node:path';
 
+import { commandRetrySeams } from '../board/project/project-runner.js';
 import { CommandExit } from '../cli/command.js';
 import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
@@ -717,7 +718,7 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const modeSet = preflight.resolved.sources.boardRelationships !== 'default';
     const board = await readDoctorBoard(gh, project.root, preflight.config.roadmapIssue, preflight.config.boardRelationships, modeSet);
     const { boardProjectNumber: number, boardProjectTemplate: template } = preflight.config;
-    const projectRows = await readDoctorProject({ gh, number, template });
+    const projectRows = await readDoctorProject({ gh, number, template, config: preflight.config, retry: commandRetrySeams(context.output, context.outputMode) });
     const readings: BoardReadings = { ...board, project: projectRows, cleanup, refs, release, tiers, effortSchema, effortSync };
     writeText(context, renderDoctor(preflight));
     await announceRisk(context, preflight, seams);

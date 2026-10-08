@@ -34,6 +34,12 @@
  * by its one failed line, which is how the case sees it was asked. Beside them, the same line with the number unset sends no
  * `gh api` call, and a `local` issue sends no `gh` at all.
  *
+ * The retry cases time the project add out once (`retry-fake.ts`): the
+ * add is sent again and the issue lands on the project, the `retrying`
+ * line after the create's own lines, or one `retry` event in json mode.
+ * Their control is the same failure under `board.project.retries: false`,
+ * which leaves the issue off the project with no `retrying` line.
+ *
  * The spawned case runs `bun src/rafa.ts issue create` in a scratch
  * repository whose config names `github` first, under a PATH holding a
  * stand-in `gh` that logs its arguments and exits 1. So the registered
@@ -59,6 +65,7 @@ import { SPEC_LABEL } from '../../board/issue.js';
 import { createGhProjectPort } from '../../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from '../../board/project/project-fake.js';
 import { notFoundWarning } from '../../board/project/refresh-warnings.js';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
 import { CommandExit } from '../../cli/command.js';
 import {
   dispatchInProject,
@@ -589,6 +596,11 @@ const PROJECT_OWNER = FAKE_PROJECT_REPOSITORY.split('/')[0] ?? '';
 /** The project's number on the fake. */
 const PROJECT_NUMBER = 6;
 
+/** True for the call adding an item to the project. */
+function isAdd(args: readonly string[]): boolean {
+  return args.some((arg) => arg.includes('addProjectV2ItemById'));
+}
+
 /** {@link GITHUB_CONFIG} with `board.project.number` set to `number`. */
 function projectConfig(number: number): string {
   return `${GITHUB_CONFIG}board:\n  project:\n    number: ${String(number)}\n`;
@@ -659,6 +671,52 @@ describe('rafa issue create and the project', () => {
       `warn: ${notFoundWarning({ owner: PROJECT_OWNER, number: PROJECT_NUMBER + 1 })}`,
       '',
     ].join('\n'));
+  });
+
+  it('sends an add that timed out again, printing one retrying line, and puts the issue on the project', async () => {
+    const wired = projectGh();
+    const flaky = flakyGh(wired.gh, [TIMED_OUT_STDERR], isAdd);
+    const project = plantCase(projectConfig(PROJECT_NUMBER));
+    const recorder = recordRetries();
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: recorder.seams.sleep })], project);
+    const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
+    const lines = outcome.stdout.split('\n');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(lines.slice(0, 3)).toEqual([
+      'Created github issue 1.',
+      'URL: https://github.com/open-tomato/rafa/issues/1',
+      'retrying addProjectV2ItemById (1 of 3): operation timed out',
+    ]);
+    expect(recorder.waits()).toEqual([2000]);
+    expect(items.map((item) => item.content)).toEqual([{ kind: 'issue', repository: FAKE_PROJECT_REPOSITORY, number: 1 }]);
+  });
+
+  it('control: with board.project.retries false the same add is sent once and the issue stays off the project', async () => {
+    const wired = projectGh();
+    const flaky = flakyGh(wired.gh, [TIMED_OUT_STDERR], isAdd);
+    const project = plantCase(`${projectConfig(PROJECT_NUMBER)}    retries: false\n`);
+
+    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
+    const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).not.toContain('retrying ');
+    expect(outcome.stdout).toContain('warn: The project was not updated for #1: ');
+    expect(items).toEqual([]);
+  });
+
+  it('writes the retry as one retry event in json mode', async () => {
+    const wired = projectGh();
+    const flaky = flakyGh(wired.gh, [TIMED_OUT_STDERR], isAdd);
+    const project = plantCase(projectConfig(PROJECT_NUMBER));
+
+    const outcome = await dispatchInProject([...BUG_LINE, '--output=json'], SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
+    const retries = eventsOf(outcome.stdout).filter((event) => event.type === 'event' && event.name === 'retry');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(retries.map((event) => event.type === 'event' && event.summary)).toEqual(['retrying addProjectV2ItemById (1 of 3): operation timed out']);
   });
 
   it('sends no gh for a local issue, with the number set', async () => {

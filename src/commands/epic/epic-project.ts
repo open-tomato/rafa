@@ -52,7 +52,10 @@
  * own. With `board.project.number` unset it answers null and opens no
  * `gh` runner, so a repository that never opted in sees the action's
  * calls alone. Otherwise every call goes through the action's own `gh`
- * seam, or a runner in the project root.
+ * seam, or a runner in the project root, opened retrying
+ * (`../../board/project/project-runner.ts`): a call that failed on a
+ * network error is sent again, each retry an `info` line or, in json
+ * mode, one `retry` event.
  *
  * ## Never a failure of the action
  *
@@ -75,6 +78,7 @@ import type { RafaContext } from '../../cli/command.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
+import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
 import { messageOf } from '../../config-sections.js';
 import { issueProject, issueSubjectConfig } from '../issue/issue-tracker.js';
@@ -88,6 +92,8 @@ export interface EpicProjectSeams {
   readonly gh?: GhRunner;
   /** The refresh; `refreshProjectItems` when left out. */
   readonly projectRefresh?: RefreshEpicItems;
+  /** The wait before a retried call is sent again; `Bun.sleep` when left out. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** What one action asks the refresh for; see the module note. */
@@ -199,7 +205,8 @@ export async function refreshProjectAfterEpic(
     // Its warnings dropped: the action wrote them for the same file, or reads no config of its own.
     const config = issueSubjectConfig(project, () => undefined);
     if (config.boardProjectNumber === null) return null;
-    const openGh = (): GhRunner => seams.gh ?? createGhRunner({ cwd: project.root });
+    const retry = commandRetrySeams(context.output, context.outputMode, seams.sleep);
+    const openGh = (): GhRunner => openProjectRunner(seams.gh ?? createGhRunner({ cwd: project.root }), config, retry);
     warnings = await refreshLines(config, openGh, seams.projectRefresh ?? refreshIssueItems, target, named);
   } catch (error) {
     warnings = [epicProjectProblemLine(named, messageOf(error))];

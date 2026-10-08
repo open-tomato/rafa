@@ -57,13 +57,20 @@
  * each become one line by {@link settleProblemLine} naming
  * `rafa board sync`; the refresh's own warnings are answered as it
  * answers them.
+ *
+ * Every query and the refresh go through the runner opened retrying
+ * (`../../board/project/project-runner.ts`): a call that failed on a
+ * network error is sent again, each retry reported to `retry.onRetry`
+ * before its wait, and only a call that still fails is a problem line.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RefreshItems } from '../../board/project/add-issue.js';
+import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { SettleDelivered } from '../../release/settle-tag.js';
 
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
+import { openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
@@ -92,6 +99,8 @@ export interface SettleProjectOptions {
   readonly openGh: () => GhRunner;
   /** The refresh; `refreshProjectItems` when left out. */
   readonly refresh?: RefreshItems;
+  /** How a retried call waits and is reported; `Bun.sleep` and the active output when left out. */
+  readonly retry?: ProjectRunnerSeams;
 }
 
 /** What one refresh after a settle read and asked for. */
@@ -275,7 +284,7 @@ export async function refreshProjectAfterSettle(options: SettleProjectOptions): 
   const commits = releasedCommits(options.delivered);
   if (config.boardProjectNumber === null || commits === null || commits.length === 0) return null;
 
-  const gh = options.openGh();
+  const gh = openProjectRunner(options.openGh(), config, options.retry);
   let pulls: readonly CommitPull[];
   try {
     pulls = await readPulls(gh, commits, branch);

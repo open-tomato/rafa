@@ -323,6 +323,8 @@ export function openPrContext(context: RafaContext, seams: PrSeams = DEFAULT_PR_
     versionGuard: mergeGuardSettings(config),
     projectRefresh: {
       boardProjectNumber: config.boardProjectNumber,
+      boardProjectRetries: config.boardProjectRetries,
+      boardProjectRetryWaitSeconds: config.boardProjectRetryWaitSeconds,
       boardProjectWriteBatchSize: config.boardProjectWriteBatchSize,
       boardProjectWritePauseMs: config.boardProjectWritePauseMs,
       boardRelationships: config.boardRelationships,

@@ -54,6 +54,8 @@ const NUMBER = 6;
 /** The config every case reads but the one that unsets the number. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: NUMBER,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
   boardProjectWriteBatchSize: 5,
   boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',
@@ -760,6 +762,8 @@ describe('refreshProjectItems: paced by board.project.writeBatchSize and writePa
 
       const config: RefreshConfig = {
         boardProjectNumber: resolved.config.boardProjectNumber,
+        boardProjectRetries: resolved.config.boardProjectRetries,
+        boardProjectRetryWaitSeconds: resolved.config.boardProjectRetryWaitSeconds,
         boardProjectWriteBatchSize: resolved.config.boardProjectWriteBatchSize,
         boardProjectWritePauseMs: resolved.config.boardProjectWritePauseMs,
         boardRelationships: resolved.config.boardRelationships,

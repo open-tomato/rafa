@@ -50,6 +50,8 @@ const { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning } =
 /** The config every case reads. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: SYNC_PROJECT_NUMBER,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
   boardProjectWriteBatchSize: 5,
   boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',

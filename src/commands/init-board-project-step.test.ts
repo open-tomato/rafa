@@ -10,10 +10,15 @@
  * The control for "nothing opened" is the `--project` case, which opens
  * the runner once, and the yes on a terminal, which opens the prompter
  * once: the counters can read something other than zero.
+ *
+ * The retry cases plant a `setUp` that sends one call through the runner
+ * it is handed, over a `gh` timing out once: the call is sent again with
+ * the retry reported to the step's `onRetry`, and the same call under
+ * `board.project.retries: false` answers the failure.
  */
 import type { ProjectSetupConfig, ProjectSetupOptions, ProjectSetupReport, ProjectStepOptions } from './init-board-project.js';
 import type { BoardStepResult } from './init-board.js';
-import type { GhRunner } from '../adapters/tracker/github.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,6 +27,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { retryLine } from '../board/project/project-runner.js';
+import { answeringGh, flakyGh, recordRetries, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import {
@@ -47,6 +54,8 @@ const BOARD_RAN: BoardStepResult = { status: 'ran', asked: false, report: null, 
 /** The config `init` resolved before the board step. */
 const CONFIG: ProjectSetupConfig = {
   boardProjectNumber: null,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
   boardProjectWriteBatchSize: 5,
   boardProjectWritePauseMs: 0,
   boardProjectTemplate: 'https://github.com/orgs/open-tomato/projects/6',
@@ -191,6 +200,46 @@ describe('runProjectStep, the config it sets the project up with', () => {
 
     expect(record.setUps.map((setUp) => setUp.config.roadmapIssue)).toEqual([7, 3]);
     expect(record.setUps[0]?.config.boardProjectTemplate).toBe(CONFIG.boardProjectTemplate);
+  });
+});
+
+describe('runProjectStep, the runner it opens retrying', () => {
+  /** A step whose setUp sends one call for #725 through the runner it is handed, over `gh` timing out once. */
+  async function sendOne(config: ProjectSetupConfig) {
+    const { options } = harness();
+    const flaky = flakyGh(answeringGh('{}'), [TIMED_OUT_STDERR]);
+    const recorder = recordRetries();
+    const answers: GhResult[] = [];
+    const handed: ProjectSetupOptions[] = [];
+    await runProjectStep(options({
+      wanted: true,
+      config,
+      openGh: () => flaky.gh,
+      ...recorder.seams,
+      setUp: async (setUpOptions) => {
+        handed.push(setUpOptions);
+        answers.push(await setUpOptions.gh(['api', 'graphql', '-F', 'number=725']));
+        return reportOf(['present', 'present', 'present', 'present', 'present']);
+      },
+    }));
+    return { flaky, recorder, answers, handed };
+  }
+
+  it('sends a timed-out call again, reporting the retry to its onRetry and waiting through its sleep', async () => {
+    const { flaky, recorder, answers, handed } = await sendOne({ ...CONFIG, boardProjectRetries: 3, boardProjectRetryWaitSeconds: 2 });
+
+    expect(answers.map((answer) => answer.ok)).toEqual([true]);
+    expect(flaky.sent()).toHaveLength(2);
+    expect(recorder.notices().map(retryLine)).toEqual(['retrying #725 (1 of 3): operation timed out']);
+    expect(recorder.waits()).toEqual([2000]);
+    expect(handed[0]?.sleep).toBe(recorder.seams.sleep);
+  });
+
+  it('control: with board.project.retries false the same call is sent once and answers the failure', async () => {
+    const { flaky, recorder, answers } = await sendOne(CONFIG);
+
+    expect(answers.map((answer) => answer.ok)).toEqual([false]);
+    expect([flaky.sent().length, recorder.notices().length]).toEqual([1, 0]);
   });
 });
 
