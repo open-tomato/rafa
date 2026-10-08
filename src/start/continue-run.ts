@@ -43,10 +43,12 @@
  *
  * ## What the loop does with it
  *
- *   - `retry`: the approach is written as the task's tracker blocker
+ *   - `retry`: one retry is asked of the run's budget first. Only once
+ *     it is granted is the approach written as the task's tracker blocker
  *     (`writeTrackerBlocker`), which the next dispatch hands its session,
- *     and one retry is spent through the run's budget. With none left,
- *     the `retry` is read as `stop`.
+ *     and the `decision` event emitted. A refusal leaves the tracker as
+ *     the stop left it and is read as `stop`, its reason naming why: no
+ *     retry left, a moved checkout, or an interrupt.
  *   - `stop`: the run ends with {@link DECISION_STOP_EXIT}.
  *   - `jump`: the task is added to the pass-over list; its line stays
  *     `[BLOCKED]` for a later run.
@@ -289,6 +291,13 @@ function boundKey(taskInfo: Pick<TaskInfo, 'task' | 'lineNum'>, trackerContent: 
   return `${String(ref.ordinal)}:${ref.task}`;
 }
 
+/** What a `retry` the run's retries refused is read as, naming the refusal. */
+function refusedRetry(refusal: RetryRefusal | null): string {
+  if (refusal === 'checkout moved') return 'retry was chosen, but the checkout has moved from the loop\'s last commit';
+  if (refusal === 'interrupted') return 'retry was chosen, but the run was interrupted';
+  return 'retry was chosen with no retry left in this run';
+}
+
 /** A tracker line counted from 1, as the prompt and the events show it. */
 function shownLine(taskInfo: Pick<TaskInfo, 'lineNum'>): number {
   return taskInfo.lineNum + 1;
@@ -435,15 +444,16 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     return true;
   };
 
+  /** Asks the run's retries first: only a grant writes the approach and emits `retry`; a refusal stops. */
   const retryWith = (decision: ContinueDecision, subject: DecisionSubject): boolean => {
-    if (retries.left() === 0) {
-      return stopWith({ strategy: 'stop', reason: `retry was chosen with no retry left, so the run stops: ${decision.reason}` }, subject);
+    if (!retries.retry('the decision chose retry')) {
+      return stopWith({ strategy: 'stop', reason: `${refusedRetry(retries.lastRefusal())}, so the run stops: ${decision.reason}` }, subject);
     }
     const line = shownLine(subject.taskInfo);
+    writeTrackerBlocker(trackerPath, subject.taskInfo.lineNum, decision.approach ?? '');
     emitLoopEvent({ kind: 'decision', strategy: 'retry', line, reason: decision.reason });
     activeOutput().warn(`🔁 Line ${line} is retried with a new approach: ${decision.reason}`);
-    writeTrackerBlocker(trackerPath, subject.taskInfo.lineNum, decision.approach ?? '');
-    return retries.retry('the decision chose retry');
+    return true;
   };
 
   const apply = (decision: ContinueDecision, subject: DecisionSubject, content: string, identity: string): boolean => {

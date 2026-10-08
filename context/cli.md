@@ -512,9 +512,12 @@ New; it replaces no earlier text. What a row or an action added to
   `loop.retriesOnContinue`'s (`false` or 1 to 3, default `1`). One
   session decides, spawned with `--tools Read,Grep,Glob`, the run's
   `loop.settingSources`, in the checkout, its prompt stamped, and ends on
-  a `rafa:decision` block, the last one read: `retry` writes its
-  `approach` as the task's blocker and spends a retry (none left reads as
-  `stop`), `stop` ends the run, `jump` passes the task over for the run
+  a `rafa:decision` block, the last one read: `retry` asks the run's
+  retries for one first, and only once it is granted writes its
+  `approach` as the task's blocker and emits its `decision` (a refusal,
+  for no retry left, a moved checkout or an interrupt, leaves the tracker
+  untouched and reads as `stop`, its reason naming which), `stop` ends
+  the run, `jump` passes the task over for the run
   and `defer` until the task at its `after` line is ticked. An
   unreadable block, a session that exits nonzero and criteria that
   cannot be read are `stop`; a session SIGINT ended decides nothing.

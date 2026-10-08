@@ -94,6 +94,8 @@ interface Planted {
   /** The retries left; a granted retry takes one. */
   left: number;
   refusal: RetryRefusal | null;
+  /** A refusal the next retry answers though one is left: a moved checkout or an interrupt. */
+  refuseNext: RetryRefusal | null;
   interrupted: boolean;
 }
 
@@ -102,7 +104,7 @@ function plant(answers: readonly string[], exitCode = 0, seed: PassOverList = []
   const root = mkdtempSync(join(tempRoot, 'run-'));
   const trackerPath = join(root, 'PLAN_TRACKER-continue.md');
   writeFileSync(trackerPath, TRACKER, 'utf8');
-  const planted: Planted = { trackerPath, calls: [], saved: [], retried: [], left: 1, refusal: null, interrupted: false };
+  const planted: Planted = { trackerPath, calls: [], saved: [], retried: [], left: 1, refusal: null, refuseNext: null, interrupted: false };
   const options: RunDecisionsOptions = {
     continueArgs: { on: true, directive: null, forceWrapUp: false },
     repoRoot: root,
@@ -118,7 +120,11 @@ function plant(answers: readonly string[], exitCode = 0, seed: PassOverList = []
     },
     retries: {
       retry: (reason) => {
-        if (planted.left === 0) return false;
+        const refusal = planted.refuseNext ?? (planted.left === 0
+          ? 'spent'
+          : null);
+        planted.refusal = refusal;
+        if (refusal !== null) return false;
         planted.left -= 1;
         planted.retried.push(reason);
         return true;
@@ -295,6 +301,23 @@ describe('what each decision does', () => {
     expect(await decisions.atStop(heldReport(run.trackerPath))).toBe(true);
     expect(run.retried).toEqual(['the decision chose retry']);
     expect(findNextTask(readFileSync(run.trackerPath, 'utf8'))?.blocker).toBe('Run the suite in the foreground.');
+  });
+
+  it.each([
+    ['checkout moved', 'the checkout has moved'],
+    ['interrupted', 'the run was interrupted'],
+  ] as const)('retry refused for %s: read as stop naming it, the tracker untouched and no retry decision emitted', async (refusal, named) => {
+    const run = plant([decisionOutput('strategy: retry', 'reason: "A foreground run works."', 'approach: "Run it in the foreground."')]);
+    run.refuseNext = refusal;
+    const decisions = createRunDecisions(run.options);
+
+    const end = await endOf(() => decisions.atStop(heldReport(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_STOP_EXIT);
+    expect(events.map(([name, data]) => [name, (data as { strategy?: string }).strategy])).toEqual([['decision', 'stop'], ['task-blocked', undefined]]);
+    expect(events[0]?.[1]).toMatchObject({ reason: expect.stringContaining(named) as unknown });
+    expect(readFileSync(run.trackerPath, 'utf8')).toBe(TRACKER);
+    expect(lines.join('\n')).not.toContain('is retried with a new approach');
   });
 
   it('retry with no retry left: read as stop, the tracker left as the stop left it', async () => {

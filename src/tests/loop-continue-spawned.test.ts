@@ -231,8 +231,8 @@ describe('loop start --continue over a real loop', () => {
     expect(promptOf(scratch, 'task', 2)).toContain(`${BLOCKER_PROMPT_PREFIX}Read the env file from the fixture.`);
     expect(told(scratch)).toEqual([
       ['task-start', null],
-      ['decision', 'retry'],
       ['retry', 'the decision chose retry'],
+      ['decision', 'retry'],
       ['task-start', null],
       ['task-done', null],
       ['task-start', null],
