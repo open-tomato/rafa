@@ -156,6 +156,8 @@ interface RouterOptions {
   readonly rateLimitAfter?: number;
   /** Answers the refusal's stderr for a call this refuses, by its argv and how many matching calls came before it. */
   readonly refuse?: (args: readonly string[]) => string | null;
+  /** The issues whose labels list names a cursor it has already read, so their facts are refused. */
+  readonly repeating?: readonly number[];
 }
 
 /** The router, the project fake behind it, and what was recorded. */
@@ -180,8 +182,11 @@ function route(options: RouterOptions = {}): Router {
     owners: [OWNER, TEMPLATE.owner],
     repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: ISSUES.map(({ number }) => number) }],
   });
+  const repeating = new Set(options.repeating ?? []);
   const facts = createFakeFactsGh({
-    issues: ISSUES,
+    issues: ISSUES.map((issue) => (repeating.has(issue.number)
+      ? { ...issue, repeatsCursor: 'labels' as const }
+      : issue)),
     pulls: [{ number: 51, state: 'MERGED', baseRefName: 'main', headRefOid: 'head51', files: [{ path: '.changes/rafa-1.md', changeType: 'ADDED' }] }],
     trees: { head51: { '.changes/rafa-1.md': FRAGMENT }, main: { '.changes/rafa-1.md': FRAGMENT } },
   });
@@ -506,6 +511,8 @@ describe('setUpProject, the issues and fields parts', () => {
 
     expect(report.parts[3]?.outcome).toBe('refused');
     expect(report.parts[3]?.detail).toContain('5 issues were not updated');
+    expect(report.parts[3]?.listed).toBeUndefined();
+    expect(report.problems).toEqual([]);
     expect(report.parts[4]?.outcome).toBe('created');
   });
 
@@ -524,6 +531,69 @@ describe('setUpProject, the issues and fields parts', () => {
   });
 });
 
+describe('setUpProject, the fields part over refused issues', () => {
+  /** The part rows `report` renders from the fields part on, up to the number's row. */
+  function fieldsLines(report: ProjectSetupReport): readonly string[] {
+    const lines = renderProjectSetup(report);
+    const from = lines.findIndex((line) => line.includes('project fields'));
+    return lines.slice(from, lines.findIndex((line) => line.includes('board.project.number')));
+  }
+
+  it('reads created with #40 listed under it, filling the four other issues, beside a run refusing none', async () => {
+    const control = await setUpProject(options(route(), rootHolding('none-refused')));
+    const router = route({ repeating: [40] });
+
+    const report = await setUpProject(options(router, rootHolding('one-refused')));
+
+    expect(control.parts[3]?.outcome).toBe('created');
+    expect(control.parts[3]?.listed).toBeUndefined();
+    expect(report.parts[3]?.outcome).toBe('created');
+    expect(report.parts[3]?.detail).toEndWith('; 1 issue not refreshed');
+    expect(report.parts[3]?.listed).toHaveLength(1);
+    expect(report.parts[3]?.listed?.[0]).toStartWith('#40 not refreshed: ');
+    expect(report.problems).toEqual([]);
+    const held = await heldOn(router, COPY_NUMBER);
+    expect([...held.keys()]).toEqual(ADDED);
+    expect(held.get(30)?.get('Stage')).toBe('Done');
+    expect(held.get(50)?.get('Stage')).toBe('In review');
+    expect(held.get(40)?.get('Stage')).toBeUndefined();
+    const lines = fieldsLines(report);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toStartWith('  created  project fields: wrote ');
+    expect(lines[1]).toBe(`           ${report.parts[3]?.listed?.[0] ?? ''}`);
+  });
+
+  it('reads present with #40 still listed on a second run that has nothing else to write', async () => {
+    const router = route({ repeating: [40] });
+    const root = rootHolding('refused-again');
+    await setUpProject(options(router, root));
+    expect(mutations(router.calls())).toContain('updateProjectV2ItemFieldValue');
+    const before = router.calls().length;
+
+    const report = await setUpProject(options(router, root, { boardProjectNumber: savedNumber(root) }));
+
+    expect(mutations(router.calls().slice(before))).toEqual([]);
+    expect(projectSetupChanged(report)).toBe(false);
+    expect(report.parts[3]?.outcome).toBe('present');
+    expect(report.parts[3]?.detail).toBe('every value is as the rules give it; 1 issue not refreshed');
+    expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual(['#40 not refreshed']);
+    expect(fieldsLines(report)).toEqual(['  present  project fields', `           ${report.parts[3]?.listed?.[0] ?? ''}`]);
+  });
+
+  it('reads refused only when every issue the project holds was refused, each listed lowest first', async () => {
+    const router = route({ repeating: ISSUES.map(({ number }) => number) });
+
+    const report = await setUpProject(options(router, rootHolding('all-refused')));
+
+    expect(report.parts[2]?.detail).toBe('added 4 issues to the project');
+    expect(report.parts[3]?.outcome).toBe('refused');
+    expect(report.parts[3]?.detail).toBe('no item was filled: 4 issues not refreshed');
+    expect(report.parts[3]?.listed?.map((line) => line.split(':')[0])).toEqual([1, 10, 30, 40].map((issue) => `#${String(issue)} not refreshed`));
+    expect(mutations(router.calls())).not.toContain('updateProjectV2ItemFieldValue');
+    expect(report.parts[4]?.outcome).toBe('created');
+  });
+});
+
 describe('projectRefOf', () => {
   it('reads an organisation\'s and a user\'s project URL, and nothing else', () => {
     expect(projectRefOf('https://github.com/orgs/acme/projects/2')).toEqual({ owner: 'acme', number: 2 });
@@ -534,12 +604,13 @@ describe('projectRefOf', () => {
 });
 
 describe('renderProjectSetup', () => {
-  it('writes the heading, a row per part with the detail of every part not present, then each problem', () => {
+  it('writes the heading, a row per part with the detail of every part not present and its listed lines under it, then each problem', () => {
     const report: ProjectSetupReport = {
       parts: [
         { kind: 'scope', name: 'project scope', outcome: 'present', detail: 'held' },
         { kind: 'project', name: 'project', outcome: 'created', detail: 'copied' },
         { kind: 'items', name: 'project issues', outcome: 'refused', detail: 'why' },
+        { kind: 'fields', name: 'project fields', outcome: 'present', detail: 'unshown', listed: ['#4 not refreshed: a reason'] },
       ],
       project: null,
       problems: ['a skipped field'],
@@ -550,6 +621,8 @@ describe('renderProjectSetup', () => {
       '  present  project scope',
       '  created  project: copied',
       '  refused  project issues: why',
+      '  present  project fields',
+      '           #4 not refreshed: a reason',
       'a skipped field',
     ]);
     expect(projectPartLine({ kind: 'fields', name: 'project fields', outcome: 'present', detail: 'unshown' })).toBe('  present  project fields');
