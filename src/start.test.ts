@@ -43,6 +43,9 @@
  * run's events file: the granted retry emits `retry` and no
  * `task-blocked`, which only the stop the run halts on emits, so
  * `rafa loop wait --until=blocked` never answers a run still going.
+ * A second run there commits in its first session before exiting 1: the
+ * checkout has moved from the loop's last commit, so no retry is granted
+ * and the task keeps its own stop, never the guard's {@link CHECKOUT_MOVED}.
  *
  * ## The controls
  *
@@ -64,6 +67,7 @@ import ts from 'typescript';
 
 import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
 import { readSessions } from './loop/sessions.js';
+import { CHECKOUT_MOVED } from './start/checkout-guard.js';
 import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';
 import { gitIdentityEnv } from './tests/git-identity.js';
@@ -426,12 +430,13 @@ describe('where start.ts takes the suite steps', () => {
 describe('where start.ts retries a stop', () => {
   const EVERY = everyCall(START);
 
-  it('makes the run\'s retries once, from --retry over loop.retries, on the SIGINT flag', () => {
+  it('makes the run\'s retries once, from --retry over loop.retries, on the SIGINT flag and the checkout as the guard reads it', () => {
     const made = EVERY.filter((call) => call.name === 'createRunRetries');
 
     expect(made).toHaveLength(1);
     expect(made[0]?.args[0]).toContain('retries: resolveRunRetries(retry, runConfig.config.loopRetries),');
     expect(made[0]?.args[0]).toContain('isInterrupted: () => interrupted,');
+    expect(made[0]?.args[0]).toContain('isCheckoutHeld: () => guardCheckout(expected).held,');
   });
 
   it('asks for a retry at the four retry-safe stops alone, in loop order', () => {
@@ -875,5 +880,32 @@ describe('a run that retries a session that exited nonzero, over a real loop', (
       ['task-start', null],
       ['task-blocked', 'status: blocked'],
     ]);
+  }, CASE_TIMEOUT_MS);
+
+  it('grants no retry when the session committed before it exited, so the task keeps its own stop', () => {
+    const scratch = plant(failingFirstStandIn([
+      'printf \'%s\\n\' \'export const extra = 1;\' > extra.ts',
+      'git add -A',
+      'git commit -q --no-verify -m \'a commit the session made\'',
+    ]));
+
+    // The session's commit moved HEAD past the loop's expectation, which
+    // only the loop's own commits advance, so a retry would halt at the
+    // loop guard and overwrite the task's blocker: none is granted.
+    expect(runLoopStart(scratch, ['--retry=1'])).toBe(0);
+    expect(callCount(scratch)).toBe(1);
+
+    const told = runEvents(scratch)
+      .filter((event) => ['task-start', 'task-blocked', 'retry', 'halt'].includes(event.name))
+      .map((event) => [event.name, event.data['reason'] ?? null]);
+    expect(told).toEqual([
+      ['task-start', null],
+      ['task-blocked', 'session exited 1'],
+    ]);
+
+    const task = findNextTask(readFileSync(join(scratch.repo, '.plans', TRACKER_NAME), 'utf8'));
+    expect(task?.status).toBe('blocked');
+    expect(task?.task).toBe(BREAKING_TASK);
+    expect(task?.blocker ?? '').not.toContain(CHECKOUT_MOVED);
   }, CASE_TIMEOUT_MS);
 });

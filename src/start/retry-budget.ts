@@ -16,7 +16,12 @@
  * ({@link retryLine}) and one `retry` loop event (`start/loop-events.ts`)
  * and `start()` goes back to the top of its loop with `continue`, while
  * a refusal writes nothing and `start()` halts as it did before. A run
- * SIGINT has interrupted is refused at once and spends nothing.
+ * SIGINT has interrupted is refused at once and spends nothing. So is a
+ * run whose checkout has moved from the loop's last commit, read only
+ * once a retry is left: a session that committed and then exited
+ * nonzero leaves HEAD past an expectation only the loop's own commits
+ * advance, and a retry would halt at the loop guard of the next pass,
+ * blocking the task on `checkout moved` in place of its own stop.
  *
  * Which stops are retry-safe is not this module's to say: its caller
  * asks only at a stop that a blind re-run with nothing changed was
@@ -94,12 +99,18 @@ export function retryLine(grant: GrantedRetry, reason: string): string {
     + ' The loop goes on without a new rafa loop start.';
 }
 
-/** What {@link createRunRetries} needs: the run's count, and its SIGINT flag. */
+/** What {@link createRunRetries} needs: the run's count, its SIGINT flag and its checkout's reading. */
 export interface RunRetriesOptions {
   /** The retries the run makes, as {@link resolveRunRetries} answers them. */
   readonly retries: LoopRetries;
   /** True once the run has received SIGINT. */
   readonly isInterrupted: () => boolean;
+  /**
+   * True while the checkout is where the loop's last commit left it,
+   * read without marking or printing anything (`guardCheckout` in
+   * `start/checkout-guard.ts`); asked only once a retry is left.
+   */
+  readonly isCheckoutHeld: () => boolean;
 }
 
 /** The run's retries, asked at each retry-safe stop. */
@@ -118,8 +129,8 @@ export function createRunRetries(options: RunRetriesOptions): RunRetries {
   const retry = (reason: string): boolean => {
     if (options.isInterrupted()) return false;
     const grant = takeRetry(budget);
+    if (!grant.granted || !options.isCheckoutHeld()) return false;
     budget = grant.budget;
-    if (!grant.granted) return false;
     activeOutput().warn(retryLine(grant, reason));
     emitLoopEvent({ kind: 'retry', attempt: grant.attempt, of: grant.of, reason });
     return true;

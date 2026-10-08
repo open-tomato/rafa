@@ -11,7 +11,10 @@
  * {@link createRunRetries} is what `start.ts` asks at each retry-safe
  * stop. Its cases read the warning line and the `retry` event it writes
  * through a `sinkOutput` set as the active output, and a refused retry
- * is read to write neither.
+ * is read to write neither. A checkout that moved refuses a retry as an
+ * interrupt does, spending nothing; its control is the same budget
+ * granting once the checkout reads as held, and a count of the reads
+ * holds that a run with no retry left never reads the checkout at all.
  */
 import type { CliEvent } from '../ports/index.js';
 
@@ -121,7 +124,7 @@ describe('retryLine', () => {
 
 describe('createRunRetries', () => {
   it('grants n retries, warning and emitting a retry event for each, then refuses', () => {
-    const retries = createRunRetries({ retries: 2, isInterrupted: () => false });
+    const retries = createRunRetries({ retries: 2, isInterrupted: () => false, isCheckoutHeld: () => true });
 
     expect([retries.retry('suite step red'), retries.retry('session exited 1'), retries.retry('suite step red')])
       .toEqual([true, true, false]);
@@ -138,7 +141,7 @@ describe('createRunRetries', () => {
   });
 
   it('refuses every retry under false, writing nothing', () => {
-    const retries = createRunRetries({ retries: false, isInterrupted: () => false });
+    const retries = createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld: () => true });
 
     expect(retries.retry('suite step red')).toBe(false);
     expect([warnings, events]).toEqual([[], []]);
@@ -146,7 +149,7 @@ describe('createRunRetries', () => {
 
   it('refuses once the run is interrupted, spending nothing of the budget', () => {
     let interrupted = true;
-    const retries = createRunRetries({ retries: 1, isInterrupted: () => interrupted });
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => interrupted, isCheckoutHeld: () => true });
 
     expect(retries.retry('session exited 130')).toBe(false);
     expect([warnings, events]).toEqual([[], []]);
@@ -155,5 +158,36 @@ describe('createRunRetries', () => {
     interrupted = false;
     expect(retries.retry('session exited 1')).toBe(true);
     expect(warnings).toHaveLength(1);
+  });
+
+  it('refuses while the checkout has moved, spending nothing of the budget and writing nothing', () => {
+    let held = false;
+    const retries = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld: () => held });
+
+    expect(retries.retry('session exited 1')).toBe(false);
+    expect([warnings, events]).toEqual([[], []]);
+
+    // The control: the one retry is still there once the checkout holds.
+    held = true;
+    expect(retries.retry('session exited 1')).toBe(true);
+    expect(warnings).toEqual([retryLine({ attempt: 1, of: 1 }, 'session exited 1')]);
+  });
+
+  it('reads the checkout only when a retry is left and the run is not interrupted', () => {
+    let reads = 0;
+    const isCheckoutHeld = (): boolean => {
+      reads += 1;
+      return true;
+    };
+    const none = createRunRetries({ retries: false, isInterrupted: () => false, isCheckoutHeld });
+    const interrupted = createRunRetries({ retries: 1, isInterrupted: () => true, isCheckoutHeld });
+
+    expect([none.retry('suite step red'), interrupted.retry('suite step red')]).toEqual([false, false]);
+    expect(reads).toBe(0);
+
+    // The control: a run with a retry left reads it once per ask.
+    const one = createRunRetries({ retries: 1, isInterrupted: () => false, isCheckoutHeld });
+    expect([one.retry('suite step red'), one.retry('suite step red')]).toEqual([true, false]);
+    expect(reads).toBe(1);
   });
 });

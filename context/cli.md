@@ -491,7 +491,11 @@ New; it replaces no earlier text. What a row or an action added to
   no `task-blocked` event: a task stop emits that only once its retry is
   refused, so `loop wait --until=blocked` never answers a run still going.
   A SIGINT received refuses every retry left, and once the budget is spent
-  the next such stop halts.
+  the next such stop halts. A checkout moved from the loop's last commit,
+  read by `guardCheckout` (`start/checkout-guard.ts`) only while a retry is
+  left, refuses the retry without spending it, so a session that committed
+  and then exited nonzero stops on its own blocker, never the next pass's
+  `checkout moved`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.

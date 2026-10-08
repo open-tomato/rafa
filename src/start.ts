@@ -301,7 +301,10 @@
  * a report nor a commit; each retry writes a warning and a `retry`
  * event (`start/retry-budget.ts`), and no `task-blocked` event, which
  * a task stop emits only once no retry is granted, so the run really
- * stops. The attempt's report is stored either way.
+ * stops. The attempt's report is stored either way. A checkout moved
+ * from the loop's last commit refuses the retry, spending none: the
+ * next pass's loop guard would halt on it and block the task on
+ * `checkout moved` in place of its own stop.
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -340,6 +343,7 @@ import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';
 import { isBudgetExit, markBudgetExit } from './start/budget.js';
+import { guardCheckout } from './start/checkout-guard.js';
 import {
   advanceExpectation,
   haltIfCheckoutMoved,
@@ -586,10 +590,12 @@ export default async function start(args: string[], repoRoot: string): Promise<v
 
     // The retries this run takes in place of a halt, at the four
     // retry-safe stops below alone: `--retry` over `loop.retries`, none
-    // unless one names a count (`start/retry-budget.ts`).
+    // unless one names a count (`start/retry-budget.ts`). A checkout
+    // moved from `expected`, as it reads at the stop, refuses one.
     const retries = createRunRetries({
       retries: resolveRunRetries(retry, runConfig.config.loopRetries),
       isInterrupted: () => interrupted,
+      isCheckoutHeld: () => guardCheckout(expected).held,
     });
 
     // Initialize tracker only if it doesn't exist
