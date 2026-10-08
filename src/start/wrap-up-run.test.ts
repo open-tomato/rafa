@@ -413,6 +413,17 @@ describe('where runWrapUp retargets the delivered pull request', () => {
   });
 });
 
+describe('where runWrapUp marks a forced wrap-up\'s pull request a draft', () => {
+  it('marks it after the retarget and before the CI gate, over the delivered number and the passed-over tasks', () => {
+    const marked = callTo(CALLS, 'markForcedDraft');
+
+    expect(NAMES.indexOf('retargetPullRequest')).toBeLessThan(NAMES.indexOf('markForcedDraft'));
+    expect(NAMES.indexOf('markForcedDraft')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+    expect(marked.args).toEqual(['delivery.pull.number', 'passedOver', 'forcedDraftSeamsIn(checkout)']);
+    expect(WRAP_UP_RUN).toContain('if (passedOver.length > 0) await markForcedDraft(');
+  });
+});
+
 /** The run's branch in every delivery case. */
 const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
 

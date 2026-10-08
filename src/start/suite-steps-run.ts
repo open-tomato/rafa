@@ -170,6 +170,12 @@ export interface RunSuiteSteps {
    * red step; see "A step stopped by SIGINT" in the module note.
    */
   readonly stoppedOnSignal: () => boolean;
+  /**
+   * The outcome of the run's last pre-wrap-up step, or null while none
+   * has answered one (a step that threw answers none). A forced wrap-up
+   * counts its new failures (`start/continue-run.ts`).
+   */
+  readonly lastPreWrapUp: () => StepOutcome | null;
 }
 
 /** The baseline, `off` when ensuring it threw, or `interrupted` when SIGINT stopped it. */
@@ -283,8 +289,10 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
 
   // Set once this run has gone back to dispatch a pre-wrap-up repair.
   let repairSent = false;
+  let lastPreWrapUp: StepOutcome | null = null;
   const preWrapUp = async (known: SuiteBaseline): Promise<BeforeSessionAnswer> => {
     const outcome = await guarded('pre-wrap-up step', () => calls.runPreWrapUpStep(context, known));
+    lastPreWrapUp = outcome;
     if (insertedRepair(outcome) && !repairSent) {
       repairSent = true;
       announceRepair();
@@ -316,5 +324,5 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
     return goesOnNoting(await guarded('task step', () => calls.runTaskStep(context, input)));
   };
 
-  return { beforeSession, afterTask, stoppedOnSignal: () => signalled };
+  return { beforeSession, afterTask, stoppedOnSignal: () => signalled, lastPreWrapUp: () => lastPreWrapUp };
 }

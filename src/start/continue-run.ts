@@ -98,6 +98,18 @@
  * {@link PASSED_OVER_EXIT}: no pre-wrap-up step, no wrap-up and no pull
  * request.
  *
+ * Under `--force-wrap-up` it lists them and emits `passed-over` once,
+ * and {@link RunDecisions.atPlanEnd} answers them instead: the run
+ * takes its pre-wrap-up step as any run does, its one repair included,
+ * and the wrap-up opens the pull request as a draft listing them
+ * (`./forced-draft.ts`). A pre-wrap-up step that stops the run, red
+ * after its repair, is counted ({@link RunDecisions.gateForcedWrapUp}):
+ * its new failures, the baseline's inherited ones left out, within
+ * `loop.forceWrapUp.maxNewFailures` (`false` tolerating none) go on to
+ * the wrap-up; more, or a red step whose failures are none it can count
+ * (errors outside any test, no summary), end the run with
+ * {@link DECISION_STOP_EXIT} and a `halt` naming the count.
+ *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
 import type { FinishedTask } from './commit.js';
@@ -107,6 +119,8 @@ import type { LoopEvent, PassedOverTask } from './loop-events.js';
 import type { PassOverList } from './pass-over.js';
 import type { RetryRefusal, RunRetries } from './retry-budget.js';
 import type { RunSession } from './session.js';
+import type { StepOutcome } from './suite-step.js';
+import type { BeforeSessionAnswer } from './suite-steps-run.js';
 import type { OutputMode } from '../config-sections.js';
 import type { ClaudeSettingSource, RafaConfig } from '../config.js';
 import type { CapturingSpawner } from '../utils/claude.js';
@@ -163,7 +177,7 @@ export interface RunDecisionsOptions {
   /** The plan's path, as the prompt names it. */
   readonly planPath: string;
   /** The criteria keys. */
-  readonly settings: Pick<RafaConfig, 'loopContinueCriteria' | 'loopContinueCriteriaMode'>;
+  readonly settings: Pick<RafaConfig, 'loopContinueCriteria' | 'loopContinueCriteriaMode' | 'loopForceWrapUpMaxNewFailures'>;
   /** The setting sources the decision session loads. */
   readonly settingSources: readonly ClaudeSettingSource[];
   /** The run's record, written each time the pass-over list changes. */
@@ -198,8 +212,22 @@ export interface RunDecisions {
   readonly atFirstTask: (taskInfo: TaskInfo | null, trackerContent: string) => Promise<boolean>;
   /** Notes that `taskInfo` is done, releasing what waited on it. */
   readonly taskDone: (taskInfo: TaskInfo) => void;
-  /** Ends the run with `LoopEnd` when passed-over tasks are left open in `trackerContent`. */
-  readonly atPlanEnd: (trackerContent: string) => void;
+  /**
+   * Ends the run with `LoopEnd` when passed-over tasks are left open in
+   * `trackerContent`; under `--force-wrap-up`, answers them instead.
+   * Answers none when none is left open.
+   */
+  readonly atPlanEnd: (trackerContent: string) => readonly PassedOverTask[];
+  /**
+   * The answer the loop acts on after the pre-wrap-up step answered
+   * `gate`: `go-on` past a red step a forced wrap-up tolerates, `gate`
+   * otherwise. Throws `LoopEnd` for one it does not; see the module note.
+   */
+  readonly gateForcedWrapUp: (
+    gate: BeforeSessionAnswer,
+    forced: readonly PassedOverTask[],
+    outcome: StepOutcome | null,
+  ) => BeforeSessionAnswer;
 }
 
 /** No line skipped. */
@@ -211,7 +239,8 @@ const NO_DECISIONS: RunDecisions = Object.freeze({
   atStop: () => Promise.resolve(false),
   atFirstTask: () => Promise.resolve(false),
   taskDone: () => undefined,
-  atPlanEnd: () => undefined,
+  atPlanEnd: () => [],
+  gateForcedWrapUp: (gate: BeforeSessionAnswer) => gate,
 });
 
 /** The subject of one decision: the task, why it stopped, and the event its stop emits. */
@@ -441,21 +470,54 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     session.decisionsChanged(list);
   };
 
-  const atPlanEnd = (trackerContent: string): void => {
+  let announced = false;
+  const atPlanEnd = (trackerContent: string): readonly PassedOverTask[] => {
     const left = remaining(list, trackerContent);
-    if (left.length === 0) return;
+    if (left.length === 0) return [];
     const tasks: PassedOverTask[] = left.map((entry) => ({
       line: entry.task.lineNum + 1,
       text: entry.task.task,
       strategy: entry.strategy,
       reason: entry.reason,
     }));
-    activeOutput().warn('\n⏭  Every task left is one this run passed over; no wrap-up runs and no pull request is opened:');
-    for (const task of tasks) activeOutput().warn(`   line ${task.line} (${task.strategy}): ${task.text}\n      ${task.reason}`);
-    emitLoopEvent({ kind: 'passed-over', tasks });
+    const forcing = options.continueArgs.forceWrapUp;
+    if (!announced) {
+      activeOutput().warn(forcing
+        ? '\n⏭  Every task left is one this run passed over; --force-wrap-up wraps up anyway, as a draft pull request listing them:'
+        : '\n⏭  Every task left is one this run passed over; no wrap-up runs and no pull request is opened:');
+      for (const task of tasks) activeOutput().warn(`   line ${task.line} (${task.strategy}): ${task.text}\n      ${task.reason}`);
+      emitLoopEvent({ kind: 'passed-over', tasks });
+      announced = true;
+    }
+    if (forcing) return tasks;
     emitLoopEvent({ kind: 'halt', reason: `passed over ${tasks.length} task(s)` });
     throw new LoopEnd(PASSED_OVER_EXIT, `⏭  The run ended with ${tasks.length} passed-over task(s) left open. Run again with --continue once they can go on, or with --force-wrap-up to open a draft pull request.`);
   };
 
-  return { skipLines, atStop, atFirstTask, taskDone, atPlanEnd };
+  const gateForcedWrapUp = (
+    gate: BeforeSessionAnswer,
+    forced: readonly PassedOverTask[],
+    outcome: StepOutcome | null,
+  ): BeforeSessionAnswer => {
+    if (gate !== 'stop' || forced.length === 0 || outcome === null || !outcome.red || outcome.interrupted) return gate;
+    const max = options.settings.loopForceWrapUpMaxNewFailures;
+    const tolerated = max === false
+      ? 0
+      : max;
+    const count = outcome.step?.newFailures.length ?? 0;
+    if (count > 0 && count <= tolerated) {
+      activeOutput().warn(`⚠️  --force-wrap-up goes on past the red pre-wrap-up step: ${count} new failure(s), within loop.forceWrapUp.maxNewFailures ${tolerated}.`);
+      return 'go-on';
+    }
+    const why = count === 0
+      ? 'the red pre-wrap-up step holds no failure it can count (errors outside any test, or no summary)'
+      : `${count} new failure(s), over loop.forceWrapUp.maxNewFailures ${String(max)}`;
+    const halt = count === 0
+      ? 'forced wrap-up refused: no failure to count'
+      : `forced wrap-up refused: ${why}`;
+    emitLoopEvent({ kind: 'halt', reason: halt });
+    throw new LoopEnd(DECISION_STOP_EXIT, `⛔ --force-wrap-up refused the wrap-up: ${why}. Repair them, or raise loop.forceWrapUp.maxNewFailures.`);
+  };
+
+  return { skipLines, atStop, atFirstTask, taskDone, atPlanEnd, gateForcedWrapUp };
 }

@@ -260,6 +260,32 @@ describe('loop start --continue over a real loop', () => {
     ]);
   }, CASE_TIMEOUT_MS);
 
+  it('with --force-wrap-up, takes the pre-wrap-up step and wraps up past the gate it passed over', () => {
+    const scratch = plant({
+      tasks: [report('blocked'), report('done'), ['The wrap-up is done.']],
+      decisions: [decision('strategy: jump', 'reason: "A person writes the env file, and no later task reads it."')],
+    });
+
+    const run = runLoopStart(scratch, 'text', [...SESSION_FLAGS, '--continue', '--force-wrap-up']);
+
+    expect(callsOf(scratch)).toEqual(['task', 'decision', 'task', 'task']);
+    expect(promptOf(scratch, 'task', 3)).not.toContain('Loop continue decision instructions');
+    expect(told(scratch).slice(0, 5)).toEqual([
+      ['task-start', null],
+      ['decision', 'jump'],
+      ['task-start', null],
+      ['task-done', null],
+      ['passed-over', null],
+    ]);
+    expect(eventsOf(scratch).filter((event) => event.name === 'wrap-up')
+      .map((event) => event.data['phase'])).toContain('session');
+    expect(readSessions(scratch.repo).flatMap((record) => (record.steps ?? []).map((step) => step.kind))).toContain('pre-wrap-up');
+    expect(run.stdout).toContain('Wrapping up with 1 passed-over task(s) left open (--force-wrap-up)');
+    // The scratch project has no pull request provider, so there is no pull request to mark a draft.
+    expect(run.stdout + run.stderr).toContain('the forced wrap-up has no pull request to mark as a draft');
+    expect(run.exitCode).toBe(0);
+  }, CASE_TIMEOUT_MS);
+
   it('halts as it always did without --continue, spawning no decision session', () => {
     const scratch = plant({ tasks: [report('blocked')], decisions: [] });
 

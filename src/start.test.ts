@@ -215,7 +215,7 @@ describe('the wrap-up branch of start.ts', () => {
     expect(wrapUpCalls(branch).map((call) => call.name)).toEqual(['prepareReleaseStage', 'runWrapUp']);
   });
 
-  it('hands it the run\'s session, root, checkout, config, plan, serving, lessons, expectation and CI flags', () => {
+  it('hands it the run\'s session, root, checkout, config, plan, serving, lessons, expectation, CI flags and passed-over tasks', () => {
     const [input] = callTo(CALLS, 'runWrapUp').args;
     const fields = [
       'session,',
@@ -231,6 +231,7 @@ describe('the wrap-up branch of start.ts', () => {
       'ciWait,',
       'ciTimeoutMin,',
       'ciAttempts,',
+      'passedOver,',
     ];
 
     for (const field of fields) expect(input).toContain(field);
@@ -377,7 +378,8 @@ describe('where start.ts takes the suite steps', () => {
 
   it('stops the run when a step before a session is red, unless it retries or a decision goes on, and breaks on an interrupt it ran through', () => {
     expect(START).toContain(
-      'const suiteGate = await suiteSteps.beforeSession(taskInfo);\n      if (suiteGate === \'stop\') {\n'
+      'const suiteGate = decisions.gateForcedWrapUp(await suiteSteps.beforeSession(taskInfo), passedOver, suiteSteps.lastPreWrapUp());\n'
+      + '      if (suiteGate === \'stop\') {\n'
       + '        if (!suiteSteps.stoppedOnSignal() && retries.retry(\'suite step red\')) continue;\n'
       + '        if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: \'suite-red\' })) continue;\n'
       + '        emitLoopEvent({ kind: \'halt\', reason: \'suite step red\' });\n        return;\n      }\n      if (interrupted) break;',
@@ -521,7 +523,7 @@ describe('where start.ts hands a stop to a --continue decision', () => {
   });
 
   it('ends at the plan\'s end on passed-over tasks before the loop guard, and releases defers once a task is done', () => {
-    expect(START).toContain('      if (!taskInfo) decisions.atPlanEnd(trackerContent);\n');
+    expect(START).toContain('      const passedOver = taskInfo\n        ? []\n        : decisions.atPlanEnd(trackerContent);\n');
     expect(START).toContain('      if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;\n');
     expect(START.indexOf('decisions.atFirstTask(')).toBeLessThan(START.indexOf('haltIfCheckoutMoved({ expected, trackerPath, taskInfo })'));
     expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltIfWrapUpMoved({ expected, before: \'dispatch\' })'));

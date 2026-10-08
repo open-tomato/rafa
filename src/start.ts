@@ -270,8 +270,8 @@
  * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
- * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts` and
- * `start/continue-run.ts` write goes
+ * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts`,
+ * `start/continue-run.ts` and `start/forced-draft.ts` write goes
  * through the active output
  * (`adapters/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
@@ -325,7 +325,11 @@
  * `decision-needed` event, and a `--decide` on the line is applied once,
  * on the first pass to a `[BLOCKED]` task it opens on, else at its first
  * stop. A run left with only passed-over tasks ends with exit code 22
- * before the pre-wrap-up step.
+ * before the pre-wrap-up step; under `--force-wrap-up` it takes that
+ * step, goes on past a red one whose new failures
+ * `loop.forceWrapUp.maxNewFailures` tolerates (ending with exit code 20
+ * past one it does not), and wraps up as a draft pull request listing
+ * the passed-over tasks (`start/forced-draft.ts`).
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -672,8 +676,11 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       const trackerContent = fs.readFileSync(trackerPath, 'utf8');
       const taskInfo = findNextTask(trackerContent, { skipLines: decisions.skipLines(trackerContent) });
       // No task left but the ones a `--continue` run passed over: the run
-      // ends here, before the pre-wrap-up step and the wrap-up.
-      if (!taskInfo) decisions.atPlanEnd(trackerContent);
+      // ends here, before the pre-wrap-up step and the wrap-up, or under
+      // `--force-wrap-up` goes on with them listed (`start/continue-run.ts`).
+      const passedOver = taskInfo
+        ? []
+        : decisions.atPlanEnd(trackerContent);
       // A `--decide` named on the line, on the first pass alone, meets the
       // `[BLOCKED]` task a stopped run left before it is dispatched again.
       if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;
@@ -698,7 +705,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // back to `findNextTask`, which answers that repair, so it runs in
       // this run and the pre-wrap-up step runs again after it.
       if (!taskInfo) emitLoopEvent({ kind: 'wrap-up', phase: 'tests' });
-      const suiteGate = await suiteSteps.beforeSession(taskInfo);
+      // A forced wrap-up goes on past a red pre-wrap-up step its
+      // `loop.forceWrapUp.maxNewFailures` tolerates, and ends past one it does not.
+      const suiteGate = decisions.gateForcedWrapUp(await suiteSteps.beforeSession(taskInfo), passedOver, suiteSteps.lastPreWrapUp());
       if (suiteGate === 'stop') {
         if (!suiteSteps.stoppedOnSignal() && retries.retry('suite step red')) continue;
         if (!suiteSteps.stoppedOnSignal() && await decisions.atStop({ kind: 'suite-red' })) continue;
@@ -729,6 +738,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
           ciTimeoutMin,
           ciAttempts,
           isInterrupted: () => interrupted,
+          passedOver,
         });
         break;
       }

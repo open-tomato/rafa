@@ -13,8 +13,10 @@
  * the decision asked is its control.
  */
 import type { DecisionStop, RunDecisionsOptions } from './continue-run.js';
+import type { PassedOverTask } from './loop-events.js';
 import type { PassOverList } from './pass-over.js';
 import type { RetryRefusal } from './retry-budget.js';
+import type { StepOutcome } from './suite-step.js';
 import type { CliEvent } from '../ports/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -107,7 +109,7 @@ function plant(answers: readonly string[], exitCode = 0, seed: PassOverList = []
     checkout: root,
     trackerPath,
     planPath: join(root, 'PLAN-continue.md'),
-    settings: { loopContinueCriteria: '.rafa/continue-criteria.md', loopContinueCriteriaMode: 'extend' },
+    settings: { loopContinueCriteria: '.rafa/continue-criteria.md', loopContinueCriteriaMode: 'extend', loopForceWrapUpMaxNewFailures: false },
     settingSources: ['project', 'local'],
     session: {
       decisionsChanged: (list) => {
@@ -478,5 +480,81 @@ describe('a decision named on the line with --decide', () => {
 
     expect(await createRunDecisions(run.options).atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(false);
     expect(events).toEqual([]);
+  });
+});
+
+describe('--force-wrap-up', () => {
+  const seed: PassOverList = [{ task: { lineNum: 2, task: 'Check the env file a person writes' }, strategy: 'jump', reason: 'A person writes it.' }];
+  const done = TRACKER.replace(/- \[ \] /g, '- [x] ');
+  const forcedTasks: readonly PassedOverTask[] = [{ line: 3, text: 'Check the env file a person writes', strategy: 'jump', reason: 'A person writes it.' }];
+
+  /** The options of a forced run over the seed, tolerating `max` new failures. */
+  function forced(max: number | false): RunDecisionsOptions {
+    const run = plant([], 0, seed);
+    return {
+      ...run.options,
+      continueArgs: { on: true, directive: null, forceWrapUp: true },
+      settings: { ...run.options.settings, loopForceWrapUpMaxNewFailures: max },
+    };
+  }
+
+  /** A red pre-wrap-up outcome with `count` new failures. */
+  function redWith(count: number): StepOutcome {
+    const failures = Array.from({ length: count }, (_, index) => ({ file: `src/x${index}.test.ts`, name: `x ${index}` }));
+    return {
+      kind: 'pre-wrap-up',
+      step: { kind: 'pre-wrap-up', scope: 'full', command: ['bun', 'test'], exitCode: 1, summary: null, failures, newFailures: failures },
+      red: true,
+      interrupted: false,
+      blocker: 'red',
+      blockedLine: 9,
+      repairInserted: false,
+    };
+  }
+
+  it('answers the passed-over tasks at the plan\'s end, ending nothing, and announces them once', () => {
+    const decisions = createRunDecisions(forced(false));
+
+    expect(decisions.atPlanEnd(done)).toEqual(forcedTasks);
+    expect(decisions.atPlanEnd(done)).toEqual(forcedTasks);
+    expect(events).toEqual([['passed-over', { tasks: forcedTasks }]]);
+  });
+
+  it('answers none at the end of a plan whose passed-over tasks are done, so the wrap-up is the ordinary one', () => {
+    expect(createRunDecisions(forced(false)).atPlanEnd(TRACKER.replace(/- \[(?: |BLOCKED)\] /g, '- [x] '))).toEqual([]);
+  });
+
+  it('goes on to the wrap-up past a red pre-wrap-up step whose new failures are within the tolerance', () => {
+    const decisions = createRunDecisions(forced(2));
+
+    expect(decisions.gateForcedWrapUp('stop', forcedTasks, redWith(2))).toBe('go-on');
+    expect(lines.join('\n')).toContain('2 new failure(s)');
+  });
+
+  it('refuses the wrap-up with exit code 20 and a halt naming the count over the tolerance', async () => {
+    const decisions = createRunDecisions(forced(2));
+
+    const end = await endOf(() => Promise.resolve(decisions.gateForcedWrapUp('stop', forcedTasks, redWith(3))));
+
+    expect(end.exitCode).toBe(DECISION_STOP_EXIT);
+    expect(end.message).toContain('3 new failure(s)');
+    expect(events.at(-1)).toEqual(['halt', { reason: 'forced wrap-up refused: 3 new failure(s), over loop.forceWrapUp.maxNewFailures 2' }]);
+  });
+
+  it('tolerates no new failure under false, and refuses a red step it counts none in', async () => {
+    expect((await endOf(() => Promise.resolve(createRunDecisions(forced(false)).gateForcedWrapUp('stop', forcedTasks, redWith(1))))).exitCode)
+      .toBe(DECISION_STOP_EXIT);
+    expect((await endOf(() => Promise.resolve(createRunDecisions(forced(50)).gateForcedWrapUp('stop', forcedTasks, redWith(0))))).message)
+      .toContain('no failure it can count');
+  });
+
+  it('leaves every other gate as it is: a run not forced, an interrupted step, and a green or repair answer', () => {
+    const decisions = createRunDecisions(forced(5));
+
+    expect(decisions.gateForcedWrapUp('stop', [], redWith(1))).toBe('stop');
+    expect(decisions.gateForcedWrapUp('stop', forcedTasks, { ...redWith(1), red: false, interrupted: true })).toBe('stop');
+    expect(decisions.gateForcedWrapUp('stop', forcedTasks, null)).toBe('stop');
+    expect(decisions.gateForcedWrapUp('go-on', forcedTasks, null)).toBe('go-on');
+    expect(decisions.gateForcedWrapUp('repair', forcedTasks, redWith(1))).toBe('repair');
   });
 });

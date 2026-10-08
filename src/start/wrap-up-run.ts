@@ -44,6 +44,13 @@
  * request, or that wrote nothing, writes nothing more, and a blocked or
  * interrupted delivery reaches no second write.
  *
+ * A `--continue --force-wrap-up` run hands in the tasks it passed over
+ * ({@link WrapUpRunInput.passedOver}). Its wrap-up says so in place of
+ * "All tasks completed", and once the delivery answers DELIVERED, after
+ * the retarget and before the CI wait, the pull request is converted to
+ * a draft listing them (`start/forced-draft.ts`); a `none` provider has
+ * none to convert, which one line says.
+ *
  * Whoever opened it, a DELIVERED pull request whose base is not the
  * run's — the `base` resolved once at the top of {@link runWrapUp} —
  * is then retargeted onto it (`start/pr-retarget.ts`), before the CI
@@ -87,6 +94,7 @@
  */
 import type { CheckoutExpectation } from './checkout-guard.js';
 import type { ClaudeSettingSource, RafaConfig } from '../config.js';
+import type { PassedOverTask } from './loop-events.js';
 import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { SessionServing } from './serving.js';
 import type { RunSession } from './session.js';
@@ -103,6 +111,7 @@ import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import { expectWrapUpCommits, haltIfWrapUpMoved } from './checkout-watch.js';
+import { forcedDraftSeamsIn, markForcedDraft } from './forced-draft.js';
 import { emitLoopEvent } from './loop-events.js';
 import { prLifecycleSeamsIn, refusedPushReaderIn, verifyPullRequest } from './pr-lifecycle.js';
 import { retargetPullRequest } from './pr-retarget.js';
@@ -142,6 +151,11 @@ export interface WrapUpRunInput {
   readonly ciAttempts: number;
   /** True once the operator has interrupted the run; no retry or runner PR follows. */
   readonly isInterrupted: () => boolean;
+  /**
+   * The tasks a `--force-wrap-up` run passed over, which its draft pull
+   * request lists; none, or left out, for every other run.
+   */
+  readonly passedOver?: readonly PassedOverTask[];
 }
 
 /** Runs the wrap-up branch of the loop; see the module note. */
@@ -162,8 +176,11 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     ciAttempts,
   } = input;
 
+  const passedOver = input.passedOver ?? [];
   session.wrapUpStarted();
-  activeOutput().info('\n✅ All tasks completed!');
+  activeOutput().info(passedOver.length === 0
+    ? '\n✅ All tasks completed!'
+    : `\n⚠️  Wrapping up with ${passedOver.length} passed-over task(s) left open (--force-wrap-up): the pull request becomes a draft listing them.`);
   activeOutput().info('🧹 Wrap-up session starting: promote the listed lessons, sync with main, then commit, push and open the PR.');
   activeOutput().info('   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.');
   // Step 1 of the release, written BEFORE the session that
@@ -226,6 +243,9 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // The pull request, delivered after step 3 and before the CI gate:
   // read, retried, opened by the runner; see the module note. A `none`
   // provider has no pull request to deliver.
+  if (passedOver.length > 0 && readProvider().provider === 'none') {
+    activeOutput().warn('⚠️  pr.provider is none: the forced wrap-up has no pull request to mark as a draft.');
+  }
   if (readProvider().provider !== 'none') {
     const delivery = await deliverPullRequest(
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
@@ -247,6 +267,9 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
     // reads are the ones GitHub runs against the right base. A refused
     // edit is a warning and the run carries on (`start/pr-retarget.ts`).
     await retargetPullRequest(delivery.pull, base, { pulls: ghPullRequestsIn(checkout), output: activeOutput() });
+    // A forced wrap-up's pull request becomes a draft listing the tasks
+    // it passed over, before the CI wait (`start/forced-draft.ts`).
+    if (passedOver.length > 0) await markForcedDraft(delivery.pull.number, passedOver, forcedDraftSeamsIn(checkout));
   } else {
     // A `none` provider delivers nothing: the event carries its reason, with no lookup.
     await emitPullRequestEvent(expected.branch, null, lookup);

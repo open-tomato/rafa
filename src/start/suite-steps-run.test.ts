@@ -326,6 +326,27 @@ describe('beforeSession on a red pre-wrap-up step', () => {
   });
 });
 
+describe('lastPreWrapUp', () => {
+  it('answers none before a pre-wrap-up step ran, and the last one\'s outcome after', async () => {
+    const red = { ...outcome('pre-wrap-up', true, 10), repairInserted: false };
+    const { calls } = scripted({ runPreWrapUpStep: () => Promise.resolve(red) });
+    const steps = stepsWith(calls);
+
+    await steps.beforeSession(taskAt('A task', 3));
+    expect(steps.lastPreWrapUp()).toBeNull();
+    await steps.beforeSession(null);
+    expect(steps.lastPreWrapUp()).toBe(red);
+  });
+
+  it('answers none for a pre-wrap-up step that threw', async () => {
+    const { calls } = scripted({ runPreWrapUpStep: () => Promise.reject(new Error('spawn failed')) });
+    const steps = stepsWith(calls);
+
+    await steps.beforeSession(null);
+    expect(steps.lastPreWrapUp()).toBeNull();
+  });
+});
+
 describe('afterTask', () => {
   it('runs the task step from the task\'s base, with its sentence and the affected default', async () => {
     const { calls, seen } = scripted();
