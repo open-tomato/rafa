@@ -522,6 +522,8 @@ describe('where start.ts hands a stop to a --continue decision', () => {
 
   it('ends at the plan\'s end on passed-over tasks before the loop guard, and releases defers once a task is done', () => {
     expect(START).toContain('      if (!taskInfo) decisions.atPlanEnd(trackerContent);\n');
+    expect(START).toContain('      if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;\n');
+    expect(START.indexOf('decisions.atFirstTask(')).toBeLessThan(START.indexOf('haltIfCheckoutMoved({ expected, trackerPath, taskInfo })'));
     expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltIfWrapUpMoved({ expected, before: \'dispatch\' })'));
     expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeGreaterThan(START.indexOf('emitLoopEvent(held);'));
     expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeLessThan(START.indexOf('emitLoopEvent({ kind: \'task-done\''));

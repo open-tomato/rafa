@@ -227,6 +227,39 @@ describe('loop start --continue over a real loop', () => {
     ]);
   }, CASE_TIMEOUT_MS);
 
+  it('under --output=json ends with exit 21 and the prompt, then applies --decide=jump on the next run before any session', () => {
+    const scratch = plant({ tasks: [report('blocked'), report('done')], decisions: [] });
+
+    const first = runLoopStart(scratch, 'json', [...SESSION_FLAGS, '--continue']);
+
+    expect(first.exitCode).toBe(21);
+    expect(callsOf(scratch)).toEqual(['task']);
+    const needed = first.stdout.split('\n')
+      .filter((line) => line.includes('"decision-needed"'))
+      .map((line) => JSON.parse(line) as { data: Record<string, unknown> });
+    expect(needed).toHaveLength(1);
+    expect(needed[0]?.data).toMatchObject({ task: GATE, line: 3, holds: ['status: blocked'], retriesLeft: 1 });
+    expect(needed[0]?.data['prompt']).toContain('# Loop continue decision instructions');
+    expect(trackerOf(scratch)).toContain(`- [BLOCKED] ${GATE}`);
+
+    // The caller decides: the gate is jumped before anything is spawned,
+    // the later task runs, and the run ends on the gate passed over.
+    const second = runLoopStart(scratch, 'json', [...SESSION_FLAGS, '--continue', '--decide=jump']);
+
+    expect(second.exitCode).toBe(22);
+    expect(callsOf(scratch)).toEqual(['task', 'task']);
+    expect(told(scratch)).toEqual([
+      ['task-start', null],
+      ['decision-needed', null],
+      ['task-blocked', 'status: blocked'],
+      ['decision', 'jump'],
+      ['task-start', null],
+      ['task-done', null],
+      ['passed-over', null],
+      ['halt', 'passed over 1 task(s)'],
+    ]);
+  }, CASE_TIMEOUT_MS);
+
   it('halts as it always did without --continue, spawning no decision session', () => {
     const scratch = plant({ tasks: [report('blocked')], decisions: [] });
 

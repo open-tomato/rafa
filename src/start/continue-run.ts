@@ -70,6 +70,26 @@
  * plan's newest stopped run saved (`readPreviousPassOver`), handed in as
  * {@link RunDecisionsOptions.seed}.
  *
+ * ## A decision without a session
+ *
+ * Under `--output=json` (`activeOutputMode`) no session is spawned: the
+ * stop emits `decision-needed`, holding the task, its line, why it
+ * stopped, the open tasks, the retries left and the rendered prompt,
+ * then the stop's own event, and the run ends with
+ * {@link DECISION_NEEDED_EXIT}, the tracker as the stop left it. The
+ * caller decides and starts the run again with `--continue --decide=`.
+ * The events output is read by the operators as text is, and decides
+ * through the session.
+ *
+ * A decision named on the line (`--decide`, `./continue-args.ts`) is
+ * applied once, in place of the session, to the first decision point
+ * the run meets. A run that opens on a `[BLOCKED]` task, the line a
+ * stopped run left, meets it there, before that task is dispatched:
+ * {@link RunDecisions.atFirstTask}, asked on the loop's first pass
+ * alone. A run that opens on an open task keeps the directive for its
+ * first stop. Either way, every later decision point decides as the
+ * mode does.
+ *
  * ## The end of the plan
  *
  * When `findNextTask` with the skipped lines answers no task while
@@ -87,21 +107,22 @@ import type { LoopEvent, PassedOverTask } from './loop-events.js';
 import type { PassOverList } from './pass-over.js';
 import type { RetryRefusal, RunRetries } from './retry-budget.js';
 import type { RunSession } from './session.js';
+import type { OutputMode } from '../config-sections.js';
 import type { ClaudeSettingSource, RafaConfig } from '../config.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { heldOnNothingLeftBehind } from './commit.js';
-import { DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
+import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
 import { parseDecision } from './decision-parse.js';
 import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.js';
 import { runDecisionSession } from './decision-session.js';
-import { emitLoopEvent } from './loop-events.js';
+import { emitLoopEvent, taskPosition } from './loop-events.js';
 import { addDecision, markDone, remaining, skippedLines, taskIdentity } from './pass-over.js';
 
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
@@ -155,6 +176,8 @@ export interface RunDecisionsOptions {
   readonly seed: PassOverList;
   /** The decision session's spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
+  /** The output mode, read at each decision; `activeOutputMode` when left out. */
+  readonly mode?: () => OutputMode;
 }
 
 /** The run's decisions; see the module note. */
@@ -167,6 +190,12 @@ export interface RunDecisions {
    * event). Throws `LoopEnd` when the decision ends the run.
    */
   readonly atStop: (stop: DecisionStop) => Promise<boolean>;
+  /**
+   * On the loop's first pass alone: applies a `--decide` directive to
+   * `taskInfo` when it is `[BLOCKED]`, true when the loop goes on. Throws
+   * `LoopEnd` for a `stop`.
+   */
+  readonly atFirstTask: (taskInfo: TaskInfo | null, trackerContent: string) => Promise<boolean>;
   /** Notes that `taskInfo` is done, releasing what waited on it. */
   readonly taskDone: (taskInfo: TaskInfo) => void;
   /** Ends the run with `LoopEnd` when passed-over tasks are left open in `trackerContent`. */
@@ -180,6 +209,7 @@ const NO_LINES: ReadonlySet<number> = new Set();
 const NO_DECISIONS: RunDecisions = Object.freeze({
   skipLines: () => NO_LINES,
   atStop: () => Promise.resolve(false),
+  atFirstTask: () => Promise.resolve(false),
   taskDone: () => undefined,
   atPlanEnd: () => undefined,
 });
@@ -213,6 +243,9 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   if (!options.continueArgs.on) return NO_DECISIONS;
   const { trackerPath, retries, session } = options;
 
+  const mode = options.mode ?? activeOutputMode;
+  let directive = options.continueArgs.directive;
+  let firstPass = true;
   let list: PassOverList = options.seed;
   const deferred = new Set<string>();
   const passedOver = new Set<string>();
@@ -246,15 +279,15 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     throw new LoopEnd(DECISION_STOP_EXIT, `⛔ The --continue decision on line ${line} is stop: ${decision.reason}`);
   };
 
-  /** A session's decision on `subject`, or null when SIGINT ended the session. */
-  const sessionDecision = async (subject: DecisionSubject, content: string): Promise<ContinueDecision | null> => {
+  /** The prompt for `subject`, or the `stop` criteria that cannot be read are decided as. */
+  const promptFor = (subject: DecisionSubject, content: string): string | ContinueDecision => {
     const criteria = resolveContinueCriteria({
       root: options.repoRoot,
       path: options.settings.loopContinueCriteria,
       mode: options.settings.loopContinueCriteriaMode,
     });
     if (!criteria.ok) return { strategy: 'stop', reason: `the criteria cannot be read, so the run stops: ${criteria.refusal}` };
-    const prompt = buildDecisionPrompt({
+    return buildDecisionPrompt({
       plan: options.planPath,
       task: subject.taskInfo,
       holds: subject.holds,
@@ -262,6 +295,29 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       openTasks: listOpenTasks(content),
       criteria: criteria.criteria,
     });
+  };
+
+  /** Ends a json run on `subject` with `decision-needed`; see the module note. */
+  const needDecision = (subject: DecisionSubject, content: string, prompt: string): never => {
+    const line = shownLine(subject.taskInfo);
+    emitLoopEvent({
+      kind: 'decision-needed',
+      task: subject.taskInfo.task,
+      line,
+      holds: subject.holds,
+      openTasks: listOpenTasks(content).map((task) => ({ line: shownLine(task), text: task.task })),
+      retriesLeft: retries.left(),
+      prompt,
+    });
+    emitLoopEvent(subject.stopEvent);
+    throw new LoopEnd(DECISION_NEEDED_EXIT, [
+      `🧭 A decision is needed for the stop on line ${line}; the decision-needed event holds its prompt.`,
+      '   Run again with --continue --decide=retry|stop|jump|defer (--approach=<text> for retry, --after=<line> for defer).',
+    ].join('\n'));
+  };
+
+  /** A session's decision on `prompt`, or null when SIGINT ended the session. */
+  const sessionDecision = async (subject: DecisionSubject, prompt: string): Promise<ContinueDecision | null> => {
     activeOutput().info(`\n🧭 Deciding how the run goes on after the stop on line ${shownLine(subject.taskInfo)}: one read-only session (--continue).`);
     const answer = await runDecisionSession({
       prompt,
@@ -276,6 +332,25 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       return { strategy: 'stop', reason: `the decision session exited ${answer.exitCode}, so the run stops` };
     }
     return parseDecision(answer.stdout);
+  };
+
+  /** The `--decide` directive, once: answered and then dropped, null after. */
+  const takeDirective = (subject: DecisionSubject): ContinueDecision | null => {
+    const taken = directive;
+    if (taken === null) return null;
+    directive = null;
+    activeOutput().info(`\n🧭 Applying --decide=${taken.strategy}, named on the line, to line ${shownLine(subject.taskInfo)}.`);
+    return taken;
+  };
+
+  /** The decision on `subject`: the directive, the json run's end, or the session's; null for an interrupt. */
+  const decisionFor = async (subject: DecisionSubject, content: string): Promise<ContinueDecision | null> => {
+    const directed = takeDirective(subject);
+    if (directed !== null) return directed;
+    const prompt = promptFor(subject, content);
+    if (typeof prompt !== 'string') return prompt;
+    if (mode() === 'json') needDecision(subject, content, prompt);
+    return sessionDecision(subject, prompt);
   };
 
   /** `decision` under the run's two bounds; see the module note. */
@@ -329,7 +404,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
 
   const decide = async (subject: DecisionSubject): Promise<boolean> => {
     const content = readTracker();
-    const decision = await sessionDecision(subject, content);
+    const decision = await decisionFor(subject, content);
     if (decision === null) return false;
     const identity = taskIdentity(subject.taskInfo.task);
     return apply(bounded(decision, identity), subject, content, identity);
@@ -345,6 +420,18 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     return subject === null
       ? false
       : decide(subject);
+  };
+
+  const atFirstTask = async (taskInfo: TaskInfo | null, trackerContent: string): Promise<boolean> => {
+    if (!firstPass) return false;
+    firstPass = false;
+    if (directive === null || taskInfo?.status !== 'blocked') return false;
+    const stopEvent: LoopEvent = {
+      kind: 'task-blocked',
+      position: taskPosition(trackerContent, taskInfo.lineNum),
+      reason: `--decide=${directive.strategy}`,
+    };
+    return decide({ taskInfo, holds: [taskInfo.blocker ?? 'blocked by an earlier run'], stopEvent });
   };
 
   const taskDone = (taskInfo: TaskInfo): void => {
@@ -370,5 +457,5 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     throw new LoopEnd(PASSED_OVER_EXIT, `⏭  The run ended with ${tasks.length} passed-over task(s) left open. Run again with --continue once they can go on, or with --force-wrap-up to open a draft pull request.`);
   };
 
-  return { skipLines, atStop, taskDone, atPlanEnd };
+  return { skipLines, atStop, atFirstTask, taskDone, atPlanEnd };
 }

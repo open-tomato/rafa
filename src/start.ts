@@ -320,8 +320,12 @@
  * once, and a retry-safe stop once its retries are spent. A `retry`
  * writes its approach on the task's line and spends a retry, a `jump`
  * or `defer` passes the task over (`findNextTask` skips its line), and
- * a `stop` ends the run with exit code 20. A run left with only
- * passed-over tasks ends with exit code 22 before the pre-wrap-up step.
+ * a `stop` ends the run with exit code 20. Under `--output=json` no
+ * session is spawned: the run ends with exit code 21 and a
+ * `decision-needed` event, and a `--decide` on the line is applied once,
+ * on the first pass to a `[BLOCKED]` task it opens on, else at its first
+ * stop. A run left with only passed-over tasks ends with exit code 22
+ * before the pre-wrap-up step.
  *
  * Every event the run emits is appended to its events file,
  * `.rafa/runs/<session-id>.events.ndjson` (`start/loop-events.ts`),
@@ -670,6 +674,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // No task left but the ones a `--continue` run passed over: the run
       // ends here, before the pre-wrap-up step and the wrap-up.
       if (!taskInfo) decisions.atPlanEnd(trackerContent);
+      // A `--decide` named on the line, on the first pass alone, meets the
+      // `[BLOCKED]` task a stopped run left before it is dispatched again.
+      if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;
 
       // The loop guard, before anything is written into the checkout: a
       // moved or missing one marks the task `[BLOCKED]`, or before the

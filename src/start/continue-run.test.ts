@@ -28,8 +28,8 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { CONTINUE_OFF } from './continue-args.js';
-import { DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
+import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
+import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
 import { createRunDecisions } from './continue-run.js';
 import { UNREADABLE_PREFIX } from './decision-parse.js';
 
@@ -389,6 +389,94 @@ describe('the seed and the end of the plan', () => {
     const run = plant([], 0, seed);
 
     expect(() => createRunDecisions(run.options).atPlanEnd(TRACKER.replace(/- \[(?: |BLOCKED)\] /g, '- [x] '))).not.toThrow();
+    expect(events).toEqual([]);
+  });
+});
+
+describe('under --output=json', () => {
+  it('spawns no session: it emits decision-needed with the prompt, then the stop\'s event, and ends with exit code 21', async () => {
+    const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
+    const decisions = createRunDecisions({ ...run.options, mode: () => 'json' });
+
+    const end = await endOf(() => decisions.atStop(heldReport(run.trackerPath)));
+
+    expect(end.exitCode).toBe(DECISION_NEEDED_EXIT);
+    expect(end.message).toContain('--decide=');
+    expect(run.calls).toHaveLength(0);
+    expect(events.map(([name]) => name)).toEqual(['decision-needed', 'task-blocked']);
+    const needed = events[0]?.[1] as Record<string, unknown>;
+    expect(needed).toMatchObject({
+      task: 'Check the env file a person writes',
+      line: 3,
+      holds: ['status: blocked'],
+      retriesLeft: 1,
+    });
+    expect(needed['openTasks']).toEqual([
+      { line: 3, text: 'Check the env file a person writes' },
+      { line: 4, text: 'Use the env file' },
+      { line: 5, text: 'Write the helper' },
+      { line: 6, text: 'Wire the helper' },
+    ]);
+    expect(needed['prompt']).toContain('# Loop continue decision instructions');
+    expect(readFileSync(run.trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('decides through the session in the text and events modes, its control', async () => {
+    for (const mode of ['text', 'events'] as const) {
+      const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
+
+      expect(await createRunDecisions({ ...run.options, mode: () => mode }).atStop(heldReport(run.trackerPath))).toBe(true);
+      expect(run.calls).toHaveLength(1);
+    }
+  });
+});
+
+describe('a decision named on the line with --decide', () => {
+  /** The options of `run` with `directive` named on the line. */
+  function directed(run: ReturnType<typeof plant>, directive: RunDecisionsOptions['continueArgs']['directive']): RunDecisionsOptions {
+    return { ...run.options, continueArgs: { on: true, directive, forceWrapUp: false }, mode: () => 'json' };
+  }
+
+  it('applies once, to the blocked task the run opens on, before anything is spawned', async () => {
+    const run = plant([]);
+    const decisions = createRunDecisions(directed(run, { strategy: 'jump', reason: DIRECTIVE_REASON }));
+
+    expect(await decisions.atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(true);
+    expect(run.calls).toHaveLength(0);
+    expect(decisions.skipLines(TRACKER).has(2)).toBe(true);
+    expect(events).toEqual([['decision', { strategy: 'jump', line: 3, reason: DIRECTIVE_REASON }]]);
+
+    // Applied once: a later stop in json mode needs a decision again.
+    expect((await endOf(() => decisions.atStop(heldReport(run.trackerPath)))).exitCode).toBe(DECISION_NEEDED_EXIT);
+  });
+
+  it('retry: writes the approach on the blocked line the run opens on and spends a retry', async () => {
+    const run = plant([]);
+    const decisions = createRunDecisions(directed(run, { strategy: 'retry', reason: DIRECTIVE_REASON, approach: 'Read the fixture.' }));
+
+    expect(await decisions.atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(true);
+    expect(run.retried).toHaveLength(1);
+    expect(findNextTask(readFileSync(run.trackerPath, 'utf8'))?.blocker).toBe('Read the fixture.');
+  });
+
+  it('waits for the first stop when the run opens on an open task, and is asked on the first pass alone', async () => {
+    const run = plant([]);
+    const decisions = createRunDecisions(directed(run, { strategy: 'stop', reason: DIRECTIVE_REASON }));
+    const open = taskAt(run.trackerPath, 3);
+
+    expect(await decisions.atFirstTask(open, TRACKER)).toBe(false);
+    expect(await decisions.atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(false);
+    expect(events).toEqual([]);
+
+    const end = await endOf(() => decisions.atStop(heldReport(run.trackerPath)));
+    expect(end.exitCode).toBe(DECISION_STOP_EXIT);
+    expect(run.calls).toHaveLength(0);
+  });
+
+  it('leaves the first pass alone without a directive', async () => {
+    const run = plant([]);
+
+    expect(await createRunDecisions(run.options).atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(false);
     expect(events).toEqual([]);
   });
 });
