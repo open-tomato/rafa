@@ -351,8 +351,8 @@ function limitRefusal(limit: Limit, shown: string) {
   };
 }
 
-/** An accepting reading of `value`. */
-function acceptedAs(value: unknown) {
+/** An accepting reading of `value`, kept at its own literal type. */
+function acceptedAs<const T>(value: T) {
   return { value, problems: [], extras: [] };
 }
 
