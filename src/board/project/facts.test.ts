@@ -15,6 +15,12 @@
  *    base, so a reader answering true for every fragment fails.
  *  - The files beyond the first page hold the only fragment, so a reader
  *    stopping at one page answers none.
+ *  - Each list of an issue read past its first page holds, on its last
+ *    page alone, the entry the case looks for: a label, a closing
+ *    reference, or the one closing cross-reference among 116, as `#485`
+ *    held. A reader stopping at one page answers none of them.
+ *  - The cursor that repeats is read beside the same issue without it,
+ *    which reads to its end.
  */
 import type { FakeFactsIssue, FakeFactsPull, FakePullFile } from './facts-fake.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -22,7 +28,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { createFakeFactsGh, FAKE_REPOSITORY } from './facts-fake.js';
-import { blobsArgs, issuesArgs, PAGE_SIZE } from './facts-query.js';
+import { blobsArgs, issuesArgs, listPagesArgs, PAGE_SIZE } from './facts-query.js';
 import { bodyCloses, readIssueFacts, UNREAD_LEVEL } from './facts.js';
 import { stageOf } from './rules.js';
 
@@ -330,6 +336,73 @@ describe('readIssueFacts: the Stage edge cases, read through the fake', () => {
   });
 });
 
+describe('readIssueFacts: an issue\'s lists past their first page', () => {
+  /** Issue 485, with `issueMentions` issue-sourced cross-references before pull request 900's closing one. */
+  function busy(issueMentions: number, repeatsCursor?: FakeFactsIssue['repeatsCursor']): FakeFactsIssue {
+    return { number: 485, state: 'OPEN', issueMentions, mentions: [{ pull: 900 }], ...(repeatsCursor === undefined
+      ? {}
+      : { repeatsCursor }) };
+  }
+
+  /** The calls among `calls` reading a further page of a list. */
+  function listPageCalls(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
+    return calls.filter((args) => args.some((arg) => arg.startsWith('query=') && arg.includes(': issue(number:') && !arg.includes('fragment facts')));
+  }
+
+  it('reads all 116 cross-references of an issue, finding the closing pull request on the second page at one more request', async () => {
+    const { facts, calls } = await read({ issues: [busy(115)], pulls: [pull(900, { body: 'Closes #485' })] }, [485]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(listPageCalls(calls)).toHaveLength(1);
+    expect(listPageCalls(calls)[0]).toContain(`tl485=${btoa(String(PAGE_SIZE))}`);
+  });
+
+  it('sends no list read for an issue whose every list fits one page', async () => {
+    const { facts, calls } = await read({ issues: [busy(PAGE_SIZE - 1)], pulls: [pull(900, { body: 'Closes #485' })] }, [485]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(listPageCalls(calls)).toEqual([]);
+  });
+
+  it('reads labels and closing references past their first page, three pages each', async () => {
+    const labels = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => `l${String(index)}`);
+    const closedBy = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => index + 1);
+    const pulls = closedBy.map((number) => pull(number, { state: number === closedBy.length
+      ? 'MERGED'
+      : 'CLOSED' }));
+    const { facts, calls } = await read({ issues: [{ number: 7, state: 'OPEN', labels, closedBy }], pulls }, [7]);
+
+    expect(facts.get(7)?.labels).toEqual(labels);
+    expect(facts.get(7)?.pullRequests.map(({ number }) => number)).toEqual([closedBy.length]);
+    expect(listPageCalls(calls)).toHaveLength(2);
+  });
+
+  it('batches the further pages of several issues into one request', async () => {
+    const issues = [busy(115), { ...busy(130), number: 486, mentions: [] }];
+    const { facts, calls } = await read({ issues, pulls: [pull(900, { body: 'Closes #485' })] }, [485, 486]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(facts.get(486)?.pullRequests).toEqual([]);
+    expect(listPageCalls(calls)).toHaveLength(1);
+  });
+
+  it('throws naming the issue and the list when a cursor repeats', async () => {
+    const fake = createFakeFactsGh({ issues: [busy(115, 'timelineItems')], pulls: [pull(900, { body: 'Closes #485' })] });
+
+    await expect(readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [485]))
+      .rejects.toThrow(`issue #485.timelineItems answered the cursor "${btoa(String(PAGE_SIZE))}" a second time`);
+    expect(listPageCalls(fake.calls())).toHaveLength(1);
+  });
+
+  it('asks a labels page with no pull fragment, and a cross-references page with one', () => {
+    const queryOf = (args: readonly string[]): string => args.find((arg) => arg.startsWith('query=')) ?? '';
+
+    expect(queryOf(listPagesArgs([{ number: 1, list: 'labels', cursor: 'MQ' }]))).not.toContain('fragment pull');
+    expect(queryOf(listPagesArgs([{ number: 1, list: 'timelineItems', cursor: 'MQ' }]))).toContain('fragment pull on PullRequest');
+    expect(listPagesArgs([{ number: 1, list: 'labels', cursor: 'a"b' }])).toContain('la1=a"b');
+  });
+});
+
 describe('readIssueFacts: refusals', () => {
   /** A runner answering `answer` to every call. */
   function answering(answer: GhResult): GhRunner {
@@ -349,18 +422,18 @@ describe('readIssueFacts: refusals', () => {
     await expect(readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('no issue #1');
   });
 
-  it('throws on a list longer than one page, naming the issue and the key', async () => {
+  it('throws on a list whose next page is not marked true or false, naming the issue and the key', async () => {
     const issue = {
       number: 1,
       state: 'OPEN',
       stateReason: null,
-      labels: { pageInfo: { hasNextPage: true }, nodes: [] },
+      labels: { pageInfo: { hasNextPage: null }, nodes: [] },
       closedByPullRequestsReferences: { pageInfo: { hasNextPage: false }, nodes: [] },
       timelineItems: { pageInfo: { hasNextPage: false }, nodes: [] },
     };
     const gh = answering({ ok: true, stdout: JSON.stringify({ data: { repository: { nameWithOwner: FAKE_REPOSITORY, i1: issue } } }), stderr: '' });
 
-    await expect(readIssueFacts({ gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('issue #1.labels holds more than 100 entries');
+    await expect(readIssueFacts({ gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('issue #1.labels.pageInfo.hasNextPage is null');
   });
 
   it('throws on an answer that is not JSON', async () => {

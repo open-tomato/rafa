@@ -1,5 +1,5 @@
 /**
- * A strict fake of the three `gh api graphql` reads the facts reader
+ * A strict fake of the four `gh api graphql` reads the facts reader
  * (`./facts.ts`) sends, behind a {@link GhRunner}: one in-memory
  * repository of issues, pull requests and branch trees, recording every
  * command it is handed. No case that uses it spawns a process or reaches
@@ -21,9 +21,16 @@
  * with the cursor the base64 of the last index read (`Mw` for 3), as
  * `#850`'s first page of three answered.
  *
+ * An issue's labels, closing references and cross-references page the
+ * same way, at the `first:` the query asks, the first page in the issues
+ * query and each further one in a list query naming its cursor as a
+ * variable. An issue planted with {@link FakeFactsIssue.repeatsCursor}
+ * answers that list's first `endCursor` on every page with a next page
+ * always ahead, the way a cursor that does not move would read.
+ *
  * ## Strict
  *
- * Anything but the three reads — another command, a query of another
+ * Anything but the four reads — another command, a query of another
  * shape, an issue or pull request it does not hold — is refused with `ok`
  * false and a message opening with `fake gh:`, the prefix of every
  * message the fake invents. A missing issue or pull request fails the
@@ -34,6 +41,9 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 /** The repository the fake answers for when none is given. */
 export const FAKE_REPOSITORY = 'open-tomato/rafa';
+
+/** An issue's lists the fake pages, by the name the query asks them. */
+export type FakeIssueList = 'labels' | 'closedByPullRequestsReferences' | 'timelineItems';
 
 /** How a planted pull request mentions an issue in the issue's timeline. */
 export interface FakeMention {
@@ -55,6 +65,8 @@ export interface FakeFactsIssue {
   readonly mentions?: readonly FakeMention[];
   /** How many issue-sourced cross-references precede the pull requests. */
   readonly issueMentions?: number;
+  /** The list whose cursor never moves; see the module note. None when left out. */
+  readonly repeatsCursor?: FakeIssueList;
 }
 
 /** One file a planted pull request changed. */
@@ -114,8 +126,30 @@ function fieldsOf(args: readonly string[]): ReadonlyMap<string, string> | null {
   return fields;
 }
 
-function connection(nodes: readonly unknown[]): Json {
-  return { pageInfo: { hasNextPage: false }, nodes };
+/** The `first:` the query asks of `list`, or null when it asks none. */
+function firstOf(query: string, list: string): number | null {
+  const match = new RegExp(`${list}\\(first: (\\d+)`, 'u').exec(query);
+  return match === null
+    ? null
+    : Number(match[1]);
+}
+
+/** The page of `nodes` of `first` entries from the base64 `cursor` on, or from the start when undefined. */
+function pageOf(nodes: readonly unknown[], first: number, cursor: string | undefined, repeats: boolean): Json {
+  const start = cursor === undefined
+    ? 0
+    : Number(atob(cursor));
+  const end = Math.min(nodes.length, start + first);
+  if (repeats) return { pageInfo: { hasNextPage: true, endCursor: btoa(String(Math.min(nodes.length, first))) }, nodes: nodes.slice(start, end) };
+  return {
+    pageInfo: {
+      hasNextPage: end < nodes.length,
+      endCursor: end === 0
+        ? null
+        : btoa(String(end)),
+    },
+    nodes: nodes.slice(start, end),
+  };
 }
 
 /** Makes the fake; see the module note. */
@@ -134,23 +168,43 @@ export function createFakeFactsGh(options: FakeFactsGhOptions = {}): FakeFactsGh
     headRefOid: pull.headRefOid,
   });
 
-  const issueNode = (issue: FakeFactsIssue): Json | string => {
+  /** Every node of each list of `issue`, or the message refusing it. */
+  const listsOf = (issue: FakeFactsIssue): Readonly<Record<FakeIssueList, readonly unknown[]>> | string => {
     const missing = [...(issue.closedBy ?? []), ...(issue.mentions ?? []).map(({ pull }) => pull)].find((number) => !pulls.has(number));
     if (missing !== undefined) return `issue #${String(issue.number)} names pull request #${String(missing)}, which is not planted`;
-    const sources = [
-      ...Array.from({ length: issue.issueMentions ?? 0 }, () => ({ isCrossRepository: false, source: {} })),
-      ...(issue.mentions ?? []).map(({ pull, crossRepository }) => {
-        const planted = pulls.get(pull) as FakeFactsPull;
-        return { isCrossRepository: crossRepository ?? false, source: { ...pullFields(planted), body: planted.body ?? '' } };
-      }),
-    ];
+    return {
+      labels: (issue.labels ?? []).map((name) => ({ name })),
+      closedByPullRequestsReferences: (issue.closedBy ?? []).map((number) => pullFields(pulls.get(number) as FakeFactsPull)),
+      timelineItems: [
+        ...Array.from({ length: issue.issueMentions ?? 0 }, () => ({ isCrossRepository: false, source: {} })),
+        ...(issue.mentions ?? []).map(({ pull, crossRepository }) => {
+          const planted = pulls.get(pull) as FakeFactsPull;
+          return { isCrossRepository: crossRepository ?? false, source: { ...pullFields(planted), body: planted.body ?? '' } };
+        }),
+      ],
+    };
+  };
+
+  const issueNode = (issue: FakeFactsIssue, query: string): Json | string => {
+    const lists = listsOf(issue);
+    if (typeof lists === 'string') return lists;
+    const page = (list: FakeIssueList): Json | string => {
+      const first = firstOf(query, list);
+      return first === null
+        ? `the issues query asks no first: of ${list}`
+        : pageOf(lists[list], first, undefined, issue.repeatsCursor === list);
+    };
+    const [labels, closedBy, timeline] = [page('labels'), page('closedByPullRequestsReferences'), page('timelineItems')];
+    if (typeof labels === 'string') return labels;
+    if (typeof closedBy === 'string') return closedBy;
+    if (typeof timeline === 'string') return timeline;
     return {
       number: issue.number,
       state: issue.state,
       stateReason: issue.stateReason ?? null,
-      labels: connection((issue.labels ?? []).map((name) => ({ name }))),
-      closedByPullRequestsReferences: connection((issue.closedBy ?? []).map((number) => pullFields(pulls.get(number) as FakeFactsPull))),
-      timelineItems: connection(sources),
+      labels,
+      closedByPullRequestsReferences: closedBy,
+      timelineItems: timeline,
     };
   };
 
@@ -159,9 +213,25 @@ export function createFakeFactsGh(options: FakeFactsGhOptions = {}): FakeFactsGh
     for (const [, alias, number] of query.matchAll(/ (i\d+): issue\(number: (\d+)\)/gu)) {
       const issue = issues.get(Number(number));
       if (issue === undefined) return refused(`no issue #${String(number)}`);
-      const node = issueNode(issue);
+      const node = issueNode(issue, query);
       if (typeof node === 'string') return refused(node);
       answer[alias ?? ''] = node;
+    }
+    return ok(answer);
+  };
+
+  const answerListPages = (query: string, fields: ReadonlyMap<string, string>): GhResult => {
+    const answer: Record<string, unknown> = {};
+    const asked = / (\w+): issue\(number: (\d+)\) \{ (labels|closedByPullRequestsReferences|timelineItems)\(first: (\d+), after: \$(\w+)[,)]/gu;
+    for (const [, alias, number, list, first, variable] of query.matchAll(asked)) {
+      const issue = issues.get(Number(number));
+      if (issue === undefined) return refused(`no issue #${String(number)}`);
+      const cursor = fields.get(variable ?? '');
+      if (cursor === undefined) return refused(`no value for the cursor $${String(variable)}`);
+      const lists = listsOf(issue);
+      if (typeof lists === 'string') return refused(lists);
+      const name = list as FakeIssueList;
+      answer[alias ?? ''] = { [name]: pageOf(lists[name], Number(first), cursor, issue.repeatsCursor === name) };
     }
     return ok(answer);
   };
@@ -171,23 +241,7 @@ export function createFakeFactsGh(options: FakeFactsGhOptions = {}): FakeFactsGh
     for (const [, alias, number, first] of query.matchAll(/ (p\d+): pullRequest\(number: (\d+)\) \{ files\(first: (\d+),/gu)) {
       const pull = pulls.get(Number(number));
       if (pull === undefined) return refused(`no pull request #${String(number)}`);
-      const cursor = fields.get(`c${String(number)}`);
-      const start = cursor === undefined
-        ? 0
-        : Number(atob(cursor));
-      const files = pull.files ?? [];
-      const end = Math.min(files.length, start + Number(first));
-      answer[alias ?? ''] = {
-        files: {
-          pageInfo: {
-            hasNextPage: end < files.length,
-            endCursor: end === 0
-              ? null
-              : btoa(String(end)),
-          },
-          nodes: files.slice(start, end).map(({ path, changeType }) => ({ path, changeType })),
-        },
-      };
+      answer[alias ?? ''] = { files: pageOf(pull.files ?? [], Number(first), fields.get(`c${String(number)}`), false) };
     }
     return ok(answer);
   };
@@ -219,6 +273,7 @@ export function createFakeFactsGh(options: FakeFactsGhOptions = {}): FakeFactsGh
     if (fields === null || query === undefined) return Promise.resolve(refused(`unmodelled command: gh ${args.join(' ')}`));
     if (fields.get('owner') !== '{owner}' || fields.get('repo') !== '{repo}') return Promise.resolve(refused('owner and repo are not the placeholders'));
     if (query.includes('fragment facts on Issue')) return Promise.resolve(answerIssues(query));
+    if (query.includes(': issue(number:')) return Promise.resolve(answerListPages(query, fields));
     if (query.includes(': pullRequest(number:')) return Promise.resolve(answerFiles(query, fields));
     if (query.includes(': object(expression:')) return Promise.resolve(answerBlobs(query, fields));
     return Promise.resolve(refused(`unmodelled query: ${query}`));

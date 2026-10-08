@@ -60,16 +60,27 @@
  * first — so the rule's "its fragment ships and is still on the base"
  * holds of the pull request exactly when it holds of one of them.
  *
+ * ## Every list read to its end
+ *
+ * An issue's labels, closing references and cross-references are each
+ * read {@link PAGE_SIZE} to a page, GitHub's cap, and followed past the
+ * first page by its `endCursor`, as a pull request's files are. The
+ * issues query carries every first page, so only an issue holding more
+ * than one page of a list costs more requests: one per further page,
+ * batched across issues. Measured on 2026-10-07 over rafa's own
+ * repository, `#485` held 116 cross-references, so a reader stopping at
+ * one page would have answered it short by sixteen, any of them the pull
+ * request the Stage turns on.
+ *
  * ## Refusals
  *
  * A failed `gh` call, an answer that is not the recorded shape, and a
- * list longer than one page of {@link PAGE_SIZE} (an issue's labels,
- * closing references or cross-references) THROW, naming the issue and
- * the key: a dropped entry would answer facts that read as complete and
- * are short by the one pull request the Stage turns on. A pull request's
- * files are the one list read past its first page.
+ * list whose next page names a cursor it has already read THROW, naming
+ * the issue and the list: a cursor that repeats would read the same page
+ * forever, and a dropped entry would answer facts that read as complete
+ * and are short by the one pull request the Stage turns on.
  */
-import type { FilesPage, FragmentLookup } from './facts-query.js';
+import type { FilesPage, FragmentLookup, IssueList, ListPage } from './facts-query.js';
 import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { PlanReleaseLevel } from '../../plan/parse.js';
@@ -87,7 +98,11 @@ import {
   FRAGMENT_BATCH,
   ISSUE_BATCH,
   issueAlias,
+  ISSUE_LISTS,
   issuesArgs,
+  LIST_BATCH,
+  listAlias,
+  listPagesArgs,
   PAGE_SIZE,
   PULL_BATCH,
   pullAlias,
@@ -184,12 +199,21 @@ function readList(value: unknown, where: string): readonly unknown[] {
   return value;
 }
 
-/** The nodes of the one-page connection at `where`, refusing a second page; see the module note. */
-function readOnePage(value: unknown, where: string): readonly unknown[] {
+/** One page of a connection: its nodes, and the cursor of the next page, or null on the last. */
+interface ConnectionPage {
+  readonly nodes: readonly unknown[];
+  readonly next: string | null;
+}
+
+/** The page of the connection at `where`. */
+function readPage(value: unknown, where: string): ConnectionPage {
   const connection = readMapping(value, where);
   const pageInfo = readMapping(connection['pageInfo'], `${where}.pageInfo`);
-  if (pageInfo['hasNextPage'] !== false) refuse(`${where} holds more than ${String(PAGE_SIZE)} entries, one page`);
-  return readList(connection['nodes'], `${where}.nodes`);
+  const nodes = readList(connection['nodes'], `${where}.nodes`);
+  const more = pageInfo['hasNextPage'];
+  if (more === false) return { nodes, next: null };
+  if (more !== true) refuse(`${where}.pageInfo.hasNextPage is ${describeValue(more)}, expected true or false`);
+  return { nodes, next: readString(pageInfo['endCursor'], `${where}.pageInfo.endCursor`) };
 }
 
 /** Sends `args` and answers the `repository` of the answer, or throws naming what `gh` said. */
@@ -239,41 +263,111 @@ function crossReferencedPull(value: unknown, where: string, issue: number, repos
     : null;
 }
 
-/** The issue answered under `alias`; see the module note. */
-function readIssue(repositoryAnswer: Answer, number: number, repository: string): ReadIssue {
+/** An issue's own fields, as the issues query read them. */
+type IssueHead = Pick<IssueFacts, 'number' | 'state' | 'stateReason'>;
+
+/** Every node read so far of each list of one issue. */
+type IssueNodes = Readonly<Record<IssueList, readonly unknown[]>>;
+
+/** One issue as the issues query answered it: its fields, and the first page of each list. */
+interface IssueFirstPages {
+  readonly head: IssueHead;
+  readonly repository: string;
+  readonly pages: Readonly<Record<IssueList, ConnectionPage>>;
+}
+
+/** Where issue `number`'s `list` is named in a refusal. */
+function listWhere(number: number, list: IssueList): string {
+  return `issue #${String(number)}.${list}`;
+}
+
+/** Issue `number` as the issues query answered it under its alias. */
+function readIssueFirstPages(answer: Answer, number: number, repository: string): IssueFirstPages {
   const where = `issue #${String(number)}`;
-  const issue = readMapping(repositoryAnswer[issueAlias(number)], where);
+  const issue = readMapping(answer[issueAlias(number)], where);
   const state = issue['state'];
   if (state !== 'OPEN' && state !== 'CLOSED') refuse(`${where}.state is ${describeValue(state)}, expected OPEN or CLOSED`);
   const reason = issue['stateReason'];
   if (reason !== null && typeof reason !== 'string') refuse(`${where}.stateReason is ${describeValue(reason)}, expected a string or null`);
-  const labels = readOnePage(issue['labels'], `${where}.labels`)
+  const pages = Object.fromEntries(ISSUE_LISTS.map((list) => [list, readPage(issue[list], listWhere(number, list))])) as Record<IssueList, ConnectionPage>;
+  return { head: { number, state: state satisfies BoardIssueState, stateReason: reason }, repository, pages };
+}
+
+/** The key of one issue's list among the pages read. */
+function listKey(number: number, list: IssueList): string {
+  return `${String(number)}:${list}`;
+}
+
+/**
+ * Reads every page past the first of each list of `firsts`, a batch of
+ * {@link LIST_BATCH} pages to a request, and answers every node of each
+ * list by {@link listKey}. Throws on a cursor read before; see the module note.
+ */
+async function readRemainingPages(gh: GhRunner, firsts: readonly IssueFirstPages[]): Promise<ReadonlyMap<string, readonly unknown[]>> {
+  const nodes = new Map<string, unknown[]>();
+  const seen = new Map<string, Set<string>>();
+  let pending: readonly ListPage[] = firsts.flatMap(({ head: { number }, pages }) => ISSUE_LISTS.flatMap((list) => {
+    const page = pages[list];
+    nodes.set(listKey(number, list), [...page.nodes]);
+    seen.set(listKey(number, list), new Set(page.next === null
+      ? []
+      : [page.next]));
+    return page.next === null
+      ? []
+      : [{ number, list, cursor: page.next }];
+  }));
+  while (pending.length > 0) {
+    const next: ListPage[] = [];
+    for (const batch of batchesOf(pending, LIST_BATCH)) {
+      const answer = await readRepository(gh, listPagesArgs(batch));
+      for (const { number, list } of batch) {
+        const where = listWhere(number, list);
+        const page = readPage(readMapping(answer[listAlias(number, list)], `issue #${String(number)}`)[list], where);
+        nodes.get(listKey(number, list))?.push(...page.nodes);
+        if (page.next === null) continue;
+        const cursors = seen.get(listKey(number, list));
+        if (cursors?.has(page.next) === true) refuse(`${where} answered the cursor ${JSON.stringify(page.next)} a second time, so its next page would repeat one read before`);
+        cursors?.add(page.next);
+        next.push({ number, list, cursor: page.next });
+      }
+    }
+    pending = next;
+  }
+  return nodes;
+}
+
+/** The issue from its fields and every node of its lists; see the module note. */
+function readIssue(head: IssueHead, lists: IssueNodes, repository: string): ReadIssue {
+  const where = `issue #${String(head.number)}`;
+  const labels = lists.labels
     .map((label, index) => readString(readMapping(label, `${where}.labels[${String(index)}]`)['name'], `${where}.labels[${String(index)}].name`));
-  const linked = readOnePage(issue['closedByPullRequestsReferences'], `${where}.closedByPullRequestsReferences`)
+  const linked = lists.closedByPullRequestsReferences
     .map((pull, index) => readPull(pull, `${where}.closedByPullRequestsReferences[${String(index)}]`));
-  const mentioned = readOnePage(issue['timelineItems'], `${where}.timelineItems`)
-    .map((event, index) => crossReferencedPull(event, `${where}.timelineItems[${String(index)}]`, number, repository));
+  const mentioned = lists.timelineItems
+    .map((event, index) => crossReferencedPull(event, `${where}.timelineItems[${String(index)}]`, head.number, repository));
   const pulls = new Map([...linked, ...mentioned].flatMap((pull) => pull === null
     ? []
     : [[pull.number, pull] as const]));
   return {
-    number,
-    state: state satisfies BoardIssueState,
-    stateReason: reason,
+    ...head,
     labels,
     pulls: [...pulls.values()].sort((left, right) => left.number - right.number),
   };
 }
 
-/** Reads the issues `numbers`, one batch after another. */
+/** Reads the issues `numbers`, one batch after another, then every further page of their lists. */
 async function readIssues(gh: GhRunner, numbers: readonly number[]): Promise<readonly ReadIssue[]> {
-  const read: ReadIssue[] = [];
+  const firsts: IssueFirstPages[] = [];
   for (const batch of batchesOf(numbers, ISSUE_BATCH)) {
     const answer = await readRepository(gh, issuesArgs(batch));
     const repository = readString(answer['nameWithOwner'], 'data.repository.nameWithOwner');
-    read.push(...batch.map((number) => readIssue(answer, number, repository)));
+    firsts.push(...batch.map((number) => readIssueFirstPages(answer, number, repository)));
   }
-  return read;
+  const nodes = await readRemainingPages(gh, firsts);
+  return firsts.map(({ head, repository }) => {
+    const lists = Object.fromEntries(ISSUE_LISTS.map((list) => [list, nodes.get(listKey(head.number, list)) ?? []])) as Record<IssueList, readonly unknown[]>;
+    return readIssue(head, lists, repository);
+  });
 }
 
 /** The fragment paths among one page of files at `where`, and the cursor of the next page, if any. */
