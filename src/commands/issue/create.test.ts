@@ -640,8 +640,9 @@ describe('rafa issue create and the project', () => {
     expect(lines.slice(0, 2)).toEqual(['Created github issue 1.', 'URL: https://github.com/open-tomato/rafa/issues/1']);
     expect(wired.fake.issue('1')).toMatchObject({ title: 'Timeouts in plan show', state: 'OPEN' });
     expect(items.map((item) => item.content)).toEqual([{ kind: 'issue', repository: FAKE_PROJECT_REPOSITORY, number: 1 }]);
-    // The project fake models no facts query, so the refresh asked after the add rejects there, answered as one line.
-    expect(lines[2]).toStartWith('warn: The project was not updated for #1: board project facts: ');
+    // The project fake models no facts query, so #1's facts are refused; the board read after them finds no
+    // Roadmap issue and rejects, answered as one line.
+    expect(lines[2]).toStartWith('warn: The project was not updated for #1: no open issue is titled Roadmap');
     expect(lines[2]).toContain('rafa board sync');
   });
 

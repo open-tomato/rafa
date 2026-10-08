@@ -321,7 +321,7 @@ async function missingIssues(options: ProjectSetupOptions, repository: string, p
   const held = heldIssues(await createGhProjectPort(gh).items(project.id), repository);
   const ranked = board.closed.filter((issue) => rankOf(board.ranks, issue) !== null);
   const unread = board.closed.filter((issue) => rankOf(board.ranks, issue) === null && !held.has(issue));
-  const facts = await readIssueFacts({ gh, fragments: config.releaseFragments }, unread);
+  const { facts } = await readIssueFacts({ gh, fragments: config.releaseFragments }, unread);
   const inReview = unread.filter((issue) => {
     const read = facts.get(issue);
     return read !== undefined && stageOf(read) === 'In review';

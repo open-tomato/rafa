@@ -122,7 +122,8 @@ Commands that call the refresh outside the label wrapper:
 
 ### The warnings
 
-Four kinds of failure are turned into warnings that name their fix:
+Five kinds of failure are turned into warnings, each naming its fix where it
+has one:
 
 | Failure | Warning | Fix |
 | --- | --- | --- |
@@ -130,10 +131,12 @@ Four kinds of failure are turned into warnings that name their fix:
 | A write refused by the GitHub rate limit | how many issues were not updated | `rafa board sync` |
 | `board.project.number` names no project | the number and that it was not found | `rafa init --board` |
 | A field or option renamed on the project | which field was skipped | `rafa doctor` |
+| An issue whose facts could not be read | `#<n> not refreshed: <reason>` | none: the next refresh or `rafa board sync` reads it again |
 
 When a field is renamed, the refresh skips that field and writes the other
-four. All four warnings keep the caller's exit code and are printed after the
-command's own output.
+four. When one issue's facts cannot be read, that issue alone is left as it
+was and the others are written. All five warnings keep the caller's exit code
+and are printed after the command's own output.
 
 ### Configuration
 

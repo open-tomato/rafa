@@ -4,8 +4,9 @@
  * reason, its labels, the pull requests that close it — open or merged,
  * with the base branch each went into — the fragment each added under
  * `release.fragments`, and whether that fragment is still on the base
- * branch. {@link readIssueFacts} answers one {@link IssueFacts} per issue,
- * a shape {@link stageOf} takes as it is.
+ * branch. {@link readIssueFacts} answers one {@link IssueFacts} per issue
+ * it could read, a shape {@link stageOf} takes as it is, and one
+ * {@link FactsRefusal} per issue it could not; see "Refusals" below.
  *
  * ## The pull requests that close an issue
  *
@@ -72,13 +73,26 @@
  * one page would have answered it short by sixteen, any of them the pull
  * request the Stage turns on.
  *
- * ## Refusals
+ * ## Refusals, one issue at a time
  *
  * A failed `gh` call, an answer that is not the recorded shape, and a
- * list whose next page names a cursor it has already read THROW, naming
- * the issue and the list: a cursor that repeats would read the same page
- * forever, and a dropped entry would answer facts that read as complete
- * and are short by the one pull request the Stage turns on.
+ * list whose next page names a cursor it has already read refuse the
+ * issue they reach and no other: {@link readIssueFacts} answers it in
+ * {@link IssueFactsAnswer.refused} with the reason, which names the issue
+ * or the pull request and the list, and answers every other issue's facts
+ * as read. It never throws over a read. A refused issue gets no facts at
+ * all, never facts short of what failed: a cursor that repeats would read
+ * the same page forever, and a dropped entry would answer facts that read
+ * as complete and are short by the one pull request the Stage turns on.
+ *
+ * One request reads many issues, pages, pull requests or blobs, so a
+ * request that fails as a whole — `gh` exiting non-zero, as it does on an
+ * alias naming a number the repository does not hold, or an answer that
+ * is not JSON — is sent again one item to a request, and only an item
+ * that still fails alone is refused. An entry that is not the recorded
+ * shape inside an answer that is refuses its own item, with no second
+ * request. A pull request whose files or fragment blobs could not be read
+ * refuses every issue it closes, the reason naming the pull request.
  */
 import type { FilesPage, FragmentLookup, IssueList, ListPage } from './facts-query.js';
 import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
@@ -149,6 +163,21 @@ export interface IssueFacts extends StageFacts {
   readonly pullRequests: readonly FactsPullRequest[];
 }
 
+/** One issue {@link readIssueFacts} could not answer facts for; see the module note. */
+export interface FactsRefusal {
+  readonly number: number;
+  /** What failed: a call that failed alone, or an answer that is not the recorded shape. */
+  readonly reason: string;
+}
+
+/** What {@link readIssueFacts} answers: each issue asked for is in exactly one of the two. */
+export interface IssueFactsAnswer {
+  /** The facts of each issue read, by issue number. */
+  readonly facts: ReadonlyMap<number, IssueFacts>;
+  /** The issues refused, in the order asked. */
+  readonly refused: readonly FactsRefusal[];
+}
+
 /** What {@link readIssueFacts} is made with. */
 export interface FactsReaderOptions {
   readonly gh: GhRunner;
@@ -175,6 +204,30 @@ type Answer = Readonly<Record<string, unknown>>;
 /** Refuses an answer, naming where it went wrong and what was there. */
 function refuse(problem: string): never {
   throw new Error(`${PREFIX}: ${problem}`);
+}
+
+/** The reason a refusal carries: the error's message, without this module's prefix. */
+function reasonOf(error: unknown): string {
+  const message = error instanceof Error
+    ? error.message
+    : String(error);
+  return message.startsWith(`${PREFIX}: `)
+    ? message.slice(PREFIX.length + 2)
+    : message;
+}
+
+/** One item of a read, with its value or the reason it could not be read. */
+type Settled<I, T> =
+  | { readonly item: I; readonly ok: true; readonly value: T }
+  | { readonly item: I; readonly ok: false; readonly reason: string };
+
+/** `item` read by `read`, or the reason `read` threw. */
+function settle<I, T>(item: I, read: () => T): Settled<I, T> {
+  try {
+    return { item, ok: true, value: read() };
+  } catch (error) {
+    return { item, ok: false, reason: reasonOf(error) };
+  }
 }
 
 function readMapping(value: unknown, where: string): Answer {
@@ -228,6 +281,37 @@ async function readRepository(gh: GhRunner, args: readonly string[]): Promise<An
   }
   const data = readMapping(readMapping(parsed, 'the answer')['data'], 'data');
   return readMapping(data['repository'], 'data.repository');
+}
+
+/** How one kind of read asks for a batch and reads one item of its answer. */
+interface BatchRead<I, T> {
+  readonly size: number;
+  readonly argsOf: (batch: readonly I[]) => readonly string[];
+  /** One item of `answer`, `index` its place in the batch; throws on an entry that is not the recorded shape. */
+  readonly readOne: (answer: Answer, item: I, index: number) => T;
+}
+
+/**
+ * Reads `items` `how.size` to a request and answers each one settled, in
+ * the order of `items`. A request that fails as a whole is sent again one
+ * item to a request; see the module note.
+ */
+async function readEach<I, T>(gh: GhRunner, items: readonly I[], how: BatchRead<I, T>): Promise<readonly Settled<I, T>[]> {
+  const read: Settled<I, T>[] = [];
+  for (const batch of batchesOf(items, how.size)) {
+    let answer: Answer;
+    try {
+      answer = await readRepository(gh, how.argsOf(batch));
+    } catch (error) {
+      const alone = batch.length === 1
+        ? batch.map((item): Settled<I, T> => ({ item, ok: false, reason: reasonOf(error) }))
+        : await readEach(gh, batch, { ...how, size: 1 });
+      read.push(...alone);
+      continue;
+    }
+    read.push(...batch.map((item, index) => settle(item, () => how.readOne(answer, item, index))));
+  }
+  return read;
 }
 
 /** The pull request at `where`, or null for one closed without merging. */
@@ -298,12 +382,25 @@ function listKey(number: number, list: IssueList): string {
   return `${String(number)}:${list}`;
 }
 
+/** The issues refused so far, by number, with the reason. */
+type Refused = Map<number, string>;
+
+/** The page of issue `number`'s `list` in a list read's `answer`. */
+function readListPage(answer: Answer, { number, list }: ListPage): ConnectionPage {
+  return readPage(readMapping(answer[listAlias(number, list)], `issue #${String(number)}`)[list], listWhere(number, list));
+}
+
+/** How the further pages of the lists are read. */
+const LIST_PAGES: BatchRead<ListPage, ConnectionPage> = { size: LIST_BATCH, argsOf: listPagesArgs, readOne: readListPage };
+
 /**
  * Reads every page past the first of each list of `firsts`, a batch of
  * {@link LIST_BATCH} pages to a request, and answers every node of each
- * list by {@link listKey}. Throws on a cursor read before; see the module note.
+ * list by {@link listKey}. An issue whose page could not be read, or whose
+ * cursor repeats, goes into `refused` and is read no further; see the
+ * module note.
  */
-async function readRemainingPages(gh: GhRunner, firsts: readonly IssueFirstPages[]): Promise<ReadonlyMap<string, readonly unknown[]>> {
+async function readRemainingPages(gh: GhRunner, firsts: readonly IssueFirstPages[], refused: Refused): Promise<ReadonlyMap<string, readonly unknown[]>> {
   const nodes = new Map<string, unknown[]>();
   const seen = new Map<string, Set<string>>();
   let pending: readonly ListPage[] = firsts.flatMap(({ head: { number }, pages }) => ISSUE_LISTS.flatMap((list) => {
@@ -318,20 +415,25 @@ async function readRemainingPages(gh: GhRunner, firsts: readonly IssueFirstPages
   }));
   while (pending.length > 0) {
     const next: ListPage[] = [];
-    for (const batch of batchesOf(pending, LIST_BATCH)) {
-      const answer = await readRepository(gh, listPagesArgs(batch));
-      for (const { number, list } of batch) {
-        const where = listWhere(number, list);
-        const page = readPage(readMapping(answer[listAlias(number, list)], `issue #${String(number)}`)[list], where);
-        nodes.get(listKey(number, list))?.push(...page.nodes);
-        if (page.next === null) continue;
-        const cursors = seen.get(listKey(number, list));
-        if (cursors?.has(page.next) === true) refuse(`${where} answered the cursor ${JSON.stringify(page.next)} a second time, so its next page would repeat one read before`);
-        cursors?.add(page.next);
-        next.push({ number, list, cursor: page.next });
+    for (const settled of await readEach(gh, pending, LIST_PAGES)) {
+      const { number, list } = settled.item;
+      if (refused.has(number)) continue;
+      if (!settled.ok) {
+        refused.set(number, settled.reason);
+        continue;
       }
+      nodes.get(listKey(number, list))?.push(...settled.value.nodes);
+      const cursor = settled.value.next;
+      if (cursor === null) continue;
+      const cursors = seen.get(listKey(number, list));
+      if (cursors?.has(cursor) === true) {
+        refused.set(number, `${listWhere(number, list)} answered the cursor ${JSON.stringify(cursor)} a second time, so its next page would repeat one read before`);
+        continue;
+      }
+      cursors?.add(cursor);
+      next.push({ number, list, cursor });
     }
-    pending = next;
+    pending = next.filter(({ number }) => !refused.has(number));
   }
   return nodes;
 }
@@ -355,18 +457,33 @@ function readIssue(head: IssueHead, lists: IssueNodes, repository: string): Read
   };
 }
 
-/** Reads the issues `numbers`, one batch after another, then every further page of their lists. */
-async function readIssues(gh: GhRunner, numbers: readonly number[]): Promise<readonly ReadIssue[]> {
-  const firsts: IssueFirstPages[] = [];
-  for (const batch of batchesOf(numbers, ISSUE_BATCH)) {
-    const answer = await readRepository(gh, issuesArgs(batch));
-    const repository = readString(answer['nameWithOwner'], 'data.repository.nameWithOwner');
-    firsts.push(...batch.map((number) => readIssueFirstPages(answer, number, repository)));
-  }
-  const nodes = await readRemainingPages(gh, firsts);
-  return firsts.map(({ head, repository }) => {
+/** Issue `number`'s first pages in an issues read's `answer`. */
+function readFirstPagesOf(answer: Answer, number: number): IssueFirstPages {
+  return readIssueFirstPages(answer, number, readString(answer['nameWithOwner'], 'data.repository.nameWithOwner'));
+}
+
+/** How the issues and the first page of each list are read. */
+const ISSUES: BatchRead<number, IssueFirstPages> = { size: ISSUE_BATCH, argsOf: issuesArgs, readOne: readFirstPagesOf };
+
+/**
+ * Reads the issues `numbers`, one batch after another, then every further
+ * page of their lists. An issue that could not be read goes into
+ * `refused` and is left out; see the module note.
+ */
+async function readIssues(gh: GhRunner, numbers: readonly number[], refused: Refused): Promise<readonly ReadIssue[]> {
+  const firsts = (await readEach(gh, numbers, ISSUES)).flatMap((settled) => {
+    if (settled.ok) return [settled.value];
+    refused.set(settled.item, settled.reason);
+    return [];
+  });
+  const nodes = await readRemainingPages(gh, firsts, refused);
+  return firsts.flatMap(({ head, repository }) => {
+    if (refused.has(head.number)) return [];
     const lists = Object.fromEntries(ISSUE_LISTS.map((list) => [list, nodes.get(listKey(head.number, list)) ?? []])) as Record<IssueList, readonly unknown[]>;
-    return readIssue(head, lists, repository);
+    const issue = settle(head.number, () => readIssue(head, lists, repository));
+    if (issue.ok) return [issue.value];
+    refused.set(head.number, issue.reason);
+    return [];
   });
 }
 
@@ -391,19 +508,37 @@ function readFilesPage(value: unknown, where: string, prefix: string): { paths: 
   };
 }
 
-/** The fragment paths each pull request of `numbers` added, every page read. */
-async function readAddedFragments(gh: GhRunner, numbers: readonly number[], prefix: string): Promise<ReadonlyMap<number, readonly string[]>> {
+/** The pull requests whose files or blobs could not be read, by number, with the reason. */
+type FailedPulls = Map<number, string>;
+
+/**
+ * The fragment paths each pull request of `numbers` added, every page
+ * read; a pull request whose files could not be read goes into `failed`
+ * and is read no further.
+ */
+async function readAddedFragments(
+  gh: GhRunner,
+  numbers: readonly number[],
+  prefix: string,
+  failed: FailedPulls,
+): Promise<ReadonlyMap<number, readonly string[]>> {
   const added = new Map<number, string[]>(numbers.map((number) => [number, []]));
+  const how: BatchRead<FilesPage, ReturnType<typeof readFilesPage>> = {
+    size: PULL_BATCH,
+    argsOf: filesArgs,
+    readOne: (answer, { number }) => readFilesPage(answer[pullAlias(number)], `pull request #${String(number)}`, prefix),
+  };
   let pending: readonly FilesPage[] = numbers.map((number) => ({ number, cursor: null }));
   while (pending.length > 0) {
     const next: FilesPage[] = [];
-    for (const batch of batchesOf(pending, PULL_BATCH)) {
-      const answer = await readRepository(gh, filesArgs(batch));
-      for (const { number } of batch) {
-        const page = readFilesPage(answer[pullAlias(number)], `pull request #${String(number)}`, prefix);
-        added.get(number)?.push(...page.paths);
-        if (page.next !== null) next.push({ number, cursor: page.next });
+    for (const settled of await readEach(gh, pending, how)) {
+      const { number } = settled.item;
+      if (!settled.ok) {
+        failed.set(number, settled.reason);
+        continue;
       }
+      added.get(number)?.push(...settled.value.paths);
+      if (settled.value.next !== null) next.push({ number, cursor: settled.value.next });
     }
     pending = next;
   }
@@ -416,24 +551,25 @@ interface FragmentBlobs {
   readonly onBase: boolean;
 }
 
-/** Reads each lookup's two blobs, in the order of `lookups`. */
-async function readBlobs(gh: GhRunner, lookups: readonly FragmentLookup[]): Promise<readonly FragmentBlobs[]> {
-  const read: FragmentBlobs[] = [];
-  for (const batch of batchesOf(lookups, FRAGMENT_BATCH)) {
-    const answer = await readRepository(gh, blobsArgs(batch));
-    read.push(...batch.map(({ path }, index) => {
-      const { head, base } = blobAliases(index);
-      if (!(head in answer) || !(base in answer)) refuse(`the blob read answered no ${head} or ${base} for ${path}`);
-      const headBlob = answer[head];
-      const text = headBlob === null
-        ? null
-        : readMapping(headBlob, `${path} at the head`)['text'];
-      if (text !== null && typeof text !== 'string') refuse(`${path} at the head has text ${describeValue(text)}, expected a string`);
-      return { text, onBase: answer[base] !== null };
-    }));
-  }
-  return read;
+/** A fragment to read, with the pull request that added it. */
+interface PullLookup extends FragmentLookup {
+  readonly pull: number;
 }
+
+/** The two blobs of the lookup at `index` of a blob read's `answer`. */
+function readBlobsOf(answer: Answer, { path }: PullLookup, index: number): FragmentBlobs {
+  const { head, base } = blobAliases(index);
+  if (!(head in answer) || !(base in answer)) refuse(`the blob read answered no ${head} or ${base} for ${path}`);
+  const headBlob = answer[head];
+  const text = headBlob === null
+    ? null
+    : readMapping(headBlob, `${path} at the head`)['text'];
+  if (text !== null && typeof text !== 'string') refuse(`${path} at the head has text ${describeValue(text)}, expected a string`);
+  return { text, onBase: answer[base] !== null };
+}
+
+/** How each fragment's two blobs are read. */
+const BLOBS: BatchRead<PullLookup, FragmentBlobs> = { size: FRAGMENT_BATCH, argsOf: blobsArgs, readOne: readBlobsOf };
 
 /** The fragment `path` reads as, from its blobs; see the module note. */
 function fragmentOf(path: string, blobs: FragmentBlobs): FactsFragment {
@@ -459,23 +595,56 @@ function blobKey(pull: number, path: string): string {
   return `${String(pull)}:${path}`;
 }
 
+/** The fragments of `pulls` read off GitHub, by {@link blobKey}; a pull request that failed goes into `failed`. */
+async function readFragments(
+  gh: GhRunner,
+  pulls: readonly ReadPull[],
+  prefix: string,
+  failed: FailedPulls,
+): Promise<{ readonly added: ReadonlyMap<number, readonly string[]>; readonly fragments: ReadonlyMap<string, FactsFragment> }> {
+  const added = await readAddedFragments(gh, pulls.map(({ number }) => number), prefix, failed);
+  const lookups: readonly PullLookup[] = pulls
+    .filter(({ number }) => !failed.has(number))
+    .flatMap((pull) => (added.get(pull.number) ?? []).map((path) => ({ pull: pull.number, path, headRefOid: pull.headRefOid, baseRefName: pull.baseRefName })));
+  const fragments = new Map((await readEach(gh, lookups, BLOBS)).flatMap((settled) => {
+    if (settled.ok) return [[blobKey(settled.item.pull, settled.item.path), fragmentOf(settled.item.path, settled.value)] as const];
+    failed.set(settled.item.pull, settled.reason);
+    return [];
+  }));
+  return { added, fragments };
+}
+
 /**
- * The facts of each issue of `numbers`, by issue number; a number given
- * twice is read once. Throws on a failed `gh` call or an answer that is
- * not the recorded shape; see the module note.
+ * The facts of each issue of `numbers` that could be read, by issue
+ * number, and a refusal naming each one that could not, with the reason;
+ * a number given twice is read once. Never throws over a failed `gh` call
+ * or an answer that is not the recorded shape; see the module note.
  */
-export async function readIssueFacts(options: FactsReaderOptions, numbers: readonly number[]): Promise<ReadonlyMap<number, IssueFacts>> {
+export async function readIssueFacts(options: FactsReaderOptions, numbers: readonly number[]): Promise<IssueFactsAnswer> {
   const { gh } = options;
-  const prefix = directoryPrefix(options.fragments);
-  const issues = await readIssues(gh, [...new Set(numbers)]);
+  const asked = [...new Set(numbers)];
+  const refused: Refused = new Map();
+  const failed: FailedPulls = new Map();
+  const issues = await readIssues(gh, asked, refused);
   const pulls = [...new Map(issues.flatMap(({ pulls: read }) => read.map((pull) => [pull.number, pull] as const))).values()];
-  const added = await readAddedFragments(gh, pulls.map(({ number }) => number), prefix);
-  const lookups = pulls.flatMap((pull) => (added.get(pull.number) ?? []).map((path) => ({ pull: pull.number, path, headRefOid: pull.headRefOid, baseRefName: pull.baseRefName })));
-  const blobs = await readBlobs(gh, lookups);
-  const fragments = new Map(lookups.map(({ pull, path }, index) => [blobKey(pull, path), fragmentOf(path, blobs[index] ?? { text: null, onBase: false })]));
+  const { added, fragments } = await readFragments(gh, pulls, directoryPrefix(options.fragments), failed);
   const factsOf = (pull: ReadPull): FactsPullRequest => {
     const own = [...(added.get(pull.number) ?? [])].sort().flatMap((path) => fragments.get(blobKey(pull.number, path)) ?? []);
     return { number: pull.number, state: pull.state, baseRefName: pull.baseRefName, fragments: own, fragment: decidingFragment(own) };
   };
-  return new Map(issues.map(({ pulls: read, ...issue }) => [issue.number, { ...issue, pullRequests: read.map(factsOf) }]));
+  const facts = new Map(issues.flatMap(({ pulls: read, ...issue }) => {
+    const unread = read.find(({ number }) => failed.has(number));
+    if (unread === undefined) return [[issue.number, { ...issue, pullRequests: read.map(factsOf) }] as const];
+    refused.set(issue.number, `pull request #${String(unread.number)} could not be read: ${failed.get(unread.number) ?? ''}`);
+    return [];
+  }));
+  return {
+    facts,
+    refused: asked.flatMap((number) => {
+      const reason = refused.get(number);
+      return reason === undefined
+        ? []
+        : [{ number, reason }];
+    }),
+  };
 }

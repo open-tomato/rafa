@@ -26,7 +26,8 @@
  *     no item is answered in {@link ProjectRefreshed.missing} and nothing
  *     is read or written for it, since adding an item is its caller's
  *     step (`rafa issue create`, `rafa board sync`);
- *  4. for the issues on the project, their facts (`./facts.ts`);
+ *  4. for the issues on the project, their facts (`./facts.ts`), each
+ *     issue read or refused on its own;
  *  5. the board once for all of them: the listing in the
  *     `board.relationships` mode, the labelled boards, the default board
  *     among them (`resolveDefaultBoard`, `../boards.ts`) whose lines Rank
@@ -37,6 +38,16 @@
  *     which the refresh does not print.
  *
  * Steps 4 and 5 are skipped when no issue asked for is on the project.
+ *
+ * ## One issue refused, the rest written
+ *
+ * An issue whose facts could not be read — a call that failed for it
+ * alone, an answer that is not the recorded shape, a list whose cursor
+ * repeats — is refused alone: nothing is written for it, it is answered
+ * in {@link ProjectRefreshed.refused}, and its line,
+ * `#<n> not refreshed: <reason>` (`notRefreshedWarning`), opens the
+ * warnings. Every other issue's values are written as read, so the next
+ * refresh or `rafa board sync` picks the refused one up.
  *
  * ## Widening: an epic's members, and the items whose Rank shifted
  *
@@ -88,11 +99,11 @@
  *
  * ## Failures, answered as warning lines
  *
- * The four rows of the spec's "What can go wrong" table are never
- * thrown: each is answered in the refresh's `warnings`, one line naming
- * its fix (`./refresh-warnings.ts`), for the caller to print after its
- * own output while keeping its own exit code. A refresh with nothing to
- * warn of answers an empty list.
+ * The four rows of the spec's "What can go wrong" table, and each issue
+ * refused as above, are never thrown: each is answered in the refresh's
+ * `warnings`, one line naming its fix (`./refresh-warnings.ts`), for the
+ * caller to print after its own output while keeping its own exit code.
+ * A refresh with nothing to warn of answers an empty list.
  *
  *  - A token without the `project` scope, read off the refusal of any
  *    project call, answers `refused` with the scope line; what was
@@ -107,9 +118,10 @@
  *
  * Any other failed read or write rejects with the reader's own error, a
  * `ProjectPortError` from the port keeping what `gh` wrote; a board with
- * no default board rejects as `resolveDefaultBoard` does.
+ * no default board rejects as `resolveDefaultBoard` does. A failed facts
+ * read never rejects: it refuses the issues it reached, as above.
  */
-import type { IssueFacts } from './facts.js';
+import type { FactsRefusal } from './facts.js';
 import type { FieldMismatch, MatchedField, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
 import type { ProjectWritesOptions, ProjectWritesResult } from './writes.js';
@@ -132,6 +144,7 @@ import { projectChangesOf, projectValuesOf } from './refresh-values.js';
 import {
   isMissingProjectScope,
   notFoundWarning,
+  notRefreshedWarning,
   rateLimitWarning,
   scopeWarning,
   skippedFieldWarning,
@@ -222,12 +235,23 @@ export interface ProjectRefreshed {
   readonly missing: readonly number[];
   /** The template's fields the project does not hold as expected, none written. */
   readonly skipped: readonly FieldMismatch[];
-  /** The rate-limit line when the writes were refused, then one line per skipped field. */
+  /** The issues on the project whose facts could not be read, none written, in the order asked and widened. */
+  readonly refused: readonly FactsRefusal[];
+  /** One line per refused issue, then the rate-limit line when the writes were refused, then one line per skipped field. */
   readonly warnings: readonly string[];
 }
 
 /** What {@link refreshProjectItems} answers. */
 export type ProjectRefresh = ProjectRefreshSkipped | ProjectRefreshNotFound | ProjectRefreshRefused | ProjectRefreshed;
+
+/** The changes the issues read need, and the issues refused; see the module note. */
+interface IssueChanges {
+  readonly changes: readonly ProjectChange[];
+  readonly refused: readonly FactsRefusal[];
+}
+
+/** The facts answer of a refresh with no issue on the project to read. */
+const NOTHING_READ: IssueChanges = Object.freeze({ changes: [], refused: [] });
 
 /** The writes answer of a refresh that had nothing to write. */
 const NOTHING_WRITTEN: ProjectWritesResult = Object.freeze({ written: 0, notUpdated: 0, rateLimited: false, detail: '' });
@@ -321,18 +345,20 @@ async function changesFor(
   project: Project,
   present: ReadonlyMap<number, ProjectItem>,
   read: RefreshBoard | null,
-): Promise<readonly ProjectChange[]> {
+): Promise<IssueChanges> {
   const { config, gh } = options;
   const numbers = [...present.keys()];
-  const facts: ReadonlyMap<number, IssueFacts> = await readIssueFacts({ gh, fragments: config.releaseFragments }, numbers);
+  const { facts, refused } = await readIssueFacts({ gh, fragments: config.releaseFragments }, numbers);
   const board = read ?? await readRefreshBoard(config, gh, repository);
   const { matched } = matchProjectFields(project);
-  return numbers.flatMap((issue) => {
-    const read = facts.get(issue);
+  const changes = numbers.flatMap((issue) => {
+    const issueFacts = facts.get(issue);
     const item = present.get(issue);
-    if (read === undefined || item === undefined) throw new Error(`${PREFIX}: no facts were read for #${String(issue)}`);
-    return projectChangesOf(issue, item, projectValuesOf(read, board), matched);
+    return issueFacts === undefined || item === undefined
+      ? []
+      : projectChangesOf(issue, item, projectValuesOf(issueFacts, board), matched);
   });
+  return { changes, refused };
 }
 
 /** True when `item` holds another Rank than `rank`, compared as a write would compare it. */
@@ -402,27 +428,29 @@ async function refreshOn(
   }));
   const missing = numbers.filter((issue) => !present.has(issue));
   const { mismatched: skipped } = matchProjectFields(project);
-  const changes = present.size === 0
-    ? []
+  const { changes, refused } = present.size === 0
+    ? NOTHING_READ
     : await changesFor(options, repository, project, present, board);
   const writes = changes.length === 0 || options.dryRun === true
     ? NOTHING_WRITTEN
     : await writeProjectFields(gh, project.id, changes.map(({ write }) => write), writesOptionsOf(options));
   const warnings = [
+    ...refused.map(notRefreshedWarning),
     ...(writes.rateLimited
       ? [rateLimitWarning(writes.notUpdated)]
       : []),
     ...skipped.map(skippedFieldWarning),
   ];
-  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped, warnings };
+  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped, refused, warnings };
 }
 
 /**
  * Brings the project's items for `issues`, and those `widening` adds, in
  * step with what rafa reads of them, writing only the values that differ;
  * with no `board.project.number` it sends no call. The four failures of
- * the spec's "What can go wrong" table are answered in `warnings`, never
- * thrown. See the module note.
+ * the spec's "What can go wrong" table, and each issue whose facts could
+ * not be read, are answered in `warnings`, never thrown. See the module
+ * note.
  *
  * Throws a `RangeError`, having sent nothing, for an entry of `issues` or
  * of `widening.membersOf` that is not a positive whole number.

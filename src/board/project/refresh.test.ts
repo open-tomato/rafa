@@ -20,6 +20,9 @@
  *    proves the key and not a `gh` that was never wired.
  *  - The second refresh sends no write only after the first sent some,
  *    and the project's values read back equal what the first wrote.
+ *  - An issue refused for its facts is read beside the four others of
+ *    the same refresh, which are written as the rules give them, so a
+ *    refresh dropping every issue, or rejecting, fails.
  */
 import type { FakeFactsIssue, FakeFactsPull } from './facts-fake.js';
 import type { ProjectFieldValue, ProjectItem } from './port.js';
@@ -39,7 +42,7 @@ import { loadConfig } from '../../config-load.js';
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_RATE_LIMIT_MESSAGE, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
-import { notFoundWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
+import { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
 
 /** The owner of the repository and the project. */
@@ -123,11 +126,18 @@ interface Wired {
   readonly calls: () => readonly (readonly string[])[];
 }
 
+/** What a case changes of the facts fake: the issues it holds, and a wrapper over its runner. */
+interface FactsPlant {
+  readonly issues?: readonly PlantedIssue[];
+  readonly wrap?: (gh: GhRunner) => GhRunner;
+}
+
 /** The router of the module note over `projectItems`, and `config`, the project fake's rate limit as `fake` sets it. */
 function wire(
   projectItems: readonly FakeProjectItem[] | null,
   config: RefreshConfig = CONFIG,
   fake: Pick<FakeProjectGhOptions, 'rateLimitAfter'> = {},
+  plant: FactsPlant = {},
 ): Wired {
   const project = createFakeProjectGh({
     ...fake,
@@ -136,7 +146,8 @@ function wire(
       : [{ owner: OWNER, number: NUMBER, items: projectItems }],
     owners: [OWNER],
   });
-  const facts = createFakeFactsGh({ issues: ISSUES, pulls: PULLS, trees: TREES });
+  const facts = createFakeFactsGh({ issues: plant.issues ?? ISSUES, pulls: PULLS, trees: TREES });
+  const factsGh = plant.wrap?.(facts.gh) ?? facts.gh;
   const recorded: (readonly string[])[] = [];
   const gh: GhRunner = (args) => {
     recorded.push(args);
@@ -146,7 +157,7 @@ function wire(
       return Promise.resolve(answered(ISSUES.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
     }
     if (line.startsWith('issue list --state all')) return Promise.resolve(answered(ISSUES.map(listed)));
-    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api' && args.includes('owner={owner}')) return factsGh(args);
     if (args[0] === 'api') return project.gh(args);
     return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
   };
@@ -296,6 +307,7 @@ describe('refreshProjectItems: issues and projects that are not there', () => {
       writes: { written: 0, notUpdated: 0, rateLimited: false, detail: '' },
       missing: [40],
       skipped: [],
+      refused: [],
       warnings: [],
     });
     expect(wired.calls().some((args) => args.includes('owner={owner}') || args[0] === 'issue')).toBe(false);
@@ -440,6 +452,71 @@ function limitWritesWhile(wired: Wired, state: { refusing: boolean }): GhRunner 
 function changedPairs(changes: readonly ProjectChange[]): readonly string[] {
   return changes.map(({ issue, name }) => `${String(issue)}:${name}`);
 }
+
+describe('refreshProjectItems: one issue refused for its facts, the rest written', () => {
+  /** `gh`, failing with `stderr` every call whose argv holds `needle`. */
+  function failingOn(needle: string, stderr: string): (gh: GhRunner) => GhRunner {
+    return (gh) => (args) => (args.some((arg) => arg.includes(needle))
+      ? Promise.resolve({ ok: false, stdout: '', stderr })
+      : gh(args));
+  }
+
+  it('writes the four issues read and answers the one whose facts fail as refused, its line opening the warnings', async () => {
+    const wired = wire(items(), CONFIG, {}, { wrap: failingOn('i21: issue(number: 21)', 'read: operation timed out') });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    const reason = 'gh api graphql failed: read: operation timed out';
+    expect(refresh.kind === 'refreshed' && refresh.refused).toEqual([{ number: 21, reason }]);
+    expect(refresh.warnings).toEqual([notRefreshedWarning({ number: 21, reason })]);
+    const { 21: unwritten, ...rest } = EXPECTED;
+    expect(unwritten).toBeDefined();
+    expect(await heldValues(wired)).toEqual({ ...rest, 21: {} });
+    expect(refresh.kind === 'refreshed' && refresh.changes.some(({ issue }) => issue === 21)).toBe(false);
+  });
+
+  it('refuses alone an issue whose cross-references repeat their cursor, naming the list, and fills the others', async () => {
+    const issues = ISSUES.map((issue) => (issue.number === 22
+      ? { ...issue, issueMentions: 101, repeatsCursor: 'timelineItems' as const }
+      : issue));
+    const wired = wire(items(), CONFIG, {}, { issues });
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true });
+
+    expect(refresh.kind === 'refreshed' && refresh.refused.map(({ number }) => number)).toEqual([22]);
+    expect(refresh.warnings).toHaveLength(1);
+    expect(refresh.warnings[0]).toStartWith('#22 not refreshed: issue #22.timelineItems answered the cursor ');
+    const { 22: unwritten, ...rest } = EXPECTED;
+    expect(unwritten).toBeDefined();
+    expect(await heldValues(wired)).toEqual({ ...rest, 22: {} });
+  });
+
+  it('answers the refused lines before the rate-limit line', async () => {
+    const wired = wire(items(), CONFIG, { rateLimitAfter: 0 }, { wrap: failingOn('i21: issue(number: 21)', 'read: operation timed out') });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 21]);
+
+    expect(refresh.warnings[0]).toBe('#21 not refreshed: gh api graphql failed: read: operation timed out');
+    expect(refresh.warnings[1]).toStartWith('The project was not fully updated');
+    expect(refresh.warnings).toHaveLength(2);
+  });
+
+  it('picks the refused issue up on the next refresh once its facts read', async () => {
+    let failing = true;
+    const wrap = (gh: GhRunner): GhRunner => (args) => (failing && args.some((arg) => arg.includes('i21: issue(number: 21)'))
+      ? Promise.resolve({ ok: false, stdout: '', stderr: 'HTTP 502' })
+      : gh(args));
+    const wired = wire(items(), CONFIG, {}, { wrap });
+    await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+    failing = false;
+
+    const second = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    expect(second.warnings).toEqual([]);
+    expect(second.kind === 'refreshed' && second.changes.map(({ issue }) => issue)).toEqual([21, 21]);
+    expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});
 
 describe('refreshProjectItems: an interrupted fill resumes with only the unwritten values', () => {
   it('writes, after a refusal stopped the fill, exactly the values not yet written, then nothing on a third refresh', async () => {

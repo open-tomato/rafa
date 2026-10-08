@@ -2,7 +2,8 @@
  * The warning lines of the refresh (`./refresh.ts`): the four rows of the
  * spec's "What can go wrong" table
  * (`.rafa/specs/rafa-791-github-project-each-repository.md`), each one
- * line naming its fix. The project is a mirror and the issues stay the
+ * line naming its fix, and the line of an issue whose facts could not be
+ * read (`.rafa/specs/rafa-924-board-project-fixes.md`). The project is a mirror and the issues stay the
  * source of truth, so a failed project write never fails the command
  * that called it: the caller prints these after its own output and keeps
  * its own exit code.
@@ -13,6 +14,7 @@
  * | A write refused by the rate limit | {@link rateLimitWarning} | {@link BOARD_SYNC_FIX} |
  * | `board.project.number` names no project | {@link notFoundWarning} | {@link INIT_BOARD_FIX} |
  * | A field or option renamed on the project | {@link skippedFieldWarning} | {@link DOCTOR_FIX} |
+ * | An issue whose facts could not be read | {@link notRefreshedWarning} | none: the next refresh reads it again |
  *
  * ## Telling a missing scope apart
  *
@@ -26,6 +28,7 @@
  * scope refusal AND the project scope, so a refusal over another scope
  * is not answered with a fix that would not help.
  */
+import type { FactsRefusal } from './facts.js';
 import type { FieldMismatch, ProjectRef } from './port.js';
 
 import { ProjectPortError } from './port.js';
@@ -75,4 +78,9 @@ export function notFoundWarning(ref: ProjectRef): string {
 /** The line of a field skipped while the rest were written. */
 export function skippedFieldWarning(mismatch: FieldMismatch): string {
   return `The project's field "${mismatch.template.name}" was skipped and the rest were written: ${mismatch.sentence} Run \`${DOCTOR_FIX}\`.`;
+}
+
+/** The line of an issue the refresh left alone, its facts refused: `#<n> not refreshed: <reason>`. */
+export function notRefreshedWarning(refusal: FactsRefusal): string {
+  return `#${String(refusal.number)} not refreshed: ${refusal.reason}`;
 }
