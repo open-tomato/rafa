@@ -46,7 +46,9 @@
  *
  * ## What the loop does with it
  *
- *   - `retry`: one retry is asked of the run's budget first. Only once
+ *   - `retry`: one retry is asked of the run's budget first, on the
+ *     task as the retries keyed it when it was dispatched (the stop's
+ *     `retryTask`), since a session may move lines in the tracker. Only once
  *     it is granted is the approach written as the task's tracker blocker
  *     (`writeTrackerBlocker`), which the next dispatch hands its session,
  *     and the `decision` event emitted. A refusal leaves the tracker as
@@ -132,7 +134,7 @@ import type { ContinueArgs } from './continue-args.js';
 import type { ContinueDecision } from './decision-parse.js';
 import type { LoopEvent, PassedOverTask } from './loop-events.js';
 import type { PassOverList } from './pass-over.js';
-import type { RetryRefusal, RunRetries } from './retry-budget.js';
+import type { RetryRefusal, RetryTask, RunRetries } from './retry-budget.js';
 import type { NeededDecision, RunSession } from './session.js';
 import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
@@ -171,6 +173,8 @@ export type DecisionStop =
     /** A clean exit held: by its report, by what it left behind, or by a refused commit. */
     readonly kind: 'clean-exit';
     readonly taskInfo: TaskInfo;
+    /** The task as the retries keyed it at its dispatch, which a retry decision is asked on. */
+    readonly retryTask: RetryTask;
     readonly finished: Pick<FinishedTask, 'attempt' | 'holds'>;
     /** The stop's own event, emitted only when the run stops. */
     readonly stopEvent: StopEvent;
@@ -179,6 +183,7 @@ export type DecisionStop =
     /** A task session that exited nonzero, past its budget and an interrupt. */
     readonly kind: 'session-exit';
     readonly taskInfo: TaskInfo;
+    readonly retryTask: RetryTask;
     readonly exitCode: number;
     readonly stopEvent: StopEvent;
   }
@@ -278,6 +283,8 @@ const NO_DECISIONS: RunDecisions = Object.freeze({
 /** The subject of one decision: the task, why it stopped, and the event its stop emits. */
 interface DecisionSubject {
   readonly taskInfo: TaskInfo;
+  /** The task as the retries key it, read in the same tracker as `taskInfo`. */
+  readonly retryTask: RetryTask;
   readonly holds: readonly string[];
   readonly stopEvent: StopEvent;
 }
@@ -349,15 +356,16 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const skipLines = (trackerContent: string): ReadonlySet<number> => skippedLines(list, trackerContent);
 
   const subjectOf = (stop: DecisionStop): DecisionSubject | null => {
-    if (stop.kind === 'clean-exit') return { taskInfo: stop.taskInfo, holds: stop.finished.holds, stopEvent: stop.stopEvent };
+    if (stop.kind === 'clean-exit') return { taskInfo: stop.taskInfo, retryTask: stop.retryTask, holds: stop.finished.holds, stopEvent: stop.stopEvent };
     if (stop.kind === 'session-exit') {
-      return { taskInfo: stop.taskInfo, holds: [`session exited ${stop.exitCode}`], stopEvent: stop.stopEvent };
+      return { taskInfo: stop.taskInfo, retryTask: stop.retryTask, holds: [`session exited ${stop.exitCode}`], stopEvent: stop.stopEvent };
     }
     const content = readTracker();
     const blocked = findNextTask(content, { skipLines: skipLines(content) });
     if (blocked?.status !== 'blocked') return null;
     return {
       taskInfo: blocked,
+      retryTask: retryTaskOf(blocked, content),
       holds: [blocked.blocker ?? SUITE_STEP_RED],
       stopEvent: { kind: 'halt', reason: SUITE_STEP_RED },
     };
@@ -477,8 +485,8 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   };
 
   /** Asks the run's retries first, on the subject's task: only a grant writes the approach and emits `retry`; a refusal stops. */
-  const retryWith = (decision: ContinueDecision, subject: DecisionSubject, content: string): boolean => {
-    if (!retries.retry('the decision chose retry', retryTaskOf(subject.taskInfo, content))) {
+  const retryWith = (decision: ContinueDecision, subject: DecisionSubject): boolean => {
+    if (!retries.retry('the decision chose retry', subject.retryTask)) {
       return stopWith({ strategy: 'stop', reason: `${refusedRetry(retries.lastRefusal())}, so the run stops: ${decision.reason}` }, subject);
     }
     const line = shownLine(subject.taskInfo);
@@ -491,7 +499,7 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
   const apply = (decision: ContinueDecision, subject: DecisionSubject, content: string, identity: string): boolean => {
     switch (decision.strategy) {
       case 'retry':
-        return retryWith(decision, subject, content);
+        return retryWith(decision, subject);
       case 'stop':
         return stopWith(decision, subject);
       case 'jump':
@@ -543,7 +551,12 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       position: taskPosition(trackerContent, taskInfo.lineNum),
       reason: `--decide=${directive.strategy}`,
     };
-    return decide({ taskInfo, holds: [taskInfo.blocker ?? 'blocked by an earlier run'], stopEvent });
+    return decide({
+      taskInfo,
+      retryTask: retryTaskOf(taskInfo, trackerContent),
+      holds: [taskInfo.blocker ?? 'blocked by an earlier run'],
+      stopEvent,
+    });
   };
 
   const taskDone = (taskInfo: TaskInfo): void => {

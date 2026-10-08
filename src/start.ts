@@ -842,7 +842,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         await storeReport('failed');
         const failed = { kind: 'task-blocked', position, reason: `session exited ${exitCode}` } as const;
         if (retries.retry(`session exited ${exitCode}`, retryTask)) continue;
-        if (await decisions.atStop({ kind: 'session-exit', taskInfo, exitCode, stopEvent: failed })) continue;
+        if (await decisions.atStop({ kind: 'session-exit', taskInfo, retryTask, exitCode, stopEvent: failed })) continue;
         activeOutput().error(`\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);
         emitLoopEvent(failed);
         return;
@@ -868,7 +868,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (finished.outcome !== 'done') {
         const held = { kind: 'task-blocked', position, reason: finished.holds[0] ?? 'held by its report' } as const;
         if (heldOnNothingLeftBehind(finished) && retries.retry('left neither a report nor a commit', retryTask)) continue;
-        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, finished, stopEvent: held })) continue;
+        if (await decisions.atStop({ kind: 'clean-exit', taskInfo, retryTask, finished, stopEvent: held })) continue;
         emitLoopEvent(held);
         return;
       }

@@ -35,6 +35,7 @@ import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DECISION_NEEDED_EXIT, DECISION_STOP_EXIT, LoopEnd, PASSED_OVER_EXIT } from './continue-exits.js';
 import { createRunDecisions } from './continue-run.js';
 import { UNREADABLE_PREFIX } from './decision-parse.js';
+import { retryTaskOf } from './retry-budget.js';
 
 /** A fence, kept out of the block literals below. */
 const FENCE = '```';
@@ -162,6 +163,7 @@ function heldReport(trackerPath: string): Extract<DecisionStop, { kind: 'clean-e
   return {
     kind: 'clean-exit',
     taskInfo,
+    retryTask: retryTaskOf(taskInfo, readFileSync(trackerPath, 'utf8')),
     finished: { attempt: { outcome: 'committed', subject: 's', sha: 'abc', failedStep: null, exitCode: 0, message: '' }, holds: ['status: blocked'] },
     stopEvent: { kind: 'task-blocked', position: { index: 1, total: 4 }, reason: 'status: blocked' },
   };
@@ -230,9 +232,11 @@ describe('where a --continue run decides', () => {
   it('decides a retry-safe stop only once its retries refused for being spent', async () => {
     const run = plant([decisionOutput('strategy: jump', 'reason: "x"')]);
     const decisions = createRunDecisions(run.options);
+    const taskInfo = taskAt(run.trackerPath, 2);
     const stop: DecisionStop = {
       kind: 'session-exit',
-      taskInfo: taskAt(run.trackerPath, 2),
+      taskInfo,
+      retryTask: retryTaskOf(taskInfo, TRACKER),
       exitCode: 1,
       stopEvent: { kind: 'task-blocked', position: { index: 1, total: 4 }, reason: 'session exited 1' },
     };
@@ -330,6 +334,26 @@ describe('what each decision does', () => {
     // Asked on the stopped task, which a later done of it does not reset.
     expect(run.retriedOn).toEqual(['1:Check the env file a person writes']);
     expect(findNextTask(readFileSync(run.trackerPath, 'utf8'))?.blocker).toBe('Run the suite in the foreground.');
+  });
+
+  it('retry: asked on the key the stop carries from its dispatch, though the session moved its copy among the tracker\'s lines', async () => {
+    // At dispatch the task was the second copy of its text; the session
+    // then added a line above both copies, so the line number read before
+    // it now names the first copy. Read again in the tracker after the
+    // session, the stale line would key the first copy, and its done
+    // would start the count over.
+    const run = plant([decisionOutput('strategy: retry', 'reason: "A foreground run works."', 'approach: "Run it in the foreground."')]);
+    const dispatched = ['# Plan: continue', '', '- [x] Check the env file', '- [ ] Check the env file', ''].join('\n');
+    const taskInfo = findNextTask(dispatched);
+    if (taskInfo === null) throw new Error('no open task in the dispatched tracker');
+    writeFileSync(run.trackerPath, ['# Plan: continue', '', '- [ ] Note the env file', '- [x] Check the env file', '- [BLOCKED] Check the env file', ''].join('\n'), 'utf8');
+    const decisions = createRunDecisions(run.options);
+
+    expect(await decisions.atStop({ ...heldReport(run.trackerPath), taskInfo, retryTask: retryTaskOf(taskInfo, dispatched) })).toBe(true);
+
+    expect(run.retriedOn).toEqual(['2:Check the env file']);
+    // The control: the stale line read in the tracker after the session keys the first copy.
+    expect(retryTaskOf(taskInfo, readFileSync(run.trackerPath, 'utf8')).key).toBe('1:Check the env file');
   });
 
   it.each([

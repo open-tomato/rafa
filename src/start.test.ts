@@ -478,7 +478,7 @@ describe('where start.ts retries a stop', () => {
     expect(START).toContain('        await storeReport(\'failed\');\n'
       + '        const failed = { kind: \'task-blocked\', position, reason: `session exited ${exitCode}` } as const;\n'
       + '        if (retries.retry(`session exited ${exitCode}`, retryTask)) continue;\n'
-      + '        if (await decisions.atStop({ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed })) continue;\n'
+      + '        if (await decisions.atStop({ kind: \'session-exit\', taskInfo, retryTask, exitCode, stopEvent: failed })) continue;\n'
       + '        activeOutput().error(`\\n❌ Task failed (exit ${exitCode}). Marked as blocked. Run again to retry.`);\n'
       + '        emitLoopEvent(failed);\n        return;\n');
     // The line telling the operator to run again is printed only once the
@@ -486,7 +486,7 @@ describe('where start.ts retries a stop', () => {
     expect(START.match(/Run again to retry\./g)).toHaveLength(1);
     expect(START).toContain('        const held = { kind: \'task-blocked\', position, reason: finished.holds[0] ?? \'held by its report\' } as const;\n'
       + '        if (heldOnNothingLeftBehind(finished) && retries.retry(\'left neither a report nor a commit\', retryTask)) continue;\n'
-      + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, finished, stopEvent: held })) continue;\n'
+      + '        if (await decisions.atStop({ kind: \'clean-exit\', taskInfo, retryTask, finished, stopEvent: held })) continue;\n'
       + '        emitLoopEvent(held);\n        return;\n');
     expect(START.match(/if \(!suiteSteps\.stoppedOnSignal\(\) && retries\.retry\('suite step red', (?:null|retryTask)\)\) continue;/g)).toHaveLength(2);
   });
@@ -539,8 +539,8 @@ describe('where start.ts hands a stop to a --continue decision', () => {
   it('asks at the four stops a retry is asked at, each right after its retry, and at the held report', () => {
     expect(EVERY.filter((call) => call.name === 'atStop').map((call) => call.args[0])).toEqual([
       '{ kind: \'suite-red\' }',
-      '{ kind: \'session-exit\', taskInfo, exitCode, stopEvent: failed }',
-      '{ kind: \'clean-exit\', taskInfo, finished, stopEvent: held }',
+      '{ kind: \'session-exit\', taskInfo, retryTask, exitCode, stopEvent: failed }',
+      '{ kind: \'clean-exit\', taskInfo, retryTask, finished, stopEvent: held }',
       '{ kind: \'suite-red\' }',
     ]);
   });
