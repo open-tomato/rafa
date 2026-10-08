@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
@@ -161,6 +162,17 @@ function heldReport(trackerPath: string): DecisionStop {
     finished: { attempt: { outcome: 'committed', subject: 's', sha: 'abc', failedStep: null, exitCode: 0, message: '' }, holds: ['status: blocked'] },
     stopEvent: { kind: 'task-blocked', position: { index: 1, total: 4 }, reason: 'status: blocked' },
   };
+}
+
+/** What `read` threw, as a `CommandExit` that is no `LoopEnd`. Fails when it threw none. */
+async function refusalOf(read: () => Promise<unknown>): Promise<CommandExit> {
+  try {
+    await read();
+  } catch (error) {
+    if (error instanceof CommandExit && !(error instanceof LoopEnd)) return error;
+    throw error;
+  }
+  throw new Error('expected a refusal, and nothing was thrown');
 }
 
 /** What `read` threw, as a `LoopEnd`. Fails when it threw none. */
@@ -566,6 +578,50 @@ describe('a decision named on the line with --decide', () => {
     const end = await endOf(() => decisions.atStop(heldReport(run.trackerPath)));
     expect(end.exitCode).toBe(DECISION_STOP_EXIT);
     expect(run.calls).toHaveLength(0);
+  });
+
+  it('refuses the directive when the previous run needed a decision on another task, naming both', async () => {
+    const run = plant([]);
+    const decisions = createRunDecisions({
+      ...directed(run, { strategy: 'jump', reason: DIRECTIVE_REASON }),
+      previousNeeded: { task: 'Use the env file', line: 4 },
+    });
+
+    const refusal = await refusalOf(() => decisions.atFirstTask(taskAt(run.trackerPath, 2), TRACKER));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain('--decide=jump');
+    expect(refusal.message).toContain('line 4 "Use the env file"');
+    expect(refusal.message).toContain('line 3 "Check the env file a person writes"');
+    expect(events).toEqual([]);
+    expect(decisions.skipLines(TRACKER).size).toBe(0);
+    expect(readFileSync(run.trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('applies the directive when the previous run needed it for the task the run opens on, whatever its line now', async () => {
+    const run = plant([]);
+    const decisions = createRunDecisions({
+      ...directed(run, { strategy: 'jump', reason: DIRECTIVE_REASON }),
+      previousNeeded: { task: 'Check the env file a person writes  {model=haiku}', line: 9 },
+    });
+
+    expect(await decisions.atFirstTask(taskAt(run.trackerPath, 2), TRACKER)).toBe(true);
+    expect(events).toEqual([['decision', { strategy: 'jump', line: 3, reason: DIRECTIVE_REASON }]]);
+  });
+
+  it('warns in one line at the run\'s end about a directive no decision point used, and only then', async () => {
+    const unused = plant([]);
+    createRunDecisions(directed(unused, { strategy: 'stop', reason: DIRECTIVE_REASON })).atRunEnd();
+    expect(lines.filter((line) => line.includes('--decide=stop was not applied'))).toHaveLength(1);
+
+    lines = [];
+    const used = plant([]);
+    const decisions = createRunDecisions(directed(used, { strategy: 'jump', reason: DIRECTIVE_REASON }));
+    await decisions.atFirstTask(taskAt(used.trackerPath, 2), TRACKER);
+    decisions.atRunEnd();
+    createRunDecisions(used.options).atRunEnd();
+    createRunDecisions({ ...used.options, continueArgs: CONTINUE_OFF }).atRunEnd();
+    expect(lines.filter((line) => line.includes('was not applied'))).toEqual([]);
   });
 
   it('leaves the first pass alone without a directive', async () => {

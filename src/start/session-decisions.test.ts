@@ -25,10 +25,11 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
+import { eventsFileOf } from '../loop/events-file.js';
 import { readSession, runsDir, sessionFilePath } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { openRunSession, readPreviousPassOver } from './session.js';
+import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './session.js';
 
 /** This file's scratch directory. */
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-start-session-decisions-'));
@@ -237,5 +238,45 @@ describe('readPreviousPassOver', () => {
     const bare = freshRoot();
     plant(bare, record({ decisions: [DEFER] }));
     expect(readPreviousPassOver(bare, { ...demoPlan(bare), checkout: join(bare, 'wt', 'demo') }, { isAlive: GONE })).toEqual([DEFER]);
+  });
+});
+
+/** Writes `events`, each a name and its data, as `record`'s events file. */
+function plantEvents(root: string, value: SessionRecord, events: readonly (readonly [string, Record<string, unknown>])[]): void {
+  const lines = events.map(([name, data]) => JSON.stringify({ name, summary: name, data, ts: '2026-10-08T10:00:00.000Z' }));
+  writeFileSync(eventsFileOf(root, value), `${lines.join('\n')}\n`);
+}
+
+describe('readPreviousDecisionNeeded', () => {
+  const NEEDED = ['decision-needed', { task: 'Gate on .env.local  {model=haiku}', line: 4 }] as const;
+
+  it('answers the task and line the previous run\'s decision-needed named', () => {
+    const root = freshRoot();
+    const stopped = record({ decisions: [] });
+    plant(root, stopped);
+    plantEvents(root, stopped, [['task-start', {}], NEEDED, ['task-blocked', { reason: 'status: blocked' }]]);
+
+    expect(readPreviousDecisionNeeded(root, demoPlan(root), { isAlive: GONE })).toEqual({ task: 'Gate on .env.local  {model=haiku}', line: 4 });
+  });
+
+  it('answers none when the previous run went on past its decision, or never needed one', () => {
+    const root = freshRoot();
+    const went = record();
+    plant(root, went);
+    plantEvents(root, went, [['task-start', {}], NEEDED, ['task-blocked', {}], ['decision', { strategy: 'jump' }], ['task-start', {}]]);
+
+    expect(readPreviousDecisionNeeded(root, demoPlan(root), { isAlive: GONE })).toBeNull();
+    expect(readPreviousDecisionNeeded(freshRoot(), demoPlan(freshRoot()), { isAlive: GONE })).toBeNull();
+  });
+
+  it('reads past a newer run that reached no task, as one refused before its loop did', () => {
+    const root = freshRoot();
+    const needed = record({ sessionId: 'session-0001', startedAt: '2026-10-08T08:00:00.000Z' });
+    const refused = record({ sessionId: 'session-0002', startedAt: '2026-10-08T09:00:00.000Z' });
+    plant(root, needed, refused);
+    plantEvents(root, needed, [['task-start', {}], NEEDED, ['task-blocked', {}]]);
+    plantEvents(root, refused, [['error', { message: 'refused' }]]);
+
+    expect(readPreviousDecisionNeeded(root, demoPlan(root), { isAlive: GONE })).toEqual({ task: 'Gate on .env.local  {model=haiku}', line: 4 });
   });
 });

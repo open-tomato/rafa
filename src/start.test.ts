@@ -513,7 +513,9 @@ describe('where start.ts hands a stop to a --continue decision', () => {
     for (const field of ['continueArgs: continueRun,', 'retries,', 'session,', 'isInterrupted: () => interrupted,']) {
       expect(made[0]?.args[0]).toContain(field);
     }
-    expect(made[0]?.args[0]).toContain('seed: continueRun.on\n        ? readPreviousPassOver(repoRoot, { planPath, planStub, branch, checkout })\n        : [],');
+    expect(made[0]?.args[0]).toContain('seed: continueRun.on\n        ? readPreviousPassOver(repoRoot, runPlace)\n        : [],');
+    expect(made[0]?.args[0]).toContain('previousNeeded: continueRun.directive === null\n        ? null\n        : readPreviousDecisionNeeded(repoRoot, runPlace),');
+    expect(START).toContain('const runPlace = { planPath, planStub, branch, checkout };');
     expect(EVERY.indexOf(callTo(EVERY, 'createRunRetries'))).toBeLessThan(EVERY.indexOf(callTo(EVERY, 'createRunDecisions')));
   });
 
@@ -620,8 +622,9 @@ describe('the events file start.ts binds around the run', () => {
     expect(importedFrom(START, './start/loop-events.js')).toEqual(expect.arrayContaining(['bindEventsFile', 'unbindEventsFile']));
   });
 
-  it('unbinds it in the run\'s finally, beside the session\'s end', () => {
-    expect(finallyOf(STATEMENTS)).toEqual(['unbindEventsFile();', 'session.end();']);
+  it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {
+    expect(finallyOf(STATEMENTS)).toEqual(['decisionsAtEnd();', 'unbindEventsFile();', 'session.end();']);
+    expect(START).toContain('    decisionsAtEnd = decisions.atRunEnd;\n');
   });
 
   it('emits an error event carrying what the run threw from its catch, but for a LoopEnd, then rethrows it', () => {

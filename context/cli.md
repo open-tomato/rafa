@@ -539,7 +539,13 @@ New; it replaces no earlier text. What a row or an action added to
   - **The line**: `--decide=retry|stop|jump|defer` names the decision,
     applied once in place of a session: on the loop's first pass to the
     `[BLOCKED]` task it opens on, before that task is dispatched again,
-    or else at the run's first stop. `--approach=<text>` goes with
+    or else at the run's first stop. When the plan's previous run on
+    the branch ended on a `decision-needed` (read off its events file,
+    `readPreviousDecisionNeeded`, past runs that reached no task) whose
+    task's text is not that `[BLOCKED]` task's, the directive is refused
+    with exit code 1 and a line naming both, nothing decided. A
+    directive no decision point used is named in one warning line at
+    the run's end. `--approach=<text>` goes with
     `--decide=retry` alone and is required by it, `--after=<line>`
     (counted from 1) with `--decide=defer` alone and required by it.
     `--decide` and `--force-wrap-up` without `--continue`, a bare value

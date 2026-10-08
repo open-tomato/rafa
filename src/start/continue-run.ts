@@ -95,9 +95,15 @@
  * the run meets. A run that opens on a `[BLOCKED]` task, the line a
  * stopped run left, meets it there, before that task is dispatched:
  * {@link RunDecisions.atFirstTask}, asked on the loop's first pass
- * alone. A run that opens on an open task keeps the directive for its
- * first stop. Either way, every later decision point decides as the
- * mode does.
+ * alone. When the plan's previous run ended needing a decision
+ * ({@link RunDecisionsOptions.previousNeeded}) on a task whose text is
+ * not that `[BLOCKED]` task's, the directive was meant for another task:
+ * it is refused with exit code 1 and a line naming both, before
+ * anything is decided or dispatched. A run that opens on an open task
+ * keeps the directive for its first stop. Either way, every later
+ * decision point decides as the mode does, and a directive no decision
+ * point used is named in one warning line at the run's end
+ * ({@link RunDecisions.atRunEnd}).
  *
  * ## The end of the plan
  *
@@ -127,7 +133,7 @@ import type { ContinueDecision } from './decision-parse.js';
 import type { LoopEvent, PassedOverTask } from './loop-events.js';
 import type { PassOverList } from './pass-over.js';
 import type { RetryRefusal, RunRetries } from './retry-budget.js';
-import type { RunSession } from './session.js';
+import type { NeededDecision, RunSession } from './session.js';
 import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
 import type { OutputMode } from '../config-sections.js';
@@ -138,6 +144,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { CommandExit } from '../cli/command.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { heldOnNothingLeftBehind } from './commit.js';
@@ -146,7 +153,7 @@ import { parseDecision } from './decision-parse.js';
 import { buildDecisionPrompt, resolveContinueCriteria } from './decision-prompt.js';
 import { runDecisionSession } from './decision-session.js';
 import { emitLoopEvent, taskPosition } from './loop-events.js';
-import { addDecision, markDone, remaining, seedFrom, skippedLines, taskRefIn } from './pass-over.js';
+import { addDecision, markDone, remaining, seedFrom, skippedLines, taskIdentity, taskRefIn } from './pass-over.js';
 
 /** The reason of a red suite step's stop, as the loop's `halt` names it. */
 export const SUITE_STEP_RED = 'suite step red';
@@ -207,6 +214,12 @@ export interface RunDecisionsOptions {
   readonly spawn?: CapturingSpawner;
   /** The output mode, read at each decision; `activeOutputMode` when left out. */
   readonly mode?: () => OutputMode;
+  /**
+   * The task the plan's previous run needed a decision on
+   * (`readPreviousDecisionNeeded`), which a `--decide` directive must
+   * name; none when left out.
+   */
+  readonly previousNeeded?: NeededDecision | null;
 }
 
 /** The run's decisions; see the module note. */
@@ -227,6 +240,8 @@ export interface RunDecisions {
   readonly atFirstTask: (taskInfo: TaskInfo | null, trackerContent: string) => Promise<boolean>;
   /** Notes that `taskInfo` is done, releasing what waited on it. */
   readonly taskDone: (taskInfo: TaskInfo) => void;
+  /** At the run's end, whatever ended it: one warning line for a `--decide` directive no decision point used. */
+  readonly atRunEnd: () => void;
   /**
    * Ends the run with `LoopEnd` when passed-over tasks are left open in
    * `trackerContent`; under `--force-wrap-up`, answers them instead.
@@ -254,6 +269,7 @@ const NO_DECISIONS: RunDecisions = Object.freeze({
   atStop: () => Promise.resolve(false),
   atFirstTask: () => Promise.resolve(false),
   taskDone: () => undefined,
+  atRunEnd: () => undefined,
   atPlanEnd: () => [],
   gateForcedWrapUp: (gate: BeforeSessionAnswer) => gate,
 });
@@ -503,10 +519,24 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
       : decide(subject);
   };
 
+  /** Refuses the directive when the previous run needed a decision on a task other than `taskInfo`. */
+  const refuseMisdirected = (taskInfo: TaskInfo, taken: ContinueDecision): void => {
+    const needed = options.previousNeeded ?? null;
+    if (needed === null || taskIdentity(needed.task) === taskIdentity(taskInfo.task)) return;
+    directive = null;
+    throw new CommandExit(1, [
+      `❌ Refusing --decide=${taken.strategy}: the last run needed a decision on line ${needed.line} "${taskIdentity(needed.task)}",`
+      + ` but this run opens on line ${shownLine(taskInfo)} "${taskIdentity(taskInfo.task)}".`,
+      '   Check the tracker, then run again with --continue alone for a decision on the task this run opens on.',
+      '   Nothing was decided and nothing was dispatched.',
+    ].join('\n'));
+  };
+
   const atFirstTask = async (taskInfo: TaskInfo | null, trackerContent: string): Promise<boolean> => {
     if (!firstPass) return false;
     firstPass = false;
     if (directive === null || taskInfo?.status !== 'blocked') return false;
+    refuseMisdirected(taskInfo, directive);
     const stopEvent: StopEvent = {
       kind: 'task-blocked',
       position: taskPosition(trackerContent, taskInfo.lineNum),
@@ -575,5 +605,10 @@ export function createRunDecisions(options: RunDecisionsOptions): RunDecisions {
     throw new LoopEnd(DECISION_STOP_EXIT, `⛔ --force-wrap-up refused the wrap-up: ${why}. Repair them, or raise loop.forceWrapUp.maxNewFailures.`);
   };
 
-  return { skipLines, atStop, atFirstTask, taskDone, atPlanEnd, gateForcedWrapUp };
+  const atRunEnd = (): void => {
+    if (directive === null) return;
+    activeOutput().warn(`⚠️  --decide=${directive.strategy} was not applied: the run met no decision point. It applies once, to the next run's first [BLOCKED] task or first stop.`);
+  };
+
+  return { skipLines, atStop, atFirstTask, taskDone, atRunEnd, atPlanEnd, gateForcedWrapUp };
 }

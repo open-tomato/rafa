@@ -419,7 +419,7 @@ import {
   refuseWorktreeWhileTracking,
 } from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
-import { openRunSession, readPreviousPassOver } from './start/session.js';
+import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { readAlwaysRunFiles } from './start/task-gate-lines.js';
@@ -537,6 +537,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // (`start/loop-events.ts`).
   const session = openRunSession({ repoRoot, planPath, planStub, branch, roadmap, checkout });
   bindEventsFile(repoRoot, session.id);
+  // Set once the run's `--continue` decisions are made, and asked at its
+  // end however it ends: a `--decide` no decision point used is named.
+  let decisionsAtEnd = (): void => undefined;
   try {
     const planContent = fs.readFileSync(planPath, 'utf8');
     const promptContent = fs.readFileSync(promptPath, 'utf8');
@@ -642,6 +645,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     // (`start/continue-run.ts`); without it, nothing changes. The run
     // opens with the list the plan's last ended run on this branch
     // saved, less the tasks no longer `[BLOCKED]`.
+    const runPlace = { planPath, planStub, branch, checkout };
     const decisions = createRunDecisions({
       continueArgs: continueRun,
       repoRoot,
@@ -654,9 +658,14 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       retries,
       isInterrupted: () => interrupted,
       seed: continueRun.on
-        ? readPreviousPassOver(repoRoot, { planPath, planStub, branch, checkout })
+        ? readPreviousPassOver(repoRoot, runPlace)
         : [],
+      // A `--decide` must name the task the previous run needed a decision on.
+      previousNeeded: continueRun.directive === null
+        ? null
+        : readPreviousDecisionNeeded(repoRoot, runPlace),
     });
+    decisionsAtEnd = decisions.atRunEnd;
 
     // Initialize tracker only if it doesn't exist
     if (!fs.existsSync(trackerPath)) {
@@ -878,6 +887,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     if (!(error instanceof LoopEnd)) emitLoopEvent({ kind: 'error', message: messageOf(error) });
     throw error;
   } finally {
+    decisionsAtEnd();
     unbindEventsFile();
     session.end();
   }

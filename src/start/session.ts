@@ -128,6 +128,7 @@ import { relative } from 'node:path';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
+import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {
   beginSession,
   errorCode,
@@ -382,6 +383,14 @@ function sameRunPlace(repoRoot: string, record: SessionRecord, plan: PassOverPla
 /** The states of a run that has ended, whose saved list a later run reads. */
 const ENDED_STATES: ReadonlySet<SessionRecord['state']> = new Set(['stopped', 'done']);
 
+/** The plan's ended runs on the branch (and worktree) `plan` names, newest first. */
+function endedRunsNewestFirst(repoRoot: string, plan: PassOverPlan, seams: SessionReadSeams): readonly SessionRecord[] {
+  const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
+  return readSessions(repoRoot, seams)
+    .filter((record) => ENDED_STATES.has(record.state) && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan))
+    .reverse();
+}
+
 /**
  * The pass-over list the plan's newest ended run on the same branch
  * saved on its record, stopped or done, or none: none for a plan with
@@ -401,11 +410,56 @@ export function readPreviousPassOver(
   plan: PassOverPlan,
   seams: SessionReadSeams = {},
 ): PassOverList {
-  const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
-  const ended = readSessions(repoRoot, seams)
-    .filter((record) => ENDED_STATES.has(record.state) && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan));
-  const newest = ended.at(-1);
+  const newest = endedRunsNewestFirst(repoRoot, plan, seams)[0];
   return newest === undefined
     ? []
     : sessionDecisions(newest);
+}
+
+/** The task a run's `decision-needed` event named: its text and its tracker line, counted from 1. */
+export interface NeededDecision {
+  readonly task: string;
+  readonly line: number;
+}
+
+/** The loop events that say what a run did with its tasks, the last of which {@link readPreviousDecisionNeeded} reads. */
+const TASK_EVENTS: ReadonlySet<string> = new Set(['task-start', 'decision', 'decision-needed']);
+
+/** The task the `decision-needed` event `data` names, or null for data that names none. */
+function neededOf(data: Readonly<Record<string, unknown>>): NeededDecision | null {
+  const { task, line } = data;
+  return typeof task === 'string' && typeof line === 'number'
+    ? { task, line }
+    : null;
+}
+
+/**
+ * The task the plan's previous run on the same branch needed a decision
+ * on, or null. The previous run is the newest ended run, as
+ * {@link readPreviousPassOver} picks it, that reached its loop: one
+ * whose events file holds a `task-start`, a `decision` or a
+ * `decision-needed`, so a run refused before its loop, by a refused
+ * `--decide` among others, is read past. When that run's last such
+ * event is a `decision-needed`, the task it names is answered; a run
+ * that went on past its decision, or never needed one, answers null.
+ *
+ * @throws SessionRecordError when a record under `.rafa/runs/` cannot
+ *   be read, as `readSessions` does.
+ */
+export function readPreviousDecisionNeeded(
+  repoRoot: string,
+  plan: PassOverPlan,
+  seams: SessionReadSeams = {},
+): NeededDecision | null {
+  for (const record of endedRunsNewestFirst(repoRoot, plan, seams)) {
+    const read = readEventsFrom(eventsFileOf(repoRoot, record), 0);
+    const last = read.kind === 'read'
+      ? read.events.filter((event) => TASK_EVENTS.has(event.name)).at(-1)
+      : undefined;
+    if (last === undefined) continue;
+    return last.name === 'decision-needed'
+      ? neededOf(last.data)
+      : null;
+  }
+  return null;
 }
