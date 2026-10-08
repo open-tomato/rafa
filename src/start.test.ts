@@ -430,11 +430,11 @@ describe('where start.ts takes the suite steps', () => {
 describe('where start.ts retries a stop', () => {
   const EVERY = everyCall(START);
 
-  it('makes the run\'s retries once, from --retry over loop.retries, on the SIGINT flag and the checkout as the guard reads it', () => {
+  it('makes the run\'s retries once, from --retry over the configured count, on the SIGINT flag and the checkout as the guard reads it', () => {
     const made = EVERY.filter((call) => call.name === 'createRunRetries');
 
     expect(made).toHaveLength(1);
-    expect(made[0]?.args[0]).toContain('retries: resolveRunRetries(retry, runConfig.config.loopRetries),');
+    expect(made[0]?.args[0]).toContain('retries: resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on)),');
     expect(made[0]?.args[0]).toContain('isInterrupted: () => interrupted,');
     expect(made[0]?.args[0]).toContain('isCheckoutHeld: () => guardCheckout(expected).held,');
   });

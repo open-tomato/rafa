@@ -237,7 +237,15 @@
  *               still reports the verdict).
  * --retry       re-enter the loop up to n times (1 to 3) after a
  *               retry-safe stop; outranks `loop.retries`, `false` unless
- *               a config names a count (`start/retry-budget.ts`).
+ *               a config names a count, or `loop.retriesOnContinue`, 1
+ *               unless a config names another, under `--continue`
+ *               (`start/retry-budget.ts`).
+ * --continue    hand a stop that would end the run to a decision: retry
+ *               with a new approach, stop, jump over the task, or defer
+ *               it; `--decide=<strategy>` (with `--approach=<text>` or
+ *               `--after=<line>`) names the decision on the line, and
+ *               `--force-wrap-up` wraps up a run that passed tasks over
+ *               (`start/continue-args.ts`).
  *
  * After the last task the loop runs its wrap-up branch
  * (`start/wrap-up-run.ts`): a wrap-up session (`start/wrap-up.ts`:
@@ -352,6 +360,7 @@ import {
 } from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
 import { finishCleanExit, heldOnNothingLeftBehind } from './start/commit.js';
+import { configuredRetries, refuseUnusableCriteria } from './start/continue-args.js';
 import {
   dispatchTask,
   renderProgressForDispatch,
@@ -436,7 +445,10 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const { inject: injectMode, settingSources } = runConfig.config;
 
   // Every flag `start()` reads itself, read once (`start/run-setup.ts`).
-  const { startAt, plan, ciWait, ciTimeoutMin, ciAttempts, roadmap, retry } = readRunArgs(args);
+  const { startAt, plan, ciWait, ciTimeoutMin, ciAttempts, roadmap, retry, continueRun } = readRunArgs(args);
+  // Under `--continue`, criteria a decision could not be made by refuse
+  // the run now rather than at its first decision (`start/continue-args.ts`).
+  refuseUnusableCriteria(continueRun, repoRoot, runConfig.config);
   if (startAt) await deferUntil(startAt);
 
   // Default plan: PLAN.md in plan.dir, else at the root (`start/plan-path.ts`).
@@ -589,11 +601,12 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     });
 
     // The retries this run takes in place of a halt, at the four
-    // retry-safe stops below alone: `--retry` over `loop.retries`, none
-    // unless one names a count (`start/retry-budget.ts`). A checkout
-    // moved from `expected`, as it reads at the stop, refuses one.
+    // retry-safe stops below alone: `--retry` over `loop.retries`, or
+    // over `loop.retriesOnContinue` under `--continue`, none unless one
+    // names a count (`start/retry-budget.ts`). A checkout moved from
+    // `expected`, as it reads at the stop, refuses one.
     const retries = createRunRetries({
-      retries: resolveRunRetries(retry, runConfig.config.loopRetries),
+      retries: resolveRunRetries(retry, configuredRetries(runConfig.config, continueRun.on)),
       isInterrupted: () => interrupted,
       isCheckoutHeld: () => guardCheckout(expected).held,
     });

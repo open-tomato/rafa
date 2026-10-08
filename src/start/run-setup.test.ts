@@ -44,6 +44,7 @@ import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
 import {
   guardRunBranch,
@@ -66,6 +67,7 @@ describe('readRunArgs', () => {
       ciAttempts: DEFAULT_CI_ATTEMPTS,
       roadmap: false,
       retry: undefined,
+      continueRun: CONTINUE_OFF,
     });
   });
 
@@ -78,6 +80,9 @@ describe('readRunArgs', () => {
       '--ci-attempts=0',
       '--roadmap',
       '--retry=2',
+      '--continue',
+      '--decide=jump',
+      '--force-wrap-up',
     ];
 
     expect(readRunArgs(args)).toEqual({
@@ -88,6 +93,7 @@ describe('readRunArgs', () => {
       ciAttempts: 0,
       roadmap: true,
       retry: 2,
+      continueRun: { on: true, directive: { strategy: 'jump', reason: DIRECTIVE_REASON }, forceWrapUp: true },
     });
   });
 

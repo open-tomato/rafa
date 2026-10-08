@@ -5,8 +5,9 @@ Usage:
   rafa loop start [--plan=<string>] [--start-at=<string>] [--inject=<string>]
     [--skills-resolver=<string>] [--runtime=<string>] [--no-ci-wait]
     [--ci-timeout=<number>] [--ci-attempts=<number>] [--retry=<number>]
-    [--create-branch] [--as-worktree] [--any-branch] [--roadmap] [-d|--detached]
-    [--no-hint]
+    [--continue] [--decide=<string>] [--approach=<string>] [--after=<number>]
+    [--force-wrap-up] [--create-branch] [--as-worktree] [--any-branch]
+    [--roadmap] [-d|--detached] [--no-hint]
 
 Description:
   Walks the tracker of a plan one task at a time, each in a Claude Code session
@@ -34,15 +35,21 @@ Description:
   the run through that record. With `--retry` or `loop.retries` it goes back
   into its loop instead of stopping, at most that many times, after a red suite
   step, a task session that exited nonzero, or one that left neither a report
-  nor a commit. A run holds its terminal: until phase 6 it refuses `--detached`.
-  With `--runtime` the whole run goes on in that installed rafa, never in a
-  `src/` directory.
+  nor a commit. With `--continue` a stop that would end the run is handed to a
+  decision instead: retry the task with a new approach, stop with exit code 20,
+  jump over it or defer it until a later task is done; a run left with only
+  passed-over tasks ends with exit code 22 and no wrap-up unless
+  `--force-wrap-up`, and under `--output=json` a decision the line does not name
+  ends the run with exit code 21 and the decision prompt. A run holds its
+  terminal: until phase 6 it refuses `--detached`. With `--runtime` the whole
+  run goes on in that installed rafa, never in a `src/` directory.
 
 Spends:
   🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries`
-  more when it opens no pull request, repair sessions while CI is red, and the
+  more when it opens no pull request, repair sessions while CI is red, the
   sessions of up to `--retry` (`loop.retries`) more passes of the loop after a
-  stop it retries
+  stop it retries, and under `--continue` one read-only decision session per
+  decision
 
 Flags:
   --plan              string
@@ -79,6 +86,29 @@ Flags:
       stop the run. Outranks `loop.retries` in `.rafa/config.yaml`, `false`
       unless the config names a count; any other value is refused before the run
       starts.
+  --continue          boolean
+      Hands a stop that would end the run to a decision instead: a report that
+      holds its task at once, and a retry-safe stop once its retries are spent.
+      One read-only decision session picks `retry` (with a new approach),
+      `stop`, `jump` (pass the task over this run) or `defer` (pass it over
+      until a later task is done), by the bundled criteria and
+      `loop.continue.criteria`. The retries are `loop.retriesOnContinue` unless
+      `--retry` names a count.
+  --decide            string
+      Names the decision on the line, `retry`, `stop`, `jump` or `defer`,
+      applied once to the first decision point the run meets, so no decision
+      session is spawned for it. Needs `--continue`.
+  --approach          string
+      The new approach a `--decide=retry` hands the task's next session;
+      required by it and read beside nothing else.
+  --after             number
+      The tracker line, counted from 1, of the task a `--decide=defer` waits on;
+      required by it and read beside nothing else.
+  --force-wrap-up     boolean
+      Wraps up a `--continue` run left with only passed-over tasks anyway, as a
+      draft pull request listing them, once the pre-wrap-up suite step finds no
+      more new failures than `loop.forceWrapUp.maxNewFailures` tolerates. Needs
+      `--continue`.
   --create-branch     boolean
       On `main` or `master`, creates `feat/<plan-stub>` from the latest
       `origin/<base>` and runs the plan there without asking, or switches to

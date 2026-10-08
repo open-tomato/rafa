@@ -39,6 +39,14 @@
  * to 3. It declares no default: what it outranks is `loop.retries`,
  * `false` unless a config names a count, and the help says so.
  *
+ * `--continue`, `--decide=<strategy>`, `--approach=<text>`,
+ * `--after=<line>` and `--force-wrap-up` are read by
+ * `src/start/continue-args.ts`, through `readRunArgs`, and every
+ * combination it refuses is refused there, before the run is deferred
+ * or its session record opened. Under `--continue` the retries a run
+ * opens without `--retry` are `loop.retriesOnContinue`'s, and the spend
+ * line counts the one decision session each decision may start.
+ *
  * `--runtime=<path|version>` is read by `start/runtime.ts`, right after
  * that refusal. A `--runtime` typed ahead of the subject is read by the
  * dispatcher into the context's `flags` and left out of its `argv`, the
@@ -80,7 +88,11 @@ const wrapped = wrapPhaseZeroCommand({
     + ' `resume`, `status` and `list` reach the run through that record. With `--retry` or'
     + ' `loop.retries` it goes back into its loop instead of stopping, at most that many times, after a'
     + ' red suite step, a task session that exited nonzero, or one that left neither a report nor a'
-    + ' commit. A run holds its terminal: until'
+    + ' commit. With `--continue` a stop that would end the run is handed to a decision instead: retry the'
+    + ' task with a new approach, stop with exit code 20, jump over it or defer it until a later task is'
+    + ' done; a run left with only passed-over tasks ends with exit code 22 and no wrap-up unless'
+    + ' `--force-wrap-up`, and under `--output=json` a decision the line does not name ends the run with'
+    + ' exit code 21 and the decision prompt. A run holds its terminal: until'
     + ' phase 6 it refuses `--detached`. With `--runtime` the whole run goes on in that installed rafa,'
     + ' never in a `src/` directory.',
   args: [],
@@ -145,6 +157,40 @@ const wrapped = wrapPhaseZeroCommand({
       type: 'number',
     },
     {
+      name: 'continue',
+      description: 'Hands a stop that would end the run to a decision instead: a report that holds its task at'
+        + ' once, and a retry-safe stop once its retries are spent. One read-only decision session picks'
+        + ' `retry` (with a new approach), `stop`, `jump` (pass the task over this run) or `defer` (pass'
+        + ' it over until a later task is done), by the bundled criteria and `loop.continue.criteria`.'
+        + ' The retries are `loop.retriesOnContinue` unless `--retry` names a count.',
+      type: 'boolean',
+    },
+    {
+      name: 'decide',
+      description: 'Names the decision on the line, `retry`, `stop`, `jump` or `defer`, applied once to the first'
+        + ' decision point the run meets, so no decision session is spawned for it. Needs `--continue`.',
+      type: 'string',
+    },
+    {
+      name: 'approach',
+      description: 'The new approach a `--decide=retry` hands the task\'s next session; required by it and'
+        + ' read beside nothing else.',
+      type: 'string',
+    },
+    {
+      name: 'after',
+      description: 'The tracker line, counted from 1, of the task a `--decide=defer` waits on; required by it'
+        + ' and read beside nothing else.',
+      type: 'number',
+    },
+    {
+      name: 'force-wrap-up',
+      description: 'Wraps up a `--continue` run left with only passed-over tasks anyway, as a draft pull request'
+        + ' listing them, once the pre-wrap-up suite step finds no more new failures than'
+        + ' `loop.forceWrapUp.maxNewFailures` tolerates. Needs `--continue`.',
+      type: 'boolean',
+    },
+    {
       name: 'create-branch',
       description: 'On `main` or `master`, creates `feat/<plan-stub>` from the latest `origin/<base>`'
         + ' and runs the plan there without asking, or switches to that branch when it already'
@@ -202,8 +248,8 @@ const wrapped = wrapPhaseZeroCommand({
   spends: {
     when: 'always',
     what: 'one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request,'
-      + ' repair sessions while CI is red, and the sessions of up to `--retry` (`loop.retries`) more passes of the loop'
-      + ' after a stop it retries',
+      + ' repair sessions while CI is red, the sessions of up to `--retry` (`loop.retries`) more passes of the loop'
+      + ' after a stop it retries, and under `--continue` one read-only decision session per decision',
   },
 }, start);
 
