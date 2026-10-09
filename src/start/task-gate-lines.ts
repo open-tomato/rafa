@@ -126,7 +126,11 @@ export function alwaysRunLines(files: readonly string[]): string[] {
   return [`Also run \`bun test ${args}\`: these are the \`tests.alwaysRun\` files, content sweeps no changed file selects.`];
 }
 
-/** Where the type-check line's scratch tsconfig lists a file: the session puts each test file's path here. */
+/**
+ * Where the type-check line's scratch tsconfig lists a file, after the
+ * checkout's path: the session puts each test file's path relative to
+ * the checkout here, as `scratchTsconfigFields` joins it.
+ */
 export const TYPE_CHECK_FILE = '<test file>';
 
 /** Where the type-check line's tsc run names the scratch tsconfig the session wrote. */
@@ -148,7 +152,8 @@ export function typeCheckLines(recipe: TypeCheckRecipe | null): string[] {
   return [
     `Before you report done, type-check the \`*${TEST_FILE_SUFFIX}\` files your change adds or edits, if any, as the runner's type step will:`
     + ` write \`${scratch}\` to \`tsconfig.json\` in a new directory outside the checkout,`
-    + ` one \`files\` entry per such file with its path in place of \`${TYPE_CHECK_FILE}\`, then run \`${run}\` in the checkout.`
+    + ` one \`files\` entry per such file with \`${TYPE_CHECK_FILE}\` replaced by its path relative to the checkout, such as \`src/x${TEST_FILE_SUFFIX}\``
+    + ` (the entry already opens with the checkout's path), then run \`${run}\` in the checkout.`
     + ' In a test file your change adds, fix every error it reports.'
     + ` In one your change edits, fix the errors on the lines your change touches, which \`git diff <base> -- ${TYPE_CHECK_FILE}\` names`
     + ' with `<base>` the base commit above, and leave the others: the file held them before this task.',

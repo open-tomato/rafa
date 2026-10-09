@@ -297,7 +297,9 @@ type error that exists on the base branch is not new and does not block;
 one that first appears in the diff is red. Every task prompt, the wrap-up's
 aside, carries one line handing its session that check before it reports
 done (`typeCheckLines` in `src/start/task-gate-lines.ts`): the scratch
-tsconfig as JSON, with `<test file>` where each test file's path goes, and
+tsconfig as JSON, with `<test file>` where each test file's path relative
+to the checkout goes (the entry already opens with the checkout's path, so
+an absolute one doubles it and tsc reports TS6053), and
 `<modules>/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` to run
 in the checkout, both rendered by the type step's own
 `scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so the

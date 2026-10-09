@@ -350,6 +350,25 @@ function linesTheDiffNames(line: string, base: string, file: string): readonly n
   return added;
 }
 
+describe('the type-check line followed with an absolute path in place of the placeholder', () => {
+  it('doubles the checkout\'s path, which is why the line asks for the path relative to the checkout', async () => {
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    expect(line).toContain('relative to the checkout');
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const absolute = await runTsc({ cwd: repo, argv: followLine(line, join(repo, 'a.test.ts'), join(scratch, 'tsconfig.json')) });
+      expect(absolute.stdout).toContain(`error TS6053: File '${join(repo, repo, 'a.test.ts')}' not found.`);
+
+      // The control: the relative path the line asks for reaches the file and its error.
+      const relative = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      expect(relative.stdout).toContain(`a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}`);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
+
 describe('the type-check line followed in an edited test file', () => {
   it('names, through its git diff, the line of the error the step reads as new and not the line of the one the file held', async () => {
     const base = commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'base');
