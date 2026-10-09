@@ -9,6 +9,16 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.41.0 — 2026-10-09, rafa loop start --retry and --continue go on past a loop stop
+<!-- rafa:fragments loop-failure-retry -->
+
+- Loop: `rafa loop start --retry=<n>` (1 to 3) goes back into its loop instead of stopping, at most n times in a row, after a red suite step, a task session that exited nonzero (never on its budget or an interrupt), or a session that left neither a report nor a commit. The count starts over once a later task is done, neither the stopped task nor a repair, so a task that keeps failing still stops at n. Each retry prints a warning naming which retry in a row of how many and the stop, and emits a `retry` loop event; a report that blocks its task, a refused commit, a moved checkout and an interrupt still stop the run, and a value outside 1 to 3 is refused before the run starts. A retry refused because the checkout moved prints one warning line, and "Run again to retry" prints only when the run really stops.
+- Loop: `rafa loop start --continue` hands a stop that would end the run to one read-only decision session: a report that holds its task at once, a retry-safe stop once its retries are spent. It picks `retry` (the approach becomes the task's blocker, spending a retry), `stop` (exit code 20), `jump` or `defer` (the task is passed over for the run, or until a later task is done), by bundled criteria a project extends or replaces. The pass-over list is saved on the run record for the next `--continue` run, and a run left with only passed-over tasks ends with exit code 22 and no wrap-up.
+- Loop: under `--output=json`, `--continue` spawns no session: the run emits `decision-needed` with the prompt and ends with exit code 21, and `--decide=retry|stop|jump|defer` (with `--approach=<text>` or `--after=<line>`) names the decision on the next run. `--force-wrap-up` wraps a run with passed-over tasks up anyway, as a draft pull request listing them, once the pre-wrap-up step's new failures are within `loop.forceWrapUp.maxNewFailures`. New loop events: `decision`, `decision-needed` and `passed-over`.
+- Loop: every task prompt tells its session to type-check the `*.test.ts` files its change adds or edits before it reports done, with the runner's type step's own scratch tsconfig and `tsc` command, when the checkout holds a `tsconfig.json` and the step finds its `tsc`.
+- Config: `loop.retries`, `false` by default or a whole number from 1 to 3, sets the same count for every run; `--retry` outranks it, and `0`, negatives, fractions, `true` and quoted numbers are refused. `loop.retriesOnContinue` (default `1`), `loop.continue.criteria` (default `.rafa/continue-criteria.md`), `loop.continue.criteriaMode` (`extend` or `replace`) and `loop.forceWrapUp.maxNewFailures` (`false` or 1 to 50) set the `--continue` run.
+- Documentation: `context/cli.md` describes the retry, `--continue` and its criteria file, and `context/operators.md` the `retry`, `decision`, `decision needed` and `passed over` events lines.
+
 ## 0.40.0 — 2026-10-08, Fill a long-lived repository's project in one run, with progress
 <!-- rafa:fragments rafa-lock-0-39-0 rafa-924-board-project-fixes -->
 
