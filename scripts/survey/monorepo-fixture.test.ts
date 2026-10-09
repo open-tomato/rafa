@@ -1,6 +1,6 @@
 import type { BuiltFixture, Variant } from './monorepo-fixture';
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -226,5 +226,40 @@ describe('the script run as a command', () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr.toString()).toContain('Unknown --variant=npm');
     expect(result.stdout.toString()).toBe('');
+  });
+});
+
+describe('the bun variant, installed', () => {
+  let out = '';
+  let root = '';
+
+  beforeAll(() => {
+    out = mkdtempSync(join(tmpdir(), 'monorepo-fixture-bun-install-'));
+    const result = Bun.spawnSync(
+      ['bun', SCRIPT, '--variant=bun', `--out=${out}`],
+      { stderr: 'pipe', stdout: 'pipe' },
+    );
+    if (result.exitCode !== 0) {
+      throw new Error(`fixture build failed: ${result.stdout.toString()}${result.stderr.toString()}`);
+    }
+    root = realpathSync(join(out, 'bun'));
+  });
+
+  afterAll(() => {
+    rmSync(out, { recursive: true, force: true });
+  });
+
+  it('resolves @fixture/core and @fixture/feature from cli to the sibling package folders', () => {
+    const cliSource = join(root, 'packages', 'cli', 'src');
+    expect(Bun.resolveSync('@fixture/core', cliSource)).toBe(join(root, 'packages', 'core', 'src', 'index.ts'));
+    expect(Bun.resolveSync('@fixture/feature', cliSource)).toBe(join(root, 'packages', 'feature', 'src', 'index.ts'));
+  });
+
+  it('passes the fixture\'s own bun test', () => {
+    const result = Bun.spawnSync(['bun', 'test'], { cwd: root, stderr: 'pipe', stdout: 'pipe' });
+    if (result.exitCode !== 0) {
+      throw new Error(`bun test failed: ${result.stdout.toString()}${result.stderr.toString()}`);
+    }
+    expect(result.exitCode).toBe(0);
   });
 });
