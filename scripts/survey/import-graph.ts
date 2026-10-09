@@ -40,7 +40,7 @@
 import type { FileKind } from './files';
 import type { DirectedGraph } from './graph-algorithms';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 
@@ -497,15 +497,24 @@ export async function readMetafile(root: string, files: readonly string[]): Prom
 
 /**
  * A resolver that asks bun, from the importing file's folder, and returns
- * a repository-relative path for a target under `root`.
+ * a repository-relative path for a target under `root`. Bun resolves
+ * through any symlink in `root`'s path (on macOS, the OS temp directory is
+ * one) inconsistently from one call to the next, so both sides of the
+ * comparison are brought to their own real path here, rather than trusting
+ * `Bun.resolveSync` to have done so.
  *
  * @param root - The repository root.
  * @returns The resolver.
  */
 export function bunResolver(root: string): ResolveImport {
+  const realRoot = realpathSync.native(root);
   return (specifier, from) => {
     try {
-      return relativeToRoot(Bun.resolveSync(specifier, dirname(join(root, from))), root);
+      const resolved = Bun.resolveSync(specifier, dirname(join(root, from)));
+      const real = resolved.startsWith('/')
+        ? realpathSync.native(resolved)
+        : resolved;
+      return relativeToRoot(real, realRoot);
     } catch {
       return undefined;
     }
