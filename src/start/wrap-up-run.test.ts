@@ -413,6 +413,40 @@ describe('where runWrapUp retargets the delivered pull request', () => {
   });
 });
 
+describe('where runWrapUp marks a forced wrap-up\'s pull request a draft', () => {
+  /** Where the delivered pull request's `pr` event is emitted. */
+  const DELIVERED_EMIT = WRAP_UP_RUN.indexOf('await emitPullRequestEvent(expected.branch, delivery.kind');
+
+  it('marks it right after the delivery and before its pr event, over the delivered number and the passed-over tasks', () => {
+    const marked = callTo(CALLS, 'markForcedDraft');
+
+    expect(NAMES.indexOf('deliverPullRequest')).toBeLessThan(NAMES.indexOf('markForcedDraft'));
+    expect(WRAP_UP_RUN.indexOf('await markForcedDraft(')).toBeGreaterThan(-1);
+    expect(WRAP_UP_RUN.indexOf('await markForcedDraft(')).toBeLessThan(DELIVERED_EMIT);
+    expect(marked.args).toEqual(['delivery.pull.number', 'passedOver', 'forcedDraftSeamsIn(checkout)']);
+    expect(marked.bound).toBe('drafted');
+    expect(WRAP_UP_RUN).toContain('const drafted = delivery.kind !== \'delivered\' || passedOver.length === 0\n      || await markForcedDraft(');
+  });
+
+  it('emits the pr event only once the pull request is a draft, or needs none', () => {
+    const guard = WRAP_UP_RUN.indexOf('if (drafted) {');
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(DELIVERED_EMIT);
+    expect(WRAP_UP_RUN.slice(guard, DELIVERED_EMIT)).not.toContain('}');
+  });
+
+  it('ends a run whose draft was refused after the retarget, before the CI gate and the finish', () => {
+    const refused = callTo(CALLS, 'refuseUndraftedPullRequest');
+
+    expect(refused.args).toEqual(['delivery.pull.number']);
+    expect(WRAP_UP_RUN).toContain('if (!drafted) refuseUndraftedPullRequest(delivery.pull.number);');
+    expect(NAMES.indexOf('retargetPullRequest')).toBeLessThan(NAMES.indexOf('refuseUndraftedPullRequest'));
+    expect(NAMES.indexOf('refuseUndraftedPullRequest')).toBeLessThan(NAMES.indexOf('verifyPullRequest'));
+    expect(NAMES.indexOf('refuseUndraftedPullRequest')).toBeLessThan(NAMES.lastIndexOf('finished'));
+  });
+});
+
 /** The run's branch in every delivery case. */
 const BRANCH = 'feat/rafa-579-loop-run-ends-delivered';
 
@@ -867,8 +901,8 @@ describe('the pull request event in each output mode', () => {
     expect(lines.map((line) => [line.name, line.data])).toEqual([['pr', { number: 615 }]]);
   });
 
-  it('emits over the delivery\'s number in runWrapUp, right after the delivery', () => {
-    expect(WRAP_UP_RUN).toMatch(/const delivery = await deliverPullRequest\([\s\S]*?\);\n\s*await emitPullRequestEvent\(expected\.branch, delivery\.kind === 'delivered'\n\s*\? delivery\.pull\.number\n\s*: null, lookup\);/);
+  it('emits over the delivery\'s number in runWrapUp, right after the delivery and a forced wrap-up\'s draft', () => {
+    expect(WRAP_UP_RUN).toMatch(/const delivery = await deliverPullRequest\([\s\S]*?\);\n(?:\s*\/\/[^\n]*\n)*\s*const drafted = [^;]*;\n\s*if \(drafted\) \{\n\s*await emitPullRequestEvent\(expected\.branch, delivery\.kind === 'delivered'\n\s*\? delivery\.pull\.number\n\s*: null, lookup\);/);
   });
 
   it('emits once on every path out of runWrapUp: a moved checkout, each delivery outcome and a none provider', () => {

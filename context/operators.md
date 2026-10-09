@@ -172,11 +172,42 @@ rafa· wrap-up          session
 rafa· pr #612 opened
 rafa· no pr            no open pull request for feat/rafa-485
 rafa· halt             checkout moved
+rafa· retry 1/2        suite step red
+rafa· decision jump    line 12: A person writes the env file this gate checks.
+rafa· decision needed  line 12 "Check the env file"
+rafa· passed over      2 tasks: line 12 (jump), line 15 (defer)
 rafa· inherited        src/parse/parse.test.ts > parse > drops the last line
 rafa· error            ❌ Task failed (exit 1). Marked as blocked. Run again to retry.
 ```
 
-`src/start/loop-events.ts` builds each line. An `inherited` line names
+`src/start/loop-events.ts` builds each line. A `retry` line says the run
+went back into its loop after a stop instead of halting, which retry in
+a row of how many, under `--retry` or `loop.retries`
+(`src/start/retry-budget.ts`), the count starting over once a later task
+is done, neither the stopped one nor a repair;
+it ends nothing, so `rafa loop wait` and `rafa stretch item` read on past
+it. A stop it retries writes no `task-blocked` line: a task stop writes
+one only once no retry is granted, so a `task-blocked` line still means
+the run stopped.
+
+The three `--continue` lines (`context/cli.md`) count tracker lines
+from 1, as the decision prompt does. A `decision` line names the
+strategy a stop was decided as and its reason. A `retry`, `jump` or
+`defer` ends nothing and the run goes on; a `stop` is followed by the
+stop's own `task-blocked` or `halt` line, and the run ends with exit
+code 20. A `decision needed` line is json mode's: no session was
+spawned, the event's data holds the task, its line, why it stopped,
+the open tasks, the retries in a row left and the rendered prompt, and after
+the stop's own line the run ends with exit code 21, for the caller to
+start again with `--continue --decide=<strategy>`. A `passed over` line
+lists the tasks a run ends with passed over; a `halt` follows it and the
+run ends with exit code 22, unless `--force-wrap-up` goes on to a draft
+pull request. A refused forced wrap-up is a `halt` naming its count,
+with exit code 20, and so is a forced wrap-up whose pull request `gh`
+would not make a draft, its `halt` naming the pull request in place of
+the `pr` line. None of these ends on an `error` line.
+
+An `inherited` line names
 the run-start failure, by file and case, that a reported bug was read as
 (`src/start/triage.ts`): nothing was filed for it. A task's tokens are input,
 cache creation and output from its session log, read as
@@ -199,6 +230,9 @@ stderr line naming the path and the error, once per binding, and never
 throws into the loop. `loop start` binds it right after opening the
 session record and unbinds it in the run's `finally` (`src/start.ts`);
 anything the run throws is first written as an `error` event, then
-rethrown. A test binds its own temp root and unbinds after.
+rethrown, but for the `LoopEnd` a `--continue` run ends with, exit code
+20, 21 or 22, which has emitted its own events before it is thrown
+(`src/start/continue-exits.ts`). A test binds its own temp root and
+unbinds after.
 The record, `<session-id>.json`, stays the only `.json` file a run
 writes, so `loop list`, `status` and `stop` read it alone.

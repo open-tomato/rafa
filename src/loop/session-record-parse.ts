@@ -22,7 +22,9 @@
  * is no absolute path (null included), a `steps` key whose value is no
  * list of steps (null included), a step outside the shape `sessions.ts` describes or whose
  * `newFailures` names a test its `failures` does not, a step whose
- * `interrupted` key holds anything but `true`, a pid that is no
+ * `interrupted` key holds anything but `true`, a `decisions` key whose
+ * value is no list of decisions (null included), a decision outside the
+ * shape `sessions.ts` describes, a pid that is no
  * positive whole number (signal 0 to pid 0 or below would reach a process
  * group), an unparsable `startedAt`, and a `sessionId` that is no plain
  * file name or differs from the file's name. `readSessions`
@@ -46,7 +48,12 @@
  * record is read whole and its next write carries no `reason` key on
  * that step.
  */
-import type { SessionRecord, SessionStep } from './sessions.js';
+import type {
+  SessionDecision,
+  SessionRecord,
+  SessionStep,
+  SessionTaskRef,
+} from './sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 
@@ -97,6 +104,9 @@ export const SESSION_STEP_REASONS = Object.freeze(['declared', 'trigger', 'fallb
 
 /** One of {@link SESSION_STEP_REASONS}. */
 export type SessionStepReason = (typeof SESSION_STEP_REASONS)[number];
+
+/** The strategies a saved decision may name: the two that pass over a task. */
+export const SESSION_DECISION_STRATEGIES = Object.freeze(['jump', 'defer'] as const);
 
 /** A record file that cannot be read, or holds no record this module accepts. */
 export class SessionRecordError extends Error {
@@ -248,6 +258,69 @@ export function stepProblems(step: unknown, at: string): string[] {
   return problems.filter((problem): problem is string => problem !== null);
 }
 
+/** True for a whole number from 0. */
+function isLineIndex(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Every problem with a decision's task reference at `at`. */
+function taskRefProblems(ref: unknown, at: string): string[] {
+  if (!isObject(ref)) return [`${at} is ${describeValue(ref)}, expected a task`];
+  const lineNum = field(ref, 'lineNum');
+  const task = field(ref, 'task');
+  const ordinal = field(ref, 'ordinal');
+  return [
+    isLineIndex(lineNum)
+      ? null
+      : `${at}.lineNum is ${describeValue(lineNum)}, expected a whole number from 0`,
+    isText(task)
+      ? null
+      : `${at}.task is ${describeValue(task)}, expected a non-empty string`,
+    ordinal === undefined || isPositiveWhole(ordinal)
+      ? null
+      : `${at}.ordinal is ${describeValue(ordinal)}, expected a whole number from 1`,
+  ].filter((problem): problem is string => problem !== null);
+}
+
+/** The problem with a decision's `after`: there on a defer alone. */
+function afterProblems(decision: object, strategy: unknown, at: string): string[] {
+  const after = field(decision, 'after');
+  if (strategy === 'defer') {
+    return after === undefined
+      ? [`${at}.after is missing, expected the task a defer waits on`]
+      : taskRefProblems(after, `${at}.after`);
+  }
+  return after === undefined
+    ? []
+    : [`${at}.after is ${describeValue(after)}, expected no key on a jump`];
+}
+
+/** Every problem with one saved decision, the `at` naming its place in the record. */
+function decisionProblems(decision: unknown, at: string): string[] {
+  if (!isObject(decision)) return [`${at} is ${describeValue(decision)}, expected a decision`];
+  const strategy = field(decision, 'strategy');
+  const reason = field(decision, 'reason');
+  const problems = [
+    ...taskRefProblems(field(decision, 'task'), `${at}.task`),
+    (SESSION_DECISION_STRATEGIES as readonly unknown[]).includes(strategy)
+      ? null
+      : `${at}.strategy is ${describeValue(strategy)}, expected one of ${SESSION_DECISION_STRATEGIES.join(', ')}`,
+    isText(reason)
+      ? null
+      : `${at}.reason is ${describeValue(reason)}, expected a non-empty string`,
+    ...afterProblems(decision, strategy, at),
+  ];
+  return problems.filter((problem): problem is string => problem !== null);
+}
+
+/** Every problem with a record's `decisions`, none for a record without the key. */
+function decisionsProblems(fields: object): string[] {
+  if (!Object.hasOwn(fields, 'decisions')) return [];
+  const decisions = field(fields, 'decisions');
+  if (!Array.isArray(decisions)) return [`decisions is ${describeValue(decisions)}, expected a list of decisions`];
+  return decisions.flatMap((decision: unknown, index) => decisionProblems(decision, `decisions[${index}]`));
+}
+
 /** Every problem with a record's `steps`, none for a record without the key. */
 function stepsProblems(fields: object): string[] {
   if (!Object.hasOwn(fields, 'steps')) return [];
@@ -302,6 +375,7 @@ export function recordProblems(fields: object, file: string): string[] {
     hopProblem(fields),
     worktreeProblem(fields),
     ...stepsProblems(fields),
+    ...decisionsProblems(fields),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
@@ -370,10 +444,39 @@ function stepsEntry(steps: unknown): { readonly steps?: readonly SessionStep[] }
   return { steps: Object.freeze((steps as readonly SessionStep[]).map(freezeStep)) };
 }
 
+/** A frozen task reference already checked, copied to its fields, `ordinal` last and only when it is there. */
+function freezeTaskRef(ref: SessionTaskRef): SessionTaskRef {
+  return Object.freeze({
+    lineNum: ref.lineNum,
+    task: ref.task,
+    ...(ref.ordinal === undefined
+      ? {}
+      : { ordinal: ref.ordinal }),
+  });
+}
+
+/** A frozen decision already checked, its fields in the order they are written, `after` last and only on a defer. */
+function freezeDecision(decision: SessionDecision): SessionDecision {
+  return Object.freeze({
+    task: freezeTaskRef(decision.task),
+    strategy: decision.strategy,
+    reason: decision.reason,
+    ...(decision.after === undefined
+      ? {}
+      : { after: freezeTaskRef(decision.after) }),
+  });
+}
+
+/** The `decisions` entry of a frozen record: none while the list is missing or empty. */
+function decisionsEntry(decisions: unknown): { readonly decisions?: readonly SessionDecision[] } {
+  if (!Array.isArray(decisions) || decisions.length === 0) return {};
+  return { decisions: Object.freeze((decisions as readonly SessionDecision[]).map(freezeDecision)) };
+}
+
 /**
  * A frozen record of fields already checked, in the order it is written;
- * `phase`, `hop`, `worktree` then `steps` last, each only when there,
- * `phase` only when it is one of {@link SESSION_PHASES}.
+ * `phase`, `hop`, `worktree`, `steps` then `decisions` last, each only
+ * when there, `phase` only when it is one of {@link SESSION_PHASES}.
  */
 export function freezeRecord(fields: object): SessionRecord {
   const task = field(fields, 'task');
@@ -398,12 +501,18 @@ export function freezeRecord(fields: object): SessionRecord {
       ? {}
       : { worktree: worktree as string },
     ...stepsEntry(field(fields, 'steps')),
+    ...decisionsEntry(field(fields, 'decisions')),
   });
 }
 
 /** The steps a record holds, oldest first; none for a record written before the field. */
 export function sessionSteps(record: Pick<SessionRecord, 'steps'>): readonly SessionStep[] {
   return record.steps ?? [];
+}
+
+/** The pass-over list a record saved; none for a record without the key. */
+export function sessionDecisions(record: Pick<SessionRecord, 'decisions'>): readonly SessionDecision[] {
+  return record.decisions ?? [];
 }
 
 /**

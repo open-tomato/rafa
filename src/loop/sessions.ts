@@ -54,6 +54,23 @@
  *     holding none. A stored `steps: []` reads the same way and is written
  *     back without the key. Steps are only ever appended
  *     ({@link SessionChange}'s `appendStep`); every later write keeps them.
+ *   - `decisions`: the pass-over list of a `loop start --continue` run
+ *     (`start/pass-over.ts`), each a {@link SessionDecision}: the task
+ *     jumped or deferred, its `lineNum` counted from 0 as the tracker
+ *     reader counts it, its text with the blocker comment and
+ *     declaration off, and its `ordinal`, which copy of that text it is
+ *     among the tracker's task lines (left out of a record from before
+ *     the field, and read as 1), the strategy, `jump` or `defer`, the
+ *     decision's reason, and on a defer alone the task it waits on, as
+ *     `after`. A later run of the plan reads it back off the newest
+ *     ended record, stopped or done, and matches each task by its text
+ *     and ordinal.
+ *     The field is additive, as `steps` is: a record carries no
+ *     `decisions` key until a change hands a list, an empty list is
+ *     written without the key, and
+ *     {@link sessionDecisions} reads such a record as holding none. A
+ *     change's list replaces the stored one whole
+ *     ({@link SessionChange}'s `decisions`); every other write keeps it.
  *
  * ## Steps
  *
@@ -198,6 +215,7 @@ import {
   RECORD_EXTENSION,
   recordProblems,
   SessionRecordError,
+  sessionDecisions,
   sessionSteps,
   stepProblems,
 } from './session-record-parse.js';
@@ -211,11 +229,13 @@ export type {
 export {
   isSessionId,
   parseSessionRecord,
+  SESSION_DECISION_STRATEGIES,
   SESSION_PHASES,
   SESSION_STATES,
   SESSION_STEP_KINDS,
   SESSION_STEP_REASONS,
   SessionRecordError,
+  sessionDecisions,
   sessionPhase,
   sessionSteps,
 } from './session-record-parse.js';
@@ -250,6 +270,29 @@ export interface SessionStep {
   readonly interrupted?: true;
 }
 
+/** A task a saved decision names: its zero-based tracker line and its text. */
+export interface SessionTaskRef {
+  /** Counted from 0, as `TaskInfo.lineNum`; a hint, the text and the ordinal being the key. */
+  readonly lineNum: number;
+  /** The task's text, its blocker comment and declaration off. */
+  readonly task: string;
+  /**
+   * Which copy of `task` it is among the tracker's task lines, ticked
+   * ones included, counted from 1 in tracker order. Left out of a record
+   * written before the field, which reads as 1.
+   */
+  readonly ordinal?: number;
+}
+
+/** One task a `--continue` run passes over, as its record saves it. See the module note. */
+export interface SessionDecision {
+  readonly task: SessionTaskRef;
+  readonly strategy: 'jump' | 'defer';
+  readonly reason: string;
+  /** On a defer alone: the task it waits on. */
+  readonly after?: SessionTaskRef;
+}
+
 /** One `loop start` run, as its record holds it. See the module note. */
 export interface SessionRecord {
   readonly sessionId: string;
@@ -268,10 +311,12 @@ export interface SessionRecord {
   readonly worktree?: string;
   /** The suite steps recorded, oldest first; left out while there are none. Read it with {@link sessionSteps}. */
   readonly steps?: readonly SessionStep[];
+  /** The pass-over list saved; left out while there is none. Read it with {@link sessionDecisions}. */
+  readonly decisions?: readonly SessionDecision[];
 }
 
-/** What a new record is made from; it opens `running`, with no task, no phase and no step. */
-export type SessionDraft = Omit<SessionRecord, 'state' | 'task' | 'phase' | 'steps'>;
+/** What a new record is made from; it opens `running`, with no task, no phase, no step and no decision. */
+export type SessionDraft = Omit<SessionRecord, 'state' | 'task' | 'phase' | 'steps' | 'decisions'>;
 
 /** What {@link updateSession} changes. A field left out keeps its stored value. */
 export interface SessionChange {
@@ -281,6 +326,8 @@ export interface SessionChange {
   readonly phase?: SessionPhase;
   /** A step appended after the stored ones. */
   readonly appendStep?: SessionStep;
+  /** The pass-over list, replacing the stored one whole; an empty one drops the key. */
+  readonly decisions?: readonly SessionDecision[];
   /**
    * The stored states the change acts on. Any other refuses it with
    * {@link SessionStateError}, writing nothing. Every state when left out.
@@ -530,6 +577,7 @@ export function updateSession(root: string, sessionId: string, change: SessionCh
     steps: change.appendStep === undefined
       ? sessionSteps(stored)
       : [...sessionSteps(stored), change.appendStep],
+    decisions: change.decisions ?? sessionDecisions(stored),
   });
   writeRecordFile(file, record, false);
   return record;

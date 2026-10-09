@@ -9,6 +9,8 @@
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
+ * `src/start/retry-budget.ts`, `src/start/continue-run.ts`,
+ * `src/start/forced-draft.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
@@ -180,6 +182,9 @@ const ROUTED_MODULES: string[] = [
   'start/dispatch.ts',
   'start/triage.ts',
   'start/release-stage.ts',
+  'start/retry-budget.ts',
+  'start/continue-run.ts',
+  'start/forced-draft.ts',
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
@@ -579,8 +584,10 @@ describe('a loop start run whose session fails', () => {
       `step:${TASK}`,
       `info:\n🔄 Executing task: ${TASK}`,
       ...SESSION_LINES,
-      failure,
+      // The failure line asks for another run, so it is written once the
+      // attempt is stored and no retry or decision goes on.
       expect.stringMatching(NO_REPORT_WARNING),
+      failure,
       'result',
     ]);
     expect(readFileSync(join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`), 'utf8'))

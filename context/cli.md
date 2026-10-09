@@ -469,6 +469,160 @@ New; it replaces no earlier text. What a row or an action added to
   on to the wait. A blocked or interrupted delivery reaches no retarget.
   With `pr.provider: none`, the pull request is never opened; a run ends `ok`
   once the wrap-up finishes.
+- **`loop start --retry=<n>` and `loop.retries` re-enter the loop after a
+  retry-safe stop** (`start/retry-budget.ts`, `config-schema-loop-retries.ts`):
+  the run goes back to the top of its loop with `continue`, where
+  `findNextTask` answers the `[BLOCKED]` line or the inserted repair, instead
+  of returning, at most n times in a row. A task that finishes `done` sets
+  the spent count back to 0 (`settleOnDone`) unless it is the task of the
+  last stop, told apart by its text and its copy (`retryTaskOf`, over
+  `taskRefIn` in `start/pass-over.ts`), or a repair task (`isRepairTask`,
+  `start/suite-blocker.ts`): a plan task's red step, its repair done, the
+  repair's own step red again spend on toward n, and only the next plan
+  task done starts the count over, so a task that keeps failing still
+  meets the cap. A red suite step before a session is the stop of no task,
+  and the next task done resets. The key is `false` (the default) or
+  a whole number from 1 to 3, and the flag outranks it for one run; any other
+  flag value, a bare `--retry` and `--no-retry` are refused with exit code 1
+  by `readRunArgs` (`start/run-setup.ts`), before the deferral and the
+  session record. Four stops are retried: a red suite step before a session
+  and a red task step after one (never one `stoppedOnSignal` reads as
+  stopped by SIGINT, `start/suite-steps-run.ts`), a task session that exited
+  nonzero (the budget exit and the interrupt end before it is asked), and a
+  clean exit held only on its absences (`heldOnNothingLeftBehind`,
+  `start/commit.ts`: every hold a no-report, background-wait or no-commit
+  hold). A report that says `status: blocked` or lists a blocker, a refused
+  commit, a moved checkout, a report left unstored, a pause, an interrupt
+  and every refusal before the loop halt as before. Each retry writes one
+  warning, `🔁 Retrying (retry <i> of <n> in a row) after the stop: <reason>.`, and one
+  `retry` loop event after the stop's own lines and its stored report, and
+  no `task-blocked` event: a task stop emits that only once its retry is
+  refused, so `loop wait --until=blocked` never answers a run still going.
+  A SIGINT received refuses every retry left, and once n are spent in a row
+  the next such stop halts. A checkout moved from the loop's last commit,
+  read by `guardCheckout` (`start/checkout-guard.ts`) only while a retry is
+  left, refuses the retry without spending it, writing one warning line,
+  `⚠️  No retry after the stop: <reason>. The checkout has moved ...`, so a
+  session that committed and then exited nonzero stops on its own blocker,
+  never the next pass's `checkout moved`. On a session that exited
+  nonzero, `❌ Task failed (exit <n>). Marked as blocked. Run again to
+  retry.` is written only once no retry or decision goes on.
+- **`loop start --continue` hands a stop that would end the run to a
+  decision** (`start/continue-args.ts`, `start/continue-run.ts`,
+  `start/decision-session.ts`, `start/decision-prompt.ts`,
+  `start/decision-parse.ts`, `start/pass-over.ts`,
+  `config-schema-loop-continue.ts`): a report that holds its task
+  (`status: blocked` or a listed blocker) at once, and a retry-safe stop
+  once `RunRetries.lastRefusal` reads `spent`. A refused commit, a budget
+  exit, an interrupt, a pause, a moved checkout, a report left unstored,
+  every refusal before the loop and the wrap-up halt as before. The
+  retries a `--continue` run opens without `--retry` are
+  `loop.retriesOnContinue`'s (`false` or 1 to 3, default `1`). One
+  session decides, spawned with `--tools Read,Grep,Glob`, the run's
+  `loop.settingSources`, in the checkout, its prompt stamped, and ends on
+  a `rafa:decision` block, the last one read: `retry` asks the run's
+  retries for one first, and only once it is granted writes its
+  `approach` as the task's blocker and emits its `decision` (a refusal,
+  for no retry left, a moved checkout or an interrupt, leaves the tracker
+  untouched and reads as `stop`, its reason naming which), `stop` ends
+  the run, `jump` passes the task over for the run
+  and `defer` until the task at its `after` line is ticked. An
+  unreadable block, a session that exits nonzero and criteria that
+  cannot be read are `stop`; a session SIGINT ended decides nothing,
+  emits the stop's own `task-blocked` or `halt` with `interrupted` as
+  its reason, and ends the run with exit code 0.
+  Passed-over lines are `findNextTask`'s `skipLines`; the tracker keeps
+  them `[BLOCKED]`, and the list is saved on the run record as
+  `decisions` and read back by the plan's next `--continue` run on the
+  same branch (and worktree, when the record names one), off the newest
+  record that ended there, stopped or done: a `--force-wrap-up` run ends
+  `done` with its list kept, and a newer run that ended with no list
+  leaves nothing to read. That run drops
+  each entry whose task no longer reads `[BLOCKED]` (`seedFrom`): a line
+  put back to `- [ ]`, ticked, edited or removed is taken again. A second
+  `defer` of a task is applied as a `jump`, and a task passed over that
+  reaches a decision again is stopped, each reason saying so. The
+  effort store gets no row for the decision session: `effort/classify.ts`
+  has no kind for it, so `effort collect` reads its log as `other`.
+  - **The line**: `--decide=retry|stop|jump|defer` names the decision,
+    applied once in place of a session: on the loop's first pass to the
+    `[BLOCKED]` task it opens on, before that task is dispatched again,
+    or else at the run's first stop. When the plan's previous run on
+    the branch ended on a `decision-needed` (read off its events file,
+    `readPreviousDecisionNeeded`, past runs that reached no task) whose
+    task's text is not that `[BLOCKED]` task's, the directive is refused
+    with exit code 1 and a line naming both, nothing decided. A
+    directive no decision point used is named in one warning line at
+    the run's end. `--approach=<text>` goes with
+    `--decide=retry` alone and is required by it, `--after=<line>`
+    (counted from 1) with `--decide=defer` alone and required by it.
+    `--decide` and `--force-wrap-up` without `--continue`, a bare value
+    flag, a strategy that is none of the four and an `--after` that is no
+    whole number from 1 are refused with exit code 1 by `readRunArgs`,
+    before the deferral; so is a `--continue` run whose
+    `loop.continue.criteriaMode: replace` names a missing or blank file,
+    and a `--decide=retry` on a run whose retries, `--retry` over
+    `loop.retriesOnContinue`, are `false` (`refuseRetryWithoutBudget`).
+  - **json mode**: under `--output=json` no session is spawned. The stop
+    emits `decision-needed` (the task, its line, why it stopped, the open
+    tasks, the retries left and the rendered prompt), then its own
+    `task-blocked` or `halt`, and the run ends with exit code 21, the
+    tracker as the stop left it. The text and events modes decide
+    through the session.
+  - **The end**: when only passed-over tasks are left open, the run lists
+    each with its strategy and reason, emits `passed-over` and a `halt`,
+    and ends with exit code 22, before the pre-wrap-up step: no wrap-up
+    and no pull request. Its last lines say how a task comes back: mark
+    its tracker line `- [ ]` and run again, since a `--continue` run
+    passes a `[BLOCKED]` one over again, or run without `--continue`,
+    which resumes the first `[BLOCKED]` line. `--force-wrap-up` takes the pre-wrap-up step
+    instead, its one repair included; a step red after that repair whose
+    new failures (the baseline's left out) are within
+    `loop.forceWrapUp.maxNewFailures` (`false`, the default, tolerating
+    none, or 1 to 50) goes on, and one over it, or red with no failure to
+    count, ends with exit code 20. The wrap-up then marks the delivered
+    pull request a draft with `gh pr ready <n> --undo` and writes a
+    `## Passed-over tasks` section into its body (`start/forced-draft.ts`),
+    both before the run's `pr` event. A body write refused is a warning;
+    a draft refused emits no `pr` event, and after the release's write
+    and the retarget ends the run with a `halt`, exit code 20 and a line
+    naming the pull request and `gh pr ready <n> --undo` to run by hand,
+    before the CI wait, its record `stopped`.
+  - **Exit codes and events** (`start/continue-exits.ts`): 20 for a
+    decision's `stop`, a refused forced wrap-up and a refused draft, 21
+    for a decision needed, 22 for a run ended on passed-over tasks; from
+    20 so none meets a code `loop wait` answers (10 to 16, 2) or one
+    every command shares (0 to 3). Each is thrown as a `LoopEnd` once
+    the run has emitted its own events, `decision`, `decision-needed` or
+    `passed-over` and then the stop's `task-blocked` or `halt`, so the
+    run's catch writes no `error` event for it. `context/operators.md`
+    shows their lines.
+- **The `--continue` criteria** (`src/continue-criteria.md`,
+  `start/decision-prompt.ts`): the decision session chooses by criteria
+  read in order, the first that fits deciding and `stop` when none does.
+  The bundled base, drawn from a survey of 29 loop stops, says: never
+  `jump` or `defer` past a task a later open task imports, extends or
+  tests (choose `retry` or `stop`); `stop` when the task text is
+  contradicted by measured behaviour or the blocker asks for a design
+  decision; `jump` a check or gate on a prerequisite a person owns (a
+  file a person writes, an environment variable, an external account)
+  that no later task depends on; `defer` when the blocker names
+  something a later open task provides, `after` being that task; `retry`
+  only when the blocker names a concrete alternative inside the task's
+  own scope, the `approach` saying what to do differently. A project
+  adds its own in `loop.continue.criteria`, `.rafa/continue-criteria.md`
+  unless the config names another path, read from the project root on
+  every decision, so an edit needs no rebuild. `loop.continue.criteriaMode:
+  extend`, the default, appends it under the base after a
+  `### Project criteria` heading, a missing or blank file leaving the
+  base alone; `replace` uses it alone, and refuses a run whose file is
+  missing or blank. The prompt's contract,
+  `src/continue-decision-prompt.md`, is not overridable, so no project
+  edit can break the parser; the build copies both files into `dist/`.
+  It marks what it says of `retry` in two sections, `<!-- retry -->` and
+  `<!-- no-retry -->`, and `renderDecisionPrompt` keeps the first while
+  a retry is left and the second with none: a retry-safe stop is decided
+  only once its retries are spent, so its prompt offers no `retry`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
@@ -504,7 +658,8 @@ New; it replaces no earlier text. What a row or an action added to
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`, `start/wrap-up-run.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
-  `adapters/tracker/resolve.ts`,
+  `start/retry-budget.ts`, `start/continue-run.ts`,
+  `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,

@@ -45,6 +45,37 @@ const SUMMARIES: readonly (readonly [LoopEvent, string])[] = [
   [{ kind: 'pr', number: 612 }, 'pr #612 opened'],
   [{ kind: 'no-pr', reason: 'no open pull request for feat/x' }, 'no pr            no open pull request for feat/x'],
   [{ kind: 'halt', reason: 'checkout moved' }, 'halt             checkout moved'],
+  [{ kind: 'retry', attempt: 1, of: 2, reason: 'suite step red' }, 'retry 1/2        suite step red'],
+  [
+    { kind: 'decision', strategy: 'jump', line: 12, reason: 'A person writes the env file this gate checks.' },
+    'decision jump    line 12: A person writes the env file this gate checks.',
+  ],
+  [
+    {
+      kind: 'decision-needed',
+      task: 'Check the env file',
+      line: 12,
+      holds: ['status: blocked'],
+      openTasks: [{ line: 12, text: 'Check the env file' }, { line: 14, text: 'Use the env file' }],
+      retriesLeft: 1,
+      prompt: '# Loop continue decision instructions',
+    },
+    'decision needed  line 12 "Check the env file"',
+  ],
+  [
+    {
+      kind: 'passed-over',
+      tasks: [
+        { line: 12, text: 'Check the env file', strategy: 'jump', reason: 'a person owns it' },
+        { line: 15, text: 'Wire the helper', strategy: 'defer', reason: 'line 18 writes it' },
+      ],
+    },
+    'passed over      2 tasks: line 12 (jump), line 15 (defer)',
+  ],
+  [
+    { kind: 'passed-over', tasks: [{ line: 3, text: 'Gate', strategy: 'jump', reason: 'r' }] },
+    'passed over      1 task: line 3 (jump)',
+  ],
   [
     { kind: 'inherited', file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' },
     'inherited        src/parse/parse.test.ts > parse > drops the last line',
@@ -71,6 +102,8 @@ describe('summaryOf', () => {
     [{ kind: 'task-blocked', position: AT, reason: 'blocker: suite red\nsecond line of detail\n' }, 'task 3/9 blocked blocker: suite red second line of detail'],
     [{ kind: 'no-pr', reason: 'gh said:\n  not found' }, 'no pr            gh said: not found'],
     [{ kind: 'halt', reason: '\ncheckout moved\n' }, 'halt             checkout moved'],
+    [{ kind: 'retry', attempt: 3, of: 3, reason: 'session exited 1\n' }, 'retry 3/3        session exited 1'],
+    [{ kind: 'decision', strategy: 'stop', line: 4, reason: 'the task text\nis wrong\n' }, 'decision stop    line 4: the task text is wrong'],
   ] as const)('folds a multi-line reason onto one line: %o', (event, line) => {
     expect(summaryOf(event)).toBe(line);
   });

@@ -65,6 +65,7 @@ import * as backgroundWait from './background-wait.js';
 import {
   BACKGROUND_WAIT_HOLD,
   finishCleanExit,
+  heldOnNothingLeftBehind,
   NOTHING_REPORTED_OR_COMMITTED,
   readReportHolds,
 } from './commit.js';
@@ -510,5 +511,47 @@ describe('finishCleanExit', () => {
     console.warn('counted');
     console.error('counted');
     expect([log, warn, error].map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1]);
+  });
+});
+
+describe('heldOnNothingLeftBehind', () => {
+  // The classification `start/retry-budget.ts` retries on: a task held
+  // only because its session left neither a report nor a commit. Each
+  // case settles a real tracker, so the holds read are the ones
+  // `finishCleanExit` answers and never a list written here.
+  it('answers true for a task held on no report and no commit', () => {
+    expect(heldOnNothingLeftBehind(settle('Done, and nothing to report.', NOTHING_TO_COMMIT).finished)).toBe(true);
+  });
+
+  it('answers true when the no-report hold names a background wait', () => {
+    expect(heldOnNothingLeftBehind(settle(BACKGROUND_WAIT, NOTHING_TO_COMMIT).finished)).toBe(true);
+  });
+
+  it('answers true for a report block that is there but unreadable, beside no commit', () => {
+    // The loop reads no report off it, so the session is held on the two
+    // absences as a silent one is, and its next dispatch reads that.
+    expect(heldOnNothingLeftBehind(settle(UNREADABLE, NOTHING_TO_COMMIT).finished)).toBe(true);
+  });
+
+  it('answers false for a report saying status blocked, or listing a blocker', () => {
+    expect(heldOnNothingLeftBehind(settle(STATUS_BLOCKED, NOTHING_TO_COMMIT).finished)).toBe(false);
+    expect(heldOnNothingLeftBehind(settle(DONE_WITH_BLOCKER, COMMITTED).finished)).toBe(false);
+  });
+
+  it('answers false for a refused commit, held on no line at all', () => {
+    expect(heldOnNothingLeftBehind(settle('Done, and nothing to report.', REFUSED).finished)).toBe(false);
+  });
+
+  it('answers false for a ticked task, which holds nothing', () => {
+    expect(heldOnNothingLeftBehind(settle(CLEAN, COMMITTED).finished)).toBe(false);
+  });
+
+  it('answers false when a report hold stands beside the two absences', () => {
+    // No settle answers this shape today; the case holds that EVERY hold
+    // has to be an absence, not any one of them.
+    const mixed = { attempt: NOTHING_TO_COMMIT, holds: ['status: blocked', NO_REPORT_HOLD, NO_COMMIT_HOLD] };
+
+    expect(heldOnNothingLeftBehind(mixed)).toBe(false);
+    expect(heldOnNothingLeftBehind({ ...mixed, holds: [NO_REPORT_HOLD, NO_COMMIT_HOLD] })).toBe(true);
   });
 });

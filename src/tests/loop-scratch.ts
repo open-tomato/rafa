@@ -74,6 +74,15 @@ export interface Planting {
    */
   readonly claudeWork?: string;
   /**
+   * The stand-in's shell lines after its `#!/bin/sh`, in place of the
+   * default body, for a case whose calls answer differently from one
+   * another: handed the call log, which the lines should append to once
+   * per call, and the repository. The prompt is on stdin and the
+   * arguments are `$@`. `claudeExit`, `claudeStdout` and `claudeWork`
+   * are not read when it is given.
+   */
+  readonly claudeBody?: (paths: { readonly callLog: string; readonly repo: string }) => readonly string[];
+  /**
    * Whether the scratch HOME still owes the standing notices
    * (`src/notices/notices.ts`). Defaults to dismissed, so every other
    * case reads the run's own lines and nothing else; `pending` is the one
@@ -119,15 +128,14 @@ function plantUnder(base: string, n: number, planting: Planting): Scratch {
   const work = planting.claudeWork === undefined
     ? []
     : [`echo work >> '${join(repo, planting.claudeWork)}'`];
-  writeFileSync(claude, [
-    '#!/bin/sh',
+  const body = planting.claudeBody?.({ callLog, repo }) ?? [
     'while read -r _line; do :; done',
     `echo called >> '${callLog}'`,
     ...work,
     `/bin/cat '${claudeStdout}'`,
     `exit ${planting.claudeExit ?? 0}`,
-    '',
-  ].join('\n'), 'utf8');
+  ];
+  writeFileSync(claude, ['#!/bin/sh', ...body, ''].join('\n'), 'utf8');
   chmodSync(claude, 0o755);
 
   git(repo, home, 'init', '-q', '.');
