@@ -35,6 +35,13 @@
  * scratch tsconfig and tsc argv, with {@link TYPE_CHECK_FILE} and
  * {@link TYPE_CHECK_SCRATCH} where the step puts its files and its
  * scratch path. With no recipe, no line.
+ *
+ * Which errors to fix is said so the session can act on one run at HEAD:
+ * a test file holds many errors no gate reported (`type-step.ts`), and
+ * the session has no run at the base to compare with. So the line asks
+ * for every error in a file the task added, and in a file it edited for
+ * the errors on the lines `git diff <base> -- <file>` names, against the
+ * base the base line hands it.
  */
 import type { TypeCheckRecipe } from './type-step.js';
 import type { GitRunner } from '../pr/index.js';
@@ -142,6 +149,8 @@ export function typeCheckLines(recipe: TypeCheckRecipe | null): string[] {
     `Before you report done, type-check the \`*${TEST_FILE_SUFFIX}\` files your change adds or edits, if any, as the runner's type step will:`
     + ` write \`${scratch}\` to \`tsconfig.json\` in a new directory outside the checkout,`
     + ` one \`files\` entry per such file with its path in place of \`${TYPE_CHECK_FILE}\`, then run \`${run}\` in the checkout.`
-    + ' Fix each error it reports in those files that the base commit did not hold.',
+    + ' In a test file your change adds, fix every error it reports.'
+    + ` In one your change edits, fix the errors on the lines your change touches, which \`git diff <base> -- ${TYPE_CHECK_FILE}\` names`
+    + ' with `<base>` the base commit above, and leave the others: the file held them before this task.',
   ];
 }

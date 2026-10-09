@@ -154,8 +154,17 @@ describe('the type-check line, over the runner\'s type step recipe', () => {
       + '"files":["/work/repo/<test file>"],"include":[]}` to `tsconfig.json` in a new directory outside the checkout,'
       + ' one `files` entry per such file with its path in place of `<test file>`, then run'
       + ' `/work/node_modules/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` in the checkout.'
-      + ' Fix each error it reports in those files that the base commit did not hold.',
+      + ' In a test file your change adds, fix every error it reports.'
+      + ' In one your change edits, fix the errors on the lines your change touches, which `git diff <base> -- <test file>` names'
+      + ' with `<base>` the base commit above, and leave the others: the file held them before this task.',
     ]);
+  });
+
+  it('tells the session which errors to fix without a run at the base: all in an added file, the touched lines in an edited one', () => {
+    const line = typeCheckLines(RECIPE)[0] ?? '';
+
+    expect(line).toContain('`git diff <base> -- <test file>`');
+    expect(line).not.toContain('did not hold');
   });
 
   it('renders the step\'s own scratch fields and argv, so the line and the step cannot drift', () => {

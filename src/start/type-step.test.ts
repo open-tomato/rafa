@@ -77,6 +77,9 @@ const SAME_ERROR_LINE = 'export const other: number = \'two\';';
 
 const TS2322 = 'TS2322 Type \'string\' is not assignable to type \'number\'.';
 
+/** A line tsc answers with a TS2322 whose message differs from {@link ERROR_LINE}'s. */
+const OTHER_ERROR_LINE = 'export const flag: boolean = 1;';
+
 let repo: string;
 let lines: { level: string; message: string }[];
 
@@ -325,6 +328,44 @@ describe('the recipe a task prompt hands the session (typeCheckLines)', () => {
       // The control: the same line over the clean file reports nothing.
       const clean = await runTsc({ cwd: repo, argv: followLine(line, 'b.test.ts', join(scratch, 'tsconfig.json')) });
       expect([clean.exitCode, clean.stdout]).toEqual([0, '']);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
+
+/** The lines of `file` the type-check line's `git diff <base> -- <test file>` names as added, run as written in `repo`. */
+function linesTheDiffNames(line: string, base: string, file: string): readonly number[] {
+  const [, command = ''] = /`(git diff <base> -- [^`]+)`/.exec(line) ?? [];
+  const followed = command.replace('<base>', base).replace(TYPE_CHECK_FILE, file);
+  const [, ...args] = followed.split(' ');
+  const added: number[] = [];
+  let at = 0;
+  for (const text of git(...args).split('\n')) {
+    const hunk = /^@@ -\S+ \+(\d+)/.exec(text);
+    if (hunk) at = Number(hunk[1]);
+    else if (at > 0 && text.startsWith('+')) added.push(at++);
+    else if (at > 0 && !text.startsWith('-')) at += 1;
+  }
+  return added;
+}
+
+describe('the type-check line followed in an edited test file', () => {
+  it('names, through its git diff, the line of the error the step reads as new and not the line of the one the file held', async () => {
+    const base = commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, OTHER_ERROR_LINE] }, 'task');
+    const step = await runTypeStep(realInput(base));
+    expect(step.blocker).toContain('a.test.ts:7:14 TS2322');
+    expect(step.blocker).not.toContain('a.test.ts:6:14');
+
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const run = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      const reported = parseTscOutput(run.stdout, repo).map((error) => error.line);
+      // The session's run reports both errors; the inherited one is the control the diff leaves out.
+      expect(reported).toEqual([6, 7]);
+      expect(reported.filter((at) => linesTheDiffNames(line, base, 'a.test.ts').includes(at))).toEqual([7]);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

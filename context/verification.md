@@ -301,7 +301,10 @@ tsconfig as JSON, with `<test file>` where each test file's path goes, and
 `<modules>/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` to run
 in the checkout, both rendered by the type step's own
 `scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so the
-line cannot drift from the step. A checkout with no `tsconfig.json` at its
+line cannot drift from the step. It asks for every error in a test file
+the task added, and in one it edited for the errors on the lines
+`git diff <base> -- <test file>` names, so the session acts on one run
+with no run at the base. A checkout with no `tsconfig.json` at its
 root, where the step runs nothing, gets no line; a run whose suite steps
 are off (no baseline) still gets it. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
