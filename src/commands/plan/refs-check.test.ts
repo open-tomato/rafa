@@ -72,6 +72,7 @@ import {
   checkCreateRefs,
   checkoutRosterWarning,
   createPlanRefsVerifier,
+  planRoster,
   RAFA_PACKAGE_NAME,
   readCheckoutRoster,
   registryRoster,
@@ -255,6 +256,82 @@ describe('check 4 over the spec a plan create run resolved', () => {
     expect(answer?.restamped).toBe(true);
     expect(readRefsBlock(readFileSync(copyPath, 'utf8')).stamps).toHaveLength(1);
     expect(lines.info[0]).toBe('🔖 dangerous.acceptStaleRefs: re-stamped 1 reference of issue #20 as reviewed.');
+  });
+});
+
+describe('the roster handed in is what a spec\'s command reference is read against', () => {
+  /** A saved copy naming `rafa plan create` on line 5, stamped present: unstale against {@link CORE_ROSTER}. */
+  const COMMAND_COPY = writeRefsBlock(
+    ['# Spec', '', '## Scope', '', 'Runs `rafa plan create`.', ''].join('\n'),
+    [{ kind: 'command', text: 'rafa plan create', fingerprint: PRESENT }],
+  );
+
+  /** The core roster with every `plan` subject dropped, so `rafa plan create` reads absent against it. */
+  const NO_PLAN_ROSTER: DescribeDocument = {
+    ...CORE_ROSTER,
+    subjects: CORE_ROSTER.subjects.filter((subject) => subject.name !== 'plan'),
+  };
+
+  /** A project root holding {@link COMMAND_COPY}, and the spec a board route answers for it. */
+  function plantCommandSpec(): { root: string; spec: ResolvedSpec; copyPath: string } {
+    planted += 1;
+    const root = join(tempBase, `project-${String(planted)}`);
+    mkdirSync(join(root, '.rafa', 'specs'), { recursive: true });
+    const relative = join('.rafa', 'specs', 'rafa-21-spec.md');
+    writeFileSync(join(root, relative), COMMAND_COPY);
+    const spec: ResolvedSpec = { path: relative, kind: 'issue', source: 'issue #21', issue: 21, read: null, snapshot: null };
+    return { root, spec, copyPath: join(root, relative) };
+  }
+
+  it('passes a command reference the roster handed in still holds, with no verifier seam given', async () => {
+    const { root, spec, copyPath } = plantCommandSpec();
+
+    const answer = await checkCreateRefs({ spec, repoRoot: root, args: ['--issue=21'], acceptStaleRefs: false, roster: CORE_ROSTER });
+
+    expect(answer).toEqual({ rows: expect.any(Array), accepted: [], restamped: false });
+    expect(readFileSync(copyPath, 'utf8')).toBe(COMMAND_COPY);
+  });
+
+  it('refuses the same reference as dangling when the roster handed in no longer names the command', async () => {
+    const { root, spec, copyPath } = plantCommandSpec();
+
+    const thrown = await refusal(checkCreateRefs({
+      spec,
+      repoRoot: root,
+      args: ['--issue=21'],
+      acceptStaleRefs: false,
+      roster: NO_PLAN_ROSTER,
+    }));
+
+    expect(thrown.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(thrown.message).toContain('issue #21 names references');
+    expect(thrown.message).toContain('• dangling rafa plan create (line 5)');
+    expect(readFileSync(copyPath, 'utf8')).toBe(COMMAND_COPY);
+  });
+});
+
+describe('planRoster answers the roster a spec\'s references are read against', () => {
+  it('answers the roster handed in, unchanged, for a root that is not rafa', async () => {
+    const root = plantCheckout({ name: 'some-other-project' });
+
+    expect(await planRoster(root, CORE_ROSTER)).toEqual(CORE_ROSTER);
+    expect(calledWith(root)).toBeNull();
+  });
+
+  it('answers the checkout\'s own roster, not the one handed in, when the root is rafa', async () => {
+    const root = plantCheckout();
+
+    expect(await planRoster(root, CORE_ROSTER)).toEqual(CHECKOUT_ROSTER);
+  });
+
+  it('falls back to the roster handed in, with one warning line, when the checkout\'s own could not be read', async () => {
+    const root = plantCheckout({ entry: 'console.error(\'boom: the entry is broken\');\nprocess.exit(3);\n' });
+    const { lines, output } = capture();
+
+    expect(await planRoster(root, CORE_ROSTER, { output })).toEqual(CORE_ROSTER);
+    expect(lines.warn).toEqual([
+      checkoutRosterWarning('bun src/rafa.ts describe --output=json failed: boom: the entry is broken'),
+    ]);
   });
 });
 
