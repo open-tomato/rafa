@@ -16,6 +16,8 @@
  *     label and the message, as a text line would carry them, so a
  *     reader of `message` alone loses nothing. Everything else the entry
  *     knew goes under `fields`, which is left out when there is nothing.
+ *     A `data` that JSON cannot write, a cycle or a bigint, is left out
+ *     and `fields.dataUnwritable` says so: a diagnostic never throws.
  *     The events output prints an `error` event and drops the rest, as
  *     it did.
  *
@@ -23,7 +25,12 @@
  * text mode it reads `api: <label>: <exchange line> — <message>`. As an
  * event it is written at level `debug`, since the event's level list is
  * a published shape, with `fields.type` set to `api` and the filtered
- * exchange under `fields.api`.
+ * exchange under `fields.api`. Its message and the message of its error
+ * have every URL in them filtered too. Its `data` is written as given.
+ *
+ * Text mode writes neither `data` nor the error behind an entry: the
+ * message is the line. Json mode keeps the error's message under
+ * `fields.error`, never its stack.
  *
  * ## The call site
  *
@@ -31,7 +38,11 @@
  * it. The stack is recorded with `Error.captureStackTrace(holder, log)`,
  * `log` being the function the caller invoked: everything from `log`
  * upward is left out, so the first frame is the caller's and never this
- * file's. The contract suite holds that.
+ * file's. The contract suite holds that. A frame of the runtime's own
+ * code is skipped, so `items.forEach((x) => logger.log(…))` names the
+ * line of the `forEach`. One limit stays: where the runtime removes the
+ * calling frame altogether, as for a `.then(() => logger.log(…))`, no
+ * site is written.
  */
 import type { LoggerSettings, LoggerTheme } from './settings.js';
 import type { OutputMode } from '../../config-sections.js';
@@ -42,7 +53,7 @@ import { basename } from 'node:path';
 import { messageOf } from '../../config-sections.js';
 import { activeOutput, activeOutputMode } from '../output/active.js';
 
-import { exchangeLine, filterExchange } from './api-filter.js';
+import { exchangeLine, filterExchange, scrubUrls } from './api-filter.js';
 import { paint } from './colour.js';
 import { activeLoggerSettings, levelEnabled } from './settings.js';
 
@@ -66,6 +77,9 @@ type ConsoleEnv = Required<CreateConsoleLoggerOptions>;
 /** The file and line at the end of a stack frame. */
 const FRAME_LOCATION = /\(?([^()\s]+):(\d+):\d+\)?$/;
 
+/** Where a frame of the runtime's own code says it is, such as `Array.forEach`. */
+const NATIVE_FRAME = 'native';
+
 /** What a stack frame's line opens with. */
 const FRAME_OPENING = 'at ';
 
@@ -78,12 +92,38 @@ function labelOf(entry: LogEntry): string {
     .join(' ');
 }
 
+/** The message of `entry`, with every URL in it filtered when the entry is an `api` one. */
+function messageIn(entry: LogEntry): string {
+  return entry.level === 'api'
+    ? scrubUrls(entry.message)
+    : entry.message;
+}
+
 /** What `entry` says: its message, or for an `api` entry its exchange line, then the message. */
 function bodyOf(entry: LogEntry): string {
-  if (entry.api === undefined) return entry.message;
-  return entry.message === ''
+  const message = messageIn(entry);
+  if (entry.api === undefined) return message;
+  return message === ''
     ? exchangeLine(entry.api)
-    : `${exchangeLine(entry.api)} — ${entry.message}`;
+    : `${exchangeLine(entry.api)} — ${message}`;
+}
+
+/** The message of the error behind `entry`, its URLs filtered for an `api` entry; undefined with no error. */
+function errorIn(entry: LogEntry): string | undefined {
+  if (entry.error === undefined) return undefined;
+  return entry.level === 'api'
+    ? scrubUrls(messageOf(entry.error))
+    : messageOf(entry.error);
+}
+
+/** True when `value` can be written as JSON: no cycle, no bigint, nothing `JSON.stringify` refuses. */
+function writableAsJson(value: unknown): boolean {
+  try {
+    JSON.stringify(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The label and the body, or the body alone for an entry with no label. */
@@ -107,6 +147,7 @@ export function textLine(entry: LogEntry, site: string | null, theme: LoggerThem
 
 /** What `entry` knew beyond its message, or null when it knew nothing. */
 function fieldsOf(entry: LogEntry, site: string | null): Readonly<Record<string, unknown>> | null {
+  const dataWritable = entry.data === undefined || writableAsJson(entry.data);
   const known = ([
     ['type', entry.level === 'api'
       ? 'api'
@@ -115,10 +156,13 @@ function fieldsOf(entry: LogEntry, site: string | null): Readonly<Record<string,
     ['action', entry.action],
     ['code', entry.code],
     ['hint', entry.hint],
-    ['data', entry.data],
-    ['error', entry.error === undefined
+    ['data', dataWritable
+      ? entry.data
+      : undefined],
+    ['dataUnwritable', dataWritable
       ? undefined
-      : messageOf(entry.error)],
+      : true],
+    ['error', errorIn(entry)],
     ['api', entry.api === undefined
       ? undefined
       : filterExchange(entry.api)],
@@ -149,15 +193,14 @@ function eventOf(entry: LogEntry, site: string | null): CliEventLog {
 function callSiteOf(below: (entry: LogEntry) => void): string | null {
   const holder: { stack?: string } = {};
   Error.captureStackTrace(holder, below);
-  const frame = (holder.stack ?? '').split('\n')
+  const located = (holder.stack ?? '').split('\n')
     .map((line) => line.trim())
-    .find((line) => line.startsWith(FRAME_OPENING));
-  const match = frame === undefined
+    .filter((line) => line.startsWith(FRAME_OPENING))
+    .map((line) => FRAME_LOCATION.exec(line))
+    .find((match) => match !== null && match[1] !== NATIVE_FRAME);
+  return located === undefined || located === null
     ? null
-    : FRAME_LOCATION.exec(frame);
-  return match === null
-    ? null
-    : `${basename(match[1] ?? '')}:${match[2] ?? ''}`;
+    : `${basename(located[1] ?? '')}:${located[2] ?? ''}`;
 }
 
 /** Writes `entry` through the output of `env`, in the shape its mode reads. */
@@ -171,10 +214,15 @@ function write(env: ConsoleEnv, entry: LogEntry, settings: LoggerSettings, site:
   if (entry.hint !== undefined) output.info(`  hint: ${entry.hint}`);
 }
 
+/** `entry` without the members it names as undefined, so they do not erase a child's bindings. */
+function definedOf(entry: LogEntry): LogEntry {
+  return Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== undefined)) as unknown as LogEntry;
+}
+
 /** A logger over `env` adding `bindings` to every entry. */
 function loggerWith(env: ConsoleEnv, bindings: LogBindings): Logger {
   const log = (given: LogEntry): void => {
-    const entry: LogEntry = { ...bindings, ...given };
+    const entry: LogEntry = { ...bindings, ...definedOf(given) };
     const settings = env.settings();
     if (!levelEnabled(entry.level, entry.module, settings, env.verbosity)) return;
     const site = settings.callSite && entry.level === 'debug'

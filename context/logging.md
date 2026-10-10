@@ -46,18 +46,30 @@ An `api` entry is the metadata of one request to a service and what came
 back, for debugging background calls such as the hub's. It carries an
 `ApiExchange`: `service`, `method`, `url`, and when known `status`,
 `durationMs`, `requestBytes`, `responseBytes`, `requestId` and `headers`.
-The type has no field for a body, so none can be written.
+The type has no field for a body, and the filter answers the named
+members and no other, so a record that carries a `body` past the type
+still has it dropped.
 
 `src/adapters/logger/api-filter.ts` filters every exchange before it is
 written:
 
 - the URL's user info and its fragment are dropped
-- the value of a query parameter whose name matches `token`, `key`,
-  `secret`, `signature`, `password`, `auth` or `code` becomes `[redacted]`
+- the value of a query parameter with a sensitive name becomes
+  `[redacted]`. The name is matched loosely (`token`, `key`, `secret`,
+  `sig`, `passw`, `pwd`, `auth`, `code`, `jwt`, `session`, `credential`),
+  read through its percent-encoding, and split on `;` as well as `&`. A
+  name that cannot be decoded is redacted, and so is a part with no name
 - only the headers of `API_HEADER_ALLOW_LIST` are kept. It is an
   allow-list on purpose: a new secret header stays unwritten until someone
   adds its name
 - a string that is no http or https URL is written as `[unreadable url]`
+- every URL inside the entry's message, and inside the message of its
+  error, goes through the same filter
+
+The filter reads names, so it has limits. A secret that is part of the
+path (`/v1/tokens/abc123`) passes, as does one a caller puts in `service`,
+`method`, `requestId` or the entry's `data`. Those are the caller's to
+keep clean.
 
 Nothing writes an `api` entry yet. A request handler for services is where
 it starts. `gh` runs as a child process, so rafa never sees its requests.
@@ -78,15 +90,22 @@ warn: git commit: no author identity is set [git:no-identity]
 api: hub: hub POST https://hub.example/v1/sync?token=[redacted] → 201 in 42 ms — push
 ```
 
-The first line is what the tracker chain writes today. The second shows
-an entry that carries a hint, and the third an `api` entry.
+The first line is what a `rafa issue` action writes today when the chain
+passes a tracker over. The second shows an entry that carries a hint, and
+the third an `api` entry.
+
+Text mode writes neither `data` nor the error behind an entry: the
+message is the line.
 
 The label is the module and the action. The code is in brackets, the hint
 is on a second line, and each part is left out when the entry lacks it.
 
 Json and events modes emit today's `log` event. `message` is the label and
 the message, as a text line carries them. Everything else goes under an
-optional `fields` member, which is left out when there is nothing:
+optional `fields` member, which is left out when there is nothing. An
+error is kept as its message under `fields.error`, never its stack. A
+`data` that JSON cannot write, a cycle or a bigint, is left out, and
+`fields.dataUnwritable` says so:
 
 ```json
 {"type":"log","level":"warn","message":"tracker chain: github unavailable: down","fields":{"module":"tracker","action":"chain","code":"tracker:unavailable"},"ts":"…"}
@@ -101,8 +120,8 @@ filtered exchange under `fields.api`.
 Only the level prefix of a text line is coloured, and only when
 `colourEnabled` says so (`src/adapters/logger/colour.ts`):
 
-1. `FORCE_COLOR` set to anything but `0` or nothing turns colour on.
-   Set to `0`, it turns colour off.
+1. `FORCE_COLOR` set to anything but `0`, `false` or nothing turns colour
+   on. Set to `0` or `false`, it turns colour off.
 2. Else `NO_COLOR` set to anything but nothing turns colour off.
 3. Else colour is on when stdout is a terminal.
 
@@ -115,7 +134,10 @@ wrote it. The adapter records the stack with
 `Error.captureStackTrace(holder, log)`, `log` being the function the
 caller invoked, so the first frame is the caller's and never the
 adapter's. The contract suite holds that, and a logger that reads the
-wrong frame fails it.
+wrong frame fails it. A frame of the runtime's own code is skipped, so
+`items.forEach((x) => logger.log(…))` names the line of the `forEach`.
+Where the runtime removes the calling frame altogether, as for
+`.then(() => logger.log(…))`, no site is written.
 
 ### The active logger, and when config reaches it
 
@@ -128,22 +150,32 @@ A command's logger exists before the project is found, and the command
 loads its config later. So the settings are module state: `loadConfig`
 hands them over once a config is read, before it prints that load's own
 warnings, and a logger reads them at each entry. Until then the defaults
-and the verbosity flags apply. Every invocation starts from the defaults.
+and the verbosity flags apply. Every invocation starts from the defaults,
+so a command that loads no config runs at the defaults whatever the file
+says.
 
 ### The gate on `Output`
 
 The existing `warn`, `error` and `debug` call sites keep calling `Output`.
-The dispatcher's wrapper around a command's output lets such a line
-through only when `activeLogger().enabled(<level>)`. So `logger.level:
-error` quiets every warning a command writes through its output, with no
-module changed. That gate knows no module: a per-module level reaches
-only the modules that moved to a child logger.
+The dispatcher's wrapper around a command's output lets a `warn` or an
+`error` line through only when `activeLogger().enabled(<level>)`. So
+`logger.level: error` quiets every warning a command writes through its
+output, with no module changed. That gate knows no module: a per-module
+level reaches only the modules that moved to a child logger.
+
+`Output.debug` is handled by mode. Json and events mode write it as they
+always did, at every verbosity. In text mode the logger decides: the line
+is written, as `debug: <message>`, at verbosity 2 or with `logger.level:
+debug`.
+
+A logger whose `enabled` throws hides nothing: the line is written.
 
 ### Moving a module
 
-`src/adapters/tracker/resolve.ts` is the first one moved. Its default
-warning sink was a function calling `activeOutput().warn` with a
-`PREFIX`-led string. It is now:
+`src/adapters/tracker/resolve.ts` is the first one moved, and the `rafa
+issue` actions reach it (`resolveIssueTracker` names no sink of its own).
+Its default warning sink was a function calling `activeOutput().warn`
+with a `PREFIX`-led string. It is now:
 
 ```ts
 activeLogger().child({ module: 'tracker', action: 'chain' })
@@ -188,7 +220,7 @@ of every port.
 
 ### The contract
 
-`src/adapters/logger/contract.ts` holds ten cases every adapter passes,
+`src/adapters/logger/contract.ts` holds eleven cases every adapter passes,
 run with `runLoggerContract`. They ask what was written, never its shape.
 `contract.test.ts` runs them over loggers broken on purpose, so each case
 is shown able to fail.

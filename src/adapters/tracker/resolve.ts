@@ -12,7 +12,8 @@
  * ## Never silent
  *
  * The source's rule is kept as it was written: falling back is never
- * silent. Every failed attempt is logged, and it is folded into a
+ * silent. Every failed attempt is reported, unless the config asks for
+ * no warnings (see "Quieting" below), and it is always folded into a
  * `fallbackReason` that travels with the tracker the chain lands on.
  * Silent degradation is what produced the loose-markdown problem the
  * source's harness replaced.

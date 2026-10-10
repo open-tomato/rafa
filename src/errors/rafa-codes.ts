@@ -92,7 +92,7 @@ export const RAFA_CODES: readonly ErrorCodeEntry[] = defineErrorCodes([
   { code: 'api:http-status', description: 'a remote service answered with an error status', hint: 'read the status, then retry or fix the request', level: 'error', since: SEED },
   { code: 'config:invalid-value', description: 'a config key holds a value its reader refuses', hint: 'fix the key the message names', level: 'error', since: SEED },
   { code: 'tracker:unreachable', description: 'the issue tracker could not be reached', hint: 'check the network and gh auth status', level: 'error', since: SEED },
-  { code: 'tracker:unavailable', description: 'a tracker kind failed its preflight and the chain passed it over', hint: 'read the reason given, or leave the fallback tracker in use', level: 'warn', since: '#950' },
+  { code: 'tracker:unavailable', description: 'a tracker kind could not be made or failed its preflight, and the chain passed it over', hint: 'read the reason given, or leave the fallback tracker in use', level: 'warn', since: '#950' },
   { code: 'spawn:nonzero-exit', description: 'a child process exited nonzero', hint: 'read the child\'s stderr above', level: 'error', since: SEED },
 ]);
 

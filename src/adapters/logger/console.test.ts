@@ -79,6 +79,24 @@ describe('the console logger in text mode', () => {
     ]);
   });
 
+  it('filters a URL in an api entry\'s message', () => {
+    const harness = consoleHarness(() => ({ ...DEFAULT_LOGGER_SETTINGS, api: true }), 0);
+
+    harness.logger.log({ ...EXCHANGE, message: 'retried https://hub.example/v1/sync?token=s3cret-value' });
+
+    expect(harness.kept.lines().join('\n')).not.toContain('s3cret-value');
+    expect(harness.kept.lines().join('\n')).toContain('retried https://hub.example/v1/sync?token=[redacted]');
+  });
+
+  it('names the caller of a helper that tail-calls log, never a native frame', () => {
+    const harness = consoleHarness(() => ({ ...DEFAULT_LOGGER_SETTINGS, callSite: true }), 2);
+
+    ['one'].forEach((message) => harness.logger.log({ level: 'debug', message }));
+
+    expect(harness.kept.lines()[0]).not.toContain('(native');
+    expect(harness.kept.lines()[0]).toContain('console.test.ts:');
+  });
+
   it('keeps a message holding a newline as it was written', () => {
     const harness = consoleHarness(settings, 0);
 
@@ -140,6 +158,30 @@ describe('the console logger in json mode', () => {
     expect(JSON.stringify(event)).not.toContain('user:pass');
   });
 
+  it('emits an entry whose data JSON cannot write, without the data and saying so', () => {
+    const harness = consoleHarness(settings, 0, 'json');
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    harness.logger.log({ level: 'warn', message: 'big', data: { n: 10n } });
+    harness.logger.log({ level: 'warn', message: 'round', data: cyclic });
+
+    expect(harness.kept.events()).toMatchObject([
+      { message: 'big', fields: { dataUnwritable: true } },
+      { message: 'round', fields: { dataUnwritable: true } },
+    ]);
+    expect(harness.kept.events().map((event) => event.type === 'log' && 'data' in (event.fields ?? {}))).toEqual([false, false]);
+  });
+
+  it('filters a URL in an api entry\'s error', () => {
+    const harness = consoleHarness(() => ({ ...DEFAULT_LOGGER_SETTINGS, api: true }), 0, 'json');
+
+    harness.logger.log({ ...EXCHANGE, error: new Error('fetch https://hub.example/v1/sync?token=s3cret-value failed') });
+
+    expect(JSON.stringify(harness.kept.events())).not.toContain('s3cret-value');
+    expect(harness.kept.events()[0]).toMatchObject({ fields: { error: 'fetch https://hub.example/v1/sync?token=[redacted] failed' } });
+  });
+
   it('carries an error as its message under fields', () => {
     const harness = consoleHarness(settings, 0, 'json');
 
@@ -150,6 +192,15 @@ describe('the console logger in json mode', () => {
 });
 
 describe('a child of the console logger', () => {
+  it('keeps its bindings when an entry names a member as undefined', () => {
+    const harness = consoleHarness(() => ({ ...DEFAULT_LOGGER_SETTINGS, modules: new Map([['board', 'debug']]) }), 0);
+    const child = harness.logger.child({ module: 'board' });
+
+    child.log({ level: 'debug', message: 'kept', module: undefined });
+
+    expect(harness.kept.lines()).toEqual(['debug: board: kept']);
+  });
+
   it('adds its bindings to every entry, a later child\'s over an earlier one\'s', () => {
     const harness = consoleHarness(settings, 0);
     const child = harness.logger.child({ module: 'tracker', action: 'chain' }).child({ action: 'preflight' });

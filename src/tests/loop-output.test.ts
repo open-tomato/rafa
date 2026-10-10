@@ -15,7 +15,8 @@
  * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
- * in their code, and each calls `activeOutput()`. Each is parsed with
+ * in their code, and each calls `activeOutput()`, or `activeLogger()`,
+ * whose console logger writes through the active output. Each is parsed with
  * TypeScript and walked by `source-uses.ts`, so a comment or a string
  * naming either is no reading. The control walks a planted source holding
  * each in code, in a comment and in a string.
@@ -198,7 +199,7 @@ describe('the modules loop start writes through', () => {
     const source = readFileSync(join(SRC_DIR, path), 'utf8');
 
     expect(consoleAndExitUses(source)).toEqual([]);
-    expect(source).toContain('activeOutput()');
+    expect(source).toMatch(/active(?:Output|Logger)\(\)/);
   });
 
   it('reads a console member and a process.exit in code, and neither in a comment or a string', () => {

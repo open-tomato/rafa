@@ -10,6 +10,7 @@
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -18,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { activeLogger } from '../adapters/logger/active.js';
+import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { requireProject, resolveProjectConfig } from '../commands/plan/plan-files.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -63,6 +64,7 @@ const DEMO: RafaCommand = Object.freeze({
     });
     context.output.info('answer');
     context.output.warn('careful');
+    context.output.debug('out-debug');
     activeLogger().child({ module: 'demo' })
       .log({ level: 'debug', message: 'demo-debug' });
     activeLogger().child({ module: 'plan' })
@@ -70,6 +72,26 @@ const DEMO: RafaCommand = Object.freeze({
     activeLogger().child({ module: 'demo' })
       .log({ level: 'warn', message: 'demo-warn' });
     if (context.outputMode === 'json') context.output.result({ ok: 1 });
+    await Promise.resolve();
+  },
+});
+
+/** Sets a logger whose `enabled` throws, then warns through its output. */
+const BROKEN: RafaCommand = Object.freeze({
+  ...DEMO,
+  name: 'demo broken',
+  action: 'broken',
+  examples: [{ cmd: 'rafa demo broken', note: 'Runs the fixture.' }],
+  run: async (context: RafaContext) => {
+    const broken: Logger = {
+      log: () => {},
+      child: () => broken,
+      enabled: () => {
+        throw new Error('boom');
+      },
+    };
+    setActiveLogger(broken);
+    context.output.warn('still-here');
     await Promise.resolve();
   },
 });
@@ -122,7 +144,22 @@ describe('a command under the dispatcher, in text mode', () => {
   it('writes every module\'s debug entries at verbosity 2', async () => {
     const run = await ran(['-v', '-v'], projectWith());
 
-    expect(run.stdout).toBe('answer\nwarn: careful\ndebug: demo: demo-debug\ndebug: plan: plan-debug\nwarn: demo: demo-warn\n');
+    expect(run.stdout)
+      .toBe('answer\nwarn: careful\ndebug: out-debug\ndebug: demo: demo-debug\ndebug: plan: plan-debug\nwarn: demo: demo-warn\n');
+  });
+
+  it('writes the same debug lines at logger.level debug, with no verbosity flag', async () => {
+    const run = await ran([], projectWith('logger:\n  level: debug\n'));
+
+    expect(run.stdout)
+      .toBe('answer\nwarn: careful\ndebug: out-debug\ndebug: demo: demo-debug\ndebug: plan: plan-debug\nwarn: demo: demo-warn\n');
+  });
+
+  it('keeps writing a warning when the logger\'s own enabled throws', async () => {
+    const run = await dispatchInProject(['demo', 'broken'], SUBJECTS, [BROKEN], projectWith());
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toBe('warn: still-here\n');
   });
 
   it('starts from the default settings, whatever an earlier run left', async () => {
@@ -145,9 +182,17 @@ describe('a command under the dispatcher, in json mode', () => {
     const run = await ran(['--output=json'], projectWith('logger:\n  level: error\n'));
     const events = eventsOf(run.stdout);
 
-    expect(events.filter((event) => event.type === 'log' && event.level !== 'info')).toEqual([]);
-    expect(events.filter((event) => event.type === 'log')).toMatchObject([{ level: 'info', message: 'answer' }]);
+    expect(events.filter((event) => event.type === 'log' && event.level === 'warn')).toEqual([]);
+    expect(events.filter((event) => event.type === 'log'))
+      .toMatchObject([{ level: 'info', message: 'answer' }, { level: 'debug', message: 'out-debug' }]);
     expect(events.at(-1)).toMatchObject({ type: 'result', ok: true, data: { ok: 1 } });
+  });
+
+  it('emits a debug line of the output at every verbosity, as it did before the gate', async () => {
+    const run = await ran(['--output=json'], projectWith());
+    const debug = eventsOf(run.stdout).filter((event) => event.type === 'log' && event.level === 'debug');
+
+    expect(debug).toMatchObject([{ message: 'out-debug' }]);
   });
 
   it('emits both warnings as log events at the defaults, the logger\'s with its module under fields', async () => {

@@ -55,10 +55,13 @@
  * ## What a command writes through
  *
  * The context's output passes every `info` line and every `step` and
- * `log` event to the output assembled for the invocation. A `warn`,
- * `error` or `debug` line passes only when the command's logger has
- * that level on (see "The logger"); `info` is never gated, since it is
- * the command's own answer. It holds a command's `result` payload for
+ * `log` event to the output assembled for the invocation. A `warn` or
+ * `error` line passes only when the command's logger has that level on
+ * (see "The logger"); `info` is never gated, since it is the command's
+ * own answer. A `debug` line is written as it always was in json and
+ * events mode. In text mode the logger decides: it is written, as
+ * `debug: <message>`, at verbosity 2 or with `logger.level: debug`. A
+ * logger whose `enabled` throws hides nothing. It holds a command's `result` payload for
  * the terminal event instead of writing it, and refuses a second one.
  * It refuses a `start` or a `result` handed to `emit`, which are the
  * dispatcher's alone. A refusal throws inside the command, which ends
@@ -175,7 +178,7 @@ import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { CliEvent, CliEventResult, Output } from '../ports/index.js';
+import type { CliEvent, CliEventResult, LogLevel, Output } from '../ports/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { homedir } from 'node:os';
@@ -401,21 +404,37 @@ function success(payload: { readonly value: unknown } | null): Ending {
   return { exitCode: 0, payload, error: null, stderrLine: null };
 }
 
-/** The output a command writes through; see the module note. */
-function guardOutput(base: Output): GuardedOutput {
+/**
+ * Whether the active logger has `level` on. A logger whose `enabled`
+ * throws answers true: a diagnostic channel that is broken never hides
+ * a line or ends the command writing it.
+ */
+function levelOn(level: LogLevel): boolean {
+  try {
+    return activeLogger().enabled(level);
+  } catch {
+    return true;
+  }
+}
+
+/** The output a command writes through, in `mode`; see the module note. */
+function guardOutput(base: Output, mode: CliContext['outputMode']): GuardedOutput {
   let held: { readonly value: unknown } | null = null;
   const output: Output = Object.freeze({
     info: (message: string) => {
       base.info(message);
     },
     warn: (message: string) => {
-      if (activeLogger().enabled('warn')) base.warn(message);
+      if (levelOn('warn')) base.warn(message);
     },
     error: (message: string) => {
-      if (activeLogger().enabled('error')) base.error(message);
+      if (levelOn('error')) base.error(message);
     },
     debug: (message: string) => {
-      if (activeLogger().enabled('debug')) base.debug(message);
+      // Json and events write a debug line as they always did. In text
+      // the logger decides, and the line is the text output's own.
+      if (mode !== 'text') base.debug(message);
+      else if (levelOn('debug')) base.info(`debug: ${message}`);
     },
     emit: (event: CliEvent) => {
       if (event.type === 'start' || event.type === 'result') {
@@ -488,7 +507,7 @@ async function runCommand(
   if (deprecation !== null) settings.stderr.write(`${deprecation}\n`);
   for (const flag of readDeprecatedFlags(route).typed) settings.stderr.write(`${deprecatedFlagLine(route, flag)}\n`);
 
-  const guarded = guardOutput(base.output);
+  const guarded = guardOutput(base.output, base.outputMode);
   const context: RafaContext = Object.freeze({
     ...base,
     output: guarded.output,

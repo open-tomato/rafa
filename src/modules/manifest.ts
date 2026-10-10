@@ -22,8 +22,8 @@
  *     once. `learning` is refused by name: the spec closes that port to
  *     third parties, so no module provides a learning source.
  *   - `provides`: one entry per listed type, read by that type's shape.
- *     `tracker`, `store`, `planner` and `sync` name a `kind` and an
- *     `entry`;
+ *     `tracker`, `store`, `planner`, `sync` and `logger` name a `kind`
+ *     and an `entry`;
  *     `output` adds `channels`, a non-empty list of the spec's channels;
  *     `commands` names an `entry`; `skills` and `agents` are a directory
  *     path; `mcp` is a non-empty list of servers, each a `name` unique in
@@ -31,7 +31,7 @@
  *   - `requires`: `rafa`, a version range the running version must
  *     satisfy, and `ports`, the version of each port the module
  *     implements. Every listed type that is a port (`tracker`, `store`,
- *     `planner`, `output`, `sync`) states its version, and a stated
+ *     `planner`, `output`, `sync`, `logger`) states its version, and a stated
  *     version core does not serve is refused naming both numbers.
  *   - `prerequisites` and `source`, both optional: the `required` and
  *     `optional` item lists `.rafa/config.yaml` reads, through the same

@@ -22,7 +22,8 @@
  *     that built its line in a helper and reported the helper fails it;
  *   - an `api` entry is written only with `api` on, and never with a
  *     secret query value, a URL's user info or a header outside the
- *     allow-list.
+ *     allow-list, nor with a member the exchange type does not name,
+ *     such as a body a record carried past the type.
  *
  * `contract.test.ts` runs the cases over loggers broken on purpose, the
  * control that each of those cases can fail.
@@ -211,6 +212,17 @@ export function loggerContractCases(options: LoggerContractOptions): readonly Lo
         on.logger.log(SECRET_EXCHANGE);
         expect(textOf(on)).toContain('hub.example');
         for (const secret of SECRETS) expect(textOf(on)).not.toContain(secret);
+      },
+    },
+    {
+      name: 'writes no member of an exchange that the type does not name',
+      run: () => {
+        // A record built elsewhere passes the type with members it does not name.
+        const record = { service: 'hub', method: 'POST', url: 'https://hub.example/x', body: 'case-body-s3cret' };
+        const harness = create(settingsWith({ api: true }), 0);
+        harness.logger.log({ level: 'api', message: 'push', api: record });
+        expect(textOf(harness)).toContain('hub.example');
+        expect(textOf(harness)).not.toContain('case-body-s3cret');
       },
     },
   ];

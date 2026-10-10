@@ -13,6 +13,7 @@ import { consoleHarness } from '../../tests/logger-harness.js';
 import { loggerContractCases, runLoggerContract } from './contract.js';
 
 runLoggerContract({ name: 'console', create: (settings, verbosity) => consoleHarness(settings, verbosity) });
+runLoggerContract({ name: 'console, json mode', create: (settings, verbosity) => consoleHarness(settings, verbosity, 'json') });
 
 /** A logger writing `line(entry)` for every entry, whatever the settings say. */
 function looseLogger(written: string[], line: (entry: LogEntry) => string, bindings: Partial<LogEntry> = {}): Logger {
@@ -69,6 +70,7 @@ describe('the logger contract, over loggers broken on purpose', () => {
     });
 
     expect(names).toContain('writes an api entry only with api on, and none of its secrets');
+    expect(names).toContain('writes no member of an exchange that the type does not name');
   });
 
   it('catches a logger whose child drops its bindings', () => {
@@ -108,8 +110,8 @@ describe('the logger contract, over a logger naming its own file', () => {
 });
 
 describe('the logger contract', () => {
-  it('holds ten cases', () => {
+  it('holds eleven cases', () => {
     expect(loggerContractCases({ name: 'console', create: (settings, verbosity) => consoleHarness(settings, verbosity) }))
-      .toHaveLength(10);
+      .toHaveLength(11);
   });
 });
