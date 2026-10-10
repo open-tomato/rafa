@@ -3,7 +3,23 @@
 Two notices exist, `alpha` and `danger`, both about consent rather than a
 fault (`src/notices/notices.ts`): the package is alpha software, and
 every session rafa spawns runs with `--dangerously-skip-permissions`
-under the person's accounts. Before you run a plan, use `rafa plan risk`
+under the person's accounts. The `danger` notice also names
+`loop.settingSources` as the run resolved it, in its configured order,
+and the scopes left out of the three Claude Code knows:
+
+```text
+   loop.settingSources resolved to project,local: each session loads its settings from there.
+   Left out: user. Permission rules and hooks in a scope left out do not reach the session.
+```
+
+With all three loaded the second line reads `No scope is left out, so
+none is named here as not reaching the session.` The notice says nothing
+of what a rule in a LOADED scope does under the flag. The text is built
+from the value handed in, never from `CONFIG_DEFAULTS`: each caller
+passes its own resolved `settingSources` to `requireNoticesAnswered`,
+`NoticeRequest` carries it and `noticeLines` takes it.
+
+Before you run a plan, use `rafa plan risk`
 to see what it may do on this machine and under your accounts; this is
 not a sandbox, but a reading of what the plan and its skills say.
 
@@ -53,8 +69,10 @@ suite that spawns either command does the same.
 ### Adding a notice
 
 Add the id to `NOTICE_IDS` (the order is the print order), its lines to
-`noticeLines`, a case to `notices.test.ts`, and the sentence to the
-README. `--no-danger`, which would remove the reason for the second
+`noticeLines(notice, version, settingSources)`, a case to
+`notices.test.ts`, and the sentence to the README. What a notice needs
+from the run's configuration goes on `NoticeRequest` and is handed to
+`requireNoticesAnswered(settingSources)` by its two callers. `--no-danger`, which would remove the reason for the second
 notice, is not built.
 
 ## Since-last-command notice
