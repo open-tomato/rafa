@@ -215,6 +215,13 @@ describe('failingFilesOf', () => {
     expect(failingFilesOf(failures)).toEqual(CASES_FILES);
     expect(failingFilesOf([])).toEqual([]);
   });
+
+  it('leaves out a file name that is blank or names a directory, which bun would run as a whole folder', () => {
+    const named = ['', '   ', '.', './', '..', 'src/', 'src/.', 'src/..', 'a.test.ts'].map((file) => ({ file }));
+    expect(failingFilesOf(named)).toEqual(['a.test.ts']);
+    // The control: names holding a dot or a slash elsewhere are files, and are kept.
+    expect(failingFilesOf([{ file: './a.test.ts' }, { file: 'src/.hidden.test.ts' }, { file: '../up/b.test.ts' }])).toEqual(['./a.test.ts', 'src/.hidden.test.ts', '../up/b.test.ts']);
+  });
 });
 
 describe('failedCasesLines', () => {

@@ -25,7 +25,10 @@
  * when `tests.retakeRedAlone` is false, when the step was read as a stop
  * on SIGINT, or when the step holds no NEW failure: a failure the
  * baseline holds is never retaken. Else it takes the files of the new
- * failures in first-seen order, the first {@link RETAKE_ALONE_MAX_FILES}
+ * failures in first-seen order (`failingFilesOf`, which leaves out a
+ * blank name and one spelled as a directory: run as a path, `./` is the
+ * whole project, so such a failure stays a new one with no file run for
+ * it), the first {@link RETAKE_ALONE_MAX_FILES}
  * of them, and runs each as `bun test ./<file>`, one process per file,
  * through the same `runSuite` seam the step ran through, so with the
  * same directory, environment and reporter. Its JUnit file is

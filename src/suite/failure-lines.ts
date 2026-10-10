@@ -209,9 +209,26 @@ export function withErrorLines(failures: readonly SuiteFailure[], cases: readonl
   });
 }
 
-/** The files `failures` name, each once, in first-seen order. */
+/**
+ * True when `file` can name one test file: not blank, not spelled as a
+ * directory with a trailing `/`, and not ending in a `.` or `..` segment.
+ */
+function namesOneFile(file: string): boolean {
+  const name = file.trim();
+  if (name === '' || name.endsWith('/')) return false;
+  const last = name.split('/').at(-1);
+  return last !== '.' && last !== '..';
+}
+
+/**
+ * The files `failures` name, each once, in first-seen order. A name
+ * that cannot be one file is left out ({@link namesOneFile}): a JUnit
+ * case with no `file` attribute under a suite with none reads as `''`
+ * (`./run.ts`), no header of Bun's stderr is such a name, and handed on
+ * as a path it becomes `./`, which `bun test` runs as the whole project.
+ */
 export function failingFilesOf(failures: readonly Pick<SuiteFailure, 'file'>[]): readonly string[] {
-  return [...new Set(failures.map((failure) => failure.file))];
+  return [...new Set(failures.map((failure) => failure.file))].filter(namesOneFile);
 }
 
 /** One case as kept: its `(fail)` line without the time, and its error lines indented under it. */

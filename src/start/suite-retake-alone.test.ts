@@ -604,6 +604,21 @@ describe('the files a step retakes', () => {
     expect(outcome.blocker).not.toContain('not run alone');
   });
 
+  it('runs no file alone for a failure whose file name is blank or a directory, which stays a new failure', async () => {
+    for (const file of ['', './', 'src/']) {
+      writeFileSync(trackerPath, TRACKER, 'utf8');
+      const unnamed: SuiteFailure = { file, name: 'case with no file' };
+      const { context, seen } = contextWith([red([unnamed, LEAKED]), result()]);
+      const outcome = await runTaskStep(context, input);
+
+      // The step's run and the one file that has a name. `bun test ./` would be the whole project.
+      expect(seen.runs.map((run) => run.paths)).toEqual([undefined, [LEAKY]]);
+      expect(outcome.red).toBe(true);
+      expect(seen.steps[0]?.newFailures).toEqual([unnamed]);
+      expect(seen.steps[0]?.stepOnly?.map((entry) => entry.file)).toEqual([LEAKY]);
+    }
+  });
+
   it('names at most the cap of files before a file, the nearest ones, in run order', async () => {
     const order = [...Array.from({ length: STEP_ONLY_BEFORE + 3 }, (_, index) => `src/p${index}.test.ts`), LEAKY];
     const { context, seen } = contextWith([red([LEAKED], { fileOrder: [order] }), result()]);
