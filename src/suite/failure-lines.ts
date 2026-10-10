@@ -82,7 +82,7 @@
  */
 import type { SuiteFailure } from './run.js';
 
-import { cappedSections, joinSections } from './unhandled.js';
+import { cappedSections, joinSections, plainLines } from './unhandled.js';
 
 /** The most lines kept of one failed case's error. */
 export const MAX_ERROR_LINES = 5;
@@ -185,7 +185,7 @@ function takeLine(lines: readonly string[], headers: ReadonlyMap<string, string>
  * the module note.
  */
 export function parseFailedCases(stderr: string, files: readonly string[]): readonly FailedCase[] {
-  const lines = stderr.split(/\r?\n/).map((line) => line.trimEnd());
+  const lines = plainLines(stderr.split(/\r?\n/).map((line) => line.trimEnd()));
   const headers = new Map(files.map((file) => [`${file}:`, file]));
   let walk: CaseWalk = { file: null, start: 0, cases: [] };
   for (let index = 0; index < lines.length; index += 1) walk = takeLine(lines, headers, walk, index);

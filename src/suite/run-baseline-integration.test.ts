@@ -139,6 +139,31 @@ describe('runSuite and baseline over a real bun test', () => {
     }
   }, 30_000);
 
+  it('reads the same failure, error lines and error count when the runner\'s own environment sets GITHUB_ACTIONS', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rafa-suite-actions-'));
+    try {
+      writeProject(dir, 1);
+      writeFileSync(join(dir, 'load.test.ts'), 'throw new Error(\'boom while loading\');\n');
+      const actions = { ...process.env, GITHUB_ACTIONS: 'true' };
+
+      // The control: the same project spawned with GITHUB_ACTIONS handed on opens a group per file and
+      // repeats each error as an annotation, the shape a hosted run prints and a shell never does.
+      const annotated = Bun.spawnSync(['bun', 'test', './pass.test.ts', './fail.test.ts', './load.test.ts'], { cwd: dir, env: { ...actions, CLAUDECODE: undefined }, stdout: 'ignore', stderr: 'pipe' }).stderr.toString();
+      expect(annotated).toContain('::group::fail.test.ts:');
+      expect(annotated).toContain('::error ');
+
+      const result = await runSuite({ cwd: dir, junitFile: join(dir, '.rafa', 'runs', 'actions.junit.xml'), paths: ['pass.test.ts', 'fail.test.ts', 'load.test.ts'], env: actions });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.summary).not.toBeNull();
+      expect(result.failures).toEqual([printed('breaks')]);
+      expect(result.errors).toBe(1);
+      expect(result.unhandled).toEqual([{ file: 'load.test.ts', firstLine: 'error: boom while loading' }]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it('reads the same failure, error lines and error count when the runner\'s own environment sets FORCE_COLOR', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'rafa-suite-colour-'));
     try {

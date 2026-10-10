@@ -107,9 +107,39 @@ const SUMMARY_LINE = /^Ran \d+ tests? across \d+ files?\./;
 /** One count line of the block above the summary, as ` 3 fail`. */
 const COUNT_LINE = /^\s*\d+ \S/;
 
-/** `stderr` as lines, line endings and trailing spaces removed. */
+/**
+ * What Bun puts ahead of a file header under GitHub Actions, where each
+ * file's lines open a log group: `::group::a.test.ts:`.
+ */
+const GROUP_PREFIX = '::group::';
+
+/**
+ * A GitHub Actions workflow command Bun prints on a line of its own
+ * there: the annotation repeating a case's error (`::error file=...::`),
+ * and the line closing a file's group. Neither is part of an error.
+ */
+const WORKFLOW_COMMAND_LINE = /^::(?:error|warning|notice|debug|endgroup)(?:::| )/;
+
+/**
+ * `lines` as a shell run prints them: a file header without the group it
+ * opens under GitHub Actions, and no workflow command line. Bun prints
+ * both when `GITHUB_ACTIONS` is set and no agent variable is, so a
+ * hosted run's lines read as a local run's do.
+ */
+export function plainLines(lines: readonly string[]): readonly string[] {
+  return lines
+    .filter((line) => !WORKFLOW_COMMAND_LINE.test(line))
+    .map((line) => line.startsWith(GROUP_PREFIX)
+      ? line.slice(GROUP_PREFIX.length)
+      : line);
+}
+
+/**
+ * `stderr` as lines, line endings and trailing spaces removed, read as a
+ * shell run prints them ({@link plainLines}).
+ */
 function linesOf(stderr: string): readonly string[] {
-  return stderr.split(/\r?\n/).map((line) => line.trimEnd());
+  return plainLines(stderr.split(/\r?\n/).map((line) => line.trimEnd()));
 }
 
 /** The file header line above the heading at `index`, or null. */

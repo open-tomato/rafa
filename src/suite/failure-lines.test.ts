@@ -160,6 +160,28 @@ describe('parseFailedCases over written stderr', () => {
     expect(parseFailedCases(stderr, ['a.test.ts'])).toEqual([{ file: 'a.test.ts', name: 'silent', label: 'silent', errorLines: [] }]);
   });
 
+  it('reads a run printed under GitHub Actions, whose file header opens a group and whose error is repeated as an annotation', () => {
+    const stderr = [
+      '::group::a.test.ts:',
+      '1 | throw new Error(\'boom\');',
+      '          ^',
+      'error: boom',
+      '      at <anonymous> (/tmp/scratch/a.test.ts:1:7)',
+      '',
+      '::error file=a.test.ts,line=1,col=7,title=error: boom::%0A      at <anonymous> (/tmp/scratch/a.test.ts:1:7)%0A',
+      '(fail) throws [0.05ms]',
+      '',
+      '::endgroup::',
+      '',
+    ].join('\n');
+    expect(parseFailedCases(stderr, ['a.test.ts'])).toEqual([
+      { file: 'a.test.ts', name: 'throws', label: 'throws [0.05ms]', errorLines: ['error: boom'] },
+    ]);
+    // Control: a frameless error there keeps its own line and not the annotation that repeats it.
+    const frameless = ['::group::a.test.ts:', 'error: no frame', '::error title=error: no frame::', '(fail) bare [0.01ms]', '::endgroup::', ''].join('\n');
+    expect(parseFailedCases(frameless, ['a.test.ts'])[0]?.errorLines).toEqual(['error: no frame']);
+  });
+
   it('leaves out a failed case under no file it was handed', () => {
     const stderr = ['other.test.ts:', 'error: boom', '(fail) elsewhere [0.01ms]', ''].join('\n');
     expect(parseFailedCases(stderr, ['a.test.ts'])).toEqual([]);
