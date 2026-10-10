@@ -34,7 +34,11 @@
  * Nothing else in the context is handed on. The declaration's `flags`
  * spell what the phase 0 parser reads, for help and `describe`, and a
  * `default` declared there fills the context's `flags` and never reaches
- * the function, whose parser applies its own.
+ * the function, whose parser applies its own. `plan create` needs one
+ * more thing of its context, the roster of the registry its line was
+ * routed through, and takes it without this wrapper handing it over:
+ * its `run` wraps a call that closes over the context
+ * (`./plan/create.ts`).
  *
  * ## How a wrapped command ends
  *

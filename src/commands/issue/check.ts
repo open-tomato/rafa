@@ -39,8 +39,10 @@
  * The targets are read by the verifier `plan create`'s check 4 builds
  * (`createPlanRefsVerifier`, `gh`, `git`, `ts-symbols` and the roster
  * `planRoster` answers at the project root: the checkout's own when it
- * is rafa itself, the core roster otherwise), or by
- * {@link IssueCheckSeams.verifier}.
+ * is rafa itself, the core roster otherwise, which this command hands
+ * in as `registryRoster` over the registry its line was routed
+ * through), or by {@link IssueCheckSeams.verifier}, under which no
+ * roster is built.
  * A board issue `gh` could not read and a refs block the codec will not
  * read are refused with exit code 1 and the error's own words.
  *
@@ -75,7 +77,7 @@ import { readCopyRefs, readRefsText, restampCopyRefs } from '../../refs/reading.
 import { fingerprintText, RefsBlockError } from '../../refs/stamp.js';
 import { RefVerifyError } from '../../refs/verify.js';
 import { readSwitch } from '../plan/plan-files.js';
-import { createPlanRefsVerifier } from '../plan/refs-check.js';
+import { createPlanRefsVerifier, registryRoster } from '../plan/refs-check.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 
@@ -123,7 +125,7 @@ export interface IssueCheckResult {
 
 /** How the targets are read; each left out is the command's own. */
 export interface IssueCheckSeams {
-  /** Makes the verifier for a project root; `createPlanRefsVerifier` when left out. */
+  /** Makes the verifier for a project root; `createPlanRefsVerifier` over the context's roster when left out. */
   readonly verifier?: (repoRoot: string) => RefVerifier;
 }
 
@@ -277,7 +279,8 @@ export async function checkIssue(context: RafaContext, seams: IssueCheckSeams = 
     context.output.warn(message);
   });
   const copy = findSavedCopy(project.root, config.specsDir, issue);
-  const verify = (seams.verifier ?? createPlanRefsVerifier)(project.root);
+  const makeVerifier = seams.verifier ?? ((root: string) => createPlanRefsVerifier(root, registryRoster(context.registry)));
+  const verify = makeVerifier(project.root);
   try {
     const references = await readReferences(copy.absolute, issue, verify, stamp);
     return Object.freeze({ issue, path: copy.path, stamped: stamp, references: Object.freeze(references) });

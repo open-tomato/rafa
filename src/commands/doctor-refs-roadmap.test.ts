@@ -35,6 +35,9 @@ afterAll(() => {
 });
 
 const SPECS = join('.rafa', 'specs');
+
+/** The core roster the verifier reads commands against and the row is handed. */
+const ROSTER = describeRegistry(CORE_REGISTRY, '0.0.0-test');
 const REFS_COLUMN = 6;
 
 function git(cwd: string, args: readonly string[]): void {
@@ -94,11 +97,11 @@ describe('doctor row and roadmap refs column over planted saved copies', () => {
         issues,
         git: createGitRunner(dir),
         outline: null,
-        roster: describeRegistry(CORE_REGISTRY, '0.0.0-test'),
+        roster: ROSTER,
       }),
     };
 
-    const reading = await readDoctorRefs({ root, specsDir: SPECS, gh, issues: undefined }, seams);
+    const reading = await readDoctorRefs({ root, specsDir: SPECS, gh, roster: ROSTER, issues: undefined }, seams);
     if (!reading.ok) throw new Error(reading.detail);
 
     expect([reading.suspect, reading.dangling, reading.unknown]).toEqual([1, 1, 0]);

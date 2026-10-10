@@ -82,6 +82,9 @@ const CHECKOUT_ROSTER: DescribeDocument = {
   commands: [],
 };
 
+/** The roster handed in as the core's: it holds nothing, so a command or flag read against it and not the checkout's reads absent. */
+const EMPTY_ROSTER: DescribeDocument = { ...CHECKOUT_ROSTER, subjects: [] };
+
 const SPEC = [
   '# Spec',
   '',
@@ -95,7 +98,7 @@ const SPEC = [
 describe('the #172 classes, extracted and verified together', () => {
   it('reads no extracted reference as absent', async () => {
     const root = plantRepository();
-    const verify = createPlanRefsVerifier(root, { checkoutRoster: () => Promise.resolve({ kind: 'read', roster: CHECKOUT_ROSTER }) });
+    const verify = createPlanRefsVerifier(root, EMPTY_ROSTER, { checkoutRoster: () => Promise.resolve({ kind: 'read', roster: CHECKOUT_ROSTER }) });
 
     const refs = extractRefs(SPEC);
     const readings = await Promise.all(refs.map(async (ref) => ({ ref, reading: await verify(ref) })));

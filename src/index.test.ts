@@ -400,6 +400,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
+    ['./refs-check.js', ['registryRoster']],
   ]],
   ['./commands/plan/list.js', [
     ['../../plan/index.js', ['parsePlan']],
@@ -562,6 +563,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueProject',
@@ -657,7 +659,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../refs/stamp.js', ['fingerprintText', 'RefsBlockError']],
     ['../../refs/verify.js', ['RefVerifyError']],
     ['../plan/plan-files.js', ['readSwitch']],
-    ['../plan/refs-check.js', ['createPlanRefsVerifier']],
+    ['../plan/refs-check.js', ['createPlanRefsVerifier', 'registryRoster']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
@@ -1045,6 +1047,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/roadmap-epic-table.js', ['unknownLine']],
     ['../issue/roadmap-table.js', ['renderRoadmapTable']],
     ['../plan/plan-files.js', ['plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/epic/new.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1435,6 +1438,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
     ['./plan/plan-files.js', ['isFile']],
+    ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
     ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],

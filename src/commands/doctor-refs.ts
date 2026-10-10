@@ -55,10 +55,13 @@
  * Commands and flags are read against the roster `plan create`'s check 4
  * reads them against (`planRoster` in `./plan/refs-check.ts`): the
  * checkout's own when the project root is rafa itself, the core roster
- * otherwise. It is read once per run, on the first reference read, and a
- * root that is rafa whose roster cannot be read gets its one warning line
- * through {@link DoctorRefsInput.output} and is read against the core
- * roster; the row is not failed for it.
+ * otherwise. The core roster is {@link DoctorRefsInput.roster}, which
+ * each caller builds with `registryRoster` from the registry its line
+ * was routed through; that module holds why it is handed in and never
+ * imported. The checkout's is read once per run, on the first reference
+ * read, and a root that is rafa whose roster cannot be read gets its
+ * one warning line through {@link DoctorRefsInput.output} and is read
+ * against the core roster; the row is not failed for it.
  *
  * ## An unreadable board is `unknown`
  *
@@ -97,6 +100,7 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
+import type { DescribeDocument } from '../cli/describe.js';
 import type { Output } from '../ports/index.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
@@ -146,6 +150,8 @@ export interface DoctorRefsInput {
   readonly specsDir: string;
   /** The `gh` runner `doctor` opened for the board, or null for a provider that is not `gh`. */
   readonly gh: GhRunner | null;
+  /** The core roster the default verifier falls back on; see the module note. Unread with `refsVerifier` given. */
+  readonly roster: DescribeDocument;
   /** The environment `ts-symbols` is looked up on; `process.env` when left out. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Read only the copies of these issues; every copy when left out. */
@@ -262,7 +268,7 @@ async function defaultVerifier(input: DoctorRefsInput, issues: IssueReader, seam
     issues,
     git: createGitRunner(input.root),
     outline: withOutlineCache(tsSymbolsOutliner({ cwd: input.root, env: input.env }), input.root),
-    roster: await planRoster(input.root, { checkoutRoster: seams.checkoutRoster, output: input.output }),
+    roster: await planRoster(input.root, input.roster, { checkoutRoster: seams.checkoutRoster, output: input.output }),
   });
 }
 

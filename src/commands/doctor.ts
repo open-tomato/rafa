@@ -304,6 +304,7 @@ import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
 import { isFile } from './plan/plan-files.js';
+import { registryRoster } from './plan/refs-check.js';
 
 /**
  * How the checks run; see the module note. Each left out is the
@@ -710,7 +711,8 @@ async function runDoctor(context: RafaContext, seams: DoctorSeams): Promise<void
     const preflight = await checkPreflight(context, project, seams);
     const gh = boardRunner(preflight.provider, preflight.root, seams);
     const cleanup = await readDoctorCleanup({ root: project.root, home: project.home, config: preflight.config, gh }, seams);
-    const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, env: context.env }, seams);
+    const roster = registryRoster(context.registry);
+    const refs = await readDoctorRefs({ root: project.root, specsDir: preflight.config.specsDir, gh, roster, env: context.env }, seams);
     const release = readDoctorRelease({ root: project.root, config: preflight.config }, seams);
     const tiers = await checkDoctorTiers({ project, env: context.env, resolved: preflight.resolved, plan: null }, seams);
     const effortSchema = readDoctorEffortSchema(project.root, context.env);

@@ -158,6 +158,7 @@ import { roadmapBoard } from '../issue/list.js';
 import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
 import { plansDirAt, readSwitch } from '../plan/plan-files.js';
+import { registryRoster } from '../plan/refs-check.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa epics [<n>] [--labels] [--texts] [--refresh]';
@@ -326,7 +327,7 @@ function rowSeams(context: RafaContext, seams: EpicShowSeams, config: RafaConfig
   const refresh = readSwitch('refresh', context.flags['refresh'], SWITCH_HINT);
   const board = roadmapBoard(seams, gh, root, refresh, seams.relations?.mode ?? 'labels');
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
-    { root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
+    { root, specsDir: config.specsDir, gh, roster: registryRoster(context.registry), env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
   return onceSeams({

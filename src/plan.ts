@@ -131,6 +131,17 @@
  * is handed over, so `plan.test.ts` resolves a fixture planner under the
  * same kind and spawns no session.
  *
+ * The roster is a parameter too, and has no default: the core roster
+ * check 4 reads a snapshot's commands and flags against, which
+ * `commands/plan/create.ts` builds from the registry the line was
+ * routed through and this command hands to `checkCreateRefs` as it is.
+ * `commands/plan/refs-check.ts` holds why it is handed in and never
+ * imported: this module is loaded by `commands/index.ts`, through
+ * `create.ts`, before that module's registry is made. It comes before
+ * the registry in the parameter list because every caller hands one. A
+ * `--spec` run and a `--dry-run` run read no reference, and so never
+ * read it.
+ *
  * ## One source for the plan format
  *
  * `src/bundled/skills/dev-planner/SKILL.md`, the rafa tier's copy, is the
@@ -200,6 +211,7 @@ import type { AdapterRegistry } from './adapters/registry.js';
 import type { GhRunner } from './adapters/tracker/github.js';
 import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
+import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
 import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
@@ -575,6 +587,7 @@ function resolvePlanConfig(repoRoot: string, home: string): RafaConfig {
 export default async function plan(
   args: string[],
   repoRoot: string,
+  roster: DescribeDocument,
   registry: AdapterRegistry = CORE_ADAPTER_REGISTRY,
 ): Promise<void> {
   const home = homedir();
@@ -615,7 +628,7 @@ export default async function plan(
       }
       // Check 4: the references the saved copy names, read against its
       // stamps. `--spec` has no copy to read.
-      await checkCreateRefs({ spec, repoRoot, args, acceptStaleRefs: dangerousAcceptStaleRefs });
+      await checkCreateRefs({ spec, repoRoot, args, acceptStaleRefs: dangerousAcceptStaleRefs, roster });
       return stub;
     },
     claim: (request) => claimPlanIssue(request, createPlanClaimContext(repoRoot, config)),
