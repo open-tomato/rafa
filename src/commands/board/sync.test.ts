@@ -251,6 +251,22 @@ describe('rafa board sync', () => {
     expect((await fake.heldValues())[21]).toEqual({ Stage: 'Ready', Rank: 3 });
   });
 
+  it('fills both added issues when the project\'s own listing lags behind the adds it just sent', async () => {
+    const { fake, project } = setUp();
+    fake.project.lagItems();
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
+    expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
+    fake.project.showItems();
+    expect((await fake.heldValues())[1]).toEqual({ Stage: 'Backlog' });
+    expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
+  });
+
   it('exits 0 when the only failure is a refused issue, printing its warning line and syncing the rest', async () => {
     const { fake, project } = setUp({ repeatsCursor: [21] });
 

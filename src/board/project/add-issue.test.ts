@@ -19,6 +19,7 @@
  *    answering an empty `notFilled`, which answers its own lines alone,
  *    so the line is the `notFilled` entry's doing.
  */
+import type { FakeFactsIssue } from './facts-fake.js';
 import type { ProjectItem } from './port.js';
 import type {
   AddedNotFilled,
@@ -33,6 +34,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { addAndRefreshIssue } from './add-issue.js';
+import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
 import { refreshFailedWarning } from './issue-board-refresh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from './project-fake.js';
@@ -312,5 +314,68 @@ describe('addAndRefreshIssue: failures answered as warning lines, never rejectio
 
     expect(run.lines).toEqual([refreshFailedWarning(NEW_ISSUE, error)]);
     expect(run.heldAfter).toEqual([NEW_ISSUE]);
+  });
+});
+
+/**
+ * Cross-module: `addAndRefreshIssue` asked for no `refresh`, so it falls
+ * to the real `refreshProjectItems` (`./refresh.ts`) over the real
+ * project fake's own lag (`./project-fake.ts`, `lagItems`), the way
+ * `rafa issue create` runs it. The board holds the roadmap issue #1 and
+ * the new issue alone, so the default board resolves by its label and
+ * every call is one `./facts-fake.ts` and `./project-fake.ts` model.
+ */
+describe('addAndRefreshIssue: the real refresh, filling the new issue through the project fake\'s own lag', () => {
+  /** The board the refresh reads: the roadmap issue, and the new one, open with no blocker. */
+  const BOARD_ISSUES: readonly FakeFactsIssue[] = [
+    { number: 1, state: 'OPEN', labels: ['type:roadmap'] },
+    { number: NEW_ISSUE, state: 'OPEN', labels: ['type:spec'] },
+  ];
+
+  /** `issue` as `gh issue list --json number,title,body,state,stateReason,labels` writes it. */
+  function listed(issue: FakeFactsIssue): Readonly<Record<string, unknown>> {
+    return {
+      number: issue.number,
+      title: `#${String(issue.number)}`,
+      body: '',
+      state: issue.state,
+      stateReason: issue.stateReason ?? '',
+      labels: (issue.labels ?? []).map((name) => ({ name })),
+    };
+  }
+
+  /** The runner routing the repository, the board listing and the facts beside the project fake `project`. */
+  function ghOver(project: ReturnType<typeof createFakeProjectGh>): GhRunner {
+    const facts = createFakeFactsGh({ issues: BOARD_ISSUES });
+    return (args) => {
+      const line = args.join(' ');
+      if (line === 'repo view --json nameWithOwner') return Promise.resolve(answered({ nameWithOwner: FAKE_PROJECT_REPOSITORY }));
+      if (line.startsWith('issue list --label type:roadmap --state open')) {
+        return Promise.resolve(answered(BOARD_ISSUES.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
+      }
+      if (line.startsWith('issue list --state all')) return Promise.resolve(answered(BOARD_ISSUES.map(listed)));
+      if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+      return project.gh(args);
+    };
+  }
+
+  it('fills the new issue through the item the add answered, the project\'s listing never showing it yet', async () => {
+    const project = createFakeProjectGh({
+      projects: [{ owner: OWNER, number: NUMBER }],
+      owners: [OWNER],
+      repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: BOARD_ISSUES.map(({ number }) => number) }],
+    });
+    const gh = ghOver(project);
+    project.lagItems();
+
+    const lines = await addAndRefreshIssue({ config: CONFIG, openGh: () => gh }, NEW_ISSUE);
+
+    expect(lines).toEqual([]);
+    project.showItems();
+    const items = await createGhProjectPort(gh).items(PROJECT_ID);
+    const item = items.find((held) => held.content.kind === 'issue' && held.content.number === NEW_ISSUE);
+    const stage = item?.values.get('Stage');
+    expect(stage?.kind).toBe('option');
+    expect(stage?.kind === 'option' && stage.name).toBe('Backlog');
   });
 });

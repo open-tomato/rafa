@@ -319,6 +319,21 @@ describe('syncProject: over an item listing that does not show the issues just a
     expect(synced.warnings.at(-1)).toStartWith('#40 added but not filled: ');
     expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
   });
+
+  it('names the same added issue in the warning over the project fake\'s own lag, the control above over a hand-rolled one', async () => {
+    const fake = createSyncFake({ repeatsCursor: [40] });
+    fake.project.lagItems();
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1]);
+    expect(synced.warnings.at(-1)).toStartWith('#40 added but not filled: ');
+    fake.project.showItems();
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
+  });
 });
 
 describe('syncProject: the phases each pass feeds', () => {
