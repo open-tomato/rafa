@@ -34,8 +34,9 @@
  * Only an enabled module goes further, and only with no problem so far:
  *
  *   1. Each `tracker`, `store`, `planner`, `output`, `sync` and
- *      `logger` entry is resolved against the module directory and imported. Its default
- *      export is the adapter's `create`, called with an `AdapterContext`
+ *      `logger` entry is resolved against the module directory and
+ *      imported. Its default export is the adapter's `create`, called
+ *      with an `AdapterContext`
  *      and answering the port. It is registered under its port type and the
  *      `kind` the manifest names, at the port version `requires.ports`
  *      states, so the registry's own refusals apply: a kind core or an
