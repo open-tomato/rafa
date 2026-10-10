@@ -2,7 +2,7 @@ import type { DirectedGraph, GraphEdge } from './graph-algorithms';
 
 import { describe, expect, it } from 'bun:test';
 
-import { betweenness, louvainClusters } from './graph-algorithms';
+import { betweenness, louvainClusters, stronglyConnected } from './graph-algorithms';
 
 /** Every ordered pair of distinct nodes in `names`, as edges both ways. */
 function clique(names: readonly string[]): GraphEdge[] {
@@ -138,11 +138,102 @@ describe('betweenness', () => {
   });
 });
 
+describe('stronglyConnected', () => {
+  it('puts the nodes of one cycle in one component and every other node in its own', () => {
+    const graph: DirectedGraph = {
+      edges: [
+        { from: 'a', to: 'b' },
+        { from: 'b', to: 'c' },
+        { from: 'c', to: 'a' },
+        { from: 'c', to: 'd' },
+        { from: 'e', to: 'a' },
+      ],
+      nodes: ['a', 'b', 'c', 'd', 'e'],
+    };
+    expect(stronglyConnected(graph)).toEqual([['a', 'b', 'c'], ['d'], ['e']]);
+  });
+
+  it('keeps a chain apart, so the cycle above is read and not given', () => {
+    const graph: DirectedGraph = {
+      edges: [
+        { from: 'a', to: 'b' },
+        { from: 'b', to: 'c' },
+      ],
+      nodes: ['a', 'b', 'c'],
+    };
+    expect(stronglyConnected(graph)).toEqual([['a'], ['b'], ['c']]);
+  });
+
+  it('joins two cycles sharing a node and keeps apart two that one edge links one way', () => {
+    const shared: DirectedGraph = {
+      edges: [
+        { from: 'a', to: 'hub' },
+        { from: 'hub', to: 'a' },
+        { from: 'b', to: 'hub' },
+        { from: 'hub', to: 'b' },
+      ],
+      nodes: ['a', 'b', 'hub'],
+    };
+    expect(stronglyConnected(shared)).toEqual([['a', 'b', 'hub']]);
+    expect(stronglyConnected(BRIDGED)).toEqual([LEFT, RIGHT]);
+  });
+
+  it('joins the two cliques once an edge runs back across the bridge', () => {
+    const closed: DirectedGraph = { ...BRIDGED, edges: [...BRIDGED.edges, { from: 'b4', to: 'a1' }] };
+    expect(stronglyConnected(closed)).toEqual([[...LEFT, ...RIGHT]]);
+  });
+
+  it('orders components largest first, then by first member', () => {
+    const graph: DirectedGraph = {
+      edges: [
+        { from: 'y1', to: 'y2' },
+        { from: 'y2', to: 'y1' },
+        { from: 'x1', to: 'x2' },
+        { from: 'x2', to: 'x1' },
+        { from: 'm1', to: 'm2' },
+        { from: 'm2', to: 'm3' },
+        { from: 'm3', to: 'm1' },
+      ],
+      nodes: ['y1', 'y2', 'x1', 'x2', 'm1', 'm2', 'm3', 'alone'],
+    };
+    expect(stronglyConnected(graph)).toEqual([['m1', 'm2', 'm3'], ['x1', 'x2'], ['y1', 'y2'], ['alone']]);
+  });
+
+  it('reads a self-loop and a repeated edge as no cycle', () => {
+    const graph: DirectedGraph = {
+      edges: [
+        { from: 'a', to: 'a' },
+        { from: 'a', to: 'b' },
+        { from: 'a', to: 'b' },
+      ],
+      nodes: ['a', 'b'],
+    };
+    expect(stronglyConnected(graph)).toEqual([['a'], ['b']]);
+  });
+
+  it('answers nothing for an empty graph', () => {
+    expect(stronglyConnected({ edges: [], nodes: [] })).toEqual([]);
+  });
+
+  it('walks a ring longer than the call stack is deep', () => {
+    const names = Array.from({ length: 50_000 }, (_, index) => `n${String(index).padStart(5, '0')}`);
+    const edges = names.map((from, index) => ({ from, to: names[(index + 1) % names.length] ?? '' }));
+    expect(stronglyConnected({ edges, nodes: names })).toEqual([names]);
+  });
+
+  it('refuses an edge naming a node the graph does not list', () => {
+    expect(() => stronglyConnected({ edges: [{ from: 'a', to: 'ghost' }], nodes: ['a'] })).toThrow(
+      'Edge a -> ghost names node ghost, which the graph does not list',
+    );
+  });
+});
+
 describe('determinism', () => {
   it('returns equal results on two runs over one graph', () => {
     const graph = ringOfCliques();
     expect(louvainClusters(graph)).toEqual(louvainClusters(graph));
     expect([...betweenness(graph)]).toEqual([...betweenness(graph)]);
+    expect(stronglyConnected(graph)).toEqual(stronglyConnected(graph));
   });
 
   it('returns equal results whatever order the graph lists its nodes and edges in', () => {
@@ -153,5 +244,6 @@ describe('determinism', () => {
     };
     expect(louvainClusters(shuffled)).toEqual(louvainClusters(graph));
     expect([...betweenness(shuffled)]).toEqual([...betweenness(graph)]);
+    expect(stronglyConnected(shuffled)).toEqual(stronglyConnected(graph));
   });
 });
