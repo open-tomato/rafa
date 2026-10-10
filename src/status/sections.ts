@@ -10,7 +10,7 @@
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
  * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
- * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/commands/doctor-cleanup.ts`) | git, the disk, `gh` for merged pull requests |
+ * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests |
  *
  * Nothing here prints, and nothing spawns except through
  * {@link StatusSeams}, whose defaults are the system's own, so a unit
@@ -188,7 +188,7 @@ import { createGhBoardListing } from '../board/roadmap-board.js';
 import { horizonOf } from '../board/roadmap-epic-rows.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
-import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
+import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { messageOf } from '../config-sections.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 import { isLive, readSessionChecklist } from '../loop/session-readings.js';

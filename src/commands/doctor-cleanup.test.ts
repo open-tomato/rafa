@@ -19,10 +19,11 @@
  * Every render case with a row sits beside one without: all four counts
  * zero, and a reading git refused.
  */
-import type { DoctorCleanupInput, DoctorCleanupReading } from './doctor-cleanup.js';
+import type { DoctorCleanupReading } from './doctor-cleanup.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
+import type { DoctorCleanupInput } from '../cleanup/settings.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 import type { PullRequests } from '../pr/types.js';
 
@@ -32,10 +33,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
+import { doctorCleanupSettings } from '../cleanup/settings.js';
 
 import {
   cleanupRow,
-  doctorCleanupSettings,
   hasCleanup,
   readDoctorCleanup,
   renderDoctorCleanup,

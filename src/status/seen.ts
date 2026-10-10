@@ -50,7 +50,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
-import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
+import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { messageOf } from '../config-sections.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 import { readSessionChecklist } from '../loop/session-readings.js';
