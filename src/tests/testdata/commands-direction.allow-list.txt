@@ -1,5 +1,4 @@
 src/adapters/learning/local -> src/commands/instinct/instinct-records
-src/board/gate -> src/commands/plan/validate
 src/board/relations/labels -> src/commands/issue/unblock
 src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock

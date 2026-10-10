@@ -1,7 +1,10 @@
 /**
  * `rafa plan validate <file>`: a plan file read by `parsePlan`, every
  * issue the parser reports written out, and exit code 1 when there is
- * one.
+ * one. This is the command half: the command, its roster check, its
+ * effort-store rules and what it writes. The reading of the one file,
+ * `validatePlan` with its `PlanValidation`, is the library half,
+ * `../../plan/validate.ts`, which any folder may import.
  *
  * ## What is read
  *
@@ -108,9 +111,8 @@
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
-import type { PlanIssue } from '../../plan/index.js';
-import type { TaskCounts } from '../../plan/plan-files.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
+import type { PlanValidation } from '../../plan/validate.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { readFileSync } from 'node:fs';
@@ -128,9 +130,9 @@ import {
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
-import { parsePlan } from '../../plan/index.js';
-import { countTasks, formatCounts, isFile, issueLine, plural } from '../../plan/plan-files.js';
+import { formatCounts, issueLine, plural } from '../../plan/plan-files.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
+import { validatePlan } from '../../plan/validate.js';
 
 import { expectOneArgument } from './plan-files.js';
 import { checkStoreRules } from './store-check.js';
@@ -140,18 +142,6 @@ const USAGE = 'rafa plan validate <file>';
 
 /** Answers the directory a typed path is resolved against: the process's, unless a test hands another. */
 export type WorkingDirectory = () => string;
-
-/** A plan file read; see the module note. */
-export interface PlanValidation {
-  /** The file read, absolute. */
-  readonly file: string;
-  /** How many `# Stage:` headings it holds. */
-  readonly stages: number;
-  /** Its tasks, counted by checkbox. */
-  readonly tasks: TaskCounts;
-  /** Every issue `parsePlan` reported, in line order. */
-  readonly issues: readonly PlanIssue[];
-}
 
 /** What the roster check of one plan found; see the module note. */
 export interface RosterFindings {
@@ -167,13 +157,6 @@ export interface RosterFindings {
 export interface PlanValidationResult extends PlanValidation, RosterFindings {
   /** Every effort-store rule the plan breaks, in line order; see the module note. */
   readonly storeProblems: readonly StoreRuleProblem[];
-}
-
-/** The plan at the absolute path `file`, read, or a refusal with exit code 1 when it is no file. */
-export function validatePlan(file: string): PlanValidation {
-  if (!isFile(file)) throw new CommandExit(1, `❌ Plan file not found: ${file}`);
-  const model = parsePlan(readFileSync(file, 'utf8'));
-  return { file, stages: model.stages.length, tasks: countTasks(model.tasks), issues: model.issues };
 }
 
 /** The config as it resolves for the project, refusing one `loadConfig` refuses. */
