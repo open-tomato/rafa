@@ -1,8 +1,6 @@
-src/adapters/learning/local -> src/commands/instinct/instinct-records
 src/board/relations/labels -> src/commands/issue/unblock
 src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock
-src/effort/report-skills -> src/commands/instinct/instinct-records
 src/next/settle-step -> src/commands/pr/merge-cleanup
 src/next/settle-step -> src/commands/pr/merge-followups
 src/project/scaffold -> src/commands/init-release

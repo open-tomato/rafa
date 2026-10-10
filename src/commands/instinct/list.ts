@@ -5,7 +5,7 @@
  *
  * The scopes are `<root>/.rafa/instincts` and `~/.rafa/instincts`
  * (`src/schema/tiers.ts`), nearest the work first, and what counts as
- * a record there is `./instinct-records.ts`'s: a top-level `.md`, with
+ * a record there is `src/schema/scope-records.ts`'s: a top-level `.md`, with
  * the Learning adapter's `instincts.ndjson` and `flags.ndjson` passed
  * over without a word. So the count this prints is a count of records,
  * never of the store's lines.
@@ -70,20 +70,21 @@
  * of them; both together is exit code 1, as is either typed with a
  * value.
  */
-import type { InstinctRecordEntry, ScopeListing } from './instinct-records.js';
 import type { InstinctPromoteSeams } from './promote.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { InstinctRecord } from '../../ports/index.js';
 import type { Instinct, InstinctScope } from '../../schema/instinct.js';
+import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 
 import { toHeldRecords } from '../../adapters/learning/held.js';
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { triggerKey } from '../../learning/index.js';
+import { readScopes } from '../../schema/scope-records.js';
 import { expectNoArgument, resolveProjectConfig } from '../plan/plan-files.js';
 
-import { allRecords, instinctProject, readScopes } from './instinct-records.js';
+import { allRecords, instinctProject } from './instinct-records.js';
 import { makeLearningAdapter, refusedPullMessage } from './promote.js';
 
 /** The command's name, as a refusal opens with it. */

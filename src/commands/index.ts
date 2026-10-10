@@ -52,7 +52,7 @@
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
- * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
+ * instinct scopes hold through `schema/scope-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the nine `pr` actions, which read, open, retarget, wait on, merge and

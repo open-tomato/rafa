@@ -160,7 +160,6 @@ import type { InstinctScope } from '../../schema/tiers.js';
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { readScope } from '../../commands/instinct/instinct-records.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { actionHash, bless, merge, triggerKey } from '../../learning/index.js';
 import {
@@ -171,6 +170,7 @@ import {
   parseInstinct,
   writeInstinct,
 } from '../../schema/instinct.js';
+import { readScope } from '../../schema/scope-records.js';
 import { RAFA_INSTINCTS_PATH } from '../../schema/tiers.js';
 import { activeOutput } from '../output/active.js';
 

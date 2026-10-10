@@ -93,8 +93,8 @@ import type { PlanCiRow } from './store/plan-ci.js';
 
 import { readFileSync } from 'node:fs';
 
-import { readScopes } from '../commands/instinct/instinct-records.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
+import { readScopes } from '../schema/scope-records.js';
 
 import { findRecurrences } from './recurrence.js';
 import { readSkillFacts } from './skill-facts.js';

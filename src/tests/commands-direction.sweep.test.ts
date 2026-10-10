@@ -110,6 +110,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/doctor-cleanup.ts', libraryHalf: 'src/cleanup/settings.ts' },
   { commandFile: 'src/commands/doctor-effort-sync.ts', libraryHalf: 'src/effort/sync/doctor-reading.ts' },
   { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'src/effort/file-stamp.ts' },
+  { commandFile: 'src/commands/instinct/instinct-records.ts', libraryHalf: 'src/schema/scope-records.ts' },
 ];
 
 /**
