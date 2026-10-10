@@ -4,7 +4,7 @@
  * request closes, read, asked about and unlabelled where every blocker
  * has closed.
  *
- * `src/commands/issue/unblock.ts` is the whole of what touches the
+ * `src/board/unblock.ts` is the whole of what touches the
  * board — the listing, the state of each blocker, the one question and
  * the one `removeLabel` — and this module is the half that decides
  * whether a merge has anything to unblock at all and turns everything
@@ -67,11 +67,11 @@
  * reaches GitHub, spawns `gh` or waits on an answer.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
+import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
+import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
 import { messageOf } from '../../config-sections.js';
-import { isUnblockFailure, runUnblock } from '../issue/unblock.js';
 
 /** What every line this module writes about the reading names it as. */
 const READING = 'the blocked-issue reading';

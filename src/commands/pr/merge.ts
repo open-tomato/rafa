@@ -203,12 +203,12 @@ import type { UncheckedMerge, UncheckedMergeReport } from './merge-unchecked.js'
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
+import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
-import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { commandRetrySeams } from '../../board/project/project-runner.js';

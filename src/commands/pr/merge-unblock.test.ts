@@ -31,7 +31,7 @@
  *    message alone.
  */
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockAsk } from '../issue/unblock.js';
+import type { UnblockAsk } from '../../board/unblock.js';
 
 import { describe, expect, it } from 'bun:test';
 

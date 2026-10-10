@@ -69,7 +69,7 @@ import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { BlockersReading } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { UnblockReport } from '../issue/unblock.js';
+import type { UnblockReport } from '../../board/unblock.js';
 
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { openProjectRunner } from '../../board/project/project-runner.js';

@@ -106,11 +106,11 @@ import type {
   RelationWriteStatus,
 } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockReport, UnblockStatus } from '../../commands/issue/unblock.js';
 import type { EpicTickResult } from '../../commands/pr/merge-tick.js';
 import type { Epic } from '../epics.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
+import type { UnblockReport, UnblockStatus } from '../unblock.js';
 
 import { epicTickProblemLine, epicTickSentence, tickEpics } from '../../commands/pr/merge-tick.js';
 import { unblockAfterMerge } from '../../commands/pr/merge-unblock.js';

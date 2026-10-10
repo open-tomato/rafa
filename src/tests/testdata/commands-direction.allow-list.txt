@@ -1,4 +1,3 @@
-src/board/relations/labels -> src/commands/issue/unblock
 src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock
 src/next/settle-step -> src/commands/pr/merge-cleanup

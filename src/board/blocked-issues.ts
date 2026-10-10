@@ -9,8 +9,8 @@
  * Nothing here reads a command's context, its arguments or its flags,
  * and nothing here imports from `src/commands/`, so any folder may take
  * {@link readBlockedIssues}: `../status/sections.ts` reads the report
- * `../status/blocked-count.ts` counts, and `rafa issue unblock`
- * (`../commands/issue/unblock.ts`) takes the two listing limits.
+ * `../status/blocked-count.ts` counts, and the unblock run
+ * (`./unblock.ts`) takes the two listing limits.
  *
  * It is a `labels` mode reading of `board.relationships`: `spec:blocked`
  * and the `Blocked by:` line are that mode's marks, and a caller on a
