@@ -215,7 +215,7 @@ fired when either result carried a PreToolUse Bash hook error message.
 
 | Setting sources | Deny held | Hook fired | scp result | ssh result |
 |---|---|---|---|---|
-| `project,local` | No | No | Exit 1: host unavailable | Exit 255: host not resolved |
+| `project,local` | No | No | Exit 1: no such file | Exit 255: host not resolved |
 | `user,project,local` | Yes | Yes | Permission denied by Bash | Denied by ssh-host-fence hook |
 
 **No scope was modified.** The measurement added nothing to the project 
