@@ -9,7 +9,7 @@
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end` and the eight `pr` actions
+ * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes` and the eight `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -196,6 +196,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'stretch start': ['text'],
   'stretch item': ['text'],
   'stretch end': ['text'],
+  'bug codes': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -290,6 +291,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
+  'bug codes': [[], ['suggest', 'family', 'check']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -404,6 +406,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['stretch start --role=watchtower --n=5', 'stretch start', ['--role=watchtower', '--n=5'], ''],
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
   ['stretch end --dry-run', 'stretch end', ['--dry-run'], ''],
+  ['bug codes --family=git', 'bug codes', ['--family=git'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -514,7 +517,7 @@ const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8')
 
 describe('the core roster', () => {
   it('registers the seventeen subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch']);
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
@@ -607,6 +610,7 @@ describe('the core roster', () => {
       'stretch start',
       'stretch item',
       'stretch end',
+      'bug codes',
       'status',
       'next',
       'roadmap',
