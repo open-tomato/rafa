@@ -112,9 +112,10 @@
  * they run (`src/board/project/progress.ts`): a start line with the
  * total, `adding issues: 283`, a line at most every
  * `board.project.progressSeconds` with the count and the time so far, an
- * end line with the refused count, and a line for each pause for
- * GitHub's write limit; in json mode each is one `progress` event ahead
- * of the terminal result. The phases are timed by the `now` seam.
+ * end line with the refused count, and a line for each pause between two
+ * write requests that is at least `board.project.progressSeconds` long;
+ * in json mode each is one `progress` event ahead of the terminal
+ * result. The phases are timed by the `now` seam.
  *
  * ## A rerun
  *

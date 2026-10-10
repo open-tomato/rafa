@@ -38,10 +38,12 @@
  * writing the fields of each refresh, and adding the missing issues. Each
  * prints a start line with its total, `reading facts: 283`, a line at
  * most every `board.project.progressSeconds` with the count and the time
- * so far, and an end line with the refused count; a pause for GitHub's
- * write limit prints `waiting 1 s for GitHub's write limit`. In json mode
- * each line is one `progress` event ahead of the terminal result. The
- * phases are timed by {@link BoardSyncSeams.now}.
+ * so far, and an end line with the refused count. A pause between two
+ * write requests prints nothing unless it is at least
+ * `board.project.progressSeconds` long, and then
+ * `pausing 15 s between writes (board.project.writePauseMs)`. In json
+ * mode each line is one `progress` event ahead of the terminal result.
+ * The phases are timed by {@link BoardSyncSeams.now}.
  *
  * ## Exit codes
  *

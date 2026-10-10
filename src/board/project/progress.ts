@@ -11,16 +11,24 @@
  * | start | `adding issues: 283` | once, before the first item |
  * | progress | `adding issues: 146/283, 6m 40s` | on an advance, once `board.project.progressSeconds` have passed since the last start or progress line |
  * | end | `adding issues: 283/283, 2 refused, 10m 13s` | once, after the last item |
- * | wait | `waiting 2 s for GitHub's write limit` | each time the caller reports a pause |
+ * | wait | `pausing 15 s between writes (board.project.writePauseMs)` | each time the caller reports a pause of at least `board.project.progressSeconds` |
  *
  * The three phases are {@link PROGRESS_PHASES}: adding the issues,
  * reading their facts and writing their fields. A progress line comes
  * only from an advance: the reporter holds no timer, so while one item
  * takes longer than `progressSeconds` (a retry's wait, say) no line is
- * printed, and the next advance prints one. `progressSeconds: false`
- * drops the progress lines; the start, end and wait lines stay, the wait
- * line because it says why the run stands still. A wait line does not
- * move the throttle.
+ * printed, and the next advance prints one.
+ *
+ * A pause is the caller's own pacing between two write requests,
+ * `board.project.writePauseMs`, and never a wait on GitHub's limit. One
+ * shorter than `progressSeconds` is routine and prints nothing, so with
+ * the defaults (a 1 s pause, a line every 10 s) no wait line comes
+ * between the count lines; one at least that long prints its wait line,
+ * which says why the run stands still. A wait line does not move the
+ * throttle.
+ *
+ * `progressSeconds: false` drops the progress lines and the wait lines;
+ * the start and end lines stay.
  *
  * No line is redrawn in place, so the lines read the same in a terminal
  * and in a loop's log. Each line's {@link ProgressLine.data} is the
@@ -124,8 +132,12 @@ export interface PhaseReporter {
   readonly advance: (done: number) => ProgressLine | undefined;
   /** The end line. */
   readonly end: (result: PhaseEnd) => ProgressLine;
-  /** The line of a pause for GitHub's write limit of `waitMs`, at the last advance's count. */
-  readonly wait: (waitMs: number) => ProgressLine;
+  /**
+   * The line of a pause of `waitMs` between two writes, at the last
+   * advance's count, when the pause is at least `progressSeconds` long,
+   * else undefined; always undefined with `progressSeconds: false`.
+   */
+  readonly wait: (waitMs: number) => ProgressLine | undefined;
 }
 
 /** What a phase's caller is fed by: where the lines go, the clock and the throttle. */
@@ -167,9 +179,9 @@ export function formatElapsed(elapsedMs: number): string {
   return `${String(rest)}s`;
 }
 
-/** The text of a wait line: `waiting 2 s for GitHub's write limit`, the seconds rounded up. */
+/** The text of a wait line: `pausing 2 s between writes (board.project.writePauseMs)`, the seconds rounded up. */
 export function waitLine(waitMs: number): string {
-  return `waiting ${String(Math.ceil(Math.max(0, waitMs) / MS_PER_SECOND))} s for GitHub's write limit`;
+  return `pausing ${String(Math.ceil(Math.max(0, waitMs) / MS_PER_SECOND))} s between writes (board.project.writePauseMs)`;
 }
 
 /** The json event of one line, stamped `now`. */
@@ -229,6 +241,7 @@ export function phaseReporter(options: PhaseReporterOptions): PhaseReporter {
       };
     },
     wait: (waitMs) => {
+      if (gapMs === null || waitMs < gapMs) return undefined;
       const data = { ...base('wait', doneSoFar, options.now()), waitMs };
       return { text: waitLine(waitMs), data };
     },
@@ -250,7 +263,8 @@ export function openPhase(feed: ProgressFeed | undefined, phase: ProgressPhase, 
       if (line !== undefined) feed.sink(line);
     },
     wait: (waitMs) => {
-      feed.sink(reporter.wait(waitMs));
+      const line = reporter.wait(waitMs);
+      if (line !== undefined) feed.sink(line);
     },
     end: (result) => {
       feed.sink(reporter.end(result));

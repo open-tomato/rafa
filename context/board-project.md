@@ -143,12 +143,20 @@ Three phases print progress: adding the issues, reading their facts, and
 writing their fields. Each prints a start line with its total, `adding
 issues: 283`, then a line at most every `board.project.progressSeconds`
 with the count and the time so far, `adding issues: 146/283, 6m 40s`, and
-an end line with the count, the refused count and the time. A pause for
-GitHub's write limit prints `waiting <n> s for GitHub's write limit`.
+an end line with the count, the refused count and the time.
 
-`progressSeconds: false` drops the lines between; the start and end lines
-stay. In json mode each line is a `progress` event with the phase, done,
-total and elapsed milliseconds. The same lines come from `rafa board sync`.
+A pause between two write requests (`board.project.writePauseMs`) prints
+nothing while it is shorter than `board.project.progressSeconds`, so the
+defaults (a 1 s pause, a line every 10 s) print none. A pause at least
+that long prints
+`pausing <n> s between writes (board.project.writePauseMs)`,
+and in json mode a `progress` event whose step is `wait`, with the
+milliseconds as `waitMs`.
+
+`progressSeconds: false` drops the lines between, the pause lines
+included; the start and end lines stay. In json mode each line is a
+`progress` event with the phase, done, total and elapsed milliseconds.
+The same lines come from `rafa board sync`.
 
 Commands that call the refresh outside the label wrapper:
 - `rafa issue create` — refresh the new issue
@@ -239,5 +247,5 @@ board:
   project:
     retries: 5
     retryWaitSeconds: 5     # a slow or flaky network
-    writePauseMs: 2000      # gentler on GitHub's write limit
+    writePauseMs: 2000      # a longer pause between write requests
 ```
