@@ -8,7 +8,8 @@
  * Each case dispatches one fixture command over a planted project, so
  * the config the command loads is the file the case wrote.
  */
-import type { RafaCommand } from './command.js';
+import type { RafaCommand, RafaContext } from './command.js';
+import type { OutputStream } from '../adapters/output/stream.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -56,7 +57,7 @@ const DEMO: RafaCommand = Object.freeze({
   flags: [],
   examples: [{ cmd: 'rafa demo run', note: 'Runs the fixture.' }],
   outputs: ['text', 'json'] as const,
-  run: async (context) => {
+  run: async (context: RafaContext) => {
     resolveProjectConfig(requireProject(context, COMMAND_NAME), COMMAND_NAME, (message) => {
       context.output.warn(message);
     });
@@ -86,10 +87,11 @@ async function ran(words: readonly string[], project: PlantedProject, env: Recor
 /** `rafa demo run` over `project`, writing to a stream that says it is a terminal. */
 async function ranOnTerminal(project: PlantedProject, env: Record<string, string>): Promise<string> {
   const chunks: string[] = [];
+  const terminal: OutputStream & { readonly isTTY: boolean } = { isTTY: true, write: (chunk: string) => chunks.push(chunk) };
   await dispatch(['demo', 'run'], {
     registry: createCommandRegistry({ subjects: SUBJECTS, commands: [DEMO] }),
     env,
-    stdout: { isTTY: true, write: (chunk: string) => chunks.push(chunk) },
+    stdout: terminal,
     stderr: { write: () => true },
     cwd: project.root,
     home: project.home,
