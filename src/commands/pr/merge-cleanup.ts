@@ -70,20 +70,27 @@
  * and runs where the release does (`release.enabled`, read as the
  * wrap-up and the guard read it); only its `folded` answer names
  * settle.
+ *
+ * ## The library half
+ *
+ * That dry run's reading, `settleWaitingOn`, is in
+ * `src/pr/settle-waiting.ts`, the library half of this file, since
+ * `rafa next`'s settle step (`src/next/settle-step.ts`) is decided by
+ * the same reading. This file imports it and holds no re-export of it;
+ * {@link FollowUpPlace} widens that file's `SettleWaitingPlace` with
+ * the home and the pid probe the other follow-up reads.
  */
 import type { FollowUp } from './merge-followups.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
-import type { SettleWaiting } from '../../pr/settle-waiting.js';
-import type { MergeGuardSettings } from '../../release/guard-merge.js';
+import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
-import { resolveReleaseEnabled } from '../../release/enabled.js';
-import { readSettle } from '../../release/settle.js';
+import { settleWaitingOn } from '../../pr/settle-waiting.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
 import { liveLoopsOf } from '../self-update.js';
 
@@ -121,15 +128,13 @@ export interface BranchesPresent {
 export type MergedPull = Pick<PullRequestDetail, 'number' | 'headRefName' | 'baseRefName'>;
 
 /** Where the follow-ups are read: the project root, the home, and the base the fragments wait on. */
-export interface FollowUpPlace {
+export interface FollowUpPlace extends SettleWaitingPlace {
   /** The project root, whose `package.json` names the version. */
   readonly root: string;
   /** The home, whose runtime directory says whether the version is installed. */
   readonly home: string;
   /** The merged pull request's base branch, read as `origin/<base>`. */
   readonly base: string;
-  /** The release settings the settle dry run reads, `release.enabled` among them. */
-  readonly release: MergeGuardSettings;
   /** Whether a loop record's pid is alive, for the update follow-up. `isPidAlive` when left out. */
   readonly isAlive?: PidProbe;
 }
@@ -245,14 +250,6 @@ function liveLoopBranchesOf(root: string, isAlive?: PidProbe): readonly string[]
   } catch {
     return null;
   }
-}
-
-/** What the settle dry run folded on `origin/<base>`, or null where the release is off or nothing folds. */
-export function settleWaitingOn(place: FollowUpPlace, git: GitRunner): SettleWaiting | null {
-  if (!resolveReleaseEnabled(place.release, place.root).enabled) return null;
-  const reading = readSettle(git, `${REMOTE}/${place.base}`, place.release);
-  if (reading.outcome !== 'folded') return null;
-  return { base: place.base, fragments: reading.fragments.length, version: reading.version };
 }
 
 /** The follow-ups that apply once the base has been pulled; see the module note and `merge-followups.ts`. */

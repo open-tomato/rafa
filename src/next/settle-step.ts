@@ -22,7 +22,7 @@
  *
  * What the step turns on is {@link SettleWaiting}, the settle dry run
  * over `origin/<base>` that `pr merge`'s own follow-up is decided by
- * (`settleWaitingOn`, `src/commands/pr/merge-cleanup.ts`), composed for
+ * (`settleWaitingOn`, `src/pr/settle-waiting.ts`), composed for
  * the project by `openNextSources` (`./sources.ts`). So `rafa next`
  * proposes settle exactly where the merge it just ran named
  * `rafa release settle` as its last line, and names nothing where the
@@ -50,9 +50,9 @@ import type { GitRunner } from '../pr/index.js';
 import type { SettleWaiting } from '../pr/settle-waiting.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 
-import { settleWaitingOn } from '../commands/pr/merge-cleanup.js';
 import { messageOf } from '../config-sections.js';
 import { plural } from '../plan/plan-files.js';
+import { settleWaitingOn } from '../pr/settle-waiting.js';
 import { mergeGuardSettings } from '../release/guard-merge.js';
 
 /** The id the settle step's state carries; no row of the table answers it. */
@@ -68,7 +68,7 @@ export type SettleReader = () => SettleWaiting | null;
 export interface SettlePlace {
   /** The project root, where `release.enabled` reads its files. */
   readonly root: string;
-  /** The home, which the follow-up place carries beside the root. */
+  /** The home, which the callers hand beside the root; the settle reading does not read it. */
   readonly home: string;
   /** The base branch the fragments wait on, read as `origin/<base>`. */
   readonly base: string;
@@ -83,7 +83,7 @@ export interface SettlePlace {
  */
 export function settleReaderFor(place: SettlePlace, git: GitRunner): SettleReader {
   const release = mergeGuardSettings(place.config);
-  return () => settleWaitingOn({ root: place.root, home: place.home, base: place.base, release }, git);
+  return () => settleWaitingOn({ root: place.root, base: place.base, release }, git);
 }
 
 /** Whether the settle step is read after an action that ran: `merge` and `merge-unchecked`. */
