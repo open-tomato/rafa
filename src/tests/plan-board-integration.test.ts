@@ -205,7 +205,7 @@ const PROBE_WITH_PROMPT = [
   '  create: (context) => ({',
   '    create: async (request) => {',
   '      const specContent = readFileSync(join(context.repoRoot, request.specPath), "utf8");',
-  '      const prompt = context.planPrompt(specContent, request.stub);',
+  '      const prompt = context.planPrompt(specContent, request.stub, join(context.repoRoot, context.planDir));',
   '      const planPath = context.planDir + "/PLAN-" + request.stub + ".md";',
   '      mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
   '      writeFileSync(',

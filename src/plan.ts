@@ -31,7 +31,9 @@
  * and the plan format beside itself. It makes the adapter with the setting sources,
  * `plan.dir` and {@link buildPlanPrompt} bound to what it read. The
  * adapter reads the spec, makes `plan.dir`, runs the session, and answers
- * the paths the session wrote or rejects.
+ * the paths the session wrote or rejects. It also hands the prompt
+ * builder `plan.dir` resolved absolute against the root, which is the
+ * directory the prompt names both files in.
  *
  * ## Which spec, and where the plan is
  *
@@ -55,7 +57,10 @@
  * announcement, the plan prompt and the adapter all spell it through
  * `planFilePath` (`adapters/planner/claude.ts`), so the plan the session
  * is told to write is the plan the adapter looks for and the command
- * names.
+ * names. The command and the adapter spell it relative to the root,
+ * unless `plan.dir` is absolute. The prompt spells it absolute, under
+ * the root the adapter resolved, so a session whose working directory
+ * is not the root still writes the file the adapter looks for (#171).
  *
  * The command writes every line the operator reads through the active
  * output (`adapters/output/active.ts`), at `info`, each message as
@@ -483,10 +488,14 @@ const SLOT_PATTERN = new RegExp(`\\{(${PLAN_PROMPT_SLOTS.join('|')})\\}`, 'g');
  *
  * `planFormat` is the dev-planner skill as read ({@link readPlanFormat});
  * its frontmatter is dropped here ({@link planFormatBody}). `planDir` is
- * the directory the plan is written into, the run's resolved `plan.dir`,
- * and both files are named in it through `planFilePath`, as the adapter
- * names the files it looks for. `routing` is the resolved `routing`
- * setting the `{ROUTING}` slot renders ({@link formatRoutingSection}),
+ * the directory the plan is written into, and both files are named in it
+ * through `planFilePath`, as the adapter names the files it looks for.
+ * `rafa plan create` fills it with the directory the adapter hands its
+ * builder, the run's `plan.dir` resolved absolute against the project
+ * root, so `{PLAN_FILE}` and `{PREREQUISITES_FILE}` are absolute paths
+ * there; a relative one is named as it is handed over. `routing` is the
+ * resolved `routing` setting the `{ROUTING}` slot renders
+ * ({@link formatRoutingSection}),
  * rafa's defaults unless one is handed over. `skillIndex` is the index
  * the `{SKILL_INDEX}` slot renders ({@link formatSkillIndexSection}), as
  * {@link readPlanSkillIndex} reads it; empty unless one is handed over.
@@ -654,12 +663,12 @@ export default async function plan(
     repoRoot,
     planDir,
     settingSources,
-    planPrompt: (specContent, planStub) => buildPlanPrompt(
+    planPrompt: (specContent, planStub, absolutePlanDir) => buildPlanPrompt(
       template,
       planFormat,
       specContent,
       planStub,
-      planDir,
+      absolutePlanDir,
       progressContent,
       routing,
       skillIndex,

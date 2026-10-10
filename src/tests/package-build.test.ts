@@ -692,7 +692,9 @@ function filesUnder(directory: string): string[] {
 /**
  * The prompt `rafa plan` builds from the source template and skill for
  * {@link SPEC}, with the skill index read for `scratch` under the config
- * it resolves there, over the source rafa tier.
+ * it resolves there, over the source rafa tier. The plans directory is
+ * the scratch repository's, absolute, as the `claude` planner hands it
+ * to the builder.
  */
 function expectedPlanPrompt(scratch: PlanScratch): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
@@ -700,7 +702,8 @@ function expectedPlanPrompt(scratch: PlanScratch): string {
   const home = scratch.env['HOME'] ?? '';
   const { config } = loadConfig({ root: scratch.repo, home });
   const index = readPlanSkillIndex(scratch.repo, home, config, join(REPO_ROOT, 'src', 'plan.ts'));
-  return buildPlanPrompt(template, skill, SPEC, 'spec', '.rafa/plans', undefined, undefined, index);
+  const planDir = join(realpathSync(scratch.repo), '.rafa', 'plans');
+  return buildPlanPrompt(template, skill, SPEC, 'spec', planDir, undefined, undefined, index);
 }
 
 describe('the package manifest', () => {
