@@ -640,7 +640,13 @@ describe('the events file start.ts binds around the run', () => {
   });
 
   it('unbinds it in the run\'s finally, beside the session\'s end, after the decisions\' end', () => {
-    expect(finallyOf(STATEMENTS)).toEqual(['decisionsAtEnd();', 'unbindEventsFile();', 'session.end();']);
+    expect(finallyOf(STATEMENTS)).toEqual([
+      'decisionsAtEnd();',
+      // The test files a suite step read red only in the step, printed as the run's last lines (`start/step-only-report.ts`).
+      'announceRunStepOnly(readRunStepOnly(repoRoot, session.id));',
+      'unbindEventsFile();',
+      'session.end();',
+    ]);
     expect(START).toContain('    decisionsAtEnd = decisions.atRunEnd;\n');
   });
 

@@ -490,8 +490,8 @@ describe('the wrap-up session', () => {
     // it on to the session (`start/wrap-up-run.ts`).
     expect(start).toContain('await runWrapUp({');
     expect(start).toContain('          planContent,\n');
-    expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);');
-    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons)');
+    expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, { stepOnly });');
+    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons, extras.stepOnly)');
     expect(start).toContain('inject: injectMode,');
     expect(start).not.toContain('await preserveProgress(injection');
     expect(wrapUpRun).not.toContain('await preserveProgress(injection');

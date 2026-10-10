@@ -250,6 +250,23 @@ reads one of three ways:
   spawned): the file stays a new failure, and nothing is said of how it
   ran alone.
 
+**A file red only in a step is named again where a person reads.** It
+blocked nothing, so its one warning scrolls away while the state that
+failed it stays in the tree. `src/start/step-only-report.ts` reads the
+`stepOnly` entries off the run's record, one item per file with every
+step that read it so, and carries them to two places. The wrap-up
+prompt, and each retry's, lists them under `## Test files red only in a
+suite step` and asks the session to put the list in the pull request
+body under `### Test files red only in a suite step`, changing no code
+for it; with no such file the prompt holds no such section. And the
+run's end, however it ends, prints the same lines once as warnings. A
+line reads `- \`src/b.test.ts\`: 2 tests (\`b > first\`, \`b > second\`)
+red in 3 steps (task, stage) and green when run alone; first error:
+"..."; run after src/a.test.ts.`, naming the first three tests
+(`STEP_ONLY_TESTS_NAMED`). Only this run's record is read, and a pull
+request the runner opens itself, after every retry ended without one,
+carries the fragment's notes and not this list.
+
 A retake ended by SIGINT makes the step a stop, as the step's own run
 would. Each retake writes `<kind>-alone-<n>.junit.xml` and
 `<kind>-alone-<n>.output.txt` beside the step's own files, which it

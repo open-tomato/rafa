@@ -423,6 +423,7 @@ import {
 import { runFromSelectedRuntime } from './start/runtime.js';
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
+import { announceRunStepOnly, readRunStepOnly } from './start/step-only-report.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
 import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
@@ -899,6 +900,9 @@ export default async function start(args: string[], repoRoot: string): Promise<v
     throw error;
   } finally {
     decisionsAtEnd();
+    // The test files a suite step read red only in the step, which
+    // blocked nothing: named once more as the run's last lines.
+    announceRunStepOnly(readRunStepOnly(repoRoot, session.id));
     unbindEventsFile();
     session.end();
   }
