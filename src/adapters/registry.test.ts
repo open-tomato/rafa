@@ -167,7 +167,7 @@ const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
 const PORTS_ENTRY = fileURLToPath(new URL('../ports/index.ts', import.meta.url));
 
 /** The port types, in the order a refusal lists them. */
-const PORT_TYPES = 'tracker, store, learning, output, planner, sync';
+const PORT_TYPES = 'tracker, store, learning, output, planner, sync, logger';
 
 /** What the planner case's session writes to stdout: a review judging the spec ready. */
 const PLANNER_SESSION_STDOUT = [
@@ -627,9 +627,22 @@ describe('the core adapter registry', () => {
     expect(existsSync(root)).toBe(false);
   });
 
+  it('registers the console logger', () => {
+    expect(CORE_ADAPTER_REGISTRY.kinds('logger')).toEqual(['console']);
+  });
+
+  it('makes the console logger at the verbosity it is handed', () => {
+    const quiet = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create({ repoRoot: freshRoot('logger') });
+    const verbose = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create({ repoRoot: freshRoot('logger'), verbosity: 2 });
+
+    expect(quiet.enabled('warn')).toBe(true);
+    expect(quiet.enabled('debug')).toBe(false);
+    expect(verbose.enabled('debug')).toBe(true);
+  });
+
   it('is frozen, and so is every adapter it holds', () => {
     expect(Object.isFrozen(CORE_ADAPTER_REGISTRY)).toBe(true);
-    for (const port of ['store', 'output', 'tracker', 'learning', 'planner', 'sync'] as const) {
+    for (const port of ['store', 'output', 'tracker', 'learning', 'planner', 'sync', 'logger'] as const) {
       expect(CORE_ADAPTER_REGISTRY.kinds(port)).not.toEqual([]);
       for (const kind of CORE_ADAPTER_REGISTRY.kinds(port)) {
         expect(Object.isFrozen(CORE_ADAPTER_REGISTRY.resolve(port, kind))).toBe(true);

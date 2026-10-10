@@ -75,7 +75,9 @@ import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
+import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { activeOutput } from './adapters/output/active.js';
+import { loggerSettingsOf } from './config-schema-logger.js';
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
 import { setActiveStoreSettings } from './effort/store/settings.js';
@@ -152,6 +154,11 @@ function printWarning(message: string): void {
  * unknown key through `warn`, the active output's `warn` when none is
  * given.
  *
+ * The resolved `logger` settings are handed to the logger
+ * (`adapters/logger/settings.ts`) before any warning is printed, so a
+ * `logger.level` of `error` also quiets the warnings of the load that
+ * set it.
+ *
  * The resolved `effort.busyTimeoutMs` is handed to the effort store
  * (`effort/store/settings.ts`), so every store open after this call
  * waits that long for a lock.
@@ -168,6 +175,7 @@ export function loadConfig(
   const user = readUserConfigFile(roots);
   const file = readConfigFile(roots.root);
   const resolved = resolveConfig({ cli, file, user });
+  setActiveLoggerSettings(loggerSettingsOf(resolved.config));
   for (const warning of resolved.warnings) warn(warning);
   setActiveStoreSettings({ busyTimeoutMs: resolved.config.effortBusyTimeoutMs });
   return resolved;

@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-six registered so far wrap a
+ * of each is its command. Four of the ninety-seven registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -91,7 +91,8 @@
  * `stretch item`, which runs `plan create`, `loop start`, `loop wait`
  * and `pr merge` as child processes, nor `stretch end`, which opens its
  * pull request through `pr open`'s `openPull` and puts `pr.base` back
- * through `src/config-set.ts`.
+ * through `src/config-set.ts`, nor `bug codes`, which lists the cause
+ * codes of `src/errors/` beside the project's `errors.codes`.
  *
  * ## What is registered
  *
@@ -349,6 +350,12 @@
  *     (`./stretch/end.ts`). Refused with exit code 1 when `pr.base`
  *     names no `stretch/<n>` branch or there is no `report.md`. It
  *     starts no session.
+ *   - `bug codes [--suggest=<text>] [--family=<family>] [--check]`: the
+ *     cause codes a bug can carry, rafa's own and then the project's
+ *     `errors.codes`, by family; `--suggest` ranks the closest to a
+ *     cause in words, and `--check` exits 1 when two codes of one family
+ *     read alike, the two refused together (`./bug/codes.ts`). It
+ *     writes nothing and starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to
@@ -374,7 +381,7 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the seventeen with an action registered: a subject with
+ * The subjects are the eighteen with an action registered: a subject with
  * none would show in every roster and dispatch nothing. `skill index` is
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
@@ -390,6 +397,7 @@ import agentShow from './agent/show.js';
 import agentVendor from './agent/vendor.js';
 import boardList from './board/list.js';
 import boardSync from './board/sync.js';
+import bugCodes from './bug/codes.js';
 import ciStatus from './ci/status.js';
 import claimAccept from './claim/accept.js';
 import claimHand from './claim/hand.js';
@@ -500,6 +508,7 @@ export const CORE_SUBJECTS: readonly SubjectSpec[] = Object.freeze([
   { name: 'config', summary: 'set one key in the project\'s config, keeping every comment, and print its old and new values' },
   { name: 'ci', summary: 'read the newest CI run on a branch: its state, its commit and the cases it failed' },
   { name: 'stretch', summary: 'open a stretch: its integration branch, pr.base pointed at it, and the operators in tmux' },
+  { name: 'bug', summary: 'list the cause codes a bug can carry, rank the closest to a cause in words, and check for codes that read alike' },
 ]);
 
 /** The core commands, in roster order. */
@@ -591,6 +600,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   stretchStart,
   stretchItem,
   stretchEnd,
+  bugCodes,
   status,
   next,
   roadmap,

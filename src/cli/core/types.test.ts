@@ -101,6 +101,7 @@ const CONFORMING_PROBE = probeSource(
   '      type: "log";',
   '      level: "debug" | "info" | "warn" | "error";',
   '      message: string;',
+  '      fields?: Readonly<Record<string, unknown>>;',
   '      ts: string;',
   '    }>()(event);',
   '    const level: true = exactly<"debug" | "info" | "warn" | "error">()(event.level);',

@@ -8,7 +8,7 @@
  * per kind, each made with a context built just for that kind. Repeating
  * that grid here would add nothing the size of this file could earn
  * back. What this file adds instead is the single running example the
- * mutation grid never assembles: every one of the ten kinds core
+ * mutation grid never assembles: every one of the twelve kinds core
  * registers, made from ONE shared context, so a kind whose `create`
  * reaches for a field none of the others need cannot pass silently by
  * only ever being exercised alongside a context tailored to it.
@@ -16,8 +16,8 @@
  * The four claims:
  *
  *   - Every core port kind resolves and makes something real, from a
- *     context wide enough to satisfy every one of the ten at once,
- *     across all six port types.
+ *     context wide enough to satisfy every one of the twelve at once,
+ *     across all seven port types.
  *   - A fixture add-on adapter registers under a name of its own and is
  *     found beside the core kinds, without changing the registry it
  *     extended.
@@ -130,6 +130,7 @@ describe('every core port kind', () => {
       output: CORE_ADAPTER_REGISTRY.kinds('output'),
       planner: CORE_ADAPTER_REGISTRY.kinds('planner'),
       sync: CORE_ADAPTER_REGISTRY.kinds('sync'),
+      logger: CORE_ADAPTER_REGISTRY.kinds('logger'),
     }).toEqual({
       tracker: ['local', 'github'],
       store: ['sqlite', 'ndjson'],
@@ -137,6 +138,7 @@ describe('every core port kind', () => {
       output: ['text', 'json', 'events'],
       planner: ['claude'],
       sync: ['local', 'file'],
+      logger: ['console'],
     });
 
     const sqlite = CORE_ADAPTER_REGISTRY.resolve('store', 'sqlite').create(context);
@@ -149,6 +151,7 @@ describe('every core port kind', () => {
     const planner = CORE_ADAPTER_REGISTRY.resolve('planner', 'claude').create(context);
     const sync = CORE_ADAPTER_REGISTRY.resolve('sync', 'local').create(context);
     const fileSync = CORE_ADAPTER_REGISTRY.resolve('sync', 'file').create(context);
+    const logger = CORE_ADAPTER_REGISTRY.resolve('logger', 'console').create(context);
 
     expect(sqlite.path('sessions')).toContain(root);
     expect(ndjson.path('sessions')).toContain(root);
@@ -160,6 +163,7 @@ describe('every core port kind', () => {
     expect(sync.kind).toBe('local');
     expect(await sync.push({ to: null })).toEqual({ status: 'nothing-to-sync' });
     expect(fileSync.kind).toBe('file');
+    expect(logger.enabled('warn')).toBe(true);
 
     text.info('shared context smoke check');
     json.result('shared context smoke check');
@@ -171,7 +175,7 @@ describe('every core port kind', () => {
       data: 'shared context smoke check',
     });
 
-    // None of the ten touched disk making the adapter alone.
+    // None of the twelve touched disk making the adapter alone.
     expect(existsSync(root)).toBe(false);
   });
 });

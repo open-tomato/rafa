@@ -1296,6 +1296,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./item.js', ['stretchOfBase']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
   ]],
+  ['./commands/bug/codes.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../errors/codes.js', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
+    ['../../errors/match.js', ['nearDuplicates', 'suggestCodes']],
+    ['../../errors/rafa-codes.js', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
+    ['../issue/issue-tracker.js', ['lineRefusal', 'readNonBlankFlag']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
@@ -1681,6 +1689,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/stretch/start.js',
       './commands/stretch/item.js',
       './commands/stretch/end.js',
+      './commands/bug/codes.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

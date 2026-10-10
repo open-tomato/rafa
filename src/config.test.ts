@@ -90,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -154,6 +154,13 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releaseSettle',
   'releaseTag',
   'releasePublishCommand',
+  'errorsCodes',
+  'loggerKind',
+  'loggerLevel',
+  'loggerTheme',
+  'loggerModules',
+  'loggerCallSite',
+  'loggerApi',
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
@@ -234,6 +241,13 @@ const DEFAULTS: RafaConfig = {
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  errorsCodes: [],
+  loggerKind: 'console',
+  loggerLevel: 'warn',
+  loggerTheme: 'default',
+  loggerModules: new Map(),
+  loggerCallSite: false,
+  loggerApi: false,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
@@ -361,6 +375,20 @@ const FULL = [
   '  settle: pr',
   '  tag: settle',
   '  publishCommand: pnpm publish',
+  'errors:',
+  '  codes:',
+  '    - code: deploy:missing-secret',
+  '      description: a deploy reads an unset secret',
+  '      hint: set the secret',
+  '      level: error',
+  '      since: v1',
+  'logger:',
+  '  kind: winston',
+  '  level: debug',
+  '  theme: plain',
+  '  modules: { board: { level: error } }',
+  '  callSite: true',
+  '  api: true',
   'cleanup:',
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
@@ -465,6 +493,13 @@ const FULL_VALUES: RafaConfig = {
   releaseSettle: 'pr',
   releaseTag: 'settle',
   releasePublishCommand: 'pnpm publish',
+  errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+  loggerKind: 'winston',
+  loggerLevel: 'debug',
+  loggerTheme: 'plain',
+  loggerModules: new Map([['board', 'error']]),
+  loggerCallSite: true,
+  loggerApi: true,
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
@@ -545,7 +580,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(11);
+    expect(lists).toHaveLength(12);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1009,6 +1044,42 @@ describe('parseConfigText', () => {
         'release.publishCommand', 'release:\n  publishCommand: ""',
         'release.publishCommand is "", expected a publish command',
         'release:\n  publishCommand: pnpm publish', 'releasePublishCommand', 'pnpm publish',
+      ],
+      [
+        'errors.codes', 'errors:\n  codes: git:x',
+        'errors.codes is "git:x", expected a list of error code entries',
+        'errors:\n  codes:\n    - code: deploy:missing-secret\n      description: a deploy reads an unset secret\n      hint: set the secret\n      level: error\n      since: v1',
+        'errorsCodes', [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+      ],
+      [
+        'logger.kind', 'logger:\n  kind: ""',
+        'logger.kind is "", expected an adapter kind, such as console',
+        'logger:\n  kind: winston', 'loggerKind', 'winston',
+      ],
+      [
+        'logger.level', 'logger:\n  level: info',
+        'logger.level is "info", expected one of: error, warn, debug',
+        'logger:\n  level: debug', 'loggerLevel', 'debug',
+      ],
+      [
+        'logger.theme', 'logger:\n  theme: neon',
+        'logger.theme is "neon", expected one of: default, plain',
+        'logger:\n  theme: plain', 'loggerTheme', 'plain',
+      ],
+      [
+        'logger.modules', 'logger:\n  modules: { board: debug }',
+        'logger.modules.board is "debug", expected a mapping holding level',
+        'logger:\n  modules: { board: { level: debug } }', 'loggerModules', new Map([['board', 'debug']]),
+      ],
+      [
+        'logger.callSite', 'logger:\n  callSite: "yes"',
+        'logger.callSite is "yes", expected true or false',
+        'logger:\n  callSite: true', 'loggerCallSite', true,
+      ],
+      [
+        'logger.api', 'logger:\n  api: 1',
+        'logger.api is 1, expected true or false',
+        'logger:\n  api: true', 'loggerApi', true,
       ],
       [
         'cleanup.staleDays', 'cleanup:\n  staleDays: 0',

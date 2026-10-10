@@ -33,7 +33,9 @@
  * follow the opened line.
  * A repository whose `pr.provider` resolves to `none` has no pull request
  * to deliver, and none of this runs: the CI gate's own `none` path
- * pushes the branch as before.
+ * pushes the branch as before. The wrap-up session is handed that
+ * provider, and under `none` looks up no pull request either
+ * (`start/wrap-up.ts`).
  *
  * Step 3 writes the release's forecast or failure sentence into the
  * pull request body, and finds none to write it to when the first
@@ -207,18 +209,22 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // the runner's own open, the retarget of a delivered pull request,
   // and the CI gate's repair prompts, which name `origin/<base>`.
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
+  // The run's `pr.provider`, read off this config and the checkout's
+  // `origin` by every reader below. The wrap-up session is handed it so
+  // that under `none` it looks up no pull request and its closing line
+  // promises no retry (`start/wrap-up.ts`).
+  const readProvider = () => resolvePrProvider({
+    configured: settings.prProvider ?? null,
+    dir: checkout,
+  });
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
-  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
+  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider);
   // The `pr` or `no-pr` event, in every output mode, at the delivery's
   // place below and never here: over the number the delivery holds when
   // it holds one, else over this lookup, made after the retries and the
   // runner (see `emitPullRequestEvent`). A `none` provider has no pull
   // request to ask: its lookup answers the reason and never runs
   // `gh pr list`.
-  const readProvider = () => resolvePrProvider({
-    configured: settings.prProvider ?? null,
-    dir: checkout,
-  });
   const lookup = (): Promise<number | string | null> => readProvider().provider === 'none'
     ? Promise.resolve(NO_PROVIDER_REASON)
     : openPullRequestNumber(checkout, expected.branch);

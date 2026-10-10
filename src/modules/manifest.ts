@@ -22,8 +22,8 @@
  *     once. `learning` is refused by name: the spec closes that port to
  *     third parties, so no module provides a learning source.
  *   - `provides`: one entry per listed type, read by that type's shape.
- *     `tracker`, `store`, `planner` and `sync` name a `kind` and an
- *     `entry`;
+ *     `tracker`, `store`, `planner`, `sync` and `logger` name a `kind`
+ *     and an `entry`;
  *     `output` adds `channels`, a non-empty list of the spec's channels;
  *     `commands` names an `entry`; `skills` and `agents` are a directory
  *     path; `mcp` is a non-empty list of servers, each a `name` unique in
@@ -31,7 +31,7 @@
  *   - `requires`: `rafa`, a version range the running version must
  *     satisfy, and `ports`, the version of each port the module
  *     implements. Every listed type that is a port (`tracker`, `store`,
- *     `planner`, `output`, `sync`) states its version, and a stated
+ *     `planner`, `output`, `sync`, `logger`) states its version, and a stated
  *     version core does not serve is refused naming both numbers.
  *   - `prerequisites` and `source`, both optional: the `required` and
  *     `optional` item lists `.rafa/config.yaml` reads, through the same
@@ -101,9 +101,10 @@ export const MANIFEST_VERSION = 1;
 /**
  * The feature types of the spec's table, in its order, then `sync`: the
  * port issue #323 adds, whose `git`, `service` and `p2p` strategies come
- * from modules.
+ * from modules. Then `logger`, the port issue #950 adds, so a module can
+ * bring a logger of another kind.
  */
-export const FEATURE_TYPES = ['output', 'tracker', 'store', 'planner', 'learning', 'skills', 'agents', 'mcp', 'commands', 'sync'] as const;
+export const FEATURE_TYPES = ['output', 'tracker', 'store', 'planner', 'learning', 'skills', 'agents', 'mcp', 'commands', 'sync', 'logger'] as const;
 
 /** One feature type. */
 export type FeatureType = (typeof FEATURE_TYPES)[number];
@@ -151,6 +152,7 @@ export interface ManifestProvides {
   readonly mcp?: readonly McpServer[];
   readonly commands?: CommandsProvision;
   readonly sync?: AdapterProvision;
+  readonly logger?: AdapterProvision;
 }
 
 /** A manifest that passed {@link validateManifest}. */
@@ -411,6 +413,7 @@ const PROVISION_READERS: ReadonlyMap<string, Check<unknown>> = new Map<string, C
   ['mcp', readMcp],
   ['commands', readCommands],
   ['sync', readAdapter],
+  ['logger', readAdapter],
 ]);
 
 /** What `types` declares, when it read clean, and the label a cross check names it by. */

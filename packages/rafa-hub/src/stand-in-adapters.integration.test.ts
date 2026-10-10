@@ -43,7 +43,9 @@ const KEYS: Readonly<Record<string, { readonly id: string; readonly may: readonl
 function openKeyIdentity(): HubIdentity {
   const identify = (request: Request): Promise<IdentityAnswer> => {
     const key = request.headers.get(KEY_HEADER);
-    const grant = key === null ? undefined : KEYS[key];
+    const grant = key === null
+      ? undefined
+      : KEYS[key];
     if (grant === undefined) {
       return Promise.resolve({ served: false, refusal: { reason: 'unauthenticated', message: 'Send a hub key the hub knows.' } });
     }

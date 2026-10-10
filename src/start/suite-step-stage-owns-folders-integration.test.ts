@@ -15,9 +15,10 @@
  * (`readPlanOwns`, `../suite/owns.ts`). Neither is sent more than once:
  * `planOwnsReader` (`./suite-step.ts`) reads the chain once per run and
  * answers every later ask from what it already has. The stand-in also
- * answers `repo view` and `pr list`, plainly: the run sends both for
- * reasons of its own, the tracker's preflight and the wrap-up's own
- * check for an existing pull request, neither about `Owns:` at all.
+ * answers `repo view`, plainly: the run sends it for the tracker's
+ * preflight, which is not about `Owns:` at all. It answers `pr list`
+ * too, which this run does not send: under `pr.provider: none` the
+ * wrap-up looks up no pull request (`start/wrap-up.ts`).
  *
  * The plan's one stage has one task, so its commit is also its stage's
  * last: the stage step that follows is due (`dueStages`) and is not the
@@ -309,10 +310,10 @@ const EPIC_LIST_JSON = JSON.stringify([{
  * The stand-in `gh`: answers the two commands `readPlanOwns` sends —
  * `issue view` for the spec issue, `issue list` for its epic — from
  * which this file's own assertion reads back whether each ran exactly
- * once. The run also sends `repo view` (the tracker's own preflight) and
- * `pr list` (the wrap-up's own check for an existing pull request),
- * neither about `Owns:` folders at all, so both are answered plainly;
- * every call, of any kind, is logged. Any call outside these four exits
+ * once. The run also sends `repo view` (the tracker's own preflight),
+ * not about `Owns:` folders at all, and answered plainly; `pr list` is
+ * answered the same way, though under `pr.provider: none` the wrap-up
+ * sends none. Every call, of any kind, is logged. Any call outside these four exits
  * 1 naming it, so an unplanned `gh` reach in this run fails loudly
  * rather than silently.
  */
@@ -461,8 +462,8 @@ describe('a stage step over a plan whose epic Owns: two folders', () => {
 
     // readPlanOwns sent exactly one issue view and one issue list, never
     // asked again: planOwnsReader answers every later ask from what it
-    // already read. Every other gh call this run sent (repo view, pr
-    // list) is none of `Owns:`'s own and left out of this count.
+    // already read. The other gh call this run sent (repo view) is none
+    // of `Owns:`'s own and left out of this count.
     const ownsCalls = ghCalls(scratch).filter((call) => call === 'issue view' || call === 'issue list');
     expect(ownsCalls).toEqual(['issue view', 'issue list']);
 
