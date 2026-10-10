@@ -686,6 +686,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/pr/merge.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/epic-tick.js', ['epicTickSentence']],
     ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../board/roadmap.js', ['closedIssuesIn']],
@@ -703,7 +704,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge-guard.js', ['guardBeforeMerge']],
     ['./merge-project.js', ['refreshProjectAfterMerge']],
     ['./merge-refuse.js', ['refuseFromGit']],
-    ['./merge-tick.js', ['epicTickSentence', 'noBoardListsLine', 'tickRoadmapAfterMerge']],
+    ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
     ['./merge-unblock.js', ['unblockAfterMerge']],
     ['./merge-unchecked.js', ['commentIfUnchecked', 'confirmUncheckedMerge', 'readUncheckedMerge', 'uncheckedReport']],
     ['./pr-context.js', [

@@ -116,7 +116,7 @@
  * where the board write has nothing to do with this checkout and is as
  * true then as it is after. Before the boards, the closed issue's line
  * is ticked on the checklist of the epic its `epic:` label names, one
- * line printed per epic (`./merge-tick.ts`, `epicTickSentence`).
+ * line printed per epic (`src/board/epic-tick.ts`, `epicTickSentence`).
  *
  * Nothing it comes to fails the command, so a roadmap that cannot be
  * read, an edit that would not land and a pull request closing no issue
@@ -211,6 +211,7 @@ import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { epicTickSentence } from '../../board/epic-tick.js';
 import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
@@ -229,7 +230,7 @@ import { freedAfterMerge } from './merge-freed.js';
 import { guardBeforeMerge } from './merge-guard.js';
 import { refreshProjectAfterMerge } from './merge-project.js';
 import { refuseFromGit } from './merge-refuse.js';
-import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
+import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { unblockAfterMerge } from './merge-unblock.js';
 import { commentIfUnchecked, confirmUncheckedMerge, readUncheckedMerge, uncheckedReport } from './merge-unchecked.js';
 import {

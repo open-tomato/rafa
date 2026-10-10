@@ -725,7 +725,8 @@ Ticking: `pr merge` ticks the PR's `Closes #<n>` line on every open
 no issue carries the label, after the merge (GitHub closes the issue; it does
 not tick a task-list box). Before the boards it ticks the same line on the
 checklist of the open epic the issue's `epic:<slug>` label names, printing one
-sentence per epic (`src/commands/pr/merge-tick.ts`).
+sentence per epic (`src/commands/pr/merge-tick.ts`, which runs
+`tickEpics` of `src/board/epic-tick.ts`).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
 `If-Match` and `gh` sends no conditional request, so a lost update comes

@@ -84,7 +84,7 @@
  * The four relationship writes are `./labels-writes.ts`'s. `afterMerge`
  * runs, for a merged pull request whose body closes an issue, the two
  * board steps `rafa pr merge` runs today in this order: the epic
- * checklist tick (`tickEpics`, `src/commands/pr/merge-tick.ts`) and the
+ * checklist tick (`tickEpics`, `src/board/epic-tick.ts`) and the
  * unblock reading (`unblockAfterMerge`, `src/commands/pr/merge-unblock.ts`).
  * Each prints what it came to through the request's `info` and `warn`
  * exactly as `pr merge` prints it, and each outcome is also answered as
@@ -106,16 +106,16 @@ import type {
   RelationWriteStatus,
 } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { EpicTickResult } from '../../commands/pr/merge-tick.js';
+import type { EpicTickResult } from '../epic-tick.js';
 import type { Epic } from '../epics.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 import type { UnblockReport, UnblockStatus } from '../unblock.js';
 
-import { epicTickProblemLine, epicTickSentence, tickEpics } from '../../commands/pr/merge-tick.js';
 import { unblockAfterMerge } from '../../commands/pr/merge-unblock.js';
 import { messageOf } from '../../config-sections.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../blocked.js';
+import { epicTickProblemLine, epicTickSentence, tickEpics } from '../epic-tick.js';
 import { epicLines } from '../epic-walk.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf, readEpics } from '../epics.js';
 import { boardListFields } from '../roadmap-board.js';

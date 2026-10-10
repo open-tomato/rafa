@@ -5,7 +5,7 @@
  *
  * In the `labels` mode, the default, that step is the unblock reading
  * (`./merge-unblock.ts`), which asks about each freed issue and takes
- * `spec:blocked` off; with the epic tick (`./merge-tick.ts`) it is what
+ * `spec:blocked` off; with the epic tick (`src/board/epic-tick.ts`) it is what
  * the `labels` adapter's `afterMerge` runs (`src/board/relations/labels.ts`).
  * In the `native` mode a blocker is GitHub's blocked-by link, which
  * GitHub clears by itself when the blocking issue closes, and the
