@@ -14,7 +14,9 @@
  * in an async scope of its own, an `AsyncLocalStorage`
  * (`node:async_hooks`). Inside that function, and in everything it
  * awaits or starts, the readers answer that output and that mode; once
- * the function ends, however it ends, nothing of them is left.
+ * the function ends, however it ends, nothing of them is left. The
+ * dispatcher runs every command this way (`src/cli/dispatch.ts`), with
+ * the command's context output in the invocation's mode.
  *
  * A scope belongs to one run, so runs need not nest to stay apart. Two
  * runs that overlap in one process, started together and awaited with
@@ -27,14 +29,15 @@
  *
  * ## The module-level value
  *
- * Outside every scope the readers answer one module-level value. Until
- * something sets another, it is the `text` adapter at verbosity 0
- * writing to `process.stdout`. {@link setActiveOutput} with `null` puts
- * that default back. The default is made once, when this module is first
- * imported, so {@link activeOutput} answers the same object on every
- * read while nothing is set. It holds `process.stdout` itself and calls
- * its `write` on each line, so a spy set on `process.stdout.write` after
- * the import sees every line.
+ * Outside every scope the readers answer one module-level value, which
+ * no module but a test and its fixtures sets. Until one sets another, it
+ * is the `text` adapter at verbosity 0 writing to `process.stdout`.
+ * {@link setActiveOutput} with `null` puts that default back. The
+ * default is made once, when this module is first imported, so
+ * {@link activeOutput} answers the same object on every read while
+ * nothing is set. It holds `process.stdout` itself and calls its `write`
+ * on each line, so a spy set on `process.stdout.write` after the import
+ * sees every line.
  *
  * ## A set made inside a scope
  *
@@ -66,9 +69,9 @@
  * wrote in `text` mode and as one `log` event per line in `json` mode.
  * `start/dispatch.ts` emits a `step` event per task in `json` mode
  * alone, where the `text` adapter would render it as a `step: ` line
- * beside the line announcing the task. The dispatcher sets each
- * invocation's mode with its output. The default, and an output set at
- * module level with no mode, render in `text`.
+ * beside the line announcing the task. The dispatcher hands each
+ * invocation's mode to its scope with its output. The default, and an
+ * output set at module level with no mode, render in `text`.
  *
  * Bun runs every test file in one process, and the module-level value is
  * module state: a case that sets an output sets `null` after it, or each

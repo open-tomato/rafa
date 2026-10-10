@@ -21,13 +21,12 @@
  *      refusal writes nothing yet. A command needing a project has it
  *      resolved first, and outside one ends as the `no_project` refusal
  *      without running (see "The project"). A command that runs prints
- *      its deprecation lines when it has any and runs with its context's
- *      output set as the active output (`src/adapters/output/active.ts`)
- *      in the invocation's output mode, the output and the mode active
- *      before being put back once it ends. It runs recorded as the
- *      running command with its context's parsed flags (`running.ts`),
- *      for a reader below its `run` to ask, and the record it replaced is
- *      put back once it ends, whether it returns or throws; a help
+ *      its deprecation lines when it has any and runs in an async scope
+ *      of its own (see "The scope a command runs in"), with its
+ *      context's output as the active output
+ *      (`src/adapters/output/active.ts`) in the invocation's output mode,
+ *      and recorded as the running command with its context's parsed
+ *      flags (`running.ts`), for a reader below its `run` to ask; a help
  *      request, a version request, a refusal and `no_project` run no
  *      command and record none. Its context's `registry` is the one the
  *      line was routed through, with every module that loaded mounted on
@@ -41,6 +40,36 @@
  * The dispatcher sets no `process.exitCode` and calls no
  * `process.exit`: it answers the exit code, and its caller ends the
  * process with it.
+ *
+ * ## The scope a command runs in
+ *
+ * The active output and the running command are what a module far below
+ * a command's `run` asks for without a context handed down to it. Each
+ * invocation carries its own in an async scope, an `AsyncLocalStorage`
+ * each of the two modules holds (`runWithActiveOutput`,
+ * `runAsRunningCommand`): they are read inside the command's `run` and
+ * everything it awaits, and nothing of them is left once it ends,
+ * whether it returns or throws. The dispatcher sets and puts back no
+ * module-level value.
+ *
+ * So invocations need not nest to stay apart. Two dispatched in one
+ * process and awaited with `Promise.all` each read their own output and
+ * record whichever ends first, and one a command dispatches from inside
+ * its `run` reads the inner ones inside and the outer ones after. Until
+ * #927 each invocation set the two module-level values and put the
+ * previous ones back in a `finally`, a stack: two that overlapped and
+ * ended in the order they started left the first's output and record for
+ * the rest of the process, and the spend guard (`src/utils/claude.ts`)
+ * then refused every session a later test file started, naming a command
+ * that had ended.
+ *
+ * What a caller set at module level ahead of an invocation
+ * (`setActiveOutput`, `setRunningCommand`) is hidden while the command
+ * runs and read again after it. A set a command makes inside its `run`
+ * writes the module-level value: the command goes on reading its
+ * invocation's own, and the set value is what a reader outside every
+ * invocation finds afterwards. Each module's note says which callbacks
+ * read outside the scope.
  *
  * ## The events, by mode
  *
@@ -159,14 +188,14 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { homedir } from 'node:os';
 
-import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
+import { runWithActiveOutput } from '../adapters/output/active.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
-import { restoreRunningCommand, setRunningCommand } from './running.js';
+import { runAsRunningCommand } from './running.js';
 import { versionLine } from './version.js';
 
 /** What every refusal the dispatcher throws opens with. */
@@ -444,12 +473,12 @@ async function runCommand(
     registry,
     project,
   });
-  const previous = activeOutput();
-  const previousMode = activeOutputMode();
-  setActiveOutput(guarded.output, base.outputMode);
-  const previousRunning = setRunningCommand(route.command, base.flags);
   try {
-    await route.command.run(context);
+    await runAsRunningCommand(
+      route.command,
+      base.flags,
+      async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
+    );
     return success(guarded.payload());
   } catch (error) {
     if (!(error instanceof CommandExit)) {
@@ -473,9 +502,6 @@ async function runCommand(
         ? null
         : error.message,
     };
-  } finally {
-    restoreRunningCommand(previousRunning);
-    setActiveOutput(previous, previousMode);
   }
 }
 

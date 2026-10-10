@@ -13,7 +13,8 @@
  * scope of its own, an `AsyncLocalStorage` (`node:async_hooks`). Inside
  * that function, and in everything it awaits or starts, the reader
  * answers that record; once the function ends, however it ends, nothing
- * of it is left.
+ * of it is left. The dispatcher runs every command this way
+ * (`dispatch.ts`), so nothing it records outlives the invocation.
  *
  * A scope belongs to one run, so runs need not nest to stay apart. Two
  * runs that overlap in one process, started together and awaited with
@@ -31,7 +32,8 @@
  * recorded. {@link restoreRunningCommand} puts back a record
  * {@link setRunningCommand} answered, so a caller that sets one restores
  * it in a `finally`. Outside every scope the reader answers this value,
- * or null.
+ * or null. No module but a test sets it: a case stands in for a dispatch
+ * with it, as `src/utils/claude.test.ts` does ahead of a door.
  *
  * ## A set made inside a scope
  *
