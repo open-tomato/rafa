@@ -47,6 +47,12 @@
  * any other value, null, a number or an unknown word alike, so the
  * record is read whole and its next write carries no `reason` key on
  * that step.
+ *
+ * A failing test's `errorLines`, likewise: a step written before the
+ * key carries none, and a later rafa may keep them in another shape. The
+ * frozen failure keeps a non-empty list of strings, after its `name`,
+ * and leaves out any other value, so its next write carries no
+ * `errorLines` key on that failure.
  */
 import type {
   SessionDecision,
@@ -398,9 +404,21 @@ function freezeHop(value: unknown): HopRecord {
   return Object.freeze({ ...hop, home: Object.freeze(hop.home), from: Object.freeze(hop.from) });
 }
 
-/** A frozen list of failing tests already checked, each copied to its two fields. */
+/** The `errorLines` entry of a frozen failure: none unless the value is a non-empty list of strings. */
+function errorLinesEntry(errorLines: unknown): { readonly errorLines?: readonly string[] } {
+  const kept = Array.isArray(errorLines) && errorLines.length > 0 && errorLines.every((line) => typeof line === 'string');
+  return kept
+    ? { errorLines: Object.freeze([...errorLines as readonly string[]]) }
+    : {};
+}
+
+/** A frozen list of failing tests already checked, each copied to its file, its name and, when it holds any, its error lines. */
 function freezeFailures(failures: readonly SuiteFailure[]): readonly SuiteFailure[] {
-  return Object.freeze(failures.map((failure) => Object.freeze({ file: failure.file, name: failure.name })));
+  return Object.freeze(failures.map((failure) => Object.freeze({
+    file: failure.file,
+    name: failure.name,
+    ...errorLinesEntry(field(failure, 'errorLines')),
+  })));
 }
 
 /** True for one of {@link SESSION_STEP_REASONS}. */

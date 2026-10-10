@@ -1,7 +1,8 @@
 /**
  * Unit cases for the `bun test` paths {@link blockerText} writes: a
  * relative path gains `./` so bun reads it as a path, not a substring
- * filter, and an absolute one is written as it is. Then the pre-wrap-up
+ * filter, and an absolute one is written as it is. Then the error lines
+ * it quotes for the new failures, by file. Then the pre-wrap-up
  * repair {@link writeRepairTask} writes, over a real tracker file under a
  * temporary directory: inserted after the last task, or the ticked one
  * blocked again on a second red, each claim paired with its control.
@@ -46,6 +47,54 @@ describe('blockerText paths', () => {
     const unhandled = [{ file: 'src/a/boom.test.ts', firstLine: 'Error: x' }, { file: '/abs/boom.test.ts', firstLine: null }];
     const text = blockerText('stage step', { exitCode: 1, unhandled }, verdict([], 2));
     expect(text).toContain('Run bun test ./src/a/boom.test.ts /abs/boom.test.ts and make each load.');
+  });
+});
+
+describe('blockerText error lines', () => {
+  const SPEND = 'UndeclaredSpendError: rafa loop start spends through claude and declared none';
+  const thrown = (name: string): SuiteFailure => ({ file: 'src/utils/claude.test.ts', name, errorLines: [SPEND, 'second line'] });
+
+  it('quotes the first error line of a file\'s new failures once, with how many tests printed it', () => {
+    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([thrown('a'), thrown('b'), thrown('c')]));
+    expect(text).toBe([
+      'The runner\'s task step found failures the suite baseline does not hold.',
+      'New failing test files: src/utils/claude.test.ts (3 tests).',
+      'Run bun test ./src/utils/claude.test.ts and make them pass.',
+      `What Bun printed for them: src/utils/claude.test.ts "${SPEND}" (3 tests).`,
+    ].join(' '));
+    // Control: only the first line of an error is quoted.
+    expect(text).not.toContain('second line');
+  });
+
+  it('quotes each distinct line of one file in first-seen order, and each file apart', () => {
+    const fresh: readonly SuiteFailure[] = [
+      { file: 'sub/two.test.ts', name: 'two > first', errorLines: ['error: first boom'] },
+      { file: 'a.test.ts', name: 'times out', errorLines: ['this test timed out after 50ms.'] },
+      { file: 'sub/two.test.ts', name: 'two > third', errorLines: ['TypeError: third boom'] },
+      { file: 'sub/two.test.ts', name: 'two > fourth', errorLines: ['error: first boom'] },
+    ];
+    expect(blockerText('stage step', { exitCode: 1, unhandled: [] }, verdict(fresh))).toContain(
+      'What Bun printed for them: sub/two.test.ts "error: first boom" (2 tests), "TypeError: third boom" (1 test); a.test.ts "this test timed out after 50ms." (1 test).',
+    );
+  });
+
+  it('counts the lines of one file past the third, and the files past the tenth', () => {
+    const lines = ['one', 'two', 'three', 'four', 'five'].map((word, index): SuiteFailure => ({ file: 'a.test.ts', name: `t${index}`, errorLines: [`error: ${word}`] }));
+    expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(lines))).toContain(
+      'What Bun printed for them: a.test.ts "error: one" (1 test), "error: two" (1 test), "error: three" (1 test), and 2 more lines.',
+    );
+    const files = Array.from({ length: 12 }, (_, index): SuiteFailure => ({ file: `f${index}.test.ts`, name: 't', errorLines: ['error: x'] }));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(files));
+    expect(text).toContain('f9.test.ts "error: x" (1 test); and 2 more files.');
+    expect(text).not.toContain('f10.test.ts "error: x"');
+  });
+
+  it('says nothing of what Bun printed when no new failure carries a line, and leaves out a file without one', () => {
+    const bare: SuiteFailure = { file: 'src/bare.test.ts', name: 'x > y' };
+    expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([bare]))).not.toContain('What Bun printed');
+    const mixed = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([bare, thrown('a')]));
+    expect(mixed).toContain(`What Bun printed for them: src/utils/claude.test.ts "${SPEND}" (1 test).`);
+    expect(mixed).toContain('New failing test files: src/bare.test.ts (1 test), src/utils/claude.test.ts (1 test).');
   });
 });
 

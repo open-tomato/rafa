@@ -68,13 +68,14 @@
  * Stderr is the one place that names such an error, so a result also
  * carries {@link SuiteResult.unhandled}: each block's file and the
  * error's first line, read by `parseUnhandled` (`./unhandled.ts`). And
- * the run writes `unhandledText` of its stderr, the blocks and the
- * summary lines only, capped, beside the JUnit file as
- * `<name>.output.txt` ({@link outputFileFor}); a step's text is
+ * the run writes `suiteOutputText` (`./failure-lines.ts`) of its stderr,
+ * the blocks, the failed cases with their error lines and the summary
+ * lines only, capped, beside the JUnit file as `<name>.output.txt`
+ * ({@link outputFileFor}); a step's text is
  * `.rafa/runs/<session>/suite/<kind>.output.txt`. It is removed before
  * the spawn, as the JUnit file is, and written after every run, empty
- * when stderr held neither a block nor a summary, so the file on disk is
- * always this run's.
+ * when stderr held none of the three, so the file on disk is always this
+ * run's.
  *
  * ## How a test is named
  *
@@ -107,6 +108,23 @@
  * test, a passing todo or a missing assertion, so `<error>` is read for
  * other JUnit writers. A repeated pair keeps the message of the testcase
  * the JUnit file names first.
+ *
+ * Bun 1.3.14, the version `package.json` pins, wrote NO `message`
+ * attribute at all: `<failure type="AssertionError" />` for a thrown
+ * error and a failed assertion alike, `<failure type="TimeoutError" />`
+ * for a timeout (`testdata/failed-cases.junit.xml`). Under it a failure
+ * carries no message, and what failed it is read from stderr instead.
+ *
+ * ## The error lines a failure carries
+ *
+ * A failure's {@link SuiteFailure.errorLines} are the first lines of the
+ * error Bun printed above its `(fail)` line, read by `parseFailedCases`
+ * (`./failure-lines.ts`, which describes the reading and its caps) from
+ * the same stderr the summary is read from, and matched to the JUnit
+ * pair by file and name. The key is left out of a failure Bun printed no
+ * error line for, or whose `(fail)` line was not found. The lines are
+ * not part of what identifies a failure: a baseline compares the pair
+ * alone.
  */
 import type { UnhandledError } from './unhandled.js';
 import type { SpawnEnv } from '../utils/session-env.js';
@@ -114,7 +132,8 @@ import type { SpawnEnv } from '../utils/session-env.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 
-import { parseUnhandled, unhandledText } from './unhandled.js';
+import { failingFilesOf, parseFailedCases, suiteOutputText, withErrorLines } from './failure-lines.js';
+import { parseUnhandled } from './unhandled.js';
 
 /** The variable removed from the environment `bun test` runs in. */
 export const CLAUDE_CODE_ENV = 'CLAUDECODE';
@@ -130,6 +149,11 @@ export interface SuiteFailure {
    * identify inherited failures.
    */
   readonly message?: string;
+  /**
+   * The first lines of the error Bun printed for it on stderr, trimmed;
+   * absent when it printed none. See the module note.
+   */
+  readonly errorLines?: readonly string[];
 }
 
 /**
@@ -454,9 +478,11 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
   const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
-  writeFileSync(outputFile, unhandledText(stderr));
+  const { junit, failures: named } = readJunit(options.junitFile);
+  const cases = parseFailedCases(stderr, failingFilesOf(named));
+  writeFileSync(outputFile, suiteOutputText(stderr, cases));
   const { summary, errors } = readSummary(stderr);
-  const { junit, failures } = readJunit(options.junitFile);
+  const failures = withErrorLines(named, cases);
   const unhandled = parseUnhandled(stderr);
   const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled };
   return readNoTestFiles(stderr)

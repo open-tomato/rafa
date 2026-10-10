@@ -106,7 +106,8 @@ means it is new. Only new failures make a step red. A red task or stage
 step inserts a `[BLOCKED]` repair task above the first open plan task,
 which it leaves as it was: the repair's text names the commit the step
 ran at (`Repair the red task step at commit <sha>`), its declaration is
-`{agent=build-error-resolver}`, and its blocker names the new failures,
+`{agent=build-error-resolver}`, and its blocker names the new failures
+and the first error line Bun printed for each file's,
 which the repair session receives through `BLOCKER_PROMPT_PREFIX`. With
 no open task left, the repair goes after the checklist's last task. A
 red task step after a repair task writes its blocker on that repair's
@@ -155,7 +156,8 @@ tests` and counts it on the summary's `errors` line. The baseline keeps
 that count only, and a step counting more is red. Its blocker names each
 block's file and first error line, as `src/boom.test.ts threw "error:
 boom"` (`src/start/suite-blocker.ts`), and the blocks with the summary
-lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`. A task,
+lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`,
+beside the failed cases the next paragraph describes. A task,
 stage or pre-wrap-up step whose only red is that excess is taken once
 more over the same run (`src/start/suite-step.ts`). A retake at or under
 the baseline's count prints an `Intermittent` warning naming the first
@@ -163,10 +165,31 @@ run's files and lines, and the run goes on; a retake over it again is
 red, and the run halts as it does on any red step. Both runs are
 recorded, and the files on disk are the retake's.
 
+**A failed case's error is read from stderr, and the step keeps its
+first lines.** Bun 1.3.14, the pinned version, writes every thrown
+error and failed assertion to the JUnit file as
+`<failure type="AssertionError" />` and a timeout as
+`<failure type="TimeoutError" />`, with no message, so the report says
+which case failed and not why. Bun prints the error above the case's
+`(fail)` line on stderr, and `src/suite/failure-lines.ts` reads it from
+there: the lines under the code frame, up to the stack, at most five
+(`MAX_ERROR_LINES`), each cut at 300 characters. They are kept in three
+places. Each of the step's `newFailures` in the run record carries them
+as `errorLines`. The step's
+`.rafa/runs/<session>/suite/<kind>.output.txt` lists every failed case
+under its file, its lines indented under it, between the
+unhandled-error blocks and the summary lines (at most 40 cases, the
+rest counted). And the blocker quotes the first line of each, by file,
+as `What Bun printed for them: src/a.test.ts "error: boom" (2 tests)`,
+which is what the repair session reads. A case whose `(fail)` line is
+not found on stderr, or that printed nothing, carries no lines, and the
+blocker then names its file and count alone.
+
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.
 The `newFailures` array in each step lists only the failures not present
-in the baseline. The runner writes these arrays as each step completes,
+in the baseline, each with the `errorLines` Bun printed for it when it
+printed any. The runner writes these arrays as each step completes,
 and the loop reads them to decide what to report to the next task.
 
 **Known baseline failures are documented on this page.** Some tests fail

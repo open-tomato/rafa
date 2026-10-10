@@ -199,20 +199,39 @@ function blocksText(blocks: readonly RawBlock[]): readonly string[] {
   return [...kept.flat(), ...more];
 }
 
+/** The two parts of the capped text: the kept blocks' lines and the summary lines, either one empty. */
+export interface CappedSections {
+  readonly blocks: readonly string[];
+  readonly summary: readonly string[];
+}
+
+/**
+ * The capped blocks and the summary lines of Bun's `stderr`, apart, so
+ * that a caller can put lines of its own between them
+ * (`./failure-lines.ts`) and join them with {@link joinSections}.
+ */
+export function cappedSections(stderr: string): CappedSections {
+  const lines = linesOf(stderr);
+  return { blocks: blocksText(rawBlocks(lines)), summary: summaryLines(lines) };
+}
+
+/**
+ * `sections` as one text: each one that holds a line, a blank line
+ * between two, ending in a newline; empty when none holds a line.
+ */
+export function joinSections(sections: readonly (readonly string[])[]): string {
+  const held = sections.filter((section) => section.length > 0);
+  return held.length === 0
+    ? ''
+    : `${held.map((section) => section.join('\n')).join('\n\n')}\n`;
+}
+
 /**
  * The text of Bun's `stderr` that keeps only its unhandled-error blocks
  * and its summary lines, capped as the module note says, ending in a
  * newline; empty when stderr holds neither.
  */
 export function unhandledText(stderr: string): string {
-  const lines = linesOf(stderr);
-  const blocks = blocksText(rawBlocks(lines));
-  const summary = summaryLines(lines);
-  const gap = blocks.length > 0 && summary.length > 0
-    ? ['']
-    : [];
-  const all = [...blocks, ...gap, ...summary];
-  return all.length === 0
-    ? ''
-    : `${all.join('\n')}\n`;
+  const { blocks, summary } = cappedSections(stderr);
+  return joinSections([blocks, summary]);
 }

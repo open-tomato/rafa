@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="8" assertions="3" failures="6" skipped="0" time="0.064078">
+  <testsuite name="timeout.test.ts" file="timeout.test.ts" tests="1" assertions="0" failures="1" skipped="0" time="0.051" hostname="fixture-host">
+    <testcase name="times out" classname="" time="0.051262" file="timeout.test.ts" line="3" assertions="0">
+      <failure type="TimeoutError" />
+    </testcase>
+  </testsuite>
+  <testsuite name="thrown.test.ts" file="thrown.test.ts" tests="2" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+    <testsuite name="stand-in claude" file="thrown.test.ts" line="11" tests="2" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+      <testcase name="throws before any expect" classname="stand-in claude" time="0.000192" file="thrown.test.ts" line="12" assertions="0">
+        <failure type="AssertionError" />
+      </testcase>
+      <testcase name="passes" classname="stand-in claude" time="0.000025" file="thrown.test.ts" line="17" assertions="1" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="assertion.test.ts" file="assertion.test.ts" tests="1" assertions="1" failures="1" skipped="0" time="0" hostname="fixture-host">
+    <testcase name="fails an assertion" classname="" time="0.000173" file="assertion.test.ts" line="3" assertions="1">
+      <failure type="AssertionError" />
+    </testcase>
+  </testsuite>
+  <testsuite name="sub/two.test.ts" file="sub/two.test.ts" tests="4" assertions="1" failures="3" skipped="0" time="0" hostname="fixture-host">
+    <testsuite name="two" file="sub/two.test.ts" line="3" tests="4" assertions="1" failures="3" skipped="0" time="0" hostname="fixture-host">
+      <testcase name="first throws a plain error" classname="two" time="0.000056" file="sub/two.test.ts" line="4" assertions="0">
+        <failure type="AssertionError" />
+      </testcase>
+      <testcase name="passes between" classname="two" time="0.000011" file="sub/two.test.ts" line="8" assertions="1" />
+      <testcase name="second throws a string" classname="two" time="0.000039" file="sub/two.test.ts" line="12" assertions="0">
+        <failure type="AssertionError" />
+      </testcase>
+      <testcase name="third rejects" classname="two" time="0.000092" file="sub/two.test.ts" line="16" assertions="0">
+        <failure type="AssertionError" />
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

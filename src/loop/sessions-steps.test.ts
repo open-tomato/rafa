@@ -9,7 +9,9 @@
  * since bun's `toEqual` reads a key set to undefined as a key left out.
  * Each refusal sits beside a control: the same record with a well-formed
  * step is read. The `reason` case appends a step carrying one after a
- * step without, as a run resumed from a 0.35.0 record does.
+ * step without, as a run resumed from a 0.35.0 record does. The
+ * `errorLines` cases read a new failure's error lines back, and a value
+ * that is no list of lines as no lines at all.
  */
 import type { SessionDraft, SessionRecord, SessionStep } from './sessions.js';
 
@@ -294,6 +296,39 @@ describe('parseSessionRecord and the steps field', () => {
     expect(Object.keys(stored.steps[0] ?? {})).not.toContain('reason');
     expect(Object.keys(stored.steps[1] ?? {}).slice(0, 3)).toEqual(['kind', 'scope', 'reason']);
     expect(sessionSteps(readSession(root, ID, { isAlive: ALIVE }))[1]?.reason).toBe('fallback');
+  });
+
+  it('writes a new failure\'s error lines after its name, reads them back frozen, and adds no key to a failure without', () => {
+    const root = freshRoot();
+    beginSession(root, draft(), { isAlive: ALIVE });
+    const printed = { ...FRESH, errorLines: ['UndeclaredSpendError: spends through claude', 'second line'] };
+    const step: SessionStep = { ...TASK_STEP, newFailures: [printed] };
+
+    const record = updateSession(root, ID, { appendStep: step });
+    const stored = JSON.parse(readFileSync(sessionFilePath(root, ID), 'utf8')) as { steps: { failures: object[]; newFailures: object[] }[] };
+    const [read] = sessionSteps(readSession(root, ID, { isAlive: ALIVE }));
+
+    expect(sessionSteps(record)).toEqual([step]);
+    expect(Object.keys(stored.steps[0]?.newFailures[0] ?? {})).toEqual(['file', 'name', 'errorLines']);
+    expect(stored.steps[0]?.failures.map((failure) => Object.keys(failure))).toEqual([['file', 'name'], ['file', 'name']]);
+    expect(read?.newFailures).toEqual([printed]);
+    expect(Object.isFrozen(read?.newFailures[0]?.errorLines)).toBe(true);
+  });
+
+  it.each([
+    ['a string', 'error: boom'],
+    ['null', null],
+    ['an empty list', []],
+    ['a list holding a number', ['error: boom', 3]],
+  ])('reads error lines set to %s as none, refusing nothing', (_label, errorLines) => {
+    const text = stepText({ failures: [KNOWN, FRESH], newFailures: [{ ...FRESH, errorLines }] });
+
+    const [step] = sessionSteps(parseSessionRecord(text, FILE));
+
+    expect(Object.keys(step?.newFailures[0] ?? {})).toEqual(['file', 'name']);
+    // Control: the same failure with a list of lines keeps it.
+    const kept = stepText({ failures: [KNOWN, FRESH], newFailures: [{ ...FRESH, errorLines: ['error: boom'] }] });
+    expect(sessionSteps(parseSessionRecord(kept, FILE))[0]?.newFailures[0]?.errorLines).toEqual(['error: boom']);
   });
 
   it('names the place of a bad step after good ones', () => {

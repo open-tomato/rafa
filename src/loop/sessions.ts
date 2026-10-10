@@ -100,7 +100,13 @@
  *     (`SuiteFailure`, `suite/run.ts`).
  *   - `newFailures`: those of `failures` that are new against the
  *     baseline; every one of them is also in `failures`, compared by file
- *     and name.
+ *     and name. A new failure also carries `errorLines`, after its
+ *     `name`: the first lines of the error Bun printed for it
+ *     (`suite/failure-lines.ts`), which the JUnit report does not hold.
+ *     The key is left out of a failure Bun printed nothing for and of
+ *     every step written before it; a value that is no non-empty list of
+ *     strings is left out on read, never refused, as an unknown `reason`
+ *     is.
  *   - `interrupted`: only on a step the runner read as a stop rather than
  *     a suite's answer, `true`: its `bun test` ended on SIGINT, or the
  *     runner received SIGINT while it ran (`start/suite-step.ts`). Its

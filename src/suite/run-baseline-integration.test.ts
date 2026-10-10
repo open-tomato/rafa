@@ -36,11 +36,23 @@ const SPAWNED_BUN_VERSION = Bun.spawnSync(['bun', '--version']).stdout.toString(
  */
 const JUNIT_HAS_FAILURE_MESSAGE = Bun.semver.order(SPAWNED_BUN_VERSION, '1.4.0') >= 0;
 
-/** `fail.test.ts`'s failure `name`, as the run reads it. */
+/** `fail.test.ts`'s failure `name`, as a baseline holds it: the pair, and the message when the report had one. */
 function failed(name: string) {
   return JUNIT_HAS_FAILURE_MESSAGE
     ? { file: 'fail.test.ts', name, message: TO_BE_MESSAGE }
     : { file: 'fail.test.ts', name };
+}
+
+/** What `fail.test.ts`'s two failing cases expect and receive, by name. */
+const TO_BE_VALUES: Readonly<Record<string, readonly [number, number]>> = { 'breaks': [3, 2], 'also breaks': [5, 4] };
+
+/**
+ * `fail.test.ts`'s failure `name`, as a run reads it: {@link failed},
+ * with the error lines Bun printed above its `(fail)` line on stderr.
+ */
+function printed(name: string) {
+  const [expected, received] = TO_BE_VALUES[name] ?? [0, 0];
+  return { ...failed(name), errorLines: [`error: ${TO_BE_MESSAGE}`, `Expected: ${expected}`, `Received: ${received}`] };
 }
 
 const PASSING_TEST = [
@@ -93,7 +105,7 @@ describe('runSuite and baseline over a real bun test', () => {
       expect(baselineResult.summary).not.toBeNull();
       expect(baselineResult.errors).toBe(0);
       expect(baselineResult.junit).toBe('read');
-      expect(baselineResult.failures).toEqual([failed('breaks')]);
+      expect(baselineResult.failures).toEqual([printed('breaks')]);
 
       const baseline = baselineOf(baselineResult, new Date('2026-09-30T00:00:00.000Z'), 'abc123');
       expect(baseline.failures).toEqual([failed('breaks')]);
@@ -102,7 +114,7 @@ describe('runSuite and baseline over a real bun test', () => {
       const sameJunitFile = join(dir, '.rafa', 'runs', 'same.junit.xml');
       const sameResult = await runSuite({ cwd: dir, junitFile: sameJunitFile });
       const sameSplit = splitFailures(sameResult.failures, baseline);
-      expect(sameSplit).toEqual({ fresh: [], known: [failed('breaks')] });
+      expect(sameSplit).toEqual({ fresh: [], known: [printed('breaks')] });
 
       // A new failing test alongside the known one: the split tells them apart.
       writeProject(dir, 2);
@@ -112,12 +124,12 @@ describe('runSuite and baseline over a real bun test', () => {
       expect(laterResult.exitCode).toBe(1);
       expect(laterResult.summary).not.toBeNull();
       expect(laterResult.errors).toBe(0);
-      expect(laterResult.failures).toEqual([failed('breaks'), failed('also breaks')]);
+      expect(laterResult.failures).toEqual([printed('breaks'), printed('also breaks')]);
 
       const split = splitFailures(laterResult.failures, baseline);
       expect(split).toEqual({
-        fresh: [failed('also breaks')],
-        known: [failed('breaks')],
+        fresh: [printed('also breaks')],
+        known: [printed('breaks')],
       });
     } finally {
       rmSync(dir, { recursive: true, force: true });

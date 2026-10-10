@@ -3,8 +3,15 @@
  * blocker text, and the repair task that carries it.
  *
  * {@link blockerText} names each new failing test file with its count,
- * the command running them (`bun test <files>`), and the errors or the
- * missing summary when those made the step red. Errors outside any test
+ * the command running them (`bun test <files>`), what Bun printed for
+ * them, and the errors or the missing summary when those made the step
+ * red. What Bun printed is the first error line of each new failure
+ * (`suite/failure-lines.ts`), which the JUnit report does not hold:
+ * quoted by file, each distinct line once with how many of the file's
+ * tests printed it, the first {@link ERROR_LINES_QUOTED} lines of a file
+ * and the first {@link ERROR_FILES_QUOTED} files, the rest counted. A
+ * file whose failures carry no line is left out of that sentence, and
+ * the sentence is left out when none does. Errors outside any test
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
@@ -69,6 +76,60 @@ function failingFiles(failures: readonly SuiteFailure[]): readonly (readonly [st
   return [...counts.entries()];
 }
 
+/** How many distinct error lines of one file the blocker quotes before it counts the rest. */
+const ERROR_LINES_QUOTED = 3;
+
+/** How many files' error lines the blocker quotes before it counts the rest. */
+const ERROR_FILES_QUOTED = 10;
+
+/** `count` as `1 test` or `N tests`. */
+function testCount(count: number): string {
+  return `${count} ${count === 1
+    ? 'test'
+    : 'tests'}`;
+}
+
+/** Each distinct first error line among `failures` and how many of them printed it, in first-seen order. */
+function firstErrorLines(failures: readonly SuiteFailure[]): readonly (readonly [string, number])[] {
+  const counts = new Map<string, number>();
+  for (const failure of failures) {
+    const line = failure.errorLines?.[0];
+    if (line !== undefined) counts.set(line, (counts.get(line) ?? 0) + 1);
+  }
+  return [...counts.entries()];
+}
+
+/** One file's quoted error lines, as `<file> "<line>" (N tests), ...`, or null when its failures carry none. */
+function quotedFile(file: string, failures: readonly SuiteFailure[]): string | null {
+  const lines = firstErrorLines(failures.filter((failure) => failure.file === file));
+  if (lines.length === 0) return null;
+  const quoted = lines.slice(0, ERROR_LINES_QUOTED).map(([line, count]) => `"${line}" (${testCount(count)})`);
+  const left = lines.length - quoted.length;
+  const more = left > 0
+    ? [`and ${left} more lines`]
+    : [];
+  return `${file} ${[...quoted, ...more].join(', ')}`;
+}
+
+/**
+ * The first error lines Bun printed for `failures`, by file, `; ` apart,
+ * or null when none carries a line. See the module note.
+ */
+export function quotedErrors(failures: readonly SuiteFailure[]): string | null {
+  const files = failingFiles(failures).flatMap(([file]) => {
+    const quoted = quotedFile(file, failures);
+    return quoted === null
+      ? []
+      : [quoted];
+  });
+  if (files.length === 0) return null;
+  const left = files.length - ERROR_FILES_QUOTED;
+  const more = left > 0
+    ? [`and ${left} more files`]
+    : [];
+  return [...files.slice(0, ERROR_FILES_QUOTED), ...more].join('; ');
+}
+
 /** How many errors outside any test {@link unhandledNames} names before it counts the rest. */
 const UNHANDLED_NAMED = 10;
 
@@ -125,18 +186,18 @@ function errorsText(newErrors: number, errors: readonly UnhandledError[]): strin
 
 /**
  * The blocker a red step writes: the new failing files with their
- * counts and the command running them, then the errors outside any test
- * by file and first line, or the missing summary, when those made it
- * red. `label` names the step.
+ * counts, the command running them and what Bun printed for them, then
+ * the errors outside any test by file and first line, or the missing
+ * summary, when those made it red. `label` names the step.
  */
 export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   if (files.length > 0) {
-    const named = files.map(([file, count]) => `${file} (${count} ${count === 1
-      ? 'test'
-      : 'tests'})`);
+    const named = files.map(([file, count]) => `${file} (${testCount(count)})`);
     parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => runnablePath(file)).join(' ')} and make them pass.`);
+    const quoted = quotedErrors(verdict.fresh);
+    if (quoted !== null) parts.push(`What Bun printed for them: ${quoted}.`);
   }
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);

@@ -126,10 +126,14 @@
  * blocker on that repair's line instead, marking it `[BLOCKED]` again,
  * and insert nothing. The text and the writes live in
  * `suite-blocker.ts`. The text names each new failing test file with its
- * count, the command running them (`bun test <files>`), and the
- * errors outside any test, by file and first line, or the missing
- * summary when those made it red; the repair session is handed it
- * through `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`).
+ * count, the command running them (`bun test <files>`), the first error
+ * line Bun printed for them, and the errors outside any test, by file
+ * and first line, or the missing summary when those made it red; the
+ * repair session is handed it through `BLOCKER_PROMPT_PREFIX`
+ * (`start/dispatch.ts`). The recorded step keeps those error lines too,
+ * up to `MAX_ERROR_LINES` (`suite/failure-lines.ts`) on each of its
+ * `newFailures`: Bun's JUnit report names a failing case and not what
+ * failed it, so stderr is where they are read.
  *
  * ## SIGINT: a stop, not a red step
  *
@@ -519,6 +523,13 @@ function isRed(verdict: StepVerdict): boolean {
   return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
 }
 
+/** A new failure as the run record holds it: its pair, and its error lines when Bun printed any. */
+function recordedFailure(failure: SuiteFailure): SuiteFailure {
+  return failure.errorLines === undefined
+    ? { file: failure.file, name: failure.name }
+    : { file: failure.file, name: failure.name, errorLines: failure.errorLines };
+}
+
 /** The step the run record holds for `result`, its `reason` right after its scope when it has one; see the module note. */
 function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[]): SessionStep {
   const { kind, scope, reason } = settling;
@@ -532,7 +543,7 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
     exitCode: result.exitCode,
     summary: result.summary,
     failures: result.failures.map((failure) => ({ file: failure.file, name: failure.name })),
-    newFailures: fresh.map((failure) => ({ file: failure.file, name: failure.name })),
+    newFailures: fresh.map(recordedFailure),
   };
 }
 
