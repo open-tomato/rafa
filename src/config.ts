@@ -413,6 +413,12 @@ function readLayer(
     releaseTag: read('releaseTag'),
     releasePublishCommand: read('releasePublishCommand'),
     errorsCodes: read('errorsCodes'),
+    loggerKind: read('loggerKind'),
+    loggerLevel: read('loggerLevel'),
+    loggerTheme: read('loggerTheme'),
+    loggerModules: read('loggerModules'),
+    loggerCallSite: read('loggerCallSite'),
+    loggerApi: read('loggerApi'),
     cleanupStaleDays: read('cleanupStaleDays'),
     cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
     cleanupKeep: read('cleanupKeep'),
@@ -567,6 +573,7 @@ const MAP_SETTINGS: ReadonlySet<ConfigSetting> = new Set<ConfigSetting>([
   'tiersSkills',
   'tiersAgents',
   'routing',
+  'loggerModules',
 ]);
 
 /**
