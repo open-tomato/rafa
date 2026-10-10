@@ -92,6 +92,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['errorsCodes', 'errors.codes'],
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
@@ -145,6 +146,7 @@ const TOP = [
   'claims',
   'triage',
   'release',
+  'errors',
   'cleanup',
   'dangerous',
   'status',
@@ -164,7 +166,7 @@ describe('SETTINGS', () => {
     expect(spelled).toEqual(KEYS.map((pair) => [...pair]));
   });
 
-  it('carries item keys for the two lists of mappings and for nothing else', () => {
+  it('carries item keys for the lists of mappings and for nothing else', () => {
     const withItems = SETTING_NAMES
       .filter((setting) => SETTINGS[setting].itemKeys !== undefined)
       .map((setting) => [setting, SETTINGS[setting].itemKeys]);
@@ -173,6 +175,7 @@ describe('SETTINGS', () => {
       ['prerequisitesRequired', ['tool', 'env', 'service', 'lsp', 'probe']],
       ['prerequisitesOptional', ['tool', 'env', 'service', 'lsp', 'probe', 'reason']],
       ['modules', ['npm', 'github', 'path', 'ref']],
+      ['errorsCodes', ['code', 'description', 'hint', 'level', 'since']],
     ]);
   });
 });
@@ -211,6 +214,7 @@ describe('SECTIONS', () => {
       'cleanup',
       'dangerous',
       'effort',
+      'errors',
       'hub',
       'learning',
       'learning.bless',
