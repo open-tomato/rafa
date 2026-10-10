@@ -11,7 +11,7 @@
  * written to a temporary directory outside the repository and import the
  * entry by absolute path, so no gate ever reads one.
  *
- * One probe implements all six ports, its tracker under a kind an
+ * One probe implements all seven ports, its tracker under a kind an
  * add-on brings, its `file` sync over `copyEffortStore` and `mergeStore`,
  * assigns both store backends to `Store`, states every port version, and
  * compiles clean. Every other probe changes one thing
@@ -375,10 +375,15 @@ const CONFORMING_PROBE = probeSource(
   '    };',
   '  },',
   '};',
-  'export const versions: P.PortVersions = {',
-  '  tracker: 1, store: 1, learning: 1, output: 1, planner: 1, sync: 1,',
+  'export const logger: P.Logger = {',
+  '  log: (entry: P.LogEntry) => { void entry.api?.url; },',
+  '  child: (bindings: P.LogBindings) => { void bindings.module; return logger; },',
+  '  enabled: (level: P.LogLevel) => level !== "api",',
   '};',
-  'export const port: P.PortType = "sync";',
+  'export const versions: P.PortVersions = {',
+  '  tracker: 1, store: 1, learning: 1, output: 1, planner: 1, sync: 1, logger: 1,',
+  '};',
+  'export const port: P.PortType = "logger";',
 );
 
 /** A sync literal: `kind`, `push` and `pull` as given. */
@@ -625,7 +630,7 @@ const REFUSALS: readonly Refusal[] = [
     file: 'port-version-drifted.ts',
     source: probeSource(
       'export const versions: P.PortVersions = {',
-      '  tracker: 2, store: 1, learning: 1, output: 1, planner: 1, sync: 1,',
+      '  tracker: 2, store: 1, learning: 1, output: 1, planner: 1, sync: 1, logger: 1,',
       '};',
     ),
     code: 2322,

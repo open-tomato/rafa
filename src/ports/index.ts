@@ -1,5 +1,5 @@
 /**
- * The package's ports: the six interfaces core defines for an adapter
+ * The package's ports: the seven interfaces core defines for an adapter
  * to implement, declared as types with no implementation behind any of
  * them.
  *
@@ -169,11 +169,12 @@ export interface PortVersions {
   output: OutputPortVersion;
   planner: PlannerPortVersion;
   sync: SyncPortVersion;
+  logger: LoggerPortVersion;
 }
 
 /**
- * The six port types: `tracker`, `store`, `learning`, `output`,
- * `planner` and `sync`.
+ * The seven port types: `tracker`, `store`, `learning`, `output`,
+ * `planner`, `sync` and `logger`.
  */
 export type PortType = keyof PortVersions;
 

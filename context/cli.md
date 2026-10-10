@@ -2621,8 +2621,8 @@ say nothing of why.
   `npm source "<name>" is refused: phase 1 loads path sources alone, ...`.
 - **Every `path` source is validated**, enabled or not, with
   `validateManifest` (`src/modules/manifest.ts`). An enabled one with no
-  problem has each `tracker`, `store`, `planner`, `output` and `sync`
-  entry imported, its default export the adapter's `create`, registered
+  problem has each `tracker`, `store`, `planner`, `output`, `sync` and
+  `logger` entry imported, its default export the adapter's `create`, registered
   under the manifest's `kind` and `requires.ports` version on
   `CORE_ADAPTER_REGISTRY`, and its `commands` entry handed to
   `loadModuleCommands`. An entry outside the module directory, an import
