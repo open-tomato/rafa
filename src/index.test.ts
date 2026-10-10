@@ -757,6 +757,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/fix-schema.js', [
     ['../../cli/command.js', ['CommandExit']],
+    ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/fix-schema.js', ['fixStoreSchema', 'SchemaFixRefusal']],
     ['../../effort/store/sqlite.js', ['sqliteStorePath']],
     ['../../loop/sessions.js', ['readSessions']],
@@ -764,11 +765,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/effort/copy.js', [
     ['../../cli/command.js', ['CommandExit']],
+    ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/copy.js', ['copyEffortStore', 'EffortCopyFailure', 'EffortCopyRefusal']],
     ['../../effort/store/location.js', ['EFFORT_DIR_VARIABLE']],
     ['../../effort/store.js', ['EFFORT_STORE_DIR']],
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
-    ['./fix-schema.js', ['fileStamp']],
   ]],
   ['./commands/effort/schema.js', [
     ['../../cli/command.js', ['CommandExit']],
@@ -781,16 +782,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/effort/migrate.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
+    ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/development-build.js', ['DevelopmentBuildRefusedError']],
     ['../../effort/store/location.js', ['effortStoreDir']],
     ['../../effort/store/migrate.js', ['migrateStore', 'MigrateRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
-    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
+    ['./fix-schema.js', ['keepsIdLine']],
   ]],
   ['./commands/effort/merge.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
+    ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/development-build.js', ['DevelopmentBuildRefusedError']],
     ['../../effort/store/location.js', ['effortStoreDir']],
     ['../../effort/store/merge-store.js', ['MergeRefusal', 'mergeStore']],
@@ -798,7 +801,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../effort/store/rebuild-aside.js', ['RebuildRefusal']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./fix-schema.js', ['fileStamp', 'keepsIdLine']],
+    ['./fix-schema.js', ['keepsIdLine']],
   ]],
   ['./commands/effort/import.js', [
     ['../../effort/sync/file.js', ['createFileSync']],

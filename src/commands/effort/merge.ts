@@ -41,6 +41,7 @@ import { join, resolve } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';
 import { MergeRefusal, mergeStore } from '../../effort/store/merge-store.js';
@@ -49,7 +50,7 @@ import { RebuildRefusal } from '../../effort/store/rebuild-aside.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
 import { expectOneArgument, readSwitch, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
-import { fileStamp, keepsIdLine } from './fix-schema.js';
+import { keepsIdLine } from './fix-schema.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort merge';

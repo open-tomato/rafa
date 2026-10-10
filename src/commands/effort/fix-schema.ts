@@ -26,6 +26,11 @@
  * Every refusal is exit code 1 with the live store untouched; every other
  * outcome is exit code 0. In json mode the `FixSchemaResult` is the data
  * of the terminal result.
+ *
+ * This is the command half. The stamp the parallel and backup files are
+ * named with, `fileStamp`, is the library half,
+ * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
+ * too; this file re-exports none of it.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { FixSchemaResult } from '../../effort/store/fix-schema.js';
@@ -33,6 +38,7 @@ import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { CommandExit } from '../../cli/command.js';
+import { fileStamp } from '../../effort/file-stamp.js';
 import { fixStoreSchema, SchemaFixRefusal } from '../../effort/store/fix-schema.js';
 import { sqliteStorePath } from '../../effort/store/sqlite.js';
 import { readSessions } from '../../loop/sessions.js';
@@ -54,12 +60,6 @@ export interface FixSchemaCommandSeams {
   readonly isAlive?: PidProbe;
   /** Which build runs; `readRuntimeIdentity()` by default. */
   readonly identity?: RuntimeIdentity;
-}
-
-/** A clock reading as a file-name stamp: `20260926T101500Z`. */
-export function fileStamp(date: Date): string {
-  return date.toISOString().replace(/[-:]/g, '')
-    .replace(/\.\d{3}Z$/, 'Z');
 }
 
 /**

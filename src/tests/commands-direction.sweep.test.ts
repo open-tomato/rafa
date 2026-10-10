@@ -109,6 +109,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'src/board/blocked-issues.ts' },
   { commandFile: 'src/commands/doctor-cleanup.ts', libraryHalf: 'src/cleanup/settings.ts' },
   { commandFile: 'src/commands/doctor-effort-sync.ts', libraryHalf: 'src/effort/sync/doctor-reading.ts' },
+  { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'src/effort/file-stamp.ts' },
 ];
 
 /**
