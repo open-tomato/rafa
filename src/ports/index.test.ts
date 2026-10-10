@@ -157,6 +157,7 @@ const ENTRY_FILE = join(SRC_DIR, 'ports', 'index.ts');
 
 /** The type names the entry exports, sorted as `sort` sorts them. */
 const TYPE_EXPORTS = [
+  'ApiExchange',
   'AppendResult',
   'BlessedBundle',
   'CliEvent',
@@ -183,6 +184,11 @@ const TYPE_EXPORTS = [
   'IssueType',
   'Learning',
   'LearningPortVersion',
+  'LogBindings',
+  'LogEntry',
+  'LogLevel',
+  'Logger',
+  'LoggerPortVersion',
   'MergeDecision',
   'MergeResult',
   'MergeRule',

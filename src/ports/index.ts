@@ -460,6 +460,8 @@ export interface CliEventLog {
   type: 'log';
   level: 'debug' | 'info' | 'warn' | 'error';
   message: string;
+  /** What a logger knew beyond the message: module, action, code, hint and the like. */
+  fields?: Readonly<Record<string, unknown>>;
   ts: string;
 }
 
@@ -507,6 +509,87 @@ export interface Output {
   /** The command's answer. */
   result: (payload: unknown) => void;
 }
+
+// ---------------------------------------------------------------------
+// Logger
+// ---------------------------------------------------------------------
+
+/**
+ * How loud a log entry is, or `api` for the metadata of one request and
+ * its response. `error`, `warn` and `debug` are ordered, quietest first;
+ * `api` sits outside that order and is turned on by itself. There is no
+ * `info`: that is a command's own text, which goes through {@link Output}.
+ */
+export type LogLevel = 'error' | 'warn' | 'debug' | 'api';
+
+/** One request to a service and what came back, as metadata only: never a body. */
+export interface ApiExchange {
+  /** The service called, such as `hub`. */
+  service: string;
+  /** The request method, such as `GET`. */
+  method: string;
+  /** The request URL; an adapter filters it before writing it. */
+  url: string;
+  /** The response status; absent when no response arrived. */
+  status?: number;
+  /** How long the exchange took, in milliseconds. */
+  durationMs?: number;
+  /** The size of the request body, in bytes. */
+  requestBytes?: number;
+  /** The size of the response body, in bytes. */
+  responseBytes?: number;
+  /** The id the service gave the request, when it gives one. */
+  requestId?: string;
+  /** Response headers; an adapter writes only the ones its allow-list names. */
+  headers?: Readonly<Record<string, string>>;
+}
+
+/** One diagnostic line, with what is known about where it comes from. */
+export interface LogEntry {
+  /** How loud the entry is, or `api`. */
+  level: LogLevel;
+  /** What happened, as one sentence. */
+  message: string;
+  /** The module writing it, as a child logger binds it. */
+  module?: string;
+  /** The action or step running. */
+  action?: string;
+  /** A cause code, `<family>:<leaf>` (`src/errors/codes.ts`). */
+  code?: string;
+  /** The recommended next action. */
+  hint?: string;
+  /** Anything else worth keeping, for an adapter that stores fields. */
+  data?: Readonly<Record<string, unknown>>;
+  /** The error behind the entry, kept whole so its own stack survives. */
+  error?: unknown;
+  /** The exchange an `api` entry is about. */
+  api?: ApiExchange;
+}
+
+/** What a child logger adds to every entry it writes. */
+export interface LogBindings {
+  /** The module every entry of the child comes from. */
+  module?: string;
+  /** The action every entry of the child belongs to. */
+  action?: string;
+}
+
+/**
+ * Where diagnostics go: errors, warnings, debug lines and `api`
+ * exchanges, each with its module, cause code and hint when known. A
+ * command's own text and its result stay on {@link Output}.
+ */
+export interface Logger {
+  /** Writes `entry`, unless its level is off for its module. */
+  log: (entry: LogEntry) => void;
+  /** A logger adding `bindings` to every entry; an entry's own fields win. */
+  child: (bindings: LogBindings) => Logger;
+  /** Whether an entry at `level` from `module` would be written. */
+  enabled: (level: LogLevel, module?: string) => boolean;
+}
+
+/** The version of the {@link Logger} port this entry declares. */
+export type LoggerPortVersion = 1;
 
 // ---------------------------------------------------------------------
 // Planner
