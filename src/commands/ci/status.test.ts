@@ -15,9 +15,10 @@
  * that does send one; the refusals read the runner factory's log beside
  * a valid line that does make a runner.
  */
-import type { CiStatusReading, CiStatusSeams } from './status.js';
+import type { CiStatusSeams } from './status.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { FakeRun } from '../../ci/runs-fake.js';
+import type { CiStatusReading } from '../../ci/status-reading.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
@@ -28,9 +29,10 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
+import { verdictOf } from '../../ci/status-reading.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import { CI_STATUS_EVENT, CI_STATUS_USAGE, createCiStatusCommand, verdictOf } from './status.js';
+import { CI_STATUS_EVENT, CI_STATUS_USAGE, createCiStatusCommand } from './status.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-ci-status-')));

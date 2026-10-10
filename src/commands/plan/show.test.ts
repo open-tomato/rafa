@@ -40,9 +40,9 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
 import { parsePlan } from '../../plan/index.js';
+import { plansDirAt } from '../../plan/plan-files.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
-import { plansDirAt } from './plan-files.js';
 import planShowCommand, { readTrackerFlag, renderShownPlan, showPlan } from './show.js';
 
 /** A temporary directory of this file's own. */

@@ -84,8 +84,8 @@
  * The four relationship writes are `./labels-writes.ts`'s. `afterMerge`
  * runs, for a merged pull request whose body closes an issue, the two
  * board steps `rafa pr merge` runs today in this order: the epic
- * checklist tick (`tickEpics`, `src/commands/pr/merge-tick.ts`) and the
- * unblock reading (`unblockAfterMerge`, `src/commands/pr/merge-unblock.ts`).
+ * checklist tick (`tickEpics`, `src/board/epic-tick.ts`) and the
+ * unblock reading (`unblockAfterMerge`, `src/board/unblock-after-merge.ts`).
  * Each prints what it came to through the request's `info` and `warn`
  * exactly as `pr merge` prints it, and each outcome is also answered as
  * a {@link RelationWrite}: an epic's tick names the epic, an unblock
@@ -106,21 +106,21 @@ import type {
   RelationWriteStatus,
 } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockReport, UnblockStatus } from '../../commands/issue/unblock.js';
-import type { EpicTickResult } from '../../commands/pr/merge-tick.js';
+import type { EpicTickResult } from '../epic-tick.js';
 import type { Epic } from '../epics.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
+import type { UnblockReport, UnblockStatus } from '../unblock.js';
 
-import { epicTickProblemLine, epicTickSentence, tickEpics } from '../../commands/pr/merge-tick.js';
-import { unblockAfterMerge } from '../../commands/pr/merge-unblock.js';
 import { messageOf } from '../../config-sections.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../blocked.js';
+import { epicTickProblemLine, epicTickSentence, tickEpics } from '../epic-tick.js';
 import { epicLines } from '../epic-walk.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf, readEpics } from '../epics.js';
 import { boardListFields } from '../roadmap-board.js';
 import { createGhRoadmapBody } from '../roadmap-tick.js';
 import { closedIssuesIn } from '../roadmap.js';
+import { unblockAfterMerge } from '../unblock-after-merge.js';
 
 import { freedByOver } from './freed.js';
 import { addLabelsBlocker, removeLabelsBlocker, removeLabelsParent, setLabelsParent } from './labels-writes.js';

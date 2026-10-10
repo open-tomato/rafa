@@ -50,7 +50,7 @@
  * carry the `labels` ones too, so a listing in the native fields serves
  * both modes; `./doctor-board.ts` asks for them whenever the key is set.
  * In `labels` mode one `gh repo view --json nameWithOwner`
- * (`readBoardRepository`, `./epic/move-native.ts`) follows the listing,
+ * (`readBoardRepository`, `../board/repository.ts`) follows the listing,
  * to tell a local link from a foreign one; `native` mode reads labels and
  * bodies only, and sends nothing more. No issue is read one at a time.
  *
@@ -72,11 +72,11 @@ import type { BoardRelationshipMode } from '../config-sections.js';
 
 import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { EPIC_LABEL_PREFIX } from '../board/epics.js';
+import { readBoardRepository } from '../board/repository.js';
 import { messageOf } from '../config-sections.js';
+import { plural } from '../plan/plan-files.js';
 
-import { readBoardRepository } from './epic/move-native.js';
 import { MOVE_FIX } from './init-board.js';
-import { plural } from './plan/plan-files.js';
 
 /** The heading the marks sit under. */
 export const MARKS_HEADING = 'Other mode\'s marks:';

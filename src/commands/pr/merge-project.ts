@@ -11,8 +11,8 @@
  * maybe its `spec:blocked` label and so its Blocked Stage. None of those
  * writes goes through the refreshing `IssueBoard`
  * (`src/board/project/issue-board-refresh.ts`): GitHub closes the issue,
- * and the unblock reading (`./merge-unblock.ts`) takes its label off
- * through a plain board. So this module refreshes them itself, in one
+ * and the unblock reading (`src/board/unblock-after-merge.ts`) takes its
+ * label off through a plain board. So this module refreshes them itself, in one
  * refresh, after that reading has written what it writes.
  *
  * ## Which issues it refreshes
@@ -69,16 +69,16 @@ import type { ProjectRunnerSeams } from '../../board/project/project-runner.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { BlockersReading } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { UnblockReport } from '../issue/unblock.js';
+import type { UnblockReport } from '../../board/unblock.js';
 
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
 import { selectBoardRelations } from '../../board/relations/select.js';
+import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { messageOf } from '../../config-sections.js';
-import { readBoardRepository } from '../epic/move-native.js';
 
 /** What {@link refreshProjectAfterMerge} is made with. */
 export interface MergeProjectOptions {

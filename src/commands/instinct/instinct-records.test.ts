@@ -25,17 +25,16 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
-
 import {
-  findRecords,
   isRecordFile,
-  LEARNING_STORE_FILES,
   readRecord,
   readScope,
   readScopes,
   recordFiles,
   recordId,
-} from './instinct-records.js';
+} from '../../schema/scope-records.js';
+
+import { findRecords, LEARNING_STORE_FILES } from './instinct-records.js';
 
 /** A temporary directory of this file's own, its path resolved through every link. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-instinct-records-')));

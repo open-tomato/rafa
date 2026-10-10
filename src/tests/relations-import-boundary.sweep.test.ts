@@ -25,7 +25,7 @@
  * `groupByEpicLabel` and `readBlockedBy` directly, exactly as it did
  * before the port existed, so labels-mode output stays byte-identical
  * (the hard rule the baseline captures below exist to police). A few
- * more modules (`setup.ts`, `epic/new.ts`, `pr/merge-tick.ts`,
+ * more modules (`setup.ts`, `epic/new.ts`, `epic-tick.ts`,
  * `issue/unblock.ts`, `issue/roadmap-epic-table.ts`,
  * `issue/create-blocked.ts`) write or format a labels-mode-only concern
  * that has no native counterpart yet.
@@ -79,12 +79,15 @@ const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'board/epic-dependents.ts': 'epic cancel\'s labels-mode branch, reading epic: labels and Blocked by: lines directly; native mode reads the port',
   'board/epic-problems.ts': 'the two-epic-label fault finder doctor-epics.ts reports, a labels-mode structural check',
   'board/roadmap-rows.ts': 'the roadmap table\'s labels-mode branch, per its own module note',
+  'board/blocked-issues.ts': 'the labels-mode reading of every open spec:blocked issue, behind the doctor row and status\'s count',
   'board/blocked-line.ts': 'the walk\'s labels-mode-only remedy: "take spec:blocked off #n"',
+  'board/epic-tick.ts': 'the epic tick pr merge and the labels adapter share, matching a member against its epic: label',
+  'board/unblock.ts': 'the unblock run rafa issue unblock and pr merge share, a labels-mode-only reading of Blocked by: lines and write of spec:blocked',
   'board/setup.ts': 'writes the spec:blocked label definition during rafa init',
   'status/render.ts': 'status\'s labels-mode wording for the blocked count',
   'status/blocked-count.ts': 'status\'s labels-mode wording when the count could not be read',
   'next/state.ts': 'next\'s labels-mode remedy wording',
-  'commands/doctor-blocked.ts': 'the doctor row reporting spec:blocked issues',
+  'commands/doctor-blocked.ts': 'the doctor row\'s clean line, counting the issues labelled spec:blocked',
   'commands/doctor-epics.ts': 'the doctor row reporting epic: labels',
   'commands/doctor-marks.ts': 'the doctor row naming the other mode\'s marks, which in native mode looks for epic: labels, spec:blocked and Blocked by: lines',
   'commands/epic/move.ts': 'the move module',
@@ -92,9 +95,8 @@ const ALLOWED_IMPORTERS: Readonly<Record<string, string>> = Object.freeze({
   'commands/epic/close.ts': 'epic close\'s labels-mode branch, finding members by the epic: label',
   'commands/epic/cancel.ts': 'epic cancel\'s labels-mode branch, checking whether a member carries spec:blocked',
   'commands/epic/cancel-unblock.ts': 'epic cancel\'s labels-mode branch, reading a waited-on outsider\'s Blocked by: line',
-  'commands/pr/merge-tick.ts': 'pr merge\'s epic-tick, matching a member against its epic: label',
   'commands/issue/roadmap-epic-table.ts': 'the roadmap epic table\'s labels-mode branch',
-  'commands/issue/unblock.ts': 'rafa issue unblock, a labels-mode-only command',
+  'commands/issue/unblock.ts': 'rafa issue unblock, a labels-mode-only command, wording its lines with spec:blocked',
   'commands/issue/create-blocked.ts': 'rafa issue create\'s spec:blocked mark from a spec\'s Blocked by: line, a labels-mode write #467 moves behind the port',
   'suite/owns.ts': 'the stage step\'s Owns: lookup, finding a spec\'s epic by its epic: label the way epic-context.ts does; a failed read only widens the step to the whole suite',
 });

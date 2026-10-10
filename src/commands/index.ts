@@ -52,14 +52,14 @@
  * `skill backfill`, which run the demotion pass of `src/demote/` and the
  * backfill of `src/backfill/` over one skills directory, nor
  * `instinct list` and `instinct show`, which read the records the two
- * instinct scopes hold through `commands/instinct/instinct-records.ts`, nor
+ * instinct scopes hold through `schema/scope-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
  * the nine `pr` actions, which read, open, retarget, wait on, merge and
  * triage one repository's pull requests through the PullRequests port
  * and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
- * through `src/release/` and share `release/status.ts`'s readers, nor
+ * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and

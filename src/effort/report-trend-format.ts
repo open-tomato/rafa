@@ -25,7 +25,7 @@ import type {
   TrendSegment,
 } from './report-trend.js';
 
-import { plural } from '../commands/plan/plan-files.js';
+import { plural } from '../plan/plan-files.js';
 
 import { alignRows, formatHistogram, formatMinutes, oneLine } from './report-format.js';
 

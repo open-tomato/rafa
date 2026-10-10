@@ -12,7 +12,7 @@
  */
 import type { PlantedProject } from './cli-capture.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { LoopSessionSeams } from '../commands/loop/loop-sessions.js';
+import type { LoopSessionSeams } from '../loop/session-readings.js';
 import type { SessionRecord } from '../loop/sessions.js';
 
 import {

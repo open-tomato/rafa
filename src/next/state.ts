@@ -161,8 +161,8 @@ import type { NextSources, NextWorld, OpenPull } from './readings.js';
 import { blockedLineSentence, notReadySentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { planLabel } from '../commands/loop/loop-sessions.js';
-import { plural } from '../commands/plan/plan-files.js';
+import { planLabel } from '../loop/session-readings.js';
+import { plural } from '../plan/plan-files.js';
 import { hasDiverged } from '../start/branch-decision.js';
 
 import { homeAfterLoop, readAwayEnded, readHopBlocked, readHopDry, readHopHalt, readPrOwnerReview } from './hop-rows.js';

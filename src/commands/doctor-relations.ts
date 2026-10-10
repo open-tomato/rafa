@@ -22,7 +22,7 @@
  * boards row, so the run sends that listing once. The adapter needs the
  * board's repository to tell a local link from a foreign one, read with
  * one `gh repo view --json nameWithOwner` (`readBoardRepository`,
- * `./epic/move-native.ts`) after the listing answered. No issue is read
+ * `../board/repository.ts`) after the listing answered. No issue is read
  * one at a time.
  *
  *  - Blockers: every OPEN issue whose `blockersOf` reading is truncated.
@@ -56,10 +56,11 @@ import type { RelationsReading } from '../board/relations/port.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 
 import { selectBoardRelations } from '../board/relations/select.js';
+import { readBoardRepository } from '../board/repository.js';
 import { messageOf } from '../config-sections.js';
+import { plural } from '../plan/plan-files.js';
 
-import { NATIVE_MODE, readBoardRepository } from './epic/move-native.js';
-import { plural } from './plan/plan-files.js';
+import { NATIVE_MODE } from './epic/move-native.js';
 
 /** The heading the relationship lines sit under. */
 export const RELATIONS_HEADING = 'Relationships:';

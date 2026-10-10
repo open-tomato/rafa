@@ -148,11 +148,10 @@ import { EPIC_GUARD_PATH, writeEpicGuard } from '../board/epic-guard.js';
 import { LABELS_READS } from '../board/relations/labels.js';
 import { planRelationsMove, writeRelationsMove } from '../board/relations/move.js';
 import { createNativeRelations } from '../board/relations/native.js';
+import { readBoardRepository } from '../board/repository.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
-
-import { readBoardRepository } from './epic/move-native.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 export const YES_ANSWERS: readonly string[] = ['y', 'yes'];

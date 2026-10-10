@@ -126,7 +126,6 @@ import type { SettleSettings } from './settle.js';
 import type { FoldFragment } from './strategy.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { changelogVersions, compareVersions } from '../commands/release/status.js';
 import { messageOf } from '../config-sections.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { gitSaid } from '../pr/git.js';
@@ -136,6 +135,7 @@ import { forecastRelease } from './forecast.js';
 import { directoryPrefix, readFragmentTree } from './fragment-tree.js';
 import { highestChangeLevel, RELEASE_LEVEL_RANK } from './level.js';
 import { readReceipt } from './receipt.js';
+import { changelogVersions, compareVersions } from './status-readings.js';
 import { releaseStrategyFor } from './strategy.js';
 import { gitPathOf, parseSemanticVersion, readManifestVersion } from './version.js';
 

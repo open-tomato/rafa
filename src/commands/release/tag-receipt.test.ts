@@ -10,9 +10,9 @@
  * receipted, which tags: the refusal is the receipt's, not another
  * check's.
  */
-import type { ReleaseTag } from './status.js';
 import type { TagDecision, TagInputs, TagRefused } from './tag.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { ReleaseTag } from '../../release/status-readings.js';
 
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

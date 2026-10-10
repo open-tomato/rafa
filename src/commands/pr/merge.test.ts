@@ -56,6 +56,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
+import { epicTickSentence } from '../../board/epic-tick.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
 import { PR_NEEDS_GH } from '../../pr/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
@@ -63,7 +64,7 @@ import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { ENDING_LINE, ENDING_QUESTION, endingProbe } from '../../tests/ending-probe.js';
 
-import { epicTickSentence, noBoardListsLine } from './merge-tick.js';
+import { noBoardListsLine } from './merge-tick.js';
 import { createPrMergeCommand, summaryLine } from './merge.js';
 import { PR_USAGE } from './pr-context.js';
 
@@ -846,7 +847,7 @@ describe('the self-update follow-up beside a live loop', () => {
     const { project, seams } = updateCase();
     plantLoop(project, 'running', 'feature/a', LIVE_PID);
     const { run, events } = await ran(seams, project, ['41', '--yes', '--output=json']);
-    const data = events.at(-1)?.data as { followUps: { id: string; why: string }[] };
+    const data = dataOf(events) as unknown as { followUps: { id: string; why: string }[] };
 
     expect(run.exitCode).toBe(0);
     expect(data.followUps.map((followUp) => followUp.id)).toEqual(['self-update']);

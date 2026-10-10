@@ -14,7 +14,7 @@
  * the pid probe, which runs after the records are read, as a run writing
  * its end at that moment would.
  */
-import type { LoopSessionSeams } from './loop-sessions.js';
+import type { LoopSessionSeams } from '../../loop/session-readings.js';
 import type { SessionRecord } from '../../loop/sessions.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';

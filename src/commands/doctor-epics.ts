@@ -41,7 +41,7 @@
  * past the end of a listing that came back full is an epic this run did
  * not read. So when the listing answers as many issues as it asked for,
  * NO orphan is reported and {@link DoctorEpicsReport.unchecked} carries
- * the sentence saying so, as `./doctor-blocked.ts` refuses to call an id
+ * the sentence saying so, as `../board/blocked-issues.ts` refuses to call an id
  * unknown on a half-read board. Two labels on one issue are read off that
  * issue alone and are reported either way.
  *
@@ -70,8 +70,7 @@ import { epicProblemMessage, readEpicProblems } from '../board/epic-problems.js'
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing } from '../board/roadmap-board.js';
 import { messageOf } from '../config-sections.js';
-
-import { plural } from './plan/plan-files.js';
+import { plural } from '../plan/plan-files.js';
 
 /** The heading the epic label lines sit under, as `Blocked issues:` heads its own. */
 export const EPICS_HEADING = 'Epic labels:';

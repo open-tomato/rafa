@@ -60,9 +60,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { changelogVersions } from '../commands/release/status.js';
-
 import { checkReceipt } from './receipt.js';
+import { changelogVersions } from './status-readings.js';
 import { parseSemanticVersion } from './version.js';
 
 /** The open or close of a fenced code block, as `release status` reads one. */

@@ -146,10 +146,10 @@ import {
 } from '../board/project/refresh-warnings.js';
 import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.js';
 import { rankOf, stageOf } from '../board/project/rules.js';
+import { readBoardRepository } from '../board/repository.js';
 import { readRoadmapSetting } from '../board/setup-config.js';
 import { isMapping, messageOf } from '../config-sections.js';
 
-import { readBoardRepository } from './epic/move-native.js';
 import { PROJECT_NUMBER_SETTING, writeProjectNumber } from './init-board-project-setting.js';
 import { YES_ANSWERS } from './init-board.js';
 

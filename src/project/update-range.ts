@@ -16,7 +16,7 @@
  * moves a lock past its own release candidate, and a release candidate
  * installed over its release is a downgrade.
  */
-import { compareVersions } from '../commands/release/status.js';
+import { compareVersions } from '../release/status-readings.js';
 import { parseSemanticVersion } from '../release/version.js';
 
 /** Why a move was refused. */

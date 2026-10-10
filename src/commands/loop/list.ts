@@ -5,9 +5,9 @@
  *
  * Every record under `.rafa/runs/` reading `running` or `paused`, oldest
  * first (`loop/sessions.ts`), with the tasks of its plan counted as
- * `rafa loop status` counts them (`loop-sessions.ts`), the phase its run is
- * in beside the tasks done over total, `task` for a record from a rafa
- * older than the field. A record whose pid
+ * `rafa loop status` counts them (`loop/session-readings.ts`), the phase
+ * its run is in beside the tasks done over total, `task` for a record
+ * from a rafa older than the field. A record whose pid
  * is gone reads `stopped` and is not listed, nor is one that reads `done`.
  * No branch is read: the list is the project's, whatever is checked out.
  *
@@ -33,25 +33,28 @@
  * Exit code 1 for an argument, and for records that cannot be read. The
  * command declares no flag.
  */
-import type { LoopSessionSeams, ResolvedLoopSeams } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { isAbsolute, relative } from 'node:path';
 
-import { sessionPhase } from '../../loop/sessions.js';
-import { countTasks, expectNoArgument } from '../plan/plan-files.js';
-
 import {
   isLive,
-  phasedCounts,
-  phaseNote,
-  projectRoot,
   readRecords,
   readSessionChecklist,
   resolveLoopSeams,
   sessionLine,
+} from '../../loop/session-readings.js';
+import { sessionPhase } from '../../loop/sessions.js';
+import { countTasks } from '../../plan/plan-files.js';
+import { expectNoArgument } from '../plan/plan-files.js';
+
+import {
+  phasedCounts,
+  phaseNote,
+  projectRoot,
 } from './loop-sessions.js';
 
 /** The usage line a refusal names. */

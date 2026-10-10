@@ -44,7 +44,7 @@
  * `DevelopmentBuildRefusedError`, `UnionSchemaMismatch`), passed through
  * unchanged, so a caller maps them as `rafa effort merge` does; the NDJSON
  * refusal is among them. The parallel and backup files are stamped from
- * the clock as `fileStamp` (`src/commands/effort/fix-schema.ts`) spells
+ * the clock as `fileStamp` (`src/effort/file-stamp.ts`) spells
  * it, the spelling `rafa effort merge` uses.
  *
  * ## Which store
@@ -74,8 +74,8 @@ import type { MergeOptions } from '../store/merge-store.js';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { fileStamp } from '../../commands/effort/fix-schema.js';
 import { describeValue } from '../../config-sections.js';
+import { fileStamp } from '../file-stamp.js';
 import { copyEffortStore } from '../store/copy.js';
 import { effortStoreDir } from '../store/location.js';
 import { MOVE_TO_SQLITE, mergeStore } from '../store/merge-store.js';

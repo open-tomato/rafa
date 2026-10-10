@@ -78,10 +78,10 @@ import type { HopRecord } from './hop-record.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { NextNowEpic } from '../board/epic-walk.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { PlanListing } from '../commands/plan/list.js';
-import type { PlansDir } from '../commands/plan/plan-files.js';
 import type { BoardRelationshipMode } from '../config-sections.js';
 import type { SessionRecord } from '../loop/sessions.js';
+import type { PlanListing } from '../plan/list.js';
+import type { PlansDir } from '../plan/plan-files.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../pr/index.js';
 import type { OwnerApproval } from '../pr/owner-approval.js';
 import type { Position } from '../project/position.js';
@@ -89,10 +89,10 @@ import type { BaseStanding } from '../start/branch-decision.js';
 
 import { scanClaimBranches } from '../board/roadmap.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { isLive } from '../commands/loop/loop-sessions.js';
-import { listPlans } from '../commands/plan/list.js';
-import { planFileName } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
+import { isLive } from '../loop/session-readings.js';
+import { listPlans } from '../plan/list.js';
+import { planFileName } from '../plan/plan-files.js';
 import { gitSaid, parseWorkingTree } from '../pr/index.js';
 import { BRANCH_PREFIX, parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';
 

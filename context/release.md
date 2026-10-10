@@ -213,7 +213,10 @@ last fetched) and prints:
   the next patch/minor/major bump from the one below it), dates out of order,
   and headings with no tag above the adoption boundary
 
-Exits 0. Never writes. Implemented in `src/commands/release/status.ts`.
+Exits 0. Never writes. Implemented in `src/commands/release/status.ts`; the
+readers other folders import (`compareVersions`, `changelogVersions`,
+`readTags`, `readUntagged`) are its library half,
+`src/release/status-readings.ts`.
 
 **`rafa pr list`** shows each open pull request's forecast (the version and
 section that settle would produce if the branch merged now), marked as forecast,

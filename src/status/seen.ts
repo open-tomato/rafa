@@ -50,10 +50,10 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
-import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
-import { readSessionChecklist } from '../commands/loop/loop-sessions.js';
-import { blockedTasks } from '../commands/loop/status.js';
+import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { messageOf } from '../config-sections.js';
+import { blockedTasks } from '../loop/blocked-tasks.js';
+import { readSessionChecklist } from '../loop/session-readings.js';
 import { readSessions, SESSION_STATES } from '../loop/sessions.js';
 import { scopeAt } from '../project/scope.js';
 

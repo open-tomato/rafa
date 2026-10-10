@@ -5,7 +5,7 @@
  *
  * | Mode | What is counted | What it reads |
  * | --- | --- | --- |
- * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`src/commands/doctor-blocked.ts`), its own `gh issue list --label spec:blocked` |
+ * | `labels`, or no port | every open issue labelled `spec:blocked` | `readBlockedIssues` (`src/board/blocked-issues.ts`), its own `gh issue list --label spec:blocked` |
  * | `native` | every open issue on the listing whose `blockedBy` reading still holds it (`isWaiting`) | the one board listing the section already holds |
  *
  * `labels` mode is what `rafa status` counted before the port, command for
@@ -23,9 +23,9 @@
  * report's `problem` rather than rejecting.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardRelations } from '../board/relations/port.js';
 import type { BoardListing } from '../board/roadmap-board.js';
-import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { isWaiting } from '../board/relations/port.js';

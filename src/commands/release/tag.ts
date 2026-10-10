@@ -146,30 +146,31 @@
  *
  * ## What is shared with `release status`
  *
- * The tag reader, the changelog's version reader and the seams are
- * `./status.ts`'s, imported rather than copied: both actions ask the
+ * The tag reader and the changelog's version reader are
+ * `src/release/status-readings.ts`'s and the seams are `./status.ts`'s,
+ * imported rather than copied: both actions ask the
  * same two questions of the same repository, and a second spelling of
  * either would be a second thing to keep right. `pr list`, `pr show`
  * and `pr view` take `SEPARATOR` off `pr current` the same way.
  *
  * ## Two borrowings from other subjects
  *
- * `versionTag` comes from `../pr/merge-followups.ts`, where `pr merge`
- * PREDICTS the tag this command will write in order to decide whether
- * to name it as a follow-up. That prediction and this write have to be
- * the same string or the follow-up sends the operator at a tag nothing
- * writes, and one function is what holds them together; two copies of
+ * `versionTag` comes from `src/release/version-tag.ts`, which settle's
+ * tag step (`src/release/settle-tag.ts`) builds its tag from too. That
+ * write and this one have to be the same string or one version gets two
+ * tags, and one function is what holds them together; two copies of
  * `` `v${version}` `` would drift with nothing to notice.
  *
  * `expectNoArgument` comes from `../plan/plan-files.ts`, the refusal
  * eight other commands reading no argument already share.
  */
 import type { ReleaseCommitReading } from './release-commit.js';
-import type { ReleaseSeams, TagReading } from './status.js';
+import type { ReleaseSeams } from './status.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
+import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 
 import { readFileSync } from 'node:fs';
@@ -180,13 +181,14 @@ import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
+import { changelogVersions, readTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
+import { versionTag } from '../../release/version-tag.js';
 import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
-import { versionTag } from '../pr/merge-followups.js';
 
 import { readReleaseCommit } from './release-commit.js';
-import { changelogVersions, DEFAULT_RELEASE_SEAMS, readTags } from './status.js';
+import { DEFAULT_RELEASE_SEAMS } from './status.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';

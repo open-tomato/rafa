@@ -21,7 +21,7 @@
  * The `native` adapter tells a blocker on this board from one on another,
  * so it is made with the board's `owner/name`, read with the one
  * `gh repo view --json nameWithOwner` `readBoardRepository` sends
- * (`src/commands/epic/move-native.ts`). A repository `gh` will not name
+ * (`src/board/repository.ts`). A repository `gh` will not name
  * throws, and `rafa next` fails with it before any turn; a hint swallows
  * it as it swallows every reading that failed.
  *
@@ -41,7 +41,7 @@ import type { RafaConfig } from '../config.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { selectBoardRelations } from '../board/relations/select.js';
-import { readBoardRepository } from '../commands/epic/move-native.js';
+import { readBoardRepository } from '../board/repository.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
 import { resolvePrProvider } from '../pr/index.js';

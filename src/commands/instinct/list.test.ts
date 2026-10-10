@@ -41,9 +41,9 @@ import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js
 import { actionHash } from '../../learning/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
+import { readRecord } from '../../schema/scope-records.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
-import { readRecord } from './instinct-records.js';
 import {
   conflictLines,
   createInstinctListCommand,

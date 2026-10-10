@@ -29,7 +29,7 @@
 import type { MergeProjectOptions, MergeProjectRefresh } from './merge-project.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectRefresh, RefreshConfig } from '../../board/project/refresh.js';
-import type { UnblockOutcome, UnblockReport } from '../issue/unblock.js';
+import type { UnblockOutcome, UnblockReport } from '../../board/unblock.js';
 
 import { describe, expect, it } from 'bun:test';
 

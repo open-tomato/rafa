@@ -20,7 +20,9 @@
  * ## What is read, and where
  *
  * It reads what `rafa release status` reads, through that action's own
- * readers, and assembles no `git` argv of its own:
+ * readers (`./release/status-fragments.ts` and the library half,
+ * `src/release/status-readings.ts`), and assembles no `git` argv of its
+ * own:
  *
  *   - the base version and the waiting fragments with their forecast
  *     come from `readWaiting` (`./release/status-fragments.ts`) at
@@ -54,9 +56,9 @@ import { join } from 'node:path';
 
 import { createGitRunner } from '../pr/index.js';
 import { resolveReleaseEnabled } from '../release/enabled.js';
+import { changelogVersions, readTags } from '../release/status-readings.js';
 
 import { forecastPhrase, readWaiting, waitingSettingsOf } from './release/status-fragments.js';
-import { changelogVersions, readTags } from './release/status.js';
 
 /** The command the warning names. */
 export const SETTLE_COMMAND = 'rafa release settle';

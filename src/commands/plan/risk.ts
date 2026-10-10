@@ -53,11 +53,12 @@ import { resolve } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { CommandExit } from '../../cli/command.js';
+import { isFile, plural } from '../../plan/plan-files.js';
 import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
 import { createGitRunner } from '../../pr/git.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 
-import { expectAtMostOneArgument, isFile, plural, readSwitch, requireProject, resolveProjectConfig } from './plan-files.js';
+import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from './plan-files.js';
 
 /** The command as a refusal names it. */
 const COMMAND = 'rafa plan risk';

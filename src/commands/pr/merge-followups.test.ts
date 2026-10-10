@@ -16,14 +16,16 @@
  * is checked against the name `rafa release settle` registers under,
  * so the line cannot name a command `rafa` would not route.
  */
-import type { FollowUpReading, SettleWaiting } from './merge-followups.js';
+import type { FollowUpReading } from './merge-followups.js';
+import type { SettleWaiting } from '../../pr/settle-waiting.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { versionTag } from '../../release/version-tag.js';
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 import { createReleaseSettleCommand } from '../release/settle.js';
 
-import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND, versionTag } from './merge-followups.js';
+import { afterLoopsPhrase, readFollowUps, readPackageFacts, RELEASE_SETTLE_COMMAND } from './merge-followups.js';
 
 /** Two fragments waiting on main that fold into 0.5.0. */
 const WAITING: SettleWaiting = { base: 'main', fragments: 2, version: '0.5.0' };

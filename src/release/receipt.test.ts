@@ -17,8 +17,6 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { changelogVersions } from '../commands/release/status.js';
-
 import {
   adoptionBoundary,
   changelogSections,
@@ -26,6 +24,7 @@ import {
   readReceipt,
   receiptProblem,
 } from './receipt.js';
+import { changelogVersions } from './status-readings.js';
 import { fragmentsReceipt } from './strategies/semver-by-level.js';
 
 /** A changelog of `sections`, newest first, each a heading and optional receipt. */

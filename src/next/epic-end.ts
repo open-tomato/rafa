@@ -18,7 +18,7 @@
  * The first two are always there; the third only where
  * {@link readEpicEndRelease} finds a version the changelog calls
  * released that no tag names, the reading `rafa release status` makes
- * through `readUntagged` and `readTags` (`src/commands/release/status.ts`).
+ * through `readUntagged` and `readTags` (`src/release/status-readings.ts`).
  * The release commands are named, never run: `rafa epic close` is the
  * gate that checks the acceptance criteria and `release tag` a write of
  * its own, and each is the person's to type.
@@ -46,7 +46,7 @@
 import type { DryEpic, NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { readTags, readUntagged } from '../commands/release/status.js';
+import { readTags, readUntagged } from '../release/status-readings.js';
 
 /** The mark the closing gate's line opens with: the next step, as the proposal line marks it. */
 const CLOSE_MARK = '👉';

@@ -51,15 +51,17 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
 import { projectConfigText } from '../project/scaffold.js';
+import {
+  DANGEROUS_VERSION_COLLISION_LINE,
+  PR_VERSION_COLLISION_LINE,
+  RELEASE_FRAGMENT_LINES,
+} from '../release/scaffold.js';
 import { withReleaseEnabled } from '../release/setting.js';
 
 import {
   askRelease,
-  DANGEROUS_VERSION_COLLISION_LINE,
   missingChangelogLine,
   missingVersionFileLine,
-  PR_VERSION_COLLISION_LINE,
-  RELEASE_FRAGMENT_LINES,
   releaseQuestion,
   RELEASE_FIX,
   renderReleaseStep,

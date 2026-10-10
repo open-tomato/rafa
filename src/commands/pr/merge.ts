@@ -116,7 +116,7 @@
  * where the board write has nothing to do with this checkout and is as
  * true then as it is after. Before the boards, the closed issue's line
  * is ticked on the checklist of the epic its `epic:` label names, one
- * line printed per epic (`./merge-tick.ts`, `epicTickSentence`).
+ * line printed per epic (`src/board/epic-tick.ts`, `epicTickSentence`).
  *
  * Nothing it comes to fails the command, so a roadmap that cannot be
  * read, an edit that would not land and a pull request closing no issue
@@ -127,8 +127,8 @@
  * A merge that closes an issue can be the thing that clears another
  * issue's blocker, so after the clean-up the command runs the reading
  * `rafa issue unblock` runs, over every open issue whose `Blocked by:` line
- * names an issue this pull request closes (`./merge-unblock.ts`, per
- * the spec). Like the tick, nothing it comes to changes the exit code.
+ * names an issue this pull request closes
+ * (`src/board/unblock-after-merge.ts`, per the spec). Like the tick, nothing it comes to changes the exit code.
  *
  * Unlike the tick it runs after the clean-up, and only the follow-ups
  * come after it, for two reasons. It ASKS, and a question in the middle of the
@@ -157,7 +157,8 @@
  * (`./merge-freed.ts`). What that reading came to is the result's
  * `freed`, a key the `labels` mode leaves out; `unblocked` is null there.
  * The `labels` mode, the default, runs `./merge-tick.ts` and
- * `./merge-unblock.ts` exactly as above: they are what that mode's
+ * `src/board/unblock-after-merge.ts` exactly as above: they are what that
+ * mode's
  * `afterMerge` is (`src/board/relations/labels.ts`), called here at the
  * two points their own notes name.
  *
@@ -203,17 +204,19 @@ import type { UncheckedMerge, UncheckedMergeReport } from './merge-unchecked.js'
 import type { PrContext, PrSeams, PullSource } from './pr-context.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
+import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
-import type { UnblockAsk, UnblockReport } from '../issue/unblock.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { epicTickSentence } from '../../board/epic-tick.js';
 import { commandRetrySeams } from '../../board/project/project-runner.js';
 import { tickSentence } from '../../board/roadmap-tick.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
+import { unblockAfterMerge } from '../../board/unblock-after-merge.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { recordPlanCi } from '../../effort/store/plan-ci.js';
@@ -229,8 +232,7 @@ import { freedAfterMerge } from './merge-freed.js';
 import { guardBeforeMerge } from './merge-guard.js';
 import { refreshProjectAfterMerge } from './merge-project.js';
 import { refuseFromGit } from './merge-refuse.js';
-import { epicTickSentence, noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
-import { unblockAfterMerge } from './merge-unblock.js';
+import { noBoardListsLine, tickRoadmapAfterMerge } from './merge-tick.js';
 import { commentIfUnchecked, confirmUncheckedMerge, readUncheckedMerge, uncheckedReport } from './merge-unchecked.js';
 import {
   lineRefusal,

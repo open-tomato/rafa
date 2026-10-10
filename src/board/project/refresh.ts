@@ -192,10 +192,10 @@ import type { RafaConfig } from '../../config.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapSearch } from '../roadmap.js';
 
-import { readBoardRepository } from '../../commands/epic/move-native.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../boards.js';
 import { readEpics } from '../epics.js';
 import { selectBoardRelations } from '../relations/select.js';
+import { readBoardRepository } from '../repository.js';
 import { createGhBoardListing } from '../roadmap-board.js';
 import { createGhRoadmapSearch, parseRoadmapBody } from '../roadmap.js';
 
