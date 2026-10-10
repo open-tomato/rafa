@@ -1,6 +1,7 @@
 /**
  * Tests for the `tests` section: `tests.fullSuiteTriggers`,
- * `tests.integration` and `tests.alwaysRun`.
+ * `tests.integration` and `tests.alwaysRun`, the three glob lists, and
+ * `tests.retakeRedAlone`, the one switch.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
  * is proved is the reader the schema wires to the key, not a reader of
@@ -16,8 +17,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { globList, TESTS_DEFAULTS } from './config-schema-tests.js';
+import { globList, TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import { SETTINGS } from './config-schema.js';
+import { flag } from './config-sections.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
@@ -164,6 +166,40 @@ describe('tests.alwaysRun', () => {
     const error = refusal(() => parseConfigText('tests:\n  alwaysRun: ["/src/**/*.sweep.test.ts"]\n', PATH));
 
     expect(error.problems).toEqual([`${PATH}: tests.alwaysRun[0] is "/src/**/*.sweep.test.ts", ${EXPECTED_GLOB}`]);
+  });
+});
+
+describe('tests.retakeRedAlone', () => {
+  it('is spelled tests.retakeRedAlone, file-only, read as a YAML boolean, and written last in the section', () => {
+    expect(SETTINGS.testsRetakeRedAlone.key).toBe('tests.retakeRedAlone');
+    expect(SETTINGS.testsRetakeRedAlone.cli).toBe(false);
+    expect(SETTINGS.testsRetakeRedAlone.read).toBe(flag);
+    expect(Object.keys(TESTS_SETTINGS)).toEqual(['testsFullSuiteTriggers', 'testsIntegration', 'testsAlwaysRun', 'testsRetakeRedAlone']);
+  });
+
+  it('is on when no layer names it', () => {
+    expect(TESTS_DEFAULTS.testsRetakeRedAlone).toBe(true);
+    expect(CONFIG_DEFAULTS.testsRetakeRedAlone).toBe(true);
+    expect(resolveConfig().config.testsRetakeRedAlone).toBe(true);
+    expect(resolveConfig().sources.testsRetakeRedAlone).toBe('default');
+  });
+
+  it('is turned off by a file saying false, outranking the default', () => {
+    const resolved = resolveConfig({ file: parseConfigText('tests:\n  retakeRedAlone: false\n', PATH) });
+
+    expect(resolved.config.testsRetakeRedAlone).toBe(false);
+    expect(resolved.sources.testsRetakeRedAlone).toBe('file');
+    expect(resolved.warnings).toEqual([]);
+  });
+
+  it.each([['"false"'], ['off'], ['0'], ['[]']])('refuses %s, which is no YAML boolean', (written) => {
+    const error = refusal(() => parseConfigText(`tests:\n  retakeRedAlone: ${written}\n`, PATH));
+
+    expect(error.problems).toHaveLength(1);
+    expect(error.problems[0]).toContain('tests.retakeRedAlone is ');
+    expect(error.problems[0]).toContain(', expected true or false');
+    // Control: the same key with a boolean is read.
+    expect(parseConfigText('tests:\n  retakeRedAlone: true\n', PATH).extras).toEqual([]);
   });
 });
 

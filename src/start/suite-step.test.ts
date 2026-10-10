@@ -166,6 +166,7 @@ function contextWith(
       testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json'],
       testsIntegration: ['**/*-integration.test.ts'],
       testsAlwaysRun: options.alwaysRun ?? [],
+      testsRetakeRedAlone: false,
     },
     owns: () => {
       seen.ownsReads += 1;
@@ -298,6 +299,20 @@ describe('runTaskStep', () => {
     expect(next?.blocker).toContain('src/new.test.ts (2 tests)');
     expect(next?.blocker).toContain('bun test ./src/new.test.ts');
     expect(next?.blocker).not.toContain(KNOWN.file);
+  });
+
+  it('records each new failure\'s error lines on the step, and quotes them on the repair task', async () => {
+    const thrown = { ...FRESH, errorLines: ['UndeclaredSpendError: spends through claude and declared none', 'second line'] };
+    const known = { ...KNOWN, errorLines: ['error: old'] };
+    const { context, seen } = contextWith([red([known, thrown, FRESH_TWO])]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.steps[0]?.newFailures).toEqual([thrown, FRESH_TWO]);
+    // The failures list stays the pairs alone: the lines are kept where a reader acts on them.
+    expect(seen.steps[0]?.failures).toEqual([KNOWN, FRESH, FRESH_TWO]);
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(outcome.blocker ?? '');
+    expect(outcome.blocker).toContain('What Bun printed for them: src/new.test.ts "UndeclaredSpendError: spends through claude and declared none" (1 test).');
+    expect(outcome.blocker).not.toContain('error: old');
   });
 
   it('runs the full suite for a tests=full line', async () => {

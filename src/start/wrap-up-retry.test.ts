@@ -26,6 +26,7 @@ import { classifyPromptContent } from '../effort/classify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { withStamp } from './stamp.js';
+import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';
 import { buildWrapUpRetryPrompt, missingPullRequestBullet, retryWrapUp } from './wrap-up-retry.js';
 import { buildWrapUpPrompt } from './wrap-up.js';
 
@@ -179,6 +180,30 @@ describe('the retry wrap-up prompt', () => {
     expect([retryLines[0], ...retryLines.slice(1 + bullet.length)].join('\n')).toBe(first);
     expect(retry).toEndWith(PLAN);
     expect(retry).toContain('This pull request ships NO release fragment: no release fragment: release.enabled is false in this project.');
+  });
+});
+
+describe('the retry wrap-up prompt\'s files red only in a suite step', () => {
+  const items = runStepOnlyOf([{
+    kind: 'pre-wrap-up',
+    scope: 'full',
+    command: ['bun', 'test'],
+    exitCode: 1,
+    summary: 'Ran 3 tests across 2 files. [1.00ms]',
+    failures: [{ file: 'src/b.test.ts', name: 'b > only' }],
+    newFailures: [],
+    stepOnly: [{ file: 'src/b.test.ts', tests: ['b > only'], errorLines: [], position: 2, before: ['src/a.test.ts'] }],
+  }]);
+
+  test('carries the section the first wrap-up prompt carries, since the retry is the session that opens the pull request', () => {
+    const retry = buildWrapUpRetryPrompt({ branch: BRANCH, base: BASE, planContent: PLAN, release: null, lessons: [], previousMessage: MESSAGE, stepOnly: items });
+
+    expect(retry).toContain(stepOnlySection(items).join('\n'));
+    expect(retry.split('\n')[0]).toBe(buildWrapUpPrompt(BRANCH, BASE, PLAN).split('\n')[0] ?? '');
+  });
+
+  test('carries none when the run holds no such file', () => {
+    expect(retryPrompt()).not.toContain(STEP_ONLY_HEADING);
   });
 });
 

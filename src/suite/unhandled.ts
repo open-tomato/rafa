@@ -107,9 +107,39 @@ const SUMMARY_LINE = /^Ran \d+ tests? across \d+ files?\./;
 /** One count line of the block above the summary, as ` 3 fail`. */
 const COUNT_LINE = /^\s*\d+ \S/;
 
-/** `stderr` as lines, line endings and trailing spaces removed. */
+/**
+ * What Bun puts ahead of a file header under GitHub Actions, where each
+ * file's lines open a log group: `::group::a.test.ts:`.
+ */
+const GROUP_PREFIX = '::group::';
+
+/**
+ * A GitHub Actions workflow command Bun prints on a line of its own
+ * there: the annotation repeating a case's error (`::error file=...::`),
+ * and the line closing a file's group. Neither is part of an error.
+ */
+const WORKFLOW_COMMAND_LINE = /^::(?:error|warning|notice|debug|endgroup)(?:::| )/;
+
+/**
+ * `lines` as a shell run prints them: a file header without the group it
+ * opens under GitHub Actions, and no workflow command line. Bun prints
+ * both when `GITHUB_ACTIONS` is set and no agent variable is, so a
+ * hosted run's lines read as a local run's do.
+ */
+export function plainLines(lines: readonly string[]): readonly string[] {
+  return lines
+    .filter((line) => !WORKFLOW_COMMAND_LINE.test(line))
+    .map((line) => line.startsWith(GROUP_PREFIX)
+      ? line.slice(GROUP_PREFIX.length)
+      : line);
+}
+
+/**
+ * `stderr` as lines, line endings and trailing spaces removed, read as a
+ * shell run prints them ({@link plainLines}).
+ */
 function linesOf(stderr: string): readonly string[] {
-  return stderr.split(/\r?\n/).map((line) => line.trimEnd());
+  return plainLines(stderr.split(/\r?\n/).map((line) => line.trimEnd()));
 }
 
 /** The file header line above the heading at `index`, or null. */
@@ -199,20 +229,39 @@ function blocksText(blocks: readonly RawBlock[]): readonly string[] {
   return [...kept.flat(), ...more];
 }
 
+/** The two parts of the capped text: the kept blocks' lines and the summary lines, either one empty. */
+export interface CappedSections {
+  readonly blocks: readonly string[];
+  readonly summary: readonly string[];
+}
+
+/**
+ * The capped blocks and the summary lines of Bun's `stderr`, apart, so
+ * that a caller can put lines of its own between them
+ * (`./failure-lines.ts`) and join them with {@link joinSections}.
+ */
+export function cappedSections(stderr: string): CappedSections {
+  const lines = linesOf(stderr);
+  return { blocks: blocksText(rawBlocks(lines)), summary: summaryLines(lines) };
+}
+
+/**
+ * `sections` as one text: each one that holds a line, a blank line
+ * between two, ending in a newline; empty when none holds a line.
+ */
+export function joinSections(sections: readonly (readonly string[])[]): string {
+  const held = sections.filter((section) => section.length > 0);
+  return held.length === 0
+    ? ''
+    : `${held.map((section) => section.join('\n')).join('\n\n')}\n`;
+}
+
 /**
  * The text of Bun's `stderr` that keeps only its unhandled-error blocks
  * and its summary lines, capped as the module note says, ending in a
  * newline; empty when stderr holds neither.
  */
 export function unhandledText(stderr: string): string {
-  const lines = linesOf(stderr);
-  const blocks = blocksText(rawBlocks(lines));
-  const summary = summaryLines(lines);
-  const gap = blocks.length > 0 && summary.length > 0
-    ? ['']
-    : [];
-  const all = [...blocks, ...gap, ...summary];
-  return all.length === 0
-    ? ''
-    : `${all.join('\n')}\n`;
+  const { blocks, summary } = cappedSections(stderr);
+  return joinSections([blocks, summary]);
 }

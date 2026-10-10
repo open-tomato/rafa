@@ -201,6 +201,7 @@ function runStep(scratch: Scratch): ReturnType<typeof runTaskStep> {
       testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json'],
       testsIntegration: ['**/*-integration.test.ts'],
       testsAlwaysRun: [],
+      testsRetakeRedAlone: false,
     },
     owns: () => Promise.resolve(null),
     seams: { appendStep: (step) => steps.push(step) },

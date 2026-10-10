@@ -6,7 +6,8 @@
  * before the wrap-up session.
  *
  * Each step runs `bun test` itself (`suite/run.ts`: no timeout,
- * `CLAUDECODE` removed, failures read from Bun's JUnit file), appends
+ * `CLAUDECODE` and `FORCE_COLOR` removed, failures read from Bun's JUnit
+ * file), appends
  * one {@link SessionStep} to the run record (`loop/sessions.ts`) BEFORE
  * anything acts on it, prints what it found, and answers a
  * {@link StepOutcome}. Deciding whether the run goes on is the caller's:
@@ -115,6 +116,30 @@
  * step does. The retake writes over the first run's JUnit and output
  * files, so those on disk are the settled run's.
  *
+ * A task, stage or pre-wrap-up step that reads NEW failures runs
+ * each newly red test file alone, once, before it settles
+ * (`retakeRedAlone`, `suite-retake-alone.ts`, whose note is the account
+ * of it; `tests.retakeRedAlone: false` turns it off). A file green alone
+ * was red only in the step's own file order, by state a file before it
+ * left in the shared process: its tests leave the step's new failures,
+ * the recorded step lists it under `stepOnly`, and one warning names it.
+ * A step whose every new failure is such is green. A file red alone
+ * stays a new failure, and the blocker says it was red again alone. So
+ * does a file green alone that ran after a test file the step's own
+ * diff names (the task's, the stage's, or for the pre-wrap-up step and
+ * the task step of a repair task the plan's since the baseline's
+ * commit): the change under check may be what left that state, and the
+ * blocker names those files. A
+ * retake ended by SIGINT makes the step a stop, as below.
+ *
+ * The two retakes are taken in order by `takeRetakes`: the one on
+ * errors, the files alone, and then the one on errors once more when
+ * the first did not run and the files alone took the step's last new
+ * failure away. State one file leaves behind can both fail a file after
+ * it and throw between tests, and such a step is left red on the error
+ * alone, which is the red the retake on errors exists for. The step's
+ * run is still retaken once at most.
+ *
  * A red task, stage or pre-wrap-up step inserts a `[BLOCKED]` repair
  * task above the first open plan task, through `insertTrackerTask`
  * (`utils/tracker.ts`), leaving that task as it was: its text names the
@@ -126,10 +151,14 @@
  * blocker on that repair's line instead, marking it `[BLOCKED]` again,
  * and insert nothing. The text and the writes live in
  * `suite-blocker.ts`. The text names each new failing test file with its
- * count, the command running them (`bun test <files>`), and the
- * errors outside any test, by file and first line, or the missing
- * summary when those made it red; the repair session is handed it
- * through `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`).
+ * count, the command running them (`bun test <files>`), the first error
+ * line Bun printed for them, and the errors outside any test, by file
+ * and first line, or the missing summary when those made it red; the
+ * repair session is handed it through `BLOCKER_PROMPT_PREFIX`
+ * (`start/dispatch.ts`). The recorded step keeps those error lines too,
+ * up to `MAX_ERROR_LINES` (`suite/failure-lines.ts`) on each of its
+ * `newFailures`: Bun's JUnit report names a failing case and not what
+ * failed it, so stderr is where they are read.
  *
  * ## SIGINT: a stop, not a red step
  *
@@ -194,8 +223,8 @@
  * here; this note stays its account. The helpers it shares with the
  * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
  * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
- * {@link settleStep}, {@link retakeOnErrors}, {@link Settling} and
- * {@link StepRuns}) are exported for it alone.
+ * {@link settleStep}, {@link Settling} and {@link StepRuns}) are
+ * exported for it alone.
  *
  * ## Where the task step's diff checks live
  *
@@ -205,14 +234,17 @@
  * {@link SuiteStepSeams},
  * {@link SuiteStepContext}, {@link TaskStepInput}, {@link Settling},
  * {@link isStepInterrupted} and {@link SIGINT_EXIT_CODE} are what that
- * module imports back from here.
+ * module imports back from here. `suite-retake-alone.ts` imports back
+ * {@link verdictOf}, {@link isCheckInterrupted}, {@link isStepInterrupted},
+ * {@link retakeOnErrors} and the two JUnit file paths, exported for it.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
+import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { SessionStep, SessionStepKind, SessionStepReason } from '../loop/sessions.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../loop/sessions.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -246,7 +278,8 @@ import {
 import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
-import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
 import { taskDiffChecks } from './task-step-checks.js';
@@ -298,7 +331,7 @@ export interface SuiteStepContext {
   readonly trackerPath: string;
   /** The run's session id, naming its record. */
   readonly sessionId: string;
-  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsFullSuiteTriggers' | 'testsIntegration'>;
+  readonly settings: Pick<TestsSettings, 'testsAlwaysRun' | 'testsFullSuiteTriggers' | 'testsIntegration' | 'testsRetakeRedAlone'>;
   /** The plan's `Owns:` folders, or null without any; see {@link planOwnsReader}. */
   readonly owns: () => Promise<readonly string[] | null>;
   /** True once the runner has received SIGINT; never, when left out. See the module note. */
@@ -493,16 +526,26 @@ export function readHead(git: GitRunner): string | null {
     : null;
 }
 
-/** The paths changed from `from` to HEAD, or null with a warning when git does not answer. */
-export function readDiff(git: GitRunner, from: string): readonly string[] | null {
+/** What a task or stage step does when its diff does not read. */
+const FULL_SUITE_INSTEAD = 'the step runs the full suite';
+
+/** What the pre-wrap-up step loses when the plan's diff does not read (`suite-retake-alone.ts`). */
+const PLAN_DIFF_UNCHECKED = 'no file green alone is checked against the files the plan changed';
+
+/**
+ * The paths changed from `from` to HEAD, or null with a warning when
+ * git does not answer, which ends in `otherwise`: what the caller does
+ * without them.
+ */
+export function readDiff(git: GitRunner, from: string, otherwise: string = FULL_SUITE_INSTEAD): readonly string[] | null {
   const result = git(['diff', '--name-only', '-z', '--no-renames', from, 'HEAD']);
   if (result.ok) return result.stdout.split('\0').filter((path) => path !== '');
-  activeOutput().warn(`⚠️  git diff from ${from} did not answer (${gitSaid(result) || 'nothing said'}); the step runs the full suite.`);
+  activeOutput().warn(`⚠️  git diff from ${from} did not answer (${gitSaid(result) || 'nothing said'}); ${otherwise}.`);
   return null;
 }
 
 /** A result's failures against `baseline`, and whether they make it red. */
-function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): StepVerdict {
+export function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): StepVerdict {
   const { fresh, known } = splitFailures(result.failures, baseline);
   const newErrors = Math.max(0, (result.errors ?? 0) - (baseline?.errors ?? 0));
   const unreported = result.exitCode !== 0 && result.summary === null && result.noTestFiles !== true;
@@ -519,8 +562,19 @@ function isRed(verdict: StepVerdict): boolean {
   return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
 }
 
-/** The step the run record holds for `result`, its `reason` right after its scope when it has one; see the module note. */
-function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[]): SessionStep {
+/** A new failure as the run record holds it: its pair, and its error lines when Bun printed any. */
+function recordedFailure(failure: SuiteFailure): SuiteFailure {
+  return failure.errorLines === undefined
+    ? { file: failure.file, name: failure.name }
+    : { file: failure.file, name: failure.name, errorLines: failure.errorLines };
+}
+
+/**
+ * The step the run record holds for `result`, its `reason` right after
+ * its scope when it has one and `stepOnly` last when it holds a file;
+ * see the module note.
+ */
+function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[], stepOnly: readonly SessionStepOnly[] = []): SessionStep {
   const { kind, scope, reason } = settling;
   return {
     kind,
@@ -532,7 +586,10 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
     exitCode: result.exitCode,
     summary: result.summary,
     failures: result.failures.map((failure) => ({ file: failure.file, name: failure.name })),
-    newFailures: fresh.map((failure) => ({ file: failure.file, name: failure.name })),
+    newFailures: fresh.map(recordedFailure),
+    ...(stepOnly.length === 0
+      ? {}
+      : { stepOnly }),
   };
 }
 
@@ -572,6 +629,8 @@ export interface Settling {
   readonly lint?: LintOutcome;
   /** The task step's type step, when it ran; see the module note. */
   readonly types?: TypeOutcome;
+  /** What the step's newly red files read when run alone, once they were (`suite-retake-alone.ts`). */
+  readonly alone?: AloneReading;
 }
 
 /** The task step's diff checks `settling` carries, in the order their blockers are written. */
@@ -580,7 +639,7 @@ function checksOf(settling: Pick<Settling, 'lint' | 'types'>): readonly (LintOut
 }
 
 /** True when one of `settling`'s diff checks was read as a stop on SIGINT. */
-function isCheckInterrupted(settling: Pick<Settling, 'lint' | 'types'>): boolean {
+export function isCheckInterrupted(settling: Pick<Settling, 'lint' | 'types'>): boolean {
   return checksOf(settling).some((check) => check.interrupted);
 }
 
@@ -603,17 +662,18 @@ function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling):
 
 /** Records, prints and, when red and `blocks`, writes the blocker; see the module note. */
 export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
-  const { kind, label, result, baseline } = settling;
-  if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settleInterrupted(seams, settling);
-  const verdict = verdictOf(result, baseline);
-  const step = stepOf(settling, result, verdict.fresh);
+  const { kind, label, result, baseline, alone } = settling;
+  if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settleInterrupted(seams, settling);
+  const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
+  const step = stepOf(settling, result, verdict.fresh, alone?.stepOnly);
   recordStep(seams, step);
   announce(label, result, verdict.known);
+  announceStepOnly(context, settling);
   const checked = checkBlockers(settling);
   if (!isRed(verdict) && checked.length === 0) return { kind, step, red: false, interrupted: false, blocker: null, blockedLine: null, repairInserted: false };
 
   const tested = isRed(verdict)
-    ? [blockerText(label, result, verdict)]
+    ? [blockerText(label, result, verdict, alone)]
     : [];
   const blocker = [...tested, ...checked].join(' ');
   activeOutput().error(`❌ ${blocker}`);
@@ -634,14 +694,17 @@ function isErrorsOnly(verdict: StepVerdict, settling: Pick<Settling, 'lint' | 't
 /**
  * The run a step settles: `settling`'s own, or, when its only red is
  * errors outside any test, its retake by `rerun`, the first run recorded
- * and printed before it. See the module note.
+ * and printed before it. A file `settling` already read red only in the
+ * step (`suite-retake-alone.ts`) is no red here, is recorded so with
+ * the first run, and stays listed on the retake while still red in it.
+ * See the module note.
  */
 export async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
-  const { label, result, baseline } = settling;
-  if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settling;
-  const verdict = verdictOf(result, baseline);
+  const { label, result, baseline, alone } = settling;
+  if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settling;
+  const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
   if (!isErrorsOnly(verdict, settling)) return settling;
-  recordStep(seams, stepOf(settling, result, verdict.fresh));
+  recordStep(seams, stepOf(settling, result, verdict.fresh, alone?.stepOnly));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
   activeOutput().warn(`🔁 The ${label} counted ${verdict.newErrors} more error(s) outside any test than the baseline and nothing else red (${named}); taking it once more.`);
@@ -650,7 +713,9 @@ export async function retakeOnErrors(context: SuiteStepContext, seams: Required<
   if (again.newErrors === 0 && !isStepInterrupted(context, retake)) {
     activeOutput().warn(`⚠️  Intermittent: the retake of the ${label} counted no more errors outside any test than the baseline. The first run's: ${named}. The run goes on.`);
   }
-  return { ...settling, result: retake };
+  return alone === undefined
+    ? { ...settling, result: retake }
+    : { ...settling, result: retake, alone: stillRedIn(alone, retake) };
 }
 
 /** Runs one suite: over `paths`, since `changedSince`, or the whole project; its JUnit file is `kind`'s unless `junitFile` names one. */
@@ -728,9 +793,8 @@ function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): 
   return reading.files;
 }
 
-/** The task step's scope, or null when the diff did not read. */
-async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput): Promise<TaskStepScope | null> {
-  const diff = readDiff(seams.git, input.base);
+/** The task step's scope over `diff`, the task's own, or null when that did not read. */
+async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<TaskStepScope | null> {
   if (diff === null) return null;
   const moduleLine = input.declared === 'module';
   return taskStepScope({
@@ -746,6 +810,19 @@ async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepS
   });
 }
 
+/**
+ * Reads the plan's diff when asked: from the baseline's commit to HEAD,
+ * or `without` when the baseline holds no commit. It is what a
+ * pre-wrap-up step, and the task step of a repair task, check their
+ * files green alone against (`suite-retake-alone.ts`).
+ */
+function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
+  const commit = baseline?.commit ?? null;
+  return () => (commit === null
+    ? without
+    : readDiff(seams.git, commit, PLAN_DIFF_UNCHECKED));
+}
+
 /** Runs the step's own run, then its always-run run unless there is none or the first was a stop, folded into one result. */
 export async function runWithAlwaysRun(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: 'task' | 'stage', runs: StepRuns): Promise<SuiteResult> {
   const first = await runOne(context, seams, kind, runs.narrowing);
@@ -758,7 +835,8 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
 /** Runs the task step after a task commits; see the module note. */
 export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
   const seams = seamsOf(context);
-  const scope = await taskScopeOf(context, seams, input);
+  const diff = readDiff(seams.git, input.base);
+  const scope = await taskScopeOf(context, seams, input, diff);
   const runs = scope === null || scope.scope === 'full'
     ? { narrowing: {}, alwaysRun: [], timed: [] }
     : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
@@ -767,7 +845,10 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const label = `task step after "${input.task}"`;
   const checks = await taskDiffChecks(context, seams, input, result);
   const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs)));
+  const touched = isRepairTask(input.task)
+    ? planDiffReader(seams, input.baseline, diff)
+    : () => diff;
+  const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs), touched));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
     : junitFileFor(context.repoRoot, context.sessionId, 'task');
@@ -780,7 +861,7 @@ export async function runPreWrapUpStep(context: SuiteStepContext, baseline: Suit
   const seams = seamsOf(context);
   const result = await runOne(context, seams, 'pre-wrap-up', {});
   const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
-  return settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {})));
+  return settleStep(context, seams, await takeRetakes(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {}), planDiffReader(seams, baseline, null)));
 }
 
 /** What {@link planOwnsReader} reads the folders with. */
