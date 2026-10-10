@@ -376,10 +376,19 @@ describe('where start.ts takes the suite steps', () => {
     // this one call: `start/suite-steps-run.test.ts` reads which runs when.
     expect(callTo(EVERY, 'beforeSession').args).toEqual(['taskInfo']);
     const before = indexOf(EVERY, 'beforeSession');
-    expect(indexOf(EVERY, 'haltIfWrapUpMoved')).toBeLessThan(before);
+    expect(indexOf(EVERY, 'haltBeforeSession')).toBeLessThan(before);
     expect(before).toBeLessThan(indexOf(EVERY, 'renderProgressForDispatch'));
     expect(before).toBeLessThan(indexOf(EVERY, 'runWrapUp'));
     expect(before).toBeLessThan(indexOf(EVERY, 'dispatchTask'));
+  });
+
+  it('holds the checkout again once the steps ran, right before progress.txt is rendered', () => {
+    // The steps take minutes, and a worktree removed meanwhile would fail
+    // the render with a line about the store (`start/session-guard.ts`).
+    expect(EVERY.filter((call) => call.name === 'haltBeforeSession')).toHaveLength(2);
+    expect(START).toContain(
+      '      if (haltBeforeSession({ expected, trackerPath, taskInfo })) return;\n      if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;\n',
+    );
   });
 
   it('stops the run when a step before a session is red, unless it retries or a decision goes on, and breaks on an interrupt it ran through', () => {
@@ -556,8 +565,8 @@ describe('where start.ts hands a stop to a --continue decision', () => {
   it('ends at the plan\'s end on passed-over tasks before the loop guard, and releases defers once a task is done', () => {
     expect(START).toContain('      const passedOver = taskInfo\n        ? []\n        : decisions.atPlanEnd(trackerContent);\n');
     expect(START).toContain('      if (await decisions.atFirstTask(taskInfo, trackerContent)) continue;\n');
-    expect(START.indexOf('decisions.atFirstTask(')).toBeLessThan(START.indexOf('haltIfCheckoutMoved({ expected, trackerPath, taskInfo })'));
-    expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltIfWrapUpMoved({ expected, before: \'dispatch\' })'));
+    expect(START.indexOf('decisions.atFirstTask(')).toBeLessThan(START.indexOf('haltBeforeSession({ expected, trackerPath, taskInfo })'));
+    expect(START.indexOf('decisions.atPlanEnd(')).toBeLessThan(START.indexOf('haltBeforeSession({ expected, trackerPath, taskInfo })'));
     expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeGreaterThan(START.indexOf('emitLoopEvent(held);'));
     expect(START.indexOf('decisions.taskDone(taskInfo);')).toBeLessThan(START.indexOf('emitLoopEvent({ kind: \'task-done\''));
   });

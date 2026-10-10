@@ -109,17 +109,19 @@
  *
  * Every run, worktree or not, holds its checkout to its branch at the
  * HEAD it started from, moved on by each commit a task's attempt makes
- * (`start/checkout-watch.ts`). Before each task is dispatched, and
- * before `progress.txt` is written into the checkout, the loop guard
- * reads the checkout (`start/checkout-guard.ts`), and again before each
- * task commit. A checkout on another branch, at another commit, or gone
+ * (`start/checkout-watch.ts`). Before each task is dispatched the loop
+ * guard reads the checkout (`start/checkout-guard.ts`): ahead of the
+ * suite steps, again right before `progress.txt` is written into the
+ * checkout (`start/session-guard.ts`), and again before each task
+ * commit. A checkout on another branch, at another commit, or gone
  * marks the task `[BLOCKED]` with `checkout moved` as its blocker text
  * and stops the run: no further session is spawned, nothing is
  * committed, the checkout is not switched back, and the output names the
  * branch expected, what was found and the one command that restores it.
  * The guard runs once more inside the dispatch, immediately before the
  * session is spawned, and halts the same way, so a checkout removed
- * after the first guard never reaches the spawn.
+ * during the suite steps never reaches the render, and one removed
+ * after it never reaches the spawn.
  * A halt before the commit stores the session's report as `blocked`. The guard
  * also runs before the wrap-up session, marking nothing since the
  * wrap-up has no tracker line, and before the loop's release commit,
@@ -267,7 +269,7 @@
  * that could not run at all prepares nothing, and the wrap-up runs
  * without a release rather than not at all.
  *
- * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
+ * Every line this module, `start/run-config.ts`, `start/run-setup.ts`, `start/checkout.ts`, `start/checkout-watch.ts`, `start/session-guard.ts`, `start/worktree.ts`, `start/runtime.ts`, `start/session.ts`,
  * `start/risk-total.ts`, `start/preflight.ts`, `start/commit.ts`, `start/budget.ts`,
  * `start/triage.ts`, `start/release-stage.ts`, `start/wrap-up.ts`, `start/wrap-up-run.ts`,
  * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts`,
@@ -378,7 +380,6 @@ import { guardCheckout } from './start/checkout-guard.js';
 import {
   advanceExpectation,
   haltIfCheckoutMoved,
-  haltIfWrapUpMoved,
   openCheckoutExpectation,
 } from './start/checkout-watch.js';
 import { announceRunDirs } from './start/checkout.js';
@@ -421,6 +422,7 @@ import {
   refuseWorktreeWhileTracking,
 } from './start/run-setup.js';
 import { runFromSelectedRuntime } from './start/runtime.js';
+import { haltBeforeSession } from './start/session-guard.js';
 import { openRunSession, readPreviousDecisionNeeded, readPreviousPassOver } from './start/session.js';
 import { setActivePlanStub } from './start/stamp.js';
 import { createRunSuiteSteps } from './start/suite-steps-run.js';
@@ -706,13 +708,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       // The loop guard, before anything is written into the checkout: a
       // moved or missing one marks the task `[BLOCKED]`, or before the
       // wrap-up marks nothing, and stops the run.
-      const moved = taskInfo
-        ? haltIfCheckoutMoved({ expected, trackerPath, taskInfo })
-        : haltIfWrapUpMoved({ expected, before: 'dispatch' });
-      if (moved) {
-        emitLoopEvent({ kind: 'halt', reason: 'checkout moved' });
-        return;
-      }
+      if (haltBeforeSession({ expected, trackerPath, taskInfo })) return;
 
       // The baseline at the first dispatch, then the stage steps due
       // before an open task (none before a blocked one, which is the
@@ -737,6 +733,8 @@ export default async function start(args: string[], repoRoot: string): Promise<v
       if (suiteGate === 'repair') continue;
 
       // Before the session it is for, whichever it is: a task or the wrap-up.
+      // Guarded again first: the suite steps ran since the guard above.
+      if (haltBeforeSession({ expected, trackerPath, taskInfo })) return;
       if (!renderProgressForDispatch(repoRoot, planStub, checkout)) return;
 
       if (!taskInfo) {

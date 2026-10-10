@@ -66,11 +66,15 @@ spells out, and the shapes the lint config forces.
   `bun run check-types` runs the root `tsc --noEmit`, whose `tsconfig.json`
   excludes `packages`, then `bun run --filter './packages/*' check-types`,
   each package's own `tsc --noEmit`; a package's `tsconfig.json`
-  includes its test files. `bun run lint` reaches none of it:
-  `eslint.config.mjs` ignores `packages/**`, and a package file linted
-  with `--no-ignore` reports `import/no-unresolved` on both subpaths,
-  because `eslint.base.mjs`'s resolver reads only the root
-  `tsconfig.json`.
+  includes its test files. `bun run lint` lints it from the root config
+  like `src/`, its `testdata/` folders included, and so does the
+  runner's lint step on a task's diff. The two subpaths resolve for
+  `import/no-unresolved` because `eslint.base.mjs`'s resolver lists
+  `./packages/*/tsconfig.json` beside the root `tsconfig.json`; without
+  that entry, `bunx eslint packages` reported 21 `import/no-unresolved`
+  errors (measured on ESLint 9.39.5). Two globs make several projects,
+  so the resolver also sets `noWarnOnMultipleProjects`, or every run
+  prints `Multiple projects found` to stderr.
 
 ### References
 
