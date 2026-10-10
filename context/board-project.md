@@ -89,6 +89,17 @@ fragment is still on the base branch). It runs each value through its rule
 function and calls the project port's write functions to set only the values
 that are different from what the project holds.
 
+A caller that has just added issues can hand the refresh the item each add
+answered, as known items (`knownItem`, the fourth argument of
+`refreshProjectItems`). The refresh reads them beside the project's item
+listing, so an issue is filled whether or not the listing shows its item
+yet. A known item is matched to its issue by number and repository; where
+the listing and a known item both name an issue, the listing's item is used,
+since it holds the values already written. Each known item the refresh did
+not fill is answered in `notFilled` with its reason: its item is of another
+repository (never written to), its issue was not among those refreshed, its
+facts were refused, or a rate-limit refusal left one of its writes unsent.
+
 ### Lists read to their end
 
 The facts reader reads an issue's labels, closing references and
