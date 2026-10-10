@@ -64,6 +64,14 @@ describe('RAFA_CODES', () => {
     expect(hintOf('cli:result-unwritable')).toBe('file a bug: the command answered data that cannot be written as JSON');
   });
 
+  it('tells a tracker passed over in the chain from one that cannot be reached', () => {
+    const codes = RAFA_CODES.map((entry) => entry.code);
+
+    expect(codes).toContain('tracker:unreachable');
+    expect(codes).toContain('tracker:unavailable');
+    expect(RAFA_CODES.find((entry) => entry.code === 'tracker:unavailable')?.level).toBe('warn');
+  });
+
   it('ranks git:no-identity first for the spec example', () => {
     expect(suggestCodes('git commit has no author identity', RAFA_CODES)[0]?.code).toBe('git:no-identity');
   });
