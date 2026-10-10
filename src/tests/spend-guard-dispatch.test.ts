@@ -45,6 +45,22 @@
  * appends to, never off a resolved promise: a guard checked after the
  * spawn, or a stand-in that ran without being asked to log, would both
  * leave that file empty in the case that should have written to it.
+ *
+ * ## The overlap case
+ *
+ * Two undeclared commands that start no session are dispatched at once,
+ * the first started ending first, and `spawnClaude` is then called
+ * outside any dispatch, as a later test file's stand-in session is. It
+ * reaches the stand-in once: a dispatch records its command in an async
+ * scope of its own (`cli/running.ts`), so nothing is left for the guard
+ * to read once both have ended. This is #927 as it was measured: with
+ * the record put back in a `finally`, the second to end put back the
+ * first's record, and the guard refused every session a later file
+ * started, naming a command that had long ended. Run on 2026-10-10
+ * against that dispatcher, this case alone was red, rejecting with
+ * `rafa plan idle started a Claude session but declares no spends` and
+ * the stand-in's log empty. The third case above is its control that
+ * the stand-in can be reached at all.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
@@ -97,6 +113,20 @@ function spender(subject: string, action: string, spend?: CommandSpend, flags: R
       await spawnClaude(claudeArgs(DEFAULT_SOURCES), 'a planted prompt');
     },
   };
+}
+
+/** An undeclared command under `plan` that starts no session, running `run`. */
+function idle(action: string, run: RafaCommand['run']): RafaCommand {
+  return { ...spender('plan', action), run };
+}
+
+/** A promise and the function that settles it, so a case orders its own overlap. */
+function gate(): { readonly opened: Promise<void>; readonly open: () => void } {
+  let open: () => void = () => {};
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { opened, open };
 }
 
 /** The planted `pr triage`'s `--resolve` flag, matching the real command's own. */
@@ -196,6 +226,38 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stderr).toBe('');
+    expect(standInCalls()).toBe(1);
+  });
+
+  it('refuses no session started outside any dispatch after two undeclared commands overlapped, the first started ending first', async () => {
+    const bothRunning = gate();
+    const firstEnded = gate();
+    const registry = createCommandRegistry({
+      subjects: [{ name: 'plan', summary: 'plans' }],
+      commands: [
+        idle('idle', async () => {
+          await bothRunning.opened;
+        }),
+        idle('waits', async () => {
+          bothRunning.open();
+          await firstEnded.opened;
+        }),
+      ],
+    });
+    const sink = memoryStream().stream;
+    const options = { registry, env: {}, stdout: sink, stderr: sink };
+
+    const outcomes = await Promise.all([
+      dispatch(['plan', 'idle'], options).then((outcome) => {
+        firstEnded.open();
+        return outcome;
+      }),
+      dispatch(['plan', 'waits'], options),
+    ]);
+    const exitCode = await spawnClaude(claudeArgs(DEFAULT_SOURCES), 'a prompt outside any dispatch');
+
+    expect(outcomes.map((outcome) => outcome.exitCode)).toEqual([0, 0]);
+    expect(exitCode).toBe(0);
     expect(standInCalls()).toBe(1);
   });
 });
