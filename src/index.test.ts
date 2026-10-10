@@ -481,6 +481,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/loop/status.js', [
     ['../../config-sections.js', ['messageOf']],
+    ['../../loop/blocked-tasks.js', ['blockedTasks']],
     ['../../loop/session-readings.js', [
       'estimateEta',
       'isLive',
@@ -491,7 +492,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['../../loop/sessions.js', ['sessionPhase']],
     ['../../plan/plan-files.js', ['countTasks']],
-    ['../../utils/tracker.js', ['splitBlockerComment']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['etaLine', 'phasedCounts', 'phaseNote', 'pickSession', 'sessionIdFlag']],
   ]],

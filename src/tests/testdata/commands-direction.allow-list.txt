@@ -12,7 +12,5 @@ src/start/preflight-sync -> src/commands/doctor-effort-sync
 src/status/blocked-count -> src/commands/doctor-blocked
 src/status/sections -> src/commands/doctor-blocked
 src/status/sections -> src/commands/doctor-cleanup
-src/status/sections -> src/commands/loop/status
 src/status/seen -> src/commands/doctor-cleanup
-src/status/seen -> src/commands/loop/status
 src/stretch/pit-readings -> src/commands/ci/status

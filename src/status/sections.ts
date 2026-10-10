@@ -6,7 +6,7 @@
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
- * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/loop/session-readings.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
+ * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
  * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
@@ -167,8 +167,8 @@ import type { Epic } from '../board/epics.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
 import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
-import type { BlockedTask } from '../commands/loop/status.js';
 import type { RafaConfig } from '../config.js';
+import type { BlockedTask } from '../loop/blocked-tasks.js';
 import type { PidProbe, SessionRecord } from '../loop/sessions.js';
 import type { NextOwnerGateOptions } from '../next/owner-gate.js';
 import type { NextBoard, NextRoadmapReading, NextSources, OpenPull, PickedLine } from '../next/readings.js';
@@ -189,8 +189,8 @@ import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { readBlockedIssues } from '../commands/doctor-blocked.js';
 import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
-import { blockedTasks } from '../commands/loop/status.js';
 import { messageOf } from '../config-sections.js';
+import { blockedTasks } from '../loop/blocked-tasks.js';
 import { isLive, readSessionChecklist } from '../loop/session-readings.js';
 import { readSessions } from '../loop/sessions.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
