@@ -3,7 +3,8 @@
  * sit, the task counts and their phrase, the file a stub names and the
  * stub a file name carries, what is read as a file, one issue as a line,
  * the refusal of a line handing a command the wrong number of arguments,
- * the config a project resolves, and the read of a flag taking no value.
+ * the config a project resolves, the read of a flag taking no value, and
+ * where a refused plan is moved aside.
  *
  * The directory cases plant a project of their own and read `plan.dir`
  * back off it: one whose config sets none, which is the `.rafa/plans`
@@ -37,6 +38,7 @@ import {
   plansDirAt,
   plural,
   readSwitch,
+  rejectedPath,
   resolvePlansDir,
   resolveProjectConfig,
   stubOfPlanFile,
@@ -183,6 +185,14 @@ describe('the plan files', () => {
 
     expect(['plan.md', 'link.md', 'folder.md', 'folder-link.md', 'missing.md'].map((name) => isFile(join(dir, name))))
       .toEqual([true, true, false, false, false]);
+  });
+
+  it('places a rejected path under rejected/ beside the file, parent directory included', () => {
+    expect(rejectedPath('.rafa/plans/PLAN-rafa-20.md')).toBe('.rafa/plans/rejected/PLAN-rafa-20.md');
+  });
+
+  it('places a rejected path with no parent directory under rejected/ alone', () => {
+    expect(rejectedPath('PLAN-rafa-20.md')).toBe('rejected/PLAN-rafa-20.md');
   });
 });
 

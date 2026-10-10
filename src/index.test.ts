@@ -400,6 +400,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
+    ['./refs-check.js', ['registryRoster']],
   ]],
   ['./commands/plan/list.js', [
     ['../../plan/index.js', ['parsePlan']],
@@ -562,6 +563,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueProject',
@@ -657,7 +659,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../refs/stamp.js', ['fingerprintText', 'RefsBlockError']],
     ['../../refs/verify.js', ['RefVerifyError']],
     ['../plan/plan-files.js', ['readSwitch']],
-    ['../plan/refs-check.js', ['createPlanRefsVerifier']],
+    ['../plan/refs-check.js', ['createPlanRefsVerifier', 'registryRoster']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
@@ -1030,8 +1032,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
     ['../../board/epic-cancel-notice.js', ['cancelledEpicNoticeLines']],
     ['../../board/epic-problems.js', ['epicProblemMessage']],
-    ['../../board/epic-walk.js', ['epicLines', 'isNowEpic']],
+    ['../../board/epic-walk.js', ['epicLines']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
+    ['../../board/now-epic.js', ['firstNowEpic']],
     ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams', 'readListedEpics', 'readModeEpicProblems']],
     ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
@@ -1044,6 +1047,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/roadmap-epic-table.js', ['unknownLine']],
     ['../issue/roadmap-table.js', ['renderRoadmapTable']],
     ['../plan/plan-files.js', ['plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/epic/new.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1361,6 +1365,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/boards.js', ['resolveDefaultBoard']],
     ['../board/configured-relations.js', ['readConfiguredRelations']],
     ['../board/epic-board.js', ['boardOfEpic', 'openBoards']],
+    ['../board/now-epic.js', ['firstNowEpic']],
     ['../board/place.js', ['resolvePlace']],
     ['../board/roadmap-board.js', ['createGhBoardListing']],
     ['../board/roadmap-epic-rows.js', ['horizonOf', 'readListedEpics']],
@@ -1371,7 +1376,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-sections.js', ['messageOf']],
     ['../pr/git.js', ['createGitRunner']],
     ['../project/position.js', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
-    ['./epic/show.js', ['firstNowEpic']],
     ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/init.js', [
@@ -1434,6 +1438,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
     ['./plan/plan-files.js', ['isFile']],
+    ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
     ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],

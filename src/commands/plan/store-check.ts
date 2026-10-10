@@ -20,7 +20,8 @@
  * `loop start`'s preflight would refuse is never announced as ready. On
  * any problem it moves the plan, and the PREREQUISITES file when there
  * is one, into `rejected/` beside them (`rejectedPath` in
- * `src/board/gate.ts`), where the next `loop start` does not pick them
+ * `./plan-files.ts`, shared with `src/board/gate.ts` so neither module
+ * imports the other), where the next `loop start` does not pick them
  * up and an operator can still read what the session cost, and throws
  * `CommandExit(1)` listing one `storeRuleLine` per problem, the plan
  * named by the path the planner answered. A file that cannot be moved is
@@ -43,13 +44,12 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
 import { activeOutput } from '../../adapters/output/active.js';
-import { rejectedPath } from '../../board/gate.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';
 
-import { isFile, plural } from './plan-files.js';
+import { isFile, plural, rejectedPath } from './plan-files.js';
 
 /** The text at `path`, or null when no file sits there. */
 function readFileOrNull(path: string | null): string | null {

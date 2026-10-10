@@ -1,7 +1,7 @@
 /**
- * The survey's graph algorithms: Louvain clustering and Brandes
- * betweenness, both deterministic so a second run over the same graph
- * returns equal results.
+ * The survey's graph algorithms: Louvain clustering, Brandes betweenness
+ * and Tarjan's strongly connected components, all deterministic so a
+ * second run over the same graph returns equal results.
  *
  * Nothing here draws a random number. Every node list is sorted before an
  * algorithm walks it, every tie is broken by that order, and every float
@@ -17,6 +17,9 @@
  *     edge counts once and a self-loop is ignored.
  *   - `betweenness` follows edges in their direction only. A repeated edge
  *     counts once and a self-loop is ignored.
+ *   - `stronglyConnected` follows edges in their direction only. A repeated
+ *     edge counts once and a self-loop is ignored, so a node importing
+ *     only itself is a component of one like any other.
  */
 
 /** One directed edge, from the importing node to the imported one. */
@@ -411,4 +414,110 @@ function singleSourceDependency(source: number, successors: readonly (readonly n
     }
   }
   return dependency;
+}
+
+/** What Tarjan's walk keeps while it runs; every array is changed in place. */
+interface TarjanState {
+  /** Each node's successors, by index, sorted. */
+  readonly successors: readonly (readonly number[])[];
+  /** The order each node was first reached in, or -1 when it has not been. */
+  readonly reached: number[];
+  /** The earliest-reached node each node can get back to, by that order. */
+  readonly lowest: number[];
+  /** Whether each node is on the stack of nodes awaiting a component. */
+  readonly onStack: boolean[];
+  /** The nodes awaiting a component, in the order they were reached. */
+  readonly stack: number[];
+  /** The components closed so far, each as node indexes. */
+  readonly components: number[][];
+  /** How many nodes have been reached: the order the next one takes. */
+  reachedCount: number;
+}
+
+/**
+ * Tarjan's walk from one root, with its own stack of frames in place of
+ * recursion, so a long chain of imports cannot overflow the call stack.
+ * Every component the walk closes is added to `state.components`.
+ *
+ * @param state - The walk's state; changed in place.
+ * @param root - The node the walk starts at, not reached before.
+ */
+function tarjanFrom(state: TarjanState, root: number): void {
+  const { lowest, onStack, reached, stack, successors } = state;
+  const enter = (node: number): void => {
+    reached[node] = state.reachedCount;
+    lowest[node] = state.reachedCount;
+    state.reachedCount += 1;
+    stack.push(node);
+    onStack[node] = true;
+  };
+  // One frame per node on the current path: the node and its next successor.
+  const frames: { readonly node: number; next: number }[] = [{ next: 0, node: root }];
+  enter(root);
+  for (let frame = frames.at(-1); frame !== undefined; frame = frames.at(-1)) {
+    const { node } = frame;
+    const successor = successors[node]?.[frame.next];
+    if (successor !== undefined) {
+      frame.next += 1;
+      if (reached[successor] === -1) {
+        enter(successor);
+        frames.push({ next: 0, node: successor });
+      } else if (onStack[successor]) {
+        lowest[node] = Math.min(lowest[node] ?? 0, reached[successor] ?? 0);
+      }
+      continue;
+    }
+    frames.pop();
+    const parent = frames.at(-1)?.node;
+    if (parent !== undefined) {
+      lowest[parent] = Math.min(lowest[parent] ?? 0, lowest[node] ?? 0);
+    }
+    if (lowest[node] === reached[node]) {
+      const cut = stack.lastIndexOf(node);
+      const component = stack.splice(cut);
+      for (const member of component) {
+        onStack[member] = false;
+      }
+      state.components.push(component);
+    }
+  }
+}
+
+/**
+ * The graph's strongly connected components, by Tarjan's algorithm: the
+ * largest sets of nodes in which every node reaches every other along
+ * edges in their direction. Two files are in one component exactly when
+ * an import cycle holds them both. Roots and successors are walked in
+ * sorted order, so the result repeats from run to run.
+ *
+ * @param graph - The graph to read.
+ * @returns The components, each sorted, largest first and, between two of
+ *   one size, the one whose first member sorts first. Every node is in
+ *   exactly one component; a node on no cycle is a component of its own.
+ * @throws When an edge names a node the graph does not list.
+ */
+export function stronglyConnected(graph: DirectedGraph): string[][] {
+  const { edges, nodes } = indexGraph(graph);
+  const size = nodes.names.length;
+  const successors = Array.from({ length: size }, () => [] as number[]);
+  for (const [from, to] of edges) {
+    successors[from]?.push(to);
+  }
+  const state: TarjanState = {
+    components: [],
+    lowest: new Array<number>(size).fill(-1),
+    onStack: new Array<boolean>(size).fill(false),
+    reached: new Array<number>(size).fill(-1),
+    reachedCount: 0,
+    stack: [],
+    successors,
+  };
+  for (let root = 0; root < size; root += 1) {
+    if (state.reached[root] === -1) {
+      tarjanFrom(state, root);
+    }
+  }
+  return state.components
+    .map((component) => component.map((node) => nodes.names[node] ?? '').sort())
+    .sort((left, right) => right.length - left.length || compareNames(left[0] ?? '', right[0] ?? ''));
 }

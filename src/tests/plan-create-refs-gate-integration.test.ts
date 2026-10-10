@@ -37,7 +37,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_REFUSAL_EXIT } from '../board/plan-spec.js';
+import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { CommandExit } from '../cli/command.js';
 import { checkCreateRefs, RAFA_PACKAGE_NAME } from '../commands/plan/refs-check.js';
 import { readRefsBlock } from '../refs/stamp.js';
@@ -90,6 +90,9 @@ const CHECKOUT_ROSTER: DescribeDocument = {
   subjects: [{ name: 'checkoutonly', summary: '', actions: [action('frobnicate', ['frob-fast'])] }],
   commands: [],
 };
+
+/** The roster handed in as the core's: it holds nothing, so a command or flag read against it and not the checkout's reads absent. */
+const EMPTY_ROSTER: DescribeDocument = { ...CHECKOUT_ROSTER, subjects: [] };
 
 /** An entry that answers {@link CHECKOUT_ROSTER} as `describe --output=json` does. */
 const ROSTER_ENTRY = [
@@ -150,7 +153,7 @@ function capture(): { lines: Lines; output: Output } {
 
 /** Check 4 as `plan create --issue=172` runs it with no acceptance, over the verifier the command builds. */
 async function runCheck4(root: string, spec: ResolvedSpec, output: Output): ReturnType<typeof checkCreateRefs> {
-  return checkCreateRefs({ spec, repoRoot: root, args: ['--issue=172'], acceptStaleRefs: false, output });
+  return checkCreateRefs({ spec, repoRoot: root, args: ['--issue=172'], acceptStaleRefs: false, roster: EMPTY_ROSTER, output });
 }
 
 /** The refusal `run` ends with, or a failure when it ends with none. */
@@ -286,7 +289,14 @@ describe('check 4 over a spec whose stamped references drifted', () => {
     git(root, ['add', 'src/changes.ts']);
     git(root, ['commit', '--quiet', '--no-verify', '--message', 'drift']);
 
-    const answer = await checkCreateRefs({ spec, repoRoot: root, args: ['--issue=172', '--accept-refs'], acceptStaleRefs: false, output: capture().output });
+    const answer = await checkCreateRefs({
+      spec,
+      repoRoot: root,
+      args: ['--issue=172', '--accept-refs'],
+      acceptStaleRefs: false,
+      roster: EMPTY_ROSTER,
+      output: capture().output,
+    });
 
     expect(answer?.restamped).toBe(true);
     expect(answer?.accepted.map((row) => `${row.state} ${row.text}`)).toEqual(['dangling src/staged.ts', 'suspect src/changes.ts']);

@@ -1,8 +1,8 @@
 /**
  * Tests for `rafa epic show` (`show.ts`), typed here mostly as
  * `rafa epics`, the spelling it kept through its lasting alias: the pure
- * pieces — the argument, the choice of the first `now` epic, the problems
- * kept for one epic and the lines written — and the command dispatched
+ * pieces — the argument, the problems kept for one epic and the lines
+ * written — and the command dispatched
  * over one planted `gh` and `git` holding four epics, under a registry
  * declaring the `epic` subject, so every `epics` line below is routed
  * through the subject's plural to the alias.
@@ -12,7 +12,9 @@
  * is `now` and in progress, and epic #60 (`beta`) is `now` and in
  * backlog. The Roadmap names them in that order, so a bare `rafa epics`
  * has to pass #80 by horizon and #70 as done to land on #50; landing on
- * any other epic, or on none, reddens the first dispatched case.
+ * any other epic, or on none, reddens the first dispatched case. The
+ * choice itself, `firstNowEpic`, is tested where it lives
+ * (`src/board/now-epic.test.ts`).
  *
  * "Names no issue of the other epic" is held by reading the printed
  * issue numbers, not by a missing substring alone: the control is the
@@ -28,7 +30,6 @@ import type { EpicsResult } from './show.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicProblem } from '../../board/epic-problems.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RoadmapLine } from '../../board/roadmap.js';
 import type { GitRunner } from '../../pr/git.js';
 import type { Place } from '../../project/position.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
@@ -53,7 +54,6 @@ import { completeSpecBody } from '../../tests/spec-bodies.js';
 import {
   createEpicShowCommand,
   epicHead,
-  firstNowEpic,
   isProblemOf,
   noNowEpicLine,
   readEpicArgument,
@@ -194,11 +194,6 @@ function boardIssues(): readonly BoardIssue[] {
   });
 }
 
-/** A roadmap line naming `issue`. */
-function line(issue: number, ticked = false): RoadmapLine {
-  return { issue, ticked, why: '', lineNumber: issue };
-}
-
 describe('readEpicArgument', () => {
   it('reads no word as no epic, and a whole number from 1 as that epic', () => {
     expect(readEpicArgument([])).toBeNull();
@@ -207,20 +202,6 @@ describe('readEpicArgument', () => {
 
   it.each([[['0']], [['07']], [['#5']], [['five']], [['5', '6']]])('refuses %j with exit code 1 naming the usage', (args) => {
     expect(() => readEpicArgument(args)).toThrow('Usage: rafa epics [<n>]');
-  });
-});
-
-describe('firstNowEpic', () => {
-  const epics = readEpics({ issues: boardIssues(), claims: new Set(), today: new Date('2026-09-15') });
-
-  it('passes a next epic and a done one, and answers the first open now epic not done, in roadmap order', () => {
-    expect(firstNowEpic([line(80), line(70), line(50), line(60)], boardIssues(), epics)?.number).toBe(50);
-    expect(firstNowEpic([line(60), line(50)], boardIssues(), epics)?.number).toBe(60);
-  });
-
-  it('passes a ticked line and a line naming no epic, and answers null when nothing is left', () => {
-    expect(firstNowEpic([line(51), line(50, true), line(60)], boardIssues(), epics)?.number).toBe(60);
-    expect(firstNowEpic([line(80), line(70), line(51)], boardIssues(), epics)).toBeNull();
   });
 });
 

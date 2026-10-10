@@ -20,7 +20,9 @@
  *     {@link effortReportCommand} (`rafa effort report`). These are
  *     the four functions the core commands in `src/commands/` wrap, each
  *     handed the words typed after its routing words and the root of the
- *     project the dispatcher resolved. The entry
+ *     project the dispatcher resolved, and {@link planCommand} a third
+ *     thing after them, the command roster its `--issue` and `--next`
+ *     routes read a spec's references against (`src/plan.ts`). The entry
  *     re-exports them as they are, so a service calling one runs exactly
  *     what the terminal runs.
  *   - The whole `./plan` surface: the block reader, the plan parser, the

@@ -3,7 +3,11 @@
  * `rafa plan risk` share: where a plan and its tracker sit, the config
  * that resolves for the project, a plan's tasks counted by checkbox, one
  * `parsePlan` issue as a line, the refusal of a line handing a command
- * the wrong number of arguments, and the read of a flag taking no value.
+ * the wrong number of arguments, the read of a flag taking no value, and
+ * where a refused plan is moved aside ({@link rejectedPath}). That last
+ * one sits here rather than in `../../board/gate.ts`, the module that
+ * enforces the refusal, so `./store-check.ts` can read it without
+ * importing the gate and closing a cycle back into it.
  *
  * ## Where plans sit
  *
@@ -45,7 +49,7 @@ import type { PlanIssue, PlanTask } from '../../plan/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
@@ -164,6 +168,24 @@ export function stubOfPlanFile(name: string): string | null {
 /** True when `path` is a file, a link to one included. */
 export function isFile(path: string): boolean {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+/**
+ * The directory a rejected plan is moved into: `rejected/` beside the
+ * file itself, which is `<plan.dir>/rejected` for every path the caller
+ * names, since the planner writes both files under `plan.dir`.
+ */
+export const REJECTED_DIR = 'rejected';
+
+/**
+ * Where `path` lands once a refusal moves it aside, as the report
+ * names it (`../../board/gate.ts`, `./store-check.ts`).
+ */
+export function rejectedPath(path: string): string {
+  const parent = dirname(path);
+  return parent === '.'
+    ? join(REJECTED_DIR, basename(path))
+    : join(parent, REJECTED_DIR, basename(path));
 }
 
 /** One issue as a line: `<file>:<line>: <reason>: <text>`, the line counting from one. */

@@ -175,6 +175,7 @@ import {
 import { readBinPath } from '../project/bin-path.js';
 import { writePositionFile } from '../project/position.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 import { ABSENT, PRESENT, writeRefsBlock } from '../refs/stamp.js';
 import { eventsOf, expectExit, plantProjectConfig, plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
@@ -187,7 +188,6 @@ import { SETTINGS_SECTION_TITLE } from './doctor-deep-settings.js';
 import { ENVIRONMENT_SECTION_TITLE } from './doctor-deep.js';
 import { EPICS_HEADING } from './doctor-epics.js';
 import { readPreviousCopies } from './doctor-previous.js';
-import { issueCheckCommand } from './doctor-refs.js';
 import { TIERS_SECTION_TITLE } from './doctor-tiers.js';
 import doctorCommand, { createDoctorCommand, DEFAULT_DOCTOR_SEAMS, readDeepFlag, readPlanFlag } from './doctor.js';
 import { PROJECT_HEADING } from './init-board-project.js';

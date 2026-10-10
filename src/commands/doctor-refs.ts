@@ -55,10 +55,13 @@
  * Commands and flags are read against the roster `plan create`'s check 4
  * reads them against (`planRoster` in `./plan/refs-check.ts`): the
  * checkout's own when the project root is rafa itself, the core roster
- * otherwise. It is read once per run, on the first reference read, and a
- * root that is rafa whose roster cannot be read gets its one warning line
- * through {@link DoctorRefsInput.output} and is read against the core
- * roster; the row is not failed for it.
+ * otherwise. The core roster is {@link DoctorRefsInput.roster}, which
+ * each caller builds with `registryRoster` from the registry its line
+ * was routed through; that module holds why it is handed in and never
+ * imported. The checkout's is read once per run, on the first reference
+ * read, and a root that is rafa whose roster cannot be read gets its
+ * one warning line through {@link DoctorRefsInput.output} and is read
+ * against the core roster; the row is not failed for it.
  *
  * ## An unreadable board is `unknown`
  *
@@ -77,7 +80,8 @@
  * {@link renderDoctorRefs} prints nothing for a project with no saved
  * copy. Otherwise one line counts the copies and the states; each copy
  * holding a suspect or dangling reference, or one that could not be
- * read, then gets a line naming `rafa issue check <n>`; a copy holding
+ * read, then gets a line naming `rafa issue check <n>`, spelled by
+ * `issueCheckCommand` (`../refs/check-command.ts`); a copy holding
  * only unknown references gets a line saying why they were not
  * checked. A `new` reference — a target the spec is to add, missing on
  * its first reading or still missing under a `new` stamp — is counted
@@ -96,6 +100,7 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { RefsCell } from '../board/roadmap-rows.js';
+import type { DescribeDocument } from '../cli/describe.js';
 import type { Output } from '../ports/index.js';
 import type { RefState } from '../refs/stamp.js';
 import type { IssueRead, IssueReader, RefVerifier } from '../refs/verify.js';
@@ -108,17 +113,13 @@ import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '../board/naming.js';
 import { memoiseVerifier } from '../board/refs-gate.js';
 import { messageOf } from '../config-sections.js';
 import { createGitRunner } from '../pr/git.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 import { withOutlineCache } from '../refs/outline-cache.js';
 import { readRefsText } from '../refs/reading.js';
 import { UNREADABLE } from '../refs/stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner } from '../refs/verify.js';
 
 import { planRoster } from './plan/refs-check.js';
-
-/** The fix a copy holding a suspect or dangling reference is pointed at. */
-export function issueCheckCommand(issue: number): string {
-  return `rafa issue check ${String(issue)}`;
-}
 
 /** What an issue read answers when there is no board runner to read it with. */
 export const NO_BOARD_DETAIL = 'no GitHub board: the pull request provider is not gh';
@@ -149,6 +150,8 @@ export interface DoctorRefsInput {
   readonly specsDir: string;
   /** The `gh` runner `doctor` opened for the board, or null for a provider that is not `gh`. */
   readonly gh: GhRunner | null;
+  /** The core roster the default verifier falls back on; see the module note. Unread with `refsVerifier` given. */
+  readonly roster: DescribeDocument;
   /** The environment `ts-symbols` is looked up on; `process.env` when left out. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Read only the copies of these issues; every copy when left out. */
@@ -265,7 +268,7 @@ async function defaultVerifier(input: DoctorRefsInput, issues: IssueReader, seam
     issues,
     git: createGitRunner(input.root),
     outline: withOutlineCache(tsSymbolsOutliner({ cwd: input.root, env: input.env }), input.root),
-    roster: await planRoster(input.root, { checkoutRoster: seams.checkoutRoster, output: input.output }),
+    roster: await planRoster(input.root, input.roster, { checkoutRoster: seams.checkoutRoster, output: input.output }),
   });
 }
 

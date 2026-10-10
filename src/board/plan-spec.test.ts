@@ -186,10 +186,11 @@ import { completeSpecBody } from '../tests/spec-bodies.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';
 import { BOARDS_LIST_ARGS } from './boards.js';
+import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import { ISSUE_REFUSAL_EXIT, ISSUE_VIEW_FIELDS, snapshotDiffersMessage, snapshotText, SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
 import { notesPath, specPath } from './naming.js';
-import { boardRepoLabel, BOARD_REFUSAL_EXIT, inspectSpecIssue, resolvePlanSpec, UNNAMED_REPO } from './plan-spec.js';
+import { boardRepoLabel, inspectSpecIssue, resolvePlanSpec, UNNAMED_REPO } from './plan-spec.js';
 import { previousDir } from './previous-copy.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage, TEMPLATE_HEADINGS } from './readiness.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from './roadmap-board.js';

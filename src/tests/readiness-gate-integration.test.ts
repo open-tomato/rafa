@@ -49,7 +49,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   enforceSpecReview,
   readGateFlags,
-  rejectedPath,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,
@@ -73,6 +72,7 @@ import {
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
 import { CommandExit } from '../cli/command.js';
+import { rejectedPath } from '../commands/plan/plan-files.js';
 
 import { sinkOutput } from './output-sinks.js';
 

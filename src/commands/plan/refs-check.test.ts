@@ -38,8 +38,15 @@
  * that is not rafa is paired with the rafa checkout holding the same
  * entry, and the entry's record of being run is read absent, so a root
  * read as not rafa is one whose `describe` never ran.
+ *
+ * The core roster is handed in, as the module takes it:
+ * `registryRoster` over `CORE_REGISTRY`, which this file imports and
+ * the module does not. What a mounted module adds to a roster built
+ * that way is read by a pair too, the same flag through a verifier
+ * over the registry with the module mounted and one over it without.
  */
 import type { ResolvedSpec } from '../../board/spec-source.js';
+import type { RafaCommand } from '../../cli/command.js';
 import type { DescribeDocument, DescribedAction } from '../../cli/describe.js';
 import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
@@ -51,20 +58,24 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_REFUSAL_EXIT } from '../../board/plan-spec.js';
+import { version } from '../../../package.json';
+import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
 import { acceptStaleRefsPassLine } from '../../board/refs-gate.js';
 import { CommandExit } from '../../cli/command.js';
+import { describeRegistry } from '../../cli/describe.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
+import { CORE_REGISTRY } from '../index.js';
 
 import {
   announceCreateRefs,
   checkCreateRefs,
   checkoutRosterWarning,
-  coreRoster,
   createPlanRefsVerifier,
+  planRoster,
   RAFA_PACKAGE_NAME,
   readCheckoutRoster,
+  registryRoster,
 } from './refs-check.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-check-')));
@@ -72,6 +83,9 @@ const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-refs-check-')));
 afterAll(() => {
   rmSync(tempBase, { recursive: true, force: true });
 });
+
+/** The core roster every case hands in: the one a line routed through `CORE_REGISTRY` builds. */
+const CORE_ROSTER = registryRoster(CORE_REGISTRY);
 
 /** A saved copy naming one file on line 5, stamped present, which the fake verifier reads as gone. */
 const COPY = writeRefsBlock(
@@ -188,7 +202,7 @@ describe('check 4 over the spec a plan create run resolved', () => {
     const verifiers = fakeVerifiers();
     const spec: ResolvedSpec = { path: copyPath, kind: 'spec', source: copyPath, issue: null, read: null, snapshot: null };
 
-    const answer = await checkCreateRefs({ spec, repoRoot: root, args: ['--spec=x.md'], acceptStaleRefs: false }, { verifier: verifiers.make });
+    const answer = await checkCreateRefs({ spec, repoRoot: root, args: ['--spec=x.md'], acceptStaleRefs: false, roster: CORE_ROSTER }, { verifier: verifiers.make });
 
     expect(answer).toBeNull();
     expect(verifiers.made).toEqual([]);
@@ -201,7 +215,7 @@ describe('check 4 over the spec a plan create run resolved', () => {
     const { output } = capture();
 
     const thrown = await refusal(checkCreateRefs(
-      { spec, repoRoot: root, args: ['--issue=20'], acceptStaleRefs: false, output },
+      { spec, repoRoot: root, args: ['--issue=20'], acceptStaleRefs: false, roster: CORE_ROSTER, output },
       { verifier: verifiers.make },
     ));
 
@@ -218,7 +232,7 @@ describe('check 4 over the spec a plan create run resolved', () => {
     const { lines, output } = capture();
 
     const answer = await checkCreateRefs(
-      { spec, repoRoot: root, args: ['--issue=20', '--accept-refs'], acceptStaleRefs: false, output },
+      { spec, repoRoot: root, args: ['--issue=20', '--accept-refs'], acceptStaleRefs: false, roster: CORE_ROSTER, output },
       { verifier: fakeVerifiers().make },
     );
 
@@ -235,7 +249,7 @@ describe('check 4 over the spec a plan create run resolved', () => {
     const { lines, output } = capture();
 
     const answer = await checkCreateRefs(
-      { spec, repoRoot: root, args: ['--issue=20'], acceptStaleRefs: true, output },
+      { spec, repoRoot: root, args: ['--issue=20'], acceptStaleRefs: true, roster: CORE_ROSTER, output },
       { verifier: fakeVerifiers().make },
     );
 
@@ -245,9 +259,85 @@ describe('check 4 over the spec a plan create run resolved', () => {
   });
 });
 
+describe('the roster handed in is what a spec\'s command reference is read against', () => {
+  /** A saved copy naming `rafa plan create` on line 5, stamped present: unstale against {@link CORE_ROSTER}. */
+  const COMMAND_COPY = writeRefsBlock(
+    ['# Spec', '', '## Scope', '', 'Runs `rafa plan create`.', ''].join('\n'),
+    [{ kind: 'command', text: 'rafa plan create', fingerprint: PRESENT }],
+  );
+
+  /** The core roster with every `plan` subject dropped, so `rafa plan create` reads absent against it. */
+  const NO_PLAN_ROSTER: DescribeDocument = {
+    ...CORE_ROSTER,
+    subjects: CORE_ROSTER.subjects.filter((subject) => subject.name !== 'plan'),
+  };
+
+  /** A project root holding {@link COMMAND_COPY}, and the spec a board route answers for it. */
+  function plantCommandSpec(): { root: string; spec: ResolvedSpec; copyPath: string } {
+    planted += 1;
+    const root = join(tempBase, `project-${String(planted)}`);
+    mkdirSync(join(root, '.rafa', 'specs'), { recursive: true });
+    const relative = join('.rafa', 'specs', 'rafa-21-spec.md');
+    writeFileSync(join(root, relative), COMMAND_COPY);
+    const spec: ResolvedSpec = { path: relative, kind: 'issue', source: 'issue #21', issue: 21, read: null, snapshot: null };
+    return { root, spec, copyPath: join(root, relative) };
+  }
+
+  it('passes a command reference the roster handed in still holds, with no verifier seam given', async () => {
+    const { root, spec, copyPath } = plantCommandSpec();
+
+    const answer = await checkCreateRefs({ spec, repoRoot: root, args: ['--issue=21'], acceptStaleRefs: false, roster: CORE_ROSTER });
+
+    expect(answer).toEqual({ rows: expect.any(Array), accepted: [], restamped: false });
+    expect(readFileSync(copyPath, 'utf8')).toBe(COMMAND_COPY);
+  });
+
+  it('refuses the same reference as dangling when the roster handed in no longer names the command', async () => {
+    const { root, spec, copyPath } = plantCommandSpec();
+
+    const thrown = await refusal(checkCreateRefs({
+      spec,
+      repoRoot: root,
+      args: ['--issue=21'],
+      acceptStaleRefs: false,
+      roster: NO_PLAN_ROSTER,
+    }));
+
+    expect(thrown.exitCode).toBe(BOARD_REFUSAL_EXIT);
+    expect(thrown.message).toContain('issue #21 names references');
+    expect(thrown.message).toContain('• dangling rafa plan create (line 5)');
+    expect(readFileSync(copyPath, 'utf8')).toBe(COMMAND_COPY);
+  });
+});
+
+describe('planRoster answers the roster a spec\'s references are read against', () => {
+  it('answers the roster handed in, unchanged, for a root that is not rafa', async () => {
+    const root = plantCheckout({ name: 'some-other-project' });
+
+    expect(await planRoster(root, CORE_ROSTER)).toEqual(CORE_ROSTER);
+    expect(calledWith(root)).toBeNull();
+  });
+
+  it('answers the checkout\'s own roster, not the one handed in, when the root is rafa', async () => {
+    const root = plantCheckout();
+
+    expect(await planRoster(root, CORE_ROSTER)).toEqual(CHECKOUT_ROSTER);
+  });
+
+  it('falls back to the roster handed in, with one warning line, when the checkout\'s own could not be read', async () => {
+    const root = plantCheckout({ entry: 'console.error(\'boom: the entry is broken\');\nprocess.exit(3);\n' });
+    const { lines, output } = capture();
+
+    expect(await planRoster(root, CORE_ROSTER, { output })).toEqual(CORE_ROSTER);
+    expect(lines.warn).toEqual([
+      checkoutRosterWarning('bun src/rafa.ts describe --output=json failed: boom: the entry is broken'),
+    ]);
+  });
+});
+
 describe('the verifier plan create reads references with', () => {
   it('reads commands against the core roster, and keys against the settings', async () => {
-    const verify = createPlanRefsVerifier(tempBase);
+    const verify = createPlanRefsVerifier(tempBase, CORE_ROSTER);
 
     expect(await verify({ kind: 'command', text: 'rafa plan create' })).toEqual(PRESENT);
     expect(await verify({ kind: 'command', text: 'rafa plan nonesuch' })).toEqual(ABSENT);
@@ -414,9 +504,8 @@ describe('readCheckoutRoster', () => {
     const read = await readCheckoutRoster(REPO_ROOT);
 
     if (read.kind !== 'read') throw new Error(`expected this checkout's roster, got ${JSON.stringify(read)}`);
-    const core = await coreRoster();
-    expect(read.roster.subjects.map((subject) => subject.name)).toEqual(core.subjects.map((subject) => subject.name));
-    expect(read.roster.version).toBe(core.version);
+    expect(read.roster.subjects.map((subject) => subject.name)).toEqual(CORE_ROSTER.subjects.map((subject) => subject.name));
+    expect(read.roster.version).toBe(CORE_ROSTER.version);
   });
 });
 
@@ -424,7 +513,7 @@ describe('the roster plan create reads commands and flags against', () => {
   it('is the checkout\'s own when the root is rafa, with no warning', async () => {
     const root = plantCheckout();
     const { lines, output } = capture();
-    const verify = createPlanRefsVerifier(root, { output });
+    const verify = createPlanRefsVerifier(root, CORE_ROSTER, { output });
 
     expect(await rosterPair(verify)).toEqual({ checkout: true, core: false });
     expect(await verify({ kind: 'flag', text: '--spin-fast' })).toEqual(PRESENT);
@@ -435,7 +524,7 @@ describe('the roster plan create reads commands and flags against', () => {
   it('is the core roster for a root that is not rafa, with no warning and no describe run', async () => {
     const root = plantCheckout({ name: 'some-other-project' });
     const { lines, output } = capture();
-    const verify = createPlanRefsVerifier(root, { output });
+    const verify = createPlanRefsVerifier(root, CORE_ROSTER, { output });
 
     expect(await rosterPair(verify)).toEqual({ checkout: false, core: true });
     expect(await verify({ kind: 'flag', text: '--accept-refs' })).toEqual(PRESENT);
@@ -446,7 +535,7 @@ describe('the roster plan create reads commands and flags against', () => {
   it('falls back to the core roster with one warning line naming why, however many references are read', async () => {
     const root = plantCheckout({ entry: 'console.error(\'boom: the entry is broken\');\nprocess.exit(3);\n' });
     const { lines, output } = capture();
-    const verify = createPlanRefsVerifier(root, { output });
+    const verify = createPlanRefsVerifier(root, CORE_ROSTER, { output });
 
     expect(await rosterPair(verify)).toEqual({ checkout: false, core: true });
     expect(await verify({ kind: 'flag', text: '--accept-refs' })).toEqual(PRESENT);
@@ -458,12 +547,12 @@ describe('the roster plan create reads commands and flags against', () => {
 
   it('reads through the checkoutRoster seam, a rejection falling back as a failure does', async () => {
     const read = capture();
-    const fromSeam = createPlanRefsVerifier(tempBase, {
+    const fromSeam = createPlanRefsVerifier(tempBase, CORE_ROSTER, {
       checkoutRoster: async () => ({ kind: 'read', roster: CHECKOUT_ROSTER }),
       output: read.output,
     });
     const rejected = capture();
-    const fromRejection = createPlanRefsVerifier(tempBase, {
+    const fromRejection = createPlanRefsVerifier(tempBase, CORE_ROSTER, {
       checkoutRoster: () => Promise.reject(new Error('the seam broke')),
       output: rejected.output,
     });
@@ -472,5 +561,42 @@ describe('the roster plan create reads commands and flags against', () => {
     expect(read.lines.warn).toEqual([]);
     expect(await rosterPair(fromRejection)).toEqual({ checkout: false, core: true });
     expect(rejected.lines.warn).toEqual([checkoutRosterWarning('the seam broke')]);
+  });
+});
+
+/** A module's action declaring `--hub-only`, a flag no core command declares. */
+const HUB_PUSH: RafaCommand = {
+  name: 'hub push',
+  subject: 'hub',
+  action: 'push',
+  summary: 'push to the hub',
+  description: 'Pushes.',
+  args: [],
+  flags: [{ name: 'hub-only', description: 'only the hub has it', type: 'boolean' }],
+  examples: [],
+  outputs: ['text'],
+  run: () => Promise.resolve(),
+};
+
+describe('registryRoster', () => {
+  it('is describeRegistry over the registry handed in, stamped with this package\'s version', () => {
+    expect(registryRoster(CORE_REGISTRY)).toEqual(describeRegistry(CORE_REGISTRY, version));
+    expect(CORE_ROSTER.version).toBe(version);
+  });
+
+  it('holds a mounted module\'s actions, so a flag only the module declares reads present where the core registry\'s reads it absent', async () => {
+    const mounted = registryRoster(CORE_REGISTRY.mount({ name: 'hub', entry: '/modules/hub/commands.ts', commands: [HUB_PUSH] }));
+    const moduleActions = (roster: DescribeDocument): string[] => roster.subjects
+      .filter((subject) => subject.name === 'module')
+      .flatMap((subject) => subject.actions.map((action) => action.name));
+    const overMounted = createPlanRefsVerifier(tempBase, mounted);
+    const overCore = createPlanRefsVerifier(tempBase, CORE_ROSTER);
+
+    expect(moduleActions(CORE_ROSTER)).toEqual(['list', 'exec']);
+    expect(moduleActions(mounted)).toEqual(['list', 'exec', 'exec hub push']);
+    expect(await overMounted({ kind: 'flag', text: '--hub-only' })).toEqual(PRESENT);
+    expect(await overCore({ kind: 'flag', text: '--hub-only' })).toEqual(ABSENT);
+    expect(await overMounted({ kind: 'command', text: 'rafa module exec' })).toEqual(PRESENT);
+    expect(await overCore({ kind: 'command', text: 'rafa module exec' })).toEqual(PRESENT);
   });
 });
