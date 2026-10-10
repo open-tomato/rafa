@@ -77,8 +77,7 @@ import type { BlockedReading } from '../board/blocked.js';
 
 import { blockedFaultMessage, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { describeValue, isMapping, messageOf } from '../config-sections.js';
-
-import { plural } from './plan/plan-files.js';
+import { plural } from '../plan/plan-files.js';
 
 /** The heading the blocked lines sit under, as `GitHub board:` heads the rows. */
 export const BLOCKED_HEADING = 'Blocked issues:';

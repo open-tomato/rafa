@@ -146,8 +146,8 @@ import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems }
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { plural } from '../../plan/plan-files.js';
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
-import { plural } from '../plan/plan-files.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';

@@ -13,7 +13,7 @@ import type { Dashboard, SkillsPlanSummary, TotalsWidget } from './dashboard.js'
 import type { SkillsMetric } from './report-skills.js';
 
 import { formatDuration } from '../commands/loop/loop-sessions.js';
-import { formatCounts } from '../commands/plan/plan-files.js';
+import { formatCounts } from '../plan/plan-files.js';
 
 import { alignRows } from './report-format.js';
 import { formatLoopsSegment, formatTokens, formatTrendSegment } from './report-trend-format.js';

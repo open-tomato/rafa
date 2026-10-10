@@ -191,12 +191,12 @@ import { readBlockedIssues } from '../commands/doctor-blocked.js';
 import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
 import { isLive, readSessionChecklist } from '../commands/loop/loop-sessions.js';
 import { blockedTasks } from '../commands/loop/status.js';
-import { plansDirAt } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 import { readSessions } from '../loop/sessions.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
+import { plansDirAt } from '../plan/plan-files.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
 import { positionFilePath } from '../project/position.js';
 

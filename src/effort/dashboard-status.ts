@@ -26,12 +26,12 @@
  */
 import type { LoopRow } from './report-trend.js';
 import type { SessionEta } from '../commands/loop/loop-sessions.js';
-import type { TaskCounts } from '../commands/plan/plan-files.js';
 import type { PidProbe, SessionRecord, SessionTask } from '../loop/sessions.js';
+import type { TaskCounts } from '../plan/plan-files.js';
 
 import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '../commands/loop/loop-sessions.js';
-import { countTasks } from '../commands/plan/plan-files.js';
 import { readSessions } from '../loop/sessions.js';
+import { countTasks } from '../plan/plan-files.js';
 
 /** Milliseconds in one second. */
 const MS_PER_SECOND = 1_000;

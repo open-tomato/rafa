@@ -1,13 +1,14 @@
 /**
  * What `rafa plan list`, `rafa plan show`, `rafa plan validate` and
- * `rafa plan risk` share: where a plan and its tracker sit, the config
- * that resolves for the project, a plan's tasks counted by checkbox, one
- * `parsePlan` issue as a line, the refusal of a line handing a command
- * the wrong number of arguments, the read of a flag taking no value, and
- * where a refused plan is moved aside ({@link rejectedPath}). That last
- * one sits here rather than in `../../board/gate.ts`, the module that
- * enforces the refusal, so `./store-check.ts` can read it without
- * importing the gate and closing a cycle back into it.
+ * `rafa plan risk` share that reads a command's context, arguments or
+ * flags: the project a command was handed, the config that resolves for
+ * it, where its plans sit by that config, the refusal of a line handing
+ * a command the wrong number of arguments, and the read of a flag taking
+ * no value. This is the command half; the library half,
+ * `../../plan/plan-files.ts`, holds the readings that take none of those
+ * (the {@link PlansDir} shape, the task counts, the file names, an issue
+ * as a line, where a refused plan is moved aside), and every importer
+ * takes them from there: this file re-exports none of them.
  *
  * ## Where plans sit
  *
@@ -17,17 +18,12 @@
  * unless a config names another. That is the directory `rafa plan
  * create` writes `PLAN-<stub>.md` into and the one `rafa loop start`
  * looks for its default plan in, so the readers and the writers are on
- * one directory whatever `plan.dir` is set to. The loop keeps its copy
- * of a plan beside it as `PLAN_TRACKER-<stub>.md` (`utils/tracker.ts`)
- * and ticks that copy as tasks finish. `rafa plan validate` takes a file
- * path and reads no config, so it is on none of this.
+ * one directory whatever `plan.dir` is set to. `rafa plan validate` takes
+ * a file path and reads no config, so it is on none of this.
  *
- * A {@link PlansDir} carries the two spellings a command needs: `path`,
- * absolute, is the directory read, and `label`, `plan.dir` as the config
- * spells it, is what a path a person reads opens with. A config
- * `loadConfig` refuses is refused with exit code 1, naming the command
- * and every problem; {@link resolveProjectConfig} is that refusal, and
- * `rafa plan risk` reads the whole config through it.
+ * A config `loadConfig` refuses is refused with exit code 1, naming the
+ * command and every problem; {@link resolveProjectConfig} is that
+ * refusal, and `rafa plan risk` reads the whole config through it.
  *
  * ## A flag taking no value
  *
@@ -38,36 +34,16 @@
  * boolean `strict`: `{"positional":[],"flags":{"strict":"plan.md"}}`).
  * {@link readSwitch} refuses such a value rather than reading the flag
  * as set and the plan as absent.
- *
- * A stub is one a plan stamp can carry (`utils/plan-stamp.ts`): one or
- * more letters, digits, `.`, `_` and `-`. It holds no slash, so a file
- * named from one never leaves the directory.
  */
 import type { RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
-import type { PlanIssue, PlanTask } from '../../plan/index.js';
+import type { PlansDir } from '../../plan/plan-files.js';
 import type { ProjectFound } from '../../project/scope.js';
-
-import { statSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
-import { isStampableStub } from '../../utils/plan-stamp.js';
-
-/** Where the plans of one invocation sit, in the two spellings a command needs. */
-export interface PlansDir {
-  /** `plan.dir` as the config spells it, which is what a path a person reads opens with. */
-  readonly label: string;
-  /** The directory read: `label` resolved against the project root, absolute. */
-  readonly path: string;
-}
-
-/** Where plans sit for a project `root` and a `planDir`, in both spellings. */
-export function plansDirAt(root: string, planDir: string): PlansDir {
-  return { label: planDir, path: resolve(root, planDir) };
-}
+import { plansDirAt } from '../../plan/plan-files.js';
 
 /**
  * The project the dispatcher resolved for a command that declares it
@@ -109,95 +85,6 @@ export function resolveProjectConfig(
       ...error.problems.map((problem) => `   ${problem}`),
     ].join('\n'));
   }
-}
-
-/** A plan's tasks, counted by checkbox. */
-export interface TaskCounts {
-  /** Every task line. */
-  readonly total: number;
-  /** Ticked, `- [x] `. */
-  readonly done: number;
-  /** Marked `- [BLOCKED] `. */
-  readonly blocked: number;
-  /** Still `- [ ] `. */
-  readonly open: number;
-}
-
-/** The checkbox each status is written with in a checklist. */
-const CHECKBOXES: Readonly<Record<PlanTask['status'], string>> = {
-  unchecked: '[ ]',
-  blocked: '[BLOCKED]',
-  done: '[x]',
-};
-
-/** A plan's tasks, counted by checkbox. */
-export function countTasks(tasks: readonly Pick<PlanTask, 'status'>[]): TaskCounts {
-  const done = tasks.filter((task) => task.status === 'done').length;
-  const blocked = tasks.filter((task) => task.status === 'blocked').length;
-  return { total: tasks.length, done, blocked, open: tasks.length - done - blocked };
-}
-
-/** The counts as one phrase: `3/5 done, 1 blocked, 1 open`. */
-export function formatCounts(counts: TaskCounts): string {
-  return `${counts.done}/${counts.total} done, ${counts.blocked} blocked, ${counts.open} open`;
-}
-
-/** A status as the checklist writes its checkbox: `[ ]`, `[BLOCKED]` or `[x]`. */
-export function checkbox(status: PlanTask['status']): string {
-  return CHECKBOXES[status];
-}
-
-/** The file a stub names: `PLAN-<stub>.md`, or `PLAN_TRACKER-<stub>.md` for its tracker. */
-export function planFileName(stub: string, tracker: boolean): string {
-  return tracker
-    ? `PLAN_TRACKER-${stub}.md`
-    : `PLAN-${stub}.md`;
-}
-
-/**
- * The stub a plan's file name carries, or null for any other name: a
- * tracker's, a bare `PLAN.md`, and a stub no plan stamp can carry.
- */
-export function stubOfPlanFile(name: string): string | null {
-  const stub = /^PLAN-(.+)\.md$/.exec(name)?.[1];
-  return stub !== undefined && isStampableStub(stub)
-    ? stub
-    : null;
-}
-
-/** True when `path` is a file, a link to one included. */
-export function isFile(path: string): boolean {
-  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
-}
-
-/**
- * The directory a rejected plan is moved into: `rejected/` beside the
- * file itself, which is `<plan.dir>/rejected` for every path the caller
- * names, since the planner writes both files under `plan.dir`.
- */
-export const REJECTED_DIR = 'rejected';
-
-/**
- * Where `path` lands once a refusal moves it aside, as the report
- * names it (`../../board/gate.ts`, `./store-check.ts`).
- */
-export function rejectedPath(path: string): string {
-  const parent = dirname(path);
-  return parent === '.'
-    ? join(REJECTED_DIR, basename(path))
-    : join(parent, REJECTED_DIR, basename(path));
-}
-
-/** One issue as a line: `<file>:<line>: <reason>: <text>`, the line counting from one. */
-export function issueLine(file: string, issue: PlanIssue): string {
-  return `${file}:${issue.line}: ${issue.reason}: ${issue.text}`;
-}
-
-/** A count and its noun, the noun taking an `s` unless the count is 1. */
-export function plural(count: number, noun: string): string {
-  return count === 1
-    ? `${count} ${noun}`
-    : `${count} ${noun}s`;
 }
 
 /** Refuses a line handing a command reading none any argument: exit code 1, naming the words and the usage. */

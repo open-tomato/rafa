@@ -73,10 +73,10 @@ import type { BoardRelationshipMode } from '../config-sections.js';
 import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { EPIC_LABEL_PREFIX } from '../board/epics.js';
 import { messageOf } from '../config-sections.js';
+import { plural } from '../plan/plan-files.js';
 
 import { readBoardRepository } from './epic/move-native.js';
 import { MOVE_FIX } from './init-board.js';
-import { plural } from './plan/plan-files.js';
 
 /** The heading the marks sit under. */
 export const MARKS_HEADING = 'Other mode\'s marks:';

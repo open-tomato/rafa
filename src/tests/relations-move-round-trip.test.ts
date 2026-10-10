@@ -64,7 +64,7 @@ import { markMessage, MARKS_HEADING } from '../commands/doctor-marks.js';
 import { createDoctorCommand } from '../commands/doctor.js';
 import { MOVE_FIX } from '../commands/init-board.js';
 import { createInitCommand, DEFAULT_INIT_SEAMS } from '../commands/init.js';
-import { plural } from '../commands/plan/plan-files.js';
+import { plural } from '../plan/plan-files.js';
 
 import { dispatchInProject, eventsOf, plantProject } from './cli-capture.js';
 

@@ -119,8 +119,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { rejectedPath } from '../commands/plan/plan-files.js';
 import { parsePlan } from '../plan/parse.js';
+import { rejectedPath } from '../plan/plan-files.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

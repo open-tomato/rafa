@@ -104,7 +104,8 @@ import {
   waitExitCode,
   WaitUntilError,
 } from '../../loop/wait-reasons.js';
-import { expectNoArgument, plural } from '../plan/plan-files.js';
+import { plural } from '../../plan/plan-files.js';
+import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   lineRefusal,

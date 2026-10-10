@@ -26,7 +26,7 @@ import type { PullRequests } from '../pr/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../commands/plan/plan-files.js';
+import { plansDirAt } from '../plan/plan-files.js';
 
 import { homeAfterLoop } from './hop-rows.js';
 import { readHomeAfterLoop } from './state.js';

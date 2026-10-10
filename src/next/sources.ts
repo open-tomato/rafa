@@ -269,9 +269,9 @@ import { readCurrentPlace } from '../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings, scanClaimBranches } from '../board/roadmap.js';
 import { CommandExit } from '../cli/command.js';
 import { readRecords, resolveLoopSeams } from '../commands/loop/loop-sessions.js';
-import { plansDirAt } from '../commands/plan/plan-files.js';
 import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../config.js';
+import { plansDirAt } from '../plan/plan-files.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { readEpicEndRelease } from './epic-end.js';

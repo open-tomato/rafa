@@ -42,28 +42,26 @@
  * shown and never refused: `rafa plan validate` is the check that exits
  * nonzero on one.
  */
-import type { PlansDir, TaskCounts } from './plan-files.js';
 import type { RafaCommand } from '../../cli/command.js';
 import type { PlanIssue, PlanStage, PlanTask } from '../../plan/index.js';
+import type { PlansDir, TaskCounts } from '../../plan/plan-files.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { parsePlan } from '../../plan/index.js';
-import { isStampableStub } from '../../utils/plan-stamp.js';
-
 import {
   checkbox,
   countTasks,
-  expectOneArgument,
   formatCounts,
   isFile,
   issueLine,
   planFileName,
-  requireProject,
-  resolvePlansDir,
-} from './plan-files.js';
+} from '../../plan/plan-files.js';
+import { isStampableStub } from '../../utils/plan-stamp.js';
+
+import { expectOneArgument, requireProject, resolvePlansDir } from './plan-files.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa plan show <stub> [--tracker]';

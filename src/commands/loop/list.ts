@@ -36,12 +36,13 @@
 import type { LoopSessionSeams, ResolvedLoopSeams } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { isAbsolute, relative } from 'node:path';
 
 import { sessionPhase } from '../../loop/sessions.js';
-import { countTasks, expectNoArgument } from '../plan/plan-files.js';
+import { countTasks } from '../../plan/plan-files.js';
+import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   isLive,

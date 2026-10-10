@@ -14,7 +14,7 @@
  * finish beside one, a finish at the start beside one after it, and blocked
  * tasks left beside open ones.
  */
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

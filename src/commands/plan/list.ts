@@ -5,9 +5,10 @@
  * ## What is listed
  *
  * Each file in the configured plans directory named `PLAN-<stub>.md`
- * whose stub a plan stamp can carry (`plan-files.ts`), in stub order. A
- * tracker is never listed on its own, nor is a bare `PLAN.md`, which has
- * no stub for `rafa plan show` to name, nor anything that is not a file.
+ * whose stub a plan stamp can carry (`../../plan/plan-files.ts`), in stub
+ * order. A tracker is never listed on its own, nor is a bare `PLAN.md`,
+ * which has no stub for `rafa plan show` to name, nor anything that is
+ * not a file.
  * With no plans directory the list is empty, which is no refusal.
  *
  * A plan's tasks are counted from its tracker, `PLAN_TRACKER-<stub>.md`,
@@ -51,25 +52,27 @@
  * The command declares no argument and the one flag `open`, and refuses
  * a line handing it an argument with exit code 1.
  */
-import type { PlansDir, TaskCounts } from './plan-files.js';
 import type { RafaCommand } from '../../cli/command.js';
+import type { PlansDir, TaskCounts } from '../../plan/plan-files.js';
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parsePlan } from '../../plan/index.js';
-
 import {
   countTasks,
-  expectNoArgument,
   formatCounts,
   isFile,
   planFileName,
   plural,
+  stubOfPlanFile,
+} from '../../plan/plan-files.js';
+
+import {
+  expectNoArgument,
   readSwitch,
   requireProject,
   resolvePlansDir,
-  stubOfPlanFile,
 } from './plan-files.js';
 
 /** The usage line a refusal names, which is also how a refusal names the command. */

@@ -50,9 +50,9 @@ import type { SettleWaiting } from '../commands/pr/merge-followups.js';
 import type { GitRunner } from '../pr/index.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 
-import { plural } from '../commands/plan/plan-files.js';
 import { settleWaitingOn } from '../commands/pr/merge-cleanup.js';
 import { messageOf } from '../config-sections.js';
+import { plural } from '../plan/plan-files.js';
 import { mergeGuardSettings } from '../release/guard-merge.js';
 
 /** The id the settle step's state carries; no row of the table answers it. */

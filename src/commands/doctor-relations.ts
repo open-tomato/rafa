@@ -57,9 +57,9 @@ import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 
 import { selectBoardRelations } from '../board/relations/select.js';
 import { messageOf } from '../config-sections.js';
+import { plural } from '../plan/plan-files.js';
 
 import { NATIVE_MODE, readBoardRepository } from './epic/move-native.js';
-import { plural } from './plan/plan-files.js';
 
 /** The heading the relationship lines sit under. */
 export const RELATIONS_HEADING = 'Relationships:';

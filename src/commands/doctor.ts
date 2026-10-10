@@ -276,6 +276,7 @@ import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
+import { isFile } from '../plan/plan-files.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { isFirstDispatch } from '../preflight/first-dispatch.js';
@@ -303,7 +304,6 @@ import { readDoctorRelease, writeDoctorRelease } from './doctor-release.js';
 import { renderDoctor } from './doctor-render.js';
 import { writeDoctorStretch } from './doctor-stretch.js';
 import { checkDoctorTiers, renderDoctorTiers } from './doctor-tiers.js';
-import { isFile } from './plan/plan-files.js';
 import { registryRoster } from './plan/refs-check.js';
 
 /**

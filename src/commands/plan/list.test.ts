@@ -36,10 +36,10 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '../../plan/index.js';
+import { plansDirAt } from '../../plan/plan-files.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import planListCommand, { listPlans, openPlans, renderPlanList } from './list.js';
-import { plansDirAt } from './plan-files.js';
 import planShowCommand, { renderShownPlan, showPlan } from './show.js';
 
 /** A temporary directory of this file's own. */

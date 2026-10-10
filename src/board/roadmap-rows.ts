@@ -204,8 +204,8 @@ import type { Place } from '../project/position.js';
 
 import { existsSync, readdirSync } from 'node:fs';
 
-import { stubOfPlanFile } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
+import { stubOfPlanFile } from '../plan/plan-files.js';
 import { positionFilePath } from '../project/position.js';
 import { issueCheckCommand } from '../refs/check-command.js';
 

@@ -89,10 +89,11 @@ import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
+import { isFile, plural } from '../../plan/plan-files.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 import { isSourceShape } from '../skill/list.js';
 
-import { expectAtMostOneArgument, isFile, plural, readSwitch, requireProject } from './plan-files.js';
+import { expectAtMostOneArgument, readSwitch, requireProject } from './plan-files.js';
 import { resolveCreateSpec } from './spec-route.js';
 
 /** The command as a refusal names it. */

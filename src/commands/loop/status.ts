@@ -53,12 +53,13 @@
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { messageOf } from '../../config-sections.js';
 import { sessionPhase } from '../../loop/sessions.js';
+import { countTasks } from '../../plan/plan-files.js';
 import { splitBlockerComment } from '../../utils/tracker.js';
-import { countTasks, expectNoArgument } from '../plan/plan-files.js';
+import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   estimateEta,

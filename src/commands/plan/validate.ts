@@ -105,11 +105,11 @@
  * A line naming no file or more than one, and a path that is no file,
  * are refused with exit code 1 before anything is parsed.
  */
-import type { TaskCounts } from './plan-files.js';
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { PlanIssue } from '../../plan/index.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { ProjectFound } from '../../project/scope.js';
 
@@ -129,9 +129,10 @@ import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { parsePlan } from '../../plan/index.js';
+import { countTasks, formatCounts, isFile, issueLine, plural } from '../../plan/plan-files.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 
-import { countTasks, expectOneArgument, formatCounts, isFile, issueLine, plural } from './plan-files.js';
+import { expectOneArgument } from './plan-files.js';
 import { checkStoreRules } from './store-check.js';
 
 /** The usage line a refusal names. */

@@ -81,7 +81,7 @@ import { blockedLineSentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { idleText } from '../board/roadmap-claims.js';
 import { planLabel, sessionLine } from '../commands/loop/loop-sessions.js';
-import { formatCounts } from '../commands/plan/plan-files.js';
+import { formatCounts } from '../plan/plan-files.js';
 
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 

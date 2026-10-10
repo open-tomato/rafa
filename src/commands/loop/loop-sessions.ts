@@ -26,7 +26,7 @@
  *
  * {@link readSessionChecklist} reads the tasks of the plan a record names,
  * counted by checkbox as `rafa plan list` counts them
- * (`plan/plan-files.ts`): from the plan's tracker once there is one, and
+ * (`src/plan/plan-files.ts`): from the plan's tracker once there is one, and
  * from the plan before then. They are the whole plan's tasks, those every
  * earlier session got through included. A record whose plan and tracker
  * are both gone has none.
@@ -65,7 +65,7 @@
 import type { RafaContext, RafaFlagSpec } from '../../cli/command.js';
 import type { PidProbe, SessionChange, SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -85,8 +85,8 @@ import {
   updateSession,
 } from '../../loop/sessions.js';
 import { parsePlan } from '../../plan/index.js';
+import { isFile, plural } from '../../plan/plan-files.js';
 import { trackerPathFor } from '../../utils/tracker.js';
-import { isFile, plural } from '../plan/plan-files.js';
 
 /** How long `rafa loop stop` waits for the run it signalled to end. */
 export const STOP_WAIT_MS = 30_000;

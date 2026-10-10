@@ -112,9 +112,9 @@ import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { messageOf } from '../../config-sections.js';
+import { plansDirAt } from '../../plan/plan-files.js';
 import { createGitRunner } from '../../pr/git.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
-import { plansDirAt } from '../plan/plan-files.js';
 
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';
 
