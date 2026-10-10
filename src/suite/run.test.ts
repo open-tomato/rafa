@@ -49,12 +49,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
   CLAUDE_CODE_ENV,
+  FORCE_COLOR_ENV,
   parseJunitFailures,
   parseJunitFiles,
   readNoTestFiles,
   readSummary,
   runSuite,
   suiteCommand,
+  SUITE_ENV_REMOVED,
   suiteEnv,
   suitePathArgument,
 } from './run.js';
@@ -351,6 +353,17 @@ describe('suiteEnv', () => {
     expect(suiteEnv(base)).toEqual({ PATH: '/bin', HOME: '/h' });
     expect(base[CLAUDE_CODE_ENV]).toBe('1');
   });
+
+  it('drops FORCE_COLOR, whatever it is set to, and leaves NO_COLOR and the rest as they were', () => {
+    for (const value of ['1', '0', 'true', '']) {
+      const base = { [FORCE_COLOR_ENV]: value, NO_COLOR: '1', PATH: '/bin' };
+      expect(suiteEnv(base)).toEqual({ NO_COLOR: '1', PATH: '/bin' });
+      expect(base[FORCE_COLOR_ENV]).toBe(value);
+    }
+    expect(SUITE_ENV_REMOVED).toEqual([CLAUDE_CODE_ENV, FORCE_COLOR_ENV]);
+    // The control: a variable spelled close to it is no colour switch, and is kept.
+    expect(suiteEnv({ FORCE_COLOR_LEVEL: '3' })).toEqual({ FORCE_COLOR_LEVEL: '3' });
+  });
 });
 
 describe('runSuite', () => {
@@ -500,5 +513,11 @@ describe('runSuite', () => {
     await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('clean', 0, seen) });
     expect(seen[0]?.options.env['PATH']).toBe(process.env['PATH']);
     expect(CLAUDE_CODE_ENV in (seen[0]?.options.env ?? {})).toBe(false);
+  });
+
+  it('spawns bun test without FORCE_COLOR, which would colour the lines the run reads', async () => {
+    const seen: SeenSpawn[] = [];
+    await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), env: { PATH: '/bin', [FORCE_COLOR_ENV]: '1', TERM: 'xterm' }, spawn: recordedSpawner('clean', 0, seen) });
+    expect(seen[0]?.options.env).toEqual({ PATH: '/bin', TERM: 'xterm' });
   });
 });

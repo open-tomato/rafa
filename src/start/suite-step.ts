@@ -6,7 +6,8 @@
  * before the wrap-up session.
  *
  * Each step runs `bun test` itself (`suite/run.ts`: no timeout,
- * `CLAUDECODE` removed, failures read from Bun's JUnit file), appends
+ * `CLAUDECODE` and `FORCE_COLOR` removed, failures read from Bun's JUnit
+ * file), appends
  * one {@link SessionStep} to the run record (`loop/sessions.ts`) BEFORE
  * anything acts on it, prints what it found, and answers a
  * {@link StepOutcome}. Deciding whether the run goes on is the caller's:

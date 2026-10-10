@@ -17,7 +17,9 @@
  * Measured on bun 1.3.14 with stderr piped (no colour) and `CLAUDECODE`
  * unset, which `suiteEnv` (`./run.ts`) sees to: with it set, Bun prints
  * no `(pass)` line, and the lines of one case are no longer bounded by
- * the case before it.
+ * the case before it. `suiteEnv` removes `FORCE_COLOR` as well: with it
+ * set Bun colours the pipe and prints a `✗` glyph where `(fail)` is read
+ * below.
  *
  * Under each file's header, the path relative to the run's directory and
  * a colon, every case ends in one marker line: `(pass)`, `(fail)`,

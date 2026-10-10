@@ -16,7 +16,17 @@
  * environment's `PATH`. The
  * environment is the one handed in (`process.env` when left out) with
  * `CLAUDECODE` removed: with it set, Bun prints no per-test line, only
- * the counts. stdin and stdout are ignored; stderr is read to its end.
+ * the counts. `FORCE_COLOR` is removed too ({@link suiteEnv}). Measured
+ * on bun 1.3.14 with stderr piped: with `FORCE_COLOR=1` Bun colours the
+ * pipe, a failed case's marker line is a `✗` between escape codes in
+ * place of `(fail)`, so no error line is read, and the ` 1 error` count
+ * line and the `# Unhandled error between tests` heading carry codes
+ * too, so a file that throws while it loads reads as no error at all.
+ * `NO_COLOR=1` beside it changed nothing, so the variable is removed
+ * rather than answered; `FORCE_COLOR=0` and `NO_COLOR` alone printed no
+ * code. The JUnit file held none either way, and the summary line still
+ * opened its line. stdin and stdout are ignored; stderr is read to its
+ * end.
  *
  * Each rule below was measured on bun 1.4.2.
  *
@@ -151,8 +161,14 @@ import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 import { failingFilesOf, parseFailedCases, suiteOutputText, withErrorLines } from './failure-lines.js';
 import { parseUnhandled } from './unhandled.js';
 
-/** The variable removed from the environment `bun test` runs in. */
+/** The variable that makes Bun print the counts alone, with no per-test line; removed from the environment `bun test` runs in. */
 export const CLAUDE_CODE_ENV = 'CLAUDECODE';
+
+/** The variable that makes Bun colour what it prints to a pipe; removed too. See the module note. */
+export const FORCE_COLOR_ENV = 'FORCE_COLOR';
+
+/** The variables removed from the environment `bun test` runs in. */
+export const SUITE_ENV_REMOVED: readonly string[] = [CLAUDE_CODE_ENV, FORCE_COLOR_ENV];
 
 /** One failing test: its file, relative to the run's directory, and its full name. */
 export interface SuiteFailure {
@@ -313,9 +329,9 @@ export function outputFileFor(junitFile: string): string {
   return join(dirname(junitFile), `${stem}${OUTPUT_SUFFIX}`);
 }
 
-/** `base` without `CLAUDECODE`, as a new object. */
+/** `base` without the {@link SUITE_ENV_REMOVED} variables, `CLAUDECODE` and `FORCE_COLOR`, as a new object. */
 export function suiteEnv(base: Readonly<SpawnEnv>): SpawnEnv {
-  return Object.fromEntries(Object.entries(base).filter(([key]) => key !== CLAUDE_CODE_ENV));
+  return Object.fromEntries(Object.entries(base).filter(([key]) => !SUITE_ENV_REMOVED.includes(key)));
 }
 
 /** The index of the last summary line in `lines`, or -1. */

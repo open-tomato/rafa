@@ -8,6 +8,9 @@
  * planting a recorded JUnit fixture; this is the one case that spawns the
  * real `bun test` end to end, so a change to the argv, the JUnit reporter,
  * or the summary line's shape is caught here even if a fixture goes stale.
+ * A second case runs it with `FORCE_COLOR` set in the environment handed
+ * in, beside a direct spawn showing what that variable does to the lines
+ * the run reads.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -131,6 +134,32 @@ describe('runSuite and baseline over a real bun test', () => {
         fresh: [printed('also breaks')],
         known: [printed('breaks')],
       });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('reads the same failure, error lines and error count when the runner\'s own environment sets FORCE_COLOR', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rafa-suite-colour-'));
+    try {
+      writeProject(dir, 1);
+      writeFileSync(join(dir, 'load.test.ts'), 'throw new Error(\'boom while loading\');\n');
+      const forced = { ...process.env, FORCE_COLOR: '1' };
+
+      // The control: the same project spawned with FORCE_COLOR handed on is coloured on a pipe, and
+      // holds neither the `(fail)` line nor the plain ` 1 error` count the reading below depends on.
+      const coloured = Bun.spawnSync(['bun', 'test', './pass.test.ts', './fail.test.ts', './load.test.ts'], { cwd: dir, env: { ...forced, CLAUDECODE: undefined }, stdout: 'ignore', stderr: 'pipe' }).stderr.toString();
+      expect(coloured).toContain(String.fromCharCode(27));
+      expect(coloured).not.toContain('(fail) breaks');
+      expect(coloured.split('\n')).not.toContain(' 1 error');
+
+      const result = await runSuite({ cwd: dir, junitFile: join(dir, '.rafa', 'runs', 'colour.junit.xml'), paths: ['pass.test.ts', 'fail.test.ts', 'load.test.ts'], env: forced });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.summary).not.toBeNull();
+      expect(result.failures).toEqual([printed('breaks')]);
+      expect(result.errors).toBe(1);
+      expect(result.unhandled).toEqual([{ file: 'load.test.ts', firstLine: 'error: boom while loading' }]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
