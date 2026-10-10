@@ -112,6 +112,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'src/effort/file-stamp.ts' },
   { commandFile: 'src/commands/instinct/instinct-records.ts', libraryHalf: 'src/schema/scope-records.ts' },
   { commandFile: 'src/commands/init-release.ts', libraryHalf: 'src/release/scaffold.ts' },
+  { commandFile: 'src/commands/ci/status.ts', libraryHalf: 'src/ci/status-reading.ts' },
 ];
 
 /**

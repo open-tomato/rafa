@@ -1221,6 +1221,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../ci/failed-cases.js', ['readFailedCases']],
     ['../../ci/runs.js', ['readNewestRun']],
+    ['../../ci/status-reading.js', ['CI_STATUS_EXIT', 'readFailedLog', 'renderCiStatus', 'verdictOf']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['readNonBlankFlag', 'readRequiredFlag']],
