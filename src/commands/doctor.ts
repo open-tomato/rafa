@@ -178,8 +178,9 @@
  * ## The effort sync row
  *
  * Every such run then reads the `effort sync` row
- * (`./doctor-effort-sync.ts`, whose note says which registry each kind
- * is selected through): `ok` naming the strategy `effort.sync` names,
+ * (`./doctor-effort-sync.ts`, over the reading of
+ * `../effort/sync/doctor-reading.ts`, whose note says which registry each
+ * kind is selected through): `ok` naming the strategy `effort.sync` names,
  * `local` when it names none, and `fail` when no adapter serves it,
  * naming for `git`, `service` and `p2p` the `modules:` and `allowList:`
  * lines that load a module providing it. Its line follows the effort
@@ -249,7 +250,6 @@ import type { DoctorBoardReadings, DoctorBoardSeams } from './doctor-board.js';
 import type { DoctorCleanupReading, DoctorCleanupSeams } from './doctor-cleanup.js';
 import type { DeepDoctorSeams, DeepReading } from './doctor-deep.js';
 import type { DoctorEffortSchemaReading } from './doctor-effort-schema.js';
-import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from './doctor-effort-sync.js';
 import type { InstallReadings } from './doctor-install.js';
 import type { PreviousCopiesReading } from './doctor-previous.js';
 import type { DoctorProjectReading } from './doctor-project.js';
@@ -260,6 +260,7 @@ import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { PrProvider } from '../config-sections.js';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '../config.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
+import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type { PreflightItems, PrerequisiteReminder } from '../preflight/prerequisites-md.js';
@@ -276,6 +277,7 @@ import { versionLine } from '../cli/version.js';
 import { loadConfig } from '../config-load.js';
 import { messageOf } from '../config-sections.js';
 import { ConfigError } from '../config.js';
+import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 import { isFile } from '../plan/plan-files.js';
 import { ghPreflightItems } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
@@ -296,7 +298,7 @@ import { readDoctorCleanup, renderDoctorCleanup } from './doctor-cleanup.js';
 import { readDeep, renderDeep } from './doctor-deep.js';
 import { DOCTOR_DESCRIPTION } from './doctor-description.js';
 import { effortSchemaRefusal, readDoctorEffortSchema, writeDoctorEffortSchema } from './doctor-effort-schema.js';
-import { effortSyncRefusal, readDoctorEffortSync, renderDoctorEffortSync } from './doctor-effort-sync.js';
+import { effortSyncRefusal, renderDoctorEffortSync } from './doctor-effort-sync.js';
 import { readInstall, writeInstall } from './doctor-install.js';
 import { readDoctorProject, renderDoctorProject } from './doctor-project.js';
 import { readDoctorRefs, renderDoctorRefs } from './doctor-refs.js';

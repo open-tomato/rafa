@@ -2,7 +2,7 @@
  * `rafa doctor`, `rafa effort copy`, `rafa effort merge` and `rafa loop
  * start` spawned for real over one project whose `.rafa/config.yaml`
  * names no `effort.sync` at all: `readDoctorEffortSync`
- * (`commands/doctor-effort-sync.ts`) and `refuseUnservedSync`
+ * (`effort/sync/doctor-reading.ts`) and `refuseUnservedSync`
  * (`start/preflight-sync.ts`) both resolve the config's `effortSync`
  * default, `local`, which `CORE_ADAPTER_REGISTRY` serves with no module.
  *
