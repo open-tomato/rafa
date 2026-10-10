@@ -22,7 +22,9 @@
  * first met. A file several steps read so is listed once: it keeps the
  * tests, the first error line, the place and the files before it of the
  * first step that read it, and names every such step by kind, one per
- * step, so the same kind can repeat.
+ * step, so the same kind can repeat. A step that took its run twice
+ * (the retake on errors outside any test, `suite-step.ts`) is recorded
+ * twice and counts as two.
  *
  * {@link readRunStepOnly} reads them off the record of one run. A
  * record that is not there or does not read answers none and says

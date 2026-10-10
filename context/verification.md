@@ -170,7 +170,12 @@ more over the same run (`src/start/suite-step.ts`). A retake at or under
 the baseline's count prints an `Intermittent` warning naming the first
 run's files and lines, and the run goes on; a retake over it again is
 red, and the run halts as it does on any red step. Both runs are
-recorded, and the files on disk are the retake's.
+recorded, and the files on disk are the retake's. A step red on that
+excess AND on new failures runs its newly red files alone first
+(below); when that takes its last new failure away, the excess is its
+only red and the step is then taken once more, since state one file
+leaves behind can both fail a later file and throw between tests. The
+step's run is retaken once at most.
 
 **A failed case's error is read from stderr, and the step keeps its
 first lines.** Bun 1.3.14, the pinned version, writes every thrown

@@ -610,6 +610,85 @@ describe('the files a step retakes', () => {
   });
 });
 
+describe('a step red on a file green alone and on an error outside any test', () => {
+  const thrown = { file: 'src/boom.test.ts', firstLine: 'error: boom' };
+
+  /** The step's own run: {@link LEAKY} red, and one error outside any test over the baseline's count. */
+  const both = (): SuiteResult => red([KNOWN, LEAKED, LEAKED_TWO], { errors: 1, unhandled: [thrown] });
+
+  it('takes the run once more after the file read green alone, and is green when the retake counts no error', async () => {
+    const { context, seen } = contextWith([both(), result(), red([KNOWN, LEAKED, LEAKED_TWO])]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome).toMatchObject({ red: false, interrupted: false, blocker: null, repairInserted: false });
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+    // The step's run, the file alone, then the step's run again: over no path list, as the first was.
+    expect(seen.runs.map((run) => run.paths)).toEqual([undefined, [LEAKY], undefined]);
+    expect(seen.runs[2]?.junitFile).toBe(junitFileFor(dir, SESSION, 'task'));
+    // Both runs are recorded, each with the file red only in the step and no new failure.
+    expect(seen.steps.map((step) => [step.newFailures, step.stepOnly?.map((entry) => entry.file)])).toEqual([[[], [LEAKY]], [[], [LEAKY]]]);
+    expect(linesAt('warn').some((line) => line.startsWith(`🔁 The ${LABEL} counted 1 more error(s) outside any test than the baseline and nothing else red`))).toBe(true);
+    expect(linesAt('warn').some((line) => line.startsWith(`⚠️  Intermittent: the retake of the ${LABEL} counted no more errors`))).toBe(true);
+    expect(linesAt('error')).toEqual([]);
+  });
+
+  it('stays red on the error when the retake counts it again, the file listed as not the repair\'s to fix', async () => {
+    const { context, seen } = contextWith([both(), result(), both()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(3);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toBe([
+      `The runner's ${LABEL} found failures the suite baseline does not hold.`,
+      '1 more error(s) outside any test than the baseline; Bun\'s stderr named them as src/boom.test.ts threw "error: boom".',
+      'Run bun test ./src/boom.test.ts and make each load.',
+      `Red only in the step, green alone: not yours to fix: ${LEAKY} (2 tests).`,
+    ].join(' '));
+  });
+
+  it('takes the run no second time when the file is red alone: the failure blocks, and the error is named beside it', async () => {
+    const { context, seen } = contextWith([red([BROKE], { errors: 1, unhandled: [thrown] }), red([BROKE])]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.runs).toHaveLength(2);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`${BROKEN} (1 test, red again when run alone)`);
+    expect(outcome.blocker).toContain('1 more error(s) outside any test than the baseline');
+  });
+
+  it('takes the run once more at most: a step first red on errors alone is not taken a third time', async () => {
+    const errorsOnly = result({ exitCode: 1, errors: 1, unhandled: [thrown] });
+    const { context, seen } = contextWith([errorsOnly, both(), result()]);
+    const outcome = await runTaskStep(context, input);
+
+    // The step's run, its retake on the errors, and the file alone. No third run of the step.
+    expect(seen.runs.map((run) => run.paths)).toEqual([undefined, undefined, [LEAKY]]);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain('1 more error(s) outside any test than the baseline');
+  });
+
+  it('lists under stepOnly only the files still red in the retake', async () => {
+    const { context, seen } = contextWith([both(), result(), result()]);
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(false);
+    expect(seen.steps).toHaveLength(2);
+    expect(seen.steps[0]?.stepOnly?.map((entry) => entry.file)).toEqual([LEAKY]);
+    expect(Object.keys(seen.steps[1] ?? {})).not.toContain('stepOnly');
+    expect(linesAt('warn').filter((line) => line.includes('Red only in the step'))).toEqual([]);
+  });
+
+  it('does the same for a stage step and a pre-wrap-up step', async () => {
+    const stage = contextWith([both(), result(), red([KNOWN, LEAKED, LEAKED_TWO])]);
+    expect((await runStageStep(stage.context, { stage: 0, name: 'One' }, baseline())).red).toBe(false);
+    expect(stage.seen.runs).toHaveLength(3);
+
+    const last = contextWith([both(), result(), red([KNOWN, LEAKED, LEAKED_TWO])]);
+    expect((await runPreWrapUpStep(last.context, baseline())).red).toBe(false);
+    expect(last.seen.runs.map((run) => run.paths)).toEqual([undefined, [LEAKY], undefined]);
+  });
+});
+
 describe('a stage step and a pre-wrap-up step', () => {
   const stage = { stage: 0, name: 'One' };
 

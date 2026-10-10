@@ -20,7 +20,8 @@
  * ## The retake
  *
  * {@link retakeRedAlone} is called between the step's run and its
- * settling, after the retake on errors outside any test. It does nothing
+ * settling, after the retake on errors outside any test
+ * ({@link takeRetakes}, below). It does nothing
  * when `tests.retakeRedAlone` is false, when the step was read as a stop
  * on SIGINT, or when the step holds no NEW failure: a failure the
  * baseline holds is never retaken. Else it takes the files of the new
@@ -94,6 +95,23 @@
  * names those as red again when run alone, and lists the files green
  * alone apart as not the repair's to fix.
  *
+ * ## The order of a step's retakes
+ *
+ * A step takes two retakes, and {@link takeRetakes} is the one place
+ * that orders them. First `retakeOnErrors` (`suite-step.ts`): a step
+ * whose only red is errors outside any test is run once more. Then the
+ * files alone, above. Then `retakeOnErrors` again, when it did not run
+ * the first time and a file read red only in the step: the state one
+ * file leaves behind can both fail a file after it and throw between
+ * tests, and with the file's failures taken away such a step is red on
+ * the error alone, the case that retake exists for. It rereads the step
+ * with those files out of its new failures, records the first run with
+ * them under `stepOnly`, and its retake keeps under `stepOnly` only the
+ * files still red in it ({@link stillRedIn}), so the recorded step
+ * never lists a file its own `failures` do not hold. The step's run is
+ * taken again once at most: a step the first retake on errors already
+ * reran gets no second.
+ *
  * ## The cycle with `suite-step.ts`
  *
  * This module imports values back from `suite-step.ts`, which imports
@@ -115,7 +133,7 @@ import { splitFailures } from '../suite/baseline.js';
 import { failingFilesOf } from '../suite/failure-lines.js';
 import { outputFileFor } from '../suite/run.js';
 
-import { alwaysRunJunitFileFor, isCheckInterrupted, isStepInterrupted, junitFileFor, verdictOf } from './suite-step.js';
+import { alwaysRunJunitFileFor, isCheckInterrupted, isStepInterrupted, junitFileFor, retakeOnErrors, verdictOf } from './suite-step.js';
 
 /** The most newly red files a step runs alone; the rest stay new failures. */
 export const RETAKE_ALONE_MAX_FILES = 20;
@@ -272,6 +290,27 @@ export async function retakeRedAlone(context: SuiteStepContext, seams: Required<
   }
   announceRetakes(reading, taken.length, files.length - taken.length);
   return { ...settling, alone: reading };
+}
+
+/** `alone` with only the files red only in the step that `result` still holds a failure in. See the module note. */
+export function stillRedIn(alone: AloneReading, result: SuiteResult): AloneReading {
+  const red = new Set(result.failures.map((failure) => failure.file));
+  return { ...alone, stepOnly: alone.stepOnly.filter((entry) => red.has(entry.file)) };
+}
+
+/**
+ * `settling` after the retakes a step takes before it settles: the one
+ * on errors outside any test by `rerun`, its newly red files alone, and
+ * the one on errors again when the files alone left it nothing else
+ * red. See the module note, "The order of a step's retakes".
+ */
+export async function takeRetakes(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>, readTouched: () => readonly string[] | null): Promise<Settling> {
+  const first = await retakeOnErrors(context, seams, settling, rerun);
+  const alone = await retakeRedAlone(context, seams, first, readTouched);
+  const reran = first.result !== settling.result;
+  return reran || (alone.alone?.stepOnly.length ?? 0) === 0
+    ? alone
+    : retakeOnErrors(context, seams, alone, rerun);
 }
 
 /** `verdict` without the new failures of the files `alone` read green alone. */

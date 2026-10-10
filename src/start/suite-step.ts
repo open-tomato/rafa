@@ -115,7 +115,7 @@
  * step does. The retake writes over the first run's JUnit and output
  * files, so those on disk are the settled run's.
  *
- * A task, stage or pre-wrap-up step that reads NEW failures then runs
+ * A task, stage or pre-wrap-up step that reads NEW failures runs
  * each newly red test file alone, once, before it settles
  * (`retakeRedAlone`, `suite-retake-alone.ts`, whose note is the account
  * of it; `tests.retakeRedAlone: false` turns it off). A file green alone
@@ -130,6 +130,14 @@
  * commit): the change under check may be what left that state, and the
  * blocker names those files. A
  * retake ended by SIGINT makes the step a stop, as below.
+ *
+ * The two retakes are taken in order by `takeRetakes`: the one on
+ * errors, the files alone, and then the one on errors once more when
+ * the first did not run and the files alone took the step's last new
+ * failure away. State one file leaves behind can both fail a file after
+ * it and throw between tests, and such a step is left red on the error
+ * alone, which is the red the retake on errors exists for. The step's
+ * run is still retaken once at most.
  *
  * A red task, stage or pre-wrap-up step inserts a `[BLOCKED]` repair
  * task above the first open plan task, through `insertTrackerTask`
@@ -214,8 +222,8 @@
  * here; this note stays its account. The helpers it shares with the
  * other steps ({@link seamsOf}, {@link readHead}, {@link readDiff},
  * {@link addToLedger}, {@link runOne}, {@link runWithAlwaysRun},
- * {@link settleStep}, {@link retakeOnErrors}, {@link Settling} and
- * {@link StepRuns}) are exported for it alone.
+ * {@link settleStep}, {@link Settling} and {@link StepRuns}) are
+ * exported for it alone.
  *
  * ## Where the task step's diff checks live
  *
@@ -226,8 +234,8 @@
  * {@link SuiteStepContext}, {@link TaskStepInput}, {@link Settling},
  * {@link isStepInterrupted} and {@link SIGINT_EXIT_CODE} are what that
  * module imports back from here. `suite-retake-alone.ts` imports back
- * {@link verdictOf}, {@link isCheckInterrupted}, {@link isStepInterrupted}
- * and the two JUnit file paths, exported for it.
+ * {@link verdictOf}, {@link isCheckInterrupted}, {@link isStepInterrupted},
+ * {@link retakeOnErrors} and the two JUnit file paths, exported for it.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
 import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
@@ -270,7 +278,7 @@ import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
 import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
-import { announceStepOnly, retakeRedAlone, withoutStepOnly } from './suite-retake-alone.js';
+import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
 import { taskDiffChecks } from './task-step-checks.js';
@@ -685,14 +693,17 @@ function isErrorsOnly(verdict: StepVerdict, settling: Pick<Settling, 'lint' | 't
 /**
  * The run a step settles: `settling`'s own, or, when its only red is
  * errors outside any test, its retake by `rerun`, the first run recorded
- * and printed before it. See the module note.
+ * and printed before it. A file `settling` already read red only in the
+ * step (`suite-retake-alone.ts`) is no red here, is recorded so with
+ * the first run, and stays listed on the retake while still red in it.
+ * See the module note.
  */
 export async function retakeOnErrors(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, rerun: () => Promise<SuiteResult>): Promise<Settling> {
-  const { label, result, baseline } = settling;
-  if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settling;
-  const verdict = verdictOf(result, baseline);
+  const { label, result, baseline, alone } = settling;
+  if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settling;
+  const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
   if (!isErrorsOnly(verdict, settling)) return settling;
-  recordStep(seams, stepOf(settling, result, verdict.fresh));
+  recordStep(seams, stepOf(settling, result, verdict.fresh, alone?.stepOnly));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
   activeOutput().warn(`🔁 The ${label} counted ${verdict.newErrors} more error(s) outside any test than the baseline and nothing else red (${named}); taking it once more.`);
@@ -701,7 +712,9 @@ export async function retakeOnErrors(context: SuiteStepContext, seams: Required<
   if (again.newErrors === 0 && !isStepInterrupted(context, retake)) {
     activeOutput().warn(`⚠️  Intermittent: the retake of the ${label} counted no more errors outside any test than the baseline. The first run's: ${named}. The run goes on.`);
   }
-  return { ...settling, result: retake };
+  return alone === undefined
+    ? { ...settling, result: retake }
+    : { ...settling, result: retake, alone: stillRedIn(alone, retake) };
 }
 
 /** Runs one suite: over `paths`, since `changedSince`, or the whole project; its JUnit file is `kind`'s unless `junitFile` names one. */
@@ -831,11 +844,10 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const label = `task step after "${input.task}"`;
   const checks = await taskDiffChecks(context, seams, input, result);
   const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
-  const retaken = await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs));
   const touched = isRepairTask(input.task)
     ? planDiffReader(seams, input.baseline, diff)
     : () => diff;
-  const outcome = settleStep(context, seams, await retakeRedAlone(context, seams, retaken, touched));
+  const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs), touched));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
     : junitFileFor(context.repoRoot, context.sessionId, 'task');
@@ -848,8 +860,7 @@ export async function runPreWrapUpStep(context: SuiteStepContext, baseline: Suit
   const seams = seamsOf(context);
   const result = await runOne(context, seams, 'pre-wrap-up', {});
   const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
-  const retaken = await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {}));
-  return settleStep(context, seams, await retakeRedAlone(context, seams, retaken, planDiffReader(seams, baseline, null)));
+  return settleStep(context, seams, await takeRetakes(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {}), planDiffReader(seams, baseline, null)));
 }
 
 /** What {@link planOwnsReader} reads the folders with. */
