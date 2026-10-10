@@ -77,7 +77,8 @@
  * The loop guard runs once more inside a dispatch, immediately before
  * its session is spawned, when its caller names a
  * {@link TaskDispatchOptions.guard}: `start()` guards the checkout ahead
- * of the suite steps and `progress.txt`, and a worktree removed after
+ * of the suite steps and again ahead of `progress.txt`
+ * (`start/session-guard.ts`), and a worktree removed after
  * that would otherwise reach the spawn, where `posix_spawn` throws
  * `ENOENT` for a working directory that is gone. It is the reading
  * `start()` takes, `haltIfCheckoutMoved` (`start/checkout-watch.ts`): a
@@ -675,7 +676,10 @@ function messageOf(error: unknown): string {
  * A store that cannot be read answers false with the file left as it
  * was (`utils/progress.ts` reads before it writes), and the caller stops
  * the run before the dispatch: nothing has been spent yet, and every
- * later dispatch would meet the same store.
+ * later dispatch would meet the same store. A `checkout` that is gone
+ * fails the write and answers false with the same two lines, which name
+ * the store; `start()` runs the loop guard right before this call
+ * (`start/session-guard.ts`) so that a removed checkout halts there.
  */
 export function renderProgressForDispatch(
   repoRoot: string,
