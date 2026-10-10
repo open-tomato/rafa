@@ -9,6 +9,20 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.42.0 — 2026-10-10, Measure which permission rules and hooks reach a loop session; Board project follow-ups — quiet pauses, and every added issue filled; Break the import cycle that crosses future package lines
+<!-- rafa:fragments rafa-lock-0-41-0 rafa-804-spec-monorepo-readiness-spike rafa-902-spec-measure-which-permission rafa-947-board-project-follow-ups rafa-903-spec-break-import-cycle -->
+
+- Notices: The skip-permissions notice of `loop start` and `plan create` now names `loop.settingSources`, the scopes it resolved to and the scopes left out, whose permission rules and hooks do not reach the session
+- context/workflow.md: A new "What reaches a loop session" section records, per `loop.settingSources` value and with the Claude Code version, whether a user-scope deny rule and hook reach a loop session
+- tests: The danger notice's wording is held for `project,local` and `user,project,local` in a spawned `loop start`, and the recorded measurement's rows and version are held in `context/workflow.md`
+- board: `rafa board sync` now fills every issue it adds in the same run, even when GitHub's item listing does not show the new item yet, warns with `#<n> added but not filled: <reason>` for one it could not fill, and counts added and filled issues separately in its closing line and json result; it and `rafa init --board --project` no longer print a line for every routine pause between writes, only `pausing <n> s between writes (board.project.writePauseMs)` for a pause at least `board.project.progressSeconds` long, and never with `progressSeconds: false`
+- board project: `rafa issue create` now fills the new issue's project fields even when GitHub's item listing does not show it yet, and prints `#<n> added but not filled: <reason>` when it could not
+- library: `planCommand` now takes the command roster as its third argument and the adapter registry as its fourth; a call on `--issue` or `--next` must hand a roster in
+- references: `rafa plan create`, `rafa issue check`, `rafa doctor`, `rafa roadmap` and `rafa epic show` read a spec's commands and flags against the roster of the running invocation, so a flag only a mounted module declares now reads as present
+- testing: a new sweep test fails on any non-test runtime import cycle that crosses two clusters of `docs/survey/cluster-map.json`, and new tests hold the roster seam: a spec's command references are read against the roster handed in, and a roster lacking a named command reads it as dangling
+- internal: `rejectedPath` and `REJECTED_DIR` moved from `board/gate.ts` to `commands/plan/plan-files.ts`, breaking a c2/c6 import cycle the new sweep caught
+- docs: `context/source.md` describes the runtime import cycle sweep, its map and what to do when it fails
+
 ## 0.41.0 — 2026-10-09, rafa loop start --retry and --continue go on past a loop stop
 <!-- rafa:fragments loop-failure-retry -->
 
