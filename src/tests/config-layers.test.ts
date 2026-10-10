@@ -51,6 +51,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { loadConfig } from '../config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
 import { setActiveStoreSettings } from '../effort/store/settings.js';
@@ -63,9 +64,11 @@ afterAll(() => {
 });
 
 // `loadConfig` hands the effort store the busy timeout each file names,
-// and a later file's store would open with this file's 250 ms.
+// and a later file's store would open with this file's 250 ms. It hands
+// the logger its settings too, which a later file's logger would read.
 afterEach(() => {
   setActiveStoreSettings(null);
+  setActiveLoggerSettings(null);
 });
 
 /** A fresh, empty directory under this file's temporary root. */
@@ -230,6 +233,13 @@ const PROJECT_TEXT = [
   '      hint: set the secret',
   '      level: error',
   '      since: v1',
+  'logger:',
+  '  kind: winston',
+  '  level: debug',
+  '  theme: plain',
+  '  modules: { board: { level: error } }',
+  '  callSite: true',
+  '  api: true',
   'cleanup:',
   '  staleDays: 45',
   '  worktreeIdleDays: 10',
@@ -337,6 +347,12 @@ const PROJECT_VALUES: RafaConfig = {
   releaseTag: 'settle',
   releasePublishCommand: 'pnpm publish',
   errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
+  loggerKind: 'winston',
+  loggerLevel: 'debug',
+  loggerTheme: 'plain',
+  loggerModules: new Map([['board', 'error'], ['plan', 'debug']]),
+  loggerCallSite: true,
+  loggerApi: true,
   cleanupStaleDays: 45,
   cleanupWorktreeIdleDays: 10,
   cleanupKeep: ['project/*'],
@@ -455,6 +471,13 @@ const USER_TEXT = [
   '      hint: read the service log',
   '      level: warn',
   '      since: v2',
+  'logger:',
+  '  kind: pino',
+  '  level: error',
+  '  theme: plain',
+  '  modules: { plan: { level: debug } }',
+  '  callSite: true',
+  '  api: true',
   'cleanup:',
   '  staleDays: 90',
   '  worktreeIdleDays: 2',
@@ -547,6 +570,12 @@ const USER_VALUES: RafaConfig = {
   releaseTag: 'manual',
   releasePublishCommand: 'yarn npm publish',
   errorsCodes: [{ code: 'deploy:health-timeout', description: 'a deploy health check times out', hint: 'read the service log', level: 'warn', since: 'v2' }],
+  loggerKind: 'pino',
+  loggerLevel: 'error',
+  loggerTheme: 'plain',
+  loggerModules: new Map([['plan', 'debug']]),
+  loggerCallSite: true,
+  loggerApi: true,
   cleanupStaleDays: 90,
   cleanupWorktreeIdleDays: 2,
   cleanupKeep: ['user/*', 'scratch'],
@@ -957,6 +986,36 @@ const SECTION_CASES: readonly [string, string, string, string, ConfigSetting, un
     'errors.codes[0].code is "git:no-identity", which rafa already declares; add a leaf of your own instead',
     'errors:\n  codes:\n    - code: git:shallow-clone\n      description: d\n      hint: h\n      level: warn\n      since: v1',
     'errorsCodes', [{ code: 'git:shallow-clone', description: 'd', hint: 'h', level: 'warn', since: 'v1' }],
+  ],
+  [
+    'logger.kind', 'logger:\n  kind: ""',
+    'logger.kind is "", expected an adapter kind, such as console',
+    'logger:\n  kind: pino', 'loggerKind', 'pino',
+  ],
+  [
+    'logger.level', 'logger:\n  level: info',
+    'logger.level is "info", expected one of: error, warn, debug',
+    'logger:\n  level: error', 'loggerLevel', 'error',
+  ],
+  [
+    'logger.theme', 'logger:\n  theme: neon',
+    'logger.theme is "neon", expected one of: default, plain',
+    'logger:\n  theme: plain', 'loggerTheme', 'plain',
+  ],
+  [
+    'logger.modules', 'logger:\n  modules: { board: debug }',
+    'logger.modules.board is "debug", expected a mapping holding level',
+    'logger:\n  modules: { board: { level: warn } }', 'loggerModules', new Map([['board', 'warn']]),
+  ],
+  [
+    'logger.callSite', 'logger:\n  callSite: "yes"',
+    'logger.callSite is "yes", expected true or false',
+    'logger:\n  callSite: true', 'loggerCallSite', true,
+  ],
+  [
+    'logger.api', 'logger:\n  api: 1',
+    'logger.api is 1, expected true or false',
+    'logger:\n  api: true', 'loggerApi', true,
   ],
   [
     'cleanup.staleDays', 'cleanup:\n  staleDays: 2.5',

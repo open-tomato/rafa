@@ -14,8 +14,8 @@
  *
  * ## Keys
  *
- * A port type is one of the six `PortType` names: `tracker`, `store`,
- * `learning`, `output`, `planner` and `sync`. A kind is any non-empty string,
+ * A port type is one of the seven `PortType` names: `tracker`, `store`,
+ * `learning`, `output`, `planner`, `sync` and `logger`. A kind is any non-empty string,
  * core's own (`sqlite`) or one an add-on brings. The registry refuses a
  * second adapter under a port type and kind it already holds, so an
  * add-on cannot take a core kind over by registering its name. A
@@ -60,8 +60,9 @@
  *
  * The two store backends, `store/sqlite` and `store/ndjson`, which
  * `selectEffortStore` resolves through {@link CORE_ADAPTER_REGISTRY},
- * the two outputs under `src/adapters/output/`, `output/text` and
- * `output/json`, the two trackers under `src/adapters/tracker/`,
+ * the three outputs under `src/adapters/output/`, `output/text`,
+ * `output/json` and `output/events`, the logger under
+ * `src/adapters/logger/`, `logger/console`, the two trackers under `src/adapters/tracker/`,
  * `tracker/local` and `tracker/github`, the learning adapter under
  * `src/adapters/learning/`, `learning/local`, and the planner under
  * `src/adapters/planner/`, `planner/claude`, which `rafa plan` resolves
@@ -112,6 +113,7 @@ import type { GhRunner } from './tracker/github.js';
 import type { SelectedEffortStore } from '../effort/store/index.js';
 import type {
   Learning,
+  Logger,
   Output,
   Planner,
   PortType,
@@ -131,6 +133,7 @@ import { createFileSync } from '../effort/sync/file.js';
 import { createLocalSync } from '../effort/sync/select.js';
 
 import { createLocalLearning, localInstinctsDir } from './learning/local.js';
+import { createConsoleLogger } from './logger/console.js';
 import { createEventsOutput } from './output/events.js';
 import { createJsonOutput } from './output/json.js';
 import { createTextOutput } from './output/text.js';
@@ -155,6 +158,7 @@ export const PORT_VERSIONS: Readonly<PortVersions> = Object.freeze({
   output: 1,
   planner: 1,
   sync: 1,
+  logger: 1,
 } satisfies PortVersions);
 
 /** The served versions by port type, for a lookup no prototype member answers. */
@@ -174,6 +178,7 @@ export interface PortImplementations {
   output: Output;
   planner: Planner;
   sync: Sync;
+  logger: Logger;
 }
 
 /** What every adapter is made with. */
@@ -182,8 +187,10 @@ export interface AdapterContext {
   readonly repoRoot: string;
   /** Where an output adapter writes. Read by the outputs alone; `process.stdout` when left out. */
   readonly stream?: OutputStream;
-  /** How much the `text` output writes. Read by it alone; 0 when left out. */
+  /** How much the `text` output writes, and from which verbosity a logger writes `debug` and `api`; 0 when left out. */
   readonly verbosity?: number;
+  /** Whether a logger may colour its lines. Read by the loggers alone; false when left out. */
+  readonly colour?: boolean;
   /**
    * Why the trackers ahead of this one were passed over, recorded in each
    * issue the `local` tracker creates. Read by it alone; null when left out.
@@ -360,6 +367,7 @@ function indexByPort(adapters: readonly AnyAdapter[]): AdaptersByPort {
     output: only('output'),
     planner: only('planner'),
     sync: only('sync'),
+    logger: only('logger'),
   };
 }
 
@@ -449,6 +457,12 @@ const CORE_ADAPTERS: readonly AnyAdapter[] = [
     kind: 'events',
     portVersion: PORT_VERSIONS.output,
     create: ({ stream = process.stdout }) => createEventsOutput({ stream }),
+  },
+  {
+    port: 'logger',
+    kind: 'console',
+    portVersion: PORT_VERSIONS.logger,
+    create: ({ verbosity = 0, colour = false }) => createConsoleLogger({ verbosity, colour }),
   },
   {
     port: 'tracker',

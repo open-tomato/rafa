@@ -2621,8 +2621,8 @@ say nothing of why.
   `npm source "<name>" is refused: phase 1 loads path sources alone, ...`.
 - **Every `path` source is validated**, enabled or not, with
   `validateManifest` (`src/modules/manifest.ts`). An enabled one with no
-  problem has each `tracker`, `store`, `planner`, `output` and `sync`
-  entry imported, its default export the adapter's `create`, registered
+  problem has each `tracker`, `store`, `planner`, `output`, `sync` and
+  `logger` entry imported, its default export the adapter's `create`, registered
   under the manifest's `kind` and `requires.ports` version on
   `CORE_ADAPTER_REGISTRY`, and its `commands` entry handed to
   `loadModuleCommands`. An entry outside the module directory, an import
@@ -2701,6 +2701,21 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   (`src/adapters/output/active.ts`), set in the invocation's output mode,
   which `activeOutputMode()` answers. The output and the mode active
   before are put back afterwards, when the command throws too.
+- **A command runs with a logger of its own** (`setCommandLogger`): the
+  registry's `logger/console`, made with the invocation's verbosity and
+  with colour on only in text mode, by `FORCE_COLOR`, `NO_COLOR` and
+  whether stdout is a terminal. It is the active logger while the command
+  runs, with a resolver for any other `logger.kind`. The logger settings
+  start from the defaults for every invocation, are set when the command
+  loads its config, and are put back afterwards with the logger that was
+  active. `context/logging.md` is the page for the port.
+- **The context's output gates `warn`, `error` and `debug`** on that
+  logger: a line passes only when `activeLogger().enabled(<level>)`, so
+  `logger.level: error` quiets every warning a command writes through its
+  output, in text and json mode alike. `info`, `emit` and `result` are
+  never gated: they are the command's own answer. The dispatcher's own
+  lines, such as a thrown error's stack at `debug`, go to the base output
+  and are not gated.
 - **An alias but a lasting one, or a command declaring `deprecated`,
   writes one line to stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
