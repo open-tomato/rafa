@@ -56,6 +56,20 @@
  * That shape is GitHub's documentation, NOT a reading: no rate limit was
  * hit to read it.
  *
+ * ## A lagging item listing
+ *
+ * {@link FakeProjectGh.lagItems} marks a point: from it on, an items read
+ * answers each project without the items added since, pages and cursors
+ * counted over what it shows, and a project copied since shows none. Only
+ * the listing lags. An add still answers the new item's id, a second add
+ * of the same content answers that same id, and a field write naming a
+ * hidden item lands. {@link FakeProjectGh.showItems} ends the lag, and
+ * the next read shows every item with the values written meanwhile. A
+ * second mark moves the point to that call.
+ * That GitHub's listing omits an item added a moment earlier is #944's
+ * report, NOT a reading of this module, and how long it does is not
+ * known: the fake lags until it is told to stop.
+ *
  * ## Strict
  *
  * Anything but those calls — another command, a query of another
@@ -156,6 +170,10 @@ export interface FakeProjectGh {
   failNext(stderr: string): void;
   /** The repositories linked to the project whose node id is `projectId`, in link order. */
   linked(projectId: string): readonly string[];
+  /** Makes every items read from now on omit the items added after this call; see the module note. */
+  lagItems(): void;
+  /** Ends the lag: an items read shows every item again. */
+  showItems(): void;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -373,6 +391,16 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
   const recorded: (readonly string[])[] = [];
   let failure: string | null = null;
   let writeRequests = 0;
+  /** The count of items each project showed at the lag's point, by project id; null when no listing lags. */
+  let shownAtLag: ReadonlyMap<string, number> | null = null;
+
+  /** The items of `project` an items read shows; see the module note. */
+  const listedItems = (project: FakeProject): readonly FakeProjectItem[] => {
+    const items = project.items ?? [];
+    return shownAtLag === null
+      ? items
+      : items.slice(0, shownAtLag.get(fakeProjectId(project)) ?? 0);
+  };
 
   const projectById = (id: string | undefined): FakeProject | undefined => projects.find((held) => fakeProjectId(held) === id);
 
@@ -502,7 +530,7 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
     if (project === undefined) return notFound({ node: null }, ['node'], 40, `Could not resolve to a node with the global id of '${id}'`);
     const [, first = '0'] = /items\(first: (\d+), after: \$after\)/u.exec(query) ?? [];
     const [, valuesFirst = '0'] = /fieldValues\(first: (\d+)\)/u.exec(query) ?? [];
-    const items = project.items ?? [];
+    const items = listedItems(project);
     const start = cursor === undefined
       ? 0
       : Number(atob(cursor));
@@ -562,5 +590,11 @@ export function createFakeProjectGh(options: FakeProjectGhOptions = {}): FakePro
       failure = stderr;
     },
     linked: (projectId) => links.get(projectId) ?? [],
+    lagItems: () => {
+      shownAtLag = new Map(projects.map((held) => [fakeProjectId(held), (held.items ?? []).length]));
+    },
+    showItems: () => {
+      shownAtLag = null;
+    },
   };
 }
