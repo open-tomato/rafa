@@ -89,9 +89,9 @@ import type { BaseStanding } from '../start/branch-decision.js';
 
 import { scanClaimBranches } from '../board/roadmap.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { isLive } from '../commands/loop/loop-sessions.js';
 import { listPlans } from '../commands/plan/list.js';
 import { messageOf } from '../config-sections.js';
+import { isLive } from '../loop/session-readings.js';
 import { planFileName } from '../plan/plan-files.js';
 import { gitSaid, parseWorkingTree } from '../pr/index.js';
 import { BRANCH_PREFIX, parseBaseStanding, REMOTE, trackedChanges } from '../start/branch-decision.js';

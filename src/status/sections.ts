@@ -6,7 +6,7 @@
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
- * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/commands/loop/loop-sessions.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
+ * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/loop/session-readings.ts`), `blockedTasks` (`src/commands/loop/status.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
  * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
@@ -189,9 +189,9 @@ import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { readBlockedIssues } from '../commands/doctor-blocked.js';
 import { doctorCleanupSettings } from '../commands/doctor-cleanup.js';
-import { isLive, readSessionChecklist } from '../commands/loop/loop-sessions.js';
 import { blockedTasks } from '../commands/loop/status.js';
 import { messageOf } from '../config-sections.js';
+import { isLive, readSessionChecklist } from '../loop/session-readings.js';
 import { readSessions } from '../loop/sessions.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';

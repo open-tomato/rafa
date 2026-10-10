@@ -26,7 +26,7 @@
  * `--session-id` picking a record the branch does not name, with the
  * branch reader throwing to show it is never read then.
  */
-import type { LoopSessionSeams } from './loop-sessions.js';
+import type { LoopSessionSeams } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';

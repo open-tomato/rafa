@@ -2,7 +2,7 @@
  * When the tasks of one plan finished, as the store holds it: the
  * `collected_at` of each task session the loop stored with the outcome
  * `done`, which the rough ETA of `rafa loop status` is read from
- * (`commands/loop/loop-sessions.ts`).
+ * (`loop/session-readings.ts`).
  *
  * ## Where a finish is read
  *

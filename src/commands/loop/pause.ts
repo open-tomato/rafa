@@ -28,17 +28,19 @@
  * Exit code 1: the refusals `loop-sessions.ts` names, and a session that
  * reads `stopped` or `done`.
  */
-import type { LoopSessionSeams, ResolvedLoopSeams } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
 import type { SessionRecord } from '../../loop/sessions.js';
-
-import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   isLive,
-  pickSession,
   refusal,
   resolveLoopSeams,
+} from '../../loop/session-readings.js';
+import { expectNoArgument } from '../plan/plan-files.js';
+
+import {
+  pickSession,
   sessionIdFlag,
   writeSession,
 } from './loop-sessions.js';

@@ -11,14 +11,14 @@
  * and the task it names. The plan's tracker gives the tasks done, blocked
  * and open over the whole plan, read from the plan itself before the run
  * made its tracker, and nothing when neither file is there. The phase the
- * run is in sits beside the tasks done over total (`loop-sessions.ts`,
- * "A session's tasks"): `task`, `wrap-up`, `pull-request`, `ci` or
+ * run is in sits beside the tasks done over total (`phasedCounts`,
+ * `loop-sessions.ts`): `task`, `wrap-up`, `pull-request`, `ci` or
  * `repair`, and `task` for a record from a rafa older than the field.
  *
  * A session reading `running` or `paused` also gets its rough ETA from the
- * effort store (`loop-sessions.ts`, "The rough ETA"). A store that cannot
- * be read is warned about, and the status is given without one. A session
- * that has ended gets none.
+ * effort store (`loop/session-readings.ts`, "The rough ETA"). A store that
+ * cannot be read is warned about, and the status is given without one. A
+ * session that has ended gets none.
  *
  * A record reading `paused` while it still names a task has a pause that
  * has not taken effect: the run holds once that task ends, and the status
@@ -50,29 +50,31 @@
  *
  * Exit code 1: the refusals `loop-sessions.ts` names.
  */
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { messageOf } from '../../config-sections.js';
+import {
+  estimateEta,
+  isLive,
+  readSessionChecklist,
+  readSessionFinishes,
+  resolveLoopSeams,
+  sessionLine,
+} from '../../loop/session-readings.js';
 import { sessionPhase } from '../../loop/sessions.js';
 import { countTasks } from '../../plan/plan-files.js';
 import { splitBlockerComment } from '../../utils/tracker.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
-  estimateEta,
   etaLine,
-  isLive,
   phasedCounts,
   phaseNote,
   pickSession,
-  readSessionChecklist,
-  readSessionFinishes,
-  resolveLoopSeams,
   sessionIdFlag,
-  sessionLine,
 } from './loop-sessions.js';
 
 /** The usage line a refusal names. */
