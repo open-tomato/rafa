@@ -99,8 +99,9 @@ will run:
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
   before it settles, so that a file green alone blocks nothing unless a
-  test file the step's own change touches ran before it; read "A newly
-  red file is run alone once" below
+  test file the step's own change touches ran before it; `false`
+  switches that retake off and nothing else; read "A newly red file is
+  run alone once" below
 
 **The baseline is the `baseline` step's recorded failures.** A failure
 is identified by its test file path and full test name (the pair the
@@ -193,7 +194,14 @@ under its file, its lines indented under it, between the
 unhandled-error blocks and the summary lines (at most 40 cases, the
 rest counted). And the blocker quotes the first line of each, by file,
 as `What Bun printed for them: src/a.test.ts "error: boom" (2 tests)`,
-which is what the repair session reads. A case whose `(fail)` line is
+which is what the repair session reads. The blocker is one tracker
+line, so that quote is kept to a few hundred characters: one distinct
+line per file (`ERROR_LINES_QUOTED`), cut at 100 characters with `...`
+after the cut (`ERROR_LINE_QUOTED_LENGTH`), for the first three files
+(`ERROR_FILES_QUOTED`), then `and N more lines` for a file's other
+lines and `and N more files` for the files left out
+(`src/start/suite-blocker.ts`). The record and the output file hold
+every line uncut. A case whose `(fail)` line is
 not found on stderr, or that printed nothing, carries no lines, and the
 blocker then names its file and count alone.
 
@@ -276,8 +284,10 @@ A retake ended by SIGINT makes the step a stop, as the step's own run
 would. Each retake writes `<kind>-alone-<n>.junit.xml` and
 `<kind>-alone-<n>.output.txt` beside the step's own files, which it
 leaves as they were. `tests.retakeRedAlone: false` turns the retake
-off, and the step then blocks on every new failure as it did before the
-key.
+off and nothing else: no file is run a second time, and the step blocks
+on every new failure. The error lines of the paragraph above are kept
+either way, on the record, in the output file and in the blocker; no
+key turns them off.
 
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.

@@ -84,9 +84,11 @@
  *
  *   - It defaults to `true`. The retake costs one `bun test <file>` per
  *     newly red file and only on a step already red, and what it saves is
- *     a repair session per order-dependent file. `false` keeps the step
- *     as it was before the key: every new failure blocks, and no file is
- *     run a second time.
+ *     a repair session per order-dependent file. `false` switches the
+ *     retake off and nothing else: every new failure blocks, and no file
+ *     is run a second time. The error lines a step keeps for each failed
+ *     case (`suite/failure-lines.ts`), on its record, in its output file
+ *     and in its blocker, are kept either way; no key turns them off.
  *   - It is read through `flag` (`config-sections.ts`), a YAML boolean
  *     and nothing spelled like one, as `status.notice` is.
  *

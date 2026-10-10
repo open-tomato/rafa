@@ -8,8 +8,15 @@
  * red. What Bun printed is the first error line of each new failure
  * (`suite/failure-lines.ts`), which the JUnit report does not hold:
  * quoted by file, each distinct line once with how many of the file's
- * tests printed it, the first {@link ERROR_LINES_QUOTED} lines of a file
- * and the first {@link ERROR_FILES_QUOTED} files, the rest counted. A
+ * tests printed it. The blocker is one tracker line, the repair task's
+ * comment, so the quote is kept to a few hundred characters: the first
+ * {@link ERROR_LINES_QUOTED} distinct line of a file, cut at
+ * {@link ERROR_LINE_QUOTED_LENGTH} characters with `...` after the cut,
+ * for the first {@link ERROR_FILES_QUOTED} files, and a count of the
+ * lines and of the files left out. Every line, uncut, is on the step's
+ * record and in its output file (`suite/run.ts`). The lines are kept
+ * and quoted whatever `tests.retakeRedAlone` says: that key switches
+ * the retake alone. A
  * file whose failures carry no line is left out of that sentence, and
  * the sentence is left out when none does.
  *
@@ -97,10 +104,30 @@ function failingFiles(failures: readonly SuiteFailure[]): readonly (readonly [st
 }
 
 /** How many distinct error lines of one file the blocker quotes before it counts the rest. */
-const ERROR_LINES_QUOTED = 3;
+export const ERROR_LINES_QUOTED = 1;
 
 /** How many files' error lines the blocker quotes before it counts the rest. */
-const ERROR_FILES_QUOTED = 10;
+export const ERROR_FILES_QUOTED = 3;
+
+/** The most characters of one error line the blocker quotes; a longer one is cut there and ends in `...`. */
+export const ERROR_LINE_QUOTED_LENGTH = 100;
+
+/** What marks a quoted line cut at {@link ERROR_LINE_QUOTED_LENGTH}. */
+const QUOTE_CUT_MARK = '...';
+
+/** `line` as the blocker quotes it: whole, or cut at {@link ERROR_LINE_QUOTED_LENGTH}. */
+function quotedLine(line: string): string {
+  return line.length > ERROR_LINE_QUOTED_LENGTH
+    ? `${line.slice(0, ERROR_LINE_QUOTED_LENGTH)}${QUOTE_CUT_MARK}`
+    : line;
+}
+
+/** `left` things left out, as `and 1 more <thing>` or `and N more <thing>s`. */
+function leftOut(left: number, thing: string): string {
+  return `and ${left} more ${left === 1
+    ? thing
+    : `${thing}s`}`;
+}
 
 /** `count` as `1 test` or `N tests`. */
 function testCount(count: number): string {
@@ -123,17 +150,20 @@ function firstErrorLines(failures: readonly SuiteFailure[]): readonly (readonly 
 function quotedFile(file: string, failures: readonly SuiteFailure[]): string | null {
   const lines = firstErrorLines(failures.filter((failure) => failure.file === file));
   if (lines.length === 0) return null;
-  const quoted = lines.slice(0, ERROR_LINES_QUOTED).map(([line, count]) => `"${line}" (${testCount(count)})`);
+  const quoted = lines.slice(0, ERROR_LINES_QUOTED).map(([line, count]) => `"${quotedLine(line)}" (${testCount(count)})`);
   const left = lines.length - quoted.length;
   const more = left > 0
-    ? [`and ${left} more lines`]
+    ? [leftOut(left, 'line')]
     : [];
   return `${file} ${[...quoted, ...more].join(', ')}`;
 }
 
 /**
  * The first error lines Bun printed for `failures`, by file, `; ` apart,
- * or null when none carries a line. See the module note.
+ * or null when none carries a line: the first
+ * {@link ERROR_FILES_QUOTED} files, {@link ERROR_LINES_QUOTED} line of
+ * each, cut at {@link ERROR_LINE_QUOTED_LENGTH} characters, and how
+ * many of each were left out. See the module note.
  */
 export function quotedErrors(failures: readonly SuiteFailure[]): string | null {
   const files = failingFiles(failures).flatMap(([file]) => {
@@ -145,7 +175,7 @@ export function quotedErrors(failures: readonly SuiteFailure[]): string | null {
   if (files.length === 0) return null;
   const left = files.length - ERROR_FILES_QUOTED;
   const more = left > 0
-    ? [`and ${left} more files`]
+    ? [leftOut(left, 'file')]
     : [];
   return [...files.slice(0, ERROR_FILES_QUOTED), ...more].join('; ');
 }
@@ -238,7 +268,7 @@ function afterTouchedText(entries: readonly AfterTouched[]): string {
   const listed = entries.slice(0, AFTER_TOUCHED_NAMED);
   const left = entries.length - listed.length;
   const more = left > 0
-    ? [`and ${left} more files`]
+    ? [leftOut(left, 'file')]
     : [];
   const before = listed.flatMap((entry) => entry.touched.slice(-TOUCHED_BEFORE_NAMED));
   const paths = [...new Set([...before, ...listed.map((entry) => entry.file)])];

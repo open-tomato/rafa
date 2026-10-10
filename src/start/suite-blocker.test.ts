@@ -2,7 +2,8 @@
  * Unit cases for the `bun test` paths {@link blockerText} writes: a
  * relative path gains `./` so bun reads it as a path, not a substring
  * filter, and an absolute one is written as it is. Then the error lines
- * it quotes for the new failures, by file. Then the pre-wrap-up
+ * it quotes for the new failures, by file, and the caps that keep that
+ * quote short on the tracker line. Then the pre-wrap-up
  * repair {@link writeRepairTask} writes, over a real tracker file under a
  * temporary directory: inserted after the last task, or the ticked one
  * blocked again on a second red, each claim paired with its control.
@@ -18,7 +19,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { parsePlan } from '../plan/parse.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { blockerText, isRepairTask, repairTaskText, runnablePath, writeRepairTask } from './suite-blocker.js';
+import {
+  blockerText,
+  ERROR_FILES_QUOTED,
+  ERROR_LINE_QUOTED_LENGTH,
+  ERROR_LINES_QUOTED,
+  isRepairTask,
+  quotedErrors,
+  repairTaskText,
+  runnablePath,
+  writeRepairTask,
+} from './suite-blocker.js';
 
 const verdict = (fresh: readonly SuiteFailure[], newErrors = 0) => ({ fresh, known: [], newErrors, unreported: false });
 
@@ -66,27 +77,59 @@ describe('blockerText error lines', () => {
     expect(text).not.toContain('second line');
   });
 
-  it('quotes each distinct line of one file in first-seen order, and each file apart', () => {
+  it('quotes the first distinct line of each file, in first-seen order, and counts the file\'s other lines', () => {
     const fresh: readonly SuiteFailure[] = [
       { file: 'sub/two.test.ts', name: 'two > first', errorLines: ['error: first boom'] },
       { file: 'a.test.ts', name: 'times out', errorLines: ['this test timed out after 50ms.'] },
       { file: 'sub/two.test.ts', name: 'two > third', errorLines: ['TypeError: third boom'] },
       { file: 'sub/two.test.ts', name: 'two > fourth', errorLines: ['error: first boom'] },
     ];
+    expect(ERROR_LINES_QUOTED).toBe(1);
     expect(blockerText('stage step', { exitCode: 1, unhandled: [] }, verdict(fresh))).toContain(
-      'What Bun printed for them: sub/two.test.ts "error: first boom" (2 tests), "TypeError: third boom" (1 test); a.test.ts "this test timed out after 50ms." (1 test).',
+      'What Bun printed for them: sub/two.test.ts "error: first boom" (2 tests), and 1 more line; a.test.ts "this test timed out after 50ms." (1 test).',
     );
   });
 
-  it('counts the lines of one file past the third, and the files past the tenth', () => {
+  it('counts the lines of one file past the cap, and the files past theirs', () => {
     const lines = ['one', 'two', 'three', 'four', 'five'].map((word, index): SuiteFailure => ({ file: 'a.test.ts', name: `t${index}`, errorLines: [`error: ${word}`] }));
     expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(lines))).toContain(
-      'What Bun printed for them: a.test.ts "error: one" (1 test), "error: two" (1 test), "error: three" (1 test), and 2 more lines.',
+      'What Bun printed for them: a.test.ts "error: one" (1 test), and 4 more lines.',
     );
-    const files = Array.from({ length: 12 }, (_, index): SuiteFailure => ({ file: `f${index}.test.ts`, name: 't', errorLines: ['error: x'] }));
+    const files = Array.from({ length: ERROR_FILES_QUOTED + 2 }, (_, index): SuiteFailure => ({ file: `f${index}.test.ts`, name: 't', errorLines: ['error: x'] }));
     const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(files));
-    expect(text).toContain('f9.test.ts "error: x" (1 test); and 2 more files.');
-    expect(text).not.toContain('f10.test.ts "error: x"');
+    expect(text).toContain(`f${ERROR_FILES_QUOTED - 1}.test.ts "error: x" (1 test); and 2 more files.`);
+    expect(text).not.toContain(`f${ERROR_FILES_QUOTED}.test.ts "error: x"`);
+  });
+
+  it('cuts a quoted line at the cap, marking the cut, and leaves a line at the cap whole', () => {
+    const at = 'x'.repeat(ERROR_LINE_QUOTED_LENGTH);
+    const whole = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [at] }]));
+    expect(whole).toContain(`a.test.ts "${at}" (1 test).`);
+
+    const cut = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [`${at}yz`] }]));
+    expect(cut).toContain(`a.test.ts "${at}..." (1 test).`);
+    expect(cut).not.toContain('xy');
+  });
+
+  /** What the quote of twelve files of 52-character names, five lines each, may run to. */
+  const A_FEW_HUNDRED = 600;
+
+  it('keeps the sentence to a few hundred characters whatever the step read, saying what it left out', () => {
+    // The widest a step can read: every line at the length the reading itself cuts one at, 300 characters.
+    const wide = (file: number, line: number): string => `error: file ${file} line ${line} ${'w'.repeat(300)}`.slice(0, 300);
+    const fresh = Array.from({ length: 12 }, (_, file) => Array.from({ length: 5 }, (_unused, line): SuiteFailure => ({
+      file: `src/start/a-long-enough-name-of-a-test-file-${file}.test.ts`,
+      name: `case ${line}`,
+      errorLines: [wide(file, line), 'second line'],
+    }))).flat();
+    const quoted = quotedErrors(fresh) ?? '';
+
+    expect(quoted.length).toBeLessThanOrEqual(A_FEW_HUNDRED);
+    expect(quoted.split('; ')).toHaveLength(ERROR_FILES_QUOTED + 1);
+    expect(quoted).toContain(', and 4 more lines; ');
+    expect(quoted.endsWith(`; and ${12 - ERROR_FILES_QUOTED} more files`)).toBe(true);
+    // The control: the same failures quoted whole run to thousands of characters.
+    expect(fresh.map((failure) => failure.errorLines?.[0] ?? '').join('').length).toBeGreaterThan(10 * A_FEW_HUNDRED);
   });
 
   it('says nothing of what Bun printed when no new failure carries a line, and leaves out a file without one', () => {
