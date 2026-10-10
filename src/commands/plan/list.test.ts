@@ -26,7 +26,7 @@
  * what reading the project root gives: the subdirectory holds no plans
  * directory, so a command reading the working directory lists nothing.
  */
-import type { PlanList, PlanListing } from './list.js';
+import type { PlanList, PlanListing } from '../../plan/list.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,10 +36,11 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '../../plan/index.js';
+import { listPlans } from '../../plan/list.js';
 import { plansDirAt } from '../../plan/plan-files.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
-import planListCommand, { listPlans, openPlans, renderPlanList } from './list.js';
+import planListCommand, { openPlans, renderPlanList } from './list.js';
 import planShowCommand, { renderShownPlan, showPlan } from './show.js';
 
 /** A temporary directory of this file's own. */

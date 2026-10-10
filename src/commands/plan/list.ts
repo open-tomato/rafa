@@ -1,21 +1,17 @@
 /**
  * `rafa plan list`: every plan under the configured plans directory, with
- * how far the loop has got through each.
+ * how far the loop has got through each. This is the command half: the
+ * command, its `--open` filter and its text rendering. The list itself,
+ * `listPlans` with its `PlanList` and `PlanListing`, is the library half,
+ * `../../plan/list.ts`, which any folder may import.
  *
  * ## What is listed
  *
- * Each file in the configured plans directory named `PLAN-<stub>.md`
- * whose stub a plan stamp can carry (`../../plan/plan-files.ts`), in stub
- * order. A tracker is never listed on its own, nor is a bare `PLAN.md`,
- * which has no stub for `rafa plan show` to name, nor anything that is
- * not a file.
- * With no plans directory the list is empty, which is no refusal.
- *
- * A plan's tasks are counted from its tracker, `PLAN_TRACKER-<stub>.md`,
- * when there is one, since that is the copy the loop ticks, and from the
- * plan otherwise. Its issues are the ones `parsePlan` reports for the plan
- * itself: the file `rafa loop start` announces them for, and the one
- * `rafa plan validate` checks.
+ * What `listPlans` returns: each `PLAN-<stub>.md` of the configured plans
+ * directory, in stub order, its tasks counted from its tracker when there
+ * is one, and its issues as `parsePlan` reports them. The module note of
+ * `../../plan/list.ts` holds the rules. With no plans directory the list
+ * is empty, which is no refusal.
  *
  * The directory is `plan.dir` resolved against the project root the
  * dispatcher found, `.rafa/plans` unless a config names another
@@ -53,20 +49,10 @@
  * a line handing it an argument with exit code 1.
  */
 import type { RafaCommand } from '../../cli/command.js';
-import type { PlansDir, TaskCounts } from '../../plan/plan-files.js';
+import type { PlanList, PlanListing } from '../../plan/list.js';
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { parsePlan } from '../../plan/index.js';
-import {
-  countTasks,
-  formatCounts,
-  isFile,
-  planFileName,
-  plural,
-  stubOfPlanFile,
-} from '../../plan/plan-files.js';
+import { listPlans } from '../../plan/list.js';
+import { formatCounts, plural } from '../../plan/plan-files.js';
 
 import {
   expectNoArgument,
@@ -80,54 +66,6 @@ const USAGE = 'rafa plan list';
 
 /** What a refusal of a value read into `--open` says to do instead. */
 const OPEN_HINT = 'Type it bare: rafa plan list --open';
-
-/** One plan the list holds. */
-export interface PlanListing {
-  /** The stub its file name carries. */
-  readonly stub: string;
-  /** The plan, absolute. */
-  readonly plan: string;
-  /** Its tracker, absolute, or null when there is none. */
-  readonly tracker: string | null;
-  /** Its tasks, counted from the tracker when there is one. */
-  readonly tasks: TaskCounts;
-  /** How many issues `parsePlan` reports for the plan. */
-  readonly issues: number;
-}
-
-/** Every plan under the configured plans directory. */
-export interface PlanList {
-  /** The directory read, absolute. */
-  readonly dir: string;
-  /** The plans, in stub order. */
-  readonly plans: readonly PlanListing[];
-}
-
-/** One plan's listing; see the module note. */
-function listing(dir: string, stub: string): PlanListing {
-  const plan = join(dir, planFileName(stub, false));
-  const trackerPath = join(dir, planFileName(stub, true));
-  const tracker = isFile(trackerPath)
-    ? trackerPath
-    : null;
-  const planModel = parsePlan(readFileSync(plan, 'utf8'));
-  const counted = tracker === null
-    ? planModel
-    : parsePlan(readFileSync(tracker, 'utf8'));
-  return { stub, plan, tracker, tasks: countTasks(counted.tasks), issues: planModel.issues.length };
-}
-
-/** Every plan in `plans`, the configured plans directory; see the module note. */
-export function listPlans(plans: PlansDir): PlanList {
-  const dir = plans.path;
-  if (!existsSync(dir)) return { dir, plans: [] };
-  const stubs = readdirSync(dir)
-    .filter((name) => isFile(join(dir, name)))
-    .map((name) => stubOfPlanFile(name))
-    .filter((stub): stub is string => stub !== null)
-    .sort((a, b) => a.localeCompare(b));
-  return { dir, plans: stubs.map((stub) => listing(dir, stub)) };
-}
 
 /** Whether `--open` keeps a plan: a task still open, or any issue; see the module note. */
 function isOpen(plan: PlanListing): boolean {

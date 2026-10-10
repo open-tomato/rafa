@@ -403,8 +403,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./refs-check.js', ['registryRoster']],
   ]],
   ['./commands/plan/list.js', [
-    ['../../plan/index.js', ['parsePlan']],
-    ['../../plan/plan-files.js', ['countTasks', 'formatCounts', 'isFile', 'planFileName', 'plural', 'stubOfPlanFile']],
+    ['../../plan/list.js', ['listPlans']],
+    ['../../plan/plan-files.js', ['formatCounts', 'plural']],
     ['./plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolvePlansDir']],
   ]],
   ['./commands/plan/show.js', [

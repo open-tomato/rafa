@@ -5,7 +5,6 @@ src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock
 src/effort/report-skills -> src/commands/instinct/instinct-records
 src/effort/sync/file -> src/commands/effort/fix-schema
-src/next/readings -> src/commands/plan/list
 src/next/settle-step -> src/commands/pr/merge-cleanup
 src/next/settle-step -> src/commands/pr/merge-followups
 src/project/scaffold -> src/commands/init-release
@@ -15,7 +14,6 @@ src/status/blocked-count -> src/commands/doctor-blocked
 src/status/sections -> src/commands/doctor-blocked
 src/status/sections -> src/commands/doctor-cleanup
 src/status/sections -> src/commands/loop/status
-src/status/sections -> src/commands/plan/list
 src/status/seen -> src/commands/doctor-cleanup
 src/status/seen -> src/commands/loop/status
 src/stretch/pit-readings -> src/commands/ci/status
