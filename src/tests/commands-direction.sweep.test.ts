@@ -102,6 +102,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/plan/plan-files.ts' },
   { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/loop/session-readings.ts' },
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
+  { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
 ];
 
 /**

@@ -19,7 +19,7 @@
  * The `native` adapter tells a blocker or a parent on this board from
  * one on another, so it is made with the board's `owner/name`, read with
  * the one `gh repo view --json nameWithOwner` `readBoardRepository`
- * sends (`src/commands/epic/move-native.ts`), through `selectBoardRelations`
+ * sends (`src/board/repository.ts`), through `selectBoardRelations`
  * (`./relations/select.ts`). A repository `gh` will not name rejects with
  * that function's message; each caller words the refusal as its own
  * reading of the board would.
@@ -32,9 +32,8 @@ import type { EpicRelations } from './epics.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RafaConfig } from '../config.js';
 
-import { readBoardRepository } from '../commands/epic/move-native.js';
-
 import { selectBoardRelations } from './relations/select.js';
+import { readBoardRepository } from './repository.js';
 
 /**
  * The relations `config.boardRelationships` names, read through `gh`:

@@ -76,7 +76,7 @@ import type {
 } from './refresh.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 
-import { readBoardRepository } from '../../commands/epic/move-native.js';
+import { readBoardRepository } from '../repository.js';
 
 import { createGhProjectPort } from './gh.js';
 import { refreshFailedWarning } from './issue-board-refresh.js';

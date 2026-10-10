@@ -2109,8 +2109,9 @@ New; it replaces no earlier text. What a row or an action added to
   posted is a `warn` line, and the run exits 1 naming what to finish by
   hand. Json mode's result is `EpicMoveResult`. With
   `board.relationships: native` (read off the config by
-  `src/commands/epic/move-native.ts`, which then reads the board's
-  repository with one `gh repo view --json nameWithOwner`), the listing
+  `src/commands/epic/move-native.ts`, with the board's repository then
+  read by `src/board/repository.ts` in one
+  `gh repo view --json nameWithOwner`), the listing
   is read with the native fields, the epic left is the issue's sub-issue
   parent read through the port's `epicOf` (no parent, a parent that is
   no `type:epic` issue on the listing, and its own parent are refused

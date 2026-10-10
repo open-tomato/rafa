@@ -1066,6 +1066,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/epic-trail.js', ['blankReasonMessage', 'REASON_FLAG', 'readReason', 'renderMoveComment', 'unaskedReasonMessage']],
     ['../../board/epics.js', ['EPIC_LABEL_PREFIX', 'epicSlugsOf']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
+    ['../../board/repository.js', ['readBoardRepository']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap.js', ['branchClaims', 'closedIssuesIn', 'createGhOpenPullRequests', 'parseRoadmapBody', 'scanClaimBranches']],
     ['../../cli/command.js', ['CommandExit']],
@@ -1082,7 +1083,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'nativeAlreadyMessage',
       'nativeEpicLeft',
       'nativeParentLine',
-      'readBoardRepository',
     ]],
   ]],
   ['./commands/epic/close.js', [

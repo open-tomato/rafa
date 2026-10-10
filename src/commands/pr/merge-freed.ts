@@ -31,7 +31,7 @@
  * The `native` adapter tells a blocker on this board from one on
  * another, so it is made with the board's `owner/name`, read with one
  * `gh repo view --json nameWithOwner` (`readBoardRepository`,
- * `../epic/move-native.ts`). A merge closing an issue therefore sends
+ * `../../board/repository.ts`). A merge closing an issue therefore sends
  * two `gh` calls here, the repository and the listing, and a merge
  * closing none sends nothing at all, as the unblock reading does not.
  *
@@ -53,11 +53,12 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 
 import { selectBoardRelations } from '../../board/relations/select.js';
+import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { messageOf } from '../../config-sections.js';
 import { plural } from '../../plan/plan-files.js';
-import { NATIVE_MODE, readBoardRepository } from '../epic/move-native.js';
+import { NATIVE_MODE } from '../epic/move-native.js';
 
 import { INDENT } from './merge-cleanup.js';
 

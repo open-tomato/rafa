@@ -36,25 +36,27 @@
  * The `native` adapter tells a parent on the board's own repository
  * from one on another, so it is made with the board's `owner/name`,
  * read with one `gh repo view --json nameWithOwner` in the project's
- * directory ({@link readBoardRepository}). That call is sent in `native`
- * mode only: a `labels` move sends the calls it sent before the port.
+ * directory. That call is sent in `native` mode only: a `labels` move
+ * sends the calls it sent before the port.
+ *
+ * ## The library half
+ *
+ * The reader of that repository, `readBoardRepository`, is this
+ * module's library half, `src/board/repository.ts`, which any folder
+ * may import. This file is the command half and holds none of it:
+ * {@link configuredMoveRelations} takes the read as its
+ * `readRepository` argument, and `./move.ts` hands it the library
+ * half's reader.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardRelations, EpicOfReading } from '../../board/relations/port.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { selectBoardRelations } from '../../board/relations/select.js';
-import { describeValue, isMapping } from '../../config-sections.js';
 import { issueSubjectConfig } from '../issue/issue-tracker.js';
 
 /** What every native-mode sentence of the move opens with. */
 export const NATIVE_MODE = 'board.relationships is native';
-
-/** A repository as `gh repo view` names it: `owner/name`, each part free of `/` and whitespace. */
-const REPOSITORY = /^[^/\s]+\/[^/\s]+$/u;
-
-/** The command {@link readBoardRepository} sends, as a message names it. */
-const REPO_VIEW = 'gh repo view --json nameWithOwner';
 
 /** What a native-mode move that `gh` refused tells the person to read before running again. */
 export const NATIVE_RETRY_HINT = 'Read its parent epic before running the same line again.';
@@ -89,29 +91,6 @@ export function nativeAlreadyMessage(issue: number, epic: number): string {
 /** The line a native-mode move prints where the labels mode prints its two checklist lines. */
 export function nativeParentLine(to: number): string {
   return `Set its parent to epic ${ref(to)}; ${NATIVE_MODE}, so no label and no checklist line was written.`;
-}
-
-/**
- * The board's own repository, `owner/name`, read with one
- * `gh repo view --json nameWithOwner`. Rejects naming the command when
- * `gh` fails or answers no `owner/name`.
- */
-export async function readBoardRepository(gh: GhRunner): Promise<string> {
-  const result = await gh(['repo', 'view', '--json', 'nameWithOwner']);
-  if (!result.ok) throw new Error(`${REPO_VIEW} failed: ${result.stderr.trim() || result.stdout.trim() || 'it wrote nothing'}`);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.stdout);
-  } catch {
-    throw new Error(`${REPO_VIEW} wrote output that is not JSON: ${describeValue(result.stdout)}`);
-  }
-  const name = isMapping(parsed)
-    ? parsed['nameWithOwner']
-    : undefined;
-  if (typeof name !== 'string' || !REPOSITORY.test(name)) {
-    throw new Error(`${REPO_VIEW} answered nameWithOwner ${describeValue(name)}, expected owner/name`);
-  }
-  return name;
 }
 
 /**

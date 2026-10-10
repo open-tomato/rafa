@@ -61,9 +61,9 @@ import { createGhProjectPort } from '../board/project/gh.js';
 import { matchProjectFields } from '../board/project/port.js';
 import { openProjectRunner } from '../board/project/project-runner.js';
 import { isMissingProjectScope, PROJECT_SCOPE_FIX } from '../board/project/refresh-warnings.js';
+import { readBoardRepository } from '../board/repository.js';
 import { isMapping, messageOf } from '../config-sections.js';
 
-import { readBoardRepository } from './epic/move-native.js';
 import { holdsProjectScope, PROJECT_HEADING, PROJECT_SCOPE, PROJECT_STEP_FIX, SCOPE_ARGS } from './init-board-project.js';
 
 /** The scope row's name. */

@@ -104,8 +104,8 @@
  * ## Native mode
  *
  * The mode is the one `board.relationships` names in the project's
- * config (`./move-native.ts`, which also reads the board's repository in
- * `native` mode), or the one the relationships
+ * config (`./move-native.ts`, with the board's repository read in
+ * `native` mode by `src/board/repository.ts`), or the one the relationships
  * {@link EpicMoveSeams.relations} answer when a caller hands them in; in
  * `labels`, the default, everything above holds. Under
  * `board.relationships: native` the listing is read with the native
@@ -160,6 +160,7 @@ import {
 } from '../../board/epic-trail.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../../board/epics.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
+import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
@@ -177,7 +178,6 @@ import {
   nativeAlreadyMessage,
   nativeEpicLeft,
   nativeParentLine,
-  readBoardRepository,
 } from './move-native.js';
 
 /** The exit code every refusal of a move ends the command with. */

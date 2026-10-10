@@ -1033,7 +1033,7 @@ sends one warning and prints nothing, as the merge has already happened.
 
 The freed reading in native mode sends two `gh` calls from the one board listing
 the command already holds: the board's repository (one `gh repo view --json
-nameWithOwner`, `readBoardRepository`, `src/commands/epic/move-native.ts`) to
+nameWithOwner`, `readBoardRepository`, `src/board/repository.ts`) to
 tell the board's issues from foreign blockers; and one native board listing (`gh
 api graphql` with `filterBy: {since}` on an incremental read, or a full listing
 on the first read). No per-blocker `gh issue view` is sent; a blocker's state
