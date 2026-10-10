@@ -6,44 +6,31 @@
  * target is inside `src/commands/` — static, `import type`, `export …
  * from`, or dynamic `import()` — except `src/rafa.ts` and `src/plan.ts`,
  * exempt as the CLI's own layer. `scripts/survey/commands-direction.ts`
- * (`readCommandsEdges`, `checkCommandsDirection`) does the reading and the
- * comparison; its own unit tests cover both over planted trees. This file
- * is the other half: it runs them over every file git tracks under `src/`
- * and each `packages/<name>/src/`, and reddens on whichever of the
- * check's three reports is not empty:
+ * (`readCommandsEdges`) does the reading; its own unit tests cover it over
+ * planted trees. This file is the other half: it runs it over every file
+ * git tracks under `src/` and each `packages/<name>/src/`, and reddens on
+ * any measured edge at all.
  *
- *   - `unlisted`: a measured edge the allow-list does not hold — a new
- *     import into `src/commands/` landed without a reason recorded;
- *   - `stale`: an allow-list line no measured edge matches — the import
- *     is gone (most often a split moved its importer's library half) and
- *     the line was left behind;
- *   - `absentFromFirstList`: an allow-list line the first list does not
- *     hold — a line added after `commands-direction.first-list.txt` was
- *     captured, which the plan forbids (the file is never edited).
- *
- * `commands-direction.allow-list.txt` and `commands-direction.first-list.txt`
- * (under `testdata/`, both one edge per line, sorted, in the
- * `<importer> -> <module>` form `edgeLine` spells) start out identical,
- * holding every edge measured on the branch when this sweep was added. A
- * split task then removes its own lines from the allow-list alone, never
- * adding one and never touching the first list — so `stale` keeps
- * shrinking while `absentFromFirstList` stays empty, and a measured edge
- * that is not a split, landing with no allow-list line, reddens `unlisted`
- * immediately.
+ * The rule once allowed a tracked list of exceptions
+ * (`commands-direction.allow-list.txt` and `commands-direction.first-list.txt`
+ * under `testdata/`), shrunk by one line per split task until the last
+ * split carried the count to zero. Those two files and the allow-list
+ * comparison they fed (`checkCommandsDirection`) are gone along with their
+ * unit tests: there is nothing left to allow, so a single edge is a red.
  *
  * The files read are printed once, at load time, before any assertion
  * runs, so a run that silently read nothing (an empty `sources` map, a
- * resolver that matches no file) cannot pass by reporting three empty
- * lists for the wrong reason.
+ * resolver that matches no file) cannot pass by reporting an empty edge
+ * list for the wrong reason.
  *
- * A second check, independent of the allow-list, guards the edge case the
- * plan's close-out names: a split that leaves an `export … from` of the
- * library half behind in the command file, which keeps the edge alive for
- * every outside importer that still reaches through the command path (a
- * command-to-library import, the normal direction, is not this; only a
- * re-export is). {@link SPLIT_MODULES} is the table of command files and
- * their library half, seeded here with the three modules of the
- * "most-imported readers" stage and grown by one row per later split.
+ * A second check guards the edge case the plan's close-out names: a split
+ * that leaves an `export … from` of the library half behind in the
+ * command file, which keeps the edge alive for every outside importer
+ * that still reaches through the command path (a command-to-library
+ * import, the normal direction, is not this; only a re-export is).
+ * {@link SPLIT_MODULES} is the table of command files and their library
+ * half, seeded here with the three modules of the "most-imported readers"
+ * stage and grown by one row per later split.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -52,27 +39,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { checkCommandsDirection, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
+import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
 import { listTrackedFiles } from '../../scripts/survey/files.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const TESTDATA_DIR = join(REPO_ROOT, 'src', 'tests', 'testdata');
-const ALLOW_LIST_PATH = join(TESTDATA_DIR, 'commands-direction.allow-list.txt');
-const FIRST_LIST_PATH = join(TESTDATA_DIR, 'commands-direction.first-list.txt');
-
-/**
- * The non-blank lines of a list file, each trimmed.
- *
- * @param path - The file's absolute path.
- * @returns Its lines, in file order, blanks dropped.
- */
-function readListLines(path: string): string[] {
-  return readFileSync(path, 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-}
 
 /**
  * The line this sweep prints before it asserts: how many files it read,
@@ -154,9 +125,6 @@ for (const path of tracked.all) {
 
 const resolve = bunResolver(REPO_ROOT);
 const reading = readCommandsEdges({ files: tracked.all, resolve, sources });
-const allowList = readListLines(ALLOW_LIST_PATH);
-const firstList = readListLines(FIRST_LIST_PATH);
-const report = checkCommandsDirection({ allowList, edges: reading.edges, firstList });
 
 // Printed once, at load time, so a vacuous run (an empty read set) shows
 // up in every test's output rather than only in one of them.
@@ -168,25 +136,9 @@ describe('the commands-direction sweep', () => {
     expect(reading.missing).toEqual([]);
   });
 
-  it('holds no measured edge the allow-list does not list (unlisted)', () => {
-    expect(
-      report.unlisted,
-      `new import(s) into src/commands/, add a reason to ${ALLOW_LIST_PATH}: ${report.unlisted.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('holds no allow-list line without a measured edge (stale)', () => {
-    expect(
-      report.stale,
-      `allow-list line(s) with no matching import left in the tree, drop them: ${report.stale.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('holds no allow-list line absent from the first list (absentFromFirstList)', () => {
-    expect(
-      report.absentFromFirstList,
-      `allow-list line(s) added after the first measure, commands-direction.first-list.txt is never edited: ${report.absentFromFirstList.join(', ')}`,
-    ).toEqual([]);
+  it('holds no import from outside src/commands/ into it', () => {
+    const lines = reading.edges.map(edgeLine);
+    expect(lines, `import(s) into src/commands/ from outside it, split the library half out: ${lines.join(', ')}`).toEqual([]);
   });
 });
 

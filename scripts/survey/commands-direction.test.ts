@@ -7,13 +7,7 @@ import { dirname, join, posix } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import {
-  checkCommandsDirection,
-  COMMANDS_FOLDER,
-  edgeLine,
-  EXEMPT_IMPORTERS,
-  readCommandsEdges,
-} from './commands-direction';
+import { COMMANDS_FOLDER, edgeLine, EXEMPT_IMPORTERS, readCommandsEdges } from './commands-direction';
 import { bunResolver } from './import-graph';
 
 /**
@@ -238,96 +232,8 @@ describe('readCommandsEdges', () => {
 });
 
 describe('edgeLine', () => {
-  it('spells an edge as an allow-list line holds it', () => {
+  it('spells an edge as `<importer path> -> <module path under src/commands/>`', () => {
     expect(edgeLine(SHOW_EDGE)).toBe('src/board/place -> src/commands/epic/show');
     expect(SHOW_EDGE.to.startsWith(COMMANDS_FOLDER)).toBe(true);
-  });
-});
-
-describe('checkCommandsDirection', () => {
-  const DOCTOR_EDGE: CommandsEdge = { from: 'src/board/roadmap-rows', to: 'src/commands/doctor-refs' };
-  const SHOW_LINE = edgeLine(SHOW_EDGE);
-  const DOCTOR_LINE = edgeLine(DOCTOR_EDGE);
-
-  it('reports nothing when every edge is listed and every line is in the first list', () => {
-    const report = checkCommandsDirection({
-      allowList: [DOCTOR_LINE, SHOW_LINE],
-      edges: [SHOW_EDGE, DOCTOR_EDGE],
-      firstList: [DOCTOR_LINE, SHOW_LINE],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [], stale: [], unlisted: [] });
-  });
-
-  it('reports nothing when a split has deleted its line: the first list may hold more than the allow-list', () => {
-    const report = checkCommandsDirection({
-      allowList: [SHOW_LINE],
-      edges: [SHOW_EDGE],
-      firstList: [DOCTOR_LINE, SHOW_LINE],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [], stale: [], unlisted: [] });
-  });
-
-  it('reports an edge the allow-list does not hold as unlisted, even when the first list holds it', () => {
-    const report = checkCommandsDirection({
-      allowList: [SHOW_LINE],
-      edges: [SHOW_EDGE, DOCTOR_EDGE],
-      firstList: [DOCTOR_LINE, SHOW_LINE],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [], stale: [], unlisted: [DOCTOR_LINE] });
-  });
-
-  it('reports an allow-list line no edge matches as stale', () => {
-    const report = checkCommandsDirection({
-      allowList: [DOCTOR_LINE, SHOW_LINE],
-      edges: [SHOW_EDGE],
-      firstList: [DOCTOR_LINE, SHOW_LINE],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [], stale: [DOCTOR_LINE], unlisted: [] });
-  });
-
-  it('reports an allow-list line the first list does not hold, although its edge is measured', () => {
-    const report = checkCommandsDirection({
-      allowList: [DOCTOR_LINE, SHOW_LINE],
-      edges: [SHOW_EDGE, DOCTOR_EDGE],
-      firstList: [SHOW_LINE],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [DOCTOR_LINE], stale: [], unlisted: [] });
-  });
-
-  it('reports a line under both stale and absent from the first list when it is both', () => {
-    const report = checkCommandsDirection({
-      allowList: [DOCTOR_LINE],
-      edges: [SHOW_EDGE],
-      firstList: [],
-    });
-
-    expect(report).toEqual({ absentFromFirstList: [DOCTOR_LINE], stale: [DOCTOR_LINE], unlisted: [SHOW_LINE] });
-  });
-
-  it('answers each report sorted and free of duplicates, whatever order the lists arrive in', () => {
-    const report = checkCommandsDirection({
-      allowList: ['src/z -> src/commands/z', 'src/a -> src/commands/a', 'src/z -> src/commands/z'],
-      edges: [DOCTOR_EDGE, SHOW_EDGE, DOCTOR_EDGE],
-      firstList: [],
-    });
-
-    expect(report).toEqual({
-      absentFromFirstList: ['src/a -> src/commands/a', 'src/z -> src/commands/z'],
-      stale: ['src/a -> src/commands/a', 'src/z -> src/commands/z'],
-      unlisted: [SHOW_LINE, DOCTOR_LINE],
-    });
-  });
-
-  it('reports nothing over three empty inputs', () => {
-    expect(checkCommandsDirection({ allowList: [], edges: [], firstList: [] })).toEqual({
-      absentFromFirstList: [],
-      stale: [],
-      unlisted: [],
-    });
   });
 });

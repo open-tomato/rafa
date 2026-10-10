@@ -1,12 +1,14 @@
 /**
  * The direction reading behind the commands-direction sweep: which files
- * outside `src/commands/` import a module inside it, and how those edges
- * compare with a list of the ones still allowed.
+ * outside `src/commands/` import a module inside it.
  *
  * The rule it measures: a non-test file outside `src/commands/` holds no
  * import whose target is inside `src/commands/`. Once that holds, no
  * feature package has to import the CLI package (epic #801's first
- * acceptance criterion).
+ * acceptance criterion). The split tasks that carried every library half
+ * out of `src/commands/` brought the measured edge count to zero, so the
+ * sweep now fails on any edge at all; there is no allow-list left to
+ * compare against.
  *
  * Which files are read:
  *
@@ -30,13 +32,9 @@
  * resolves to nothing adds no edge and is not reported here: `tsc` is the
  * gate for an import that reaches no file.
  *
- * An edge is spelled as an allow-list line spells it,
- * `<importer path> -> <module path under src/commands/>`, both paths
- * repository-relative with no extension ({@link edgeLine}). Two imports
- * of one module from one file are one edge.
- *
- * {@link checkCommandsDirection} is pure: it compares the edges with two
- * lists of such lines and reads no file.
+ * An edge is spelled `<importer path> -> <module path under src/commands/>`,
+ * both paths repository-relative with no extension ({@link edgeLine}). Two
+ * imports of one module from one file are one edge.
  */
 
 import type { ResolveImport } from './import-graph';
@@ -87,26 +85,6 @@ export interface CommandsEdges {
   readonly missing: readonly string[];
 }
 
-/** What `checkCommandsDirection` compares. */
-export interface CommandsDirectionInput {
-  /** The edges measured in the tree. */
-  readonly edges: readonly CommandsEdge[];
-  /** The lines of the allow-list: the edges still allowed. */
-  readonly allowList: readonly string[];
-  /** The lines of the first list: the allow-list as it was first measured, never edited. */
-  readonly firstList: readonly string[];
-}
-
-/** The three reports of `checkCommandsDirection`, each sorted and free of duplicates. */
-export interface CommandsDirectionReport {
-  /** The lines of measured edges the allow-list does not hold: a new import into `src/commands/`. */
-  readonly unlisted: readonly string[];
-  /** The allow-list lines no measured edge matches: the import is gone and its line was kept. */
-  readonly stale: readonly string[];
-  /** The allow-list lines the first list does not hold: a line added after the first measure. */
-  readonly absentFromFirstList: readonly string[];
-}
-
 /**
  * A path less its code extension: `src/plan/parse.ts` gives
  * `src/plan/parse`.
@@ -119,8 +97,8 @@ function withoutExtension(path: string): string {
 }
 
 /**
- * The line an allow-list holds for an edge:
- * `<importer path> -> <module path under src/commands/>`.
+ * The line an edge is spelled as: `<importer path> -> <module path under
+ * src/commands/>`.
  *
  * @param edge - The edge.
  * @returns Its line.
@@ -168,26 +146,4 @@ export function readCommandsEdges(input: CommandsEdgesInput): CommandsEdges {
   }
   const edges = [...byLine.keys()].sort().flatMap((line) => byLine.get(line) ?? []);
   return { edges, exempt, missing, read };
-}
-
-/**
- * Compares the measured edges with the allow-list, and the allow-list
- * with the first list. Pure. A line is compared as it is written: the
- * caller drops blank lines and surrounding space before it hands the
- * lists in.
- *
- * @param input - The edges and the two lists of lines.
- * @returns The unlisted edges, the stale allow-list lines, and the
- *   allow-list lines absent from the first list; all three empty when the
- *   rule holds.
- */
-export function checkCommandsDirection(input: CommandsDirectionInput): CommandsDirectionReport {
-  const measured = new Set(input.edges.map(edgeLine));
-  const allowed = new Set(input.allowList);
-  const first = new Set(input.firstList);
-  return {
-    absentFromFirstList: [...allowed].filter((line) => !first.has(line)).sort(),
-    stale: [...allowed].filter((line) => !measured.has(line)).sort(),
-    unlisted: [...measured].filter((line) => !allowed.has(line)).sort(),
-  };
 }
