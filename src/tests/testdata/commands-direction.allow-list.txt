@@ -3,6 +3,5 @@ src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock
 src/next/settle-step -> src/commands/pr/merge-cleanup
 src/next/settle-step -> src/commands/pr/merge-followups
-src/project/scaffold -> src/commands/init-release
 src/release/settle-tag -> src/commands/pr/merge-followups
 src/stretch/pit-readings -> src/commands/ci/status

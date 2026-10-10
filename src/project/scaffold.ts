@@ -69,13 +69,13 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { messageOf } from '../config-sections.js';
+import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
-} from '../commands/init-release.js';
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
+} from '../release/scaffold.js';
 import { DEFAULT_ROUTES } from '../tiers/routing.js';
 
 import { scopeAt } from './scope.js';
