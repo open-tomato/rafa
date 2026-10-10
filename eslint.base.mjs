@@ -62,9 +62,12 @@ export default defineConfig([
       },
       'import/resolver': {
         typescript: {
+          // Two globs make several projects; the resolver otherwise prints
+          // `Multiple projects found` to stderr on every run.
+          noWarnOnMultipleProjects: true,
           project: [
             './tsconfig.json',
-            // './packages/*/tsconfig.json',
+            './packages/*/tsconfig.json',
             // './services/*/tsconfig.json',
             // './apps/*/tsconfig.json',
           ],

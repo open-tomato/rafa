@@ -48,8 +48,9 @@
  *     `config-schema-readings.ts`, a note that exports nothing, except
  *     the `pr` and `release` sections', which sit with their fields in
  *     `config-schema-release.ts`, the `tests` section's, which sit
- *     with theirs in `config-schema-tests.ts`, and the `triage`
- *     section's, in `config-schema-triage.ts`, each spread into
+ *     with theirs in `config-schema-tests.ts`, the `triage`
+ *     section's, in `config-schema-triage.ts`, and the `errors`
+ *     section's, in `config-schema-errors.ts`, each spread into
  *     `config-schema.ts`.
  *   - `config-readers.ts` holds `mapOf` and the named readers
  *     `config-schema.ts` reads its settings through. No caller reads a
@@ -65,7 +66,8 @@
  * one field, one default and one spec in `config-schema.ts` (in
  * `config-schema-release.ts` for a `pr` or `release` key, in
  * `config-schema-tests.ts` for a `tests` key, in
- * `config-schema-triage.ts` for a `triage` key), its reader
+ * `config-schema-triage.ts` for a `triage` key, in
+ * `config-schema-errors.ts` for an `errors` key), its reader
  * in `config-sections.ts`, and one line in {@link readLayer}'s layer
  * literal here; the literal is exhaustive on purpose, so a setting
  * added there and forgotten here does not compile.
@@ -410,6 +412,7 @@ function readLayer(
     releaseSettle: read('releaseSettle'),
     releaseTag: read('releaseTag'),
     releasePublishCommand: read('releasePublishCommand'),
+    errorsCodes: read('errorsCodes'),
     cleanupStaleDays: read('cleanupStaleDays'),
     cleanupWorktreeIdleDays: read('cleanupWorktreeIdleDays'),
     cleanupKeep: read('cleanupKeep'),

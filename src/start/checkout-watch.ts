@@ -42,11 +42,16 @@
  * committed. A line that comment cannot go on is marked as
  * `updateTrackerLine` marks it.
  *
+ * `start()` runs it through `haltBeforeSession` (`./session-guard.ts`),
+ * which picks this halt or the wrap-up's and emits the run's `halt`
+ * event: at the top of each turn, and again once the suite steps ran,
+ * right before `progress.txt` is rendered into the checkout.
+ *
  * `dispatchTask` (`./dispatch.ts`) runs the same halt once more,
- * immediately before it spawns the task's session, since the suite steps
- * and `progress.txt` come between this guard and the spawn; a checkout
- * gone by then halts there, and the spawn never reads a missing working
- * directory.
+ * immediately before it spawns the task's session, since the render,
+ * the prompt and the serving come between that guard and the spawn; a
+ * checkout gone by then halts there, and the spawn never reads a missing
+ * working directory.
  *
  * No report is stored for it: no session ran, so there is no session id
  * for a row to carry and no output to read. The tracker line is what the

@@ -221,7 +221,7 @@ describe('the list as start() and runWrapUp wire it', () => {
 
   it('is read off the run\'s record by runWrapUp, and handed on to its session and its retries', () => {
     expect(wrapUpRun).toContain('  const stepOnly = readRunStepOnly(repoRoot, session.id);\n');
-    expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, { stepOnly });');
+    expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider, { stepOnly });');
     expect(wrapUpRun).toContain('deliverySeamsIn({ ...input, base, fragment: finish.fragment, stepOnly })');
     expect(wrapUpRun).toContain('      stepOnly: context.stepOnly,\n');
   });
