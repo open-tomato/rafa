@@ -9,6 +9,17 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.43.0 — 2026-10-10, Cause codes — one list of known error contexts that a project extends; Bug sweep 17 — packages linted, every command finds its own project
+<!-- rafa:fragments rafa-949-cause-codes rafa-824-bug-sweep-17 -->
+
+- errors: rafa now ships one list of cause codes, each `<family>:<leaf>` with a description, a hint and a level, covering every value of the older route, dispatch and skill code lists (which keep their spellings) and the causes behind the largest duplicate-bug clusters; every family also takes `<family>:new-context`, and `unknown:new-context` is the last resort
+- config: `errors.codes` adds a project's own cause codes to rafa's list; a code rafa already declares, or one given twice, is refused at load with both places named
+- cli: `rafa bug codes` lists the cause codes by family, `--family` narrows the list, `--suggest="<text>"` ranks the codes closest to a cause written in words, and `--check` exits 1 when two codes of one family read alike
+- Tooling: Workspace packages under packages/ are now held to the same ESLint gate as src/, by bun run lint and by the runner's lint step, with the @open-tomato/rafa subpaths resolving (#511, #690); new tests pin that a command run from a worktree or a nested directory finds its own project's .rafa/, never a parent folder's (#471)
+- Plan: rafa plan create hands its planning session the plan and prerequisites files as absolute paths under the project root, and the refusal for a plan that was not written names that root and the path it looked for (#171)
+- loop: A worktree removed while the suite steps run now blocks the task on checkout moved and halts with that reason, instead of reporting an unreadable findings store (#848); under pr.provider none the wrap-up looks up no pull request, and its closing line names the provider and promises no retry (#847)
+- cleanup: rafa cleanup no longer asks the commit-count question about a Not-pushed branch held by a worktree that cannot be ticked, and reports it as not removed (#860); rafa cleanup --help now says a Merged, Stale or Not-pushed branch held that way starts unticked and is not deleted even when ticked (#859)
+
 ## 0.42.0 — 2026-10-10, Measure which permission rules and hooks reach a loop session; Board project follow-ups — quiet pauses, and every added issue filled; Break the import cycle that crosses future package lines
 <!-- rafa:fragments rafa-lock-0-41-0 rafa-804-spec-monorepo-readiness-spike rafa-902-spec-measure-which-permission rafa-947-board-project-follow-ups rafa-903-spec-break-import-cycle -->
 
