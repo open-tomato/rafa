@@ -31,11 +31,18 @@
  * the project root, which holds the store; the two are one directory
  * unless the loop runs in a linked worktree.
  *
+ * Under `pr.provider: none` there is no pull request to read (#847):
+ * {@link preserveProgress} is handed the provider the caller resolved
+ * and then makes neither lookup, the session's prompt is built as for a
+ * branch with no open pull request, and the line a session that exits 0
+ * ends with names the provider as `none` and promises no retry, since
+ * `start/wrap-up-run.ts` delivers nothing under it.
+ *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource, PrProvider } from '../config.js';
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
 import type { InstinctRecord } from '../learning/index.js';
@@ -436,6 +443,14 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * nothing, and `start/wrap-up-run.ts` then retries the wrap-up or opens
  * the pull request itself, which is what the line says.
  *
+ * `provider` is the run's `pr.provider` as the caller resolved it
+ * (`resolvePrProvider`, `pr/provider.ts`). Under `none` neither lookup
+ * is made, whatever `seams` holds: the prompt is built with no open
+ * pull request, and the line printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
+ * which promises no retry because the caller delivers no pull request
+ * under that provider. It is required, as `checkout` is: a default of
+ * `gh` would ask `gh` in a repository that has none to ask.
+ *
  * `seams` is what the tests answer in place of `gh` and `claude`: the
  * lookup made both before the session (for the prompt) and after it
  * (for that line), and the spawner. Left out, they are
@@ -454,11 +469,15 @@ export async function preserveProgress(
   learning: WrapUpLearning | null,
   base: string,
   checkout: string,
+  provider: PrProvider,
   seams: PreserveProgressSeams = {},
 ): Promise<string> {
   const lookup = seams.lookup ?? openPullRequestNumber;
   const branch = getCurrentBranch(checkout);
-  const openPullRequest = await lookup(checkout, branch);
+  const hasProvider = provider !== 'none';
+  const openPullRequest = hasProvider
+    ? await lookup(checkout, branch)
+    : null;
   return runWrapUpSession({
     buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons),
     settingSources,
@@ -466,7 +485,9 @@ export async function preserveProgress(
     learning,
     checkout,
     branch,
-    succeeded: async () => progressPreservedLine(await lookup(checkout, branch)),
+    succeeded: hasProvider
+      ? async () => progressPreservedLine(await lookup(checkout, branch))
+      : PROGRESS_PRESERVED_NO_PROVIDER,
     ...(seams.spawn === undefined
       ? {}
       : { spawn: seams.spawn }),
@@ -491,6 +512,14 @@ export function progressPreservedLine(openPullRequest: number | null): string {
     ? '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.'
     : `\n✅ Progress preserved; pull request #${openPullRequest} is open on this branch.`;
 }
+
+/**
+ * The line {@link preserveProgress} prints once its session exits 0
+ * under `pr.provider: none`, with no lookup made: it names the provider
+ * and says no retry follows, where {@link progressPreservedLine}'s
+ * no-pull-request line promises one.
+ */
+export const PROGRESS_PRESERVED_NO_PROVIDER = '\n✅ Progress preserved; pr.provider is none, so no pull request is looked up or opened, and no wrap-up retry follows.';
 
 /** What {@link runWrapUpSession} spawns one wrap-up session from. */
 export interface WrapUpSessionRun {

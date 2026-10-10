@@ -25,7 +25,9 @@
  *   - `settingSources`: what the session loads settings from, the run's
  *     resolved `loop.settingSources`. There is no default, for the reason
  *     `src/utils/claude.ts` gives.
- *   - `buildPrompt`: the session's prompt for one spec and stub.
+ *   - `buildPrompt`: the session's prompt for one spec and stub, with
+ *     the plans directory it is to name the files in, which is `planDir`
+ *     resolved absolute against the root. See "Paths" below.
  *     `rafa plan` hands over `buildPlanPrompt` bound to the template and
  *     the plan format it read beside itself, and to the progress notes
  *     it read or skipped. Those are read there rather than here, for two
@@ -64,22 +66,30 @@
  * The rejections of steps 1, 6 and 7 are {@link ClaudePlannerError}s. The
  * message of step 6 is the line `rafa plan` printed for that failure
  * before this adapter existed. The message of step 7 is that line with
- * the absolute root it looked under added, so a plan written somewhere
- * else is read as a path question and not only as a session fault.
+ * the absolute root it looked under and the absolute path it looked for
+ * added, so a plan written somewhere else is read as a path question and
+ * not only as a session fault.
  *
  * ## The session's working directory
  *
  * The session is spawned with the root, resolved absolute, as its
- * working directory, and never inherits the caller's. The prompt names
- * the plan by a path relative to that root (`<planDir>/PLAN-<stub>.md`),
- * so a session whose working directory differed from the root would
- * write the plan under its own directory while step 7 looked under the
- * root. That is #171: `rafa plan create` run from a git worktree nested
- * under the project root resolved the root by walking up, wrote the spec
- * copy there, and the session, left in the worktree, wrote the plan into
- * a second `.rafa/` under it and was blamed for writing none. With the
- * root as the working directory, the working directory and the root
- * name the same file for every relative path.
+ * working directory, and never inherits the caller's. The prompt once
+ * named the plan by a path relative to that root
+ * (`<planDir>/PLAN-<stub>.md`), so a session whose working directory
+ * differed from the root wrote the plan under its own directory while
+ * step 7 looked under the root. That is #171: `rafa plan create` run
+ * from a git worktree nested under the project root resolved the root by
+ * walking up, wrote the spec copy there, and the session, left in the
+ * worktree, wrote the plan into a second `.rafa/` under it and was
+ * blamed for writing none.
+ *
+ * Two things close it, and neither stands in for the other. The prompt
+ * names both files by ABSOLUTE path (see "Paths"), so the file the
+ * session is told to write is the file step 7 looks for whatever
+ * directory the session is in. And the root stays the working
+ * directory, so every other relative path the session reads or writes
+ * (the files a spec names, `progress.txt`, the project's settings)
+ * is the root's as well.
  *
  * ## The review the session rides back on
  *
@@ -115,14 +125,24 @@
  *
  * ## Paths
  *
- * Both paths are {@link planFilePath}s of `planDir`, as the port documents
- * them and as the plan prompt names them to the session:
- * `<planDir>/PLAN-<stub>.md` and `<planDir>/PREREQUISITES-<stub>.md`,
- * repository-relative unless `planDir` is absolute, and read against the
- * root either way. `rafa plan` spells the plan it refuses and the plan it
- * announces through the same function. The stub is used as it is handed
- * over, as `rafa plan` used `--stub=`, so a stub holding a `/` names a
- * file below a directory this adapter does not make.
+ * Both paths answered are {@link planFilePath}s of `planDir`, as the port
+ * documents them: `<planDir>/PLAN-<stub>.md` and
+ * `<planDir>/PREREQUISITES-<stub>.md`, repository-relative unless
+ * `planDir` is absolute, and read against the root either way.
+ * `rafa plan` spells the plan it refuses and the plan it announces
+ * through the same function. The stub is used as it is handed over, as
+ * `rafa plan` used `--stub=`, so a stub holding a `/` names a file below
+ * a directory this adapter does not make.
+ *
+ * The SESSION is told the same two files by absolute path. The builder
+ * is handed `planDir` resolved against the root as its third argument,
+ * and names the files in it, so the prompt holds
+ * `<root>/<planDir>/PLAN-<stub>.md`. The resolution is done here, once,
+ * because the root is this adapter's: a builder resolving `planDir`
+ * itself could resolve it against another directory than the one step 7
+ * reads. An absolute `planDir` is handed over as it is. The paths
+ * answered stay relative, since `rafa plan` prints them and
+ * `rafa loop start --plan=` takes them against the root.
  */
 import type { SpecReviewReading } from '../../board/spec-review.js';
 import type { ClaudeSettingSource } from '../../config.js';
@@ -148,8 +168,12 @@ export function planFilePath(planDir: string, fileName: string): string {
   return posix.join(planDir, fileName);
 }
 
-/** Builds one session's prompt from the spec's content and the plan's stub. */
-export type PlanPromptBuilder = (specContent: string, stub: string) => string;
+/**
+ * Builds one session's prompt from the spec's content, the plan's stub
+ * and `planDir`, the plans directory as an absolute path: the files the
+ * prompt tells the session to write are named in it.
+ */
+export type PlanPromptBuilder = (specContent: string, stub: string, planDir: string) => string;
 
 /** What {@link createClaudePlanner} makes a planner with. */
 export interface ClaudePlannerOptions {
@@ -205,9 +229,11 @@ export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
       throw new ClaudePlannerError(`${planPath} already exists`, FAILURE_EXIT_CODE);
     }
     const specContent = await readFile(resolve(root, specPath), 'utf8');
-    await mkdir(resolve(root, planDir), { recursive: true });
+    const absolutePlanDir = resolve(root, planDir);
+    await mkdir(absolutePlanDir, { recursive: true });
 
-    const session = await spawn(claudeArgs(settingSources), buildPrompt(specContent, stub), { cwd: root });
+    const prompt = buildPrompt(specContent, stub, absolutePlanDir);
+    const session = await spawn(claudeArgs(settingSources), prompt, { cwd: root });
     const review = parseSpecReview(session.stdout);
     const { exitCode } = session;
     if (exitCode !== 0) {
@@ -215,7 +241,8 @@ export function createClaudePlanner(options: ClaudePlannerOptions): Planner {
     }
     if (!isWritten(planPath)) {
       throw new ClaudePlannerError(
-        `The session finished but ${planPath} was not created under ${root} — inspect the output above.`,
+        `The session finished but ${planPath} was not created under ${root}: no file at`
+        + ` ${resolve(root, planPath)} — inspect the output above.`,
         FAILURE_EXIT_CODE,
         review,
       );

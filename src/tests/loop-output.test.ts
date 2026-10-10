@@ -93,16 +93,17 @@
  *
  * ## The preserved line
  *
- * A wrap-up session that exits 0 ends with a line read from a lookup of
- * the branch's open pull request made after it (`start/wrap-up.ts`).
- * No scratch repository has an `origin`, so every spawned run above
- * reads the no-pull-request line. Both readings are pinned by calling
- * `preserveProgress` in-process over a scratch checkout, with its
- * lookup and spawner answered through its seams: the no-pull-request
- * case first, then a lookup answering a number only after the session
- * ended, so a line built from the lookup made BEFORE it would fail. A
- * failed session is the control: it prints neither line and makes no
- * second lookup.
+ * A wrap-up session that exits 0 under the `gh` provider ends with a
+ * line read from a lookup of the branch's open pull request made after
+ * it (`start/wrap-up.ts`). No scratch repository has an `origin`, so
+ * every spawned run above resolves to `pr.provider: none` and reads the
+ * line that names that provider, with no lookup made. Both `gh` readings
+ * are pinned by calling `preserveProgress` in-process over a scratch
+ * checkout under `gh`, with its lookup and spawner answered through its
+ * seams: the no-pull-request case first, then a lookup answering a
+ * number only after the session ended, so a line built from the lookup
+ * made BEFORE it would fail. A failed session is the control: it prints
+ * neither line and makes no second lookup.
  *
  * ## Readings
  *
@@ -234,9 +235,16 @@ const WRAP_UP_STARTING = '🧹 Wrap-up session starting: promote the listed less
 const WRAP_UP_QUIET = '   This is one full Claude session with no intermediate output — expect several quiet minutes. Interrupting it skips the push and PR; if that happens, run again to retry just this stage.';
 
 /**
- * The line a wrap-up session that exited 0 ends with when the lookup
- * made after it finds no open pull request: every scratch repository
- * here has no `origin`, so the spawned runs below all read this one.
+ * The line a wrap-up session that exited 0 ends with under
+ * `pr.provider: none`: every scratch repository here has no `origin`,
+ * so the spawned runs below all resolve to that provider and read this
+ * one.
+ */
+const PROGRESS_PRESERVED_NO_PROVIDER = '\n✅ Progress preserved; pr.provider is none, so no pull request is looked up or opened, and no wrap-up retry follows.';
+
+/**
+ * The line it ends with under `gh` when the lookup made after it finds
+ * no open pull request.
  */
 const PROGRESS_PRESERVED_NO_PR = '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.';
 
@@ -467,7 +475,7 @@ function noTaskLines(): readonly (readonly ['info' | 'warn' | 'error', string | 
     ['info', WRAP_UP_STARTING],
     ['info', WRAP_UP_QUIET],
     ['info', NO_RELEASE_PREPARED],
-    ['info', PROGRESS_PRESERVED_NO_PR],
+    ['info', PROGRESS_PRESERVED_NO_PROVIDER],
     ['info', NO_RELEASE_REPORTED],
     ['info', NO_RELEASE_BODY],
   ];
@@ -665,7 +673,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
       `info:${WRAP_UP_QUIET}`,
       `info:${NO_RELEASE_PREPARED}`,
       ...SESSION_LINES,
-      `info:${PROGRESS_PRESERVED_NO_PR}`,
+      `info:${PROGRESS_PRESERVED_NO_PROVIDER}`,
       `info:${NO_RELEASE_REPORTED}`,
       `info:${NO_RELEASE_BODY}`,
       'result',
@@ -681,7 +689,7 @@ describe('a loop start run whose task and wrap-up sessions write to stdout', () 
     expectExit(run, 0, { ...scratch });
     expect(run.stderr).toBe('');
     expect(run.stdout).toContain(`\n🔄 Executing task: ${TASK}\n${SESSION_STDOUT}✅ Task done: ${TASK}\n`);
-    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED_NO_PR}\n`);
+    expect(run.stdout).toContain(`${WRAP_UP_QUIET}\n${NO_RELEASE_PREPARED}\n${SESSION_STDOUT}${PROGRESS_PRESERVED_NO_PROVIDER}\n`);
     expect(run.stdout.split(SESSION_STDOUT)).toHaveLength(3);
     // Read per line: the runner's `🧪 pre-wrap-up step: ...` line carries the words mid-line.
     expect(run.stdout.split('\n').filter((line) => line.startsWith('step: '))).toEqual([]);
@@ -699,7 +707,7 @@ describe('the line preserveProgress prints once its session exits 0', () => {
   });
 
   /**
-   * One `preserveProgress` over a scratch checkout, its spawner exiting
+   * One `preserveProgress` under `gh` over a scratch checkout, its spawner exiting
    * `exitCode` and its lookup answering `before` ahead of the session
    * and `after` once it has ended.
    */
@@ -709,7 +717,7 @@ describe('the line preserveProgress prints once its session exits 0', () => {
     setActiveOutput(sinkOutput({ info: (line) => infos.push(line) }));
     const scratch = plant({ branch: `feat/${STUB}`, plan: PLAN_DONE });
     let ended = false;
-    await preserveProgress(PLAN_DONE, ['project'], null, null, null, 'main', scratch.repo, {
+    await preserveProgress(PLAN_DONE, ['project'], null, null, null, 'main', scratch.repo, 'gh', {
       lookup: (_checkout, branch) => {
         lookups.push(`${ended
           ? 'after'

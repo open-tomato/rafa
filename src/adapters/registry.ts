@@ -209,7 +209,8 @@ export interface AdapterContext {
   readonly settingSources?: readonly ClaudeSettingSource[];
   /**
    * The prompt the `claude` planner's session is handed for one spec and
-   * stub. Read by it alone, which is refused without one.
+   * stub, naming its files in the absolute plans directory the planner
+   * hands over. Read by it alone, which is refused without one.
    */
   readonly planPrompt?: PlanPromptBuilder;
   /**

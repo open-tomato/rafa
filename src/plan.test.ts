@@ -323,7 +323,7 @@ const PROBE = [
   '        planDir: context.planDir,',
   '        settingSources: context.settingSources,',
   '        request,',
-  `        prompt: context.planPrompt(${JSON.stringify(FIXTURE_SPEC)}, request.stub),`,
+  `        prompt: context.planPrompt(${JSON.stringify(FIXTURE_SPEC)}, request.stub, join(context.repoRoot, context.planDir)),`,
   '      }));',
   '      if (outcome === "session-failed") throw new ClaudePlannerError("Plan generation failed (exit 3).", 3);',
   '      if (outcome === "other-rejection") throw new Error("the planner is unreachable");',
@@ -496,7 +496,10 @@ function scratchSkillIndex(scratch: Scratch): string {
 
 /**
  * The prompt `buildPlanPrompt` makes of the source template and skill for
- * the fixture spec, with the skill index read for `scratch`.
+ * the fixture spec, with the skill index read for `scratch`. The plans
+ * directory is `planDir` under the scratch root, absolute, as the fixture
+ * planner hands it to the command's builder and as the `claude` planner
+ * does (`src/adapters/planner/claude.ts`, "Paths").
  */
 function expectedPrompt(
   scratch: Scratch,
@@ -509,7 +512,7 @@ function expectedPrompt(
     readPlanFormat(SRC_DIR),
     FIXTURE_SPEC,
     'spec',
-    planDir,
+    join(realpathSync(scratch.repo), planDir),
     progress,
     undefined,
     scratchSkillIndex(scratch),
