@@ -100,6 +100,33 @@ not fill is answered in `notFilled` with its reason: its item is of another
 repository (never written to), its issue was not among those refreshed, its
 facts were refused, or a rate-limit refusal left one of its writes unsent.
 
+### Added, and filled
+
+An issue `rafa board sync` adds is filled in the same run: the sync keeps
+the item each add answered and hands those items to its second refresh as
+known items. An added issue is filled when that refresh wrote its fields,
+and not filled when the refresh answered it in `notFilled`. Two reasons
+reach a sync: the issue's facts were refused, or a rate-limit refusal left
+one of its writes unsent.
+
+The closing line counts the two apart. Where every issue added was filled
+it reads `Synced project #7: 46 changes written, 2 issues added and
+filled.`, and a sync that added none reads `0 issues added and filled`.
+Where some were not it reads `2 issues added, 1 filled`. A sync the rate
+limit stopped counts them when it had added any: `Stopped on project #7:
+12 of 14 changes written, 2 issues added, 0 filled; the rate limit refused
+the rest.` A dry run adds nothing and counts only the issues to add.
+
+The json result holds both lists, `added` and `filled`, the second always
+a part of the first.
+
+Each issue added and not filled gets one warning line after every other,
+`#<n> added but not filled: <reason>`, and the exit code stays 0. One whose
+facts were refused is named twice with the same reason, by `#<n> not
+refreshed: <reason>` and by this line: the first says nothing was written
+for it, the second that it sits on the project with no value. The next
+sync finds its item on the project and fills it in its first pass.
+
 ### Lists read to their end
 
 The facts reader reads an issue's labels, closing references and
@@ -194,7 +221,7 @@ refused issues up.
 
 ### The warnings
 
-Five kinds of failure are turned into warnings, each naming its fix where it
+Six kinds of failure are turned into warnings, each naming its fix where it
 has one:
 
 | Failure | Warning | Fix |
@@ -204,10 +231,11 @@ has one:
 | `board.project.number` names no project | the number and that it was not found | `rafa init --board` |
 | A field or option renamed on the project | which field was skipped | `rafa doctor` |
 | An issue whose facts could not be read | `#<n> not refreshed: <reason>` | none: the next refresh or `rafa board sync` reads it again |
+| An issue added and not filled | `#<n> added but not filled: <reason>` | none: the next `rafa board sync` fills it |
 
 When a field is renamed, the refresh skips that field and writes the other
 four. When one issue's facts cannot be read, that issue alone is left as it
-was and the others are written. All five warnings keep the caller's exit code
+was and the others are written. All six warnings keep the caller's exit code
 and are printed after the command's own output.
 
 ### Configuration

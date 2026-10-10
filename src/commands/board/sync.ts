@@ -20,7 +20,22 @@
  * written. Every warning line of the sync follows as a warning, a refused
  * issue's as `#<n> not refreshed: <reason>`. In json mode the terminal
  * result's `data` is a {@link BoardSyncResult}: the same changes, without
- * the write ids, and the issues refused.
+ * the write ids, the issues added, those of them filled, and the issues
+ * refused.
+ *
+ * ## Added, and filled
+ *
+ * An issue added is filled when the sync's second pass wrote its fields
+ * (`src/board/project/sync.ts`, "Added, and filled"). The closing line
+ * counts the two apart. Where every issue added was filled it reads
+ * `2 issues added and filled`, as does a sync that added none,
+ * `0 issues added and filled`; where some were not,
+ * `2 issues added, 1 filled`. Each issue added and not filled has its own
+ * warning line, `#<n> added but not filled: <reason>`, and the next sync
+ * fills it. A sync the rate limit stopped counts them too when it had
+ * added any, between the changes written and the refusal:
+ * `12 of 14 changes written, 2 issues added, 0 filled`. A dry run adds
+ * nothing, so it counts only the issues to add.
  *
  * `--dry-run` reads everything a sync reads, and sends no write and no
  * add.
@@ -119,6 +134,8 @@ export interface BoardSyncResult {
   readonly missing: readonly number[];
   /** Those of them added; none on a dry run. */
   readonly added: readonly number[];
+  /** Those of the added ones whose fields were filled; each other one has its `added but not filled` warning line. */
+  readonly filled: readonly number[];
   /** The issues whose facts could not be read, none written; each has its warning line. */
   readonly refused: readonly BoardSyncRefusal[];
   /** How many values were written; none on a dry run. */
@@ -160,6 +177,25 @@ function refusedPart(result: BoardSyncResult): string {
     : `; ${counted(result.refused.length, 'issue')} not refreshed`;
 }
 
+/**
+ * The closing line's count of the issues added and of those filled: one
+ * count when every issue added was filled, two when some were not.
+ */
+function addedPart(result: BoardSyncResult): string {
+  const issues = counted(result.added.length, 'issue');
+  return result.filled.length === result.added.length
+    ? `${issues} added and filled`
+    : `${issues} added, ${String(result.filled.length)} filled`;
+}
+
+/** The closing line of a sync the rate limit stopped, counting the issues added when it had added any. */
+function stoppedLine(result: BoardSyncResult, project: string, changes: string): string {
+  const adds = result.added.length === 0
+    ? ''
+    : `, ${addedPart(result)}`;
+  return `Stopped on ${project}: ${String(result.written)} of ${changes} written${adds}; the rate limit refused the rest.`;
+}
+
 /** The line closing a run over `result`. */
 export function closingLine(result: BoardSyncResult): string {
   const project = `project #${String(result.project.number)}`;
@@ -167,17 +203,16 @@ export function closingLine(result: BoardSyncResult): string {
     ? result.missing
     : result.added;
   const changes = counted(result.changes.length, 'change');
-  const issues = counted(adds.length, 'issue');
   const inStep = result.changes.length === 0 && adds.length === 0 && result.refused.length === 0;
   if (result.dryRun) {
     return inStep
       ? `Dry run on ${project}: in step, nothing to change.`
-      : `Dry run on ${project}: ${changes} and ${issues} to add${refusedPart(result)}; nothing written.`;
+      : `Dry run on ${project}: ${changes} and ${counted(adds.length, 'issue')} to add${refusedPart(result)}; nothing written.`;
   }
-  if (result.rateLimited) return `Stopped on ${project}: ${String(result.written)} of ${changes} written; the rate limit refused the rest.`;
+  if (result.rateLimited) return stoppedLine(result, project, changes);
   return inStep
     ? `Synced ${project}: in step, nothing to change.`
-    : `Synced ${project}: ${changes} written and ${issues} added${refusedPart(result)}.`;
+    : `Synced ${project}: ${changes} written, ${addedPart(result)}${refusedPart(result)}.`;
 }
 
 /** Every line text mode prints for `result`, the warnings left out. */
@@ -201,6 +236,7 @@ export function syncResultOf(synced: ProjectSynced): BoardSyncResult {
     changes: synced.changes.map(plainChange),
     missing: synced.missing,
     added: synced.added,
+    filled: synced.filled,
     refused: synced.refused.map(({ number, reason }) => ({ issue: number, reason })),
     written: synced.writes.written,
     rateLimited: synced.writes.rateLimited,
@@ -264,7 +300,9 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
       + ' only the Stage, Horizon, Rank, Blocked by and Progress values that differ from what rafa reads of the'
       + ' issues, then adds every open issue missing from the project and fills its fields. It repairs what changed'
       + ' outside rafa: a label edited in the web UI, an issue closed by hand, the Roadmap issue\'s order edited in'
-      + ' its body. Prints one line per change and per issue added, then a closing count. With `--dry-run` it'
+      + ' its body. Prints one line per change and per issue added, then a closing count of the changes written'
+      + ' and of the issues added and filled. An issue added whose fields could not be filled is counted apart'
+      + ' and named in a warning, `#<n> added but not filled: <reason>`; the next run fills it. With `--dry-run` it'
       + ' prints the same lines and writes nothing. With `--output=json` the changes are the data of the terminal'
       + ' result event. An issue whose facts could not be read is named in a warning, `#<n> not refreshed:'
       + ' <reason>`, while the others are synced; the exit code stays 0 and the next run reads it again. Adding'
@@ -292,7 +330,7 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
       },
       {
         cmd: 'rafa board sync --output=json',
-        note: 'Gives the changes, the issues added and the counts as the terminal result.',
+        note: 'Gives the changes, the issues added, those of them filled and the counts as the terminal result.',
       },
     ],
     outputs: ['text', 'json'],

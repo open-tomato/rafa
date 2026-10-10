@@ -66,7 +66,7 @@ describe('rafa board sync, spawned over a stand-in gh', () => {
     const converged = runRafa(scratch, scratch.repo, ['board', 'sync']);
     expectExit(converged, 0, scratch);
     expect(converged.stderr).toBe('');
-    expect(converged.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+    expect(converged.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
 
     editLabelsOutsideRafa(files, EDITED_ISSUE, EDITED_LABELS);
     const beforeDrift = callsLogged(files).length;
@@ -83,7 +83,7 @@ describe('rafa board sync, spawned over a stand-in gh', () => {
     expect(withoutProgressLines(dry.stdout)).toBe('#21 Stage: Ready → Claimed\nDry run on project #6: 1 change and 0 issues to add; nothing written.\n');
     expectExit(synced, 0, scratch);
     expect(synced.stderr).toBe('');
-    expect(withoutProgressLines(synced.stdout)).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written and 0 issues added.\n');
+    expect(withoutProgressLines(synced.stdout)).toBe('#21 Stage: Ready → Claimed\nSynced project #6: 1 change written, 0 issues added and filled.\n');
     expectExit(again, 0, scratch);
     expect(again.stderr).toBe('');
     expect(withoutProgressLines(again.stdout)).toBe('Dry run on project #6: in step, nothing to change.\n');

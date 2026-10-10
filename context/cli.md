@@ -2297,12 +2297,16 @@ New; it replaces no earlier text. What a row or an action added to
   refreshes every item of the repository on the project and answers the
   open issues with no item; each is then added and a second refresh fills
   it. A line per change, `#<n> <field>: <from> → <to>` with `(empty)` for
-  no value, a line per issue added, then a closing count, which ends
+  no value, a line per issue added, then a closing count, which counts
+  the issues added and those of them filled apart (`2 issues added and
+  filled`, or `2 issues added, 1 filled` with a `#<n> added but not
+  filled: <reason>` warning for the other) and ends
   `; <n> issue(s) not refreshed` when issues were refused and never reads
   `in step` then. `--dry-run`
   sets the refresh's `dryRun`: the same lines, no write and no add. Json
   mode's result is `BoardSyncResult`, the changes without their write
-  ids and the refused issues as `refused` (`issue`, `reason`). Exit code 1
+  ids, the issues added and filled as `added` and `filled`, and the
+  refused issues as `refused` (`issue`, `reason`). Exit code 1
   for a stray word, an unusable config and an unset
   `board.project.number`, which names `rafa init --board --project`; 2 for
   a missing `project` scope, a number naming no project, a rate-limit
