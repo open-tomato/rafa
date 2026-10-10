@@ -23,7 +23,9 @@
  *      (`./past-head.ts`), so deleting it loses nothing. A Stale or
  *      Not-pushed row is `-D`: the caller hands it
  *      over only once the person ticked it and, for Not pushed, answered
- *      the question naming its commit count.
+ *      the question naming its commit count. A Not-pushed row an
+ *      untickable worktree holds is handed over unasked, and is
+ *      withheld below.
  *   3. Last, every ticked run record (`./runs.ts`), `rm <record>
  *      [<events file>]`: one step per record, removing the record and,
  *      when the row names one, its events file. An unticked run row is no
@@ -137,7 +139,7 @@ export interface CleanupSelection {
   readonly merged: readonly MergedRow[];
   /** The Stale rows the person ticked and confirmed. */
   readonly stale: readonly StaleRow[];
-  /** The Not-pushed rows the person ticked and confirmed by the second question. */
+  /** The Not-pushed rows the person ticked and confirmed by the second question, and the ticked ones an untickable worktree holds, unasked. */
   readonly notPushed: readonly NotPushedRow[];
   /** The run-record rows; only the ticked ones become steps. None when left out. */
   readonly runs?: readonly RunRow[];

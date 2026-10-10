@@ -42,9 +42,13 @@
  *      nothing ticked.
  *   2. Each ticked Not-pushed row gets a second question naming the
  *      commits deleting it loses ({@link notPushedQuestion}); only a
- *      yes keeps it in.
+ *      yes keeps it in. A row held by a listed worktree that cannot be
+ *      ticked (its `heldBy`, `src/cleanup/groups.ts`) gets no question:
+ *      it is never deleted, so it is handed on unasked for step 3 to
+ *      withhold (#860).
  *   3. The ticked rows become `src/cleanup/steps.ts`'s steps. Every
- *      ticked row that is not a step is one warning with its reason.
+ *      ticked row that is not a step is one warning, `not removed:`
+ *      with its reason.
  *   4. `--dry-run` prints each step's command line and stops.
  *      Otherwise {@link cleanupQuestion} asks `Delete <n> branches,
  *      remove <m> worktrees and remove <r> run records? [y/N]`, and a
@@ -264,11 +268,16 @@ function pullsFor(root: string, config: RafaConfig, seams: CleanupCommandSeams):
   return (seams.pullRequests ?? ghPullRequestsIn)(root);
 }
 
-/** The Not-pushed rows of `selection` the person answered yes for, one question each. */
+/**
+ * The Not-pushed rows of `selection` the person answered yes for, one
+ * question each, and every row an untickable worktree holds, unasked:
+ * `cleanupSteps` withholds that one whatever is answered, so asking
+ * about commits it will not lose would be a question with no effect.
+ */
 async function confirmNotPushed(selection: CleanupSelection, ask: (question: string) => Promise<boolean>): Promise<CleanupSelection> {
   const kept: NotPushedRow[] = [];
   for (const row of selection.notPushed) {
-    if (await ask(notPushedQuestion(row))) kept.push(row);
+    if (row.heldBy !== undefined || await ask(notPushedQuestion(row))) kept.push(row);
   }
   return { ...selection, notPushed: kept };
 }
