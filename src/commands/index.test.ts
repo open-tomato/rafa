@@ -516,12 +516,12 @@ function numberWord(word: string): number {
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the seventeen subjects with an action, in roster order', () => {
+  it('registers the eighteen subjects with an action, in roster order', () => {
     expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open and pr retarget after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open and pr retarget after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, bug codes, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',

@@ -30,8 +30,12 @@ export interface ErrorCodeEntry {
   readonly hint: string;
   /** How loud an error of the code is. */
   readonly level: ErrorLevel;
-  /** The version or issue that added the code. */
-  readonly since: string;
+  /**
+   * The version or issue that added the code. rafa's own list always
+   * names it ({@link defineErrorCodes} refuses an entry without one); a
+   * project's entry may leave it out.
+   */
+  readonly since?: string;
   /** The spelling an older per-module union gives the same context. */
   readonly legacy?: string;
 }
@@ -71,7 +75,7 @@ export function codeProblem(code: string): string | null {
 function entryProblem(entry: ErrorCodeEntry, index: number): string | null {
   const codeFault = codeProblem(entry.code);
   if (codeFault !== null) return `[${index}].code ${codeFault}`;
-  const empty = TEXT_FIELDS.find((field) => entry[field].trim() === '');
+  const empty = TEXT_FIELDS.find((field) => (entry[field] ?? '').trim() === '');
   if (empty !== undefined) return `[${index}].${empty} is empty`;
   if (!ERROR_LEVELS.includes(entry.level)) {
     return `[${index}].level is ${JSON.stringify(entry.level)}, expected ${ERROR_LEVELS.join(' or ')}`;
@@ -85,15 +89,13 @@ function entryProblem(entry: ErrorCodeEntry, index: number): string | null {
  * is source, so a fault is a build error, never a reading to recover.
  */
 export function defineErrorCodes(entries: readonly ErrorCodeEntry[]): readonly ErrorCodeEntry[] {
-  const seen = new Map<string, number>();
   entries.forEach((entry, index) => {
     const fault = entryProblem(entry, index);
     if (fault !== null) throw new TypeError(`${PREFIX}: ${fault}`);
-    const first = seen.get(entry.code);
-    if (first !== undefined) {
+    const first = entries.findIndex((other) => other.code === entry.code);
+    if (first < index) {
       throw new TypeError(`${PREFIX}: ${JSON.stringify(entry.code)} is declared at [${first}] and [${index}]`);
     }
-    seen.set(entry.code, index);
   });
   return Object.freeze(entries.map((entry) => Object.freeze({ ...entry })));
 }

@@ -354,8 +354,8 @@
  *     cause codes a bug can carry, rafa's own and then the project's
  *     `errors.codes`, by family; `--suggest` ranks the closest to a
  *     cause in words, and `--check` exits 1 when two codes of one family
- *     read alike (`./bug/codes.ts`). It writes nothing and starts no
- *     session.
+ *     read alike, the two refused together (`./bug/codes.ts`). It
+ *     writes nothing and starts no session.
  *   - `switch <n | -> [--no-rehome]`, top-level: this checkout's place
  *     moved to a board or an epic by its number, or back to the previous
  *     place with `-`, re-homing unless `--no-rehome`, and written to

@@ -1,3 +1,8 @@
+/**
+ * Tests for the cause code entry: which codes can be declared, what
+ * `defineErrorCodes` refuses, and which codes `isKnownCode` knows, the
+ * reserved ones included. Every refusal is SPELLED here.
+ */
 import { describe, expect, it } from 'bun:test';
 
 import { codeProblem, defineErrorCodes, familyOf, isKnownCode } from './codes.js';

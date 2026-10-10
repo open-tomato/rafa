@@ -20,11 +20,16 @@
  *   - `--check` prints the pairs of codes of one family that read alike.
  *
  * In json mode the {@link CodesReport} is the data of the terminal
- * result, and no text line is written.
+ * result, and no text line is written. When `--check` finds a pair the
+ * command refuses, and a refusal's terminal event carries no data, so
+ * the report is written first as a `bug-codes-alike` event.
+ *
+ * `--suggest` and `--check` answer two questions and are refused
+ * together.
  *
  * Exit code 0, except: 1 for an argument, a flag given no value or a
- * blank one, a `--family` nobody declares and a config the reader
- * refuses; and 1 for `--check` over a list holding a pair that reads
+ * blank one, `--suggest` beside `--check`, a `--family` nobody declares
+ * and a config the reader refuses; and 1 for `--check` over a list holding a pair that reads
  * alike, after the pairs in text mode.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
@@ -48,6 +53,9 @@ export const CODES_USAGE = 'rafa bug codes [--suggest=<text>] [--family=<family>
 const SUGGEST_FLAG = 'suggest';
 const FAMILY_FLAG = 'family';
 const CHECK_FLAG = 'check';
+
+/** The name of the json event carrying the report when `--check` finds a pair. */
+export const CODES_ALIKE_EVENT = 'bug-codes-alike';
 
 /** The exit code of `--check` over a list holding a pair that reads alike. */
 const ALIKE_EXIT = 1;
@@ -180,6 +188,9 @@ export function runCodes(context: RafaContext): void {
   const check = readSwitch(CHECK_FLAG, context.flags[CHECK_FLAG], `Usage: ${CODES_USAGE}`);
   const suggest = readNonBlankFlag(context.flags, SUGGEST_FLAG, CODES_USAGE);
   const family = readNonBlankFlag(context.flags, FAMILY_FLAG, CODES_USAGE);
+  if (suggest !== undefined && check) {
+    throw lineRefusal(`--${SUGGEST_FLAG} and --${CHECK_FLAG} answer two questions: give one`, CODES_USAGE);
+  }
   const project = requireProject(context, COMMAND_NAME);
   const config = resolveProjectConfig(project, COMMAND_NAME, (message) => {
     context.output.warn(message);
@@ -191,10 +202,24 @@ export function runCodes(context: RafaContext): void {
     throw lineRefusal(`No family ${JSON.stringify(family)}. Families: ${known.join(', ')}`, CODES_USAGE);
   }
 
-  if (context.outputMode !== 'json') for (const line of renderCodes(report)) context.output.info(line);
+  const json = context.outputMode === 'json';
+  if (!json) for (const line of renderCodes(report)) context.output.info(line);
   const pairs = report.nearDuplicates?.length ?? 0;
-  if (pairs > 0) throw new CommandExit(ALIKE_EXIT, `❌ ${COMMAND_NAME} --check: ${alikeMessage(pairs)}`);
-  if (context.outputMode === 'json') context.output.result(report);
+  if (pairs === 0) {
+    if (json) context.output.result(report);
+    return;
+  }
+  // A refusal's terminal event carries no data, so json mode gets the pairs in an event first.
+  if (json) {
+    context.output.emit({
+      type: 'event',
+      name: CODES_ALIKE_EVENT,
+      summary: alikeMessage(pairs),
+      data: { ...report },
+      ts: new Date().toISOString(),
+    });
+  }
+  throw new CommandExit(ALIKE_EXIT, `❌ ${COMMAND_NAME} --check: ${alikeMessage(pairs)}`);
 }
 
 /** `rafa bug codes`, as the registry holds it. */
@@ -213,8 +238,10 @@ export function createCodesCommand(): RafaCommand {
       + 'families that exist. `--suggest` ranks the codes closest to a cause written in words, best first, at most '
       + 'five, each with the share of the text\'s words it holds; it never picks one, and a text sharing no word '
       + 'with any code says so with exit code 0. `--check` prints the pairs of codes of one family that read alike '
-      + 'and exits 1 when there is one. With `--output=json` the families, the codes with the source of each, the '
-      + 'suggestions and the pairs are the data of the terminal result event. Writes nothing and starts no session.',
+      + 'and exits 1 when there is one; it is refused beside `--suggest`. With `--output=json` the families, the '
+      + 'codes with the source of each, the suggestions and the pairs are the data of the terminal result event, '
+      + 'and of a `bug-codes-alike` event ahead of the refusal when `--check` finds a pair. Writes nothing and starts '
+      + 'no session.',
     args: [],
     flags: [
       {
@@ -230,7 +257,7 @@ export function createCodesCommand(): RafaCommand {
       },
     ],
     examples: [
-      { cmd: 'rafa bug codes', note: 'Prints every family and its codes, rafa\'s first, then the project\'s.' },
+      { cmd: 'rafa bug codes', note: 'Prints every family alphabetically, each with its codes, rafa\'s and the project\'s alike.' },
       {
         cmd: 'rafa bug codes --suggest="git commit has no author identity"',
         note: 'Ranks the closest codes, git:no-identity first.',

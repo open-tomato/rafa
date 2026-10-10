@@ -16,7 +16,8 @@ A code is `<family>:<leaf>`, both kebab-case, checked by `CODE_PATTERN`
 - `description`: one line saying what the context is
 - `hint`: the recommended next action
 - `level`: `error` or `warn`
-- `since`: the version or issue that added it
+- `since`: the version or issue that added it; rafa's list always names
+  it, and a project's entry may leave it out
 - `legacy`, optional: the spelling an older union gives the same context
 
 ### The reserved values
@@ -55,8 +56,10 @@ commit.
 
 ### A project's codes
 
-`errors.codes` in `.rafa/config.yaml` is a list of entries of the same
-shape, read by `src/config-schema-errors.ts`:
+`errors.codes` in `.rafa/config.yaml` is a list of entries with the keys
+`code`, `description`, `hint`, `level` and, optionally, `since`, read by
+`src/config-schema-errors.ts`. `legacy` is rafa's alone: on a project
+entry it is an unknown key.
 
 ```yaml
 errors:
@@ -82,15 +85,26 @@ side, each tagged `rafa` or `project`.
 ### Matching
 
 `src/errors/match.ts` splits words with triage's `wordSetOf`, so a code and
-a bug's text are read the same way.
+a bug's text are read the same way. It leaves the words of `FILLER_WORDS`
+("a", "the", "is") out of every set, because nearly every description
+holds them. "no" and "not" are kept: they tell `no-identity` from
+`identity`.
 
 - `suggestCodes(text, entries, limit)` ranks entries by the share of the
   TEXT's words each holds in its code and description, with Jaccard
-  breaking ties. An entry sharing no word is left out. It never picks a
-  code: the caller does.
+  breaking ties. A text of three words or more must share two with an
+  entry, so a cause the list lacks reads as no match and goes to
+  `<family>:new-context`. It never picks a code: the caller does.
 - `nearDuplicates(entries, threshold)` pairs codes of one family whose
-  leaf and description read alike at `NEAR_DUPLICATE_SCORE` (0.6) or above.
+  leaf and description read alike at `NEAR_DUPLICATE_SCORE` (0.5) or above.
   A test keeps rafa's own list free of such pairs.
+
+The 0.5 bar is measured. On rafa's list, two leaves for different causes
+score up to 0.44, and a second leaf for `git:no-identity` scores 0.56 when
+its description says the same in fewer words. A leaf naming the same
+cause in other words scores about 0.36, below what distinct causes reach,
+so no bar on shared words finds it. The control for that case is the
+suggestion at filing time, which shows the existing code first.
 
 ### `rafa bug codes`
 
@@ -98,4 +112,7 @@ a bug's text are read the same way.
 family by family. `--family` narrows the list, `--suggest` ranks the
 closest codes for a cause in words, and `--check` exits 1 when two codes of
 one family read alike, which is how a project checks its own additions.
+`--suggest` and `--check` are refused together. In json mode a `--check`
+that finds a pair writes its report as a `bug-codes-alike` event before
+it refuses, because a refusal's terminal event carries no data.
 `context/cli.md` holds the command's row.

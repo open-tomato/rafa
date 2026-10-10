@@ -108,7 +108,7 @@ describe('rafa bug codes --suggest', () => {
 
     expect(run.exitCode).toBe(0);
     expect(lines[0]).toBe('Closest codes for "git commit has no author identity":');
-    expect(lines[1]).toBe('  git:no-identity  83%  a git commit runs with no author identity set, often in a scratch home');
+    expect(lines[1]).toBe('  git:no-identity  100%  a git commit runs with no author identity set, often in a scratch home');
   });
 
   it('says so when no code shares a word, and still exits 0', async () => {
@@ -116,6 +116,22 @@ describe('rafa bug codes --suggest', () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.stdout.trimEnd()).toBe('No code matches "quantum flux". File it as <family>:new-context with a proposed leaf.');
+  });
+
+  it('says so for an everyday sentence about a cause the list lacks', async () => {
+    const run = await ran(['--suggest=the database connection pool is exhausted']);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.trimEnd())
+      .toBe('No code matches "the database connection pool is exhausted". File it as <family>:new-context with a proposed leaf.');
+  });
+
+  it('refuses --suggest beside --check, which answer two different questions', async () => {
+    const run = await ran(['--suggest=git', '--check']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('❌ --suggest and --check answer two questions: give one');
+    expect(run.stdout).toBe('');
   });
 
   it('refuses a blank --suggest', async () => {
@@ -144,6 +160,20 @@ describe('rafa bug codes --check', () => {
 });
 
 describe('rafa bug codes --output=json', () => {
+  it('carries the pairs --check found in an event, since the refusal that follows carries no data', async () => {
+    const run = await ran(['--check', '--output=json'], freshProject(NEAR_DUPLICATE_CONFIG));
+    const events = eventsOf(run.stdout);
+    const found = events.find((event) => event.type === 'event');
+    const pairs = found?.type === 'event'
+      ? found.data.nearDuplicates
+      : undefined;
+
+    expect(run.exitCode).toBe(1);
+    expect(found?.type === 'event' && found.name).toBe('bug-codes-alike');
+    expect(pairs).toEqual([{ first: 'git:no-identity', second: 'git:no-author', score: 1 }]);
+    expect(events.at(-1)).toMatchObject({ type: 'result', ok: false });
+  });
+
   it('answers the report as the result, both sources in it', async () => {
     const run = await ran(['--output=json'], freshProject(DEPLOY_CONFIG));
     const result = eventsOf(run.stdout).at(-1);

@@ -7,7 +7,9 @@
  * lines and `config-sections.ts` at 744 when it was added.
  *
  * Each entry is read with the same rules `defineErrorCodes`
- * (`src/errors/codes.ts`) applies to rafa's list, then the list as a
+ * (`src/errors/codes.ts`) applies to rafa's list, except that `since`
+ * may be left out: a project often has no version to name. Then the
+ * list as a
  * whole is checked: a code given twice, or one rafa already declares, is
  * refused with both places named, so neither meaning wins silently. An
  * unknown key inside an entry is kept and warned about, as every other
@@ -15,7 +17,7 @@
  */
 
 import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { Reader, Reading } from './config-sections.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
 
 import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from './config-sections.js';
@@ -54,28 +56,35 @@ const EXPECTED = {
   since: 'the version or issue that added it, a non-empty string',
 } as const;
 
-/** One entry: the five keys, unknown keys kept as extras. */
+/** The reading of a `since` the entry leaves out: no value, and no problem. */
+const NO_SINCE: Reading<string> = { value: undefined, problems: [], extras: [] };
+
+/** One entry: its four required keys and `since`, unknown keys kept as extras. */
 const errorCodeEntry: Reader<ErrorCodeEntry> = (raw, at) => {
   if (!isMapping(raw)) return refused(at, raw, `a mapping of: ${ERROR_CODE_KEYS.join(', ')}`);
   const code = codeText(raw.code, below(at, '.code'));
   const description = text(EXPECTED.description)(raw.description, below(at, '.description'));
   const hint = text(EXPECTED.hint)(raw.hint, below(at, '.hint'));
   const level = oneOf(ERROR_LEVELS)(raw.level, below(at, '.level'));
-  const since = text(EXPECTED.since)(raw.since, below(at, '.since'));
+  const since = raw.since === undefined || raw.since === null
+    ? NO_SINCE
+    : text(EXPECTED.since)(raw.since, below(at, '.since'));
   const problems = [code, description, hint, level, since].flatMap((reading) => reading.problems);
   const extras = Object.entries(raw)
     .filter(([key]) => !KNOWN_KEYS.has(key))
     .map(([key, value]) => ({ key: `${at.key}.${key}`, value }));
   if (
     code.value === undefined || description.value === undefined || hint.value === undefined
-    || level.value === undefined || since.value === undefined
+    || level.value === undefined || problems.length > 0
   ) return { value: undefined, problems, extras };
   const entry: ErrorCodeEntry = {
     code: code.value,
     description: description.value,
     hint: hint.value,
     level: level.value,
-    since: since.value,
+    ...since.value === undefined
+      ? {}
+      : { since: since.value },
   };
   return { value: Object.freeze(entry), problems: [], extras };
 };

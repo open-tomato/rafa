@@ -1,20 +1,20 @@
-import type { FailureStringCode } from '../schema/failure-strings.js';
-
+/**
+ * Tests for rafa's own cause codes, and the guard that holds the list
+ * and the four older code unions together: every union value has an
+ * entry whose `legacy` spells it, and every `legacy` names a union
+ * value. Each union is read as a runtime list, since `tsc` skips test
+ * files and a type-level check here would hold nothing.
+ */
 import { describe, expect, it } from 'bun:test';
 
 import { DISPATCH_ERROR_CODES } from '../cli/dispatch.js';
 import { ROUTE_REFUSALS } from '../cli/route.js';
+import { FAILURE_STRING_CODES } from '../schema/failure-strings.js';
 import { SKILL_ISSUE_CODES } from '../schema/skill.js';
 
 import { familyOf } from './codes.js';
 import { nearDuplicates, suggestCodes } from './match.js';
 import { FAMILY_DESCRIPTIONS, listedCodes, RAFA_CODES } from './rafa-codes.js';
-
-/** Every FailureStringCode, closed by `satisfies` so a new member reddens this file. */
-const FAILURE_STRING_CODES = Object.keys({
-  'empty-failure-string': true,
-  'short-failure-string': true,
-} satisfies Record<FailureStringCode, true>);
 
 const UNIONS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['ROUTE_REFUSALS', ROUTE_REFUSALS],
@@ -49,6 +49,19 @@ describe('RAFA_CODES', () => {
     const known = new Set(UNIONS.flatMap(([, values]) => values));
     const stray = RAFA_CODES.filter((entry) => entry.legacy !== undefined && !known.has(entry.legacy));
     expect(stray.map((entry) => entry.code)).toEqual([]);
+  });
+
+  it('answers no code for an everyday sentence about a cause the list lacks', () => {
+    expect(suggestCodes('the database connection pool is exhausted', RAFA_CODES)).toEqual([]);
+    expect(suggestCodes('docker build runs out of memory on the runner', RAFA_CODES)).toEqual([]);
+  });
+
+  it('hints at what the code it names really offers', () => {
+    const hintOf = (code: string): string | undefined => RAFA_CODES.find((entry) => entry.code === code)?.hint;
+
+    expect(hintOf('cli:unknown-module')).toBe('run rafa module list for the modules that are mounted');
+    expect(hintOf('cli:unexpected-version')).toBe('run rafa --version alone, with no command beside it');
+    expect(hintOf('cli:result-unwritable')).toBe('file a bug: the command answered data that cannot be written as JSON');
   });
 
   it('ranks git:no-identity first for the spec example', () => {
