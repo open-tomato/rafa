@@ -23,9 +23,10 @@
  *     a project that is not there answers `not-found`, and nothing more
  *     is read;
  *  3. the project's items, every page; an issue of this repository with
- *     no item is answered in {@link ProjectRefreshed.missing} and nothing
- *     is read or written for it, since adding an item is its caller's
- *     step (`rafa issue create`, `rafa board sync`);
+ *     no item there, and none among the known items (see below), is
+ *     answered in {@link ProjectRefreshed.missing} and nothing is read or
+ *     written for it, since adding an item is its caller's step
+ *     (`rafa issue create`, `rafa board sync`);
  *  4. for the issues on the project, their facts (`./facts.ts`), each
  *     issue read or refused on its own;
  *  5. the board once for all of them: the listing in the
@@ -48,6 +49,48 @@
  * `#<n> not refreshed: <reason>` (`notRefreshedWarning`), opens the
  * warnings. Every other issue's values are written as read, so the next
  * refresh or `rafa board sync` picks the refused one up.
+ *
+ * ## Known items, for issues just added
+ *
+ * A caller that has just added issues holds the item id each add answered
+ * ({@link ProjectPort.addItem}), and hands them as {@link KnownItem}s
+ * ({@link knownItem}), so the refresh fills those issues whether or not
+ * the listing of step 3 shows their items yet. Measured on 0.41.0: a sync
+ * added #939 and #941, its second refresh read the facts of one issue, and
+ * #939 kept an empty Stage until the next sync
+ * (`.rafa/specs/rafa-947-board-project-follow-ups.md`). That the listing
+ * lags an add fits those facts and is NOT a reading.
+ *
+ * A known item is matched to its issue by its content: the issue's number,
+ * and its repository compared with this one's as the listing's items are,
+ * case aside. The matched ones join the listing's items before anything is
+ * widened, so a widening reads them as it reads the others. Where the
+ * listing and a known item both name an issue the listing's wins, since
+ * it carries the values already held; of two known items naming one issue
+ * the later is used. A known item holds no value, so every field the rules
+ * give a value reads as differing and is written.
+ *
+ * Each known item the refresh did not fill is answered in
+ * {@link ProjectRefreshed.notFilled} with its reason, in the order given:
+ *
+ *  - its content names another repository, so it is matched to no issue
+ *    and never written to;
+ *  - its issue is not among the issues asked for and widened;
+ *  - its issue's facts were refused, the refusal's reason kept;
+ *  - a rate-limit refusal stopped the writes with one of its issue's
+ *    unsent.
+ *
+ * The last is read off the order of the writes: the first
+ * `writes.written` of {@link ProjectRefreshed.changes} are taken as
+ * landed, the requests going in that order and stopping at the refusal.
+ * It is exact for every request before the refused one; that the writes a
+ * refused request's data answers anyway are its first ones is NOT a
+ * reading (`./writes.ts`).
+ *
+ * They are answered as data and add no line to `warnings`: the caller
+ * that made the adds words them. A dry run writes nothing and answers
+ * none for its writes; a refresh that read no project (`skipped`,
+ * `not-found`, `refused`) answers none at all.
  *
  * ## Widening: an epic's members, and the items whose Rank shifted
  *
@@ -132,7 +175,15 @@
  * read never rejects: it refuses the issues it reached, as above.
  */
 import type { FactsRefusal } from './facts.js';
-import type { FieldMismatch, MatchedField, Project, ProjectItem, ProjectPort, ProjectRef } from './port.js';
+import type {
+  FieldMismatch,
+  MatchedField,
+  Project,
+  ProjectContentRef,
+  ProjectItem,
+  ProjectPort,
+  ProjectRef,
+} from './port.js';
 import type { ProgressFeed } from './progress.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
 import type { ProjectWritesOptions, ProjectWritesResult } from './writes.js';
@@ -223,6 +274,23 @@ export interface RefreshWidening {
   readonly openIssues?: boolean;
 }
 
+/**
+ * The item of an issue just added, as its add answered it: the node id
+ * {@link ProjectPort.addItem} answered, the issue the add sent as its
+ * content, and no value. Built by {@link knownItem}; see the module note.
+ */
+export interface KnownItem extends ProjectItem {
+  readonly content: { readonly kind: 'issue'; readonly number: number; readonly repository: string };
+}
+
+/** An issue just added that the refresh did not fill; see the module note. */
+export interface AddedNotFilled {
+  /** The issue the known item names. */
+  readonly number: number;
+  /** Why, worded to follow `#<n> added but not filled: `. */
+  readonly reason: string;
+}
+
 /** A refresh that sent no call. */
 export interface ProjectRefreshSkipped {
   readonly kind: 'skipped';
@@ -257,12 +325,18 @@ export interface ProjectRefreshed {
   readonly changes: readonly ProjectChange[];
   /** How the writes of {@link ProjectRefreshed.changes} went. */
   readonly writes: ProjectWritesResult;
-  /** The issues asked for, or added as an epic's members or as open issues, that have no item on the project, in that order. */
+  /**
+   * The issues asked for, or added as an epic's members or as open issues,
+   * that have no item on the project's listing and none among the known
+   * items, in that order.
+   */
   readonly missing: readonly number[];
   /** The template's fields the project does not hold as expected, none written. */
   readonly skipped: readonly FieldMismatch[];
   /** The issues on the project whose facts could not be read, none written, in the order asked and widened. */
   readonly refused: readonly FactsRefusal[];
+  /** The known items the refresh did not fill, each with its reason, in the order given; empty when none was handed. */
+  readonly notFilled: readonly AddedNotFilled[];
   /** One line per refused issue, then the rate-limit line when the writes were refused, then one line per skipped field. */
   readonly warnings: readonly string[];
 }
@@ -302,6 +376,56 @@ function issueItems(items: readonly ProjectItem[], repository: string): Readonly
   return new Map(items.flatMap((item) => (item.content.kind === 'issue' && item.content.repository.toLowerCase() === wanted
     ? [[item.content.number, item] as const]
     : [])));
+}
+
+/** The {@link KnownItem} of the add that answered the item id `id` for `content`; see the module note. */
+export function knownItem(id: string, content: ProjectContentRef): KnownItem {
+  return { id, archived: false, content: { kind: 'issue', number: content.number, repository: content.repository }, values: new Map() };
+}
+
+/** The reason of a known item whose issue is not among those asked for and widened. */
+const NOT_REFRESHED_REASON = 'not among the issues refreshed';
+
+/** The reason of a known item whose issue a rate-limit refusal left with a write unsent. */
+const RATE_LIMIT_REASON = 'GitHub\'s rate limit refused its writes';
+
+/** What one refresh did, as far as it decides whether a known item was filled. */
+interface FillReading {
+  readonly repository: string;
+  /** The issues the refresh held an item for, by number. */
+  readonly present: ReadonlyMap<number, ProjectItem>;
+  readonly refused: readonly FactsRefusal[];
+  /** The issues with a change a rate-limit refusal left unwritten. */
+  readonly unwritten: ReadonlySet<number>;
+}
+
+/** The issues of the `changes` a rate-limit refusal left unwritten: those past the first `writes.written`; see the module note. */
+function unwrittenIssues(changes: readonly ProjectChange[], writes: ProjectWritesResult): ReadonlySet<number> {
+  return new Set(writes.rateLimited
+    ? changes.slice(writes.written).map(({ issue }) => issue)
+    : []);
+}
+
+/** Why the refresh `reading` describes did not fill `item`, or null when it did; see the module note. */
+function notFilledReason(item: KnownItem, reading: FillReading): string | null {
+  const { number, repository } = item.content;
+  if (repository.toLowerCase() !== reading.repository.toLowerCase()) return `its item is of ${repository}, not ${reading.repository}`;
+  if (!reading.present.has(number)) return NOT_REFRESHED_REASON;
+  const refusal = reading.refused.find((refused) => refused.number === number);
+  if (refusal !== undefined) return refusal.reason;
+  return reading.unwritten.has(number)
+    ? RATE_LIMIT_REASON
+    : null;
+}
+
+/** The items of `known` the refresh `reading` describes did not fill, each with its reason, in the order given. */
+function notFilledOf(known: readonly KnownItem[], reading: FillReading): readonly AddedNotFilled[] {
+  return known.flatMap((item) => {
+    const reason = notFilledReason(item, reading);
+    return reason === null
+      ? []
+      : [{ number: item.content.number, reason }];
+  });
 }
 
 /** The home board's row: the listing's, else the labelled boards'; throws when neither holds it. */
@@ -428,20 +552,28 @@ function widens(widening: RefreshWidening): boolean {
     || widening.openIssues === true;
 }
 
-/** The refresh of `asked` on the project `ref` names, widened by `widening`, once the repository is read. */
+/** What one refresh is asked for: the issues named, what widens them, and the items of those just added. */
+interface RefreshAsk {
+  readonly asked: readonly number[];
+  readonly widening: RefreshWidening;
+  readonly known: readonly KnownItem[];
+}
+
+/** The refresh `ask` describes on the project `ref` names, once the repository is read. */
 async function refreshOn(
   options: RefreshOptions,
   repository: string,
   ref: ProjectRef,
-  asked: readonly number[],
-  widening: RefreshWidening,
+  { asked, widening, known }: RefreshAsk,
 ): Promise<ProjectRefresh> {
   const { config, gh } = options;
   const port: ProjectPort = createGhProjectPort(gh);
   const project = await port.find(ref);
   if (project === null) return { kind: 'not-found', project: ref, warnings: [notFoundWarning(ref)] };
 
-  const items = issueItems(await port.items(project.id), repository);
+  const listed = issueItems(await port.items(project.id), repository);
+  // The listing's item wins where both hold one for an issue: it carries the values already held.
+  const items = new Map([...issueItems(known, repository), ...listed]);
   const board = widens(widening)
     ? await readRefreshBoard(config, gh, repository)
     : null;
@@ -469,7 +601,8 @@ async function refreshOn(
       : []),
     ...skipped.map(skippedFieldWarning),
   ];
-  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped, refused, warnings };
+  const notFilled = notFilledOf(known, { repository, present, refused, unwritten: unwrittenIssues(changes, writes) });
+  return { kind: 'refreshed', project: ref, changes, writes, missing, skipped, refused, notFilled, warnings };
 }
 
 /**
@@ -480,17 +613,26 @@ async function refreshOn(
  * not be read, are answered in `warnings`, never thrown. See the module
  * note.
  *
+ * `known` holds the items of issues just added, which the refresh reads
+ * beside the project's listing, so an issue whose item the listing does
+ * not show yet is filled all the same; each one it did not fill is
+ * answered in `notFilled` with its reason.
+ *
  * Throws a `RangeError`, having sent nothing, for an entry of `issues` or
- * of `widening.membersOf` that is not a positive whole number.
+ * of `widening.membersOf`, or the issue of a known item, that is not a
+ * positive whole number.
  */
 export async function refreshProjectItems(
   options: RefreshOptions,
   issues: readonly number[],
   widening: RefreshWidening = {},
+  known: readonly KnownItem[] = [],
 ): Promise<ProjectRefresh> {
   const { config, gh } = options;
   const numbers = issueNumbers(issues);
   const membersOf = issueNumbers(widening.membersOf ?? []);
+  // Read for its refusal alone: a known item is matched by its own content, never by this list.
+  issueNumbers(known.map(({ content }) => content.number));
   const widened: RefreshWidening = {
     membersOf,
     shiftedRanks: widening.shiftedRanks === true,
@@ -503,7 +645,7 @@ export async function refreshProjectItems(
   const repository = await readBoardRepository(gh);
   const ref: ProjectRef = { owner: repository.split('/')[0] ?? '', number: config.boardProjectNumber };
   try {
-    return await refreshOn(options, repository, ref, numbers, widened);
+    return await refreshOn(options, repository, ref, { asked: numbers, widening: widened, known });
   } catch (error) {
     if (isMissingProjectScope(error)) return { kind: 'refused', reason: 'scope', project: ref, warnings: [scopeWarning()] };
     throw error;

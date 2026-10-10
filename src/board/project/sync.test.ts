@@ -15,6 +15,13 @@
  *  - Each sync refusing one issue is read beside the sync over the same
  *    board with no cursor that repeats, which refuses none and fills
  *    every item, so a sync answering no refusal at all would fail it.
+ *  - The sync over a listing that never shows #1 and #40 (`omittingItems`)
+ *    is read beside a plain refresh of those two issues over the same
+ *    listing, once the sync added them: it answers both as missing, so
+ *    the listing does hide them and only the items the adds answered
+ *    could have filled them.
+ *  - Each sync naming an added issue as not filled is read beside the
+ *    sync that fills both, which answers no such line.
  *
  * ## Why the warning lines are imported late
  *
@@ -30,6 +37,7 @@
  * `./options.test.ts` loads `./rules.ts` and `./port.ts` each first and
  * alone. The late import is kept, as it costs nothing.
  */
+import type { FakeProjectGhOptions } from './project-fake.js';
 import type { RefreshConfig, RefreshOptions } from './refresh.js';
 import type { SyncFake } from './sync-fake.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -37,6 +45,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { recordingFeed } from './progress-fake.js';
+import { refreshProjectItems } from './refresh.js';
 import {
   createSyncFake,
   SYNC_EXPECTED,
@@ -47,7 +56,13 @@ import {
 } from './sync-fake.js';
 import { syncProject } from './sync.js';
 
-const { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning } = await import('./refresh-warnings.js');
+const {
+  addedNotFilledWarning,
+  notFoundWarning,
+  notRefreshedWarning,
+  rateLimitWarning,
+  scopeWarning,
+} = await import('./refresh-warnings.js');
 
 /** The config every case reads. */
 const CONFIG: RefreshConfig = {
@@ -66,6 +81,11 @@ const PROJECT = { owner: SYNC_OWNER, number: SYNC_PROJECT_NUMBER };
 
 /** What the board #1 and #40 hold once added and filled: #1 is on no line, #40 asks for triage. */
 const ADDED_VALUES = { 1: { Stage: 'Backlog' }, 40: { Stage: 'Triage' } };
+
+/** The write requests of the first pass: one per `boardProjectWriteBatchSize` values the rules fill on the five items. */
+const FIRST_PASS_REQUESTS: NonNullable<FakeProjectGhOptions['rateLimitAfter']> = Math.ceil(
+  Object.values(SYNC_EXPECTED).flatMap((values) => Object.keys(values)).length / CONFIG.boardProjectWriteBatchSize,
+);
 
 /** The options of a sync over `fake`, pausing for no time. */
 function options(fake: SyncFake, dryRun = false): RefreshOptions {
@@ -90,6 +110,7 @@ describe('syncProject', () => {
     expect(synced.changes).toHaveLength(Object.values(SYNC_EXPECTED).flatMap((values) => Object.keys(values)).length);
     expect(synced.missing).toEqual([1, 40]);
     expect(synced.added).toEqual([]);
+    expect(synced.filled).toEqual([]);
     expect(synced.writes.written).toBe(0);
     expect(syncWriteCalls(fake.calls())).toEqual([]);
     expect(syncAddCalls(fake.calls())).toEqual([]);
@@ -106,6 +127,7 @@ describe('syncProject', () => {
     expect(synced.dryRun).toBe(false);
     expect(synced.missing).toEqual([1, 40]);
     expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1, 40]);
     expect(issuesOf(synced.changes)).toEqual([10, 20, 21, 22, 30, 1, 40]);
     expect(synced.writes.written).toBe(synced.changes.length);
     expect(syncAddCalls(fake.calls())).toHaveLength(2);
@@ -127,11 +149,12 @@ describe('syncProject', () => {
     expect(synced.warnings[0]).toStartWith('#21 not refreshed: ');
     expect(issuesOf(synced.changes)).toEqual([10, 20, 22, 30, 1, 40]);
     expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1, 40]);
     expect(synced.writes).toMatchObject({ written: synced.changes.length, rateLimited: false });
     expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 21: {}, ...ADDED_VALUES });
   });
 
-  it('answers an added issue refused in the second pass, on the project with no value filled', async () => {
+  it('answers an added issue refused in the second pass as added and not filled, its line after the refusal\'s own', async () => {
     const fake = createSyncFake({ repeatsCursor: [40] });
 
     const synced = await syncProject(options(fake));
@@ -139,9 +162,37 @@ describe('syncProject', () => {
     expect(synced.kind).toBe('synced');
     if (synced.kind !== 'synced') return;
     expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1]);
     expect(synced.refused.map(({ number }) => number)).toEqual([40]);
-    expect(synced.warnings).toEqual(synced.refused.map(notRefreshedWarning));
+    expect(synced.warnings).toEqual([...synced.refused.map(notRefreshedWarning), ...synced.refused.map(addedNotFilledWarning)]);
+    expect(synced.warnings[1]).toStartWith('#40 added but not filled: issue #40.labels answered the cursor');
     expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
+  });
+
+  it('names no added issue as not filled when the refused issue was on the project already', async () => {
+    const fake = createSyncFake({ repeatsCursor: [21] });
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind === 'synced' && synced.warnings.filter((line) => line.includes('added but not filled'))).toEqual([]);
+  });
+
+  it('answers both added issues as not filled when the rate limit refuses the second pass\'s writes', async () => {
+    const fake = createSyncFake({ rateLimitAfter: FIRST_PASS_REQUESTS });
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([]);
+    expect(synced.writes.rateLimited).toBe(true);
+    expect(synced.warnings).toEqual([
+      rateLimitWarning(2),
+      '#1 added but not filled: GitHub\'s rate limit refused its writes',
+      '#40 added but not filled: GitHub\'s rate limit refused its writes',
+    ]);
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: {}, 40: {} });
   });
 
   it('finds nothing on a dry run after a sync, the first dry run having found every change', async () => {
@@ -209,6 +260,79 @@ describe('syncProject', () => {
     expect(await syncProject({ ...options(fake), config: { ...CONFIG, boardProjectNumber: null } }))
       .toEqual({ kind: 'skipped', reason: 'no-project', warnings: [] });
     expect(fake.calls()).toEqual([]);
+  });
+});
+
+describe('syncProject: over an item listing that does not show the issues just added', () => {
+  /** The items read's answer, as far as a case filters it. */
+  interface ItemsAnswer {
+    readonly data: { readonly node: { readonly items: { readonly nodes: readonly { readonly content: { readonly number?: number } | null }[] } } };
+  }
+
+  /** `gh`, answering every items read without the items of `omitted`, as `./refresh.test.ts` holds the lag. */
+  function omittingItems(gh: GhRunner, omitted: readonly number[]): GhRunner {
+    return async (args) => {
+      const result = await gh(args);
+      if (!result.ok || !args.some((arg) => arg.includes('node(id: $project)'))) return result;
+      const { items: page } = (JSON.parse(result.stdout) as ItemsAnswer).data.node;
+      const nodes = page.nodes.filter(({ content }) => !omitted.includes(content?.number ?? 0));
+      return { ...result, stdout: JSON.stringify({ data: { node: { items: { ...page, nodes } } } }) };
+    };
+  }
+
+  /** The options of a sync over `fake` whose listing never shows #1 or #40. */
+  function lagging(fake: SyncFake): RefreshOptions {
+    return { ...options(fake), gh: omittingItems(fake.gh, [1, 40]) };
+  }
+
+  it('fills both added issues through the item each add answered', async () => {
+    const fake = createSyncFake();
+
+    const synced = await syncProject(lagging(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1, 40]);
+    expect(issuesOf(synced.changes)).toEqual([10, 20, 21, 22, 30, 1, 40]);
+    expect(synced.warnings).toEqual([]);
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, ...ADDED_VALUES });
+  });
+
+  it('hides the added issues from a refresh handed no known item, the control of the case above', async () => {
+    const fake = createSyncFake();
+    await syncProject(lagging(fake));
+
+    const refresh = await refreshProjectItems(lagging(fake), [1, 40]);
+
+    expect(refresh).toMatchObject({ kind: 'refreshed', missing: [1, 40], changes: [] });
+  });
+
+  it('names the added issue whose facts are refused, and fills the other', async () => {
+    const fake = createSyncFake({ repeatsCursor: [40] });
+
+    const synced = await syncProject(lagging(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.filled).toEqual([1]);
+    expect(synced.warnings.at(-1)).toStartWith('#40 added but not filled: ');
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
+  });
+
+  it('names the same added issue in the warning over the project fake\'s own lag, the control above over a hand-rolled one', async () => {
+    const fake = createSyncFake({ repeatsCursor: [40] });
+    fake.project.lagItems();
+
+    const synced = await syncProject(options(fake));
+
+    expect(synced.kind).toBe('synced');
+    if (synced.kind !== 'synced') return;
+    expect(synced.added).toEqual([1, 40]);
+    expect(synced.filled).toEqual([1]);
+    expect(synced.warnings.at(-1)).toStartWith('#40 added but not filled: ');
+    fake.project.showItems();
+    expect(await fake.heldValues()).toEqual({ ...SYNC_EXPECTED, 1: ADDED_VALUES[1], 40: {} });
   });
 });
 

@@ -527,7 +527,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   // skip-permissions notices, until the person dismisses them
   // (`notices/notices.ts`). A cancel here leaves the run on the branch the
   // offer above may have created, with nothing run on it.
-  await requireNoticesAnswered();
+  await requireNoticesAnswered(settingSources);
   setActivePlanStub(planStub);
 
   // Refuses a second run of the plan before anything else is printed or

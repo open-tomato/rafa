@@ -7,8 +7,11 @@
  * Called by the two commands that start a Claude Code session on the
  * person's behalf, ahead of anything that costs money or moves a
  * branch: `loop start` (`src/start.ts`) and `plan create`
- * (`src/plan.ts`).
+ * (`src/plan.ts`). Each hands in the `loop.settingSources` its own
+ * configuration resolved, which the danger notice names.
  */
+import type { ClaudeSettingSource } from '../config-sections.js';
+
 import { homedir } from 'node:os';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -25,11 +28,13 @@ export const NOTICES_CANCELLED = '🛑 Cancelled at the notice: nothing was star
  * Shows the notices still owed and asks the one question; see
  * `./notices.ts`. Returns when the run may go on.
  *
+ * @param settingSources - The caller's resolved `loop.settingSources`,
+ *   the scopes the sessions it is about to start will load.
  * @throws CommandExit with exit code 1 when the person cancels.
  */
-export async function requireNoticesAnswered(): Promise<void> {
+export async function requireNoticesAnswered(settingSources: readonly ClaudeSettingSource[]): Promise<void> {
   const outcome = await offerNotices(
-    { home: homedir(), version: RAFA_VERSION },
+    { home: homedir(), version: RAFA_VERSION, settingSources },
     {
       isTerminal: () => process.stdin.isTTY === true,
       openPrompter: () => createLinePrompter(process.stdin, process.stderr),

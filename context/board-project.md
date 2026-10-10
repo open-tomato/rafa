@@ -89,6 +89,51 @@ fragment is still on the base branch). It runs each value through its rule
 function and calls the project port's write functions to set only the values
 that are different from what the project holds.
 
+A caller that has just added issues can hand the refresh the item each add
+answered, as known items (`knownItem`, the fourth argument of
+`refreshProjectItems`). The refresh reads them beside the project's item
+listing, so an issue is filled whether or not the listing shows its item
+yet. A known item is matched to its issue by number and repository; where
+the listing and a known item both name an issue, the listing's item is used,
+since it holds the values already written. Each known item the refresh did
+not fill is answered in `notFilled` with its reason: its item is of another
+repository (never written to), its issue was not among those refreshed, its
+facts were refused, or a rate-limit refusal left one of its writes unsent.
+
+### Added, and filled
+
+An issue `rafa board sync` adds is filled in the same run: the sync keeps
+the item each add answered and hands those items to its second refresh as
+known items. An added issue is filled when that refresh wrote its fields,
+and not filled when the refresh answered it in `notFilled`. Two reasons
+reach a sync: the issue's facts were refused, or a rate-limit refusal left
+one of its writes unsent.
+
+The closing line counts the two apart. Where every issue added was filled
+it reads `Synced project #7: 46 changes written, 2 issues added and
+filled.`, and a sync that added none reads `0 issues added and filled`.
+Where some were not it reads `2 issues added, 1 filled`. A sync the rate
+limit stopped counts them when it had added any: `Stopped on project #7:
+12 of 14 changes written, 2 issues added, 0 filled; the rate limit refused
+the rest.` A dry run adds nothing and counts only the issues to add.
+
+The json result holds both lists, `added` and `filled`, the second always
+a part of the first.
+
+Each issue added and not filled gets one warning line after every other,
+`#<n> added but not filled: <reason>`, and the exit code stays 0. One whose
+facts were refused is named twice with the same reason, by `#<n> not
+refreshed: <reason>` and by this line: the first says nothing was written
+for it, the second that it sits on the project with no value. The next
+sync finds its item on the project and fills it in its first pass.
+
+`rafa issue create` fills its new issue the same way: it keeps the item its
+add answered and hands it to its refresh as a known item
+(`addAndRefreshIssue`, `src/board/project/add-issue.ts`). When that refresh
+answers the issue in `notFilled`, the same line is printed after the
+refresh's own, at `warn`, and the create still exits 0: the issue is filed
+and sits on the project with no value until the next `rafa board sync`.
+
 ### Lists read to their end
 
 The facts reader reads an issue's labels, closing references and
@@ -143,15 +188,25 @@ Three phases print progress: adding the issues, reading their facts, and
 writing their fields. Each prints a start line with its total, `adding
 issues: 283`, then a line at most every `board.project.progressSeconds`
 with the count and the time so far, `adding issues: 146/283, 6m 40s`, and
-an end line with the count, the refused count and the time. A pause for
-GitHub's write limit prints `waiting <n> s for GitHub's write limit`.
+an end line with the count, the refused count and the time.
 
-`progressSeconds: false` drops the lines between; the start and end lines
-stay. In json mode each line is a `progress` event with the phase, done,
-total and elapsed milliseconds. The same lines come from `rafa board sync`.
+A pause between two write requests (`board.project.writePauseMs`) prints
+nothing while it is shorter than `board.project.progressSeconds`, so the
+defaults (a 1 s pause, a line every 10 s) print none. A pause at least
+that long prints
+`pausing <n> s between writes (board.project.writePauseMs)`,
+and in json mode a `progress` event whose step is `wait`, with the
+milliseconds as `waitMs`.
+
+`progressSeconds: false` drops the lines between, the pause lines
+included; the start and end lines stay. In json mode each line is a
+`progress` event with the phase, done, total and elapsed milliseconds.
+The same lines come from `rafa board sync`.
 
 Commands that call the refresh outside the label wrapper:
-- `rafa issue create` — refresh the new issue
+- `rafa issue create` — add the new issue, then refresh it with the item the
+  add answered as a known item, and print `#<n> added but not filled:
+  <reason>` when the refresh did not fill it
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
   issues they were blocking
@@ -175,7 +230,7 @@ refused issues up.
 
 ### The warnings
 
-Five kinds of failure are turned into warnings, each naming its fix where it
+Six kinds of failure are turned into warnings, each naming its fix where it
 has one:
 
 | Failure | Warning | Fix |
@@ -185,10 +240,11 @@ has one:
 | `board.project.number` names no project | the number and that it was not found | `rafa init --board` |
 | A field or option renamed on the project | which field was skipped | `rafa doctor` |
 | An issue whose facts could not be read | `#<n> not refreshed: <reason>` | none: the next refresh or `rafa board sync` reads it again |
+| An issue added and not filled | `#<n> added but not filled: <reason>` | none: the next `rafa board sync` fills it |
 
 When a field is renamed, the refresh skips that field and writes the other
 four. When one issue's facts cannot be read, that issue alone is left as it
-was and the others are written. All five warnings keep the caller's exit code
+was and the others are written. All six warnings keep the caller's exit code
 and are printed after the command's own output.
 
 ### Configuration
@@ -239,5 +295,5 @@ board:
   project:
     retries: 5
     retryWaitSeconds: 5     # a slow or flaky network
-    writePauseMs: 2000      # gentler on GitHub's write limit
+    writePauseMs: 2000      # a longer pause between write requests
 ```

@@ -68,8 +68,9 @@
  * Given {@link ProjectWritesOptions.progress}, the writes are the
  * `writing fields` phase (`./progress.ts`): its total is the writes
  * given, it advances by the writes sent after each request, a pause
- * between two requests is a wait line (none for a pause of 0), and its
- * end counts the writes GitHub answered and, as refused, those a
+ * between two requests is a wait line only when it is at least
+ * `board.project.progressSeconds` long (so none for the default pause,
+ * and none with `progressSeconds: false`), and its end counts the writes GitHub answered and, as refused, those a
  * rate-limit refusal left unwritten. A rejection ends no phase.
  */
 import type { ProgressFeed } from './progress.js';
@@ -284,7 +285,7 @@ export async function writeProjectFields(
   let sent = 0;
   for (const [index, batch] of batches.entries()) {
     if (index > 0) {
-      if (pauseMs > 0) phase.wait(pauseMs);
+      phase.wait(pauseMs);
       await sleep(pauseMs);
     }
     const outcome = await sendBatch(gh, requests[index] ?? [], batch.length);

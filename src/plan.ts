@@ -691,7 +691,7 @@ export default async function plan(
 
   // The planner is a session too: the same notices `loop start` shows
   // (`notices/notices.ts`), ahead of the one call that costs money.
-  await requireNoticesAnswered();
+  await requireNoticesAnswered(settingSources);
 
   activeOutput().info(`📝 Generating ${planFile} from ${path.basename(specPath)}...`);
   const generated = await generateOrExit(planner, { specPath: specRequest, stub }, gate, flags.skipReview);
