@@ -847,7 +847,7 @@ describe('the self-update follow-up beside a live loop', () => {
     const { project, seams } = updateCase();
     plantLoop(project, 'running', 'feature/a', LIVE_PID);
     const { run, events } = await ran(seams, project, ['41', '--yes', '--output=json']);
-    const data = events.at(-1)?.data as { followUps: { id: string; why: string }[] };
+    const data = dataOf(events) as unknown as { followUps: { id: string; why: string }[] };
 
     expect(run.exitCode).toBe(0);
     expect(data.followUps.map((followUp) => followUp.id)).toEqual(['self-update']);
