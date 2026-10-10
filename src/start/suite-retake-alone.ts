@@ -34,8 +34,9 @@
  *
  *   - **green alone**: a summary line, a JUnit file that read, no error
  *     outside any test, and no failure the baseline does not hold. The
- *     file was red only in the step ({@link AloneReading.stepOnly}). A
- *     file holding an inherited failure beside its new ones is green
+ *     file was red only in the step ({@link AloneReading.stepOnly}),
+ *     unless a file the step's own change touches ran before it (below).
+ *     A file holding an inherited failure beside its new ones is green
  *     alone when only the inherited one is left.
  *   - **red alone**: a summary line and a JUnit file that read, with a
  *     failure the baseline does not hold or an error outside any test
@@ -49,12 +50,41 @@
  * ends the retakes and makes the step a stop
  * ({@link AloneReading.interrupted}), as the step's own run would.
  *
+ * ## Green alone, after a file the step's own change touches
+ *
+ * A file green alone was failed by a file run before it, and that file
+ * may be one the step is checking: a task that adds `a.test.ts`, which
+ * leaves a value behind, reddens `b.test.ts` after it in every step
+ * from then on, and reading `b` as red only in the step would let the
+ * leak through each one, the pre-wrap-up step included. So a file green
+ * alone is red only in the step unless a file run BEFORE it, anywhere
+ * in the order of the process that ran it and not only among the
+ * {@link STEP_ONLY_BEFORE} a `stepOnly` entry names, is in the step's
+ * own diff: the task's since its base for a task step, the stage's for
+ * a stage step, the plan's since the baseline's commit for the
+ * pre-wrap-up step. The task step of a repair task reads the plan's
+ * diff too: a repair that changed nothing has an empty diff of its own,
+ * and the file it was handed would read red only in the step and tick
+ * the repair. Such a file stays a new failure
+ * ({@link AloneReading.afterTouched}), and its blocker names the changed
+ * files run before it and the command that runs them and it in that
+ * order (`suite-blocker.ts`).
+ *
+ * The diff is asked for through `readTouched`, once, and only when a
+ * retake read green. Three cases are read as red only in the step,
+ * since nothing says otherwise: a diff git would not answer (the step's
+ * own reading of it has warned by then), a pre-wrap-up step whose
+ * baseline holds no commit, and a file the step's file order does not
+ * hold. A changed file run AFTER the file, the file itself, and a
+ * changed file that is no test file of that process count for nothing:
+ * only what ran before the file, in its process, can have left it state.
+ *
  * ## What the step does with the reading
  *
- * `settleStep` takes the tests of every file green alone out of the
- * step's new failures ({@link withoutStepOnly}), so a step whose every
- * new failure was red only in the step is green: no blocker, no repair
- * task, no halt. The recorded step keeps them in `failures` and lists
+ * `settleStep` takes the tests of every file red only in the step out
+ * of the step's new failures ({@link withoutStepOnly}), so a step whose
+ * every new failure was red only in the step is green: no blocker, no
+ * repair task, no halt. The recorded step keeps them in `failures` and lists
  * each such file under `stepOnly` (`loop/sessions.ts`) with the names of
  * its tests, the error lines of the first, its place in the order its
  * process ran the files, and the {@link STEP_ONLY_BEFORE} files run just
@@ -93,12 +123,21 @@ export const RETAKE_ALONE_MAX_FILES = 20;
 /** The most files run just before a file that its `stepOnly` entry names. */
 export const STEP_ONLY_BEFORE = 5;
 
+/** A file green alone that ran after test files the step's own diff names. See the module note. */
+export interface AfterTouched {
+  readonly file: string;
+  /** The files of the step's diff run before it in its process, in run order. */
+  readonly touched: readonly string[];
+}
+
 /** What the retakes of one step read. See the module note. */
 export interface AloneReading {
   /** The files green alone, in the order retaken. */
   readonly stepOnly: readonly SessionStepOnly[];
   /** The files red again alone, in the order retaken. */
   readonly redAlone: readonly string[];
+  /** The files green alone that ran after files the step's diff names, in the order retaken; they stay new failures. */
+  readonly afterTouched: readonly AfterTouched[];
   /** True when a retake was read as a stop on SIGINT. */
   readonly interrupted: boolean;
 }
@@ -111,19 +150,21 @@ export function aloneJunitFileFor(repoRoot: string, sessionId: string, kind: Ses
 /** How one retake read: see the module note. */
 type AloneVerdict = 'green' | 'red' | 'unread';
 
-/** Where a file ran: which of the step's processes, its place there from 1, and the files just before it. */
+/** Where a file ran: which of the step's processes, its place there from 1, the files just before it, and every file before it. */
 interface FilePlace {
   /** The process's index in `SuiteResult.fileOrder`: 0 the step's own run, 1 its always-run run. */
   readonly run: number;
   readonly position: number;
   readonly before: readonly string[];
+  /** Every file its process ran before it, in run order. */
+  readonly prefix: readonly string[];
 }
 
 /** The place of `file` in the first of `orders` that holds it, or null when none does. */
 function placeOf(file: string, orders: readonly (readonly string[])[]): FilePlace | null {
   for (const [run, order] of orders.entries()) {
     const at = order.indexOf(file);
-    if (at >= 0) return { run, position: at + 1, before: order.slice(Math.max(0, at - STEP_ONLY_BEFORE), at) };
+    if (at >= 0) return { run, position: at + 1, before: order.slice(Math.max(0, at - STEP_ONLY_BEFORE), at), prefix: order.slice(0, at) };
   }
   return null;
 }
@@ -164,23 +205,55 @@ async function runAlone(context: SuiteStepContext, seams: Required<SuiteStepSeam
   }
 }
 
-/** `reading` with `file` entered as its retake read: green alone, red alone, or left out when not read. */
-function entered(reading: AloneReading, how: AloneVerdict, file: string, fresh: readonly SuiteFailure[], result: SuiteResult): AloneReading {
-  if (how === 'green') return { ...reading, stepOnly: [...reading.stepOnly, stepOnlyOf(file, fresh, result)] };
-  return how === 'red'
-    ? { ...reading, redAlone: [...reading.redAlone, file] }
-    : reading;
+/** The files of `touched` that the process running `file` ran before it, in run order; none when its place was not read. */
+function touchedBefore(file: string, result: SuiteResult, touched: ReadonlySet<string>): readonly string[] {
+  return (placeOf(file, result.fileOrder ?? [])?.prefix ?? []).filter((before) => touched.has(before));
+}
+
+/** What {@link entered} reads a retake against: the step's new failures, its result, and its diff, asked for once. */
+interface StepRead {
+  readonly fresh: readonly SuiteFailure[];
+  readonly result: SuiteResult;
+  readonly touched: () => ReadonlySet<string>;
+}
+
+/**
+ * `reading` with `file` entered as its retake read: red alone, green
+ * alone after files the step's diff names, green alone and red only in
+ * the step, or left out when not read.
+ */
+function entered(reading: AloneReading, how: AloneVerdict, file: string, step: StepRead): AloneReading {
+  if (how === 'red') return { ...reading, redAlone: [...reading.redAlone, file] };
+  if (how !== 'green') return reading;
+  const touched = touchedBefore(file, step.result, step.touched());
+  return touched.length > 0
+    ? { ...reading, afterTouched: [...reading.afterTouched, { file, touched }] }
+    : { ...reading, stepOnly: [...reading.stepOnly, stepOnlyOf(file, step.fresh, step.result)] };
+}
+
+/** `read`, asked at most once: the set of the paths it answers, empty when it answers none. */
+function once(read: () => readonly string[] | null): () => ReadonlySet<string> {
+  let held: ReadonlySet<string> | null = null;
+  return () => {
+    held ??= new Set(read() ?? []);
+    return held;
+  };
 }
 
 /** Says what the retakes of `taken` files read, and how many files past the cap were left as they were. */
 function announceRetakes(reading: AloneReading, taken: number, left: number): void {
-  const unread = taken - reading.stepOnly.length - reading.redAlone.length;
+  const unread = taken - reading.stepOnly.length - reading.redAlone.length - reading.afterTouched.length;
   activeOutput().info(`   Run alone: ${reading.stepOnly.length} green (red only in the step), ${reading.redAlone.length} red again, ${unread} not read.`);
+  if (reading.afterTouched.length > 0) activeOutput().info(`   ${reading.afterTouched.length} file(s) green alone ran after files this change touches; they stay new failures.`);
   if (left > 0) activeOutput().info(`   ${left} more newly red file(s) were not run alone (the cap is ${RETAKE_ALONE_MAX_FILES}); they stay new failures.`);
 }
 
-/** `settling` with what its newly red files read when run alone; see the module note. */
-export async function retakeRedAlone(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling): Promise<Settling> {
+/**
+ * `settling` with what its newly red files read when run alone.
+ * `readTouched` answers the paths of the step's own diff, or null when
+ * it did not read. See the module note.
+ */
+export async function retakeRedAlone(context: SuiteStepContext, seams: Required<SuiteStepSeams>, settling: Settling, readTouched: () => readonly string[] | null): Promise<Settling> {
   const { kind, label, result, baseline } = settling;
   if (!context.settings.testsRetakeRedAlone) return settling;
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling)) return settling;
@@ -190,11 +263,12 @@ export async function retakeRedAlone(context: SuiteStepContext, seams: Required<
 
   const taken = files.slice(0, RETAKE_ALONE_MAX_FILES);
   activeOutput().info(`🔁 The ${label} read new failures in ${files.length} test file(s); running ${taken.length} alone, once each, to tell a file red on its own from one red only in the step's file order.`);
-  let reading: AloneReading = { stepOnly: [], redAlone: [], interrupted: false };
+  const step: StepRead = { fresh, result, touched: once(readTouched) };
+  let reading: AloneReading = { stepOnly: [], redAlone: [], afterTouched: [], interrupted: false };
   for (const [index, file] of taken.entries()) {
     const retake = await runAlone(context, seams, kind, file, index + 1);
     if (isStepInterrupted(context, retake ?? { exitCode: 0 })) return { ...settling, alone: { ...reading, interrupted: true } };
-    reading = entered(reading, aloneVerdict(retake, baseline), file, fresh, result);
+    reading = entered(reading, aloneVerdict(retake, baseline), file, step);
   }
   announceRetakes(reading, taken.length, files.length - taken.length);
   return { ...settling, alone: reading };

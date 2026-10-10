@@ -181,7 +181,8 @@ automatically, and which tests always run:**
 - `tests.retakeRedAlone` (boolean; defaults to `true`) — a task, stage or
   pre-wrap-up step runs each newly red test file alone once before it
   settles; a file green alone was red only in the step's file order and
-  blocks nothing (`context/verification.md`)
+  blocks nothing, unless a test file the step's own change touches ran
+  before it (`context/verification.md`)
 
 **A stage-end step with new failures blocks the next task.** After a
 stage's last task, the stage step runs the tests under the `Owns:`
@@ -190,7 +191,8 @@ folders the stage changed (scope `full`), or, with no `Owns:` folder,
 `affected`, reason `fallback`), joining the always-run files so they still
 pass the slow-sweep share guard. The step captures failures. If any
 failure is new against the baseline and still red when its file is run
-alone, the runner inserts a `[BLOCKED]`
+alone, or green alone after a test file the stage changed, the runner
+inserts a `[BLOCKED]`
 repair task above the first open task (`src/start/suite-blocker.ts`), its
 blocker the failures, which the repair session receives through
 `BLOCKER_PROMPT_PREFIX` in its prompt, and the run stops. A restarted run

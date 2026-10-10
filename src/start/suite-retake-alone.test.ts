@@ -11,6 +11,12 @@
  * same steps over a real `bun test`. Each claim that a file blocked
  * nothing sits beside a case where the same step, with the retake off or
  * the file red alone, does block.
+ *
+ * The diff a step is taken over, scripted through git, decides one more
+ * reading: a file green alone that ran after a test file that diff
+ * names stays a new failure. Each of those cases sits beside the same
+ * step over a diff naming no file run before it, where the file is red
+ * only in the step.
  */
 import type { SuiteStepContext } from './suite-step.js';
 import type { SessionStep } from '../loop/sessions.js';
@@ -30,7 +36,7 @@ import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
-import { blockerText } from './suite-blocker.js';
+import { blockerText, TOUCHED_BEFORE_NAMED } from './suite-blocker.js';
 import { aloneJunitFileFor, RETAKE_ALONE_MAX_FILES, STEP_ONLY_BEFORE } from './suite-retake-alone.js';
 import {
   junitFileFor,
@@ -134,6 +140,11 @@ function gitAt(paths: readonly string[] = ['src/a.ts']): GitRunner {
   return (args) => answers[args.join(' ')] ?? { ok: false, stdout: '', stderr: `unscripted: ${args.join(' ')}` };
 }
 
+/** A git at {@link HEAD} whose diff does not answer. */
+const unreadDiff: GitRunner = (args) => args[0] === 'rev-parse'
+  ? { ok: true, stdout: `${HEAD}\n`, stderr: '' }
+  : { ok: false, stdout: '', stderr: 'fatal: bad object' };
+
 /** One scripted answer: a result, or an error the run throws. */
 type Answer = SuiteResult | Error;
 
@@ -144,7 +155,7 @@ interface Seen {
 }
 
 /** A context over the temporary tracker, its runs answered in turn from `answers`, the retake on unless `retake` is false. */
-function contextWith(answers: readonly Answer[], options: { readonly retake?: boolean; readonly owns?: readonly string[] | null; readonly onRun?: (nth: number) => void } = {}): { readonly context: SuiteStepContext; readonly seen: Seen } {
+function contextWith(answers: readonly Answer[], options: { readonly retake?: boolean; readonly owns?: readonly string[] | null; readonly onRun?: (nth: number) => void; readonly diff?: readonly string[] | null } = {}): { readonly context: SuiteStepContext; readonly seen: Seen } {
   const seen: Seen = { runs: [], steps: [] };
   const queue = [...answers];
   const context: SuiteStepContext = {
@@ -172,7 +183,9 @@ function contextWith(answers: readonly Answer[], options: { readonly retake?: bo
       appendStep: (step) => {
         seen.steps.push(step);
       },
-      git: gitAt(),
+      git: options.diff === null
+        ? unreadDiff
+        : gitAt(options.diff),
       listTestFiles: () => ['src/b/b.test.ts'],
       readPreloadFiles: () => ({ state: 'read', files: [] }),
       now: () => new Date('2026-10-01T00:00:00Z'),
@@ -322,6 +335,159 @@ describe('a task step whose new failures are red alone', () => {
     expect(linesAt('warn').filter((line) => line.includes('Red only in the step'))).toHaveLength(1);
     expect(linesAt('info')).toContain(`🔁 The ${LABEL} read new failures in 2 test file(s); running 2 alone, once each, to tell a file red on its own from one red only in the step's file order.`);
     expect(linesAt('info')).toContain('   Run alone: 1 green (red only in the step), 1 red again, 0 not read.');
+  });
+});
+
+describe('a file green alone that ran after files the step\'s diff names', () => {
+  /** The blocker of a step whose one new failing file, {@link LEAKY}, ran after `touched`. */
+  const leakBlocker = (label: string, touched: readonly string[]): string => [
+    `The runner's ${label} found failures the suite baseline does not hold.`,
+    `New failing test files: ${LEAKY} (2 tests, green when run alone).`,
+    `What Bun printed for them: ${LEAKY} "${SPEND}" (2 tests).`,
+    `Green when run alone, red after files this change touches: ${LEAKY} after ${touched.join(', ')}.`,
+    `Run bun test ${[...touched, LEAKY].map((file) => `./${file}`).join(' ')} to see it fail: a file run before it leaves the state it meets.`,
+  ].join(' ');
+
+  it('keeps a task step red when the task changed a file run before it, naming that file on the repair', async () => {
+    const { context, seen } = contextWith([red([KNOWN, LEAKED, LEAKED_TWO]), result()], { diff: ['src/b.test.ts', 'src/a.ts'] });
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.repairInserted).toBe(true);
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.steps[0]?.newFailures).toEqual([LEAKED, LEAKED_TWO]);
+    expect(Object.keys(seen.steps[0] ?? {})).not.toContain('stepOnly');
+    expect(outcome.blocker).toBe(leakBlocker(LABEL, ['src/b.test.ts']));
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(outcome.blocker ?? '');
+    expect(linesAt('warn')).toEqual([]);
+    expect(linesAt('info')).toContain('   Run alone: 0 green (red only in the step), 0 red again, 0 not read.');
+    expect(linesAt('info')).toContain('   1 file(s) green alone ran after files this change touches; they stay new failures.');
+  });
+
+  it('reads the same file red only in the step when the task changed only a file run after it, or the file itself', async () => {
+    const { context, seen } = contextWith([red([KNOWN, LEAKED, LEAKED_TWO]), result()], { diff: ['src/z.test.ts', LEAKY] });
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(false);
+    expect(seen.steps[0]?.stepOnly?.map((entry) => entry.file)).toEqual([LEAKY]);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('reads the whole of the file\'s process order, past the files a stepOnly entry would name', async () => {
+    const order = ['src/first.test.ts', ...Array.from({ length: STEP_ONLY_BEFORE + 3 }, (_, index) => `src/p${index}.test.ts`), LEAKY];
+    const { context } = contextWith([red([LEAKED, LEAKED_TWO], { fileOrder: [order] }), result()], { diff: ['src/first.test.ts'] });
+    const outcome = await runTaskStep(context, input);
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toBe(leakBlocker(LABEL, ['src/first.test.ts']));
+  });
+
+  it('reads only the process that ran the file: a changed file of the step\'s other run does not count', async () => {
+    const sweep: SuiteFailure = { file: 'src/x.sweep.test.ts', name: 'sweep > leaked' };
+    const folded = red([sweep], { fileOrder: [ORDER, ['src/w.sweep.test.ts', sweep.file]] });
+    const other = contextWith([folded, result()], { diff: ['src/a.test.ts'] });
+    expect((await runTaskStep(other.context, input)).red).toBe(false);
+
+    writeFileSync(trackerPath, TRACKER, 'utf8');
+    const own = contextWith([folded, result()], { diff: ['src/w.sweep.test.ts'] });
+    const outcome = await runTaskStep(own.context, input);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`${sweep.file} after src/w.sweep.test.ts.`);
+  });
+
+  it('names the nearest changed files up to the cap, counts the rest, and runs the named ones in its command', async () => {
+    const changed = Array.from({ length: TOUCHED_BEFORE_NAMED + 2 }, (_, index) => `src/t${index}.test.ts`);
+    const { context } = contextWith([red([LEAKED], { fileOrder: [[...changed, LEAKY]] }), result()], { diff: changed });
+    const outcome = await runTaskStep(context, input);
+
+    const named = changed.slice(2);
+    expect(named).toHaveLength(TOUCHED_BEFORE_NAMED);
+    expect(outcome.blocker).toContain(`red after files this change touches: ${LEAKY} after ${named.join(', ')} and 2 more.`);
+    expect(outcome.blocker).toContain(`Run bun test ${[...named, LEAKY].map((file) => `./${file}`).join(' ')} to see it fail`);
+    expect(outcome.blocker).not.toContain('src/t1.test.ts');
+  });
+
+  it('gives a file red alone its own command, and the files green alone after a changed file theirs', async () => {
+    const { context, seen } = contextWith([red([KNOWN, BROKE, LEAKED, LEAKED_TWO]), red([BROKE]), result()], { diff: ['src/a.test.ts'] });
+    const outcome = await runTaskStep(context, input);
+
+    expect(seen.steps[0]?.newFailures).toEqual([BROKE, LEAKED, LEAKED_TWO]);
+    expect(outcome.blocker).toBe([
+      `The runner's ${LABEL} found failures the suite baseline does not hold.`,
+      `New failing test files: ${BROKEN} (1 test, red again when run alone), ${LEAKY} (2 tests, green when run alone).`,
+      `Run bun test ./${BROKEN} and make them pass.`,
+      `What Bun printed for them: ${BROKEN} "error: boom" (1 test); ${LEAKY} "${SPEND}" (2 tests).`,
+      `Green when run alone, red after files this change touches: ${LEAKY} after src/a.test.ts.`,
+      `Run bun test ./src/a.test.ts ./${LEAKY} to see it fail: a file run before it leaves the state it meets.`,
+    ].join(' '));
+  });
+
+  it('reads a repair task\'s step against the plan\'s diff, so a repair that changed nothing leaves the file a new failure', async () => {
+    const REPAIR_BASE = 'repair00';
+    const diffs: Record<string, readonly string[]> = { [REPAIR_BASE]: [], [BASE]: ['src/a.test.ts'] };
+    const git: GitRunner = (args) => {
+      const from = args[0] === 'diff'
+        ? diffs[args.at(-2) ?? '']
+        : undefined;
+      return from === undefined
+        ? gitAt()(args)
+        : { ok: true, stdout: from.map((path) => `${path}\0`).join(''), stderr: '' };
+    };
+    const repair = contextWith([red([LEAKED, LEAKED_TWO]), result()]);
+    const repairInput = { ...input, base: REPAIR_BASE, task: 'Repair the red task step at commit head1111' };
+    const outcome = await runTaskStep({ ...repair.context, seams: { ...repair.context.seams, git } }, repairInput);
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(`Green when run alone, red after files this change touches: ${LEAKY} after src/a.test.ts.`);
+
+    // The control: any other task over the same empty diff reads the file red only in the step.
+    writeFileSync(trackerPath, TRACKER, 'utf8');
+    const plain = contextWith([red([LEAKED, LEAKED_TWO]), result()]);
+    const other = await runTaskStep({ ...plain.context, seams: { ...plain.context.seams, git } }, { ...input, base: REPAIR_BASE });
+    expect(other.red).toBe(false);
+    expect(plain.seen.steps[0]?.stepOnly?.map((entry) => entry.file)).toEqual([LEAKY]);
+  });
+
+  it('keeps a stage step red when the stage changed a file run before it', async () => {
+    const { context } = contextWith([red([LEAKED, LEAKED_TWO]), result()], { diff: ['src/cli/running.test.ts'] });
+    const outcome = await runStageStep(context, { stage: 0, name: 'One' }, baseline());
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.repairInserted).toBe(true);
+    expect(outcome.blocker).toBe(leakBlocker('stage step for "One"', ['src/cli/running.test.ts']));
+  });
+
+  it('keeps a pre-wrap-up step red when the plan changed a file run before it, read against the baseline\'s commit', async () => {
+    const { context } = contextWith([red([KNOWN, LEAKED, LEAKED_TWO]), result()], { diff: ['src/a.test.ts', BROKEN] });
+    const outcome = await runPreWrapUpStep(context, baseline());
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.repairInserted).toBe(true);
+    expect(outcome.blocker).toBe(leakBlocker('pre-wrap-up step', ['src/a.test.ts', BROKEN]));
+    expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.task).toBe(`Repair the red pre-wrap-up step at commit ${HEAD}  {agent=build-error-resolver}`);
+  });
+
+  it('reads a file red only in the step when the step\'s diff did not read, a pre-wrap-up step warning that it could not check', async () => {
+    const task = contextWith([red([LEAKED]), result()], { diff: null });
+    expect((await runTaskStep(task.context, input)).red).toBe(false);
+    expect(task.seen.steps[0]?.stepOnly?.map((entry) => entry.file)).toEqual([LEAKY]);
+
+    lines = [];
+    const last = contextWith([red([LEAKED]), result()], { diff: null });
+    expect((await runPreWrapUpStep(last.context, baseline())).red).toBe(false);
+    expect(linesAt('warn')[0]).toBe(`⚠️  git diff from ${BASE} did not answer (fatal: bad object); no file green alone is checked against the files the plan changed.`);
+  });
+
+  it('reads no diff for a pre-wrap-up step with no file green alone', async () => {
+    const asked: string[] = [];
+    const { context } = contextWith([red([BROKE]), red([BROKE])]);
+    const git: GitRunner = (args) => {
+      asked.push(args[0] ?? '');
+      return gitAt()(args);
+    };
+    await runPreWrapUpStep({ ...context, seams: { ...context.seams, git } }, baseline());
+
+    expect(asked).not.toContain('diff');
   });
 });
 

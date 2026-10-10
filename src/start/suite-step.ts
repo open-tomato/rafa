@@ -123,7 +123,12 @@
  * left in the shared process: its tests leave the step's new failures,
  * the recorded step lists it under `stepOnly`, and one warning names it.
  * A step whose every new failure is such is green. A file red alone
- * stays a new failure, and the blocker says it was red again alone. A
+ * stays a new failure, and the blocker says it was red again alone. So
+ * does a file green alone that ran after a test file the step's own
+ * diff names (the task's, the stage's, or for the pre-wrap-up step and
+ * the task step of a repair task the plan's since the baseline's
+ * commit): the change under check may be what left that state, and the
+ * blocker names those files. A
  * retake ended by SIGINT makes the step a stop, as below.
  *
  * A red task, stage or pre-wrap-up step inserts a `[BLOCKED]` repair
@@ -264,7 +269,7 @@ import {
 import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
-import { blockerText, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
 import { announceStepOnly, retakeRedAlone, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
@@ -512,11 +517,21 @@ export function readHead(git: GitRunner): string | null {
     : null;
 }
 
-/** The paths changed from `from` to HEAD, or null with a warning when git does not answer. */
-export function readDiff(git: GitRunner, from: string): readonly string[] | null {
+/** What a task or stage step does when its diff does not read. */
+const FULL_SUITE_INSTEAD = 'the step runs the full suite';
+
+/** What the pre-wrap-up step loses when the plan's diff does not read (`suite-retake-alone.ts`). */
+const PLAN_DIFF_UNCHECKED = 'no file green alone is checked against the files the plan changed';
+
+/**
+ * The paths changed from `from` to HEAD, or null with a warning when
+ * git does not answer, which ends in `otherwise`: what the caller does
+ * without them.
+ */
+export function readDiff(git: GitRunner, from: string, otherwise: string = FULL_SUITE_INSTEAD): readonly string[] | null {
   const result = git(['diff', '--name-only', '-z', '--no-renames', from, 'HEAD']);
   if (result.ok) return result.stdout.split('\0').filter((path) => path !== '');
-  activeOutput().warn(`⚠️  git diff from ${from} did not answer (${gitSaid(result) || 'nothing said'}); the step runs the full suite.`);
+  activeOutput().warn(`⚠️  git diff from ${from} did not answer (${gitSaid(result) || 'nothing said'}); ${otherwise}.`);
   return null;
 }
 
@@ -764,9 +779,8 @@ function preloadOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>): 
   return reading.files;
 }
 
-/** The task step's scope, or null when the diff did not read. */
-async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput): Promise<TaskStepScope | null> {
-  const diff = readDiff(seams.git, input.base);
+/** The task step's scope over `diff`, the task's own, or null when that did not read. */
+async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, input: TaskStepInput, diff: readonly string[] | null): Promise<TaskStepScope | null> {
   if (diff === null) return null;
   const moduleLine = input.declared === 'module';
   return taskStepScope({
@@ -782,6 +796,19 @@ async function taskScopeOf(context: SuiteStepContext, seams: Required<SuiteStepS
   });
 }
 
+/**
+ * Reads the plan's diff when asked: from the baseline's commit to HEAD,
+ * or `without` when the baseline holds no commit. It is what a
+ * pre-wrap-up step, and the task step of a repair task, check their
+ * files green alone against (`suite-retake-alone.ts`).
+ */
+function planDiffReader(seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null, without: readonly string[] | null): () => readonly string[] | null {
+  const commit = baseline?.commit ?? null;
+  return () => (commit === null
+    ? without
+    : readDiff(seams.git, commit, PLAN_DIFF_UNCHECKED));
+}
+
 /** Runs the step's own run, then its always-run run unless there is none or the first was a stop, folded into one result. */
 export async function runWithAlwaysRun(context: SuiteStepContext, seams: Required<SuiteStepSeams>, kind: 'task' | 'stage', runs: StepRuns): Promise<SuiteResult> {
   const first = await runOne(context, seams, kind, runs.narrowing);
@@ -794,7 +821,8 @@ export async function runWithAlwaysRun(context: SuiteStepContext, seams: Require
 /** Runs the task step after a task commits; see the module note. */
 export async function runTaskStep(context: SuiteStepContext, input: TaskStepInput): Promise<StepOutcome> {
   const seams = seamsOf(context);
-  const scope = await taskScopeOf(context, seams, input);
+  const diff = readDiff(seams.git, input.base);
+  const scope = await taskScopeOf(context, seams, input, diff);
   const runs = scope === null || scope.scope === 'full'
     ? { narrowing: {}, alwaysRun: [], timed: [] }
     : taskNarrowing(scope, input.base, readTaskAlwaysRun(seams.git, context.settings.testsAlwaysRun));
@@ -804,7 +832,10 @@ export async function runTaskStep(context: SuiteStepContext, input: TaskStepInpu
   const checks = await taskDiffChecks(context, seams, input, result);
   const settling: Settling = { kind: 'task', scope: recorded, reason: taskStepReason(scope), label, result, baseline: input.baseline, repair: { kind: 'task', task: input.task }, ...checks };
   const retaken = await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'task', runs));
-  const outcome = settleStep(context, seams, await retakeRedAlone(context, seams, retaken));
+  const touched = isRepairTask(input.task)
+    ? planDiffReader(seams, input.baseline, diff)
+    : () => diff;
+  const outcome = settleStep(context, seams, await retakeRedAlone(context, seams, retaken, touched));
   const timedIn = runs.alwaysRun.length > 0
     ? alwaysRunJunitFileFor(context.repoRoot, context.sessionId)
     : junitFileFor(context.repoRoot, context.sessionId, 'task');
@@ -818,7 +849,7 @@ export async function runPreWrapUpStep(context: SuiteStepContext, baseline: Suit
   const result = await runOne(context, seams, 'pre-wrap-up', {});
   const settling: Settling = { kind: 'pre-wrap-up', scope: 'full', label: 'pre-wrap-up step', result, baseline, repair: { kind: 'pre-wrap-up' } };
   const retaken = await retakeOnErrors(context, seams, settling, () => runOne(context, seams, 'pre-wrap-up', {}));
-  return settleStep(context, seams, await retakeRedAlone(context, seams, retaken));
+  return settleStep(context, seams, await retakeRedAlone(context, seams, retaken, planDiffReader(seams, baseline, null)));
 }
 
 /** What {@link planOwnsReader} reads the folders with. */

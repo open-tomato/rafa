@@ -98,8 +98,9 @@ will run:
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
 - `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
   stage or pre-wrap-up step runs each newly red test file alone once
-  before it settles, so that a file green alone blocks nothing; read
-  "A newly red file is run alone once" below
+  before it settles, so that a file green alone blocks nothing unless a
+  test file the step's own change touches ran before it; read "A newly
+  red file is run alone once" below
 
 **The baseline is the `baseline` step's recorded failures.** A failure
 is identified by its test file path and full test name (the pair the
@@ -107,7 +108,8 @@ JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
 means it is new. Only new failures make a step red, and of those only
-the ones still red when their file is run alone (below). A red task or stage
+the ones still red when their file is run alone, or green alone after a
+test file the step's own change touches (below). A red task or stage
 step inserts a `[BLOCKED]` repair task above the first open plan task,
 which it leaves as it was: the repair's text names the commit the step
 ran at (`Repair the red task step at commit <sha>`), its declaration is
@@ -206,7 +208,8 @@ the baseline holds is never retaken, and at most 20 files are
 reads one of three ways:
 
 - **Green alone** (a summary, a JUnit file that read, no error outside
-  any test, no failure the baseline does not hold): the file was red
+  any test, no failure the baseline does not hold), and no file the
+  step's own change touches ran before it: the file was red
   only in the step. Its tests leave the step's new failures, so a step
   whose every new failure is such is green and the run goes on, with no
   blocker and no repair task. The recorded step lists the file under
@@ -216,6 +219,27 @@ reads one of three ways:
   look for the state it met. One warning per file says the same, as
   `Red only in the step: <file> read 21 tests failing ... file 12 of its
   run, after <files>. First error: "...". Capture: <output file>`.
+- **Green alone, after a file the step's own change touches**: the
+  file stays a new failure. The state it met may be what the change
+  under check leaves behind: a task that adds `a.test.ts`, which sets a
+  value, reddens `b.test.ts` after it in every step from then on, and
+  reading `b` as red only in the step would let that through each one.
+  So the step reads its own diff (the task's since its base, the
+  stage's, and for the pre-wrap-up step the plan's since the baseline's
+  commit) against every file the process ran BEFORE the file, not the
+  five of `before` alone. The task step of a repair task reads the
+  plan's diff too, so a repair that changed nothing is not ticked by an
+  empty diff of its own. The blocker says so after the count, as
+  `src/b.test.ts (1 test, green when run alone)`, leaves the file out
+  of the `make them pass` command, which would run it green, and adds
+  `Green when run alone, red after files this change touches:
+  src/b.test.ts after src/a.test.ts. Run bun test ./src/a.test.ts
+  ./src/b.test.ts to see it fail`, naming the nearest five changed
+  files (`TOUCHED_BEFORE_NAMED`) and counting the rest. A changed file
+  run after the file, the file itself, and a changed file that is no
+  test file of that process count for nothing. A diff git will not
+  answer, a baseline with no commit and a file the step's file order
+  does not hold are read as the first bullet reads them.
 - **Red alone**: the file stays a new failure, and the blocker says so
   after its count, as `src/a.test.ts (2 tests, red again when run
   alone)`. When a step holds both kinds, the repair task is for the red

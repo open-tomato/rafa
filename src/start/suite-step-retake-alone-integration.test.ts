@@ -13,10 +13,15 @@
  * the step and green alone: the shape issue 926 measured on
  * `src/utils/claude.test.ts`.
  *
- * Three cases share that project:
+ * Four cases share that project:
  *
- *   - the retake on: the step reads green, records `b-reads` under
- *     `stepOnly` with `a-sets` before it, and inserts no repair task;
+ *   - the retake on, the stage's diff naming neither test file: the step
+ *     reads green, records `b-reads` under `stepOnly` with `a-sets`
+ *     before it, and inserts no repair task;
+ *   - the same, the stage's diff naming `a-sets`, as a stage that added
+ *     it would: `b-reads` is green alone and stays a new failure, since
+ *     the file run before it is the stage's own, and the repair task
+ *     names `a-sets` and the command that runs the two in order;
  *   - the retake off (`tests.retakeRedAlone: false`), the control that
  *     the first case's green is the retake's doing: the same step is
  *     red, and inserts a repair task for `b-reads`;
@@ -25,7 +30,8 @@
  *     when run alone, and quotes the error Bun printed.
  *
  * Git is scripted (HEAD, and the stage's diff naming a file under
- * `leak/`), the record append is collected, and everything else is the
+ * `leak/`: `value.ts`, or `a-sets.test.ts` for the second case), the
+ * record append is collected, and everything else is the
  * step's own: `runSuite`'s real spawner, the real test-file walk, a real
  * tracker file.
  */
@@ -133,14 +139,17 @@ const GREEN_BASELINE: SuiteBaseline = baselineOf(
   BASE,
 );
 
-/** A scripted git: HEAD, and a stage diff from {@link BASE} naming one file under `leak/`. */
-const git: GitRunner = (args) => {
+/** The file under `leak/` a stage's diff names when it touches no test file. */
+const UNTESTED = 'leak/value.ts';
+
+/** A scripted git: HEAD, and a stage diff from {@link BASE} naming `changed`, one file under `leak/`. */
+function gitChanging(changed: string): GitRunner {
   const answers: Record<string, GitResult> = {
     'rev-parse --verify HEAD^{commit}': { ok: true, stdout: `${HEAD}\n`, stderr: '' },
-    [`diff --name-only -z --no-renames ${BASE} HEAD`]: { ok: true, stdout: 'leak/value.ts\0', stderr: '' },
+    [`diff --name-only -z --no-renames ${BASE} HEAD`]: { ok: true, stdout: `${changed}\0`, stderr: '' },
   };
-  return answers[args.join(' ')] ?? { ok: false, stdout: '', stderr: `unscripted: ${args.join(' ')}` };
-};
+  return (args) => answers[args.join(' ')] ?? { ok: false, stdout: '', stderr: `unscripted: ${args.join(' ')}` };
+}
 
 /** What one case ran and left. */
 interface Driven {
@@ -152,8 +161,8 @@ interface Driven {
 
 let scratches = 0;
 
-/** Plants the scratch project and runs the stage step of `Leak` over it. */
-async function drive(options: { readonly retake: boolean; readonly broken: boolean }): Promise<Driven> {
+/** Plants the scratch project and runs the stage step of `Leak` over it, the stage's diff naming `changed`, {@link UNTESTED} when left out. */
+async function drive(options: { readonly retake: boolean; readonly broken: boolean; readonly changed?: string }): Promise<Driven> {
   scratches += 1;
   const repo = join(tempRoot, `scratch-${scratches}`);
   mkdirSync(join(repo, 'leak'), { recursive: true });
@@ -171,7 +180,7 @@ async function drive(options: { readonly retake: boolean; readonly broken: boole
     sessionId: SESSION,
     settings: { testsFullSuiteTriggers: [], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: options.retake },
     owns: () => Promise.resolve(['leak']),
-    seams: { git, appendStep: (step) => steps.push(step) },
+    seams: { git: gitChanging(options.changed ?? UNTESTED), appendStep: (step) => steps.push(step) },
   };
   const outcome = await runStageStep(context, { stage: 0, name: 'Leak' }, GREEN_BASELINE);
   return { repo, trackerPath, outcome, steps };
@@ -214,6 +223,29 @@ describe('a stage step over a real bun test, one file failed by the file before 
       + `Capture: .rafa/runs/${SESSION}/suite/stage.output.txt. It blocks nothing and gets no repair task.`,
     ]);
     expect(lines.filter((line) => line.level === 'error')).toEqual([]);
+  }, CASE_TIMEOUT_MS);
+
+  it('stays red when the stage\'s diff names the file run before it, its repair task naming that file and the command that runs both', async () => {
+    const { repo, trackerPath, outcome, steps } = await drive({ retake: true, broken: false, changed: SETS });
+
+    expect(outcome.red).toBe(true);
+    expect(outcome.repairInserted).toBe(true);
+    expect(steps[0]?.newFailures).toEqual([{ file: READS, name: READS_CASE, errorLines: ['error: leaked state: another test file set the value'] }]);
+    expect(Object.keys(steps[0] ?? {})).not.toContain('stepOnly');
+    expect(outcome.blocker).toBe([
+      'The runner\'s stage step for "Leak" found failures the suite baseline does not hold.',
+      `New failing test files: ${READS} (1 test, green when run alone).`,
+      `What Bun printed for them: ${READS} "error: leaked state: another test file set the value" (1 test).`,
+      `Green when run alone, red after files this change touches: ${READS} after ${SETS}.`,
+      `Run bun test ./${SETS} ./${READS} to see it fail: a file run before it leaves the state it meets.`,
+    ].join(' '));
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.status).toBe('blocked');
+    expect(next?.task).toBe(`Repair the red stage step at commit ${HEAD}  {agent=build-error-resolver}`);
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+    // The retake ran and read green: the file is not broken on its own.
+    expect(suiteFile(repo, 'stage-alone-1.output.txt')).toContain(' 1 pass\n 0 fail\n');
+    expect(lines.filter((line) => line.level === 'warn')).toEqual([]);
   }, CASE_TIMEOUT_MS);
 
   it('is red on the same project with the retake off, inserting a repair task for the file', async () => {

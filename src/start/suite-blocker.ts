@@ -20,7 +20,16 @@
  * green alone is no longer among the new failures; the blocker's last
  * sentence lists each with its count, as red only in the step and not
  * the repair's to fix, so a session that sees one fail in a wider run
- * leaves it. A file not run alone, past the retake's cap or one whose
+ * leaves it. A file green alone that ran after test files the step's own
+ * diff names stays a new failure
+ * ({@link AloneReading.afterTouched}): its count is followed by `green
+ * when run alone`, it is left out of the `make them pass` command, which
+ * would run it green, and a sentence of its own names it with the
+ * changed files run before it, the nearest {@link TOUCHED_BEFORE_NAMED}
+ * and a count of the rest, for the first {@link AFTER_TOUCHED_NAMED}
+ * such files, then the command that runs those changed files and the
+ * file in the step's order, which is what fails it. A file not run
+ * alone, past the retake's cap or one whose
  * retake did not read, is named with its count alone. Errors outside any test
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
@@ -62,7 +71,7 @@
  * repair blocked again ({@link RepairWritten.inserted} false), which the
  * caller halts on.
  */
-import type { AloneReading } from './suite-retake-alone.js';
+import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
 
@@ -198,6 +207,47 @@ function errorsText(newErrors: number, errors: readonly UnhandledError[]): strin
 /** What follows the count of a file whose retake alone was red too. */
 const RED_ALONE_NOTE = ', red again when run alone';
 
+/** What follows the count of a file green alone that ran after files the step's diff names. */
+const GREEN_ALONE_NOTE = ', green when run alone';
+
+/** The most changed files the blocker names before one file green alone, the nearest ones; the rest are counted. */
+export const TOUCHED_BEFORE_NAMED = 5;
+
+/** The most files green alone after changed files the blocker names with those files; the rest are counted. */
+export const AFTER_TOUCHED_NAMED = 5;
+
+/** What of a step's retakes alone the blocker says; see the module note. */
+export type AloneSaid = Pick<AloneReading, 'stepOnly' | 'redAlone'> & Partial<Pick<AloneReading, 'afterTouched'>>;
+
+/** One file green alone, as `<file> after <changed files>`, the nearest {@link TOUCHED_BEFORE_NAMED} named. */
+function afterTouchedName(entry: AfterTouched): string {
+  const named = entry.touched.slice(-TOUCHED_BEFORE_NAMED);
+  const left = entry.touched.length - named.length;
+  const more = left > 0
+    ? ` and ${left} more`
+    : '';
+  return `${entry.file} after ${named.join(', ')}${more}`;
+}
+
+/**
+ * The blocker's sentences on the files green alone that ran after files
+ * the step's diff names: each with those files, and the one command
+ * running the named changed files and then the files themselves.
+ */
+function afterTouchedText(entries: readonly AfterTouched[]): string {
+  const listed = entries.slice(0, AFTER_TOUCHED_NAMED);
+  const left = entries.length - listed.length;
+  const more = left > 0
+    ? [`and ${left} more files`]
+    : [];
+  const before = listed.flatMap((entry) => entry.touched.slice(-TOUCHED_BEFORE_NAMED));
+  const paths = [...new Set([...before, ...listed.map((entry) => entry.file)])];
+  const seen = listed.length === 1
+    ? 'to see it fail: a file run before it leaves the state it meets'
+    : 'to see them fail: a file run before them leaves the state they meet';
+  return `Green when run alone, red after files this change touches: ${[...listed.map(afterTouchedName), ...more].join('; ')}. Run bun test ${paths.map(runnablePath).join(' ')} ${seen}.`;
+}
+
 /** How the blocker opens its list of the files red in the step and green alone. */
 const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
 
@@ -209,18 +259,23 @@ const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
  * what the step's newly red files read when run alone, when they were:
  * see the module note.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: Pick<AloneReading, 'stepOnly' | 'redAlone'>): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: AloneSaid): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
+  const afterTouched = (alone?.afterTouched ?? []).filter((entry) => files.some(([file]) => file === entry.file));
   if (files.length > 0) {
-    const redAlone = new Set(alone?.redAlone ?? []);
-    const named = files.map(([file, count]) => `${file} (${testCount(count)}${redAlone.has(file)
-      ? RED_ALONE_NOTE
-      : ''})`);
-    parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => runnablePath(file)).join(' ')} and make them pass.`);
+    const notes = new Map([
+      ...(alone?.redAlone ?? []).map((file) => [file, RED_ALONE_NOTE] as const),
+      ...afterTouched.map((entry) => [entry.file, GREEN_ALONE_NOTE] as const),
+    ]);
+    const named = files.map(([file, count]) => `${file} (${testCount(count)}${notes.get(file) ?? ''})`);
+    parts.push(`New failing test files: ${named.join(', ')}.`);
+    const run = files.filter(([file]) => notes.get(file) !== GREEN_ALONE_NOTE).map(([file]) => runnablePath(file));
+    if (run.length > 0) parts.push(`Run bun test ${run.join(' ')} and make them pass.`);
     const quoted = quotedErrors(verdict.fresh);
     if (quoted !== null) parts.push(`What Bun printed for them: ${quoted}.`);
   }
+  if (afterTouched.length > 0) parts.push(afterTouchedText(afterTouched));
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
   const stepOnly = alone?.stepOnly ?? [];
