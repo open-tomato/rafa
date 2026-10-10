@@ -198,6 +198,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
   `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
+  `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # a step reruns each newly red test file alone; green alone blocks nothing`,
 ]);
 
 /** The line every file opens its settings with. */

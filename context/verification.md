@@ -96,13 +96,18 @@ will run:
   named in `[test] preload` of `bunfig.toml`)
 - `tests.integration` (glob list, defaults to `**/*-integration.test.ts`,
   `**/*.integration.test.ts`, `**/*-spawned*.test.ts`, `**/*-cli.test.ts`)
+- `tests.retakeRedAlone` (boolean, defaults to `true`) — whether a task,
+  stage or pre-wrap-up step runs each newly red test file alone once
+  before it settles, so that a file green alone blocks nothing; read
+  "A newly red file is run alone once" below
 
 **The baseline is the `baseline` step's recorded failures.** A failure
 is identified by its test file path and full test name (the pair the
 JUnit reporter captures). When a step after the baseline reports failures,
 the runner compares each failure's file + name pair against the baseline's
 captured set: a match means the failure was already present, a mismatch
-means it is new. Only new failures make a step red. A red task or stage
+means it is new. Only new failures make a step red, and of those only
+the ones still red when their file is run alone (below). A red task or stage
 step inserts a `[BLOCKED]` repair task above the first open plan task,
 which it leaves as it was: the repair's text names the commit the step
 ran at (`Repair the red task step at commit <sha>`), its declaration is
@@ -185,11 +190,56 @@ which is what the repair session reads. A case whose `(fail)` line is
 not found on stderr, or that printed nothing, carries no lines, and the
 blocker then names its file and count alone.
 
+**A newly red file is run alone once, and one green alone is red only
+in the step.** `bun test` runs the files of one selection in one
+process, one after another, so a module-level value one test file
+leaves behind is read by every file after it. A file failed that way
+is green from a shell and green in the repair session handed it: on
+2026-10-10 one run inserted five repair tasks for
+`src/utils/claude.test.ts`, 21 cases red in the runner's steps only,
+and each repair session reran it, found it green and changed nothing.
+So a task, stage or pre-wrap-up step that reads new failures runs each
+newly red test file alone, as `bun test ./<file>`, one process per
+file, before it settles (`src/start/suite-retake-alone.ts`); a failure
+the baseline holds is never retaken, and at most 20 files are
+(`RETAKE_ALONE_MAX_FILES`), the rest staying new failures. Each retake
+reads one of three ways:
+
+- **Green alone** (a summary, a JUnit file that read, no error outside
+  any test, no failure the baseline does not hold): the file was red
+  only in the step. Its tests leave the step's new failures, so a step
+  whose every new failure is such is green and the run goes on, with no
+  blocker and no repair task. The recorded step lists the file under
+  `stepOnly`, with its tests, the error lines of the first, its
+  `position` in the order its process ran the files, and `before`, the
+  five files run just before it (`STEP_ONLY_BEFORE`), which is where to
+  look for the state it met. One warning per file says the same, as
+  `Red only in the step: <file> read 21 tests failing ... file 12 of its
+  run, after <files>. First error: "...". Capture: <output file>`.
+- **Red alone**: the file stays a new failure, and the blocker says so
+  after its count, as `src/a.test.ts (2 tests, red again when run
+  alone)`. When a step holds both kinds, the repair task is for the red
+  ones, and the blocker's last sentence lists the others as
+  `Red only in the step, green alone: not yours to fix: <file> (N
+  tests)`.
+- **Not read** (no summary, no JUnit file, or a run that could not be
+  spawned): the file stays a new failure, and nothing is said of how it
+  ran alone.
+
+A retake ended by SIGINT makes the step a stop, as the step's own run
+would. Each retake writes `<kind>-alone-<n>.junit.xml` and
+`<kind>-alone-<n>.output.txt` beside the step's own files, which it
+leaves as they were. `tests.retakeRedAlone: false` turns the retake
+off, and the step then blocks on every new failure as it did before the
+key.
+
 **The run record stores failures in `.rafa/runs/<run-id>.json`.** Each
 step's `failures` array holds the test file + name pairs it observed.
 The `newFailures` array in each step lists only the failures not present
 in the baseline, each with the `errorLines` Bun printed for it when it
-printed any. The runner writes these arrays as each step completes,
+printed any. A step that found files red only in the step lists them
+under `stepOnly`, and their tests are in `failures` and not in
+`newFailures`. The runner writes these arrays as each step completes,
 and the loop reads them to decide what to report to the next task.
 
 **Known baseline failures are documented on this page.** Some tests fail

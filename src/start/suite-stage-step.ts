@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { activeOutput } from '../adapters/output/active.js';
 import { stageStepScope } from '../suite/scope.js';
 
+import { retakeRedAlone } from './suite-retake-alone.js';
 import {
   addToLedger,
   dueStages,
@@ -103,7 +104,8 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   const runs = stageRuns(context, seams, run);
   const result = await runWithAlwaysRun(context, seams, 'stage', runs);
   const settling: Settling = { kind: 'stage', scope: recordedScope(run), reason: stageStepReason(run), label, result, baseline, repair: { kind: 'stage' } };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs)));
+  const retaken = await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs));
+  const outcome = settleStep(context, seams, await retakeRedAlone(context, seams, retaken));
   if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;
 }

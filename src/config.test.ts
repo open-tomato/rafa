@@ -170,6 +170,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'testsFullSuiteTriggers',
   'testsIntegration',
   'testsAlwaysRun',
+  'testsRetakeRedAlone',
 ];
 
 /** The block under "Config schema" in the phase 1 spec, as defaults. */
@@ -261,6 +262,7 @@ const DEFAULTS: RafaConfig = {
     '**/*-cli.test.ts',
   ],
   testsAlwaysRun: ['src/**/*.sweep.test.ts'],
+  testsRetakeRedAlone: true,
 };
 
 /**
@@ -383,6 +385,7 @@ const FULL = [
   '  fullSuiteTriggers: [package.json, "test/preload.ts"]',
   '  integration: []',
   '  alwaysRun: [src/sweeps/*.test.ts]',
+  '  retakeRedAlone: false',
   '',
 ].join('\n');
 
@@ -481,6 +484,7 @@ const FULL_VALUES: RafaConfig = {
   testsFullSuiteTriggers: ['package.json', 'test/preload.ts'],
   testsIntegration: [],
   testsAlwaysRun: ['src/sweeps/*.test.ts'],
+  testsRetakeRedAlone: false,
 };
 
 /**
@@ -1089,6 +1093,11 @@ describe('parseConfigText', () => {
         'tests.alwaysRun', 'tests:\n  alwaysRun: { sweeps: true }',
         'tests.alwaysRun is a mapping, expected a list of glob patterns',
         'tests:\n  alwaysRun: ["**/*.sweep.test.ts"]', 'testsAlwaysRun', ['**/*.sweep.test.ts'],
+      ],
+      [
+        'tests.retakeRedAlone', 'tests:\n  retakeRedAlone: off',
+        'tests.retakeRedAlone is "off", expected true or false',
+        'tests:\n  retakeRedAlone: false', 'testsRetakeRedAlone', false,
       ],
     ];
 

@@ -35,7 +35,10 @@
  * (`suite-blocker.ts`), so the run stops and that repair is dispatched
  * first on the next run, handed the blocker text through
  * `BLOCKER_PROMPT_PREFIX` (`start/dispatch.ts`), exactly as a blocked
- * task's own is.
+ * task's own is. A step whose new failures were all green when their
+ * files were run alone (`start/suite-retake-alone.ts`) answers as a
+ * green one: it has warned, written nothing on the tracker, and the run
+ * goes on.
  *
  * ## A red pre-wrap-up step
  *

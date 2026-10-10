@@ -11,7 +11,17 @@
  * tests printed it, the first {@link ERROR_LINES_QUOTED} lines of a file
  * and the first {@link ERROR_FILES_QUOTED} files, the rest counted. A
  * file whose failures carry no line is left out of that sentence, and
- * the sentence is left out when none does. Errors outside any test
+ * the sentence is left out when none does.
+ *
+ * A step that reran its newly red files alone (`suite-retake-alone.ts`)
+ * hands the reading on. A file red again alone has that said after its
+ * count, `src/a.test.ts (2 tests, red again when run alone)`: it fails
+ * on its own, so the command the blocker gives reproduces it. A file
+ * green alone is no longer among the new failures; the blocker's last
+ * sentence lists each with its count, as red only in the step and not
+ * the repair's to fix, so a session that sees one fail in a wider run
+ * leaves it. A file not run alone, past the retake's cap or one whose
+ * retake did not read, is named with its count alone. Errors outside any test
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
@@ -52,6 +62,7 @@
  * repair blocked again ({@link RepairWritten.inserted} false), which the
  * caller halts on.
  */
+import type { AloneReading } from './suite-retake-alone.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
 
@@ -184,23 +195,36 @@ function errorsText(newErrors: number, errors: readonly UnhandledError[]): strin
   return `${counted}; Bun's stderr named them as ${unhandledNames(errors)}.${run}`;
 }
 
+/** What follows the count of a file whose retake alone was red too. */
+const RED_ALONE_NOTE = ', red again when run alone';
+
+/** How the blocker opens its list of the files red in the step and green alone. */
+const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
+
 /**
  * The blocker a red step writes: the new failing files with their
  * counts, the command running them and what Bun printed for them, then
  * the errors outside any test by file and first line, or the missing
- * summary, when those made it red. `label` names the step.
+ * summary, when those made it red. `label` names the step. `alone` is
+ * what the step's newly red files read when run alone, when they were:
+ * see the module note.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: Pick<AloneReading, 'stepOnly' | 'redAlone'>): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   if (files.length > 0) {
-    const named = files.map(([file, count]) => `${file} (${testCount(count)})`);
+    const redAlone = new Set(alone?.redAlone ?? []);
+    const named = files.map(([file, count]) => `${file} (${testCount(count)}${redAlone.has(file)
+      ? RED_ALONE_NOTE
+      : ''})`);
     parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => runnablePath(file)).join(' ')} and make them pass.`);
     const quoted = quotedErrors(verdict.fresh);
     if (quoted !== null) parts.push(`What Bun printed for them: ${quoted}.`);
   }
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
+  const stepOnly = alone?.stepOnly ?? [];
+  if (stepOnly.length > 0) parts.push(`${STEP_ONLY_LEAD}: ${stepOnly.map((entry) => `${entry.file} (${testCount(entry.tests.length)})`).join(', ')}.`);
   return parts.join(' ');
 }
 

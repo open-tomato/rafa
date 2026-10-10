@@ -31,6 +31,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   failedCasesLines,
+  failingFilesOf,
   MAX_ERROR_LINE_LENGTH,
   MAX_ERROR_LINES,
   MAX_FAILED_CASES,
@@ -203,6 +204,16 @@ describe('withErrorLines', () => {
     expect(withErrorLines([{ file: 'dup.test.ts', name: 'same' }], cases)).toEqual([
       { file: 'dup.test.ts', name: 'same', errorLines: ['error: expect(received).toBe(expected)', 'Expected: 2', 'Received: 1'] },
     ]);
+  });
+});
+
+describe('failingFilesOf', () => {
+  it('answers each file once, in the order first named', () => {
+    const failures = parseJunitFailures(fixture('failed-cases.junit.xml')) ?? [];
+    // Control: the report names `sub/two.test.ts` three times.
+    expect(failures.filter((failure) => failure.file === 'sub/two.test.ts')).toHaveLength(3);
+    expect(failingFilesOf(failures)).toEqual(CASES_FILES);
+    expect(failingFilesOf([])).toEqual([]);
   });
 });
 

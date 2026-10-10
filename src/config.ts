@@ -426,6 +426,7 @@ function readLayer(
     testsFullSuiteTriggers: read('testsFullSuiteTriggers'),
     testsIntegration: read('testsIntegration'),
     testsAlwaysRun: read('testsAlwaysRun'),
+    testsRetakeRedAlone: read('testsRetakeRedAlone'),
   };
   return { layer, problems, extras };
 }

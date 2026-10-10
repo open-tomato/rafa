@@ -42,7 +42,10 @@
  * blocker on its repair task. The folded result holds both commands,
  * joined by `;`, the failures of both with each test file and name pair
  * once (a changed sweep can run in both), the errors of both summed, the
- * errors outside any test of both in run order, and both summary lines. Its exit code is the stop code when either run
+ * errors outside any test of both in run order, both summary lines, and
+ * each run's file order as its own list (`SuiteResult.fileOrder`), the
+ * first run's first, since each run is its own `bun test` process and a
+ * file's place is read within the process it ran in. Its exit code is the stop code when either run
  * ended on it, so a SIGINT during either run still reads as a stop; else
  * the exit code of a run that exited nonzero with no summary line and
  * held test files, with the summary dropped, so the step reads that run
@@ -131,6 +134,11 @@ function foldedJunit(first: SuiteResult, second: SuiteResult): JunitReading {
     : 'missing';
 }
 
+/** The file order of each run, the first run's first; a result holding none keeps its place with an empty list. */
+function foldedFileOrder(first: SuiteResult, second: SuiteResult): readonly (readonly string[])[] {
+  return [...(first.fileOrder ?? [[]]), ...(second.fileOrder ?? [[]])];
+}
+
 /**
  * The task step's run and its always-run run as one result, which the
  * step settles once. `stopCode` is the exit code read as SIGINT. See the
@@ -145,6 +153,7 @@ export function foldResults(first: SuiteResult, second: SuiteResult, stopCode: n
     errors: foldedErrors(first, second),
     junit: foldedJunit(first, second),
     unhandled: [...first.unhandled, ...second.unhandled],
+    fileOrder: foldedFileOrder(first, second),
   };
   return first.noTestFiles === true && second.noTestFiles === true
     ? { ...folded, noTestFiles: true }

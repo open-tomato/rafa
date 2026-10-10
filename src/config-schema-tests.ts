@@ -1,6 +1,7 @@
 /**
  * The `tests` section of the config schema: the three settings the
- * runner reads when it chooses which tests a recorded step runs, each
+ * runner reads when it chooses which tests a recorded step runs, and the
+ * one that says whether a step reruns a newly red file alone, each
  * one's field, its default, its spec and its reader. `config-schema.ts`'s
  * `RafaConfig` extends {@link TestsSettings}, and its `CONFIG_DEFAULTS`
  * and `SETTINGS` spread the objects below last, after the `task`
@@ -9,12 +10,12 @@
  * The section has its own module, as `config-schema-release.ts` does,
  * because `config-sections.ts` stood at 699 lines, measured with
  * `wc -l`, when these keys were added, and takes nothing new under the
- * 800-line cap of `context/source.md`. The one reader all three keys share,
- * {@link globList}, is a rule about a VALUE and sits here all the same,
- * for that reason. Only `config-schema.ts` imports this file; a caller
- * reads these settings off the resolved `RafaConfig`.
+ * 800-line cap of `context/source.md`. The one reader the three glob keys
+ * share, {@link globList}, is a rule about a VALUE and sits here all the
+ * same, for that reason. Only `config-schema.ts` imports this file; a
+ * caller reads these settings off the resolved `RafaConfig`.
  *
- * ## The three keys
+ * ## The three glob keys
  *
  * `.rafa/plans/PLAN-rafa-479-loop-task-sessions-run.md` names the first
  * two, and the plan `rafa-683-content-sweeps-lint-run` the third. Each
@@ -54,7 +55,7 @@
  *     (`start/task-always-run.ts`), running those files beside a
  *     `module` or `affected` scope.
  *
- * An empty list is a value every key accepts, and means what it says:
+ * An empty list is a value every glob key accepts, and means what it says:
  * no file triggers the full suite beyond the preload files, a stage
  * runs no integration tier, or a task runs no sweep beside its scoped
  * tests. It is not read as "the default", since a list written `[]`
@@ -71,15 +72,36 @@
  * pattern: `Bun.Glob` builds a matcher from any string, so there is no
  * malformed glob to refuse.
  *
- * No key here is a `CommandLineSetting`: each is a list, which the
- * command line has no spelling for, as `config-schema.ts` says.
+ * ## The switch
+ *
+ * `tests.retakeRedAlone` says whether a task, stage or pre-wrap-up step
+ * that reads new failures reruns each newly red test file alone, once,
+ * before it settles (`start/suite-retake-alone.ts`). A file green alone
+ * was red only in the step's own file order, by state another test file
+ * left in the shared process, and is reported as such rather than handed
+ * to a repair task (issue 926: one run of 2026-10-10 inserted five repair
+ * tasks for a file each repair session found green). Two readings:
+ *
+ *   - It defaults to `true`. The retake costs one `bun test <file>` per
+ *     newly red file and only on a step already red, and what it saves is
+ *     a repair session per order-dependent file. `false` keeps the step
+ *     as it was before the key: every new failure blocks, and no file is
+ *     run a second time.
+ *   - It is read through `flag` (`config-sections.ts`), a YAML boolean
+ *     and nothing spelled like one, as `status.notice` is.
+ *
+ * No key here is a `CommandLineSetting`: three are lists, which the
+ * command line has no spelling for, as `config-schema.ts` says, and the
+ * switch is none for the reason the `pr` section gives
+ * (`config-schema-readings.ts`): a global flag nobody typed would be one
+ * this module invented.
  */
 import type { SettingSpec } from './config-schema.js';
 import type { Reader } from './config-sections.js';
 
 import { isAbsolute } from 'node:path';
 
-import { listOf, refused, text } from './config-sections.js';
+import { flag, listOf, refused, text } from './config-sections.js';
 
 /** The `tests` section's settings, resolved. */
 export interface TestsSettings {
@@ -98,6 +120,11 @@ export interface TestsSettings {
    * changed-file selection. `tests.alwaysRun`.
    */
   testsAlwaysRun: readonly string[];
+  /**
+   * Whether a step reading new failures reruns each newly red test file
+   * alone, once, before it settles. `tests.retakeRedAlone`.
+   */
+  testsRetakeRedAlone: boolean;
 }
 
 /** What a glob-list entry is described as when it is refused. */
@@ -112,7 +139,7 @@ const repoGlob: Reader<string> = (raw, at) => typeof raw === 'string' && isAbsol
   : text(GLOB_PATTERN)(raw, at);
 
 /**
- * The reader every `tests` setting shares: a list of glob patterns, each
+ * The reader the three glob settings share: a list of glob patterns, each
  * relative to the repository root, answered frozen in the order written.
  */
 export const globList: Reader<readonly string[]> = listOf(repoGlob, 'glob patterns');
@@ -133,6 +160,7 @@ export const TESTS_DEFAULTS: Readonly<TestsSettings> = Object.freeze({
     '**/*-cli.test.ts',
   ]),
   testsAlwaysRun: Object.freeze(['src/**/*.sweep.test.ts']),
+  testsRetakeRedAlone: true,
 });
 
 /** The `tests` section's setting specs, in the order problems are reported. */
@@ -146,4 +174,5 @@ export const TESTS_SETTINGS: {
   },
   testsIntegration: { key: 'tests.integration', read: globList, cli: false },
   testsAlwaysRun: { key: 'tests.alwaysRun', read: globList, cli: false },
+  testsRetakeRedAlone: { key: 'tests.retakeRedAlone', read: flag, cli: false },
 };

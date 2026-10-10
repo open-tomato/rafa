@@ -125,6 +125,22 @@
  * error line for, or whose `(fail)` line was not found. The lines are
  * not part of what identifies a failure: a baseline compares the pair
  * alone.
+ *
+ * ## The order the files ran in
+ *
+ * {@link SuiteResult.fileOrder} holds the test files of the run in the
+ * order the JUnit file names them, which is the order Bun ran them in
+ * ({@link parseJunitFiles}): each `<testsuite>` directly under
+ * `<testsuites>`, a passing file included. Measured on bun 1.3.14: a path
+ * list ran its files in the order the arguments named them (`./b ./a` ran
+ * `b` first), a bare run in the order of Bun's own scan, which was not
+ * alphabetical, and the files of one run shared one process, so that a
+ * value one file set on `globalThis` was read by the next. That last
+ * reading is why the order is kept: a file red in a run and green alone
+ * was failed by a file before it (`start/suite-retake-alone.ts`). The
+ * field is a list of lists, one per `bun test` process: one for a run,
+ * two for a run folded with a second (`start/task-always-run.ts`). A run
+ * that wrote no JUnit file holds one empty list.
  */
 import type { UnhandledError } from './unhandled.js';
 import type { SpawnEnv } from '../utils/session-env.js';
@@ -190,6 +206,12 @@ export interface SuiteResult {
    * which it reports as an error and exit code 1); absent otherwise.
    */
   readonly noTestFiles?: boolean;
+  /**
+   * The test files each `bun test` process ran, in the order its JUnit
+   * file names them; absent from a result no run made. See the module
+   * note.
+   */
+  readonly fileOrder?: readonly (readonly string[])[];
 }
 
 /** What one spawn of `bun test` answered. */
@@ -356,10 +378,12 @@ interface OpenCase {
   message?: string;
 }
 
-/** Where the JUnit walk is: the suite stack and the case open inside it. */
+/** Where the JUnit walk is: the suite stack, the case open inside it, and the test files met so far. */
 interface JunitWalk {
   readonly suites: { readonly name: string; readonly file: string }[];
   readonly failures: SuiteFailure[];
+  /** Each test file once, in the order its suite opened. */
+  readonly files: string[];
   open: OpenCase | null;
 }
 
@@ -397,13 +421,20 @@ function openCase(walk: JunitWalk, attributes: Readonly<Record<string, string>>)
   walk.open = { file, name, failed: false };
 }
 
+/** Opens a suite from its attributes; one opened under no other is a test file, held once. */
+function openSuite(walk: JunitWalk, attributes: Readonly<Record<string, string>>): void {
+  const file = attributes['file'] ?? attributes['name'] ?? '';
+  if (walk.suites.length === 0 && file !== '' && !walk.files.includes(file)) walk.files.push(file);
+  walk.suites.push({ name: attributes['name'] ?? '', file });
+}
+
 /** Takes one tag into the walk. */
 function takeTag(walk: JunitWalk, match: RegExpMatchArray): void {
   const [, closing, element, rest, selfClosing] = match;
   const attributes = attributesOf(rest ?? '');
   if (element === 'testsuite') {
     if (closing === '/') walk.suites.pop();
-    else if (selfClosing !== '/') walk.suites.push({ name: attributes['name'] ?? '', file: attributes['file'] ?? attributes['name'] ?? '' });
+    else if (selfClosing !== '/') openSuite(walk, attributes);
     return;
   }
   if (element === 'testcase') {
@@ -421,27 +452,48 @@ function takeTag(walk: JunitWalk, match: RegExpMatchArray): void {
  * for how a test is named.
  */
 export function parseJunitFailures(xml: string): readonly SuiteFailure[] | null {
+  return walkJunit(xml)?.failures ?? null;
+}
+
+/**
+ * The test files a Bun JUnit report names, each once, in the order it
+ * names them, or null when `xml` is not a whole `<testsuites>` document.
+ * See the module note, "The order the files ran in".
+ */
+export function parseJunitFiles(xml: string): readonly string[] | null {
+  return walkJunit(xml)?.files ?? null;
+}
+
+/** The walk over a whole `<testsuites>` document, or null when `xml` is none. */
+function walkJunit(xml: string): JunitWalk | null {
   if (!/<testsuites\b/.test(xml) || !xml.includes('</testsuites>')) return null;
-  const walk: JunitWalk = { suites: [], failures: [], open: null };
+  const walk: JunitWalk = { suites: [], failures: [], files: [], open: null };
   for (const match of xml.matchAll(TAG)) {
     if (match[2] !== 'testsuites') takeTag(walk, match);
   }
-  return walk.failures;
+  return walk;
+}
+
+/** What {@link readJunit} answers: how the file read, its failures and its test files in order. */
+interface JunitRead {
+  readonly junit: JunitReading;
+  readonly failures: readonly SuiteFailure[];
+  readonly files: readonly string[];
 }
 
 /** The JUnit file at `path`, read and parsed. */
-function readJunit(path: string): { readonly junit: JunitReading; readonly failures: readonly SuiteFailure[] } {
-  if (!existsSync(path)) return { junit: 'missing', failures: [] };
+function readJunit(path: string): JunitRead {
+  if (!existsSync(path)) return { junit: 'missing', failures: [], files: [] };
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
   } catch {
-    return { junit: 'unreadable', failures: [] };
+    return { junit: 'unreadable', failures: [], files: [] };
   }
-  const failures = parseJunitFailures(text);
-  return failures === null
-    ? { junit: 'unreadable', failures: [] }
-    : { junit: 'read', failures };
+  const walk = walkJunit(text);
+  return walk === null
+    ? { junit: 'unreadable', failures: [], files: [] }
+    : { junit: 'read', failures: walk.failures, files: walk.files };
 }
 
 /**
@@ -478,13 +530,13 @@ export async function runSuite(options: SuiteRunOptions): Promise<SuiteResult> {
   const spawn = options.spawn ?? spawnSuite;
   const env = suiteEnv(options.env ?? process.env);
   const { exitCode, stderr } = await spawn(command, { cwd: options.cwd, env });
-  const { junit, failures: named } = readJunit(options.junitFile);
+  const { junit, failures: named, files } = readJunit(options.junitFile);
   const cases = parseFailedCases(stderr, failingFilesOf(named));
   writeFileSync(outputFile, suiteOutputText(stderr, cases));
   const { summary, errors } = readSummary(stderr);
   const failures = withErrorLines(named, cases);
   const unhandled = parseUnhandled(stderr);
-  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled };
+  const result: SuiteResult = { command, exitCode, summary, failures, errors, junit, unhandled, fileOrder: [files] };
   return readNoTestFiles(stderr)
     ? { ...result, noTestFiles: true }
     : result;

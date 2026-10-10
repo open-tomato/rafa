@@ -107,6 +107,18 @@
  *     every step written before it; a value that is no non-empty list of
  *     strings is left out on read, never refused, as an unknown `reason`
  *     is.
+ *   - `stepOnly`: only on a step that reran its newly red test files
+ *     alone and found some green (`start/suite-retake-alone.ts`), each a
+ *     {@link SessionStepOnly}: the file, the names of its tests that were
+ *     red in the step, the error lines Bun printed for the first of
+ *     them, its `position` in the order its `bun test` process ran the
+ *     files, counted from 1, or null when that order did not hold it, and
+ *     `before`, the few files run just before it, in run order. Such a
+ *     file's tests stay in `failures` and are left out of `newFailures`:
+ *     they were red only in the step's own file order. The key is
+ *     written right after `newFailures`. Every other step carries no
+ *     `stepOnly` key, and an entry outside that shape is left out on
+ *     read, never refused, as an unknown `reason` is.
  *   - `interrupted`: only on a step the runner read as a stop rather than
  *     a suite's answer, `true`: its `bun test` ended on SIGINT, or the
  *     runner received SIGINT while it ran (`start/suite-step.ts`). Its
@@ -257,6 +269,20 @@ export interface SessionTask {
   readonly text: string;
 }
 
+/** One test file red in a step and green when run alone. See the module note, "Steps". */
+export interface SessionStepOnly {
+  /** The test file, relative to the checkout. */
+  readonly file: string;
+  /** The full names of its tests that were red in the step. */
+  readonly tests: readonly string[];
+  /** The error lines Bun printed for the first of them; none when it printed none. */
+  readonly errorLines: readonly string[];
+  /** Its place, from 1, in the order its `bun test` process ran the files; null when that order did not hold it. */
+  readonly position: number | null;
+  /** The files run just before it, in run order. */
+  readonly before: readonly string[];
+}
+
 /** One suite run the runner recorded for a session. See the module note. */
 export interface SessionStep {
   readonly kind: SessionStepKind;
@@ -272,6 +298,8 @@ export interface SessionStep {
   readonly failures: readonly SuiteFailure[];
   /** Those of {@link SessionStep.failures} new against the baseline. */
   readonly newFailures: readonly SuiteFailure[];
+  /** The files red in the step and green alone; left out of a step with none. See the module note. */
+  readonly stepOnly?: readonly SessionStepOnly[];
   /** `true` on a step read as a stop on SIGINT; left out of every other. See the module note. */
   readonly interrupted?: true;
 }

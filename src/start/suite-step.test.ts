@@ -166,6 +166,7 @@ function contextWith(
       testsFullSuiteTriggers: ['bunfig.toml', 'tsconfig*.json', 'package.json'],
       testsIntegration: ['**/*-integration.test.ts'],
       testsAlwaysRun: options.alwaysRun ?? [],
+      testsRetakeRedAlone: false,
     },
     owns: () => {
       seen.ownsReads += 1;

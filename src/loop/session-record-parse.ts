@@ -53,11 +53,18 @@
  * frozen failure keeps a non-empty list of strings, after its `name`,
  * and leaves out any other value, so its next write carries no
  * `errorLines` key on that failure.
+ *
+ * A step's `stepOnly`, likewise. The frozen step keeps each entry that
+ * is whole (a file, a list of test names, a list of error lines, a
+ * position that is a whole number from 1 or null, and a list of files
+ * before it), right after its `newFailures`, and leaves out any other
+ * entry, and the key itself when no entry is left.
  */
 import type {
   SessionDecision,
   SessionRecord,
   SessionStep,
+  SessionStepOnly,
   SessionTaskRef,
 } from './sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
@@ -421,6 +428,37 @@ function freezeFailures(failures: readonly SuiteFailure[]): readonly SuiteFailur
   })));
 }
 
+/** True for a list of strings, blank ones included. */
+function isStringList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+/** True for a whole `stepOnly` entry; see the module note. */
+function isStepOnly(value: unknown): value is SessionStepOnly {
+  if (!isObject(value)) return false;
+  const position = field(value, 'position');
+  return isText(field(value, 'file'))
+    && isTextList(field(value, 'tests'))
+    && isStringList(field(value, 'errorLines'))
+    && (position === null || isPositiveWhole(position))
+    && isTextList(field(value, 'before'));
+}
+
+/** The `stepOnly` entry of a frozen step: its whole entries, frozen, or none when no entry is whole. */
+function stepOnlyEntry(stepOnly: unknown): { readonly stepOnly?: readonly SessionStepOnly[] } {
+  const whole = Array.isArray(stepOnly)
+    ? stepOnly.filter(isStepOnly)
+    : [];
+  if (whole.length === 0) return {};
+  return { stepOnly: Object.freeze(whole.map((entry) => Object.freeze({
+    file: entry.file,
+    tests: Object.freeze([...entry.tests]),
+    errorLines: Object.freeze([...entry.errorLines]),
+    position: entry.position,
+    before: Object.freeze([...entry.before]),
+  }))) };
+}
+
 /** True for one of {@link SESSION_STEP_REASONS}. */
 function isSessionStepReason(value: unknown): value is SessionStepReason {
   return (SESSION_STEP_REASONS as readonly unknown[]).includes(value);
@@ -436,7 +474,9 @@ function reasonEntry(reason: unknown): { readonly reason?: SessionStepReason } {
 /**
  * A frozen step already checked, its fields in the order they are
  * written: `reason` right after `scope`, only when it is one of
- * {@link SESSION_STEP_REASONS}, and `interrupted` last, only when there.
+ * {@link SESSION_STEP_REASONS}, `stepOnly` right after `newFailures`,
+ * only when it holds a whole entry, and `interrupted` last, only when
+ * there.
  */
 function freezeStep(step: SessionStep): SessionStep {
   return Object.freeze({
@@ -450,6 +490,7 @@ function freezeStep(step: SessionStep): SessionStep {
     summary: step.summary,
     failures: freezeFailures(step.failures),
     newFailures: freezeFailures(step.newFailures),
+    ...stepOnlyEntry(field(step, 'stepOnly')),
     ...(step.interrupted === true
       ? { interrupted: true as const }
       : {}),

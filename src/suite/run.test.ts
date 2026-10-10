@@ -50,6 +50,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   CLAUDE_CODE_ENV,
   parseJunitFailures,
+  parseJunitFiles,
   readNoTestFiles,
   readSummary,
   runSuite,
@@ -217,6 +218,29 @@ describe('parseJunitFailures', () => {
   });
 });
 
+describe('parseJunitFiles', () => {
+  it('answers the test files in the order the report names them, a passing one included', () => {
+    expect(parseJunitFiles(fixture('failed-cases.junit.xml'))).toEqual(['timeout.test.ts', 'thrown.test.ts', 'assertion.test.ts', 'sub/two.test.ts']);
+    expect(parseJunitFiles(fixture('clean.junit.xml'))).toHaveLength(1);
+  });
+
+  it('names a file once, and never a describe block nested in it', () => {
+    expect(parseJunitFiles(fixture('mixed.junit.xml'))).toEqual(['a.test.ts', 'sub/b.test.ts']);
+    // Control: the report nests `outer` and `inner` as testsuites of their own.
+    expect(fixture('mixed.junit.xml')).toContain('<testsuite name="outer"');
+  });
+
+  it('leaves out a file that threw while it loaded, which the report does not hold', () => {
+    expect(parseJunitFiles(fixture('mixed.junit.xml'))).not.toContain('c.test.ts');
+    expect(fixture('mixed.stderr.txt')).toContain('c.test.ts:');
+  });
+
+  it('answers null for text that is not a whole report', () => {
+    expect(parseJunitFiles('')).toBeNull();
+    expect(parseJunitFiles('<testsuites><testsuite name="a.test.ts">')).toBeNull();
+  });
+});
+
 describe('parseJunitFailures, the message', () => {
   it('keeps the first line of a <failure message=...>, unescaped, and never the stack in its text', () => {
     const body = '<failure type="Error" message="boom &amp; &lt;x&gt; &quot;q&quot;&#10;second line">'
@@ -350,8 +374,15 @@ describe('runSuite', () => {
       errors: 1,
       junit: 'read',
       unhandled: [{ file: 'c.test.ts', firstLine: 'error: Cannot find module \'./nope.js\' from \'/tmp/scratch/c.test.ts\'' }],
+      fileOrder: [['a.test.ts', 'sub/b.test.ts']],
     });
     expect(seen[0]?.options).toEqual({ cwd: dir, env: { PATH: '/bin' } });
+  });
+
+  it('answers one empty file order for a run that wrote no JUnit file', async () => {
+    const result = await runSuite({ cwd: dir, paths: ['nope'], junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('no-match', 1, []) });
+    expect(result.junit).toBe('missing');
+    expect(result.fileOrder).toEqual([[]]);
   });
 
   it('answers the error lines of a failure whose JUnit element says nothing, and keeps them beside the JUnit file', async () => {
