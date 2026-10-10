@@ -31,9 +31,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { specPath } from '../board/naming.js';
-import { BOARD_REFUSAL_EXIT } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ACCEPT_REFS_FLAG, acceptStaleRefsPassLine } from '../board/refs-gate.js';
 import { readRefsBlock } from '../refs/stamp.js';

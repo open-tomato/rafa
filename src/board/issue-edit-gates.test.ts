@@ -21,13 +21,13 @@ import { describe, expect, test } from 'bun:test';
 import { CLAIMED_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../cli/command.js';
 
+import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import { appendedBody, renderUpdateBlock, replacedBody } from './issue-edit-body.js';
 import { editStateRefusalMessage, readEditState } from './issue-edit-state.js';
 import { addedTextSource, editedBodySource, requireEditText } from './issue-edit-text.js';
 import { SPEC_LABEL } from './issue.js';
 import { LEAK_REFUSAL_EXIT } from './leak.js';
 import { branchName } from './naming.js';
-import { BOARD_REFUSAL_EXIT } from './plan-spec.js';
 import { READINESS_REFUSAL_EXIT, SPEC_READY_LABEL } from './readiness.js';
 import {
   createGhEditorLogin,

@@ -90,6 +90,9 @@ spells out, and the shapes the lint config forces.
   `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
   so unit cases drive fakes and planted repositories under `tmpdir`
   only. Sha256 uses `node:crypto` or `Bun.CryptoHasher`.
+  `check-command.ts` spells `rafa issue check <n>`, the fix a report
+  points a drifted copy at, and imports nothing, so a board module and
+  a command module both take it from there.
 
 ### The size cap no gate reads
 

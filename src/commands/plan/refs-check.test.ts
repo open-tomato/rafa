@@ -51,7 +51,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { BOARD_REFUSAL_EXIT } from '../../board/plan-spec.js';
+import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
 import { acceptStaleRefsPassLine } from '../../board/refs-gate.js';
 import { CommandExit } from '../../cli/command.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';

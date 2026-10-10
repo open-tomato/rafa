@@ -43,13 +43,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { createGitRunner } from '../pr/git.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, NEW, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
-  issueCheckCommand,
   listedIssueReader,
   memoiseIssueReader,
   NO_BOARD_DETAIL,

@@ -77,7 +77,8 @@
  * {@link renderDoctorRefs} prints nothing for a project with no saved
  * copy. Otherwise one line counts the copies and the states; each copy
  * holding a suspect or dangling reference, or one that could not be
- * read, then gets a line naming `rafa issue check <n>`; a copy holding
+ * read, then gets a line naming `rafa issue check <n>`, spelled by
+ * `issueCheckCommand` (`../refs/check-command.ts`); a copy holding
  * only unknown references gets a line saying why they were not
  * checked. A `new` reference — a target the spec is to add, missing on
  * its first reading or still missing under a `new` stamp — is counted
@@ -108,17 +109,13 @@ import { ID_PREFIX, notesFileName, SPEC_EXTENSION } from '../board/naming.js';
 import { memoiseVerifier } from '../board/refs-gate.js';
 import { messageOf } from '../config-sections.js';
 import { createGitRunner } from '../pr/git.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 import { withOutlineCache } from '../refs/outline-cache.js';
 import { readRefsText } from '../refs/reading.js';
 import { UNREADABLE } from '../refs/stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner } from '../refs/verify.js';
 
 import { planRoster } from './plan/refs-check.js';
-
-/** The fix a copy holding a suspect or dangling reference is pointed at. */
-export function issueCheckCommand(issue: number): string {
-  return `rafa issue check ${String(issue)}`;
-}
 
 /** What an issue read answers when there is no board runner to read it with. */
 export const NO_BOARD_DETAIL = 'no GitHub board: the pull request provider is not gh';

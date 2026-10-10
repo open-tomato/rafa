@@ -131,7 +131,7 @@ Nothing here is a registered step. These are the units a loop run or a command c
 | `issue ready`: one `epic:` label at most | `src/commands/issue/ready.ts` `requireOneEpic`, `src/board/epic-problems.ts` | exit 2; skipped under `board.relationships: native` | 🔒 |
 | `issue ready`: mark `spec:ready` | `src/commands/issue/ready.ts` `markIssueReady` | asks when there is a terminal and `--yes` was not typed (`readReadyYes`); `docs/workflow-checks.md` §4 still says there is no `--yes`, which the code no longer matches | consent |
 | `issue unblock` | `src/commands/issue/unblock.ts` | one question per issue whose blockers have all closed | consent |
-| `plan create` check 0 and 1: trust and `spec:ready` | `src/board/plan-spec.ts` `inspectSpecIssue`, `src/commands/plan/ready-offer.ts` | exit `BOARD_REFUSAL_EXIT` 2; the offer runs `issue ready` in place | 🔒 / consent |
+| `plan create` check 0 and 1: trust and `spec:ready` | `src/board/plan-spec.ts` `inspectSpecIssue`, `src/commands/plan/ready-offer.ts` | exit `BOARD_REFUSAL_EXIT` (`src/board/exit-codes.ts`) 2; the offer runs `issue ready` in place | 🔒 / consent |
 | `plan create` check 2: leak and completeness | `src/board/leak.ts` (`c06-command`), `src/board/readiness.ts` | refuses before the body is saved | 🔒 / 🧭 |
 | `plan create` snapshot settle | `src/board/snapshot-settle.ts`, `src/commands/plan/refresh-offer.ts` | asks only on a changed body and without `--refresh` | consent |
 | `plan create` check 4: references | `src/board/refs-gate.ts`, `src/commands/plan/refs-check.ts`, `src/refs/*` | `dangling` and `suspect` refuse; `dangerous.acceptStaleRefs` or `--accept-refs` passes them, printed | 🔒 + ⚠️ |

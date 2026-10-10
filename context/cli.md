@@ -2243,11 +2243,12 @@ New; it replaces no earlier text. What a row or an action added to
   listing's labels: `type:roadmap` is a board, else a row typed `epic`
   is an epic, else the default board (an unlabelled titled "Roadmap", or
   `roadmap.issue`, even one the listing does not hold) is a board. A
-  board moves to its first `now` epic that is not done (`firstNowEpic`,
-  null when none); an epic moves with the board whose checklist lists
-  it, the current board first, then the default, then the
-  lowest-numbered open board, else the default. `-` moves to the
-  position's `previous`, checked as a number is. The move starts from
+  board moves to its first `now` epic that is not done (`firstNowEpic`
+  in `src/board/now-epic.ts`, null when none); an epic moves with the
+  board whose checklist lists it, the current board first, then the
+  default, then the lowest-numbered open board, else the default. `-`
+  moves to the position's `previous`, checked as a number is. The move
+  starts from
   the place `resolvePlace` (`src/board/place.ts`) answers, so with no
   file the first switch's `previous` is the fallback place and
   `rafa switch -` goes back there; every notice but the absent-file one
