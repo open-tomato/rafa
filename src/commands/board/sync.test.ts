@@ -16,6 +16,9 @@
  * (`SyncFakeOptions.repeatsCursor`). Their control is the sync over the
  * same board without it, which exits 0 with no `warn:` line and every
  * item filled, so the warning line and the unfilled #21 are the refusal's.
+ * The same cursor planted on #40, an issue the sync adds, leaves it added
+ * and not filled; that control's closing line counts both added issues as
+ * filled, so the count apart is the refusal's too.
  *
  * The network-error cases plant one `HTTP 502` on the project fake: the
  * sync sends the call again, prints one `retrying` line (a `retry` event
@@ -80,6 +83,7 @@ const EMPTY: BoardSyncResult = {
   changes: [],
   missing: [],
   added: [],
+  filled: [],
   refused: [],
   written: 0,
   rateLimited: false,
@@ -135,8 +139,8 @@ describe('changeLine, closingLine and syncLines', () => {
 
   it('closes a sync on what it wrote and added, and a rate-limited one on how far it got', () => {
     expect(closingLine(EMPTY)).toBe('Synced project #6: in step, nothing to change.');
-    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE, STAGE_CHANGE], missing: [1, 40], added: [1, 40], written: 2 }))
-      .toBe('Synced project #6: 2 changes written and 2 issues added.');
+    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE, STAGE_CHANGE], missing: [1, 40], added: [1, 40], filled: [1, 40], written: 2 }))
+      .toBe('Synced project #6: 2 changes written, 2 issues added and filled.');
     expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE, STAGE_CHANGE], written: 1, rateLimited: true, notUpdated: 1 }))
       .toBe('Stopped on project #6: 1 of 2 changes written; the rate limit refused the rest.');
   });
@@ -144,9 +148,9 @@ describe('changeLine, closingLine and syncLines', () => {
   it('counts the issues refused, and never closes on in step while one was refused', () => {
     const refused = [{ issue: 21, reason: 'a reason' }];
 
-    expect(closingLine({ ...EMPTY, refused })).toBe('Synced project #6: 0 changes written and 0 issues added; 1 issue not refreshed.');
-    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE], added: [40], written: 1, refused: [...refused, { issue: 22, reason: 'b' }] }))
-      .toBe('Synced project #6: 1 change written and 1 issue added; 2 issues not refreshed.');
+    expect(closingLine({ ...EMPTY, refused })).toBe('Synced project #6: 0 changes written, 0 issues added and filled; 1 issue not refreshed.');
+    expect(closingLine({ ...EMPTY, changes: [STAGE_CHANGE], added: [40], filled: [40], written: 1, refused: [...refused, { issue: 22, reason: 'b' }] }))
+      .toBe('Synced project #6: 1 change written, 1 issue added and filled; 2 issues not refreshed.');
     expect(closingLine({ ...EMPTY, dryRun: true, refused }))
       .toBe('Dry run on project #6: 0 changes and 0 issues to add; 1 issue not refreshed; nothing written.');
   });
@@ -157,11 +161,31 @@ describe('changeLine, closingLine and syncLines', () => {
       '#40 is not on the project: would be added',
       'Dry run on project #6: 1 change and 1 issue to add; nothing written.',
     ]);
-    expect(syncLines({ ...EMPTY, changes: [STAGE_CHANGE], missing: [40], added: [40], written: 1 })).toEqual([
+    expect(syncLines({ ...EMPTY, changes: [STAGE_CHANGE], missing: [40], added: [40], filled: [40], written: 1 })).toEqual([
       '#21 Stage: Ready → Claimed',
       '#40 added to the project',
-      'Synced project #6: 1 change written and 1 issue added.',
+      'Synced project #6: 1 change written, 1 issue added and filled.',
     ]);
+  });
+
+  it('counts the issues filled apart from those added when some were not filled', () => {
+    const added = { ...EMPTY, changes: [STAGE_CHANGE], missing: [1, 40], added: [1, 40], written: 1 };
+
+    expect(closingLine({ ...added, filled: [1, 40] })).toBe('Synced project #6: 1 change written, 2 issues added and filled.');
+    expect(closingLine({ ...added, filled: [1] })).toBe('Synced project #6: 1 change written, 2 issues added, 1 filled.');
+    expect(closingLine({ ...added, filled: [] })).toBe('Synced project #6: 1 change written, 2 issues added, 0 filled.');
+    expect(closingLine({ ...added, filled: [1], refused: [{ issue: 40, reason: 'a reason' }] }))
+      .toBe('Synced project #6: 1 change written, 2 issues added, 1 filled; 1 issue not refreshed.');
+  });
+
+  it('counts the issues added on a stopped sync only when it had added any, and never the ones to add on a dry run as filled', () => {
+    const stopped = { ...EMPTY, changes: [STAGE_CHANGE, STAGE_CHANGE], written: 1, rateLimited: true, notUpdated: 1 };
+
+    expect(closingLine({ ...stopped, missing: [1, 40], added: [1, 40] }))
+      .toBe('Stopped on project #6: 1 of 2 changes written, 2 issues added, 0 filled; the rate limit refused the rest.');
+    expect(closingLine({ ...stopped, missing: [1, 40] }))
+      .toBe('Stopped on project #6: 1 of 2 changes written; the rate limit refused the rest.');
+    expect(closingLine({ ...EMPTY, dryRun: true, missing: [1, 40] })).toBe('Dry run on project #6: 0 changes and 2 issues to add; nothing written.');
   });
 });
 
@@ -208,7 +232,7 @@ describe('rafa board sync', () => {
       'writing fields: 1',
       'writing fields: 1/1, 0 refused, 0s',
       '#21 Stage: Ready → Claimed',
-      'Synced project #6: 1 change written and 0 issues added.\n',
+      'Synced project #6: 1 change written, 0 issues added and filled.\n',
     ].join('\n'));
     expect(syncOwnLines(again.stdout)).toEqual(['Dry run on project #6: in step, nothing to change.']);
   });
@@ -222,9 +246,25 @@ describe('rafa board sync', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).not.toContain('warn: ');
     expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
-    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
     expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
     expect((await fake.heldValues())[21]).toEqual({ Stage: 'Ready', Rank: 3 });
+  });
+
+  it('fills both added issues when the project\'s own listing lags behind the adds it just sent', async () => {
+    const { fake, project } = setUp();
+    fake.project.lagItems();
+
+    const result = await run(fake, [], project);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('warn: ');
+    expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
+    fake.project.showItems();
+    expect((await fake.heldValues())[1]).toEqual({ Stage: 'Backlog' });
+    expect((await fake.heldValues())[40]).toEqual({ Stage: 'Triage' });
   });
 
   it('exits 0 when the only failure is a refused issue, printing its warning line and syncing the rest', async () => {
@@ -236,7 +276,7 @@ describe('rafa board sync', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
     expect(result.stdout).not.toContain('#21 Stage');
-    expect(result.stdout).toContain('Synced project #6: 12 changes written and 2 issues added; 1 issue not refreshed.\n'
+    expect(result.stdout).toContain('Synced project #6: 12 changes written, 2 issues added and filled; 1 issue not refreshed.\n'
       + 'warn: #21 not refreshed: issue #21.labels answered the cursor');
     const warnings = result.stdout
       .trimEnd()
@@ -259,6 +299,38 @@ describe('rafa board sync', () => {
     expect(refused[0]?.reason).toContain('issue #21.labels answered the cursor');
     expect(ending?.data?.warnings).toEqual([`#21 not refreshed: ${refused[0]?.reason ?? ''}`]);
     expect(ending?.data?.added).toEqual([1, 40]);
+    expect(ending?.data?.filled).toEqual([1, 40]);
+  });
+
+  it('counts an added issue whose facts were refused as added and not filled, naming it in both warning lines', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [40] });
+
+    const result = await run(fake, [], project);
+    const warnings = result.stdout
+      .trimEnd()
+      .split('\n')
+      .filter((line) => line.startsWith('warn: '));
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('#1 added to the project\n#40 added to the project\n');
+    expect(result.stdout).toContain('Synced project #6: 13 changes written, 2 issues added, 1 filled; 1 issue not refreshed.\n');
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toStartWith('warn: #40 not refreshed: issue #40.labels answered the cursor');
+    expect(warnings[1]).toStartWith('warn: #40 added but not filled: issue #40.labels answered the cursor');
+    expect((await fake.heldValues())[40]).toEqual({});
+  });
+
+  it('gives the issues added and those filled apart in the json result when one was not filled', async () => {
+    const { fake, project } = setUp({ repeatsCursor: [40] });
+
+    const result = await run(fake, ['--output=json'], project);
+    const ending = eventsOf(result.stdout).find((event) => event.type === 'result') as { data?: BoardSyncResult } | undefined;
+
+    expect(result.exitCode).toBe(0);
+    expect(ending?.data?.added).toEqual([1, 40]);
+    expect(ending?.data?.filled).toEqual([1]);
+    expect(ending?.data?.warnings.at(-1)).toStartWith('#40 added but not filled: ');
   });
 
   it('gives the changes, the issues and the counts as the json result, without the write ids', async () => {
@@ -345,7 +417,7 @@ describe('rafa board sync: a call failing on a network error', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toMatch(RETRY_LINE);
     expect(result.stdout.match(/^retrying /gmu)).toHaveLength(1);
-    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
   });
 
   it('control: with board.project.retries false the same failure is refused with exit code 2 and no retrying line', async () => {
@@ -415,7 +487,7 @@ describe('rafa board sync: the progress of its phases', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).not.toContain('warn: ');
     expect(result.stdout).toStartWith(`${START_AND_END_LINES.join('\n')}\n#10 Stage: (empty) → Blocked\n`);
-    expect(result.stdout).toEndWith('Synced project #6: 14 changes written and 2 issues added.\n');
+    expect(result.stdout).toEndWith('Synced project #6: 14 changes written, 2 issues added and filled.\n');
   });
 
   it('prints a line between start and end on each advance once board.project.progressSeconds have passed', async () => {

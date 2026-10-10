@@ -142,12 +142,12 @@ describe('phaseReporter', () => {
       expect(lines.filter((line) => line !== undefined)).toEqual([]);
     });
 
-    test('keeps the start, end and wait lines', () => {
+    test('keeps the start and end lines, and answers no wait line however long the pause', () => {
       const clock = steppedClock();
       const reporter = adds(clock, 283, false);
       expect(reporter.start().text).toBe('adding issues: 283');
       clock.step(5_000);
-      expect(reporter.wait(2_000).text).toBe('waiting 2 s for GitHub\'s write limit');
+      expect([2_000, 60_000, 300_000].map((ms) => reporter.wait(ms))).toEqual([undefined, undefined, undefined]);
       clock.step(5_000);
       expect(reporter.end({ done: 283, refused: 0 }).text).toBe('adding issues: 283/283, 0 refused, 10s');
     });
@@ -175,9 +175,29 @@ describe('phaseReporter', () => {
       writes.start();
       clock.step(3_000);
       writes.advance(20);
-      const line = writes.wait(1_500);
-      expect(line.text).toBe('waiting 2 s for GitHub\'s write limit');
-      expect(line.data).toEqual({ phase: 'writes', step: 'wait', done: 20, total: 40, elapsedMs: 3_000, waitMs: 1_500 });
+      const line = writes.wait(14_500);
+      expect(line?.text).toBe('pausing 15 s between writes (board.project.writePauseMs)');
+      expect(line?.data).toEqual({ phase: 'writes', step: 'wait', done: 20, total: 40, elapsedMs: 3_000, waitMs: 14_500 });
+    });
+
+    test('answers no line for the default 1 s pause under the default 10 s, nor for any pause short of progressSeconds', () => {
+      const reporter = adds(steppedClock());
+      reporter.start();
+      expect([0, 1_000, 9_999].map((ms) => reporter.wait(ms))).toEqual([undefined, undefined, undefined]);
+    });
+
+    test('answers a line for a pause equal to progressSeconds, and for a longer one', () => {
+      const reporter = adds(steppedClock());
+      reporter.start();
+      expect([10_000, 10_001].map((ms) => reporter.wait(ms)?.text)).toEqual([
+        'pausing 10 s between writes (board.project.writePauseMs)',
+        'pausing 11 s between writes (board.project.writePauseMs)',
+      ]);
+    });
+
+    test('measures the pause against the progressSeconds it is opened with: 1 s prints at 1, not at 2', () => {
+      const pauseOf = (progressSeconds: number): string | undefined => adds(steppedClock(), 283, progressSeconds).wait(1_000)?.text;
+      expect([pauseOf(1), pauseOf(2)]).toEqual(['pausing 1 s between writes (board.project.writePauseMs)', undefined]);
     });
 
     test('does not move the throttle', () => {
@@ -185,16 +205,16 @@ describe('phaseReporter', () => {
       const reporter = adds(clock);
       reporter.start();
       clock.step(9_000);
-      reporter.wait(1_000);
+      expect(reporter.wait(10_000)?.data.step).toBe('wait');
       clock.step(1_000);
       expect(reporter.advance(5)?.text).toBe('adding issues: 5/283, 10s');
     });
 
     test.each([
-      [0, 'waiting 0 s for GitHub\'s write limit'],
-      [1_000, 'waiting 1 s for GitHub\'s write limit'],
-      [1_001, 'waiting 2 s for GitHub\'s write limit'],
-      [60_000, 'waiting 60 s for GitHub\'s write limit'],
+      [0, 'pausing 0 s between writes (board.project.writePauseMs)'],
+      [1_000, 'pausing 1 s between writes (board.project.writePauseMs)'],
+      [1_001, 'pausing 2 s between writes (board.project.writePauseMs)'],
+      [60_000, 'pausing 60 s between writes (board.project.writePauseMs)'],
     ])('waitLine spells %p ms as %p', (ms, words) => {
       expect(waitLine(ms)).toBe(words);
     });
@@ -232,19 +252,31 @@ describe('openPhase', () => {
     expect(recording.lines().map(({ text }) => text)).toEqual([
       'writing fields: 3',
       'writing fields: 2/3, 1s',
-      'waiting 1 s for GitHub\'s write limit',
+      'pausing 1 s between writes (board.project.writePauseMs)',
       'writing fields: 3/3, 0 refused, 3s',
     ]);
   });
 
-  test('hands no progress line the throttle holds back, and the start, wait and end lines still', () => {
+  test('hands no wait line for a pause short of progressSeconds; the same pause one step longer is the control', () => {
+    const stepsOf = (waitMs: number): readonly string[] => {
+      const recording = recordingFeed(2);
+      const phase = openPhase(recording.feed, 'writes', 3);
+      phase.wait(waitMs);
+      phase.end({ done: 3, refused: 0 });
+      return recording.steps();
+    };
+    expect(stepsOf(1_999)).toEqual(['writes start 0/3', 'writes end 3/3 0 refused']);
+    expect(stepsOf(2_000)).toEqual(['writes start 0/3', 'writes wait 0/3 2000 ms', 'writes end 3/3 0 refused']);
+  });
+
+  test('with progressSeconds false, hands no progress line and no wait line, and the start and end lines still', () => {
     const recording = recordingFeed(false);
     const phase = openPhase(recording.feed, 'adds', 2);
     phase.advance(1);
-    phase.wait(500);
+    phase.wait(300_000);
     phase.advance(2);
     phase.end({ done: 2, refused: 0 });
-    expect(recording.steps()).toEqual(['adds start 0/2', 'adds wait 1/2 500 ms', 'adds end 2/2 0 refused']);
+    expect(recording.steps()).toEqual(['adds start 0/2', 'adds end 2/2 0 refused']);
   });
 
   test('with no feed, every call does nothing and none throws', () => {
@@ -338,6 +370,27 @@ describe('commandProgressFeed', () => {
       'writing fields: 40',
       'writing fields: 40/40, 0 refused, 1m 0s',
     ]);
+  });
+
+  test('writes a pause equal to progressSeconds as one line in text mode and one wait event in json mode', () => {
+    const text = capture();
+    const json = capture();
+    const clock = steppedClock(0);
+    const clocks = { now: clock.now, stamp: () => STAMP };
+
+    openPhase(commandProgressFeed(text.output, 'text', 10, clocks), 'writes', 40).wait(10_000);
+    openPhase(commandProgressFeed(json.output, 'json', 10, clocks), 'writes', 40).wait(10_000);
+
+    expect(text.captured.info).toEqual(['writing fields: 40', 'pausing 10 s between writes (board.project.writePauseMs)']);
+    expect(json.captured.info).toEqual([]);
+    expect(json.captured.events[1]).toEqual({
+      type: 'event',
+      name: 'progress',
+      summary: 'pausing 10 s between writes (board.project.writePauseMs)',
+      data: { phase: 'writes', step: 'wait', done: 0, total: 40, elapsedMs: 0, waitMs: 10_000 },
+      ts: STAMP.toISOString(),
+    });
+    expect(json.captured.events).toHaveLength(2);
   });
 
   test('times the phases by the system clock when handed none', () => {

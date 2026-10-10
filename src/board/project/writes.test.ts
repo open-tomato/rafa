@@ -29,9 +29,12 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { sinkOutput } from '../../tests/output-sinks.js';
+
 import { createGhProjectPort } from './gh.js';
 import { matchProjectFields, ProjectPortError } from './port.js';
 import { recordingFeed } from './progress-fake.js';
+import { commandProgressFeed } from './progress.js';
 import { createFakeProjectGh, FAKE_RATE_LIMIT_MESSAGE, fakeItemId, fakeProjectId } from './project-fake.js';
 import { writeAlias, writeBatchArgs, writeProjectFields } from './writes.js';
 
@@ -304,20 +307,75 @@ describe('the writing fields phase', () => {
     return { gh: fake.gh, writes: (project.items ?? []).map((_, index) => clearOf(fakeItemId(project, index), ids.field('Stage'))) };
   }
 
-  it('starts at the writes given, advances by the writes sent after each request, and waits each pause between two', async () => {
+  it('starts at the writes given, advances by the writes sent after each request, and reports each pause as long as progressSeconds', async () => {
     const project = projectOf(11);
     const { gh, writes } = await clearsOf(project);
     const recording = recordingFeed();
-    await writeProjectFields(gh, fakeProjectId(project), writes, { ...recordingSleep(), batchSize: 5, pauseMs: 250, progress: recording.feed });
+    await writeProjectFields(gh, fakeProjectId(project), writes, { ...recordingSleep(), batchSize: 5, pauseMs: 1000, progress: recording.feed });
     expect(recording.steps()).toEqual([
       'writes start 0/11',
       'writes progress 5/11',
-      'writes wait 5/11 250 ms',
+      'writes wait 5/11 1000 ms',
       'writes progress 10/11',
-      'writes wait 10/11 250 ms',
+      'writes wait 10/11 1000 ms',
       'writes progress 11/11',
       'writes end 11/11 0 refused',
     ]);
+  });
+
+  /** The steps and the pauses slept of 11 writes in two requests, paused `pauseMs` apart under `progressSeconds`. */
+  async function pausedOnce(pauseMs: number, progressSeconds: number | false): Promise<{ steps: readonly string[]; texts: readonly string[]; pauses: readonly number[] }> {
+    const project = projectOf(11);
+    const { gh, writes } = await clearsOf(project);
+    const recording = recordingFeed(progressSeconds);
+    const pacing = recordingSleep();
+    await writeProjectFields(gh, fakeProjectId(project), writes, { ...pacing, batchSize: 6, pauseMs, progress: recording.feed });
+    return {
+      steps: recording.steps().filter((step) => step.startsWith('writes wait')),
+      texts: recording.lines()
+        .filter(({ data }) => data.step === 'wait')
+        .map(({ text }) => text),
+      pauses: pacing.pauses,
+    };
+  }
+
+  it('prints no line for the default 1 s pause under the default 10 s progressSeconds, the pause still taken', async () => {
+    expect(await pausedOnce(1000, 10)).toEqual({ steps: [], texts: [], pauses: [1000] });
+  });
+
+  it('prints one line for a pause equal to progressSeconds; one millisecond short prints none', async () => {
+    expect(await pausedOnce(10_000, 10)).toEqual({
+      steps: ['writes wait 6/11 10000 ms'],
+      texts: ['pausing 10 s between writes (board.project.writePauseMs)'],
+      pauses: [10_000],
+    });
+    expect(await pausedOnce(9_999, 10)).toEqual({ steps: [], texts: [], pauses: [9_999] });
+  });
+
+  it('prints no line with progressSeconds false, however long the pause; the same pause under 10 s is the control', async () => {
+    expect(await pausedOnce(60_000, false)).toEqual({ steps: [], texts: [], pauses: [60_000] });
+    expect((await pausedOnce(60_000, 10)).texts).toEqual(['pausing 60 s between writes (board.project.writePauseMs)']);
+  });
+
+  it('writes a pause equal to progressSeconds as one json wait event, and none for the default pause', async () => {
+    const stamp = new Date('2026-10-10T12:00:00.000Z');
+    const waitEventsOf = async (pauseMs: number): Promise<readonly unknown[]> => {
+      const project = projectOf(11);
+      const { gh, writes } = await clearsOf(project);
+      const events: unknown[] = [];
+      const output = sinkOutput({ event: (event) => events.push(event) });
+      const progress = commandProgressFeed(output, 'json', 10, { now: () => 0, stamp: () => stamp });
+      await writeProjectFields(gh, fakeProjectId(project), writes, { ...recordingSleep(), batchSize: 6, pauseMs, progress });
+      return events.filter((event) => (event as { data?: { step?: string } }).data?.step === 'wait');
+    };
+    expect(await waitEventsOf(10_000)).toEqual([{
+      type: 'event',
+      name: 'progress',
+      summary: 'pausing 10 s between writes (board.project.writePauseMs)',
+      data: { phase: 'writes', step: 'wait', done: 6, total: 11, elapsedMs: 0, waitMs: 10_000 },
+      ts: '2026-10-10T12:00:00.000Z',
+    }]);
+    expect(await waitEventsOf(1000)).toEqual([]);
   });
 
   it('prints no wait line for a pause of 0, the requests still counted', async () => {
