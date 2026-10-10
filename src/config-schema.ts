@@ -18,10 +18,11 @@
  * sections and `dangerous.acceptVersionCollision`, and
  * `config-schema-tests.ts` the `tests` section and its reader,
  * `config-schema-triage.ts` the `triage` section and its readers,
+ * `config-schema-errors.ts` the `errors` section and its readers,
  * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
  * `config-schema-loop-retries.ts` `loop.retries` and its reader,
  * `config-schema-loop-continue.ts` the four keys `loop start --continue`
- * reads and their readers, all six spread in here, and
+ * reads and their readers, all seven spread in here, and
  * `config-schema-board-project.ts` the `board.project` limits and their
  * readers, spread in after `board.project.number`.
  * `config-schema-hub.ts` holds the `hub`
@@ -83,6 +84,7 @@
  * spec — in `config-schema-release.ts` for a `pr` or `release` key,
  * `config-schema-tests.ts` for a `tests` key,
  * `config-schema-triage.ts` for a `triage` key,
+ * `config-schema-errors.ts` for an `errors` key,
  * `config-schema-wrap-up.ts` for a `loop.wrapUp` key,
  * `config-schema-loop-retries.ts` for `loop.retries`,
  * `config-schema-loop-continue.ts` for a `--continue` key,
@@ -114,6 +116,7 @@ import type {
   PrerequisiteItem,
 } from './config-items.js';
 import type { BoardProjectLimitSettings } from './config-schema-board-project.js';
+import type { ErrorsSettings } from './config-schema-errors.js';
 import type { HubSettings } from './config-schema-hub.js';
 import type { LoopContinueSettings } from './config-schema-loop-continue.js';
 import type { LoopRetriesSettings } from './config-schema-loop-retries.js';
@@ -163,6 +166,7 @@ import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
 } from './config-schema-board-project.js';
+import { ERRORS_DEFAULTS, ERRORS_SETTINGS } from './config-schema-errors.js';
 import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
 import { LOOP_CONTINUE_DEFAULTS, LOOP_CONTINUE_SETTINGS } from './config-schema-loop-continue.js';
 import { LOOP_RETRIES_DEFAULTS, LOOP_RETRIES_SETTINGS } from './config-schema-loop-retries.js';
@@ -225,13 +229,14 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * the `tests` fields are {@link TestsSettings}', the `triage` fields are
  * {@link TriageSettings}', `loopRetries` is {@link LoopRetriesSettings}',
  * the `--continue` fields are {@link LoopContinueSettings}',
- * `loopWrapUpRetries` is {@link WrapUpSettings}', and the
- * `board.project` limits are {@link BoardProjectLimitSettings}'.
+ * `loopWrapUpRetries` is {@link WrapUpSettings}', the
+ * `board.project` limits are {@link BoardProjectLimitSettings}', and
+ * `errorsCodes` is {@link ErrorsSettings}'.
  */
 export interface RafaConfig
   extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
   TestsSettings, TriageSettings, LoopRetriesSettings, LoopContinueSettings,
-  WrapUpSettings, BoardProjectLimitSettings {
+  WrapUpSettings, BoardProjectLimitSettings, ErrorsSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -424,6 +429,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   claimsAhead: 'off',
   ...TRIAGE_DEFAULTS,
   ...RELEASE_DEFAULTS,
+  ...ERRORS_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
@@ -538,6 +544,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   claimsAhead: { key: 'claims.ahead', read: claimsAhead, cli: false },
   ...TRIAGE_SETTINGS,
   ...RELEASE_SETTINGS,
+  ...ERRORS_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {
     key: 'cleanup.worktreeIdleDays',

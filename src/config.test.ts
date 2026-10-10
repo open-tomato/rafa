@@ -90,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -154,6 +154,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releaseSettle',
   'releaseTag',
   'releasePublishCommand',
+  'errorsCodes',
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
@@ -234,6 +235,7 @@ const DEFAULTS: RafaConfig = {
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  errorsCodes: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
@@ -361,6 +363,13 @@ const FULL = [
   '  settle: pr',
   '  tag: settle',
   '  publishCommand: pnpm publish',
+  'errors:',
+  '  codes:',
+  '    - code: deploy:missing-secret',
+  '      description: a deploy reads an unset secret',
+  '      hint: set the secret',
+  '      level: error',
+  '      since: v1',
   'cleanup:',
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
@@ -465,6 +474,7 @@ const FULL_VALUES: RafaConfig = {
   releaseSettle: 'pr',
   releaseTag: 'settle',
   releasePublishCommand: 'pnpm publish',
+  errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
@@ -545,7 +555,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(11);
+    expect(lists).toHaveLength(12);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1009,6 +1019,12 @@ describe('parseConfigText', () => {
         'release.publishCommand', 'release:\n  publishCommand: ""',
         'release.publishCommand is "", expected a publish command',
         'release:\n  publishCommand: pnpm publish', 'releasePublishCommand', 'pnpm publish',
+      ],
+      [
+        'errors.codes', 'errors:\n  codes: git:x',
+        'errors.codes is "git:x", expected a list of error code entries',
+        'errors:\n  codes:\n    - code: deploy:missing-secret\n      description: a deploy reads an unset secret\n      hint: set the secret\n      level: error\n      since: v1',
+        'errorsCodes', [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
       ],
       [
         'cleanup.staleDays', 'cleanup:\n  staleDays: 0',
