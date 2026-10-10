@@ -17,7 +17,7 @@ spells out, and the shapes the lint config forces.
   Shared refusals and readers live in the subject that first needed them
   rather than in a neutral module: eighteen command modules import
   `../plan/plan-files.js`, and `src/commands/release/tag.ts` takes
-  `versionTag` from `../pr/merge-followups.js` so two commands cannot
+  `versionTag` from `../../release/version-tag.js` so two writers cannot
   spell one tag differently. Reach for the existing helper — a second
   spelling of a refusal is the real smell, as `release status`'s
   hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared

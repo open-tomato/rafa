@@ -46,8 +46,8 @@
  * `warn` it is handed.
  */
 import type { NextActionId, NextState, NextStateId } from './state.js';
-import type { SettleWaiting } from '../commands/pr/merge-followups.js';
 import type { GitRunner } from '../pr/index.js';
+import type { SettleWaiting } from '../pr/settle-waiting.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 
 import { settleWaitingOn } from '../commands/pr/merge-cleanup.js';

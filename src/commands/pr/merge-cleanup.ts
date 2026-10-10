@@ -71,9 +71,10 @@
  * wrap-up and the guard read it); only its `folded` answer names
  * settle.
  */
-import type { FollowUp, SettleWaiting } from './merge-followups.js';
+import type { FollowUp } from './merge-followups.js';
 import type { PidProbe } from '../../loop/sessions.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
+import type { SettleWaiting } from '../../pr/settle-waiting.js';
 import type { MergeGuardSettings } from '../../release/guard-merge.js';
 
 import { existsSync, readFileSync } from 'node:fs';

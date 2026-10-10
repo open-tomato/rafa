@@ -115,6 +115,8 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/ci/status.ts', libraryHalf: 'src/ci/status-reading.ts' },
   { commandFile: 'src/commands/issue/unblock.ts', libraryHalf: 'src/board/unblock.ts' },
   { commandFile: 'src/commands/pr/merge-tick.ts', libraryHalf: 'src/board/epic-tick.ts' },
+  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
+  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
 ];
 
 /**

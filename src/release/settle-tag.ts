@@ -28,7 +28,7 @@
  *
  * ## The tag
  *
- * The tag name is `versionTag` from `src/commands/pr/merge-followups.ts`,
+ * The tag name is `versionTag` from `./version-tag.ts`,
  * the one spelling `rafa release tag` writes too, so the two ways of
  * tagging cannot drift. It is a lightweight tag, as `rafa release tag`
  * writes. Tags are shared between a repository and its worktrees, so
@@ -69,10 +69,10 @@ import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { ReleaseTagMode } from '../config-readers.js';
 
-import { versionTag } from '../commands/pr/merge-followups.js';
 import { gitSaid } from '../pr/git.js';
 
 import { pushSaid } from './settle-push.js';
+import { versionTag } from './version-tag.js';
 
 /** The command that tags what settle leaves untagged. */
 export const RELEASE_TAG_COMMAND = 'rafa release tag';
