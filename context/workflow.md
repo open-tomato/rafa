@@ -216,11 +216,11 @@ fired when either result carried a PreToolUse Bash hook error message.
 | Setting sources | Deny held | Hook fired | scp result | ssh result |
 |---|---|---|---|---|
 | `project,local` | No | No | Exit 1: no such file | Exit 255: host not resolved |
-| `user,project,local` | Yes | Yes | Permission denied by Bash | Denied by ssh-host-fence hook |
+| `user,project,local` | Yes | Yes | Permission denied by Bash | Blocked by the user-scope `PreToolUse` hook |
 
 **No scope was modified.** The measurement added nothing to the project 
-scope, the local scope, or the user scope. `rafa doctor` confirmed every 
-setting and hook unchanged. When a person adds `user` to 
+scope, the local scope, or the user scope. The checksum of the user-scope 
+settings file was the same before and after the runs. When a person adds `user` to 
 `loop.settingSources`, a loop session will enforce their user-scope denies 
 and hooks, as shown in the second row. The default value remains 
 `project,local`; no text suggests adding `user`, and the person picks the 
