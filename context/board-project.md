@@ -127,6 +127,13 @@ refreshed: <reason>` and by this line: the first says nothing was written
 for it, the second that it sits on the project with no value. The next
 sync finds its item on the project and fills it in its first pass.
 
+`rafa issue create` fills its new issue the same way: it keeps the item its
+add answered and hands it to its refresh as a known item
+(`addAndRefreshIssue`, `src/board/project/add-issue.ts`). When that refresh
+answers the issue in `notFilled`, the same line is printed after the
+refresh's own, at `warn`, and the create still exits 0: the issue is filed
+and sits on the project with no value until the next `rafa board sync`.
+
 ### Lists read to their end
 
 The facts reader reads an issue's labels, closing references and
@@ -197,7 +204,9 @@ included; the start and end lines stay. In json mode each line is a
 The same lines come from `rafa board sync`.
 
 Commands that call the refresh outside the label wrapper:
-- `rafa issue create` — refresh the new issue
+- `rafa issue create` — add the new issue, then refresh it with the item the
+  add answered as a known item, and print `#<n> added but not filled:
+  <reason>` when the refresh did not fill it
 - `rafa issue unblock` (native mode) — refresh the unblocked issue
 - `rafa pr merge` — refresh the issues the pull request closes and the
   issues they were blocking
