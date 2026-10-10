@@ -75,3 +75,18 @@ export function callsLogged(files: StandInFiles): readonly (readonly string[])[]
     .filter((line) => line !== '')
     .map((line) => JSON.parse(line) as string[]);
 }
+
+/** The phase labels a progress line opens with (`src/board/project/progress.ts`). */
+const PHASE_LABELS = ['adding issues: ', 'reading facts: ', 'writing fields: '];
+
+/**
+ * `stdout` with its progress lines dropped: a spawned run is timed by the
+ * system clock, so their elapsed time is not predictable, and they are
+ * covered by `src/commands/board/sync.test.ts` already.
+ */
+export function withoutProgressLines(stdout: string): string {
+  return stdout
+    .split('\n')
+    .filter((line) => !PHASE_LABELS.some((label) => line.startsWith(label)))
+    .join('\n');
+}

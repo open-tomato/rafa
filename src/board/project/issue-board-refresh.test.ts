@@ -17,6 +17,11 @@
  *  - The factory's case with no `board.project.number` is read beside the
  *    same write with the number set, which sends the refresh's reads, so
  *    a log holding the edit alone proves the key.
+ *  - The refresh's repository read timed out once is sent again, its
+ *    `retrying` line on the active output, beside the same runner under
+ *    `board.project.retries: false`, which sends it once and warns. The
+ *    label write timed out is sent once either way: it is the inner
+ *    board's, not the refresh's.
  */
 import type { IssueBoard } from '../issue-board.js';
 import type { RefreshIssues } from './issue-board-refresh.js';
@@ -28,8 +33,9 @@ import { describe, expect, it } from 'bun:test';
 import { setActiveOutput } from '../../adapters/output/active.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
-import { createRefreshingGhIssueBoard, refreshFailedWarning, withProjectRefresh } from './issue-board-refresh.js';
+import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems, withProjectRefresh } from './issue-board-refresh.js';
 import { scopeWarning } from './refresh-warnings.js';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from './retry-fake.js';
 
 /** The issue every write is made on. */
 const ISSUE = 12;
@@ -175,7 +181,7 @@ function scopelessGh(calls: string[][]): GhRunner {
 }
 
 /** The config the factory's cases read, the number set. */
-const CONFIG: RefreshConfig = { boardProjectNumber: 6, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
+const CONFIG: RefreshConfig = { boardProjectNumber: 6, boardProjectRetries: false, boardProjectRetryWaitSeconds: 1, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
 
 describe('createRefreshingGhIssueBoard', () => {
   it('sends the edit alone with board.project.number unset', async () => {
@@ -216,5 +222,76 @@ describe('createRefreshingGhIssueBoard', () => {
     }
 
     expect(warned).toEqual([scopeWarning()]);
+  });
+});
+
+describe('the refresh, opened retrying', () => {
+  /** True for the repository read, the refresh's first call. */
+  const isRepoView = (args: readonly string[]): boolean => args[0] === 'repo' && args[1] === 'view';
+
+  /** The config with 3 retries from a 2 s wait. */
+  const RETRYING: RefreshConfig = { ...CONFIG, boardProjectRetries: 3, boardProjectRetryWaitSeconds: 2 };
+
+  /** Runs `act` with an output capturing info lines active, putting the default back after. */
+  async function capturingInfo(act: () => Promise<unknown>): Promise<readonly string[]> {
+    const info: string[] = [];
+    setActiveOutput(sinkOutput({ info: (line) => info.push(line) }));
+    try {
+      await act();
+    } finally {
+      setActiveOutput(null);
+    }
+    return info;
+  }
+
+  it('sends the refresh\'s repository read again after the wait, reporting the retry on the active output', async () => {
+    const calls: string[][] = [];
+    const flaky = flakyGh(scopelessGh(calls), [TIMED_OUT_STDERR], isRepoView);
+    const recorder = recordRetries();
+    const warned: string[] = [];
+    const board = createRefreshingGhIssueBoard({ gh: flaky.gh, config: RETRYING, sleep: recorder.seams.sleep, warn: (line) => warned.push(line) });
+
+    const info = await capturingInfo(() => board.addLabel(ISSUE, 'rafa:claimed'));
+
+    expect(info).toEqual(['retrying repo view (1 of 3): operation timed out']);
+    expect(recorder.waits()).toEqual([2000]);
+    expect(flaky.sent().filter(isRepoView)).toHaveLength(2);
+    expect(warned).toEqual([scopeWarning()]);
+  });
+
+  it('control: with board.project.retries false the same read is sent once and its failure is the refresh\'s line', async () => {
+    const calls: string[][] = [];
+    const flaky = flakyGh(scopelessGh(calls), [TIMED_OUT_STDERR], isRepoView);
+    const warned: string[] = [];
+    const board = createRefreshingGhIssueBoard({ gh: flaky.gh, config: CONFIG, warn: (line) => warned.push(line) });
+
+    const info = await capturingInfo(() => board.addLabel(ISSUE, 'rafa:claimed'));
+
+    expect(info).toEqual([]);
+    expect(flaky.sent().filter(isRepoView)).toHaveLength(1);
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toStartWith('The project was not updated for #12: ');
+    expect(warned[0]).toContain('operation timed out');
+  });
+
+  it('leaves the label write to the runner as handed: a write that timed out is not sent again', async () => {
+    const calls: string[][] = [];
+    const flaky = flakyGh(scopelessGh(calls), [TIMED_OUT_STDERR], (args) => args[0] === 'issue');
+    const board = createRefreshingGhIssueBoard({ gh: flaky.gh, config: RETRYING, sleep: () => Promise.resolve(), warn: () => undefined });
+
+    const rejected = await board.addLabel(ISSUE, 'rafa:claimed').then(() => false, () => true);
+
+    expect([rejected, flaky.sent().length]).toEqual([true, 1]);
+  });
+
+  it('sends refreshIssueItems\' repository read again too, waiting through the sleep handed', async () => {
+    const calls: string[][] = [];
+    const flaky = flakyGh(scopelessGh(calls), [TIMED_OUT_STDERR], isRepoView);
+    const recorder = recordRetries();
+
+    const info = await capturingInfo(() => refreshIssueItems({ config: RETRYING, gh: flaky.gh, sleep: recorder.seams.sleep }, [ISSUE]));
+
+    expect(info).toEqual(['retrying repo view (1 of 3): operation timed out']);
+    expect(recorder.waits()).toEqual([2000]);
   });
 });

@@ -8,7 +8,9 @@
  * repository holding `.rafa/config.yaml` under this file's temporary
  * directory, with HOME a directory beside it. It imports
  * `src/plan.ts` and hands the command a registry holding a fixture
- * `planner/claude` in place of core's, and dispatches `plan create` as
+ * `planner/claude` in place of core's, ahead of it the core roster
+ * check 4 reads commands and flags against, built as the command
+ * builds it (`registryRoster`), and dispatches `plan create` as
  * `src/rafa.ts` does: the declaration of `src/commands/plan/create.ts`
  * wrapped around that call, run through `dispatch`, and the exit code it
  * answers set on the child. So a refusal and a rejection reach stderr in
@@ -288,6 +290,12 @@ type Outcome =
  * command with the arguments after the record path and the outcome, and
  * the command dispatched as `src/rafa.ts` dispatches it; see the module
  * note.
+ *
+ * `create.ts` is imported AHEAD of `commands/index.ts`, out of path
+ * order, on purpose: a child that loads `create.ts` first is the one
+ * that reddens when `commands/plan/refs-check.ts` imports `index.ts`
+ * statically, as that module's note records. Loaded after `index.ts`,
+ * `create.ts` is reached through it and the cycle resolves.
  */
 const PROBE = [
   'import { mkdirSync, writeFileSync } from "node:fs";',
@@ -298,6 +306,8 @@ const PROBE = [
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
+  `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
@@ -349,7 +359,7 @@ const PROBE = [
   '    },',
   '  }),',
   '}]);',
-  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registry));',
+  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registryRoster(CORE_REGISTRY), registry));',
   'const commands = createCommandRegistry({ subjects: [{ name: "plan", summary: "plans" }], commands: [command] });',
   'const { exitCode } = await dispatch(["plan", "create", ...args], { registry: commands });',
   'process.exitCode = exitCode;',

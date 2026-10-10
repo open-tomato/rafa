@@ -31,9 +31,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { specPath } from '../board/naming.js';
-import { BOARD_REFUSAL_EXIT } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
 import { ACCEPT_REFS_FLAG, acceptStaleRefsPassLine } from '../board/refs-gate.js';
 import { readRefsBlock } from '../refs/stamp.js';
@@ -67,6 +67,8 @@ const PROBE = [
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
+  `import { CORE_REGISTRY } from ${JSON.stringify(join(SRC_DIR, 'commands', 'index.ts'))};`,
+  `import { registryRoster } from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'refs-check.ts'))};`,
   `import { wrapPhaseZeroCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'wrap.ts'))};`,
   `import plan from ${JSON.stringify(join(SRC_DIR, 'plan.ts'))};`,
   '',
@@ -88,7 +90,7 @@ const PROBE = [
   '    },',
   '  }),',
   '}]);',
-  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registry));',
+  'const command = wrapPhaseZeroCommand(declared, (words, root) => plan(words, root, registryRoster(CORE_REGISTRY), registry));',
   'const commands = createCommandRegistry({ subjects: [{ name: "plan", summary: "plans" }], commands: [command] });',
   'const { exitCode } = await dispatch(["plan", "create", ...args], { registry: commands });',
   'process.exitCode = exitCode;',

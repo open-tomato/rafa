@@ -16,14 +16,20 @@
  *    items, over the same router, is shown to trip.
  *  - Each failing row is read beside the all-present run, which differs
  *    from it in the one answer the case changes.
+ *  - The scope read timed out once reads every row present only with
+ *    retries on: under `board.project.retries: false` the same read is
+ *    the unknown scope row. Every other case opens with retrying off.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeProjectField } from '../board/project/project-fake.js';
+import type { ProjectRetryConfig } from '../board/project/project-runner.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { createGhProjectPort } from '../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS, fakeProjectId } from '../board/project/project-fake.js';
+import { retryLine } from '../board/project/project-runner.js';
+import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 
 import {
   DRIFT_CHECK,
@@ -44,6 +50,9 @@ const NUMBER = 6;
 
 /** `board.project.template`. */
 const TEMPLATE_URL = 'https://github.com/orgs/tmpl-org/projects/2';
+
+/** The retry keys every case opens the runner with: retrying off, so a failed call fails once as it did before them. */
+const NO_RETRIES: ProjectRetryConfig = { boardProjectRetries: false, boardProjectRetryWaitSeconds: 1 };
 
 /** The URL the fake gives the owner's project. */
 const PROJECT_URL = `https://github.com/orgs/${OWNER}/projects/${String(NUMBER)}`;
@@ -105,7 +114,7 @@ function route(options: RouterOptions = {}): Router {
 
 /** Reads the rows over `router` with the number and template of the module note. */
 async function readOver(router: Router, number: number | null = NUMBER): Promise<Awaited<ReturnType<typeof readDoctorProject>>> {
-  return readDoctorProject({ gh: router.gh, number, template: TEMPLATE_URL });
+  return readDoctorProject({ gh: router.gh, number, template: TEMPLATE_URL, config: NO_RETRIES });
 }
 
 /** True when a call is a read of a project's items: the query selects `items(`. */
@@ -133,7 +142,7 @@ describe('readDoctorProject, where the repository has no project', () => {
   });
 
   it('reads nothing without a gh runner', async () => {
-    expect(await readDoctorProject({ gh: null, number: NUMBER, template: TEMPLATE_URL })).toBe(null);
+    expect(await readDoctorProject({ gh: null, number: NUMBER, template: TEMPLATE_URL, config: NO_RETRIES })).toBe(null);
   });
 
   it('renders no line for no reading', () => {
@@ -209,7 +218,7 @@ describe('readDoctorProject, the scope row', () => {
       ? Promise.resolve({ ok: true, stdout: 'not json', stderr: '' })
       : router.gh(args));
 
-    const reading = await readDoctorProject({ gh, number: NUMBER, template: TEMPLATE_URL });
+    const reading = await readDoctorProject({ gh, number: NUMBER, template: TEMPLATE_URL, config: NO_RETRIES });
 
     expect(reading?.rows[0]?.outcome).toBe('unknown');
     expect(reading?.rows[0]?.detail).toContain('not JSON');
@@ -280,5 +289,37 @@ describe('readDoctorProject, the fields row', () => {
     expect(row.detail).toContain('The project\'s field "Horizon" has no option "Done", "Cancelled".');
     expect(row.detail).toContain('The project has no field named "Rank".');
     expect(row.detail).toContain('the refresh skips those fields.');
+  });
+});
+
+describe('readDoctorProject, a call failing on a network error', () => {
+  /** The rows over a router whose `gh auth status` times out once, with `retries` off the config. */
+  async function readFlaky(retries: number | false) {
+    const flaky = flakyGh(route().gh, [TIMED_OUT_STDERR], (args) => args[0] === 'auth');
+    const recorder = recordRetries();
+    const reading = await readDoctorProject({
+      gh: flaky.gh,
+      number: NUMBER,
+      template: TEMPLATE_URL,
+      config: { boardProjectRetries: retries, boardProjectRetryWaitSeconds: 2 },
+      retry: recorder.seams,
+    });
+    return { reading, recorder };
+  }
+
+  it('sends the scope read again after the wait, reporting the retry, and reads every row present', async () => {
+    const { reading, recorder } = await readFlaky(3);
+
+    expect(recorder.notices().map(retryLine)).toEqual(['retrying auth status (1 of 3): operation timed out']);
+    expect(recorder.waits()).toEqual([2000]);
+    expect(reading?.rows.map((row) => row.outcome)).toEqual(['present', 'present', 'present']);
+  });
+
+  it('control: with board.project.retries false the same read is sent once and the scope row is unknown', async () => {
+    const { reading, recorder } = await readFlaky(false);
+
+    expect(recorder.notices()).toEqual([]);
+    expect(reading?.rows[0]?.outcome).toBe('unknown');
+    expect(reading?.rows[0]?.detail).toContain('operation timed out');
   });
 });

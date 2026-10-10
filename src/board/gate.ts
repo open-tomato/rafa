@@ -106,12 +106,13 @@
  * against a spec its own planner had refused.
  *
  * Nothing here deletes: a planning session costs money, so a rejected
- * plan is kept under {@link REJECTED_DIR} where an operator can read
- * it. The move is bounded: exactly the two paths the caller names,
- * each resolved under the repository root, each moved only when it is
- * a file that exists, and only on a reading that refuses the plan — a
- * verdict with a blocking gap, or an unread review over a plan that
- * does not read as written. A verdict planned under moves neither.
+ * plan is kept under `rejected/` ({@link rejectedPath}) where an
+ * operator can read it. The move is bounded: exactly the two paths the
+ * caller names, each resolved under the repository root, each moved
+ * only when it is a file that exists, and only on a reading that
+ * refuses the plan — a verdict with a blocking gap, or an unread review
+ * over a plan that does not read as written. A verdict planned under
+ * moves neither.
  *
  * ## What a failed write does NOT do
  *
@@ -161,11 +162,11 @@ import type { BoardTrust } from './trust.js';
 import type { Output } from '../ports/index.js';
 
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { issueLine } from '../commands/plan/plan-files.js';
+import { issueLine, rejectedPath } from '../commands/plan/plan-files.js';
 import { validatePlan } from '../commands/plan/validate.js';
 import { messageOf } from '../config-sections.js';
 
@@ -344,26 +345,12 @@ const NOT_READY_REASON = 'the planner judged the spec not ready, so no plan stan
 const UNREAD_REASON = 'no review came back and the plan does not read as written, so no plan stands.';
 
 /**
- * The directory a rejected plan is moved into: `rejected/` beside the
- * file itself, which is `<plan.dir>/rejected` for every path the
- * caller names, since the planner writes both files under `plan.dir`.
- */
-export const REJECTED_DIR = 'rejected';
-
-/** Where `path` lands once the gate refuses it, as the report names it. */
-export function rejectedPath(path: string): string {
-  const parent = dirname(path);
-  return parent === '.'
-    ? join(REJECTED_DIR, basename(path))
-    : join(parent, REJECTED_DIR, basename(path));
-}
-
-/**
- * Moves the files a session wrote against a refusal into
- * {@link REJECTED_DIR}, reporting each. A planning session costs money,
- * so a rejected plan is kept where an operator can read it rather than
- * deleted; what matters downstream is that it is no longer under
- * `plan.dir` itself, where the next `rafa loop start` would pick it up.
+ * Moves the files a session wrote against a refusal into `rejected/`
+ * ({@link rejectedPath}), reporting each. A planning session costs
+ * money, so a rejected plan is kept where an operator can read it
+ * rather than deleted; what matters downstream is that it is no longer
+ * under `plan.dir` itself, where the next `rafa loop start` would pick
+ * it up.
  *
  * An existing file of that name in `rejected/` is overwritten, which is
  * `renameSync`'s own behaviour: the newest rejection of a stub is the
@@ -574,7 +561,7 @@ async function planUnderAssumptions(
  * the caller to record `review: missing` on; one that does not is
  * refused with `CommandExit({@link SPEC_NOT_READY_EXIT},
  * {@link unreadReviewMessage})` after the two files are moved into
- * {@link REJECTED_DIR}.
+ * `rejected/` ({@link rejectedPath}).
  *
  * An explicit `not-ready` verdict is weighed against its own gaps. With
  * none of them blocking it answers `assumed`: the plan is opened under

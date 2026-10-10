@@ -36,6 +36,13 @@ All four maps were written to disk at commit 578c594 (docs: run the four map scr
 their scripts were added. Run the maps again with `scripts/survey/maps.test.ts` (added at 9a015be) to verify they have
 not drifted from the current repository.
 
+- **`cluster-map.json`**: The file-to-cluster assignment of the eight-cluster run over non-test files, at base commit
+  102d26c: 631 files under `clusters`, each with its cluster (`c1` to `c8`), and under `outside` the 27 files that run
+  left in no cluster (isolated or detached). It is not one of the four maps and no script here writes it: it was
+  exported once, for rafa-903, from a run kept outside the tracked tree, so `scripts/survey/maps.test.ts` does not
+  check it. `import-graph.json` above is a different run, 32 clusters with tests included. JSON: 2-space indent, sorted
+  keys, sorted `outside` array.
+
 ### Cluster contract traces
 
 One markdown file per cluster, showing the cluster's scope, its boundary with the rest of the graph, and the entry points

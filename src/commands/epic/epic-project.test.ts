@@ -15,6 +15,9 @@
  *  - The broken config's problem line is read beside the same config with
  *    a null target, which writes nothing, so the line comes from the
  *    config read and not from the probe.
+ *  - The retry cases' refresh sends one call through the runner it is
+ *    handed, timed out once; beside them the same call under
+ *    `board.project.retries: false` answers the failure with no line.
  */
 import type { EpicCancelResult } from './cancel.js';
 import type { EpicCloseResult } from './close.js';
@@ -35,6 +38,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createGhProjectPort } from '../../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from '../../board/project/project-fake.js';
 import { notFoundWarning } from '../../board/project/refresh-warnings.js';
+import { answeringGh, flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {
@@ -296,5 +300,50 @@ describe('refreshProjectAfterEpic: a new epic, added to the project first', () =
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toBe(`own line\nwarn: ${notFoundWarning({ owner: OWNER, number: NUMBER + 1 })}\n`);
     expect(recorded.calls).toEqual([]);
+  });
+});
+
+describe('refreshProjectAfterEpic: a call failing on a network error', () => {
+  /** A refresh sending one call for #12 through the runner it is handed, recording what it answered. */
+  function sendingRefresh(): { readonly refresh: RefreshEpicItems; readonly answers: GhResult[] } {
+    const answers: GhResult[] = [];
+    const refresh: RefreshEpicItems = async (options) => {
+      answers.push(await options.gh(['api', 'graphql', '-F', 'number=12']));
+      return { kind: 'skipped', reason: 'no-issues', warnings: [] };
+    };
+    return { refresh, answers };
+  }
+
+  it('sends the call again after the wait and prints one retrying line after the action\'s own', async () => {
+    const flaky = flakyGh(answeringGh('{}'), [TIMED_OUT_STDERR]);
+    const sending = sendingRefresh();
+    const recorder = recordRetries();
+
+    const outcome = await probe(WITH_PROJECT, { gh: flaky.gh, projectRefresh: sending.refresh, sleep: recorder.seams.sleep }, MOVE_TARGET);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toBe('own line\nretrying #12 (1 of 3): operation timed out\n');
+    expect(sending.answers.map((answer) => answer.ok)).toEqual([true]);
+    expect(recorder.waits()).toEqual([2000]);
+  });
+
+  it('control: with board.project.retries false the same call is sent once and answers the failure', async () => {
+    const flaky = flakyGh(answeringGh('{}'), [TIMED_OUT_STDERR]);
+    const sending = sendingRefresh();
+
+    const outcome = await probe(`${WITH_PROJECT}    retries: false\n`, { gh: flaky.gh, projectRefresh: sending.refresh, sleep: () => Promise.resolve() }, MOVE_TARGET);
+
+    expect(outcome.stdout).toBe('own line\n');
+    expect([sending.answers.map((answer) => answer.ok), flaky.sent().length]).toEqual([[false], 1]);
+  });
+
+  it('writes the retry as one retry event in json mode', async () => {
+    const flaky = flakyGh(answeringGh('{}'), [TIMED_OUT_STDERR]);
+    const sending = sendingRefresh();
+
+    const outcome = await probe(WITH_PROJECT, { gh: flaky.gh, projectRefresh: sending.refresh, sleep: () => Promise.resolve() }, MOVE_TARGET, 'json');
+    const retries = eventsOf(outcome.stdout).filter((event) => event.type === 'event' && event.name === 'retry');
+
+    expect(retries.map((event) => event.type === 'event' && event.summary)).toEqual(['retrying #12 (1 of 3): operation timed out']);
   });
 });

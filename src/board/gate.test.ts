@@ -119,6 +119,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { rejectedPath } from '../commands/plan/plan-files.js';
 import { parsePlan } from '../plan/parse.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -126,7 +127,6 @@ import {
   enforceSpecReview,
   NO_COMMENT_FLAG,
   readGateFlags,
-  rejectedPath,
   SKIP_REVIEW_FLAG,
   SPEC_NEEDS_WORK_LABEL,
   SPEC_NOT_READY_EXIT,

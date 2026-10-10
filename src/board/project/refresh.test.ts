@@ -20,21 +20,42 @@
  *    proves the key and not a `gh` that was never wired.
  *  - The second refresh sends no write only after the first sent some,
  *    and the project's values read back equal what the first wrote.
+ *  - An issue refused for its facts is read beside the four others of
+ *    the same refresh, which are written as the rules give them, so a
+ *    refresh dropping every issue, or rejecting, fails.
+ *  - The known-item cases read a listing that omits the items just added
+ *    (`omittingItems`), while the fake still holds them for the writes.
+ *    The same refresh without its known items answers those issues as
+ *    missing and writes nothing, so a filled issue proves the known item
+ *    and not a listing that showed it after all.
  */
 import type { FakeFactsIssue, FakeFactsPull } from './facts-fake.js';
 import type { ProjectFieldValue, ProjectItem } from './port.js';
 import type { FakeProjectGhOptions, FakeProjectItem } from './project-fake.js';
 import type { ProjectChange } from './refresh-values.js';
-import type { RefreshConfig, RefreshOptions } from './refresh.js';
+import type { KnownItem, RefreshConfig, RefreshOptions } from './refresh.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
+import { loadConfig } from '../../config-load.js';
+
 import { createFakeFactsGh } from './facts-fake.js';
 import { createGhProjectPort } from './gh.js';
-import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_RATE_LIMIT_MESSAGE, FAKE_TEMPLATE_FIELDS } from './project-fake.js';
-import { notFoundWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
-import { refreshProjectItems } from './refresh.js';
+import { recordingFeed } from './progress-fake.js';
+import {
+  createFakeProjectGh,
+  fakeItemId,
+  FAKE_PROJECT_REPOSITORY,
+  FAKE_RATE_LIMIT_MESSAGE,
+  FAKE_TEMPLATE_FIELDS,
+} from './project-fake.js';
+import { notFoundWarning, notRefreshedWarning, rateLimitWarning, scopeWarning, skippedFieldWarning } from './refresh-warnings.js';
+import { knownItem, refreshProjectItems } from './refresh.js';
 
 /** The owner of the repository and the project. */
 const OWNER = 'open-tomato';
@@ -45,6 +66,10 @@ const NUMBER = 6;
 /** The config every case reads but the one that unsets the number. */
 const CONFIG: RefreshConfig = {
   boardProjectNumber: NUMBER,
+  boardProjectRetries: false,
+  boardProjectRetryWaitSeconds: 1,
+  boardProjectWriteBatchSize: 5,
+  boardProjectWritePauseMs: 0,
   boardRelationships: 'labels',
   roadmapIssue: null,
   releaseFragments: '.changes',
@@ -115,11 +140,18 @@ interface Wired {
   readonly calls: () => readonly (readonly string[])[];
 }
 
+/** What a case changes of the facts fake: the issues it holds, and a wrapper over its runner. */
+interface FactsPlant {
+  readonly issues?: readonly PlantedIssue[];
+  readonly wrap?: (gh: GhRunner) => GhRunner;
+}
+
 /** The router of the module note over `projectItems`, and `config`, the project fake's rate limit as `fake` sets it. */
 function wire(
   projectItems: readonly FakeProjectItem[] | null,
   config: RefreshConfig = CONFIG,
   fake: Pick<FakeProjectGhOptions, 'rateLimitAfter'> = {},
+  plant: FactsPlant = {},
 ): Wired {
   const project = createFakeProjectGh({
     ...fake,
@@ -128,7 +160,8 @@ function wire(
       : [{ owner: OWNER, number: NUMBER, items: projectItems }],
     owners: [OWNER],
   });
-  const facts = createFakeFactsGh({ issues: ISSUES, pulls: PULLS, trees: TREES });
+  const facts = createFakeFactsGh({ issues: plant.issues ?? ISSUES, pulls: PULLS, trees: TREES });
+  const factsGh = plant.wrap?.(facts.gh) ?? facts.gh;
   const recorded: (readonly string[])[] = [];
   const gh: GhRunner = (args) => {
     recorded.push(args);
@@ -138,7 +171,7 @@ function wire(
       return Promise.resolve(answered(ISSUES.filter(({ labels = [] }) => labels.includes('type:roadmap')).map(listed)));
     }
     if (line.startsWith('issue list --state all')) return Promise.resolve(answered(ISSUES.map(listed)));
-    if (args[0] === 'api' && args.includes('owner={owner}')) return facts.gh(args);
+    if (args[0] === 'api' && args.includes('owner={owner}')) return factsGh(args);
     if (args[0] === 'api') return project.gh(args);
     return Promise.resolve({ ok: false, stdout: '', stderr: `test gh: unrouted command: gh ${line}\n` });
   };
@@ -177,6 +210,16 @@ async function heldValues(wired: Wired): Promise<Readonly<Record<number, Readonl
 /** The calls that wrote a field value. */
 function writeCalls(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
   return calls.filter((args) => args.some((arg) => arg.includes('updateProjectV2ItemFieldValue(') || arg.includes('clearProjectV2ItemFieldValue(')));
+}
+
+/** The mutation text of a write call's argv: its last argument, the `query=` prefix stripped. */
+function queryOf(args: readonly string[]): string {
+  return args.at(-1)?.replace(/^query=/u, '') ?? '';
+}
+
+/** How many aliased writes `args`' mutation holds. */
+function writeCountOf(args: readonly string[]): number {
+  return (queryOf(args).match(/: (?:updateProjectV2ItemFieldValue|clearProjectV2ItemFieldValue)\(/gu) ?? []).length;
 }
 
 describe('refreshProjectItems: nothing without board.project.number', () => {
@@ -278,6 +321,8 @@ describe('refreshProjectItems: issues and projects that are not there', () => {
       writes: { written: 0, notUpdated: 0, rateLimited: false, detail: '' },
       missing: [40],
       skipped: [],
+      refused: [],
+      notFilled: [],
       warnings: [],
     });
     expect(wired.calls().some((args) => args.includes('owner={owner}') || args[0] === 'issue')).toBe(false);
@@ -358,7 +403,8 @@ describe('refreshProjectItems: the failures of "What can go wrong", answered as 
   });
 
   it('answers no rate-limit line when every write lands, the control of the case above', async () => {
-    const wired = wire(items(), CONFIG, { rateLimitAfter: 1 });
+    const requests = Math.ceil(12 / CONFIG.boardProjectWriteBatchSize);
+    const wired = wire(items(), CONFIG, { rateLimitAfter: requests });
 
     const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
 
@@ -421,6 +467,71 @@ function limitWritesWhile(wired: Wired, state: { refusing: boolean }): GhRunner 
 function changedPairs(changes: readonly ProjectChange[]): readonly string[] {
   return changes.map(({ issue, name }) => `${String(issue)}:${name}`);
 }
+
+describe('refreshProjectItems: one issue refused for its facts, the rest written', () => {
+  /** `gh`, failing with `stderr` every call whose argv holds `needle`. */
+  function failingOn(needle: string, stderr: string): (gh: GhRunner) => GhRunner {
+    return (gh) => (args) => (args.some((arg) => arg.includes(needle))
+      ? Promise.resolve({ ok: false, stdout: '', stderr })
+      : gh(args));
+  }
+
+  it('writes the four issues read and answers the one whose facts fail as refused, its line opening the warnings', async () => {
+    const wired = wire(items(), CONFIG, {}, { wrap: failingOn('i21: issue(number: 21)', 'read: operation timed out') });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    const reason = 'gh api graphql failed: read: operation timed out';
+    expect(refresh.kind === 'refreshed' && refresh.refused).toEqual([{ number: 21, reason }]);
+    expect(refresh.warnings).toEqual([notRefreshedWarning({ number: 21, reason })]);
+    const { 21: unwritten, ...rest } = EXPECTED;
+    expect(unwritten).toBeDefined();
+    expect(await heldValues(wired)).toEqual({ ...rest, 21: {} });
+    expect(refresh.kind === 'refreshed' && refresh.changes.some(({ issue }) => issue === 21)).toBe(false);
+  });
+
+  it('refuses alone an issue whose cross-references repeat their cursor, naming the list, and fills the others', async () => {
+    const issues = ISSUES.map((issue) => (issue.number === 22
+      ? { ...issue, issueMentions: 101, repeatsCursor: 'timelineItems' as const }
+      : issue));
+    const wired = wire(items(), CONFIG, {}, { issues });
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true });
+
+    expect(refresh.kind === 'refreshed' && refresh.refused.map(({ number }) => number)).toEqual([22]);
+    expect(refresh.warnings).toHaveLength(1);
+    expect(refresh.warnings[0]).toStartWith('#22 not refreshed: issue #22.timelineItems answered the cursor ');
+    const { 22: unwritten, ...rest } = EXPECTED;
+    expect(unwritten).toBeDefined();
+    expect(await heldValues(wired)).toEqual({ ...rest, 22: {} });
+  });
+
+  it('answers the refused lines before the rate-limit line', async () => {
+    const wired = wire(items(), CONFIG, { rateLimitAfter: 0 }, { wrap: failingOn('i21: issue(number: 21)', 'read: operation timed out') });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 21]);
+
+    expect(refresh.warnings[0]).toBe('#21 not refreshed: gh api graphql failed: read: operation timed out');
+    expect(refresh.warnings[1]).toStartWith('The project was not fully updated');
+    expect(refresh.warnings).toHaveLength(2);
+  });
+
+  it('picks the refused issue up on the next refresh once its facts read', async () => {
+    let failing = true;
+    const wrap = (gh: GhRunner): GhRunner => (args) => (failing && args.some((arg) => arg.includes('i21: issue(number: 21)'))
+      ? Promise.resolve({ ok: false, stdout: '', stderr: 'HTTP 502' })
+      : gh(args));
+    const wired = wire(items(), CONFIG, {}, { wrap });
+    await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+    failing = false;
+
+    const second = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30]);
+
+    expect(second.warnings).toEqual([]);
+    expect(second.kind === 'refreshed' && second.changes.map(({ issue }) => issue)).toEqual([21, 21]);
+    expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});
 
 describe('refreshProjectItems: an interrupted fill resumes with only the unwritten values', () => {
   it('writes, after a refusal stopped the fill, exactly the values not yet written, then nothing on a third refresh', async () => {
@@ -640,5 +751,355 @@ describe('refreshProjectItems: widened to the whole project, and a dry run', () 
     expect(written.kind === 'refreshed' && written.changes).toEqual(dry.kind === 'refreshed' && dry.changes);
     expect(writeCalls(wired.calls()).length).toBeGreaterThan(0);
     expect(await heldValues(wired)).toEqual(EXPECTED);
+  });
+});
+
+describe('refreshProjectItems: the reading facts and writing fields phases', () => {
+  it('reads the five issues\' facts as one phase and writes their twelve values as another, five to a request', async () => {
+    const wired = wire(items());
+    const recording = recordingFeed();
+
+    await refreshProjectItems({ ...wired.options, progress: recording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(recording.steps()).toEqual([
+      'facts start 0/5',
+      'facts progress 5/5',
+      'facts end 5/5 0 refused',
+      'writes start 0/12',
+      'writes progress 5/12',
+      'writes progress 10/12',
+      'writes progress 12/12',
+      'writes end 12/12 0 refused',
+    ]);
+  });
+
+  it('ends the facts phase counting the issue refused apart from the four read, and writes only theirs', async () => {
+    const wrap = (gh: GhRunner): GhRunner => (args) => (args.some((arg) => arg.includes('i21: issue(number: 21)'))
+      ? Promise.resolve({ ok: false, stdout: '', stderr: 'read: operation timed out' })
+      : gh(args));
+    const wired = wire(items(), CONFIG, {}, { wrap });
+    const recording = recordingFeed();
+
+    await refreshProjectItems({ ...wired.options, progress: recording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(recording.steps().filter((step) => step.includes(' start ') || step.includes(' end '))).toEqual([
+      'facts start 0/5',
+      'facts end 4/5 1 refused',
+      'writes start 0/10',
+      'writes end 10/10 0 refused',
+    ]);
+  });
+
+  it('advances the facts phase after each request of twenty issues', async () => {
+    const many = Array.from({ length: 25 }, (_, index): PlantedIssue => ({ number: 101 + index, state: 'OPEN', labels: ['type:spec'] }));
+    const wired = wire(many.map(({ number }) => ({ number, values: { Stage: 'Backlog' } })), CONFIG, {}, { issues: [...ISSUES, ...many] });
+    const recording = recordingFeed();
+
+    const refresh = await refreshProjectItems({ ...wired.options, progress: recording.feed }, many.map(({ number }) => number));
+
+    expect(refresh.kind === 'refreshed' && refresh.changes).toEqual([]);
+    expect(recording.steps()).toEqual(['facts start 0/25', 'facts progress 20/25', 'facts progress 25/25', 'facts end 25/25 0 refused']);
+  });
+
+  it('opens no writes phase when no value differs, nor on a dry run', async () => {
+    const held = wire(items(EXPECTED));
+    const heldRecording = recordingFeed();
+    await refreshProjectItems({ ...held.options, progress: heldRecording.feed }, [10, 20, 21, 22, 30]);
+    const dry = wire(items());
+    const dryRecording = recordingFeed();
+    const dryRefresh = await refreshProjectItems({ ...dry.options, dryRun: true, progress: dryRecording.feed }, [10, 20, 21, 22, 30]);
+
+    expect(heldRecording.steps()).toEqual(['facts start 0/5', 'facts progress 5/5', 'facts end 5/5 0 refused']);
+    expect(dryRecording.steps()).toEqual(heldRecording.steps());
+    expect(dryRefresh.kind === 'refreshed' && dryRefresh.changes).toHaveLength(12);
+  });
+
+  it('opens no phase for an issue with no item, the project read and nothing else', async () => {
+    const wired = wire(items());
+    const recording = recordingFeed();
+
+    const refresh = await refreshProjectItems({ ...wired.options, progress: recording.feed }, [40]);
+
+    expect(refresh.kind === 'refreshed' && refresh.missing).toEqual([40]);
+    expect(recording.steps()).toEqual([]);
+  });
+});
+
+describe('refreshProjectItems: paced by board.project.writeBatchSize and writePauseMs, resolved off a real .rafa/config.yaml', () => {
+  it('batches the writes 7 to a request and pauses 0 ms, read off a config file rather than a hand-built RefreshConfig', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rafa-refresh-config-'));
+    try {
+      mkdirSync(join(root, '.rafa'), { recursive: true });
+      writeFileSync(join(root, '.rafa', 'config.yaml'), [
+        'board:',
+        '  project:',
+        `    number: ${String(NUMBER)}`,
+        '    writeBatchSize: 7',
+        '    writePauseMs: 0',
+        '',
+      ].join('\n'));
+
+      const resolved = loadConfig({ root, home: join(root, 'no-such-home') }, {}, () => {});
+      expect(resolved.config.boardProjectNumber).toBe(NUMBER);
+      expect(resolved.config.boardProjectWriteBatchSize).toBe(7);
+      expect(resolved.config.boardProjectWritePauseMs).toBe(0);
+
+      const config: RefreshConfig = {
+        boardProjectNumber: resolved.config.boardProjectNumber,
+        boardProjectRetries: resolved.config.boardProjectRetries,
+        boardProjectRetryWaitSeconds: resolved.config.boardProjectRetryWaitSeconds,
+        boardProjectWriteBatchSize: resolved.config.boardProjectWriteBatchSize,
+        boardProjectWritePauseMs: resolved.config.boardProjectWritePauseMs,
+        boardRelationships: resolved.config.boardRelationships,
+        roadmapIssue: resolved.config.roadmapIssue,
+        releaseFragments: resolved.config.releaseFragments,
+      };
+      const wired = wire(items(), config);
+      const events: string[] = [];
+      const gh: GhRunner = (args) => {
+        if (writeCalls([args]).length > 0) events.push(`request of ${String(writeCountOf(args))}`);
+        return wired.options.gh(args);
+      };
+      const sleep = (ms: number): Promise<void> => {
+        events.push(`pause of ${String(ms)}`);
+        return Promise.resolve();
+      };
+
+      const refresh = await refreshProjectItems({ ...wired.options, gh, sleep }, [10, 20, 21, 22, 30]);
+
+      expect(refresh.kind === 'refreshed' && refresh.writes).toEqual({ written: 12, notUpdated: 0, rateLimited: false, detail: '' });
+      expect(events).toEqual(['request of 7', 'pause of 0', 'request of 5']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('refreshProjectItems: known items for issues just added, over a listing that omits them', () => {
+  /** #41: open and ready, on no board line, so the rules give it a Stage and nothing else. */
+  const ISSUE_41: PlantedIssue = { number: 41, state: 'OPEN', labels: ['type:spec', 'spec:ready'] };
+
+  /** The project's items with the two just added, #40 and #41, last. */
+  const PLANTED: readonly FakeProjectItem[] = [...items(), { number: 40 }, { number: 41 }];
+
+  /** The reason of an added issue the rate limit left with a write unsent. */
+  const RATE_LIMIT_REASON = 'GitHub\'s rate limit refused its writes';
+
+  /** The items read's answer, as far as a case filters it. */
+  interface ItemsAnswer {
+    readonly data: { readonly node: { readonly items: { readonly nodes: readonly { readonly content: { readonly number?: number } | null }[] } } };
+  }
+
+  /** `gh`, answering every items read without the items of `omitted`: the listing that does not show an add yet. */
+  function omittingItems(gh: GhRunner, omitted: readonly number[]): GhRunner {
+    return async (args) => {
+      const result = await gh(args);
+      if (!result.ok || !args.some((arg) => arg.includes('node(id: $project)'))) return result;
+      const { items: page } = (JSON.parse(result.stdout) as ItemsAnswer).data.node;
+      const nodes = page.nodes.filter(({ content }) => !omitted.includes(content?.number ?? 0));
+      return { ...result, stdout: JSON.stringify({ data: { node: { items: { ...page, nodes } } } }) };
+    };
+  }
+
+  /** The project of `PLANTED` behind a listing that shows neither #40 nor #41, the facts fake holding #41 too. */
+  function wireLagging(fake: Pick<FakeProjectGhOptions, 'rateLimitAfter'> = {}, wrap?: FactsPlant['wrap']): Wired {
+    const wired = wire(PLANTED, CONFIG, fake, {
+      issues: [...ISSUES, ISSUE_41],
+      ...(wrap === undefined
+        ? {}
+        : { wrap }),
+    });
+    return { ...wired, options: { ...wired.options, gh: omittingItems(wired.options.gh, [40, 41]) } };
+  }
+
+  /** The id the fake gave the item of `issue`. */
+  function itemIdOf(issue: number): string {
+    return fakeItemId({ owner: OWNER, number: NUMBER }, PLANTED.findIndex(({ number }) => number === issue));
+  }
+
+  /** The known item of `issue`, as the add that answered its item builds it. */
+  function added(issue: number, repository: string = FAKE_PROJECT_REPOSITORY): KnownItem {
+    return knownItem(itemIdOf(issue), { repository, number: issue });
+  }
+
+  /** What `refresh` answers of the issues it could not reach: those missing, and those added and not filled. */
+  function unreached(refresh: Awaited<ReturnType<typeof refreshProjectItems>>): readonly unknown[] {
+    return refresh.kind === 'refreshed'
+      ? [refresh.missing, refresh.notFilled]
+      : [refresh.kind];
+  }
+
+  it('builds a known item from the id an add answered and what it sent, holding no value', () => {
+    expect(knownItem('PVTI_added', { repository: 'open-tomato/rafa', number: 40 })).toEqual({
+      id: 'PVTI_added',
+      archived: false,
+      content: { kind: 'issue', number: 40, repository: 'open-tomato/rafa' },
+      values: new Map(),
+    });
+  });
+
+  it('fills the added issues its listing does not show, through the known item of each add', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41], {}, [added(40), added(41)]);
+
+    expect(refresh.kind === 'refreshed' && refresh.changes.map(({ issue, name, from, to }) => [issue, name, from, to])).toEqual([
+      [40, 'Stage', null, 'Triage'],
+      [41, 'Stage', null, 'Ready'],
+    ]);
+    expect(unreached(refresh)).toEqual([[], []]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{ Stage: 'Triage' }, { Stage: 'Ready' }]);
+  });
+
+  it('answers the same issues as missing and writes nothing without their known items, the control of the case above', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41]);
+
+    expect(unreached(refresh)).toEqual([[40, 41], []]);
+    expect(writeCalls(wired.calls())).toEqual([]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{}, {}]);
+  });
+
+  it('fills the one issue a known item is handed for and leaves the other missing', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41], {}, [added(41)]);
+
+    expect(unreached(refresh)).toEqual([[40], []]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{}, { Stage: 'Ready' }]);
+  });
+
+  it('writes to the listing\'s own item, from the value it holds, when the listing and a known item both name the issue', async () => {
+    const shown = PLANTED.map((item) => (item.number === 40
+      ? { ...item, values: { Stage: 'Ready' } }
+      : item));
+    const wired = wire(shown);
+    const stale = knownItem('PVTI_not_the_listings', { repository: FAKE_PROJECT_REPOSITORY, number: 40 });
+
+    const refresh = await refreshProjectItems(wired.options, [40], {}, [stale]);
+
+    const changes = refresh.kind === 'refreshed'
+      ? refresh.changes
+      : [];
+    expect(changes.map(({ issue, name, from, to, write }) => [issue, name, from, to, write.itemId])).toEqual([
+      [40, 'Stage', 'Ready', 'Triage', itemIdOf(40)],
+    ]);
+    expect(unreached(refresh)).toEqual([[], []]);
+    expect((await heldValues(wired))[40]).toEqual({ Stage: 'Triage' });
+  });
+
+  it('never writes to a known item of another repository, answering its issue as missing and as not filled', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41], {}, [added(40, 'open-tomato/other'), added(41)]);
+
+    expect(unreached(refresh)).toEqual([
+      [40],
+      [{ number: 40, reason: 'its item is of open-tomato/other, not open-tomato/rafa' }],
+    ]);
+    expect(writeCalls(wired.calls()).some((args) => args.some((arg) => arg.endsWith(`=${itemIdOf(40)}`)))).toBe(false);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{}, { Stage: 'Ready' }]);
+  });
+
+  it('matches a known item whose repository differs from this one only by case, as the listing\'s items are matched', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [40], {}, [added(40, 'Open-Tomato/RAFA')]);
+
+    expect(unreached(refresh)).toEqual([[], []]);
+    expect((await heldValues(wired))[40]).toEqual({ Stage: 'Triage' });
+  });
+
+  it('answers an added issue whose facts are refused as not filled, with the refusal\'s reason, and fills the other', async () => {
+    const wrap = (gh: GhRunner): GhRunner => (args) => (args.some((arg) => arg.includes('i40: issue(number: 40)'))
+      ? Promise.resolve({ ok: false, stdout: '', stderr: 'read: operation timed out' })
+      : gh(args));
+    const wired = wireLagging({}, wrap);
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41], {}, [added(40), added(41)]);
+
+    const reason = 'gh api graphql failed: read: operation timed out';
+    expect(unreached(refresh)).toEqual([[], [{ number: 40, reason }]]);
+    expect(refresh.kind === 'refreshed' && refresh.refused).toEqual([{ number: 40, reason }]);
+    expect(refresh.warnings).toEqual([notRefreshedWarning({ number: 40, reason })]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{}, { Stage: 'Ready' }]);
+  });
+
+  it('answers a known item whose issue the refresh was not asked for as not filled, and leaves it unwritten', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [21], {}, [added(40)]);
+
+    expect(unreached(refresh)).toEqual([[], [{ number: 40, reason: 'not among the issues refreshed' }]]);
+    const held = await heldValues(wired);
+    expect([held[21], held[40]]).toEqual([EXPECTED[21], {}]);
+  });
+
+  it('widens over a known item as over the listing\'s: everyItem refreshes it with the items shown', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true }, [added(40)]);
+
+    expect(refresh.kind === 'refreshed' && [...new Set(refresh.changes.map(({ issue }) => issue))]).toEqual([10, 20, 21, 22, 30, 40]);
+    expect(unreached(refresh)).toEqual([[], []]);
+    expect(await heldValues(wired)).toEqual({ ...EXPECTED, 40: { Stage: 'Triage' }, 41: {} });
+  });
+
+  it('refreshes only the items shown for the same widening without the known item, the control of the case above', async () => {
+    const wired = wireLagging();
+
+    const refresh = await refreshProjectItems(wired.options, [], { everyItem: true });
+
+    expect(refresh.kind === 'refreshed' && [...new Set(refresh.changes.map(({ issue }) => issue))]).toEqual([10, 20, 21, 22, 30]);
+    expect((await heldValues(wired))[40]).toEqual({});
+  });
+
+  it('answers the added issues a rate-limit refusal left unwritten as not filled, after the two requests that landed', async () => {
+    // Fourteen writes, five to a request: #10 to #22 fill the two that land, #30, #40 and #41 the one refused.
+    const wired = wireLagging({ rateLimitAfter: 2 });
+
+    const refresh = await refreshProjectItems(wired.options, [10, 20, 21, 22, 30, 40, 41], {}, [added(40), added(41)]);
+
+    expect(refresh.kind === 'refreshed' && refresh.writes).toMatchObject({ written: 10, notUpdated: 3, rateLimited: true });
+    expect(unreached(refresh)).toEqual([[], [{ number: 40, reason: RATE_LIMIT_REASON }, { number: 41, reason: RATE_LIMIT_REASON }]]);
+    expect(refresh.warnings).toEqual([rateLimitWarning(3)]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{}, {}]);
+  });
+
+  it('answers no added issue as not filled when its writes landed before the refusal', async () => {
+    // The same fourteen writes with the added issues first: both are in the one request that lands.
+    const wired = wireLagging({ rateLimitAfter: 1 });
+
+    const refresh = await refreshProjectItems(wired.options, [40, 41, 10, 20, 21, 22, 30], {}, [added(40), added(41)]);
+
+    expect(refresh.kind === 'refreshed' && refresh.writes).toMatchObject({ written: 5, notUpdated: 4, rateLimited: true });
+    expect(unreached(refresh)).toEqual([[], []]);
+    const held = await heldValues(wired);
+    expect([held[40], held[41]]).toEqual([{ Stage: 'Triage' }, { Stage: 'Ready' }]);
+  });
+
+  it('answers the changes of a known item on a dry run, writing nothing and naming none as not filled', async () => {
+    const wired = wireLagging();
+
+    const dry = await refreshProjectItems({ ...wired.options, dryRun: true }, [40], {}, [added(40)]);
+
+    expect(dry.kind === 'refreshed' && changedPairs(dry.changes)).toEqual(['40:Stage']);
+    expect(unreached(dry)).toEqual([[], []]);
+    expect(writeCalls(wired.calls())).toEqual([]);
+  });
+
+  it('refuses a known item whose number is no issue number before any call', async () => {
+    const wired = wireLagging();
+    const bad = knownItem(itemIdOf(40), { repository: FAKE_PROJECT_REPOSITORY, number: 0 });
+
+    await expect(refreshProjectItems(wired.options, [40], {}, [bad])).rejects.toThrow('board project refresh: 0 is not an issue number');
+    expect(wired.calls()).toEqual([]);
   });
 });

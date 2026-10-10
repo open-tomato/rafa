@@ -15,6 +15,17 @@
  *    base, so a reader answering true for every fragment fails.
  *  - The files beyond the first page hold the only fragment, so a reader
  *    stopping at one page answers none.
+ *  - Each list of an issue read past its first page holds, on its last
+ *    page alone, the entry the case looks for: a label, a closing
+ *    reference, or the one closing cross-reference among 116, as `#485`
+ *    held. A reader stopping at one page answers none of them.
+ *  - The cursor that repeats is read beside the same issue without it,
+ *    which reads to its end.
+ *  - Every refused issue is read beside one in the same request that is
+ *    NOT refused and is answered its facts, so a reader refusing a whole
+ *    batch, or throwing, fails. A batch failing once and then answering
+ *    is read with no refusal, so a reader refusing on the first failure
+ *    fails.
  */
 import type { FakeFactsIssue, FakeFactsPull, FakePullFile } from './facts-fake.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
@@ -22,7 +33,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import { describe, expect, it } from 'bun:test';
 
 import { createFakeFactsGh, FAKE_REPOSITORY } from './facts-fake.js';
-import { blobsArgs, issuesArgs, PAGE_SIZE } from './facts-query.js';
+import { blobsArgs, issuesArgs, listPagesArgs, PAGE_SIZE } from './facts-query.js';
 import { bodyCloses, readIssueFacts, UNREAD_LEVEL } from './facts.js';
 import { stageOf } from './rules.js';
 
@@ -51,8 +62,8 @@ async function read(
   fragments = FRAGMENTS,
 ) {
   const fake = createFakeFactsGh({ issues: planted.issues, pulls: planted.pulls ?? [], trees: planted.trees ?? {} });
-  const facts = await readIssueFacts({ gh: fake.gh, fragments }, numbers);
-  return { facts, calls: fake.calls() };
+  const { facts, refused } = await readIssueFacts({ gh: fake.gh, fragments }, numbers);
+  return { facts, refused, calls: fake.calls() };
 }
 
 describe('bodyCloses', () => {
@@ -330,41 +341,200 @@ describe('readIssueFacts: the Stage edge cases, read through the fake', () => {
   });
 });
 
-describe('readIssueFacts: refusals', () => {
+describe('readIssueFacts: an issue\'s lists past their first page', () => {
+  /** Issue 485, with `issueMentions` issue-sourced cross-references before pull request 900's closing one. */
+  function busy(issueMentions: number, repeatsCursor?: FakeFactsIssue['repeatsCursor']): FakeFactsIssue {
+    return { number: 485, state: 'OPEN', issueMentions, mentions: [{ pull: 900 }], ...(repeatsCursor === undefined
+      ? {}
+      : { repeatsCursor }) };
+  }
+
+  /** The calls among `calls` reading a further page of a list. */
+  function listPageCalls(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
+    return calls.filter((args) => args.some((arg) => arg.startsWith('query=') && arg.includes(': issue(number:') && !arg.includes('fragment facts')));
+  }
+
+  it('reads all 116 cross-references of an issue, finding the closing pull request on the second page at one more request', async () => {
+    const { facts, calls } = await read({ issues: [busy(115)], pulls: [pull(900, { body: 'Closes #485' })] }, [485]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(listPageCalls(calls)).toHaveLength(1);
+    expect(listPageCalls(calls)[0]).toContain(`tl485=${btoa(String(PAGE_SIZE))}`);
+  });
+
+  it('sends no list read for an issue whose every list fits one page', async () => {
+    const { facts, calls } = await read({ issues: [busy(PAGE_SIZE - 1)], pulls: [pull(900, { body: 'Closes #485' })] }, [485]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(listPageCalls(calls)).toEqual([]);
+  });
+
+  it('reads labels and closing references past their first page, three pages each', async () => {
+    const labels = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => `l${String(index)}`);
+    const closedBy = Array.from({ length: 2 * PAGE_SIZE + 1 }, (_, index) => index + 1);
+    const pulls = closedBy.map((number) => pull(number, { state: number === closedBy.length
+      ? 'MERGED'
+      : 'CLOSED' }));
+    const { facts, calls } = await read({ issues: [{ number: 7, state: 'OPEN', labels, closedBy }], pulls }, [7]);
+
+    expect(facts.get(7)?.labels).toEqual(labels);
+    expect(facts.get(7)?.pullRequests.map(({ number }) => number)).toEqual([closedBy.length]);
+    expect(listPageCalls(calls)).toHaveLength(2);
+  });
+
+  it('batches the further pages of several issues into one request', async () => {
+    const issues = [busy(115), { ...busy(130), number: 486, mentions: [] }];
+    const { facts, calls } = await read({ issues, pulls: [pull(900, { body: 'Closes #485' })] }, [485, 486]);
+
+    expect(facts.get(485)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(facts.get(486)?.pullRequests).toEqual([]);
+    expect(listPageCalls(calls)).toHaveLength(1);
+  });
+
+  it('refuses alone, naming the issue and the list, an issue whose cursor repeats, beside one read to its end', async () => {
+    const issues = [busy(115, 'timelineItems'), { ...busy(115), number: 486 }];
+    const pulls = [pull(900, { body: 'Closes #485\nCloses #486' })];
+    const { facts, refused, calls } = await read({ issues, pulls }, [485, 486]);
+
+    expect(refused).toEqual([{
+      number: 485,
+      reason: `issue #485.timelineItems answered the cursor "${btoa(String(PAGE_SIZE))}" a second time, so its next page would repeat one read before`,
+    }]);
+    expect(facts.has(485)).toBe(false);
+    expect(facts.get(486)?.pullRequests.map(({ number }) => number)).toEqual([900]);
+    expect(listPageCalls(calls)).toHaveLength(1);
+  });
+
+  it('asks a labels page with no pull fragment, and a cross-references page with one', () => {
+    const queryOf = (args: readonly string[]): string => args.find((arg) => arg.startsWith('query=')) ?? '';
+
+    expect(queryOf(listPagesArgs([{ number: 1, list: 'labels', cursor: 'MQ' }]))).not.toContain('fragment pull');
+    expect(queryOf(listPagesArgs([{ number: 1, list: 'timelineItems', cursor: 'MQ' }]))).toContain('fragment pull on PullRequest');
+    expect(listPagesArgs([{ number: 1, list: 'labels', cursor: 'a"b' }])).toContain('la1=a"b');
+  });
+});
+
+describe('readIssueFacts: refusals, one issue at a time', () => {
   /** A runner answering `answer` to every call. */
   function answering(answer: GhResult): GhRunner {
     return () => Promise.resolve(answer);
   }
 
-  it('throws naming what gh said when the call fails', async () => {
+  /** `gh`, failing with `stderr` every call whose argv holds `needle`. */
+  function failingOn(gh: GhRunner, needle: string, stderr: string): GhRunner {
+    return (args) => (args.some((arg) => arg.includes(needle))
+      ? Promise.resolve({ ok: false, stdout: '', stderr })
+      : gh(args));
+  }
+
+  /** How many issues the query of `args` asks for. */
+  function issuesAsked(args: readonly string[]): number {
+    const query = args.find((arg) => arg.startsWith('query=')) ?? '';
+    return [...query.matchAll(/issue\(number: \d+\)/gu)].length;
+  }
+
+  /** The calls among `calls` reading issues. */
+  function issueCalls(calls: readonly (readonly string[])[]): readonly (readonly string[])[] {
+    return calls.filter((args) => args.some((arg) => arg.includes('fragment facts on Issue')));
+  }
+
+  it('refuses every issue with what gh said when every call fails, and never throws', async () => {
     const fake = createFakeFactsGh({ issues: [{ number: 1, state: 'OPEN' }] });
-    fake.failNext('gh: Your token has not been granted the required scopes');
+    const gh = failingOn(fake.gh, 'query=', 'gh: Your token has not been granted the required scopes');
 
-    await expect(readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('required scopes');
+    const { facts, refused } = await readIssueFacts({ gh, fragments: FRAGMENTS }, [1]);
+
+    expect(facts.size).toBe(0);
+    expect(refused).toEqual([{ number: 1, reason: 'gh api graphql failed: gh: Your token has not been granted the required scopes' }]);
   });
 
-  it('throws on an issue the repository does not hold', async () => {
-    const fake = createFakeFactsGh({ issues: [] });
+  it('reads a batch again one issue to a request after it fails once, refusing none', async () => {
+    const fake = createFakeFactsGh({ issues: [{ number: 1, state: 'OPEN' }, { number: 2, state: 'OPEN' }] });
+    fake.failNext('read: operation timed out');
 
-    await expect(readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('no issue #1');
+    const { facts, refused } = await readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [1, 2]);
+
+    expect(refused).toEqual([]);
+    expect([...facts.keys()]).toEqual([1, 2]);
+    expect(issueCalls(fake.calls()).map(issuesAsked)).toEqual([2, 1, 1]);
   });
 
-  it('throws on a list longer than one page, naming the issue and the key', async () => {
-    const issue = {
-      number: 1,
-      state: 'OPEN',
-      stateReason: null,
-      labels: { pageInfo: { hasNextPage: true }, nodes: [] },
-      closedByPullRequestsReferences: { pageInfo: { hasNextPage: false }, nodes: [] },
-      timelineItems: { pageInfo: { hasNextPage: false }, nodes: [] },
+  it('refuses alone an issue the repository does not hold, answering the rest of its batch', async () => {
+    const fake = createFakeFactsGh({ issues: [{ number: 1, state: 'OPEN' }, { number: 3, state: 'CLOSED', labels: ['x'] }] });
+
+    const { facts, refused } = await readIssueFacts({ gh: fake.gh, fragments: FRAGMENTS }, [3, 2, 1]);
+
+    expect(refused).toEqual([{ number: 2, reason: 'gh api graphql failed: fake gh: no issue #2' }]);
+    expect([...facts.keys()]).toEqual([3, 1]);
+    expect(facts.get(3)?.labels).toEqual(['x']);
+  });
+
+  it('refuses alone, with no second request, an issue whose answer is not the recorded shape beside one that is', async () => {
+    const list = { pageInfo: { hasNextPage: false }, nodes: [] };
+    const good = { number: 2, state: 'OPEN', stateReason: null, labels: list, closedByPullRequestsReferences: list, timelineItems: list };
+    const bad = { ...good, number: 1, labels: { pageInfo: { hasNextPage: null }, nodes: [] } };
+    const calls: (readonly string[])[] = [];
+    const stdout = JSON.stringify({ data: { repository: { nameWithOwner: FAKE_REPOSITORY, i1: bad, i2: good } } });
+    const gh: GhRunner = (args) => {
+      calls.push(args);
+      return Promise.resolve({ ok: true, stdout, stderr: '' });
     };
-    const gh = answering({ ok: true, stdout: JSON.stringify({ data: { repository: { nameWithOwner: FAKE_REPOSITORY, i1: issue } } }), stderr: '' });
 
-    await expect(readIssueFacts({ gh, fragments: FRAGMENTS }, [1])).rejects.toThrow('issue #1.labels holds more than 100 entries');
+    const { facts, refused } = await readIssueFacts({ gh, fragments: FRAGMENTS }, [1, 2]);
+
+    expect(refused).toEqual([{ number: 1, reason: 'issue #1.labels.pageInfo.hasNextPage is null, expected true or false' }]);
+    expect(facts.get(2)?.state).toBe('OPEN');
+    expect(calls).toHaveLength(1);
   });
 
-  it('throws on an answer that is not JSON', async () => {
-    await expect(readIssueFacts({ gh: answering({ ok: true, stdout: 'oops', stderr: '' }), fragments: FRAGMENTS }, [1])).rejects.toThrow('not JSON');
+  it('refuses an issue on an answer that is not JSON, naming the text', async () => {
+    const { facts, refused } = await readIssueFacts({ gh: answering({ ok: true, stdout: 'oops', stderr: '' }), fragments: FRAGMENTS }, [1]);
+
+    expect(facts.size).toBe(0);
+    expect(refused).toEqual([{ number: 1, reason: 'gh api graphql answered text that is not JSON: oops' }]);
+  });
+
+  it('refuses alone an issue whose further list page fails, answering the issue beside it', async () => {
+    const issues: readonly FakeFactsIssue[] = [
+      { number: 485, state: 'OPEN', issueMentions: 115 },
+      { number: 486, state: 'OPEN', issueMentions: 115 },
+    ];
+    const fake = createFakeFactsGh({ issues });
+    const gh = failingOn(fake.gh, 'tl485: issue(number: 485)', 'read: operation timed out');
+
+    const { facts, refused } = await readIssueFacts({ gh, fragments: FRAGMENTS }, [485, 486]);
+
+    expect(refused).toEqual([{ number: 485, reason: 'gh api graphql failed: read: operation timed out' }]);
+    expect(facts.get(486)?.pullRequests).toEqual([]);
+  });
+
+  it('refuses every issue a pull request whose files fail closes, naming it, and answers the issue it does not close', async () => {
+    const fake = createFakeFactsGh({
+      issues: [{ number: 1, state: 'CLOSED', closedBy: [5] }, { number: 2, state: 'CLOSED', closedBy: [5] }, { number: 3, state: 'CLOSED', closedBy: [6] }],
+      pulls: [pull(5), pull(6)],
+    });
+    const gh = failingOn(fake.gh, 'pullRequest(number: 5)', 'HTTP 502');
+
+    const { facts, refused } = await readIssueFacts({ gh, fragments: FRAGMENTS }, [1, 2, 3]);
+
+    const reason = 'pull request #5 could not be read: gh api graphql failed: HTTP 502';
+    expect(refused).toEqual([{ number: 1, reason }, { number: 2, reason }]);
+    expect(facts.get(3)?.pullRequests.map(({ number }) => number)).toEqual([6]);
+  });
+
+  it('refuses the issue whose fragment blobs fail, answering the one whose blobs read', async () => {
+    const [one, two] = ['.changes/rafa-1.md', '.changes/rafa-2.md'];
+    const fake = createFakeFactsGh({
+      issues: [{ number: 1, state: 'CLOSED', closedBy: [5] }, { number: 2, state: 'CLOSED', closedBy: [6] }],
+      pulls: [pull(5, { files: [added(one)] }), pull(6, { files: [added(two)] })],
+      trees: { head5: { [one]: fragmentText('patch') }, head6: { [two]: fragmentText('minor') } },
+    });
+    const gh = failingOn(fake.gh, `h0=head5:${one}`, 'connection reset by peer');
+
+    const { facts, refused } = await readIssueFacts({ gh, fragments: FRAGMENTS }, [1, 2]);
+
+    expect(refused).toEqual([{ number: 1, reason: 'pull request #5 could not be read: gh api graphql failed: connection reset by peer' }]);
+    expect(facts.get(2)?.pullRequests[0]?.fragment?.level).toBe('minor');
   });
 });
 

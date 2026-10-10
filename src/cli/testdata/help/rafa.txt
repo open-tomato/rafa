@@ -23,6 +23,7 @@ Quick start:
   rafa config set pr.base=stretch/9
   rafa ci status --branch=stretch/9
   rafa stretch start --dry-run
+  rafa bug codes
   rafa status
   rafa next
   rafa roadmap
@@ -68,6 +69,8 @@ Subjects:
              cases it failed
   stretch    open a stretch: its integration branch, pr.base pointed at it, and
              the operators in tmux 🪙
+  bug        list the cause codes a bug can carry, rank the closest to a cause
+             in words, and check for codes that read alike
 
 Commands:
   status, next 🪙, roadmap, switch, init, doctor, cleanup, self-update, describe

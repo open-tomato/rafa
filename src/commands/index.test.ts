@@ -9,7 +9,7 @@
  * the nine `issue` actions, `module list`, `module exec`, `agent vendor`, `agent list`, `agent show`, `agent search`,
  * `skill check`, `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`, `instinct flag`, `instinct promote`,
  * `release status`, `release settle`, `release tag`, `board list`, `board sync`,
- * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end` and the eight `pr` actions
+ * the four `claim` actions, the eight `update` actions, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes` and the eight `pr` actions
  * wrap none, and each is held to the
  * arguments and flags spelled for it here. Every command is held to
  * exactly one of the two lists.
@@ -93,7 +93,7 @@ const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 /** The modules reading each command line, from `src/`. */
 const READERS: Readonly<Record<string, readonly string[]>> = {
   'plan create': ['plan.ts', 'board/flags.ts'],
-  'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts'],
+  'loop start': ['start.ts', 'start/run-config.ts', 'start/run-setup.ts', 'start/runtime.ts', 'start/continue-args.ts'],
   'effort collect': ['effort/collect.ts', 'effort/collect-args.ts'],
   'effort report': ['effort/report.ts', 'effort/report-args.ts'],
 };
@@ -196,6 +196,7 @@ const OUTPUTS: Readonly<Record<string, RafaCommand['outputs']>> = {
   'stretch start': ['text'],
   'stretch item': ['text'],
   'stretch end': ['text'],
+  'bug codes': ['text', 'json'],
 };
 
 /** What each command wrapping no phase 0 command declares: its arguments, then its flags, by name. */
@@ -290,6 +291,7 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'stretch start': [[], ['n', 'remote-control', 'role', 'dry-run']],
   'stretch item': [['issue'], ['wait', 'dry-run']],
   'stretch end': [[], ['dry-run']],
+  'bug codes': [[], ['suggest', 'family', 'check']],
   'self-update': [[], ['force']],
   'describe': [[], []],
 };
@@ -404,6 +406,7 @@ const ROUTES: readonly (readonly [string, string, readonly string[], string])[] 
   ['stretch start --role=watchtower --n=5', 'stretch start', ['--role=watchtower', '--n=5'], ''],
   ['stretch item 812 --wait', 'stretch item', ['812', '--wait'], ''],
   ['stretch end --dry-run', 'stretch end', ['--dry-run'], ''],
+  ['bug codes --family=git', 'bug codes', ['--family=git'], ''],
   ['switch 252', 'switch', ['252'], ''],
   ['switch - --no-rehome', 'switch', ['-', '--no-rehome'], ''],
   ['board list', 'board list', [], ''],
@@ -480,6 +483,16 @@ const WRAPPER_FLAGS: Readonly<Record<string, readonly string[]>> = {
   'loop start': ['hint'],
 };
 
+/**
+ * The spellings a phase 0 parser reads only to REFUSE them, per command,
+ * which no declaration names: `--no-retry`, refused because off is
+ * spelled `loop.retries: false` (`start/run-setup.ts`). Taken off what
+ * the parser reads before the declarations are compared.
+ */
+const REFUSED_SPELLINGS: Readonly<Record<string, readonly string[]>> = {
+  'loop start': ['--no-retry'],
+};
+
 /** The quoted flag literals of a source, each once and sorted: `'--name'` and `'--name=`. */
 function literalFlags(source: string): string[] {
   const flags = [...source.matchAll(/'(--[a-z][a-z-]*)['=]/g)].map((match) => match[1] ?? '');
@@ -503,12 +516,12 @@ function numberWord(word: string): number {
 const INDEX_SOURCE = readFileSync(join(SRC_DIR, 'commands', 'index.ts'), 'utf8');
 
 describe('the core roster', () => {
-  it('registers the seventeen subjects with an action, in roster order', () => {
-    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch']);
+  it('registers the eighteen subjects with an action, in roster order', () => {
+    expect(CORE_REGISTRY.subjects().map((subject) => subject.name)).toEqual(['plan', 'loop', 'issue', 'pr', 'effort', 'module', 'agent', 'skill', 'instinct', 'release', 'board', 'epic', 'claim', 'update', 'config', 'ci', 'stretch', 'bug']);
     expect(CORE_SUBJECTS.filter((subject) => CORE_REGISTRY.actionsOf(subject.name).length === 0)).toEqual([]);
   });
 
-  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open and pr retarget after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
+  it('registers plan create, the five plan readers, loop start with its six session actions, the nine issue actions, the four pr readers with pr open and pr retarget after the third, pr wait, pr merge and pr triage, the effort commands, module list and module exec, the four agent actions, skill check, skill list, skill show, skill search, skill demote and skill backfill, the five instinct actions, the three release actions, board list, board sync, epic show, epic new, epic defer, epic promote, epic move, epic close, epic cancel, the four claim actions, update current with its seven stubs, config set, ci status, stretch start, stretch item, stretch end, bug codes, status, next, roadmap, switch, init, doctor, cleanup, self-update and describe, in roster order, none of them hidden but update rafa and update port', () => {
     expect(CORE_REGISTRY.commands({ includeHidden: true }).map(commandSpelling)).toEqual([
       'plan create',
       'plan list',
@@ -597,6 +610,7 @@ describe('the core roster', () => {
       'stretch start',
       'stretch item',
       'stretch end',
+      'bug codes',
       'status',
       'next',
       'roadmap',
@@ -751,7 +765,9 @@ describe('the flags each command declares', () => {
 
   it.each(COMMANDS.filter(([spelling]) => Object.hasOwn(READERS, spelling)))('declares for %s exactly the flags its phase 0 module reads, beside the wrapper flag', (spelling, command) => {
     const readers = READERS[spelling] ?? [];
-    const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'));
+    const refused = REFUSED_SPELLINGS[spelling] ?? [];
+    const read = literalFlags(readers.map((file) => readFileSync(join(SRC_DIR, file), 'utf8')).join('\n'))
+      .filter((flag) => !refused.includes(flag));
     const wrapper = WRAPPER_FLAGS[spelling] ?? [];
     const names = command.flags.map((flag) => flag.name);
     const own = command.flags.filter((flag) => !wrapper.includes(flag.name));

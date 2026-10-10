@@ -87,8 +87,8 @@ import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js'
 import { RefsBlockError } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';
 
+import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import { ACCEPT_REFS_FLAG } from './flags.js';
-import { BOARD_REFUSAL_EXIT } from './plan-spec.js';
 
 /**
  * The flag this module reads, re-exported: the reading is this

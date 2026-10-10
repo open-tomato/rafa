@@ -32,6 +32,10 @@
  * it runs for its scoped test gate. The line after the base line, when
  * the run's `tests.alwaysRun` resolved to any tracked file, tells the
  * session to also run `bun test` over those files (`task-gate-lines.ts`).
+ * The line after that, when the checkout holds the `tsconfig.json` and
+ * the `tsc` the runner's type step needs, tells the session to
+ * type-check the test files its change adds or edits as that step will
+ * (`typeCheckLines`).
  * Its last lines, ahead of the
  * plan stamp, are the `known-missing:` lines the run's preflight answered
  * and the sentence saying what such an item is (`start/preflight.ts`),
@@ -91,6 +95,7 @@ import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
+import type { TypeCheckRecipe } from './type-step.js';
 import type { AdapterRegistry } from '../adapters/registry.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
@@ -124,7 +129,7 @@ import { renderInheritedSection } from './inherited-notice.js';
 import { knownMissingNotice } from './preflight.js';
 import { resolveSessionTiers, serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
-import { alwaysRunLines, baseLines } from './task-gate-lines.js';
+import { alwaysRunLines, baseLines, typeCheckLines } from './task-gate-lines.js';
 
 /** The flag a task session is spawned with to run under the loop's id. */
 export const SESSION_ID_FLAG = '--session-id';
@@ -262,6 +267,13 @@ export interface TaskDispatchOptions {
    * leaves the prompt as it was.
    */
   alwaysRun?: readonly string[];
+  /**
+   * The runner's type step recipe for the checkout
+   * (`readTypeCheckRecipe`, `type-step.ts`), which the prompt hands the
+   * session to type-check its test files as the step will. None when left
+   * out or null, which leaves the prompt as it was.
+   */
+  typeCheck?: TypeCheckRecipe | null;
   /**
    * What the session is served against (`start/serving.ts`): the run's
    * served directory is filled before the session spawns, and its flags
@@ -442,6 +454,12 @@ function sectionLines(sections: TaskPromptSections & { readonly inherited: strin
  * telling the session to run them with `bun test`. With none, the
  * default, the prompt is the one built before the setting existed.
  *
+ * `typeCheck` is the runner's type step recipe. With one, the line
+ * `typeCheckLines` (`task-gate-lines.ts`) answers follows the always-run
+ * line, or the line it would follow, telling the session to type-check
+ * its test files as the step will. With none, the default, the prompt
+ * is the one built before the line existed.
+ *
  * `sections` is the task's rendered skills and lessons sections. Each
  * non-blank one goes after the blank line that closes the head (the
  * always-run line, the base line, the blocker line, or the second line without any) and before
@@ -467,6 +485,7 @@ export function buildTaskPrompt(
   base: string | null = null,
   inherited: readonly SuiteFailure[] = [],
   alwaysRun: readonly string[] = [],
+  typeCheck: TypeCheckRecipe | null = null,
 ): string {
   return [
     `Your scoped task is: ${taskText}`,
@@ -474,6 +493,7 @@ export function buildTaskPrompt(
     ...blockerLines(blocker),
     ...baseLines(base),
     ...alwaysRunLines(alwaysRun),
+    ...typeCheckLines(typeCheck),
     '',
     ...sectionLines({ ...sections, inherited: renderInheritedSection(inherited) }),
     promptContent,
@@ -609,6 +629,7 @@ export async function dispatchTask(
     options.base,
     options.inherited,
     options.alwaysRun,
+    options.typeCheck ?? null,
   ));
 
   const served = serveForSession(options.serving, resolution);

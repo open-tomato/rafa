@@ -90,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -120,6 +120,11 @@ const SETTINGS: readonly ConfigSetting[] = [
   'allowList',
   'settingSources',
   'loopWorktreeDir',
+  'loopRetries',
+  'loopRetriesOnContinue',
+  'loopContinueCriteria',
+  'loopContinueCriteriaMode',
+  'loopForceWrapUpMaxNewFailures',
   'loopWrapUpRetries',
   'prProvider',
   'prMergeMethod',
@@ -130,6 +135,11 @@ const SETTINGS: readonly ConfigSetting[] = [
   'boardRelationships',
   'boardProjectTemplate',
   'boardProjectNumber',
+  'boardProjectRetries',
+  'boardProjectRetryWaitSeconds',
+  'boardProjectProgressSeconds',
+  'boardProjectWriteBatchSize',
+  'boardProjectWritePauseMs',
   'roadmapIssue',
   'claimsStaleAfter',
   'claimsAhead',
@@ -144,6 +154,7 @@ const SETTINGS: readonly ConfigSetting[] = [
   'releaseSettle',
   'releaseTag',
   'releasePublishCommand',
+  'errorsCodes',
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
@@ -190,6 +201,11 @@ const DEFAULTS: RafaConfig = {
   allowList: [],
   settingSources: ['project', 'local'],
   loopWorktreeDir: join('.rafa', 'worktrees'),
+  loopRetries: false,
+  loopRetriesOnContinue: 1,
+  loopContinueCriteria: join('.rafa', 'continue-criteria.md'),
+  loopContinueCriteriaMode: 'extend',
+  loopForceWrapUpMaxNewFailures: false,
   loopWrapUpRetries: 1,
   prProvider: null,
   prMergeMethod: 'squash',
@@ -200,6 +216,11 @@ const DEFAULTS: RafaConfig = {
   boardRelationships: 'labels',
   boardProjectTemplate: 'https://github.com/orgs/open-tomato/projects/6',
   boardProjectNumber: null,
+  boardProjectRetries: 3,
+  boardProjectRetryWaitSeconds: 2,
+  boardProjectProgressSeconds: 10,
+  boardProjectWriteBatchSize: 20,
+  boardProjectWritePauseMs: 1000,
   roadmapIssue: null,
   claimsStaleAfter: '3d',
   claimsAhead: 'off',
@@ -214,6 +235,7 @@ const DEFAULTS: RafaConfig = {
   releaseSettle: 'push',
   releaseTag: 'manual',
   releasePublishCommand: 'npm publish',
+  errorsCodes: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
@@ -296,6 +318,13 @@ const FULL = [
   'loop:',
   '  settingSources: user, project',
   '  worktreeDir: ../worktrees',
+  '  retries: 2',
+  '  retriesOnContinue: 2',
+  '  continue:',
+  '    criteria: docs/continue.md',
+  '    criteriaMode: replace',
+  '  forceWrapUp:',
+  '    maxNewFailures: 7',
   '  wrapUp:',
   '    retries: 2',
   'pr:',
@@ -310,6 +339,11 @@ const FULL = [
   '  project:',
   '    template: https://github.com/orgs/acme/projects/2',
   '    number: 6',
+  '    retries: 5',
+  '    retryWaitSeconds: 4',
+  '    progressSeconds: 30',
+  '    writeBatchSize: 7',
+  '    writePauseMs: 0',
   'roadmap:',
   '  issue: 31',
   'claims:',
@@ -329,6 +363,13 @@ const FULL = [
   '  settle: pr',
   '  tag: settle',
   '  publishCommand: pnpm publish',
+  'errors:',
+  '  codes:',
+  '    - code: deploy:missing-secret',
+  '      description: a deploy reads an unset secret',
+  '      hint: set the secret',
+  '      level: error',
+  '      since: v1',
   'cleanup:',
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
@@ -399,6 +440,11 @@ const FULL_VALUES: RafaConfig = {
   allowList: ['my-output'],
   settingSources: ['user', 'project'],
   loopWorktreeDir: '../worktrees',
+  loopRetries: 2,
+  loopRetriesOnContinue: 2,
+  loopContinueCriteria: 'docs/continue.md',
+  loopContinueCriteriaMode: 'replace',
+  loopForceWrapUpMaxNewFailures: 7,
   loopWrapUpRetries: 2,
   prProvider: 'none',
   prMergeMethod: 'rebase',
@@ -409,6 +455,11 @@ const FULL_VALUES: RafaConfig = {
   boardRelationships: 'native',
   boardProjectTemplate: 'https://github.com/orgs/acme/projects/2',
   boardProjectNumber: 6,
+  boardProjectRetries: 5,
+  boardProjectRetryWaitSeconds: 4,
+  boardProjectProgressSeconds: 30,
+  boardProjectWriteBatchSize: 7,
+  boardProjectWritePauseMs: 0,
   roadmapIssue: 31,
   claimsStaleAfter: '36h',
   claimsAhead: 'allow',
@@ -423,6 +474,7 @@ const FULL_VALUES: RafaConfig = {
   releaseSettle: 'pr',
   releaseTag: 'settle',
   releasePublishCommand: 'pnpm publish',
+  errorsCodes: [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
@@ -503,7 +555,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(11);
+    expect(lists).toHaveLength(12);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -797,6 +849,31 @@ describe('parseConfigText', () => {
         'loop:\n  worktreeDir: /tmp/trees', 'loopWorktreeDir', '/tmp/trees',
       ],
       [
+        'loop.retries', 'loop:\n  retries: -1',
+        'loop.retries is -1, expected false or a whole number from 1 to 3',
+        'loop:\n  retries: 1', 'loopRetries', 1,
+      ],
+      [
+        'loop.retriesOnContinue', 'loop:\n  retriesOnContinue: 0',
+        'loop.retriesOnContinue is 0, expected false or a whole number from 1 to 3',
+        'loop:\n  retriesOnContinue: 3', 'loopRetriesOnContinue', 3,
+      ],
+      [
+        'loop.continue.criteria', 'loop:\n  continue:\n    criteria: 7',
+        'loop.continue.criteria is 7, expected a file path',
+        'loop:\n  continue:\n    criteria: c.md', 'loopContinueCriteria', 'c.md',
+      ],
+      [
+        'loop.continue.criteriaMode', 'loop:\n  continue:\n    criteriaMode: merge',
+        'loop.continue.criteriaMode is "merge", expected one of: extend, replace',
+        'loop:\n  continue:\n    criteriaMode: replace', 'loopContinueCriteriaMode', 'replace',
+      ],
+      [
+        'loop.forceWrapUp.maxNewFailures', 'loop:\n  forceWrapUp:\n    maxNewFailures: 51',
+        'loop.forceWrapUp.maxNewFailures is 51, expected false or a whole number from 1 to 50',
+        'loop:\n  forceWrapUp:\n    maxNewFailures: 50', 'loopForceWrapUpMaxNewFailures', 50,
+      ],
+      [
         'loop.wrapUp.retries', 'loop:\n  wrapUp:\n    retries: 0',
         'loop.wrapUp.retries is 0, expected false or a whole number from 1 to 3',
         'loop:\n  wrapUp:\n    retries: false', 'loopWrapUpRetries', false,
@@ -847,6 +924,31 @@ describe('parseConfigText', () => {
         'board.project.number', 'board:\n  project:\n    number: "6"',
         'board.project.number is "6", expected a project number, a whole number above zero',
         'board:\n  project:\n    number: 6', 'boardProjectNumber', 6,
+      ],
+      [
+        'board.project.retries', 'board:\n  project:\n    retries: 0',
+        'board.project.retries is 0, expected false or a whole number from 1 to 10',
+        'board:\n  project:\n    retries: false', 'boardProjectRetries', false,
+      ],
+      [
+        'board.project.retryWaitSeconds', 'board:\n  project:\n    retryWaitSeconds: 61',
+        'board.project.retryWaitSeconds is 61, expected a whole number from 1 to 60',
+        'board:\n  project:\n    retryWaitSeconds: 60', 'boardProjectRetryWaitSeconds', 60,
+      ],
+      [
+        'board.project.progressSeconds', 'board:\n  project:\n    progressSeconds: -1',
+        'board.project.progressSeconds is -1, expected false or a whole number from 1 to 300',
+        'board:\n  project:\n    progressSeconds: false', 'boardProjectProgressSeconds', false,
+      ],
+      [
+        'board.project.writeBatchSize', 'board:\n  project:\n    writeBatchSize: false',
+        'board.project.writeBatchSize is false, expected a whole number from 1 to 100',
+        'board:\n  project:\n    writeBatchSize: 100', 'boardProjectWriteBatchSize', 100,
+      ],
+      [
+        'board.project.writePauseMs', 'board:\n  project:\n    writePauseMs: -1',
+        'board.project.writePauseMs is -1, expected a whole number from 0 to 60000',
+        'board:\n  project:\n    writePauseMs: 0', 'boardProjectWritePauseMs', 0,
       ],
       [
         'roadmap.issue', 'roadmap:\n  issue: 0',
@@ -917,6 +1019,12 @@ describe('parseConfigText', () => {
         'release.publishCommand', 'release:\n  publishCommand: ""',
         'release.publishCommand is "", expected a publish command',
         'release:\n  publishCommand: pnpm publish', 'releasePublishCommand', 'pnpm publish',
+      ],
+      [
+        'errors.codes', 'errors:\n  codes: git:x',
+        'errors.codes is "git:x", expected a list of error code entries',
+        'errors:\n  codes:\n    - code: deploy:missing-secret\n      description: a deploy reads an unset secret\n      hint: set the secret\n      level: error\n      since: v1',
+        'errorsCodes', [{ code: 'deploy:missing-secret', description: 'a deploy reads an unset secret', hint: 'set the secret', level: 'error', since: 'v1' }],
       ],
       [
         'cleanup.staleDays', 'cleanup:\n  staleDays: 0',

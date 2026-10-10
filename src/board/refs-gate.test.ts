@@ -36,7 +36,7 @@ import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock,
 import { RefVerifyError } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
-import { BOARD_REFUSAL_EXIT } from './plan-spec.js';
+import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import {
   ACCEPT_REFS_FLAG,
   ACCEPT_STALE_REFS_KEY,

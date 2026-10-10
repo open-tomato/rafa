@@ -1,8 +1,14 @@
 /**
  * The loop's events: a task's start, its end done or blocked, each phase
- * of the wrap-up, the pull request or its absence, a halt, and each
- * reported bug triage read as a red test the run started with
- * (`start/triage.ts`). Each is emitted as one named `event` through the
+ * of the wrap-up, the pull request or its absence, a halt, a retry the
+ * run takes in place of a halt (`start/retry-budget.ts`), each reported
+ * bug triage read as a red test the run started with
+ * (`start/triage.ts`), and the three of a `--continue` run
+ * (`start/continue-run.ts`): the `decision` made at a stop, the
+ * `decision-needed` a json run ends on with the prompt it would have
+ * spawned a session with, and the `passed-over` tasks a run ends with.
+ * Their lines count from 1, as the decision prompt and `--after` do,
+ * where a tracker's `lineNum` counts from 0. Each is emitted as one named `event` through the
  * active output, which the events output prints as one `rafa· ` line,
  * json writes whole, and text drops, because the loop's own text lines
  * already say each of them.
@@ -25,6 +31,8 @@
  *
  * @module start/loop-events
  */
+import type { DecisionStrategy } from './decision-parse.js';
+
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -42,6 +50,18 @@ export interface TaskPosition {
   readonly total: number;
 }
 
+/** A task as a `--continue` event names it: its tracker line, counted from 1, and its text. */
+export interface EventTask {
+  readonly line: number;
+  readonly text: string;
+}
+
+/** A passed-over task as the `passed-over` event lists it. */
+export interface PassedOverTask extends EventTask {
+  readonly strategy: 'jump' | 'defer';
+  readonly reason: string;
+}
+
 /** A phase of the wrap-up, in the order the loop runs them. */
 export type WrapUpPhase = 'tests' | 'fragment' | 'session' | 'release' | 'ci';
 
@@ -54,6 +74,18 @@ export type LoopEvent =
   | { readonly kind: 'pr'; readonly number: number }
   | { readonly kind: 'no-pr'; readonly reason: string }
   | { readonly kind: 'halt'; readonly reason: string }
+  | { readonly kind: 'retry'; readonly attempt: number; readonly of: number; readonly reason: string }
+  | { readonly kind: 'decision'; readonly strategy: DecisionStrategy; readonly line: number; readonly reason: string }
+  | {
+    readonly kind: 'decision-needed';
+    readonly task: string;
+    readonly line: number;
+    readonly holds: readonly string[];
+    readonly openTasks: readonly EventTask[];
+    readonly retriesLeft: number;
+    readonly prompt: string;
+  }
+  | { readonly kind: 'passed-over'; readonly tasks: readonly PassedOverTask[] }
   | { readonly kind: 'inherited'; readonly file: string; readonly name: string }
   | { readonly kind: 'error'; readonly message: string };
 
@@ -97,11 +129,27 @@ export function summaryOf(event: LoopEvent): string {
       return `${padKind('no pr')}${oneLine(event.reason)}`;
     case 'halt':
       return `${padKind('halt')}${oneLine(event.reason)}`;
+    case 'retry':
+      return `${padKind(`retry ${event.attempt}/${event.of}`)}${oneLine(event.reason)}`;
+    case 'decision':
+      return `${padKind(`decision ${event.strategy}`)}line ${event.line}: ${oneLine(event.reason)}`;
+    case 'decision-needed':
+      return `${padKind('decision needed')}line ${event.line} ${quoted(event.task)}`;
+    case 'passed-over':
+      return `${padKind('passed over')}${passedOverList(event.tasks)}`;
     case 'inherited':
       return `${padKind('inherited')}${oneLine(`${event.file} > ${event.name}`)}`;
     case 'error':
       return `${padKind('error')}${firstLine(event.message)}`;
   }
+}
+
+/** `<n> task(s): line <a> (<strategy>), ...`, the passed-over tasks in one line. */
+function passedOverList(tasks: readonly PassedOverTask[]): string {
+  const noun = tasks.length === 1
+    ? 'task'
+    : 'tasks';
+  return `${tasks.length} ${noun}: ${tasks.map((task) => `line ${task.line} (${task.strategy})`).join(', ')}`;
 }
 
 /** A message's first non-blank line, trimmed, or the empty string when it has none. */

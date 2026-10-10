@@ -49,7 +49,7 @@ module's note is the long form.
 | `src/commands/plan/refresh-offer.ts` | the offer `plan create --issue` and `plan create --next` make on a body changed since its saved copy: `Issue #<n> changed since the saved copy of <date>. Plan from it as it reads now? [y/N]`, the text `refreshQuestion` in `src/board/snapshot-settle.ts` owns, made only where there is a terminal, never under `--dry-run` and never under `--refresh` |
 | `src/commands/plan/claim-route.ts` | the claim `plan create` makes on its issue before its session: `resolveAndClaim` resolves the spec, runs the cheap refusals, claims through `src/claims/plan-claim.ts` and prints the answer; a refused `--issue` or `--spec` exits 1 naming the owner, a refused `--next` pick is passed over and the walk resolved again, and an unclaimed run warns and plans; a claim ahead report (`src/claims/ahead.ts`) is printed after the claim. `createPlanClaimContext` builds the seams: `git`, the `gh` issue board or none, the store id, `claims.staleAfter`, `claims.ahead` |
 | `src/commands/plan/store-check.ts` | the effort-store rules of `src/plan/store-rules.ts` read over one plan and the `PREREQUISITES-<stub>.md` beside it (`checkStoreRules`), the one reading `plan validate` and `plan create` share; `enforceStoreRules` runs it on `plan create` straight after the planner answers and before the readiness gate settles, and on any problem moves both files into `rejected/` beside them and exits 1 with one `<file>:<line>: <rule>: <text>` line per problem, under `--skip-review` too |
-| `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: the `dangerous.acceptStaleRefs` warn line printed first thing in the run, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, verifying every reference and refusing on drift, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and a roster (`planRoster`): flags extracted only from code spans whose first word is `rafa`, symbols read at their declaration position in the source, the checkout's own roster read by running `bun src/rafa.ts describe --output=json` when the project root is `@open-tomato/rafa` with `src/rafa.ts` tracked, otherwise the core roster imported dynamically (since a static import is a load-order cycle through `src/plan.ts`), with one warning line printed when the checkout's roster cannot be read; never under `--dry-run` or `--spec` |
+| `src/commands/plan/refs-check.ts` | check 4 of the readiness gate on `plan create --issue` and `plan create --next`: the `dangerous.acceptStaleRefs` warn line printed first thing in the run, and `enforceRefsGate` run over the saved copy once the snapshot has settled and before the session, verifying every reference and refusing on drift, with the acceptance read off `--accept-refs` and the config and a verifier over `gh`, `git`, `ts-symbols` and a roster (`planRoster`): flags extracted only from code spans whose first word is `rafa`, symbols read at their declaration position in the source, the checkout's own roster read by running `bun src/rafa.ts describe --output=json` when the project root is `@open-tomato/rafa` with `src/rafa.ts` tracked, otherwise the core roster its caller hands in, built with `registryRoster` from `RafaContext.registry` (a parameter since a static import of `src/commands/index.ts` is a load-order cycle through `src/plan.ts`), with one warning line printed when the checkout's roster cannot be read; never under `--dry-run` or `--spec` |
 | `src/commands/issue/ready.ts` | `rafa issue ready <n> [--yes]`: the two checks a person would otherwise make by eye before marking an issue ready — whether the account that opened it has write access and whether its body fills the spec template — printed on `stdout` in text mode, then a refusal for an issue carrying two or more `epic:` labels, naming each, with `readEpicProblems`'s own `several-epic-labels` sentence (`src/board/epic-problems.ts`), made under `board.relationships: labels` only (in `native` mode an epic is the one sub-issue parent, and the check is skipped), and one label swap, `spec:needs-work` off and `spec:ready` on, made after the yes, or under `--yes` with no question once every check has passed, terminal or not. Exit code 0 for the normal completion; 1 for an unusable config, a value given to `--yes` or a swap `gh` refused; 2 for an untrusted author, for a body with gaps and for two `epic:` labels. The four status values are `marked` (a typed yes or `--yes`), `declined` (question answered no), `unasked` (no terminal and no `--yes`), and `already` (label already on). `--yes` answers the question alone: the write-access, template and `epic:` checks refuse under it as they do without it, writing nothing. `rafa next` never passes it, and its ceiling still refuses `--yes=ready`. The run's status and lines are the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/issue/unblock.ts` | `rafa issue unblock [<n>] [--all]`: the issues whose blockers have all closed, asked about one at a time, and `spec:blocked` taken off each one the answer says yes for. It reads the issue or `--all` open blocked issues, checks each named blocker against the board's state, and asks only when every blocker is closed. Exit code 0 on successful completion; 1 when the board could not be read. The eight status values are `removed` (label taken off), `declined`, `unasked` (no terminal), `waiting` (blocker still open), `fault` (line unreadable), `not-blocked` (label not on), and `failed` (read or write error). The outcome of each issue is the data of a json-mode terminal result. Nothing is written without a terminal. With `board.relationships: native` it reads the line, then prints that GitHub clears a blocker when the blocking issue closes, reads no board, refreshes the named issue on the project when `board.project.number` is set (no issue under `--all`), and exits 0 (`src/commands/issue/unblock-native.ts`). |
 | `src/commands/issue/check.ts` | `rafa issue check <n> [--stamp]`: the references issue `<n>`'s saved copy names, each with its state, read by the verifier check 4 builds (`createPlanRefsVerifier`) and starting no session, so it declares no `spends`. The copy is found by number, the one `rafa-<n>-<slug>.md` under `specs.dir` beside the notes file; none is refused naming `rafa plan create --issue=<n>`, two naming both, each with exit code 1, as are a line it refuses, a config refused, a board issue `gh` could not read and a refs block the codec will not read. A plain check is `readCopyRefs`, which writes the first stamps of a reference it has none for; `--stamp` prints the rows read against the old stamps and verifies each for drift, then re-stamps every reference (`restampCopyRefs`) over one memoised verifier. Exit code 0 whatever the states are. Json mode gives the issue, the copy's path, `stamped` and every reference with its `kind`, `text`, `line`, `state`, `fingerprint` and `stamp` as one word each |
@@ -131,6 +131,7 @@ module's note is the long form.
 | `src/commands/stretch/start.ts` | `rafa stretch start [--n=<n>] [--remote-control] [--role=<role>] [--dry-run]` (#816): opens stretch `--n`, else the next one (`nextStretch`, `src/stretch/folder.ts`). Refused with exit code 1, before any step, while a stretch of the project is live (`liveStretches`) or a loop of it runs (`readSessions`, `running` or `paused`), for a package with no operators (`findOperators`), for `claude` not on PATH outside `--dry-run`, and for a `pr.base` edit `withConfigSetting` refuses. Then, each printed as the line it runs: `git fetch origin <default>` (`origin/HEAD`'s target, else `main`); `git push origin origin/<default>:refs/heads/stretch/<n>` unless `git ls-remote` finds the branch there; the `pr.base` the project file held recorded in `.rafa/stretch/<n>/stretch.json` (`StretchRecord`, kept when one is there); `rafa config set pr.base=stretch/<n>`; the operators copied once (`copyOperators`, printed as `cp -R`) and the version line; the tmux lines of `src/stretch/launch.ts`, then `tmux switch-client` inside tmux, `tmux attach` on a terminal, or the attach line. Without tmux it prints the two `--role` lines for other terminals and starts the engineer here. `--role` starts that one operator session in this terminal with none of the refusals, the watchtower and analyst first waiting for the engineer's `agent.json`; `claude`'s exit code is the command's. `--dry-run` prints every step in order and runs none, the readings that decide them still read. Exit code 2 for a reading or step that failed, naming the steps already done. Every effect is a `StretchStartSeams` field. Declares `spends` unless `--dry-run` |
 | `src/commands/stretch/item.ts` | `rafa stretch item <issue> [--wait] [--dry-run]`: plans and runs a loop on the integration branch the `pr.base` names, which must be a `stretch/*` branch. Refused with exit code 1 if `pr.base` names the default branch. Runs `plan create --issue` without `--accept-refs`, then starts the loop as a detached child with `--as-worktree --no-ci-wait` and `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`. With `--wait`, waits on the loop through `rafa loop wait`. Once the loop has a pull request, merges it with the `pr merge` logic and checks skipped, that merge allowed only into a `stretch/*` base, then waits for the run on the integration branch's new head and prints the pit-stop readings. With `--dry-run` prints every step and runs none. Exit code 0 for all steps successful; 1 for a refused base or a loop that ended with no pull request; 2 for other refusals. Every effect is a `StretchItemSeams` field. Declares `spends` unless `--dry-run` |
 | `src/commands/stretch/end.ts` | `rafa stretch end [--dry-run]`: opens the pull request from `stretch/<n>` to the default branch through the `pr open` logic, its body being `report.md` with every ledger item's `Closes` lines appended. Refused with exit code 1 when there is no `report.md`, and with exit code 2 where `pr.provider` is not `gh`. Once that pull request has merged, puts back the `pr.base` recorded in `.rafa/stretch/<n>/stretch.json` through `src/config-set.ts`. With `--dry-run` prints every step and runs none. Exit code 0 for all steps successful; 1 for a refused refusal, 2 for provider or merge failure. Every effect is a `StretchEndSeams` field. Starts no session and declares no `spends` |
+| `src/commands/bug/codes.ts` | `rafa bug codes [--suggest=<text>] [--family=<family>] [--check]` (#949): the cause codes a bug can carry, rafa's own (`src/errors/rafa-codes.ts`) and then the project's `errors.codes`, read through `resolveProjectConfig`. With no flag prints each family alphabetically with its count and description, `(project)` for a family only the project declares, its codes under it, and a closing line naming `<family>:new-context` and `unknown:new-context`. `--family` narrows to one family, refused with exit code 1 and the families that exist when nobody declares it. `--suggest` ranks the closest codes through `suggestCodes` (`src/errors/match.ts`), at most five, and says so with exit code 0 when none matches. `--check` prints the pairs `nearDuplicates` finds and exits 1 when there is one; beside `--suggest` it is refused with exit code 1. In json mode the `CodesReport` is the result, and when `--check` finds a pair it is written first as a `bug-codes-alike` event, since the refusal's terminal event carries no data. Writes nothing, starts no session and declares no `spends`. `context/error-codes.md` is the page for the list |
 | `src/commands/next.ts` | `rafa next [--dry-run] [--roadmap [--claim-ahead]] [--yes[=<action ids>]]`: reads the project once — the running loops, the branch and its base, the plans and their trackers, the open pull request and its checks, the roadmap walked from the current place (`ghNextBoard`, `src/next/sources.ts`: the default board with no position file, else the place's board, or its epic's lines alone) — and prints where it stands on one line and the one thing to do about it on the next, then runs that action and reads again, until the answer is no, an action fails, there is nothing to run, or a loop has started. Exit code 0 for every ending (dry-run, nothing-to-run, declined, unasked, loop-started, unchanged, capped); 1 for a line it refuses and for a `sync` that would not fast-forward; 2 for a `--yes` list that is refused and for a repository whose `pr.provider` is not `gh`; or whatever an action threw. The `--dry-run` flag prints the two lines and stops. The `--yes` flag takes an optional comma-list of action ids, allowing those steps unasked and stopping at the first action the list leaves out. A list may name the eleven ids of `YES_ACTIONS` (`src/next/ceiling.ts`): `sync`, `resume`, `wait`, `triage`, `merge`, `settle`, `start`, `plan`, `unblock`, `hop` and `home`; bare `--yes` allows `sync`, `wait`, `unblock`, `plan` and `home`. Once a `merge` or `merge-unchecked` action has run, the settle step (`readSettleAfterMerge`, `src/next/settle-step.ts`) reads the settle dry run over `origin/<base>` that `pr merge`'s own follow-up is decided by (`settleWaitingOn`, composed as `OpenedNextSources.settle`) and, while the waiting fragments fold into a version, puts state `fragments-waiting` with action `settle` — `rafa release settle` with no words — as one more turn; it is asked like `merge`, bare `--yes` leaving it out since it pushes to the base, so it runs unasked only under a list naming `settle`, and the next turn is compared with the merge's state, so a merge that moved nothing still stops `unchanged`. A reading that throws is warned about and the chain goes on without the step. `hop` and `home` (`ROADMAP_ACTIONS`) are proposed only by the hop rows, and the stop lines (`src/next/lines.ts`) leave them out of the lists they print unless the run was typed with `--roadmap`, so a plain run prints what it printed before they were ids. The `--roadmap` flag opens the sources with `roadmap` (`openNextSources`: the board's hop reading, and `NextSources.roadmap` holding the owner gate `src/next/owner-gate.ts` composes), passes `--roadmap` last among the words of the `plan`, `start` and `resume` actions (`ROADMAP_PASSED_ACTIONS`, `src/next/actions.ts`), and, once a loop action has run while a hop is away, puts the `home` step (`readHomeAfterLoop`, `src/next/state.ts`) as one more asked or allowed turn before the chain stops `loop-started`; without the flag none of these happens and no key is added. The `--claim-ahead` flag, read beside it (`readClaimAhead`, `src/next/lines.ts`), adds `--claim-ahead` after `--roadmap` to the `plan` action's words alone (`CLAIM_AHEAD_WORD`), and a line giving it without `--roadmap` is refused with exit 1. A list naming an id of the always-asked set `ALWAYS_ASKED`, `ready` or `merge-unchecked`, is refused with exit 2. `rafa next` asks no question of its own before `merge-unchecked`: it closes its prompter and hands the question to `pr merge <n> --skip-checks`. The state table has rows indexed by id (a `NextAnswerId`), each holding `state.action` and `state.problems`, read afresh each turn; a pull request reporting no checks and not conflicting is row `pr-no-checks`, whose action is `merge-unchecked`. Each run step is recorded with its state id, the action it proposed, the command that ran it (or null for `sync`, `hop` and `home`, which run in-process), whether `rafa next` asked about it, and whether it ran. Under `--roadmap` the report also carries `hops`, what each `hop` and `home` action that ran wrote, in order; the key is left out without the flag. The report is the data of a json-mode terminal result. See `--no-hint` under the ending hint. |
 | `src/commands/switch.ts` | `rafa switch <n | -> [--no-rehome]`: this checkout's place moved to a board or an epic by its number, or back to the previous place, decided off one board listing and written to `.rafa/position.json` through `src/project/position.ts`, starting from the place `src/board/place.ts` resolves |
 | `src/rafa.ts` | the entry: `process.argv` dispatched through `CORE_REGISTRY` with `renderHelp`, and the exit code set |
@@ -378,11 +379,11 @@ New; it replaces no earlier text. What a row or an action added to
   `claim hand`, `claim accept`, `claim take`, `update current` with the
   stubs `update self`, `update project`, `update board`, `update next`,
   `update latest` and the hidden `update rafa` and `update port`,
-  `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `roadmap`, `switch`, `next`, `init`,
+  `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `roadmap`, `switch`, `next`, `init`,
   `doctor`, `status`, `cleanup`, `self-update` and
   `describe`. The subjects are `plan`, `loop`, `issue`, `pr`, `effort`,
   `module`, `agent`, `skill`, `instinct`, `release`, `board`, `epic`,
-  `claim`, `update`, `config`, `ci` and `stretch`: a
+  `claim`, `update`, `config`, `ci`, `stretch` and `bug`: a
   subject is declared with its first action, never ahead of it.
   `skill index` is in the command tree and is registered by none of it
   yet, so no roster names it.
@@ -469,6 +470,160 @@ New; it replaces no earlier text. What a row or an action added to
   on to the wait. A blocked or interrupted delivery reaches no retarget.
   With `pr.provider: none`, the pull request is never opened; a run ends `ok`
   once the wrap-up finishes.
+- **`loop start --retry=<n>` and `loop.retries` re-enter the loop after a
+  retry-safe stop** (`start/retry-budget.ts`, `config-schema-loop-retries.ts`):
+  the run goes back to the top of its loop with `continue`, where
+  `findNextTask` answers the `[BLOCKED]` line or the inserted repair, instead
+  of returning, at most n times in a row. A task that finishes `done` sets
+  the spent count back to 0 (`settleOnDone`) unless it is the task of the
+  last stop, told apart by its text and its copy (`retryTaskOf`, over
+  `taskRefIn` in `start/pass-over.ts`), or a repair task (`isRepairTask`,
+  `start/suite-blocker.ts`): a plan task's red step, its repair done, the
+  repair's own step red again spend on toward n, and only the next plan
+  task done starts the count over, so a task that keeps failing still
+  meets the cap. A red suite step before a session is the stop of no task,
+  and the next task done resets. The key is `false` (the default) or
+  a whole number from 1 to 3, and the flag outranks it for one run; any other
+  flag value, a bare `--retry` and `--no-retry` are refused with exit code 1
+  by `readRunArgs` (`start/run-setup.ts`), before the deferral and the
+  session record. Four stops are retried: a red suite step before a session
+  and a red task step after one (never one `stoppedOnSignal` reads as
+  stopped by SIGINT, `start/suite-steps-run.ts`), a task session that exited
+  nonzero (the budget exit and the interrupt end before it is asked), and a
+  clean exit held only on its absences (`heldOnNothingLeftBehind`,
+  `start/commit.ts`: every hold a no-report, background-wait or no-commit
+  hold). A report that says `status: blocked` or lists a blocker, a refused
+  commit, a moved checkout, a report left unstored, a pause, an interrupt
+  and every refusal before the loop halt as before. Each retry writes one
+  warning, `🔁 Retrying (retry <i> of <n> in a row) after the stop: <reason>.`, and one
+  `retry` loop event after the stop's own lines and its stored report, and
+  no `task-blocked` event: a task stop emits that only once its retry is
+  refused, so `loop wait --until=blocked` never answers a run still going.
+  A SIGINT received refuses every retry left, and once n are spent in a row
+  the next such stop halts. A checkout moved from the loop's last commit,
+  read by `guardCheckout` (`start/checkout-guard.ts`) only while a retry is
+  left, refuses the retry without spending it, writing one warning line,
+  `⚠️  No retry after the stop: <reason>. The checkout has moved ...`, so a
+  session that committed and then exited nonzero stops on its own blocker,
+  never the next pass's `checkout moved`. On a session that exited
+  nonzero, `❌ Task failed (exit <n>). Marked as blocked. Run again to
+  retry.` is written only once no retry or decision goes on.
+- **`loop start --continue` hands a stop that would end the run to a
+  decision** (`start/continue-args.ts`, `start/continue-run.ts`,
+  `start/decision-session.ts`, `start/decision-prompt.ts`,
+  `start/decision-parse.ts`, `start/pass-over.ts`,
+  `config-schema-loop-continue.ts`): a report that holds its task
+  (`status: blocked` or a listed blocker) at once, and a retry-safe stop
+  once `RunRetries.lastRefusal` reads `spent`. A refused commit, a budget
+  exit, an interrupt, a pause, a moved checkout, a report left unstored,
+  every refusal before the loop and the wrap-up halt as before. The
+  retries a `--continue` run opens without `--retry` are
+  `loop.retriesOnContinue`'s (`false` or 1 to 3, default `1`). One
+  session decides, spawned with `--tools Read,Grep,Glob`, the run's
+  `loop.settingSources`, in the checkout, its prompt stamped, and ends on
+  a `rafa:decision` block, the last one read: `retry` asks the run's
+  retries for one first, and only once it is granted writes its
+  `approach` as the task's blocker and emits its `decision` (a refusal,
+  for no retry left, a moved checkout or an interrupt, leaves the tracker
+  untouched and reads as `stop`, its reason naming which), `stop` ends
+  the run, `jump` passes the task over for the run
+  and `defer` until the task at its `after` line is ticked. An
+  unreadable block, a session that exits nonzero and criteria that
+  cannot be read are `stop`; a session SIGINT ended decides nothing,
+  emits the stop's own `task-blocked` or `halt` with `interrupted` as
+  its reason, and ends the run with exit code 0.
+  Passed-over lines are `findNextTask`'s `skipLines`; the tracker keeps
+  them `[BLOCKED]`, and the list is saved on the run record as
+  `decisions` and read back by the plan's next `--continue` run on the
+  same branch (and worktree, when the record names one), off the newest
+  record that ended there, stopped or done: a `--force-wrap-up` run ends
+  `done` with its list kept, and a newer run that ended with no list
+  leaves nothing to read. That run drops
+  each entry whose task no longer reads `[BLOCKED]` (`seedFrom`): a line
+  put back to `- [ ]`, ticked, edited or removed is taken again. A second
+  `defer` of a task is applied as a `jump`, and a task passed over that
+  reaches a decision again is stopped, each reason saying so. The
+  effort store gets no row for the decision session: `effort/classify.ts`
+  has no kind for it, so `effort collect` reads its log as `other`.
+  - **The line**: `--decide=retry|stop|jump|defer` names the decision,
+    applied once in place of a session: on the loop's first pass to the
+    `[BLOCKED]` task it opens on, before that task is dispatched again,
+    or else at the run's first stop. When the plan's previous run on
+    the branch ended on a `decision-needed` (read off its events file,
+    `readPreviousDecisionNeeded`, past runs that reached no task) whose
+    task's text is not that `[BLOCKED]` task's, the directive is refused
+    with exit code 1 and a line naming both, nothing decided. A
+    directive no decision point used is named in one warning line at
+    the run's end. `--approach=<text>` goes with
+    `--decide=retry` alone and is required by it, `--after=<line>`
+    (counted from 1) with `--decide=defer` alone and required by it.
+    `--decide` and `--force-wrap-up` without `--continue`, a bare value
+    flag, a strategy that is none of the four and an `--after` that is no
+    whole number from 1 are refused with exit code 1 by `readRunArgs`,
+    before the deferral; so is a `--continue` run whose
+    `loop.continue.criteriaMode: replace` names a missing or blank file,
+    and a `--decide=retry` on a run whose retries, `--retry` over
+    `loop.retriesOnContinue`, are `false` (`refuseRetryWithoutBudget`).
+  - **json mode**: under `--output=json` no session is spawned. The stop
+    emits `decision-needed` (the task, its line, why it stopped, the open
+    tasks, the retries left and the rendered prompt), then its own
+    `task-blocked` or `halt`, and the run ends with exit code 21, the
+    tracker as the stop left it. The text and events modes decide
+    through the session.
+  - **The end**: when only passed-over tasks are left open, the run lists
+    each with its strategy and reason, emits `passed-over` and a `halt`,
+    and ends with exit code 22, before the pre-wrap-up step: no wrap-up
+    and no pull request. Its last lines say how a task comes back: mark
+    its tracker line `- [ ]` and run again, since a `--continue` run
+    passes a `[BLOCKED]` one over again, or run without `--continue`,
+    which resumes the first `[BLOCKED]` line. `--force-wrap-up` takes the pre-wrap-up step
+    instead, its one repair included; a step red after that repair whose
+    new failures (the baseline's left out) are within
+    `loop.forceWrapUp.maxNewFailures` (`false`, the default, tolerating
+    none, or 1 to 50) goes on, and one over it, or red with no failure to
+    count, ends with exit code 20. The wrap-up then marks the delivered
+    pull request a draft with `gh pr ready <n> --undo` and writes a
+    `## Passed-over tasks` section into its body (`start/forced-draft.ts`),
+    both before the run's `pr` event. A body write refused is a warning;
+    a draft refused emits no `pr` event, and after the release's write
+    and the retarget ends the run with a `halt`, exit code 20 and a line
+    naming the pull request and `gh pr ready <n> --undo` to run by hand,
+    before the CI wait, its record `stopped`.
+  - **Exit codes and events** (`start/continue-exits.ts`): 20 for a
+    decision's `stop`, a refused forced wrap-up and a refused draft, 21
+    for a decision needed, 22 for a run ended on passed-over tasks; from
+    20 so none meets a code `loop wait` answers (10 to 16, 2) or one
+    every command shares (0 to 3). Each is thrown as a `LoopEnd` once
+    the run has emitted its own events, `decision`, `decision-needed` or
+    `passed-over` and then the stop's `task-blocked` or `halt`, so the
+    run's catch writes no `error` event for it. `context/operators.md`
+    shows their lines.
+- **The `--continue` criteria** (`src/continue-criteria.md`,
+  `start/decision-prompt.ts`): the decision session chooses by criteria
+  read in order, the first that fits deciding and `stop` when none does.
+  The bundled base, drawn from a survey of 29 loop stops, says: never
+  `jump` or `defer` past a task a later open task imports, extends or
+  tests (choose `retry` or `stop`); `stop` when the task text is
+  contradicted by measured behaviour or the blocker asks for a design
+  decision; `jump` a check or gate on a prerequisite a person owns (a
+  file a person writes, an environment variable, an external account)
+  that no later task depends on; `defer` when the blocker names
+  something a later open task provides, `after` being that task; `retry`
+  only when the blocker names a concrete alternative inside the task's
+  own scope, the `approach` saying what to do differently. A project
+  adds its own in `loop.continue.criteria`, `.rafa/continue-criteria.md`
+  unless the config names another path, read from the project root on
+  every decision, so an edit needs no rebuild. `loop.continue.criteriaMode:
+  extend`, the default, appends it under the base after a
+  `### Project criteria` heading, a missing or blank file leaving the
+  base alone; `replace` uses it alone, and refuses a run whose file is
+  missing or blank. The prompt's contract,
+  `src/continue-decision-prompt.md`, is not overridable, so no project
+  edit can break the parser; the build copies both files into `dist/`.
+  It marks what it says of `retry` in two sections, `<!-- retry -->` and
+  `<!-- no-retry -->`, and `renderDecisionPrompt` keeps the first while
+  a retry is left and the second with none: a retry-safe stop is decided
+  only once its retries are spent, so its prompt offers no `retry`.
 - **A run record carries `phase: task | wrap-up | pull-request | ci | repair`**
   (`start/session.ts`, `loop/session-record-parse.ts`): each written at the
   phase's start. A record with no `phase`, from an older rafa, reads as `task`.
@@ -493,18 +648,19 @@ New; it replaces no earlier text. What a row or an action added to
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`, `skill list`, `skill show`,
   `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`, `instinct show`,
   `instinct flag`, `instinct promote`, the `release` commands, `board list`, the `epic` commands, the
-  `claim` commands, the `update` commands, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
+  `claim` commands, the `update` commands, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `next`, `roadmap`, `switch` and the `pr` actions wrap none:
   `describe` reads the registry off its context, and `init`, `doctor`, `status`, `cleanup`,
   `self-update`, each plan reader, each `loop` session action, each `issue` action, each remaining
   `effort` command, `module list`, `module exec`, each `agent`, `skill`, `instinct`, `release`, `epic`,
-  `claim`, `update` and `pr` action, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
+  `claim`, `update` and `pr` action, `config set`, `ci status`, `stretch start`, `stretch item`, `stretch end`, `bug codes`, `board list`, `next`, `roadmap`, `switch` their `args` and `flags`.
 - **Where a wrapped command writes**: through the active output, in every
   module it prints from. For `loop start` those are `src/start.ts`,
   `start/run-config.ts`, `start/runtime.ts`, `start/session.ts`, `start/pause.ts`,
   `start/preflight.ts`, `preflight/run.ts`, `start/commit.ts`,
   `start/wrap-up.ts`, `start/wrap-up-run.ts`,
   `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
-  `adapters/tracker/resolve.ts`,
+  `start/retry-budget.ts`, `start/continue-run.ts`,
+  `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,
   `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
@@ -2088,11 +2244,12 @@ New; it replaces no earlier text. What a row or an action added to
   listing's labels: `type:roadmap` is a board, else a row typed `epic`
   is an epic, else the default board (an unlabelled titled "Roadmap", or
   `roadmap.issue`, even one the listing does not hold) is a board. A
-  board moves to its first `now` epic that is not done (`firstNowEpic`,
-  null when none); an epic moves with the board whose checklist lists
-  it, the current board first, then the default, then the
-  lowest-numbered open board, else the default. `-` moves to the
-  position's `previous`, checked as a number is. The move starts from
+  board moves to its first `now` epic that is not done (`firstNowEpic`
+  in `src/board/now-epic.ts`, null when none); an epic moves with the
+  board whose checklist lists it, the current board first, then the
+  default, then the lowest-numbered open board, else the default. `-`
+  moves to the position's `previous`, checked as a number is. The move
+  starts from
   the place `resolvePlace` (`src/board/place.ts`) answers, so with no
   file the first switch's `previous` is the fallback place and
   `rafa switch -` goes back there; every notice but the absent-file one
@@ -2142,15 +2299,26 @@ New; it replaces no earlier text. What a row or an action added to
   refreshes every item of the repository on the project and answers the
   open issues with no item; each is then added and a second refresh fills
   it. A line per change, `#<n> <field>: <from> → <to>` with `(empty)` for
-  no value, a line per issue added, then a closing count. `--dry-run`
+  no value, a line per issue added, then a closing count, which counts
+  the issues added and those of them filled apart (`2 issues added and
+  filled`, or `2 issues added, 1 filled` with a `#<n> added but not
+  filled: <reason>` warning for the other) and ends
+  `; <n> issue(s) not refreshed` when issues were refused and never reads
+  `in step` then. `--dry-run`
   sets the refresh's `dryRun`: the same lines, no write and no add. Json
   mode's result is `BoardSyncResult`, the changes without their write
-  ids. Exit code 1 for a stray word, an unusable config and an unset
+  ids, the issues added and filled as `added` and `filled`, and the
+  refused issues as `refused` (`issue`, `reason`). Exit code 1
+  for a stray word, an unusable config and an unset
   `board.project.number`, which names `rafa init --board --project`; 2 for
   a missing `project` scope, a number naming no project, a rate-limit
-  refusal (after the lines of what was read) and any `gh` failure. A
-  field the project holds otherwise than the template is a `warn` line,
-  exit 0. It declares no `spends`.
+  refusal (after the lines of what was read) and any `gh` failure outside
+  one issue's facts. A field the project holds otherwise than the
+  template is a `warn` line, exit 0. So is an issue whose facts could not
+  be read, in either pass: `#<n> not refreshed: <reason>`, the other
+  issues synced and the missing ones added, so a run whose only failures
+  are refused issues exits 0 and the next run reads them again. It
+  declares no `spends`.
 - **`loop stop`, `pause`, `resume`, `status` and `list` reach a run
   through its session record** (`src/commands/loop/`). `--session-id=<id>`,
   aliased `-s`, names a record. Without it the session is the one reading

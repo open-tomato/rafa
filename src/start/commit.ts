@@ -124,6 +124,34 @@ const NO_COMMIT_HOLD = 'no commit: the task changed no tracked file';
 export const NOTHING_REPORTED_OR_COMMITTED
   = 'the session wrote no report block and changed no tracked file';
 
+/**
+ * True for a hold a session that left nothing behind is held on: the
+ * missing report, bare or naming a background wait, the missing commit,
+ * or the blocker text such a task carries into its next dispatch.
+ */
+function isNothingLeftBehindHold(hold: string): boolean {
+  return hold === NO_REPORT_HOLD
+    || hold === NO_COMMIT_HOLD
+    || hold === NOTHING_REPORTED_OR_COMMITTED
+    || hold.startsWith(`${BACKGROUND_WAIT_HOLD} `);
+}
+
+/**
+ * True when a settled task is held, and held on nothing but what its
+ * session failed to leave behind: no report the loop could read and no
+ * commit, the no-report hold naming a background wait included. A
+ * refused commit, a report saying `status: blocked` and a listed blocker
+ * each answer false: the session or git decided those, and a blind
+ * re-run repeats them, where a session that left nothing behind is the
+ * shape a re-run with nothing changed was measured to pass. The loop's
+ * retry reads this (`start/retry-budget.ts`).
+ */
+export function heldOnNothingLeftBehind(finished: Pick<FinishedTask, 'attempt' | 'holds'>): boolean {
+  return finished.attempt.outcome !== 'failed'
+    && finished.holds.length > 0
+    && finished.holds.every(isNothingLeftBehindHold);
+}
+
 /** Indents every line, so a multi-line git message reads as one block. */
 function indentBlock(text: string): string {
   return text

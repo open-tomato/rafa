@@ -42,7 +42,7 @@
  *
  * - A board moves to that board and its first `now` epic that is not
  *   done: its checklist read with `parseRoadmapBody` and asked through
- *   `firstNowEpic` (`./epic/show.ts`), the pick `rafa epics` makes with no
+ *   `firstNowEpic` (`../board/now-epic.ts`), the pick `rafa epics` makes with no
  *   number, the epic null when it names none.
  * - An epic moves to that epic and to the board whose checklist lists
  *   it, ticked or not: the current board first, then the default board,
@@ -122,6 +122,7 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { resolveDefaultBoard } from '../board/boards.js';
 import { readConfiguredRelations } from '../board/configured-relations.js';
 import { boardOfEpic, openBoards } from '../board/epic-board.js';
+import { firstNowEpic } from '../board/now-epic.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
@@ -133,7 +134,6 @@ import { messageOf } from '../config-sections.js';
 import { createGitRunner } from '../pr/git.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
-import { firstNowEpic } from './epic/show.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
 
 /** The usage line a refusal names. */

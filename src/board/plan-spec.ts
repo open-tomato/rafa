@@ -41,7 +41,7 @@
  * `.rafa/specs/rafa-151-references-specs-bugs-are.md`).
  * {@link inspectSpecIssue} is the three of them that run on the issue
  * as read, in the spec's order, and each is a refusal that exits
- * {@link BOARD_REFUSAL_EXIT} before the body is snapshotted:
+ * `BOARD_REFUSAL_EXIT` (`./exit-codes.ts`) before the body is snapshotted:
  *
  *  0. the author's TRUST (`./trust.ts`): whether the login that opened
  *     the issue holds write access to the repository, or is listed in
@@ -283,9 +283,6 @@ import { createGhOpenPullRequests, createGhRoadmapSearch } from './roadmap.js';
 import { resolveSpecSource } from './spec-source.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from './trust.js';
 
-/** The exit code every board refusal this module composes carries; the spec's own. */
-export const BOARD_REFUSAL_EXIT = 2;
-
 /** What a refusal calls the issue it refused: `issue #20`. */
 export function issueSource(issue: number): string {
   return `issue #${String(issue)}`;
@@ -367,7 +364,7 @@ async function passReadyLabel(issue: SpecIssue, offer: BoundReadyOffer | undefin
  * written: the author's trust over `trust`, then the `spec:ready`
  * label, then the leak refusal, then the completeness gaps over every
  * template heading. Throws
- * `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` at the first that
+ * `CommandExit(BOARD_REFUSAL_EXIT, ...)` at the first that
  * refuses; the module note holds which checks are here, why the trust
  * one is first and what the completeness refusal costs.
  *
@@ -397,7 +394,7 @@ export async function inspectSpecIssue(
 /**
  * The one check that runs on the ROADMAP issue as read, before a line
  * is parsed out of its body: check 0, its author's trust over `trust`.
- * Throws `CommandExit({@link BOARD_REFUSAL_EXIT}, ...)` when the login
+ * Throws `CommandExit(BOARD_REFUSAL_EXIT, ...)` when the login
  * that opened it is trusted with nothing, so a `--next` run over a
  * planted roadmap walks no line of it.
  *
@@ -515,7 +512,7 @@ export type PlanSpecResolution =
  *
  * Throws the `CommandExit` of every refusal the routes carry: exit 1 for
  * the words typed (`./spec-source.ts`) and exit
- * {@link BOARD_REFUSAL_EXIT} for the board's own state — an issue or a
+ * `BOARD_REFUSAL_EXIT` (`./exit-codes.ts`) for the board's own state — an issue or a
  * roadmap whose author is trusted with nothing, a closed or unlabelled
  * issue, a leaking body, an incomplete body, a snapshot whose issue
  * body differs with no `--refresh` and no yes to the question, a roadmap that cannot be resolved.

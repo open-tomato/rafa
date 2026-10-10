@@ -196,6 +196,36 @@ stage steps still due run before the first open task after it. The blocked
 task holds until its session completes or a human unblocks it by removing
 the `[BLOCKED]` mark on its line in the tracker.
 
+### What reaches a loop session
+
+**Loop sessions enforce a limited permission scope.** A loop session 
+operates under project and local setting scopes (`loop.settingSources: 
+project,local`) by default and does not enforce user-scope denies or hooks. 
+This measurement records what reaches a session under two configurations of 
+`loop.settingSources`, and confirms that the measurement added nothing to 
+any scope.
+
+The measurement tested two probes against each scope: an `scp` command to 
+copy from a nonexistent source to a nonexistent target, and an `ssh` 
+command to connect to `rafa-902-probe.invalid`, a reserved `.invalid` host. 
+The deny held when both commands failed with permission errors. The hook 
+fired when either result carried a PreToolUse Bash hook error message.
+
+**Measured on 2026-10-10 with Claude Code version 2.1.283:**
+
+| Setting sources | Deny held | Hook fired | scp result | ssh result |
+|---|---|---|---|---|
+| `project,local` | No | No | Exit 1: no such file | Exit 255: host not resolved |
+| `user,project,local` | Yes | Yes | Permission denied by Bash | Blocked by the user-scope `PreToolUse` hook |
+
+**No scope was modified.** The measurement added nothing to the project 
+scope, the local scope, or the user scope. The checksum of the user-scope 
+settings file was the same before and after the runs. When a person adds `user` to 
+`loop.settingSources`, a loop session will enforce their user-scope denies 
+and hooks, as shown in the second row. The default value remains 
+`project,local`; no text suggests adding `user`, and the person picks the 
+scopes.
+
 ### Skills and lessons at dispatch
 
 **Every task's prompt holds a skill index, and at dispatch the session is

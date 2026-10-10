@@ -218,6 +218,7 @@ import { messageOf } from '../../config-sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, plansDirAt, readSwitch } from '../plan/plan-files.js';
+import { registryRoster } from '../plan/refs-check.js';
 
 import {
   DEFAULT_ISSUE_SEAMS,
@@ -483,7 +484,7 @@ export async function listRoadmap(
   const planNames = (seams.planNames ?? createPlanDirNames)(plans.path);
   const board = roadmapBoard(seams, gh, project.root, how.refresh === true, relations?.mode);
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
-    { root: project.root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
+    { root: project.root, specsDir: config.specsDir, gh, roster: registryRoster(context.registry), env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
 

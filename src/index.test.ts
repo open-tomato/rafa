@@ -400,6 +400,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../next/ending.js', ['endingWith', 'HINT_FLAG_SPEC']],
     ['../../plan.js', ['default']],
     ['../wrap.js', ['wrapPhaseZeroCommand']],
+    ['./refs-check.js', ['registryRoster']],
   ]],
   ['./commands/plan/list.js', [
     ['../../plan/index.js', ['parsePlan']],
@@ -562,6 +563,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../pr/git.js', ['createGitRunner']],
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueProject',
@@ -586,6 +588,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
     ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument']],
@@ -656,7 +659,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../refs/stamp.js', ['fingerprintText', 'RefsBlockError']],
     ['../../refs/verify.js', ['RefVerifyError']],
     ['../plan/plan-files.js', ['readSwitch']],
-    ['../plan/refs-check.js', ['createPlanRefsVerifier']],
+    ['../plan/refs-check.js', ['createPlanRefsVerifier', 'registryRoster']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
@@ -707,6 +710,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/pr/merge.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../cli/command.js', ['CommandExit']],
@@ -975,6 +979,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/release/settle.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
     ['../../release/settle-pr.js', ['settleByPr']],
@@ -1014,6 +1019,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/board/sync.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/project/progress.js', ['commandProgressFeed']],
+    ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
     ['../../board/project/sync.js', ['syncProject']],
     ['../../cli/command.js', ['CommandExit']],
@@ -1025,8 +1032,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/boards.js', ['createGhBoardLister', 'resolveDefaultBoard']],
     ['../../board/epic-cancel-notice.js', ['cancelledEpicNoticeLines']],
     ['../../board/epic-problems.js', ['epicProblemMessage']],
-    ['../../board/epic-walk.js', ['epicLines', 'isNowEpic']],
+    ['../../board/epic-walk.js', ['epicLines']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
+    ['../../board/now-epic.js', ['firstNowEpic']],
     ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams', 'readListedEpics', 'readModeEpicProblems']],
     ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
@@ -1039,6 +1047,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/roadmap-epic-table.js', ['unknownLine']],
     ['../issue/roadmap-table.js', ['renderRoadmapTable']],
     ['../plan/plan-files.js', ['plansDirAt', 'readSwitch']],
+    ['../plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/epic/new.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
@@ -1307,6 +1316,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./item.js', ['stretchOfBase']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
   ]],
+  ['./commands/bug/codes.js', [
+    ['../../cli/command.js', ['CommandExit']],
+    ['../../errors/codes.js', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
+    ['../../errors/match.js', ['nearDuplicates', 'suggestCodes']],
+    ['../../errors/rafa-codes.js', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
+    ['../issue/issue-tracker.js', ['lineRefusal', 'readNonBlankFlag']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
+  ]],
   ['./commands/status.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
@@ -1356,6 +1373,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/boards.js', ['resolveDefaultBoard']],
     ['../board/configured-relations.js', ['readConfiguredRelations']],
     ['../board/epic-board.js', ['boardOfEpic', 'openBoards']],
+    ['../board/now-epic.js', ['firstNowEpic']],
     ['../board/place.js', ['resolvePlace']],
     ['../board/roadmap-board.js', ['createGhBoardListing']],
     ['../board/roadmap-epic-rows.js', ['horizonOf', 'readListedEpics']],
@@ -1366,12 +1384,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-sections.js', ['messageOf']],
     ['../pr/git.js', ['createGitRunner']],
     ['../project/position.js', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
-    ['./epic/show.js', ['firstNowEpic']],
     ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/init.js', [
     ['../adapters/tracker/github.js', ['createGhRunner']],
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
+    ['../board/project/progress.js', ['commandProgressFeed']],
+    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../config-load.js', ['loadConfig']],
@@ -1399,6 +1418,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./init-release.js', ['renderReleaseStep', 'runReleaseStep']],
   ]],
   ['./commands/doctor.js', [
+    ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],
@@ -1426,6 +1446,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./doctor-stretch.js', ['writeDoctorStretch']],
     ['./doctor-tiers.js', ['checkDoctorTiers', 'renderDoctorTiers']],
     ['./plan/plan-files.js', ['isFile']],
+    ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
     ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
@@ -1687,6 +1708,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/stretch/start.js',
       './commands/stretch/item.js',
       './commands/stretch/end.js',
+      './commands/bug/codes.js',
       './commands/status.js',
       './commands/next.js',
       './commands/roadmap.js',

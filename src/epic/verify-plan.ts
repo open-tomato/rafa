@@ -69,8 +69,8 @@
  *
  * ## Where the template is read
  *
- * The build copies prompts by name into `dist/` (`cp src/PROMPT.md
- * src/plan-prompt.md src/epic-verify-prompt.md dist/`), and a module
+ * The build copies prompts by name into `dist/` (the `build` script's
+ * `cp src/PROMPT.md ... dist/` clause names each one), and a module
  * inlined into a bundle answers the BUNDLE's directory from
  * `import.meta.url`: `dist/`, where `cli.js` sits. `src/plan.ts` reads its
  * template beside itself for that reason. This module sits one directory

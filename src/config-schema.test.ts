@@ -17,7 +17,7 @@
  * {@link SETTINGS}, so a module that renames a key or drops a section
  * fails rather than agreeing with itself.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { CommandLineSetting, ConfigSetting } from './config-schema.js';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -58,6 +58,11 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['allowList', 'allowList'],
   ['settingSources', 'loop.settingSources'],
   ['loopWorktreeDir', 'loop.worktreeDir'],
+  ['loopRetries', 'loop.retries'],
+  ['loopRetriesOnContinue', 'loop.retriesOnContinue'],
+  ['loopContinueCriteria', 'loop.continue.criteria'],
+  ['loopContinueCriteriaMode', 'loop.continue.criteriaMode'],
+  ['loopForceWrapUpMaxNewFailures', 'loop.forceWrapUp.maxNewFailures'],
   ['loopWrapUpRetries', 'loop.wrapUp.retries'],
   ['prProvider', 'pr.provider'],
   ['prMergeMethod', 'pr.mergeMethod'],
@@ -68,6 +73,11 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['boardRelationships', 'board.relationships'],
   ['boardProjectTemplate', 'board.project.template'],
   ['boardProjectNumber', 'board.project.number'],
+  ['boardProjectRetries', 'board.project.retries'],
+  ['boardProjectRetryWaitSeconds', 'board.project.retryWaitSeconds'],
+  ['boardProjectProgressSeconds', 'board.project.progressSeconds'],
+  ['boardProjectWriteBatchSize', 'board.project.writeBatchSize'],
+  ['boardProjectWritePauseMs', 'board.project.writePauseMs'],
   ['roadmapIssue', 'roadmap.issue'],
   ['claimsStaleAfter', 'claims.staleAfter'],
   ['claimsAhead', 'claims.ahead'],
@@ -82,6 +92,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['errorsCodes', 'errors.codes'],
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
@@ -101,7 +112,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
-const COMMAND_LINE: readonly ConfigSetting[] = [
+const COMMAND_LINE: readonly CommandLineSetting[] = [
   'store',
   'inject',
   'planDir',
@@ -135,6 +146,7 @@ const TOP = [
   'claims',
   'triage',
   'release',
+  'errors',
   'cleanup',
   'dangerous',
   'status',
@@ -154,7 +166,7 @@ describe('SETTINGS', () => {
     expect(spelled).toEqual(KEYS.map((pair) => [...pair]));
   });
 
-  it('carries item keys for the two lists of mappings and for nothing else', () => {
+  it('carries item keys for the lists of mappings and for nothing else', () => {
     const withItems = SETTING_NAMES
       .filter((setting) => SETTINGS[setting].itemKeys !== undefined)
       .map((setting) => [setting, SETTINGS[setting].itemKeys]);
@@ -163,6 +175,7 @@ describe('SETTINGS', () => {
       ['prerequisitesRequired', ['tool', 'env', 'service', 'lsp', 'probe']],
       ['prerequisitesOptional', ['tool', 'env', 'service', 'lsp', 'probe', 'reason']],
       ['modules', ['npm', 'github', 'path', 'ref']],
+      ['errorsCodes', ['code', 'description', 'hint', 'level', 'since']],
     ]);
   });
 });
@@ -201,11 +214,14 @@ describe('SECTIONS', () => {
       'cleanup',
       'dangerous',
       'effort',
+      'errors',
       'hub',
       'learning',
       'learning.bless',
       'learning.promote',
       'loop',
+      'loop.continue',
+      'loop.forceWrapUp',
       'loop.wrapUp',
       'output',
       'plan',
@@ -260,7 +276,11 @@ describe('knownKeysAbove', () => {
       'dangerous',
       ['acceptStaleRefs', 'acceptVersionCollision', 'selfUpdateDuringLoop'],
     ]);
-    expect(knownKeysAbove('loop.worktreeDirs')).toEqual(['loop', ['settingSources', 'worktreeDir', 'wrapUp']]);
+    expect(knownKeysAbove('loop.worktreeDirs')).toEqual([
+      'loop',
+      ['settingSources', 'worktreeDir', 'retries', 'retriesOnContinue', 'continue', 'forceWrapUp', 'wrapUp'],
+    ]);
+    expect(knownKeysAbove('loop.continue.mode')).toEqual(['loop.continue', ['criteria', 'criteriaMode']]);
     expect(knownKeysAbove('status.notices')).toEqual(['status', ['notice']]);
     expect(knownKeysAbove('learning.promote.afters')).toEqual([
       'learning.promote',

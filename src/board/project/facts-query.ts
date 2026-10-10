@@ -1,6 +1,7 @@
 /**
- * The three `gh api graphql` reads the facts reader (`./facts.ts`) sends,
- * as argv: the issues, the files of their pull requests, and the
+ * The four `gh api graphql` reads the facts reader (`./facts.ts`) sends,
+ * as argv: the issues with the first page of each of their lists, a
+ * further page of a list, the files of their pull requests, and the
  * fragment blobs. Split out so the reader holds what the answers mean and
  * this module holds only what is asked, which the fake (`./facts-fake.ts`)
  * reads back the same way.
@@ -21,6 +22,9 @@ export const PAGE_SIZE = 100;
 /** How many issues one facts query names. */
 export const ISSUE_BATCH = 20;
 
+/** How many further pages of issues' lists one list query names. */
+export const LIST_BATCH = 20;
+
 /** How many pull requests one files query names. */
 export const PULL_BATCH = 20;
 
@@ -30,16 +34,51 @@ export const FRAGMENT_BATCH = 20;
 /** The fields every pull request is read with. */
 const PULL_FIELDS = 'number state baseRefName headRefOid';
 
-/** What the issues query asks of each issue. */
-const ISSUE_SELECTION = [
-  'number state stateReason',
-  ` labels(first: ${String(PAGE_SIZE)}) { pageInfo { hasNextPage } nodes { name } }`,
-  ` closedByPullRequestsReferences(first: ${String(PAGE_SIZE)}, includeClosedPrs: true)`,
-  ' { pageInfo { hasNextPage } nodes { ...pull } }',
-  ` timelineItems(first: ${String(PAGE_SIZE)}, itemTypes: [CROSS_REFERENCED_EVENT])`,
-  ' { pageInfo { hasNextPage } nodes { ... on CrossReferencedEvent',
-  ' { isCrossRepository source { ... on PullRequest { ...pull body } } } } }',
-].join('');
+/** An issue's lists the facts read, each one GraphQL connection read page by page. */
+export const ISSUE_LISTS = Object.freeze(['labels', 'closedByPullRequestsReferences', 'timelineItems'] as const);
+
+/** One of {@link ISSUE_LISTS}. */
+export type IssueList = (typeof ISSUE_LISTS)[number];
+
+/** The two letters naming each list in a {@link listAlias}. */
+const LIST_CODES: Readonly<Record<IssueList, string>> = Object.freeze({
+  labels: 'la',
+  closedByPullRequestsReferences: 'cb',
+  timelineItems: 'tl',
+});
+
+/** The arguments each list is read with, past `first` and `after`. */
+const LIST_ARGUMENTS: Readonly<Record<IssueList, string>> = Object.freeze({
+  labels: '',
+  closedByPullRequestsReferences: ', includeClosedPrs: true',
+  timelineItems: ', itemTypes: [CROSS_REFERENCED_EVENT]',
+});
+
+/** What each list asks of its nodes. */
+const LIST_NODES: Readonly<Record<IssueList, string>> = Object.freeze({
+  labels: 'name',
+  closedByPullRequestsReferences: '...pull',
+  timelineItems: '... on CrossReferencedEvent { isCrossRepository source { ... on PullRequest { ...pull body } } }',
+});
+
+/** The selection of one page of `list`, from the variable `after` on, or from the start when null. */
+function listSelection(list: IssueList, after: string | null): string {
+  const from = after === null
+    ? ''
+    : `, after: $${after}`;
+  return `${list}(first: ${String(PAGE_SIZE)}${from}${LIST_ARGUMENTS[list]})`
+    + ` { pageInfo { hasNextPage endCursor } nodes { ${LIST_NODES[list]} } }`;
+}
+
+/** What the issues query asks of each issue: the first page of every list. */
+const ISSUE_SELECTION = ['number state stateReason', ...ISSUE_LISTS.map((list) => listSelection(list, null))].join(' ');
+
+/** One further page of an issue's list, from `cursor` on. */
+export interface ListPage {
+  readonly number: number;
+  readonly list: IssueList;
+  readonly cursor: string;
+}
 
 /** One pull request whose files a files query reads, from `cursor` on, or from the start when null. */
 export interface FilesPage {
@@ -80,6 +119,11 @@ export function issueAlias(number: number): string {
   return `i${checkNumber(number)}`;
 }
 
+/** The alias, and cursor variable, of issue `number`'s `list` in a list query. */
+export function listAlias(number: number, list: IssueList): string {
+  return `${LIST_CODES[list]}${checkNumber(number)}`;
+}
+
 /** The pull request alias of `number` in a files query. */
 export function pullAlias(number: number): string {
   return `p${checkNumber(number)}`;
@@ -96,6 +140,22 @@ export function issuesArgs(numbers: readonly number[]): readonly string[] {
   const query = `query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { nameWithOwner${issues} } }`
     + ` fragment facts on Issue { ${ISSUE_SELECTION} } fragment pull on PullRequest { ${PULL_FIELDS} }`;
   return graphqlArgs(query, []);
+}
+
+/** The argv reading one further page of each list of `pages`, each under {@link listAlias}. */
+export function listPagesArgs(pages: readonly ListPage[]): readonly string[] {
+  const aliases = pages.map(({ number, list }) => listAlias(number, list));
+  const declared = aliases.map((alias) => `, $${alias}: String!`).join('');
+  const issues = pages.map(({ number, list }, index) => {
+    const alias = aliases[index] ?? listAlias(number, list);
+    return ` ${alias}: issue(number: ${String(number)}) { ${listSelection(list, alias)} }`;
+  }).join('');
+  const usesPull = pages.some(({ list }) => list !== 'labels');
+  const fragment = usesPull
+    ? ` fragment pull on PullRequest { ${PULL_FIELDS} }`
+    : '';
+  const query = `query($owner: String!, $repo: String!${declared}) { repository(owner: $owner, name: $repo) {${issues} } }${fragment}`;
+  return graphqlArgs(query, pages.map(({ cursor }, index) => [aliases[index] ?? '', cursor] as const));
 }
 
 /** The argv reading one page of files of each pull request of `pages`, each under {@link pullAlias}. */

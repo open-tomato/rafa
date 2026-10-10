@@ -42,14 +42,16 @@
  * {@link createPlanRefsVerifier} reads each target through a `gh` and a
  * `git` runner made for the project root, `ts-symbols` when it is on
  * the `PATH`, and the roster {@link planRoster} answers. Making it
- * spawns nothing: the runners are functions, and the roster is read on
- * the first reference read, so a copy naming none reads no roster.
+ * spawns nothing: the runners are functions, and the checkout's roster
+ * is read on the first reference read, so a copy naming none runs no
+ * `describe`.
  *
  * ## The roster
  *
  * Commands and flags are read against the checkout's OWN roster when
  * the project root is rafa itself, and against the core roster
- * otherwise. A spec of rafa's names the commands and flags its branch
+ * otherwise: the roster the caller hands in, which the section below
+ * holds. A spec of rafa's names the commands and flags its branch
  * adds, which the installed rafa running the check does not hold, so
  * read against that rafa's roster they read `absent` (#172).
  *
@@ -73,25 +75,63 @@
  * once per verifier. A branch whose own entry is broken still has its
  * references read, and is told what they were read against.
  *
- * The core roster is `CORE_REGISTRY` as `describeRegistry` reads it, and it
- * is imported DYNAMICALLY. A static import is a cycle that breaks on
- * one evaluation order: `src/commands/index.ts` builds its roster at
- * load from `./plan/create.ts`'s default export, which imports
- * `src/plan.ts`, which imports this module; a caller loading
- * `create.ts` first reaches `index.ts` while `create.ts`'s export is
- * not yet made. That is measured, not guessed: the static import, tried
- * on 2026-09-24, reddened `src/plan.test.ts`, whose child loads
+ * ## The roster is handed in
+ *
+ * The core roster is a PARAMETER: `roster` on what
+ * {@link checkCreateRefs} is handed, and the second argument of
+ * {@link createPlanRefsVerifier} and {@link planRoster}. Nothing here
+ * imports `src/commands/index.ts`, statically or dynamically, and
+ * nothing here defaults it, so a caller that hands none does not
+ * compile.
+ *
+ * A caller builds it with {@link registryRoster} from the registry its
+ * line was routed through, `RafaContext.registry`
+ * (`src/cli/command.ts`): `./create.ts`, which hands it to
+ * `src/plan.ts` and so to check 4, `../issue/check.ts`, and the three
+ * commands that read `../doctor-refs.ts`'s row, `../doctor.ts`,
+ * `../epic/show.ts` and `../issue/list.ts`. It is `describeRegistry`
+ * over that registry, stamped with this package's version, which is
+ * the document `rafa describe` gives for the same line. Building it
+ * spawns nothing and took 0.74 ms over `CORE_REGISTRY`, measured in
+ * this repository on 2026-10-10, so a caller builds it whether or not
+ * a reference is read.
+ *
+ * It is a parameter because of the load order. `src/commands/index.ts`
+ * builds its registry at load from `./create.ts`'s default export,
+ * which imports `src/plan.ts`, which imports this module. Imported
+ * statically from here, `index.ts` is reached while `create.ts`'s
+ * export is not yet made, by any caller that loads `create.ts` first.
+ * That is measured, not guessed: the static import, tried on
+ * 2026-09-24, reddened `src/plan.test.ts`, whose child loads
  * `create.ts` first, with `ReferenceError: Cannot access 'planCreate'
- * before initialization.` By the time a reference is read, every module
- * is loaded. The core roster holds no mounted module's commands, so a
- * `rafa module exec …` line a spec names is read against core alone.
+ * before initialization.` Until 2026-10-10 this module answered that
+ * by importing `../index.js` dynamically at the first reference read,
+ * the one dynamic import of a module under `src/` by another, and the
+ * edge the import graph survey (#802) measured holding 68 files of
+ * five clusters in one import cycle (#903). Handing the roster in
+ * removes the edge, where a static import brings the `ReferenceError`
+ * back: tried again over the parameter on 2026-10-10, it reddened 28
+ * of `src/plan.test.ts`'s 45 cases with the same words. The parameter
+ * is never swapped for an import of `index.ts`.
+ *
+ * With no module mounted the roster handed in is `CORE_REGISTRY`'s,
+ * what the dynamic import answered. With one mounted it also holds
+ * that module's actions, each named `exec <module> <action>` under
+ * `module`, since the registry a line is routed through holds every
+ * module mounted for the invocation. Measured on 2026-10-10 over
+ * `CORE_REGISTRY` with one module mounted, against `CORE_REGISTRY`
+ * alone: a flag only the module's action declares read `present`
+ * where it read `absent`, and `rafa module exec`, which is as far as a
+ * command reference is extracted, read `present` over both. So such a
+ * flag is read by whether its module loaded for this invocation.
  *
  * ## Nothing here is untestable
  *
  * The verifier is a seam ({@link CreateRefsCheckSeams.verifier}), so
  * `./refs-check.test.ts` drives a fake over copies under the temp
  * directory, and so is the checkout's roster
- * ({@link PlanRefsVerifierOptions.checkoutRoster}). The default
+ * ({@link PlanRefsVerifierOptions.checkoutRoster}). The core roster is
+ * whatever a case hands in. The default
  * {@link readCheckoutRoster} is read over repositories planted there
  * whose `src/rafa.ts` writes a roster of its own, fails, or writes the
  * wrong shape, and over this repository itself. The timeout is not
@@ -100,6 +140,7 @@
 import type { RefsGateAnswer } from '../../board/refs-gate.js';
 import type { SpecSourceRequest, ResolvedSpec } from '../../board/spec-source.js';
 import type { DescribeDocument } from '../../cli/describe.js';
+import type { CommandRegistry } from '../../cli/registry.js';
 import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
 
@@ -111,7 +152,7 @@ import { activeOutput } from '../../adapters/output/active.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { announceAcceptStaleRefs, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
 import { readSpecSourceFlags } from '../../board/spec-source.js';
-import { DESCRIBE_SCHEMA_VERSION } from '../../cli/describe.js';
+import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
 import { messageOf } from '../../config-sections.js';
 import { createGitRunner, gitSaid } from '../../pr/git.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
@@ -141,15 +182,13 @@ export type CheckoutRosterRead =
 export type CheckoutRosterReader = (repoRoot: string) => Promise<CheckoutRosterRead>;
 
 /**
- * The core roster commands and flags are read against when the project
- * is not rafa itself; see the module note for why it is loaded late.
+ * The roster of `registry` as `rafa describe` gives it, stamped with
+ * this package's version: what a caller hands in as the core roster,
+ * built from the registry its line was routed through. See the module
+ * note for why it is handed in and what a mounted module adds to it.
  */
-export async function coreRoster(): Promise<DescribeDocument> {
-  const [{ CORE_REGISTRY }, { describeRegistry }] = await Promise.all([
-    import('../index.js'),
-    import('../../cli/describe.js'),
-  ]);
-  return describeRegistry(CORE_REGISTRY, version);
+export function registryRoster(registry: CommandRegistry): DescribeDocument {
+  return describeRegistry(registry, version);
 }
 
 /** `value` as a record, or null when it is no plain object. */
@@ -264,12 +303,17 @@ export interface PlanRefsVerifierOptions {
 
 /**
  * The roster commands and flags are read against for the project at
- * `repoRoot`: the checkout's own when it is rafa itself, the core
- * roster otherwise, with one warning line when the checkout's could not
- * be read. See the module note. `rafa doctor`'s references row
- * (`../doctor-refs.ts`) reads against the same one.
+ * `repoRoot`: the checkout's own when it is rafa itself, and `roster`,
+ * the core roster the caller hands in, otherwise, with one warning line
+ * when the checkout's could not be read. See the module note. `rafa
+ * doctor`'s references row (`../doctor-refs.ts`) reads against the same
+ * one.
  */
-export async function planRoster(repoRoot: string, options: PlanRefsVerifierOptions = {}): Promise<DescribeDocument> {
+export async function planRoster(
+  repoRoot: string,
+  roster: DescribeDocument,
+  options: PlanRefsVerifierOptions = {},
+): Promise<DescribeDocument> {
   const reader = options.checkoutRoster ?? readCheckoutRoster;
   let read: CheckoutRosterRead;
   try {
@@ -279,15 +323,20 @@ export async function planRoster(repoRoot: string, options: PlanRefsVerifierOpti
   }
   if (read.kind === 'read') return read.roster;
   if (read.kind === 'failed') (options.output ?? activeOutput()).warn(checkoutRosterWarning(read.detail));
-  return coreRoster();
+  return roster;
 }
 
 /**
  * The verifier `plan create` reads a copy's references with, made for
- * the project at `repoRoot`; see the module note. The roster and the
- * `ts-symbols` lookup are made on the first reference read, once.
+ * the project at `repoRoot` over `roster`, the core roster the caller
+ * hands in; see the module note. The checkout's roster is read and the
+ * `ts-symbols` lookup made on the first reference read, once.
  */
-export function createPlanRefsVerifier(repoRoot: string, options: PlanRefsVerifierOptions = {}): RefVerifier {
+export function createPlanRefsVerifier(
+  repoRoot: string,
+  roster: DescribeDocument,
+  options: PlanRefsVerifierOptions = {},
+): RefVerifier {
   const gh = createGhRunner({ cwd: repoRoot });
   const git = createGitRunner(repoRoot);
   let made: Promise<RefVerifier> | null = null;
@@ -295,7 +344,7 @@ export function createPlanRefsVerifier(repoRoot: string, options: PlanRefsVerifi
     issues: ghIssueReader(gh),
     git,
     outline: tsSymbolsOutliner({ cwd: repoRoot }),
-    roster: await planRoster(repoRoot, options),
+    roster: await planRoster(repoRoot, roster, options),
   });
   return async (ref) => {
     made ??= verifier();
@@ -337,13 +386,15 @@ export interface CreateRefsCheckOptions {
   readonly args: readonly string[];
   /** `dangerous.acceptStaleRefs` as the config resolved it. */
   readonly acceptStaleRefs: boolean;
+  /** The core roster, built by the caller with {@link registryRoster}; see the module note. Unread with a verifier seam given. */
+  readonly roster: DescribeDocument;
   /** Where the lines go; the active output when left out. */
   readonly output?: Output;
 }
 
 /** How {@link checkCreateRefs} reads its targets; each left out is the command's own. */
 export interface CreateRefsCheckSeams {
-  /** Makes the verifier for a project root; {@link createPlanRefsVerifier} when left out. */
+  /** Makes the verifier for a project root; {@link createPlanRefsVerifier} over the roster handed in when left out. */
   readonly verifier?: (repoRoot: string) => RefVerifier;
 }
 
@@ -364,7 +415,7 @@ export async function checkCreateRefs(
   const { spec, repoRoot } = options;
   if (spec.issue === null) return null;
   const output = options.output ?? activeOutput();
-  const makeVerifier = seams.verifier ?? ((root: string) => createPlanRefsVerifier(root, { output }));
+  const makeVerifier = seams.verifier ?? ((root: string) => createPlanRefsVerifier(root, options.roster, { output }));
   return enforceRefsGate({
     path: path.resolve(repoRoot, spec.path),
     issue: spec.issue,

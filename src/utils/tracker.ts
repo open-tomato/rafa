@@ -212,13 +212,38 @@ function closedBlockLines(trackerContent: string): ReadonlySet<number> {
   return inside;
 }
 
+/** A task line of any status, ticked ones included, as {@link listTrackerTasks} answers it. */
+export interface TrackerTask extends Omit<TaskInfo, 'status'> {
+  status: TaskInfo['status'] | 'done';
+}
+
 /** The record for one task line's capture, its blocker comment taken off. */
-function taskInfoOf(capture: string, lineNum: number, status: TaskInfo['status']): TaskInfo {
+function taskInfoOf(capture: string, lineNum: number, status: TrackerTask['status']): TrackerTask {
   const { text, blocker } = splitBlockerComment(capture.trim());
   return blocker === null
     ? { task: text, lineNum, status }
     : { task: text, lineNum, status, blocker };
 }
+
+/** Each checkbox a task line opens with, and the status it reads as. */
+const TASK_LINE_STATUSES: readonly (readonly [RegExp, TrackerTask['status']])[] = [
+  [/^- \[BLOCKED\] (.+)/, 'blocked'],
+  [/^- \[ \] (.+)/, 'unchecked'],
+  [/^- \[x\] (.+)/, 'done'],
+];
+
+/** What {@link findNextTask} may be told besides the tracker. */
+export interface FindNextTaskOptions {
+  /**
+   * Zero-based lines never answered, blocked or unchecked: the tasks a
+   * `--continue` run passes over (`start/pass-over.ts`). The tracker is
+   * not written; a line holding no open task is ignored.
+   */
+  readonly skipLines?: ReadonlySet<number>;
+}
+
+/** No line skipped. */
+const NO_LINES: ReadonlySet<number> = new Set();
 
 /**
  * Finds the next task to execute in a tracker file.
@@ -269,26 +294,61 @@ function taskInfoOf(capture: string, lineNum: number, status: TaskInfo['status']
  * be dispatched at the loop's defaults with the comment quoted in its
  * prompt, its log line and its commit. The comment comes off an
  * unchecked line too, one an operator unblocked by hand.
+ *
+ * ## Lines a run passes over
+ *
+ * {@link FindNextTaskOptions.skipLines} names lines never answered,
+ * whatever their status, so a `--continue` run can go on past a task it
+ * jumped or deferred while the tracker keeps its `[BLOCKED]` line.
  */
-export function findNextTask(trackerContent: string): TaskInfo | null {
+export function findNextTask(
+  trackerContent: string,
+  options: FindNextTaskOptions = {},
+): TaskInfo | null {
+  const skip = options.skipLines ?? NO_LINES;
+  const open = listOpenTasks(trackerContent).filter((task) => !skip.has(task.lineNum));
+  return open.find((task) => task.status === 'blocked')
+    ?? open.find((task) => task.status === 'unchecked')
+    ?? null;
+}
+
+/**
+ * Every task line of a tracker, ticked ones included, in tracker order,
+ * read by the rules {@link findNextTask} answers one by: only a line
+ * opening `- [ ] `, `- [BLOCKED] ` or `- [x] ` counts, never one inside
+ * a closed `rafa:*` block, and a blocker comment comes off the text. A
+ * `--continue` run counts the copies of a repeated task text over these
+ * (`start/pass-over.ts`), so ticking one copy renumbers no other.
+ */
+export function listTrackerTasks(trackerContent: string): TrackerTask[] {
   const lines = trackerContent.split('\n');
   const inBlock = closedBlockLines(trackerContent);
+  const tasks: TrackerTask[] = [];
 
-  // Prefer resuming a blocked task first
   for (let i = 0; i < lines.length; i++) {
     if (inBlock.has(i)) continue;
-    const match = lines[i]!.match(/^- \[BLOCKED\] (.+)/);
-    if (match?.[1]) return taskInfoOf(match[1], i, 'blocked');
+    for (const [pattern, status] of TASK_LINE_STATUSES) {
+      const capture = lines[i]!.match(pattern)?.[1];
+      if (!capture) continue;
+      tasks.push(taskInfoOf(capture, i, status));
+      break;
+    }
   }
 
-  // Otherwise find the next unchecked task
-  for (let i = 0; i < lines.length; i++) {
-    if (inBlock.has(i)) continue;
-    const match = lines[i]!.match(/^- \[ \] (.+)/);
-    if (match?.[1]) return taskInfoOf(match[1], i, 'unchecked');
-  }
+  return tasks;
+}
 
-  return null;
+/** True for a task line that is still open, blocked or unchecked. */
+function isOpenTask(task: TrackerTask): task is TaskInfo {
+  return task.status !== 'done';
+}
+
+/**
+ * Every open task of a tracker, blocked or unchecked, in tracker order:
+ * {@link listTrackerTasks} with the ticked lines left out.
+ */
+export function listOpenTasks(trackerContent: string): TaskInfo[] {
+  return listTrackerTasks(trackerContent).filter(isOpenTask);
 }
 
 /**

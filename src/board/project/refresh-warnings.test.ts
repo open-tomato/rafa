@@ -1,8 +1,10 @@
 /**
  * Tests for the refresh's warning lines (`refresh-warnings.ts`): each of
- * the four lines names its fix, and the scope reading tells the
- * `project` scope apart from other refusals. The scope refusals here are
- * GitHub's documented wording, NOT readings; see the module note there.
+ * the four lines of "What can go wrong" names its fix, the not-refreshed
+ * line and the added-but-not-filled line each name the issue and the
+ * reason, and the scope reading tells the `project` scope apart from
+ * other refusals. The scope refusals here are GitHub's documented
+ * wording, NOT readings; see the module note there.
  */
 import type { FieldMismatch } from './port.js';
 
@@ -10,11 +12,13 @@ import { describe, expect, it } from 'bun:test';
 
 import { matchProjectFields, ProjectPortError } from './port.js';
 import {
+  addedNotFilledWarning,
   BOARD_SYNC_FIX,
   DOCTOR_FIX,
   INIT_BOARD_FIX,
   isMissingProjectScope,
   notFoundWarning,
+  notRefreshedWarning,
   PROJECT_SCOPE_FIX,
   rateLimitWarning,
   scopeWarning,
@@ -73,8 +77,25 @@ describe('the warning lines', () => {
     expect(skippedFieldWarning(missingRank())).toContain(DOCTOR_FIX);
   });
 
+  it('names the issue and the reason on the not-refreshed line', () => {
+    expect(notRefreshedWarning({ number: 485, reason: 'gh api graphql failed: read: operation timed out' }))
+      .toBe('#485 not refreshed: gh api graphql failed: read: operation timed out');
+  });
+
+  it('names the issue and the reason on the added-but-not-filled line', () => {
+    expect(addedNotFilledWarning({ number: 939, reason: 'gh api graphql failed: read: operation timed out' }))
+      .toBe('#939 added but not filled: gh api graphql failed: read: operation timed out');
+  });
+
   it('writes each line on one line', () => {
-    const lines = [scopeWarning(), rateLimitWarning(3), notFoundWarning({ owner: 'acme', number: 1 }), skippedFieldWarning(missingRank())];
+    const lines = [
+      scopeWarning(),
+      rateLimitWarning(3),
+      notFoundWarning({ owner: 'acme', number: 1 }),
+      skippedFieldWarning(missingRank()),
+      notRefreshedWarning({ number: 1, reason: 'a reason' }),
+      addedNotFilledWarning({ number: 1, reason: 'a reason' }),
+    ];
     expect(lines.filter((line) => line.includes('\n'))).toEqual([]);
   });
 });

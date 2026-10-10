@@ -9,6 +9,8 @@
  * `src/start/preflight.ts`, `src/preflight/run.ts`, `src/start/commit.ts`,
  * `src/start/wrap-up.ts`, `src/start/wrap-up-run.ts`, `src/start/dispatch.ts`,
  * `src/start/triage.ts`, `src/start/release-stage.ts`,
+ * `src/start/retry-budget.ts`, `src/start/continue-run.ts`,
+ * `src/start/forced-draft.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
  * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
@@ -181,6 +183,9 @@ const ROUTED_MODULES: string[] = [
   'start/dispatch.ts',
   'start/triage.ts',
   'start/release-stage.ts',
+  'start/retry-budget.ts',
+  'start/continue-run.ts',
+  'start/forced-draft.ts',
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
@@ -562,6 +567,27 @@ describe('a loop start run with no open task', () => {
     expect(riskLine).toBeGreaterThanOrEqual(0);
     expect(riskLine).toBeLessThan(lines.findIndex((line) => line.includes('--dangerously-skip-permissions')));
   }, RUN_TIMEOUT);
+
+  it('holds the danger notice to project,local and names user left out, planted at the default', () => {
+    const scratch = plant({ branch: STUB, plan: PLAN_DONE, notices: 'pending', config: 'loop:\n  settingSources: project, local\n' });
+
+    const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait']);
+
+    expectExit(run, 0, { ...scratch });
+    expect(run.stdout).toContain('loop.settingSources resolved to project,local: each session loads its settings from there.');
+    expect(run.stdout).toContain('Left out: user. Permission rules and hooks in a scope left out do not reach the session.');
+  }, RUN_TIMEOUT);
+
+  it('holds the danger notice to user,project,local and names no scope left out, planted with user added', () => {
+    const scratch = plant({ branch: STUB, plan: PLAN_DONE, notices: 'pending', config: 'loop:\n  settingSources: user, project, local\n' });
+
+    const run = runLoopStart(scratch, 'text', [PLAN_FLAG, '--no-ci-wait']);
+
+    expectExit(run, 0, { ...scratch });
+    expect(run.stdout).toContain('loop.settingSources resolved to user,project,local: each session loads its settings from there.');
+    expect(run.stdout).toContain('No scope is left out, so none is named here as not reaching the session.');
+    expect(run.stdout).not.toContain('Left out:');
+  }, RUN_TIMEOUT);
 });
 
 describe('a loop start run whose session fails', () => {
@@ -587,8 +613,10 @@ describe('a loop start run whose session fails', () => {
       `step:${TASK}`,
       `info:\n🔄 Executing task: ${TASK}`,
       ...SESSION_LINES,
-      failure,
+      // The failure line asks for another run, so it is written once the
+      // attempt is stored and no retry or decision goes on.
       expect.stringMatching(NO_REPORT_WARNING),
+      failure,
       'result',
     ]);
     expect(readFileSync(join(scratch.repo, '.plans', `PLAN_TRACKER-${STUB}.md`), 'utf8'))

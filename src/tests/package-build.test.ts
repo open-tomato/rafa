@@ -48,6 +48,12 @@
  *     2026-09-28, one run of this file, 57 pass before and 55 pass and 2
  *     fail under it (its copy case and that reader case), the manifest
  *     restored byte-identical (sha256).
+ *   - `src/continue-decision-prompt.md` and `src/continue-criteria.md`,
+ *     the `loop start --continue` contract and base criteria, are copied
+ *     into `dist/` the same way, and `start/decision-prompt.ts` sits one
+ *     directory below them in a checkout as `epic/verify-plan.ts` does,
+ *     so a case resolves both through `readBundledFile` pointed at
+ *     `dist/`.
  *   - `src/bundled/` is copied whole to `dist/bundled/`: the rafa tier,
  *     its skills and agents, which sits beside the entry in both a
  *     checkout and a build (`src/schema/tiers.ts`). The dev-planner skill
@@ -329,6 +335,7 @@ import * as planSource from '../plan/index.js';
 import { buildPlanPrompt, planFormatPath, readPlanSkillIndex } from '../plan.js';
 import * as portsSource from '../ports/index.js';
 import { PINNED_PLAN_CLASSES, pinnedPlanFileName, readPinnedPlan } from '../pr/plans/load.js';
+import { CONTINUE_CRITERIA_FILE, DECISION_PROMPT_FILE, readBundledFile } from '../start/decision-prompt.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';
 import { scratchHomeEnv } from './scratch-home-env.js';
@@ -473,6 +480,8 @@ const TEMPLATES: [string, string][] = [
   ['src/PROMPT.md', 'PROMPT.md'],
   ['src/plan-prompt.md', 'plan-prompt.md'],
   ['src/epic-verify-prompt.md', 'epic-verify-prompt.md'],
+  ['src/continue-decision-prompt.md', 'continue-decision-prompt.md'],
+  ['src/continue-criteria.md', 'continue-criteria.md'],
 ];
 
 /**
@@ -975,6 +984,12 @@ describe('the prompt templates in the build', () => {
     const source = readFileSync(join(PACKAGE_DIR, 'src', VERIFY_PROMPT_FILE), 'utf8');
 
     expect(readVerifyPrompt(DIST)).toBe(source);
+  });
+
+  it.each([[DECISION_PROMPT_FILE], [CONTINUE_CRITERIA_FILE]])('lands %s where readBundledFile looks for it from a bundle in dist', (name) => {
+    const source = readFileSync(join(PACKAGE_DIR, 'src', name), 'utf8');
+
+    expect(readBundledFile(name, DIST)).toBe(source);
   });
 
   it('hands rafa plan the template beside dist/cli.js', () => {

@@ -39,6 +39,11 @@ your accounts.
   `--dangerously-skip-permissions`.** That is what lets a plan run
   unattended, and it means a task can edit, delete and run anything your
   user account can, without asking. There is no switch for it yet.
+  The notice names `loop.settingSources` as the run resolved it: each
+  session loads its settings from those scopes, and permission rules and
+  hooks in a scope left out do not reach the session. With the default,
+  `project,local`, the scope left out is `user`; with all three loaded,
+  no scope is left out.
 - **A run acts under your accounts.** It commits, pushes its branch,
   opens a pull request with `gh`, waits for CI, and may file the
   blockers and unrelated bugs it meets as issues on the project's
@@ -51,7 +56,7 @@ your accounts.
   | Command | Spends usage |
   | --- | --- |
   | `rafa plan create` | 🪙 one planning session |
-  | `rafa loop start` | 🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request, and repair sessions while CI is red |
+  | `rafa loop start` | 🪙 one session per task, one for the wrap-up and up to `loop.wrapUp.retries` more when it opens no pull request, repair sessions while CI is red, the sessions of up to `--retry` (`loop.retries`) more passes of the loop in a row after the stops it retries, and under `--continue` one read-only decision session per decision |
   | `rafa pr triage --resolve` | 🪙 runs a small fixed plan through the loop; without `--resolve`, nothing |
   | `rafa skill backfill --propose` | 🪙 one session per batch of skills; without `--propose`, nothing |
   | `rafa skill search` | 🪙 one `haiku` session reading the twelve best-ranked files, one per kind with `--all`; with `--no-model`, nothing |

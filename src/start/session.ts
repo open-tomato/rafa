@@ -37,6 +37,12 @@
  *     pause for usage, a store the progress render cannot open, and
  *     anything thrown. A stopped record keeps the task it stopped at.
  *
+ * Under `--continue`, {@link RunSession.decisionsChanged} writes the
+ * run's pass-over list (`./pass-over.ts`) each time it changes, and
+ * {@link readPreviousPassOver} reads back the list the plan's newest
+ * ended run, stopped or done, on the same branch (and worktree, when its
+ * record names one) saved, so the next `--continue` run starts from it.
+ *
  * The open writes no phase, so a record no change has reached yet reads
  * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
  * `--no-ci-wait` runs no gate, and its record ends in `wrap-up`. The end
@@ -104,11 +110,14 @@
  * A run that is let through prints nothing here but the hop record's
  * warning above.
  */
+import type { PassOverList } from './pass-over.js';
 import type {
   PidProbe,
   SessionChange,
   SessionConflict,
   SessionDraft,
+  SessionReadSeams,
+  SessionRecord,
 } from '../loop/sessions.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { TaskInfo } from '../utils/tracker.js';
@@ -119,11 +128,15 @@ import { relative } from 'node:path';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { messageOf } from '../config-sections.js';
+import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {
   beginSession,
   errorCode,
+  readSessions,
   runsDir,
+  samePlan,
   SessionConflictError,
+  sessionDecisions,
   sessionFilePath,
   SessionRecordError,
   updateSession,
@@ -178,6 +191,8 @@ export interface RunSession {
   ciStarted(): void;
   /** Writes phase `repair`, as a repair session for the pull request is spawned. */
   repairStarted(): void;
+  /** Writes the run's pass-over list, replacing the stored one; an empty list drops the key. */
+  decisionsChanged(list: PassOverList): void;
   /** Notes that the run reached its end, so {@link RunSession.end} writes `done`. */
   finished(): void;
   /** Writes `done` after {@link RunSession.finished}, and `stopped` otherwise. */
@@ -267,6 +282,7 @@ function sessionHandle(repoRoot: string, sessionId: string): RunSession {
     pullRequestStarted: () => change('the pull-request phase', { phase: 'pull-request' }),
     ciStarted: () => change('the ci phase', { phase: 'ci' }),
     repairStarted: () => change('the repair phase', { phase: 'repair' }),
+    decisionsChanged: (list: PassOverList) => change('the pass-over list', { decisions: list }),
     finished: () => {
       reachedEnd = true;
     },
@@ -343,4 +359,107 @@ export function openRunSession(options: RunSessionOptions): RunSession {
     throw new CommandExit(1, refusal);
   }
   return sessionHandle(repoRoot, draft.sessionId);
+}
+
+/** The run {@link readPreviousPassOver} reads a list for: its plan, its branch and its checkout. */
+export interface PassOverPlan {
+  /** The plan's path, as `start()` resolved it. */
+  readonly planPath: string;
+  /** The plan's stub, or null for a plan whose file name carries none. */
+  readonly planStub: string | null;
+  /** The branch the run is on. */
+  readonly branch: string;
+  /** The run's checkout; a worktree when it is not the project root. */
+  readonly checkout: string;
+}
+
+/** True when `record` was a run of `plan`'s branch, and of its worktree when the record names one. */
+function sameRunPlace(repoRoot: string, record: SessionRecord, plan: PassOverPlan): boolean {
+  if (record.branch !== plan.branch) return false;
+  if (record.worktree === undefined) return true;
+  return plan.checkout !== repoRoot && record.worktree === plan.checkout;
+}
+
+/** The states of a run that has ended, whose saved list a later run reads. */
+const ENDED_STATES: ReadonlySet<SessionRecord['state']> = new Set(['stopped', 'done']);
+
+/** The plan's ended runs on the branch (and worktree) `plan` names, newest first. */
+function endedRunsNewestFirst(repoRoot: string, plan: PassOverPlan, seams: SessionReadSeams): readonly SessionRecord[] {
+  const wanted = { planStub: plan.planStub, plan: relative(repoRoot, plan.planPath) };
+  return readSessions(repoRoot, seams)
+    .filter((record) => ENDED_STATES.has(record.state) && samePlan(record, wanted) && sameRunPlace(repoRoot, record, plan))
+    .reverse();
+}
+
+/**
+ * The pass-over list the plan's newest ended run on the same branch
+ * saved on its record, stopped or done, or none: none for a plan with
+ * no ended run there, and none when that run saved no list, whatever an
+ * older run saved. A `--force-wrap-up` run ends `done` with its tasks
+ * still passed over, and its list is read as a stopped run's is; a run
+ * that ended with no list, done or stopped, is newer than every list
+ * before it. A record naming a worktree is read only by a run in that
+ * worktree; one naming none, by any run on its branch. A record stored
+ * `running` or `paused` whose pid is gone reads as stopped (`readState`).
+ *
+ * @throws SessionRecordError when a record under `.rafa/runs/` cannot
+ *   be read, as `readSessions` does.
+ */
+export function readPreviousPassOver(
+  repoRoot: string,
+  plan: PassOverPlan,
+  seams: SessionReadSeams = {},
+): PassOverList {
+  const newest = endedRunsNewestFirst(repoRoot, plan, seams)[0];
+  return newest === undefined
+    ? []
+    : sessionDecisions(newest);
+}
+
+/** The task a run's `decision-needed` event named: its text and its tracker line, counted from 1. */
+export interface NeededDecision {
+  readonly task: string;
+  readonly line: number;
+}
+
+/** The loop events that say what a run did with its tasks, the last of which {@link readPreviousDecisionNeeded} reads. */
+const TASK_EVENTS: ReadonlySet<string> = new Set(['task-start', 'decision', 'decision-needed']);
+
+/** The task the `decision-needed` event `data` names, or null for data that names none. */
+function neededOf(data: Readonly<Record<string, unknown>>): NeededDecision | null {
+  const { task, line } = data;
+  return typeof task === 'string' && typeof line === 'number'
+    ? { task, line }
+    : null;
+}
+
+/**
+ * The task the plan's previous run on the same branch needed a decision
+ * on, or null. The previous run is the newest ended run, as
+ * {@link readPreviousPassOver} picks it, that reached its loop: one
+ * whose events file holds a `task-start`, a `decision` or a
+ * `decision-needed`, so a run refused before its loop, by a refused
+ * `--decide` among others, is read past. When that run's last such
+ * event is a `decision-needed`, the task it names is answered; a run
+ * that went on past its decision, or never needed one, answers null.
+ *
+ * @throws SessionRecordError when a record under `.rafa/runs/` cannot
+ *   be read, as `readSessions` does.
+ */
+export function readPreviousDecisionNeeded(
+  repoRoot: string,
+  plan: PassOverPlan,
+  seams: SessionReadSeams = {},
+): NeededDecision | null {
+  for (const record of endedRunsNewestFirst(repoRoot, plan, seams)) {
+    const read = readEventsFrom(eventsFileOf(repoRoot, record), 0);
+    const last = read.kind === 'read'
+      ? read.events.filter((event) => TASK_EVENTS.has(event.name)).at(-1)
+      : undefined;
+    if (last === undefined) continue;
+    return last.name === 'decision-needed'
+      ? neededOf(last.data)
+      : null;
+  }
+  return null;
 }

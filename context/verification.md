@@ -36,7 +36,10 @@ default), `tests=module`, or `tests=full` to control what its session checks.
 - `bunx tsc --noEmit` (only TypeScript, test files excluded via tsconfig)
 - `bunx tsc` on touched test files against their base (same `tsconfig.json`
   with `typeRoots` held absolutely, read below for the scratch recipe and
-  backlog)
+  backlog); the task prompt hands the session that recipe as one line,
+  the type step's own scratch tsconfig and `tsc` command, whenever the
+  checkout holds a `tsconfig.json` and the step's walk finds a
+  `node_modules/.bin/tsc`
 - `bunx eslint <changed files>` (ESLint on changed files only; read below
   for the blocker when changed files are all ignored)
 
@@ -297,7 +300,23 @@ session's type gate runs `tsc` on files matching `**/*.test.ts` in the diff
 against their base commit. `tsconfig.json` excludes `**/*.test.ts` from the
 main gate, so `bun test` strips types without checking them. A test file
 type error that exists on the base branch is not new and does not block;
-one that first appears in the diff is red. To check one by hand, point a
+one that first appears in the diff is red. Every task prompt carries one
+line handing its session that check before it reports done; the wrap-up's
+prompt does not, since `dispatchTask` alone adds it (`typeCheckLines` in
+`src/start/task-gate-lines.ts`). The line holds the scratch
+tsconfig as JSON, with `<test file>` where each test file's path relative
+to the checkout goes (the entry already opens with the checkout's path, so
+an absolute one doubles it and tsc reports TS6053), and
+`<modules>/.bin/tsc -p <that tsconfig.json> --noEmit --pretty false` to run
+in the checkout, both rendered by the type step's own
+`scratchTsconfigFields` and `tscArgv` (`src/start/type-step.ts`), so the
+line cannot drift from the step. It asks for every error in a test file
+the task added, and in one it edited for the errors on the lines
+`git diff <base> -- <test file>` names, so the session acts on one run
+with no run at the base. A checkout with no `tsconfig.json` at its
+root, where the step runs nothing, gets no line, and so does one where the
+walk finds no `node_modules/.bin/tsc`; a run whose suite steps
+are off (no baseline) still gets it. To check one by hand, point a
 tsconfig outside the repo at it — `extends` this repo's `tsconfig.json`
 by absolute path (a bare `tsconfig.json` is looked up as a package, the
 repo's options are never applied, and hundreds of TS2802 errors follow),

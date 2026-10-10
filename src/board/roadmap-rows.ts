@@ -149,7 +149,8 @@
  * number counting them would claim a fault nobody measured. A copy whose
  * references could not be read makes the cell `?`, since the count
  * would be short by what was not read, and its reason is a warning
- * naming `rafa issue check <n>`. The reading writes nothing: a
+ * naming `rafa issue check <n>` (`issueCheckCommand`,
+ * `src/refs/check-command.ts`). The reading writes nothing: a
  * reference a copy keeps no stamp for is compared as `rafa issue check`
  * compares it, and is not stamped here.
  *
@@ -203,10 +204,10 @@ import type { Place } from '../project/position.js';
 
 import { existsSync, readdirSync } from 'node:fs';
 
-import { issueCheckCommand } from '../commands/doctor-refs.js';
 import { stubOfPlanFile } from '../commands/plan/plan-files.js';
 import { messageOf } from '../config-sections.js';
 import { positionFilePath } from '../project/position.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 
 import { readBlockedBy } from './blocked.js';
 import { resolveDefaultBoard } from './boards.js';

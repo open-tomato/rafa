@@ -48,6 +48,16 @@
  * Every other member is the inner board's own, untouched: a close or a
  * created issue is refreshed by its own caller where the spec names one.
  *
+ * ## Retried
+ *
+ * The refresh, here and through {@link refreshIssueItems}, sends its
+ * calls through the runner opened retrying (`./project-runner.ts`), with
+ * the two `board.project` retry keys and the `sleep` the caller hands:
+ * a call that failed on a network error is sent again, each retry
+ * reported to the active output before its wait. The label writes are
+ * the inner board's and go through the runner as handed. A runner the
+ * caller already opened retrying is not wrapped twice.
+ *
  * ## Cost
  *
  * One refresh per write, never batched across writes: the stage removal
@@ -64,6 +74,7 @@ import { activeOutput } from '../../adapters/output/active.js';
 import { messageOf } from '../../config-sections.js';
 import { createGhIssueBoard } from '../issue-board.js';
 
+import { openProjectRunner } from './project-runner.js';
 import { BOARD_SYNC_FIX } from './refresh-warnings.js';
 import { refreshProjectItems } from './refresh.js';
 
@@ -100,7 +111,20 @@ export interface RefreshingGhIssueBoardOptions {
  * they are initialized.
  */
 export function refreshIssueItems(options: RefreshOptions, issues: readonly number[], widening: RefreshWidening = {}): Promise<ProjectRefresh> {
-  return refreshProjectItems(options, issues, widening);
+  return refreshProjectItems(retrying(options), issues, widening);
+}
+
+/**
+ * `options` with its runner opened retrying, waiting through its own
+ * `sleep`; unchanged with `board.project.number` unset, when the refresh
+ * sends no call. See the module note.
+ */
+function retrying(options: RefreshOptions): RefreshOptions {
+  if (options.config.boardProjectNumber === null) return options;
+  const seams = options.sleep === undefined
+    ? {}
+    : { sleep: options.sleep };
+  return { ...options, gh: openProjectRunner(options.gh, options.config, seams) };
 }
 
 /** The line a refresh that rejected after `issue` was labelled is answered as. */
@@ -150,7 +174,7 @@ export function createRefreshingGhIssueBoard(options: RefreshingGhIssueBoardOpti
     ? { config, gh }
     : { config, gh, sleep };
   return withProjectRefresh(createGhIssueBoard({ gh }), {
-    refresh: (issues) => refreshProjectItems(refreshOptions, issues),
+    refresh: (issues) => refreshProjectItems(retrying(refreshOptions), issues),
     warn,
   });
 }

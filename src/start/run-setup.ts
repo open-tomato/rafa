@@ -7,7 +7,12 @@
  * before the `--start-at` deferral: the time to defer to, the plan path
  * as typed, the three CI flags, and whether `--roadmap` was passed. Every
  * one is a pure reading of the words, so reading them together where the
- * first used to be read alone changes nothing a run does. `--inject`,
+ * first used to be read alone changes nothing a run does. `--retry` is
+ * one it refuses: anything but `--retry=<n>` with n a whole number
+ * from 1 to 3 throws exit code 1 before the deferral, so a run queued
+ * for 23:00 does not learn of a typo then. The `--continue` flags are
+ * the others, read and refused the same way by
+ * `start/continue-args.ts`. `--inject`,
  * `--skills-resolver`, `--runtime` and `-d|--detached` are read by
  * `start/run-config.ts` and `start/runtime.ts`, and not here.
  *
@@ -39,12 +44,15 @@
  */
 import type { RafaConfig } from '../config-schema.js';
 import type { BranchSeams } from './branch.js';
+import type { ContinueArgs } from './continue-args.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
+import { isLoopRetryCount } from '../config-schema-loop-retries.js';
 
 import { branchNameFor, detachedHeadRefusal, isDetachedHead, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';
+import { readContinueArgs } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
 import { argValue } from './run-config.js';
 import { NOTHING_DISPATCHED } from './session.js';
@@ -296,6 +304,55 @@ export interface RunArgs {
   readonly ciAttempts: number;
   /** Whether `--roadmap` was passed (`start/session.ts`). */
   readonly roadmap: boolean;
+  /**
+   * `--retry=<n>`, the retries this run makes after a retry-safe stop
+   * (`start/retry-budget.ts`), or undefined when the line names none.
+   */
+  readonly retry: number | undefined;
+  /** What the line asks of `--continue` (`start/continue-args.ts`). */
+  readonly continueRun: ContinueArgs;
+}
+
+/** The flag naming this run's retries, outranking `loop.retries`. */
+const RETRY_FLAG = '--retry';
+
+/** Its negation, refused: off is spelled `loop.retries: false`. */
+const NO_RETRY_FLAG = '--no-retry';
+
+/** A count as `--retry` takes one: digits with no leading zero, no sign and no point. */
+const RETRY_COUNT = /^[1-9][0-9]*$/;
+
+/** Throws the refusal of a `--retry` word, `reason` saying what is wrong with it. */
+function refuseRetry(reason: string): never {
+  throw new CommandExit(1, [
+    `❌ Refusing ${reason}: ${RETRY_FLAG} takes a whole number from 1 to 3 as ${RETRY_FLAG}=<n>,`,
+    '   the retries this run makes after a retry-safe stop. Leave it out to take `loop.retries`,',
+    '   and set `loop.retries: false` in .rafa/config.yaml for none.',
+    NOTHING_DISPATCHED,
+  ].join('\n'));
+}
+
+/**
+ * `--retry=<n>` off the words before a `--`, the last one when two are
+ * typed, or undefined when none is; see the module note for what is
+ * refused. `--no-retry` is refused rather than read as none: off is
+ * spelled `loop.retries: false`, and a count is never read as off.
+ */
+function readRetryFlag(args: readonly string[]): number | undefined {
+  const end = args.indexOf('--');
+  const words = end === -1
+    ? args
+    : args.slice(0, end);
+  if (words.includes(NO_RETRY_FLAG)) refuseRetry(NO_RETRY_FLAG);
+  if (words.includes(RETRY_FLAG)) refuseRetry(`a bare ${RETRY_FLAG}`);
+  // `argValue` answers the first hit, so the words are read last first.
+  const typed = argValue([...words].reverse(), RETRY_FLAG);
+  if (typed === undefined) return undefined;
+  const count = RETRY_COUNT.test(typed)
+    ? Number(typed)
+    : Number.NaN;
+  if (!isLoopRetryCount(count)) refuseRetry(`${RETRY_FLAG}=${typed}`);
+  return count;
 }
 
 /**
@@ -312,5 +369,7 @@ export function readRunArgs(args: readonly string[]): RunArgs {
     ciTimeoutMin: Number(argValue(args, '--ci-timeout') ?? DEFAULT_CI_TIMEOUT_MIN),
     ciAttempts: Number(argValue(args, '--ci-attempts') ?? DEFAULT_CI_ATTEMPTS),
     roadmap: args.includes(ROADMAP_FLAG),
+    retry: readRetryFlag(args),
+    continueRun: readContinueArgs(args),
   };
 }

@@ -39,7 +39,9 @@
  * lines are asked in order for the first naming an epic that is OPEN,
  * carries exactly one `horizon:` label and that label `horizon:now`
  * (`isNowEpic`, the walk's own test, `src/board/epic-walk.ts`), and whose
- * computed state is not `done`: the epic `rafa next` walks into. Each
+ * computed state is not `done`: the epic `rafa next` walks into. That
+ * pick is `firstNowEpic` (`src/board/now-epic.ts`), which the current
+ * place's fallback and `rafa switch` make too. Each
  * line is told an epic by the listing's type for its issue, never by
  * reading the issue, so a Roadmap of any length costs no more than one
  * Roadmap read and one listing. When no line qualifies, one line says
@@ -136,8 +138,9 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhBoardLister, resolveDefaultBoard } from '../../board/boards.js';
 import { cancelledEpicNoticeLines } from '../../board/epic-cancel-notice.js';
 import { epicProblemMessage } from '../../board/epic-problems.js';
-import { epicLines, isNowEpic } from '../../board/epic-walk.js';
+import { epicLines } from '../../board/epic-walk.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
+import { firstNowEpic } from '../../board/now-epic.js';
 import { claimsOf, onceSeams, readListedEpics, readModeEpicProblems } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames, readCurrentPlace, readLineRows } from '../../board/roadmap-rows.js';
 import {
@@ -155,6 +158,7 @@ import { roadmapBoard } from '../issue/list.js';
 import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
 import { plansDirAt, readSwitch } from '../plan/plan-files.js';
+import { registryRoster } from '../plan/refs-check.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa epics [<n>] [--labels] [--texts] [--refresh]';
@@ -219,23 +223,6 @@ export function isProblemOf(problem: EpicProblem, epic: Epic): boolean {
     case 'orphan-label':
       return false;
   }
-}
-
-/**
- * The first of `lines` naming an epic that is open, `now` and not done,
- * read off `listing` and `epics`; null when none does. Ticked lines are
- * passed, as the walk passes them.
- */
-export function firstNowEpic(lines: readonly RoadmapLine[], listing: readonly BoardIssue[], epics: Epics): Epic | null {
-  const issues = new Map(listing.map((issue) => [issue.number, issue]));
-  const read = new Map(epics.epics.map((epic) => [epic.number, epic]));
-  for (const line of lines) {
-    const issue = issues.get(line.issue);
-    const epic = read.get(line.issue);
-    if (line.ticked || issue?.type !== 'epic' || epic === undefined) continue;
-    if (issue.state === 'OPEN' && isNowEpic(issue.labels) && epic.state !== 'done') return epic;
-  }
-  return null;
 }
 
 /** The line heading the table: the epic, its title, its computed state and its progress. */
@@ -340,7 +327,7 @@ function rowSeams(context: RafaContext, seams: EpicShowSeams, config: RafaConfig
   const refresh = readSwitch('refresh', context.flags['refresh'], SWITCH_HINT);
   const board = roadmapBoard(seams, gh, root, refresh, seams.relations?.mode ?? 'labels');
   const refs: RoadmapRefs = async (issues) => roadmapRefsCells(await readDoctorRefs(
-    { root, specsDir: config.specsDir, gh, env: context.env, issues, listing: board },
+    { root, specsDir: config.specsDir, gh, roster: registryRoster(context.registry), env: context.env, issues, listing: board },
     { refsVerifier: seams.refsVerifier },
   ));
   return onceSeams({

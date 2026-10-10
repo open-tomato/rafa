@@ -27,15 +27,18 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { realNodeModules } from '../tests/real-node-modules.js';
 
+import { TYPE_CHECK_FILE, TYPE_CHECK_SCRATCH, typeCheckLines } from './task-gate-lines.js';
 import {
   findNodeModules,
   newErrors,
   parseTscOutput,
+  readTypeCheckRecipe,
   readTypeFiles,
   runTsc,
   runTypeStep,
   scratchTsconfig,
   TSC_FLAGS,
+  tscArgv,
   typeBlockerText,
 } from './type-step.js';
 
@@ -73,6 +76,9 @@ const ERROR_LINE = 'export const count: number = \'one\';';
 const SAME_ERROR_LINE = 'export const other: number = \'two\';';
 
 const TS2322 = 'TS2322 Type \'string\' is not assignable to type \'number\'.';
+
+/** A line tsc answers with a TS2322 whose message differs from {@link ERROR_LINE}'s. */
+const OTHER_ERROR_LINE = 'export const flag: boolean = 1;';
 
 let repo: string;
 let lines: { level: string; message: string }[];
@@ -280,6 +286,111 @@ interface WalkRun {
   readonly link: string | null;
 }
 
+/** The scratch tsconfig and the tsc argv a session reads off the type-check line, for `file` at `scratch`. */
+function followLine(line: string, file: string, scratch: string): readonly string[] {
+  const [, json = '', command = ''] = /write `(\{.*\})` to `tsconfig\.json`.* then run `([^`]+)` in the checkout/.exec(line) ?? [];
+  writeFileSync(scratch, json.replace(TYPE_CHECK_FILE, file), 'utf8');
+  return command.replace(TYPE_CHECK_SCRATCH, scratch).split(' ');
+}
+
+describe('the recipe a task prompt hands the session (typeCheckLines)', () => {
+  it('is the checkout and the node_modules the step runs through, and none without a tsconfig.json', () => {
+    const recipe = readTypeCheckRecipe(repo, createGitRunner(repo));
+
+    expect(recipe).toEqual({ checkout: repo, modules: findNodeModules(repo, createGitRunner(repo)) ?? 'none found' });
+
+    // The control: with no tsconfig.json at the root the step runs nothing, and the prompt names nothing.
+    rmSync(join(repo, 'tsconfig.json'));
+    expect(readTypeCheckRecipe(repo, createGitRunner(repo))).toBeNull();
+  });
+
+  it('renders the argv the step spawns', async () => {
+    const seen: TypeRunOptions[] = [];
+    await runTypeStep(scriptedInput([['A', 'a.test.ts']], { exitCode: 0, stdout: '', stderr: '' }, seen));
+    const recipe = readTypeCheckRecipe(repo, createGitRunner(repo));
+
+    expect(seen[0]?.argv).toEqual(tscArgv(recipe?.modules ?? 'none found', seen[0]?.argv[2] ?? ''));
+  });
+
+  it('followed as written over a real tsc, reports the error the step reads as new, and none on a clean file', async () => {
+    const base = commit({ 'README.md': ['# planted'] }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE], 'b.test.ts': CLEAN }, 'task');
+    const step = await runTypeStep(realInput(base));
+    expect(step.blocker).toContain(`a.test.ts:6:14 ${TS2322}`);
+
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const red = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      expect(red.stdout).toContain(`a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}`);
+      expect(red.exitCode).not.toBe(0);
+
+      // The control: the same line over the clean file reports nothing.
+      const clean = await runTsc({ cwd: repo, argv: followLine(line, 'b.test.ts', join(scratch, 'tsconfig.json')) });
+      expect([clean.exitCode, clean.stdout]).toEqual([0, '']);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
+
+/** The lines of `file` the type-check line's `git diff <base> -- <test file>` names as added, run as written in `repo`. */
+function linesTheDiffNames(line: string, base: string, file: string): readonly number[] {
+  const [, command = ''] = /`(git diff <base> -- [^`]+)`/.exec(line) ?? [];
+  const followed = command.replace('<base>', base).replace(TYPE_CHECK_FILE, file);
+  const [, ...args] = followed.split(' ');
+  const added: number[] = [];
+  let at = 0;
+  for (const text of git(...args).split('\n')) {
+    const hunk = /^@@ -\S+ \+(\d+)/.exec(text);
+    if (hunk) at = Number(hunk[1]);
+    else if (at > 0 && text.startsWith('+')) added.push(at++);
+    else if (at > 0 && !text.startsWith('-')) at += 1;
+  }
+  return added;
+}
+
+describe('the type-check line followed with an absolute path in place of the placeholder', () => {
+  it('doubles the checkout\'s path, which is why the line asks for the path relative to the checkout', async () => {
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'task');
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    expect(line).toContain('relative to the checkout');
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const absolute = await runTsc({ cwd: repo, argv: followLine(line, join(repo, 'a.test.ts'), join(scratch, 'tsconfig.json')) });
+      expect(absolute.stdout).toContain(`error TS6053: File '${join(repo, repo, 'a.test.ts')}' not found.`);
+
+      // The control: the relative path the line asks for reaches the file and its error.
+      const relative = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      expect(relative.stdout).toContain(`a.test.ts(6,14): error ${TS2322.replace(' ', ': ')}`);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
+
+describe('the type-check line followed in an edited test file', () => {
+  it('names, through its git diff, the line of the error the step reads as new and not the line of the one the file held', async () => {
+    const base = commit({ 'a.test.ts': [...CLEAN, ERROR_LINE] }, 'base');
+    commit({ 'a.test.ts': [...CLEAN, ERROR_LINE, OTHER_ERROR_LINE] }, 'task');
+    const step = await runTypeStep(realInput(base));
+    expect(step.blocker).toContain('a.test.ts:7:14 TS2322');
+    expect(step.blocker).not.toContain('a.test.ts:6:14');
+
+    const line = typeCheckLines(readTypeCheckRecipe(repo, createGitRunner(repo)))[0] ?? '';
+    const scratch = mkdtempSync(join(tmpdir(), 'type-step-session-'));
+    try {
+      const run = await runTsc({ cwd: repo, argv: followLine(line, 'a.test.ts', join(scratch, 'tsconfig.json')) });
+      const reported = parseTscOutput(run.stdout, repo).map((error) => error.line);
+      // The session's run reports both errors; the inherited one is the control the diff leaves out.
+      expect(reported).toEqual([6, 7]);
+      expect(reported.filter((at) => linesTheDiffNames(line, base, 'a.test.ts').includes(at))).toEqual([7]);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, TSC_TIMEOUT);
+});
+
 describe('runTypeStep finds node_modules by the walk', () => {
   let top: string;
   let main: string;
@@ -380,6 +491,17 @@ describe('runTypeStep finds node_modules by the walk', () => {
     expect(existsSync(join(decoy, '.bin', 'tsc.ran'))).toBe(true);
     const wider: GitRunner = () => ({ ok: true, stdout: `${join(top, '.git')}\n`, stderr: '' });
     expect(findNodeModules(main, wider)).toBe(decoy);
+  });
+
+  it('hands the prompt no recipe when the walk finds no tsc, and one through the node_modules it finds once one is planted', () => {
+    // A tsconfig.json at the root, a decoy above the repository, and no tsc the walk reaches.
+    plantTsc(top);
+    expect(existsSync(join(main, 'tsconfig.json'))).toBe(true);
+    expect(readTypeCheckRecipe(main, createGitRunner(main))).toBeNull();
+
+    // The control: the same checkout once its own node_modules holds a tsc.
+    const modules = plantTsc(main);
+    expect(readTypeCheckRecipe(main, createGitRunner(main))).toEqual({ checkout: main, modules });
   });
 });
 

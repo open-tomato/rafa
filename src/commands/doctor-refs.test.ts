@@ -13,8 +13,9 @@
  * The verifier is `createRefVerifier` over those two, handed in through
  * the `refsVerifier` seam with no `ts-symbols` and the core roster.
  * The roster cases alone read through the row's default verifier, with
- * no `ts-symbols` on the `PATH` they hand it, no board, and the
- * checkout's own roster answered through the `checkoutRoster` seam.
+ * no `ts-symbols` on the `PATH` they hand it, no board, the checkout's
+ * own roster answered through the `checkoutRoster` seam, and the core
+ * roster handed in as the row's `roster`, as every case hands it.
  *
  * ## The controls
  *
@@ -43,13 +44,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { createGitRunner } from '../pr/git.js';
+import { issueCheckCommand } from '../refs/check-command.js';
 import { readRefsText } from '../refs/reading.js';
 import { issueFingerprint, NEW, PRESENT, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { createRefVerifier } from '../refs/verify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {
-  issueCheckCommand,
   listedIssueReader,
   memoiseIssueReader,
   NO_BOARD_DETAIL,
@@ -162,7 +163,7 @@ describe('readDoctorRefs', () => {
     plantCopy(root, 'README.md', 'Names `src/gone.ts`.\n');
     const gh = fakeGh({ 7: NEW_SEVEN });
 
-    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run }, SEAMS));
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: gh.run }, SEAMS));
 
     expect(reading.copies).toEqual([
       { issue: 1, path: join(SPECS, 'rafa-1-clean-copy.md'), suspect: 0, dangling: 0, unknown: 0, error: null },
@@ -177,7 +178,7 @@ describe('readDoctorRefs', () => {
     plantCopy(root, 'rafa-2-new-copy.md', writeRefsBlock('Adds `src/planned.ts`.\n', [{ kind: 'path', text: 'src/planned.ts', fingerprint: NEW }]));
     plantCopy(root, 'rafa-3-drift-copy.md', writeRefsBlock('Adds `src/planned.ts`.\n', [{ kind: 'path', text: 'src/planned.ts', fingerprint: PRESENT }]));
 
-    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS));
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, SEAMS));
     const clean = { ...reading, copies: reading.copies.slice(0, 2), dangling: 0 };
 
     expect(reading.copies.map((copy) => [copy.issue, copy.suspect, copy.dangling, copy.unknown, copy.error]))
@@ -191,7 +192,7 @@ describe('readDoctorRefs', () => {
     plantCopy(root, 'rafa-2-second-copy.md', 'Builds on #7 and rafa-7.\n');
     const gh = fakeGh({ 7: NEW_SEVEN });
 
-    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run }, SEAMS));
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: gh.run }, SEAMS));
 
     expect(gh.calls()).toEqual(['issue view 7 --json title,body,state']);
     expect(reading.copies.map((copy) => copy.error)).toEqual([null, null]);
@@ -203,8 +204,8 @@ describe('readDoctorRefs', () => {
     const down = fakeGh({}, 'HTTP 401: Bad credentials');
     const up = fakeGh({ 7: NEW_SEVEN, 8: NEW_SEVEN });
 
-    const unread = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: down.run }, SEAMS));
-    const read = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: up.run }, SEAMS));
+    const unread = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: down.run }, SEAMS));
+    const read = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: up.run }, SEAMS));
 
     expect(unread.copies).toEqual([
       { issue: 1, path: join(SPECS, 'rafa-1-board-copy.md'), suspect: 0, dangling: 0, unknown: 2, error: null },
@@ -218,7 +219,7 @@ describe('readDoctorRefs', () => {
     const root = plantRepository('no-board');
     plantCopy(root, 'rafa-1-plain-copy.md', 'Builds on #7.\n');
 
-    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS));
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, SEAMS));
 
     expect(reading.copies[0]).toMatchObject({ unknown: 1, error: null });
   });
@@ -229,7 +230,7 @@ describe('readDoctorRefs', () => {
     const before = readFileSync(join(root, path), 'utf8');
     const verify = createRefVerifier({ issues: async () => ({ kind: 'missing' }), git: createGitRunner(root), outline: null, roster: ROSTER });
 
-    await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS);
+    await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, SEAMS);
 
     expect(readFileSync(join(root, path), 'utf8')).toBe(before);
     expect((await readRefsText({ copy: before, issue: 1, verify })).changed).toBe(true);
@@ -240,7 +241,7 @@ describe('readDoctorRefs', () => {
     plantCopy(root, 'rafa-1-broken-copy.md', '<!-- rafa:refs\n: not yaml [\n-->\nReads `src/a.ts`.\n');
     plantCopy(root, 'rafa-2-fine-copy.md', writeRefsBlock('Names `src/missing.ts`.\n', [{ kind: 'path', text: 'src/missing.ts', fingerprint: PRESENT }]));
 
-    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS));
+    const reading = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, SEAMS));
 
     expect(reading.copies[0]?.error).toEqual(expect.any(String));
     expect(reading.copies[1]).toMatchObject({ issue: 2, dangling: 1, error: null });
@@ -251,8 +252,8 @@ describe('readDoctorRefs', () => {
     const root = plantRepository('no-specs');
     plant(root, 'specs-file', 'not a directory\n');
 
-    const missing = await readDoctorRefs({ root, specsDir: SPECS, gh: null }, SEAMS);
-    const file = await readDoctorRefs({ root, specsDir: 'specs-file', gh: null }, SEAMS);
+    const missing = await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, SEAMS);
+    const file = await readDoctorRefs({ root, specsDir: 'specs-file', roster: ROSTER, gh: null }, SEAMS);
 
     expect(missing).toEqual({ ok: true, copies: [], suspect: 0, dangling: 0, unknown: 0 });
     expect(file.ok).toBe(false);
@@ -266,8 +267,8 @@ describe('the roadmap\'s refs column', () => {
     plantCopy(root, 'rafa-2-off-roadmap.md', 'Reads `src/gone.ts`.\n');
     const gh = fakeGh({});
 
-    const narrowed = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run, issues: [1, 5] }, SEAMS));
-    const whole = okReading(await readDoctorRefs({ root, specsDir: SPECS, gh: gh.run }, SEAMS));
+    const narrowed = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: gh.run, issues: [1, 5] }, SEAMS));
+    const whole = okReading(await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: gh.run }, SEAMS));
 
     expect(narrowed.copies.map((copy) => copy.issue)).toEqual([1]);
     expect(whole.copies.map((copy) => copy.issue)).toEqual([1, 2]);
@@ -365,7 +366,7 @@ describe('the no-board detail', () => {
       },
     };
 
-    await readDoctorRefs({ root, specsDir: SPECS, gh: null }, seams);
+    await readDoctorRefs({ root, specsDir: SPECS, roster: ROSTER, gh: null }, seams);
 
     expect(seen).toEqual([[root, { kind: 'failed', detail: NO_BOARD_DETAIL }]]);
   });
@@ -470,7 +471,7 @@ async function readWithCheckoutRoster(name: string, read: CheckoutRosterRead): P
   let asked = 0;
 
   const reading = okReading(await readDoctorRefs(
-    { root, specsDir: SPECS, gh: null, env: { PATH: '' }, output },
+    { root, specsDir: SPECS, roster: ROSTER, gh: null, env: { PATH: '' }, output },
     {
       checkoutRoster: async () => {
         asked += 1;

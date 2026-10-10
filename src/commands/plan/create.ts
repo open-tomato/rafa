@@ -27,12 +27,29 @@
  * `src/plan.ts` is handed the word along with the rest of the line and
  * reads no flag it does not know, so `--no-hint` reaching its parser
  * changes nothing there.
+ *
+ * ## The roster
+ *
+ * `src/plan.ts` is also handed the roster check 4 reads a snapshot's
+ * commands and flags against: `registryRoster` (`./refs-check.ts`) over
+ * the registry this line was routed through. A wrapper hands a phase 0
+ * command the words and the project root and nothing else of the
+ * context (`../wrap.ts`), so `run` wraps the declaration again on each
+ * run, around a call that closes over the context's registry. The
+ * words and the root still reach `src/plan.ts` by the wrapper's rules.
+ * `./refs-check.ts` holds why the roster is handed in rather than
+ * imported there.
  */
+import type { RafaCommand } from '../../cli/command.js';
+import type { CommandDeclaration } from '../wrap.js';
+
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import plan from '../../plan.js';
 import { wrapPhaseZeroCommand } from '../wrap.js';
 
-const wrapped = wrapPhaseZeroCommand({
+import { registryRoster } from './refs-check.js';
+
+const declaration: CommandDeclaration = {
   name: 'plan create',
   subject: 'plan',
   action: 'create',
@@ -168,6 +185,15 @@ const wrapped = wrapPhaseZeroCommand({
   aliases: ['plan'],
   outputs: ['text', 'json'],
   spends: { when: 'always', what: 'one planning session' },
-}, plan);
+};
 
-export default endingWith(wrapped);
+/** The declaration over `src/plan.ts`, handed the roster of the registry each line was routed through; see the module note. */
+const wrapped: RafaCommand = {
+  ...declaration,
+  run: async (context) => wrapPhaseZeroCommand(
+    declaration,
+    (args, root) => plan(args, root, registryRoster(context.registry)),
+  ).run(context),
+};
+
+export default endingWith(Object.freeze(wrapped));

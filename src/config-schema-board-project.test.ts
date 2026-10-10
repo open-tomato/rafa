@@ -1,7 +1,10 @@
 /**
- * Tests for `board.project.template` and `board.project.number`, the
- * two keys naming the GitHub project a board is mirrored to: the
- * template it is copied from, by URL, and the copy's number.
+ * Tests for the `board.project` section: `board.project.template` and
+ * `board.project.number`, the two keys naming the GitHub project a board
+ * is mirrored to — the template it is copied from, by URL, and the
+ * copy's number — and the five limits on how the project is refreshed,
+ * `retries`, `retryWaitSeconds`, `progressSeconds`, `writeBatchSize` and
+ * `writePauseMs`.
  *
  * Each key is driven through the spec `SETTINGS` holds for it, so what
  * is proved is the reader the schema wires to the key, not a reader of
@@ -14,6 +17,12 @@
  * The layer cases go through `parseConfigText` and `resolveConfig`: the
  * default when nothing names a key, a file over the default, the
  * project file over the user file, and no command-line spelling.
+ *
+ * Each limit is read at its edges: the least and the most it accepts,
+ * one below and one above, `0` and `-1`, and `false`, which only
+ * `retries` and `progressSeconds` accept. `writePauseMs` is the one key
+ * whose least is `0`, so for it `0` is the accepting edge and `-1` the
+ * refusal beside it.
  */
 import type { ConfigSetting } from './config-schema.js';
 import type { ConfigOverrides } from './config.js';
@@ -234,12 +243,13 @@ describe('board.project across the layers', () => {
     expect(resolved.warnings).toEqual([]);
   });
 
-  it('warns of an unknown key under board.project, naming the two it knows', () => {
+  it('warns of an unknown key under board.project, naming the seven it knows', () => {
     const resolved = resolveConfig({ file: parseConfigText(projectFile('id: 6'), PATH) });
 
     expect(resolved.warnings).toEqual([
       `rafa config: unknown key "board.project.id" in ${PATH} has no effect in this version `
-        + '(known keys under board.project: template, number)',
+        + '(known keys under board.project: template, number, retries, retryWaitSeconds, '
+        + 'progressSeconds, writeBatchSize, writePauseMs)',
     ]);
   });
 
@@ -257,5 +267,213 @@ describe('board.project across the layers', () => {
 
     expect(resolved.config.store).toBe('ndjson');
     expect(resolved.sources.store).toBe('cli');
+  });
+});
+
+/** One `board.project` limit, every fact about it spelled out. */
+interface Limit {
+  setting: ConfigSetting;
+  name: string;
+  fallback: number;
+  least: number;
+  most: number;
+  takesFalse: boolean;
+  expected: string;
+}
+
+/** The five limits, as the plan's table names them. */
+const LIMITS: readonly Limit[] = [
+  {
+    setting: 'boardProjectRetries',
+    name: 'retries',
+    fallback: 3,
+    least: 1,
+    most: 10,
+    takesFalse: true,
+    expected: 'expected false or a whole number from 1 to 10',
+  },
+  {
+    setting: 'boardProjectRetryWaitSeconds',
+    name: 'retryWaitSeconds',
+    fallback: 2,
+    least: 1,
+    most: 60,
+    takesFalse: false,
+    expected: 'expected a whole number from 1 to 60',
+  },
+  {
+    setting: 'boardProjectProgressSeconds',
+    name: 'progressSeconds',
+    fallback: 10,
+    least: 1,
+    most: 300,
+    takesFalse: true,
+    expected: 'expected false or a whole number from 1 to 300',
+  },
+  {
+    setting: 'boardProjectWriteBatchSize',
+    name: 'writeBatchSize',
+    fallback: 20,
+    least: 1,
+    most: 100,
+    takesFalse: false,
+    expected: 'expected a whole number from 1 to 100',
+  },
+  {
+    setting: 'boardProjectWritePauseMs',
+    name: 'writePauseMs',
+    fallback: 1000,
+    least: 0,
+    most: 60_000,
+    takesFalse: false,
+    expected: 'expected a whole number from 0 to 60000',
+  },
+];
+
+/** `[name, limit]` rows, so a case title names the key it reads. */
+const LIMIT_ROWS = LIMITS.map((limit): [string, Limit] => [limit.name, limit]);
+
+/** The limits that read `false` as off. */
+const OFF_ROWS = LIMIT_ROWS.filter(([, limit]) => limit.takesFalse);
+
+/** The limits that refuse `false`. */
+const NO_OFF_ROWS = LIMIT_ROWS.filter(([, limit]) => !limit.takesFalse);
+
+/** The limits whose least is above zero, so `0` is a refusal. */
+const ABOVE_ZERO_ROWS = LIMIT_ROWS.filter(([, limit]) => limit.least > 0);
+
+/** The refusal of `shown` under `limit`, as `readAs` labels it. */
+function limitRefusal(limit: Limit, shown: string) {
+  return {
+    value: undefined,
+    problems: [`F: board.project.${limit.name} is ${shown}, ${limit.expected}`],
+    extras: [],
+  };
+}
+
+/** An accepting reading of `value`, kept at its own literal type. */
+function acceptedAs<const T>(value: T) {
+  return { value, problems: [], extras: [] };
+}
+
+describe('board.project limits in the schema', () => {
+  it.each(LIMIT_ROWS)('spells %s under board.project, file-only', (name, limit) => {
+    expect(SETTINGS[limit.setting].key).toBe(`board.project.${name}`);
+    expect(SETTINGS[limit.setting].cli).toBe(false);
+    expect(isCommandLineSetting(limit.setting)).toBe(false);
+  });
+
+  it.each(LIMIT_ROWS)('defaults %s to the plan\'s value, in the defaults and a resolution naming nothing', (_name, limit) => {
+    const resolved = resolveConfig();
+
+    expect(CONFIG_DEFAULTS[limit.setting]).toBe(limit.fallback);
+    expect(resolved.config[limit.setting]).toBe(limit.fallback);
+    expect(resolved.sources[limit.setting]).toBe('default');
+  });
+});
+
+describe('board.project limits at their edges', () => {
+  it.each(LIMIT_ROWS)('accepts the least %s, kept as written', (_name, limit) => {
+    expect(readAs(limit.setting, limit.least)).toEqual(acceptedAs(limit.least));
+  });
+
+  it.each(LIMIT_ROWS)('accepts the most %s, kept as written', (_name, limit) => {
+    expect(readAs(limit.setting, limit.most)).toEqual(acceptedAs(limit.most));
+  });
+
+  it.each(LIMIT_ROWS)('refuses one above the most %s', (_name, limit) => {
+    expect(readAs(limit.setting, limit.most + 1)).toEqual(limitRefusal(limit, String(limit.most + 1)));
+  });
+
+  it.each(ABOVE_ZERO_ROWS)('refuses 0 for %s, never reading it as off', (_name, limit) => {
+    expect(readAs(limit.setting, 0)).toEqual(limitRefusal(limit, '0'));
+  });
+
+  it('accepts 0 for writePauseMs, a pause of no time, as the one key whose least is 0', () => {
+    expect(readAs('boardProjectWritePauseMs', 0)).toEqual(acceptedAs(0));
+  });
+
+  it.each(LIMIT_ROWS)('refuses -1 for %s', (_name, limit) => {
+    expect(readAs(limit.setting, -1)).toEqual(limitRefusal(limit, '-1'));
+  });
+
+  it.each(OFF_ROWS)('accepts false for %s, as off', (_name, limit) => {
+    expect(readAs(limit.setting, false)).toEqual(acceptedAs(false));
+  });
+
+  it.each(NO_OFF_ROWS)('refuses false for %s, which has no off', (_name, limit) => {
+    expect(readAs(limit.setting, false)).toEqual(limitRefusal(limit, 'false'));
+  });
+
+  it.each(LIMIT_ROWS)('refuses true, a fraction, a quoted number, a list and null for %s', (_name, limit) => {
+    const quoted = String(limit.least + 1);
+
+    expect(readAs(limit.setting, true)).toEqual(limitRefusal(limit, 'true'));
+    expect(readAs(limit.setting, limit.least + 0.5)).toEqual(limitRefusal(limit, String(limit.least + 0.5)));
+    expect(readAs(limit.setting, quoted)).toEqual(limitRefusal(limit, JSON.stringify(quoted)));
+    expect(readAs(limit.setting, [limit.least])).toEqual(limitRefusal(limit, 'a list'));
+    expect(readAs(limit.setting, null)).toEqual(limitRefusal(limit, 'null'));
+  });
+});
+
+describe('board.project limits in a file and across the layers', () => {
+  it('reports every refused limit in a file, naming the file, the key and the value', () => {
+    const text = projectFile(
+      'retries: 0',
+      'retryWaitSeconds: 61',
+      'progressSeconds: -1',
+      'writeBatchSize: false',
+      'writePauseMs: 60001',
+    );
+
+    expect(refusal(() => parseConfigText(text, PATH)).problems).toEqual([
+      `${PATH}: board.project.retries is 0, expected false or a whole number from 1 to 10`,
+      `${PATH}: board.project.retryWaitSeconds is 61, expected a whole number from 1 to 60`,
+      `${PATH}: board.project.progressSeconds is -1, expected false or a whole number from 1 to 300`,
+      `${PATH}: board.project.writeBatchSize is false, expected a whole number from 1 to 100`,
+      `${PATH}: board.project.writePauseMs is 60001, expected a whole number from 0 to 60000`,
+    ]);
+  });
+
+  it('reads every usable limit in a file, as the control, with no problem', () => {
+    const text = projectFile(
+      'retries: false',
+      'retryWaitSeconds: 60',
+      'progressSeconds: false',
+      'writeBatchSize: 7',
+      'writePauseMs: 0',
+    );
+    const resolved = resolveConfig({ file: parseConfigText(text, PATH) });
+
+    expect(resolved.config.boardProjectRetries).toBe(false);
+    expect(resolved.config.boardProjectRetryWaitSeconds).toBe(60);
+    expect(resolved.config.boardProjectProgressSeconds).toBe(false);
+    expect(resolved.config.boardProjectWriteBatchSize).toBe(7);
+    expect(resolved.config.boardProjectWritePauseMs).toBe(0);
+    expect(resolved.sources.boardProjectWritePauseMs).toBe('file');
+    expect(resolved.warnings).toEqual([]);
+  });
+
+  it('answers the project file over the user file, and the user file over the default, key by key', () => {
+    const resolved = resolveConfig({
+      file: parseConfigText(projectFile('writeBatchSize: 5'), PATH),
+      user: parseConfigText(projectFile('writeBatchSize: 9', 'retries: 4'), USER_PATH),
+    });
+
+    expect(resolved.config.boardProjectWriteBatchSize).toBe(5);
+    expect(resolved.sources.boardProjectWriteBatchSize).toBe('file');
+    expect(resolved.config.boardProjectRetries).toBe(4);
+    expect(resolved.sources.boardProjectRetries).toBe('user');
+    expect(resolved.config.boardProjectWritePauseMs).toBe(1000);
+    expect(resolved.sources.boardProjectWritePauseMs).toBe('default');
+  });
+
+  it('reads no command-line override of a limit, as each is file-only', () => {
+    const cli = { boardProjectRetries: 9, boardProjectWriteBatchSize: 5 };
+    const resolved = resolveConfig({ cli: cli as unknown as ConfigOverrides });
+
+    expect(resolved.config.boardProjectRetries).toBe(3);
+    expect(resolved.config.boardProjectWriteBatchSize).toBe(20);
+    expect(resolved.sources.boardProjectRetries).toBe('default');
   });
 });

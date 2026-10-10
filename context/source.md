@@ -94,6 +94,9 @@ spells out, and the shapes the lint config forces.
   `src/adapters/tracker/github.ts`, `GitRunner`, a symbol lookup),
   so unit cases drive fakes and planted repositories under `tmpdir`
   only. Sha256 uses `node:crypto` or `Bun.CryptoHasher`.
+  `check-command.ts` spells `rafa issue check <n>`, the fix a report
+  points a drifted copy at, and imports nothing, so a board module and
+  a command module both take it from there.
 
 ### The size cap no gate reads
 
@@ -155,3 +158,35 @@ nothing.
   — a `context/` page quoting the comment a command writes, say — is read
   as a real fence by the rule, so escape the inner backticks (`\`\`\``)
   rather than nesting them bare.
+
+### Runtime import cycles
+
+**The sweep `src/tests/import-cycle.sweep.test.ts` fails on any non-test
+runtime import cycle that spans two clusters.** It reads the import graph
+the way `scripts/survey/import-graph.ts` does: `readMetafile` and
+`buildImportGraph` from there, and the file set from
+`scripts/survey/files.ts`. Type-only imports are erased in the graph, so
+a type-level cycle passes; `#807`'s `tsc --build` with project references
+is the gate for those.
+
+**Files are mapped to clusters via `docs/survey/cluster-map.json`,**
+the file-to-cluster assignment from the eight-cluster import graph survey
+run. A file with no mapping takes the cluster most of its folder's mapped
+files hold. If a file's folder holds no mapped file, the sweep fails,
+naming the file and that you must extend the map with a new survey run.
+The sweep prints the file coverage line and a count of files placed by
+folder majority.
+
+**The map traces the 68-file cycle that crossed package lines before
+rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:
+plan gate and `rafa next`; c2: CLI and commands; c3: task run; c4:
+inventory), held by one dynamic import (`import('../index.js')` in
+`src/commands/plan/refs-check.ts` for `coreRoster`) and three small
+symbols: `firstNowEpic` (board/place.ts importing from commands/epic/show.ts),
+`issueCheckCommand` (board/roadmap-rows.ts from commands/doctor-refs.ts),
+and `BOARD_REFUSAL_EXIT` (board/refs-gate.ts from board/plan-spec.ts
+in c6). The fix moves those three symbols first to new homes in c1, then
+replaces the dynamic import's roster with a parameter; order matters,
+because a seam landing before the three moves leaves the 13-file c1/c6
+cycle in place. Once `#905`'s shared-contract move cuts the code into
+packages, the sweep reads packages instead of clusters.

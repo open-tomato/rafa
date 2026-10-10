@@ -22,6 +22,9 @@
  *
  * {@link SyncFake.setLabels} edits an issue's labels as the web UI would,
  * outside rafa: every later read answers the new labels.
+ * {@link SyncFakeOptions.repeatsCursor} plants a labels cursor that never
+ * moves on the issues it names, so the facts reader refuses each of them
+ * alone (`./facts-fake.ts`, `FakeFactsIssue.repeatsCursor`).
  */
 import type { FakeFactsIssue } from './facts-fake.js';
 import type { ProjectFieldValue, ProjectItem } from './port.js';
@@ -86,6 +89,8 @@ export interface SyncFakeOptions {
   readonly rateLimitAfter?: number;
   /** The issues the project holds an item for; {@link SYNC_ITEM_ISSUES} when left out. */
   readonly itemIssues?: readonly number[];
+  /** The issues whose labels cursor never moves, each refused by the facts reader; none when left out. */
+  readonly repeatsCursor?: readonly number[];
 }
 
 /** The router, the project fake behind it, and what was recorded. */
@@ -148,7 +153,10 @@ export function createSyncFake(options: SyncFakeOptions = {}): SyncFake {
     owners: [SYNC_OWNER],
     repositories: [{ nameWithOwner: FAKE_PROJECT_REPOSITORY, issues: ISSUES.map(({ number }) => number) }],
   });
-  let issues = ISSUES;
+  const repeating = new Set(options.repeatsCursor ?? []);
+  let issues: readonly SyncIssue[] = ISSUES.map((issue) => (repeating.has(issue.number)
+    ? { ...issue, repeatsCursor: 'labels' }
+    : issue));
   const recorded: (readonly string[])[] = [];
   const gh: GhRunner = (args) => {
     recorded.push(args);
