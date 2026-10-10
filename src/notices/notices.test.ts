@@ -1,5 +1,6 @@
 import type { NoticeSeams } from './notices.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
+import type { ClaudeSettingSource } from '../config-sections.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,10 +17,16 @@ import {
   pendingNotices,
   readDismissed,
   readNoticeAnswer,
+  scopesLeftOut,
   writeDismissed,
 } from './notices.js';
 
 let home: string;
+
+/** `loop.settingSources` without `user`: the config default's value. */
+const WITHOUT_USER: readonly ClaudeSettingSource[] = ['project', 'local'];
+/** All three scopes, so none is left out. */
+const ALL_SCOPES: readonly ClaudeSettingSource[] = ['user', 'project', 'local'];
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'rafa-notices-'));
@@ -102,15 +109,49 @@ describe('pendingNotices', () => {
 
 describe('noticeLines', () => {
   test('names the version and the feedback link in the alpha notice', () => {
-    const text = noticeLines('alpha', '0.7.0').join('\n');
+    const text = noticeLines('alpha', '0.7.0', WITHOUT_USER).join('\n');
     expect(text).toContain('rafa 0.7.0 is alpha software');
     expect(text).toContain(FEEDBACK_URL);
   });
 
   test('names the flag and the account in the danger notice', () => {
-    const text = noticeLines('danger', '0.7.0').join('\n');
+    const text = noticeLines('danger', '0.7.0', WITHOUT_USER).join('\n');
     expect(text).toContain('--dangerously-skip-permissions');
     expect(text).toContain('your GitHub');
+  });
+
+  test('names the key, the scopes of project,local and user as left out', () => {
+    const lines = noticeLines('danger', '0.7.0', WITHOUT_USER);
+    expect(lines.slice(-2)).toEqual([
+      '   loop.settingSources resolved to project,local: each session loads its settings from there.',
+      '   Left out: user. Permission rules and hooks in a scope left out do not reach the session.',
+    ]);
+  });
+
+  test('says no scope is left out under user,project,local, and prints no empty list', () => {
+    const lines = noticeLines('danger', '0.7.0', ALL_SCOPES);
+    expect(lines.slice(-2)).toEqual([
+      '   loop.settingSources resolved to user,project,local: each session loads its settings from there.',
+      '   No scope is left out, so none is named here as not reaching the session.',
+    ]);
+    expect(lines.join('\n')).not.toContain('Left out:');
+  });
+
+  test('keeps the configured order of the scopes and names two left out in the sources order', () => {
+    const text = noticeLines('danger', '0.7.0', ['local', 'project']).join('\n');
+    expect(text).toContain('resolved to local,project:');
+    expect(noticeLines('danger', '0.7.0', ['local']).join('\n')).toContain('Left out: user,project.');
+  });
+
+  test('leaves the alpha notice the same whatever the scopes', () => {
+    expect(noticeLines('alpha', '0.7.0', ALL_SCOPES)).toEqual(noticeLines('alpha', '0.7.0', WITHOUT_USER));
+  });
+});
+
+describe('scopesLeftOut', () => {
+  test('answers user for project,local and nothing for all three', () => {
+    expect(scopesLeftOut(WITHOUT_USER)).toEqual(['user']);
+    expect(scopesLeftOut(ALL_SCOPES)).toEqual([]);
   });
 });
 
@@ -135,7 +176,7 @@ describe('readNoticeAnswer', () => {
 describe('offerNotices', () => {
   test('asks nothing and opens no prompter when both are dismissed', async () => {
     writeDismissed(home, ['alpha', 'danger']);
-    const outcome = await offerNotices({ home, version: '0.7.0' }, {
+    const outcome = await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, {
       isTerminal: () => true,
       openPrompter: () => {
         throw new Error('nothing is owed, so nothing is asked');
@@ -149,10 +190,11 @@ describe('offerNotices', () => {
 
   test('prints both notices, asks once and continues on y without dismissing', async () => {
     const script = scriptedPrompter(['y']);
-    const outcome = await offerNotices({ home, version: '0.7.0' }, terminalSeams(script.prompter));
+    const outcome = await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, terminalSeams(script.prompter));
     expect(outcome).toBe('continue');
     expect(script.shown[0]).toContain('alpha software');
     expect(script.shown[0]).toContain('--dangerously-skip-permissions');
+    expect(script.shown[0]).toContain('loop.settingSources resolved to project,local:');
     expect(script.shown[1]).toBe(NOTICE_QUESTION);
     expect(readDismissed(home)).toEqual([]);
     expect(script.closed()).toBe(true);
@@ -160,7 +202,7 @@ describe('offerNotices', () => {
 
   test('cancels on an ended input, the control for the yes above', async () => {
     const script = scriptedPrompter([null]);
-    const outcome = await offerNotices({ home, version: '0.7.0' }, terminalSeams(script.prompter));
+    const outcome = await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, terminalSeams(script.prompter));
     expect(outcome).toBe('cancelled');
     expect(readDismissed(home)).toEqual([]);
     expect(script.closed()).toBe(true);
@@ -168,7 +210,7 @@ describe('offerNotices', () => {
 
   test('continues on d and owes nothing on the next run', async () => {
     const first = scriptedPrompter(['d']);
-    expect(await offerNotices({ home, version: '0.7.0' }, terminalSeams(first.prompter))).toBe('continue');
+    expect(await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, terminalSeams(first.prompter))).toBe('continue');
     expect(readDismissed(home)).toEqual(['alpha', 'danger']);
     expect(pendingNotices(readDismissed(home))).toEqual([]);
   });
@@ -176,14 +218,14 @@ describe('offerNotices', () => {
   test('shows only the notice still owed', async () => {
     writeDismissed(home, ['alpha']);
     const script = scriptedPrompter(['y']);
-    await offerNotices({ home, version: '0.7.0' }, terminalSeams(script.prompter));
+    await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, terminalSeams(script.prompter));
     expect(script.shown[0]).not.toContain('alpha software');
     expect(script.shown[0]).toContain('--dangerously-skip-permissions');
   });
 
   test('warns and continues without a terminal, asking nothing', async () => {
     const warned: string[] = [];
-    const outcome = await offerNotices({ home, version: '0.7.0' }, {
+    const outcome = await offerNotices({ home, version: '0.7.0', settingSources: WITHOUT_USER }, {
       isTerminal: () => false,
       openPrompter: () => {
         throw new Error('no terminal, so no question');
@@ -195,5 +237,20 @@ describe('offerNotices', () => {
     expect(outcome).toBe('continue');
     expect(warned.join('\n')).toContain('--dangerously-skip-permissions');
     expect(warned.join('\n')).toContain('alpha software');
+  });
+
+  test('prints the scopes of the request it was handed, not a default', async () => {
+    const warned: string[] = [];
+    await offerNotices({ home, version: '0.7.0', settingSources: ALL_SCOPES }, {
+      isTerminal: () => false,
+      openPrompter: () => {
+        throw new Error('no terminal, so no question');
+      },
+      warn: (line) => {
+        warned.push(line);
+      },
+    });
+    expect(warned.join('\n')).toContain('loop.settingSources resolved to user,project,local:');
+    expect(warned.join('\n')).toContain('No scope is left out');
   });
 });

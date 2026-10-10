@@ -12,14 +12,19 @@
  *    what lets a run go unattended and is also what lets a task edit,
  *    delete and run anything the user's account can. A run also pushes
  *    branches, opens pull requests and may file issues under that
- *    account. The README says it; this says it where it happens.
+ *    account. The README says it; this says it where it happens. It
+ *    also names `loop.settingSources` as the run resolved it: the
+ *    scopes a session loads, and the scopes left out, whose permission
+ *    rules and hooks do not reach the session. It says nothing of what
+ *    a rule in a LOADED scope does under the flag.
  *
  * ## The shape
  *
  * ```text
  * readDismissed(home)            → the ids a person asked not to see again
  * pendingNotices(dismissed)      → the notices still owed
- * noticeLines(notice, version)   → the text, one array per notice
+ * noticeLines(notice, version, settingSources)
+ *                                → the text, one array per notice
  * readNoticeAnswer(answer)       → continue | cancel | dismiss
  * offerNotices(request, seams)   → 'continue' | 'cancelled'
  * ```
@@ -51,11 +56,12 @@
  * the run continues, since the person did answer yes.
  */
 import type { Prompter } from '../cli/prompt/confirm.js';
+import type { ClaudeSettingSource } from '../config-sections.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { CLAUDE_SETTING_SOURCES, messageOf } from '../config-sections.js';
 
 /** The notices rafa can owe a person, in the order they are printed. */
 export const NOTICE_IDS = Object.freeze(['alpha', 'danger'] as const);
@@ -114,8 +120,45 @@ export function pendingNotices(dismissed: readonly NoticeId[]): readonly NoticeI
   return NOTICE_IDS.filter((id) => !dismissed.includes(id));
 }
 
-/** The lines one notice prints. `version` is the running build's. */
-export function noticeLines(notice: NoticeId, version: string): readonly string[] {
+/**
+ * The scopes `settingSources` leaves out, of the three Claude Code
+ * knows, in {@link CLAUDE_SETTING_SOURCES} order.
+ */
+export function scopesLeftOut(settingSources: readonly ClaudeSettingSource[]): readonly ClaudeSettingSource[] {
+  return CLAUDE_SETTING_SOURCES.filter((source) => !settingSources.includes(source));
+}
+
+/**
+ * The two lines of the `danger` notice about `loop.settingSources`:
+ * the scopes it resolved to, in their configured order, and the scopes
+ * left out. With all three loaded it says no scope is left out rather
+ * than printing an empty list.
+ */
+function settingSourcesLines(settingSources: readonly ClaudeSettingSource[]): readonly string[] {
+  const leftOut = scopesLeftOut(settingSources);
+  const resolved = `   loop.settingSources resolved to ${settingSources.join(',')}: each session loads its settings from there.`;
+  if (leftOut.length === 0) {
+    return [resolved, '   No scope is left out, so none is named here as not reaching the session.'];
+  }
+  return [
+    resolved,
+    `   Left out: ${leftOut.join(',')}. Permission rules and hooks in a scope left out do not reach the session.`,
+  ];
+}
+
+/**
+ * The lines one notice prints.
+ *
+ * @param notice - The notice to print.
+ * @param version - The running build's version, for the alpha line.
+ * @param settingSources - The run's resolved `loop.settingSources`, for
+ *   the danger notice. Always the value the run loads, never a default.
+ */
+export function noticeLines(
+  notice: NoticeId,
+  version: string,
+  settingSources: readonly ClaudeSettingSource[],
+): readonly string[] {
   if (notice === 'alpha') {
     return [
       `⚠️  rafa ${version} is alpha software: commands, files and defaults still change between versions.`,
@@ -128,6 +171,7 @@ export function noticeLines(notice: NoticeId, version: string): readonly string[
     '   A task can edit, delete and run anything your account can, with no question asked.',
     '   A run also commits, pushes its branch, opens a pull request and may file issues under',
     '   your GitHub account. Run it in a repository and on a machine where that is acceptable.',
+    ...settingSourcesLines(settingSources),
   ];
 }
 
@@ -154,6 +198,8 @@ export interface NoticeRequest {
   readonly home: string;
   /** The running build's version, for the alpha line. */
   readonly version: string;
+  /** The run's resolved `loop.settingSources`, for the danger notice. */
+  readonly settingSources: readonly ClaudeSettingSource[];
 }
 
 /** The outside of {@link offerNotices}; every member has a default. */
@@ -176,7 +222,7 @@ export type NoticeOutcome = 'continue' | 'cancelled';
 export async function offerNotices(request: NoticeRequest, seams: NoticeSeams): Promise<NoticeOutcome> {
   const pending = pendingNotices(readDismissed(request.home));
   if (pending.length === 0) return 'continue';
-  const lines = pending.flatMap((notice) => [...noticeLines(notice, request.version), '']);
+  const lines = pending.flatMap((notice) => [...noticeLines(notice, request.version, request.settingSources), '']);
 
   if (!seams.isTerminal()) {
     for (const line of lines) seams.warn(line);
