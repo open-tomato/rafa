@@ -146,8 +146,9 @@
  *
  * ## What is shared with `release status`
  *
- * The tag reader, the changelog's version reader and the seams are
- * `./status.ts`'s, imported rather than copied: both actions ask the
+ * The tag reader and the changelog's version reader are
+ * `src/release/status-readings.ts`'s and the seams are `./status.ts`'s,
+ * imported rather than copied: both actions ask the
  * same two questions of the same repository, and a second spelling of
  * either would be a second thing to keep right. `pr list`, `pr show`
  * and `pr view` take `SEPARATOR` off `pr current` the same way.
@@ -165,11 +166,12 @@
  * eight other commands reading no argument already share.
  */
 import type { ReleaseCommitReading } from './release-commit.js';
-import type { ReleaseSeams, TagReading } from './status.js';
+import type { ReleaseSeams } from './status.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
+import type { TagReading } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 
 import { readFileSync } from 'node:fs';
@@ -180,13 +182,14 @@ import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../config.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
+import { changelogVersions, readTags } from '../../release/status-readings.js';
 import { pushTag, trackedRemote } from '../../release/tag-push.js';
 import { readManifestVersion, RELEASE_REMOTE } from '../../release/version.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { versionTag } from '../pr/merge-followups.js';
 
 import { readReleaseCommit } from './release-commit.js';
-import { changelogVersions, DEFAULT_RELEASE_SEAMS, readTags } from './status.js';
+import { DEFAULT_RELEASE_SEAMS } from './status.js';
 
 /** The usage line this action's refusals name. */
 export const RELEASE_TAG_USAGE = 'rafa release tag [--push]';

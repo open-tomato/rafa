@@ -9,17 +9,11 @@ src/board/relations/labels -> src/commands/pr/merge-tick
 src/board/relations/labels -> src/commands/pr/merge-unblock
 src/effort/report-skills -> src/commands/instinct/instinct-records
 src/effort/sync/file -> src/commands/effort/fix-schema
-src/next/epic-end -> src/commands/release/status
 src/next/readings -> src/commands/plan/list
 src/next/relations-mode -> src/commands/epic/move-native
 src/next/settle-step -> src/commands/pr/merge-cleanup
 src/next/settle-step -> src/commands/pr/merge-followups
-src/pr/triage/version-convert -> src/commands/release/status
 src/project/scaffold -> src/commands/init-release
-src/project/update-range -> src/commands/release/status
-src/release/audit -> src/commands/release/status
-src/release/guard -> src/commands/release/status
-src/release/receipt -> src/commands/release/status
 src/release/settle-tag -> src/commands/pr/merge-followups
 src/start/preflight-sync -> src/commands/doctor-effort-sync
 src/status/blocked-count -> src/commands/doctor-blocked

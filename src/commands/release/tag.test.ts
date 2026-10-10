@@ -35,7 +35,7 @@
  *     on the commit that set the version rather than on HEAD — the
  *     0.24.0 shape `./release-commit.ts` measures.
  */
-import type { ReleaseSeams, ReleaseTag } from './status.js';
+import type { ReleaseSeams } from './status.js';
 import type {
   ChangelogReading,
   PublishTarget,
@@ -48,6 +48,7 @@ import type {
 import type { RafaCommand } from '../../cli/command.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
+import type { ReleaseTag } from '../../release/status-readings.js';
 import type { TagPushed } from '../../release/tag-push.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 

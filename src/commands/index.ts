@@ -59,7 +59,7 @@
  * triage one repository's pull requests through the PullRequests port
  * and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
- * through `src/release/` and share `release/status.ts`'s readers, nor
+ * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
  * worktree of the base through `src/release/settle*.ts`, nor
  * `next`, which reads where the project stands through `src/next/` and
