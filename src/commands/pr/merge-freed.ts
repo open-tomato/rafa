@@ -4,8 +4,8 @@
  * and never written to.
  *
  * In the `labels` mode, the default, that step is the unblock reading
- * (`./merge-unblock.ts`), which asks about each freed issue and takes
- * `spec:blocked` off; with the epic tick (`src/board/epic-tick.ts`) it is what
+ * (`src/board/unblock-after-merge.ts`), which asks about each freed
+ * issue and takes `spec:blocked` off; with the epic tick (`src/board/epic-tick.ts`) it is what
  * the `labels` adapter's `afterMerge` runs (`src/board/relations/labels.ts`).
  * In the `native` mode a blocker is GitHub's blocked-by link, which
  * GitHub clears by itself when the blocking issue closes, and the
@@ -45,8 +45,8 @@
  * ## Why every failure is a warning
  *
  * The merge has already happened by the time this runs, as
- * `./merge-unblock.ts` records for its own reading. A repository `gh`
- * will not name and a listing it will not answer are each one
+ * `src/board/unblock-after-merge.ts` records for its own reading. A
+ * repository `gh` will not name and a listing it will not answer are each one
  * {@link freedProblemLine} warning, and `pr merge` keeps its exit code.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';

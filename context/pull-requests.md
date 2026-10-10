@@ -219,7 +219,7 @@ sentence replaces nothing.
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
-   yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
+   yes (`src/board/unblock-after-merge.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code. Under
    `board.relationships: native` step 5 ticks no epic checklist and this
@@ -1011,7 +1011,7 @@ listing falls back to a full one.
 
 The sixth step of `pr merge` (lines 163–181) differs between modes:
 
-In **`labels` mode** (the default), the unblock reading (`src/commands/pr/merge-unblock.ts`)
+In **`labels` mode** (the default), the unblock reading (`src/board/unblock-after-merge.ts`)
 runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 `Blocked by:` line names an issue this PR closes. For each such issue whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove

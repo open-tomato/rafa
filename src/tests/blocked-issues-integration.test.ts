@@ -3,7 +3,7 @@
  * `Blocked by:` line (`board/blocked.ts`), the removal-only label write
  * (`board/issue-board.ts`), the listings and the question
  * (`board/unblock.ts`), and the door a merge reaches the same
- * reading through (`commands/pr/merge-unblock.ts`, `commands/pr/merge.ts`).
+ * reading through (`board/unblock-after-merge.ts`, `commands/pr/merge.ts`).
  *
  * Every file above drives its own module against a fake board shaped for
  * that module alone, several of them passing a stub `IssueBoard` in place

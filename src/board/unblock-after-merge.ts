@@ -4,15 +4,23 @@
  * request closes, read, asked about and unlabelled where every blocker
  * has closed.
  *
- * `src/board/unblock.ts` is the whole of what touches the
- * board — the listing, the state of each blocker, the one question and
- * the one `removeLabel` — and this module is the half that decides
- * whether a merge has anything to unblock at all and turns everything
- * that can go wrong on the way into a warning. It sits beside
- * `./merge-tick.ts`, the other module holding a board-shaped piece of
- * what `pr merge` does after the provider merged, and for the same
- * reason: a merge runs it by itself at the moment a blocker clears
- * (`.rafa/specs/rafa-63-one-command-next-step.md`).
+ * `./unblock.ts` is the whole of what touches the board — the listing,
+ * the state of each blocker, the one question and the one `removeLabel`
+ * — and this module is the half that decides whether a merge has
+ * anything to unblock at all and turns everything that can go wrong on
+ * the way into a warning. It sits beside `./epic-tick.ts`, the other
+ * board-shaped piece of what `pr merge` does after the provider merged,
+ * and for the same reason: a merge runs it by itself at the moment a
+ * blocker clears (`.rafa/specs/rafa-63-one-command-next-step.md`).
+ *
+ * ## Who calls it
+ *
+ * This file came whole out of `src/commands/pr/merge-unblock.ts`, which
+ * read no argv and no flag and so left no command half behind. Its two
+ * callers are the command, `src/commands/pr/merge.ts`, which hands it
+ * the merged body and the question, and the `labels` adapter's
+ * `afterMerge` (`./relations/labels.ts`). It imports nothing under
+ * `src/commands/`.
  *
  * ## Nothing is spent on the ordinary merge
  *
@@ -47,7 +55,8 @@
  * ## Why every failure is a warning
  *
  * The merge has already happened by the time this runs, as
- * `./merge-tick.ts` records for the roadmap tick. A board that will
+ * `src/commands/pr/merge-tick.ts` records for the roadmap tick. A board
+ * that will
  * not answer the listing, an issue whose line cannot be read and a
  * `removeLabel` GitHub refused none of them un-merge anything, and
  * failing the command over one would tell an operator their merge
@@ -62,16 +71,17 @@
  *
  * GitHub arrives through the {@link GhRunner} seam, the question
  * through {@link MergeUnblockOptions.ask}, and both lines it writes
- * through the two sinks, so every case in `./merge-unblock.test.ts`
+ * through the two sinks, so every case in `./unblock-after-merge.test.ts`
  * drives a recorded runner and a scripted answer and none of them
  * reaches GitHub, spawns `gh` or waits on an answer.
  */
-import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
+import type { UnblockAsk, UnblockReport } from './unblock.js';
+import type { GhRunner } from '../adapters/tracker/github.js';
 
-import { closedIssuesIn } from '../../board/roadmap.js';
-import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../config-sections.js';
+
+import { closedIssuesIn } from './roadmap.js';
+import { isUnblockFailure, runUnblock } from './unblock.js';
 
 /** What every line this module writes about the reading names it as. */
 const READING = 'the blocked-issue reading';

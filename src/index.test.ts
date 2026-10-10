@@ -690,6 +690,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/project-runner.js', ['commandRetrySeams']],
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../board/roadmap.js', ['closedIssuesIn']],
+    ['../../board/unblock-after-merge.js', ['unblockAfterMerge']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../../effort/store/plan-ci.js', ['recordPlanCi']],
@@ -705,7 +706,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge-project.js', ['refreshProjectAfterMerge']],
     ['./merge-refuse.js', ['refuseFromGit']],
     ['./merge-tick.js', ['noBoardListsLine', 'tickRoadmapAfterMerge']],
-    ['./merge-unblock.js', ['unblockAfterMerge']],
     ['./merge-unchecked.js', ['commentIfUnchecked', 'confirmUncheckedMerge', 'readUncheckedMerge', 'uncheckedReport']],
     ['./pr-context.js', [
       'lineRefusal',

@@ -11,8 +11,8 @@
  * maybe its `spec:blocked` label and so its Blocked Stage. None of those
  * writes goes through the refreshing `IssueBoard`
  * (`src/board/project/issue-board-refresh.ts`): GitHub closes the issue,
- * and the unblock reading (`./merge-unblock.ts`) takes its label off
- * through a plain board. So this module refreshes them itself, in one
+ * and the unblock reading (`src/board/unblock-after-merge.ts`) takes its
+ * label off through a plain board. So this module refreshes them itself, in one
  * refresh, after that reading has written what it writes.
  *
  * ## Which issues it refreshes

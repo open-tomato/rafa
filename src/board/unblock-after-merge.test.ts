@@ -1,6 +1,6 @@
 /**
  * Tests for the unblock reading `rafa pr merge` runs after its clean-up
- * (`src/commands/pr/merge-unblock.ts`): whether there is anything to
+ * (`src/board/unblock-after-merge.ts`): whether there is anything to
  * read at all, which open blocked issues a merge considers, and that
  * nothing on the way out throws.
  *
@@ -30,14 +30,13 @@
  *    board recorded no removal, so "it warned" is never read off the
  *    message alone.
  */
-import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { UnblockAsk } from '../../board/unblock.js';
+import type { UnblockAsk } from './unblock.js';
+import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
-
-import { unblockAfterMerge, unblockProblemLine, unblockWarningLine } from './merge-unblock.js';
+import { SPEC_BLOCKED_LABEL } from './blocked.js';
+import { unblockAfterMerge, unblockProblemLine, unblockWarningLine } from './unblock-after-merge.js';
 
 /** One issue on a case's board. */
 interface FakeIssue {
@@ -332,7 +331,7 @@ describe('every failure is a warning naming the reading', () => {
   });
 
   it('warns the board it could not read whole, so no blocker was checked against it', async () => {
-    const rows = Array.from({ length: 500 }, (unused, index) => ({ number: 1000 + index, state: 'CLOSED' }));
+    const rows = Array.from({ length: 500 }, (_unused, index) => ({ number: 1000 + index, state: 'CLOSED' }));
     const gh = fakeGh({
       issues: { 12: { labels: [SPEC_BLOCKED_LABEL], body: body('Blocked by: #24') } },
       stateResult: { ok: true, stdout: JSON.stringify(rows), stderr: '' },
