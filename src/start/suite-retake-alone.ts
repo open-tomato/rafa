@@ -44,8 +44,14 @@
  *     ({@link AloneReading.redAlone}).
  *   - **not read**: no summary line, no JUnit file, or a run that could
  *     not be spawned, which is warned about. The file stays a new
- *     failure, as does every file past the cap, with nothing said of how
- *     it ran alone.
+ *     failure, with nothing said of how it ran alone.
+ *
+ * A file past the cap is not run at all ({@link AloneReading.notRun})
+ * and stays a new failure too. Nothing was learnt of it, so its blocker
+ * says it was not run alone and may be order-dependent like the others;
+ * and when every file that WAS run alone read red only in the step, it
+ * names the first of those to go red and the files before it as where
+ * the cause they likely share is (`suite-blocker.ts`).
  *
  * A retake ended by SIGINT, or returning after the runner received it,
  * ends the retakes and makes the step a stop
@@ -156,6 +162,10 @@ export interface AloneReading {
   readonly redAlone: readonly string[];
   /** The files green alone that ran after files the step's diff names, in the order retaken; they stay new failures. */
   readonly afterTouched: readonly AfterTouched[];
+  /** The newly red files past {@link RETAKE_ALONE_MAX_FILES}, which were not run alone; they stay new failures. */
+  readonly notRun: readonly string[];
+  /** How many files were run alone, whatever each read. */
+  readonly taken: number;
   /** True when a retake was read as a stop on SIGINT. */
   readonly interrupted: boolean;
 }
@@ -282,7 +292,7 @@ export async function retakeRedAlone(context: SuiteStepContext, seams: Required<
   const taken = files.slice(0, RETAKE_ALONE_MAX_FILES);
   activeOutput().info(`🔁 The ${label} read new failures in ${files.length} test file(s); running ${taken.length} alone, once each, to tell a file red on its own from one red only in the step's file order.`);
   const step: StepRead = { fresh, result, touched: once(readTouched) };
-  let reading: AloneReading = { stepOnly: [], redAlone: [], afterTouched: [], interrupted: false };
+  let reading: AloneReading = { stepOnly: [], redAlone: [], afterTouched: [], notRun: files.slice(RETAKE_ALONE_MAX_FILES), taken: taken.length, interrupted: false };
   for (const [index, file] of taken.entries()) {
     const retake = await runAlone(context, seams, kind, file, index + 1);
     if (isStepInterrupted(context, retake ?? { exitCode: 0 })) return { ...settling, alone: { ...reading, interrupted: true } };

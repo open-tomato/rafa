@@ -217,8 +217,8 @@ So a task, stage or pre-wrap-up step that reads new failures runs each
 newly red test file alone, as `bun test ./<file>`, one process per
 file, before it settles (`src/start/suite-retake-alone.ts`); a failure
 the baseline holds is never retaken, and at most 20 files are
-(`RETAKE_ALONE_MAX_FILES`), the rest staying new failures. Each retake
-reads one of three ways:
+(`RETAKE_ALONE_MAX_FILES`). Each newly red file reads one of five
+ways:
 
 - **Green alone** (a summary, a JUnit file that read, no error outside
   any test, no failure the baseline does not hold), and no file the
@@ -262,6 +262,16 @@ reads one of three ways:
 - **Not read** (no summary, no JUnit file, or a run that could not be
   spawned): the file stays a new failure, and nothing is said of how it
   ran alone.
+- **Not run alone** (a newly red file past the first 20): the file
+  stays a new failure, and nothing was learnt of it. The blocker says
+  so after its count, as `src/z.test.ts (1 test, not run alone)`, and
+  adds `2 files were not run alone, past the 20 the step runs alone,
+  and may be order-dependent too: one green alone is not yours to fix`.
+  When every one of the 20 run alone read red only in the step, one
+  leak most likely failed them all, so the blocker also names the first
+  of them to go red and the files run before it: `Every one of the 20
+  run alone was green alone, so these likely share one cause:
+  src/f0.test.ts was the first to go red, after src/early.test.ts`.
 
 **A file red only in a step is named again where a person reads.** It
 blocked nothing, so its one warning scrolls away while the state that

@@ -35,9 +35,13 @@
  * changed files run before it, the nearest {@link TOUCHED_BEFORE_NAMED}
  * and a count of the rest, for the first {@link AFTER_TOUCHED_NAMED}
  * such files, then the command that runs those changed files and the
- * file in the step's order, which is what fails it. A file not run
- * alone, past the retake's cap or one whose
- * retake did not read, is named with its count alone. Errors outside any test
+ * file in the step's order, which is what fails it. A file past the
+ * retake's cap has `not run alone` after its count, and one sentence
+ * says how many were not and that they may be order-dependent too; when
+ * every file that was run alone read red only in the step, it also
+ * names the first of those to go red, with the files before it, as
+ * where the cause they likely share is. A file whose
+ * retake did not read is named with its count alone. Errors outside any test
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
@@ -246,8 +250,31 @@ export const TOUCHED_BEFORE_NAMED = 5;
 /** The most files green alone after changed files the blocker names with those files; the rest are counted. */
 export const AFTER_TOUCHED_NAMED = 5;
 
+/** What follows the count of a file past the retake's cap. */
+const NOT_RUN_ALONE_NOTE = ', not run alone';
+
 /** What of a step's retakes alone the blocker says; see the module note. */
-export type AloneSaid = Pick<AloneReading, 'stepOnly' | 'redAlone'> & Partial<Pick<AloneReading, 'afterTouched'>>;
+export type AloneSaid = Omit<AloneReading, 'interrupted'>;
+
+/**
+ * The blocker's sentences on `notRun`, the newly red files the step did
+ * not run alone: that they were not and may be order-dependent too, and,
+ * when every one of the `taken` files run alone read red only in the
+ * step, the first of those to go red as where their shared cause is.
+ */
+function notRunText(notRun: number, alone: AloneSaid): string {
+  const { taken } = alone;
+  const were = notRun === 1
+    ? '1 file was'
+    : `${notRun} files were`;
+  const said = `${were} not run alone, past the ${taken} the step runs alone, and may be order-dependent too: one green alone is not yours to fix.`;
+  const [first] = alone.stepOnly;
+  if (first === undefined || alone.stepOnly.length !== taken) return said;
+  const after = first.before.length === 0
+    ? ''
+    : `, after ${first.before.join(', ')}`;
+  return `${said} Every one of the ${taken} run alone was green alone, so these likely share one cause: ${first.file} was the first to go red${after}.`;
+}
 
 /** One file green alone, as `<file> after <changed files>`, the nearest {@link TOUCHED_BEFORE_NAMED} named. */
 function afterTouchedName(entry: AfterTouched): string {
@@ -294,9 +321,11 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' 
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   const afterTouched = (alone?.afterTouched ?? []).filter((entry) => files.some(([file]) => file === entry.file));
   if (files.length > 0) {
+    const notRun = (alone?.notRun ?? []).filter((file) => files.some(([named]) => named === file));
     const notes = new Map([
       ...(alone?.redAlone ?? []).map((file) => [file, RED_ALONE_NOTE] as const),
       ...afterTouched.map((entry) => [entry.file, GREEN_ALONE_NOTE] as const),
+      ...notRun.map((file) => [file, NOT_RUN_ALONE_NOTE] as const),
     ]);
     const named = files.map(([file, count]) => `${file} (${testCount(count)}${notes.get(file) ?? ''})`);
     parts.push(`New failing test files: ${named.join(', ')}.`);
@@ -304,6 +333,7 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' 
     if (run.length > 0) parts.push(`Run bun test ${run.join(' ')} and make them pass.`);
     const quoted = quotedErrors(verdict.fresh);
     if (quoted !== null) parts.push(`What Bun printed for them: ${quoted}.`);
+    if (alone !== undefined && notRun.length > 0) parts.push(notRunText(notRun.length, alone));
   }
   if (afterTouched.length > 0) parts.push(afterTouchedText(afterTouched));
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
