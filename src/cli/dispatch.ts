@@ -54,13 +54,34 @@
  *
  * ## What a command writes through
  *
- * The context's output passes every `info`, `warn`, `error` and `debug`
- * line and every `step` and `log` event to the output assembled for the
- * invocation. It holds a command's `result` payload for the terminal
- * event instead of writing it, and refuses a second one. It refuses a
- * `start` or a `result` handed to `emit`, which are the dispatcher's
- * alone. A refusal throws inside the command, which ends as the
- * `command_error` failure.
+ * The context's output passes every `info` line and every `step` and
+ * `log` event to the output assembled for the invocation. A `warn`,
+ * `error` or `debug` line passes only when the command's logger has
+ * that level on (see "The logger"); `info` is never gated, since it is
+ * the command's own answer. It holds a command's `result` payload for
+ * the terminal event instead of writing it, and refuses a second one.
+ * It refuses a `start` or a `result` handed to `emit`, which are the
+ * dispatcher's alone. A refusal throws inside the command, which ends
+ * as the `command_error` failure.
+ *
+ * ## The logger
+ *
+ * A command runs with a logger of its own (#950): the registry's
+ * `logger/console`, made with the invocation's verbosity and with colour
+ * on only in text mode, where `FORCE_COLOR`, `NO_COLOR` and whether
+ * stdout is a terminal decide it (`adapters/logger/colour.ts`). It is
+ * set as the active logger (`adapters/logger/active.ts`) beside the
+ * active output, with a resolver that makes any other `logger.kind` from
+ * the same context, and what was active is put back when the command
+ * ends, thrown or not.
+ *
+ * The logger's settings start from the defaults for every invocation,
+ * so nothing an earlier invocation of the process loaded applies. They
+ * are set when the command loads its config (`config-load.ts`), and the
+ * settings active before are put back with the logger.
+ *
+ * The dispatcher's own lines are not gated: a thrown error's stack goes
+ * to the base output at `debug`, as before.
  *
  * ## How a command ends
  *
@@ -159,7 +180,11 @@ import type { ProjectFound } from '../project/scope.js';
 
 import { homedir } from 'node:os';
 
+import { activeLogger, restoreActiveLogger, setActiveLogger } from '../adapters/logger/active.js';
+import { colourEnabled } from '../adapters/logger/colour.js';
+import { activeLoggerSettings, DEFAULT_LOGGER_KIND, setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
+import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { CommandExit } from './command.js';
@@ -384,13 +409,13 @@ function guardOutput(base: Output): GuardedOutput {
       base.info(message);
     },
     warn: (message: string) => {
-      base.warn(message);
+      if (activeLogger().enabled('warn')) base.warn(message);
     },
     error: (message: string) => {
-      base.error(message);
+      if (activeLogger().enabled('error')) base.error(message);
     },
     debug: (message: string) => {
-      base.debug(message);
+      if (activeLogger().enabled('debug')) base.debug(message);
     },
     emit: (event: CliEvent) => {
       if (event.type === 'start' || event.type === 'result') {
@@ -404,6 +429,33 @@ function guardOutput(base: Output): GuardedOutput {
     },
   });
   return { output, payload: () => held };
+}
+
+/** Whether `stream` says it is a terminal. */
+function streamIsTerminal(stream: OutputStream): boolean {
+  return 'isTTY' in stream && stream.isTTY === true;
+}
+
+/**
+ * Sets the logger a command runs with and answers how to put back what
+ * was active; see "The logger" in the module note.
+ */
+function setCommandLogger(base: CliContext, project: ProjectFound | null, settings: Settings): () => void {
+  const context = {
+    repoRoot: project?.root ?? settings.cwd(),
+    verbosity: base.verbosity,
+    colour: base.outputMode === 'text' && colourEnabled(settings.env, streamIsTerminal(settings.stdout)),
+  };
+  const previousSettings = activeLoggerSettings();
+  setActiveLoggerSettings(null);
+  const previous = setActiveLogger(
+    CORE_ADAPTER_REGISTRY.resolve('logger', DEFAULT_LOGGER_KIND).create(context),
+    (kind) => CORE_ADAPTER_REGISTRY.resolve('logger', kind).create(context),
+  );
+  return () => {
+    restoreActiveLogger(previous);
+    setActiveLoggerSettings(previousSettings);
+  };
 }
 
 /** The context for a route, and the `invalid_spec` message when its command's spec was refused. */
@@ -447,6 +499,7 @@ async function runCommand(
   const previous = activeOutput();
   const previousMode = activeOutputMode();
   setActiveOutput(guarded.output, base.outputMode);
+  const restoreLogger = setCommandLogger(base, project, settings);
   const previousRunning = setRunningCommand(route.command, base.flags);
   try {
     await route.command.run(context);
@@ -475,6 +528,7 @@ async function runCommand(
     };
   } finally {
     restoreRunningCommand(previousRunning);
+    restoreLogger();
     setActiveOutput(previous, previousMode);
   }
 }
