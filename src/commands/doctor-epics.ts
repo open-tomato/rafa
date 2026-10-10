@@ -41,7 +41,7 @@
  * past the end of a listing that came back full is an epic this run did
  * not read. So when the listing answers as many issues as it asked for,
  * NO orphan is reported and {@link DoctorEpicsReport.unchecked} carries
- * the sentence saying so, as `./doctor-blocked.ts` refuses to call an id
+ * the sentence saying so, as `../board/blocked-issues.ts` refuses to call an id
  * unknown on a half-read board. Two labels on one issue are read off that
  * issue alone and are reported either way.
  *

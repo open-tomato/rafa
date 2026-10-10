@@ -120,7 +120,7 @@ module's note is the long form.
 | `src/commands/doctor-epics.ts` | the epic labels row of `rafa doctor`, `labels` mode only: one board listing over `src/board/roadmap-board.ts`, the `several-epic-labels` and `orphan-label` problems of `readEpicProblems` (`src/board/epic-problems.ts`) kept and worded by `epicProblemMessage`, no orphan reported when the listing came back full, and the `Epic labels:` lines, none for a board carrying no `epic:` label |
 | `src/commands/doctor-marks.ts` | the other mode's marks row of `rafa doctor`, run only when a config layer sets `board.relationships`: over the shared listing, in `native` mode every `epic:` label on an issue that is not `type:epic` and every `spec:blocked` label with whether a `Blocked by:` line sits beside it (a line without the label is not named: `labels` mode never reads it), and in `labels` mode, after one `gh repo view --json nameWithOwner`, every sub-issue `parent` and `blockedBy` list; named under `Other mode's marks:` in ascending issue number with `rafa init --board` as the fix, nothing for a board with none, and one line naming a listing or repository read that failed |
 | `src/commands/doctor-boards.ts` | the boards row of `rafa doctor`: over the listing the epic labels row reads, every open `type:roadmap` board whose `Owner:` handle `src/board/owner-resolve.ts` answers `unresolved` (one `gh api` per distinct handle; `unknown` is a line saying it could not be checked), the `unlabelled` issues titled "Roadmap" of `resolveDefaultBoard` worded by `unlabelledRoadmapMessage` (`src/board/boards.ts`), and each `lost` notice `resolvePlace` (`src/board/place.ts`) raises for the position file, printed in its words under `Boards:`; nothing for a project with none of them, and nothing for a failed listing, which the epic labels row (the relationships row in `native` mode) names |
-| `src/commands/doctor-blocked.ts` | the blocked-issue reading `rafa doctor` ends with in `labels` mode, over `src/board/blocked.ts`: the open issues labelled `spec:blocked` listed with their bodies, the board's issue numbers read only once a line named ids, and the `Blocked issues:` lines a fault is named in |
+| `src/commands/doctor-blocked.ts` | the `Blocked issues:` lines `rafa doctor` ends with in `labels` mode, one per fault, spelled from the report of `src/board/blocked-issues.ts`: the open issues labelled `spec:blocked` listed with their bodies and read by `src/board/blocked.ts`, the board's issue numbers read only once a line named ids |
 | `src/commands/doctor-tiers.ts` | the skill tier rows of `rafa doctor`, read on every run by `checkDoctorTiers` over the inventory seams `--deep` builds and the session's environment: one `warn` per collision (every holder's path, the pin line as the fix), per rafa-tier or add-on item `provenanceBlock` refuses, and for an installed Claude Code other than `SERVE_CLI_VERSION`, and again for one other than `SKILL_USE_CLI_VERSION`; a `note` per byte-identical copy to delete (the rafa holder kept, a link to the kept file not counted), per user-tier item with no `provenance` while `user` is loaded, and for a version that could not be read |
 | `src/commands/doctor-stretch.ts` | the stretch row of `rafa doctor`, wired into `src/commands/doctor.ts` with no more than the row call: warns when `pr.base` names a `stretch/*` branch that no live stretch of the project holds, reading the live stretches through `src/stretch/folder.ts` and the base through the config |
 | `src/commands/self-update.ts` | `rafa self-update`: the checkout built and installed through `src/runtime/install.ts`, which `scripts/snapshot-runtime.ts` calls too |
@@ -1206,14 +1206,15 @@ New; it replaces no earlier text. What a row or an action added to
   the exit code, and a halt prints its rows before the refusal. In
   `labels` mode (`board.relationships`, the default), through that same
   runner it then reads the blocked issues
-  (`src/commands/doctor-blocked.ts`): one
+  (`src/board/blocked-issues.ts`): one
   `gh issue list --state open --label spec:blocked --limit 100 --json number,body`,
   and, only when a `Blocked by:` line actually named ids, one
   `gh issue list --state all --limit 500 --json number` for the board's
   own numbers. Under `Blocked issues:` it names every labelled issue
   whose line is missing, names no issue, names itself, or names an id
   the board has no issue for, each with what an author does about it
-  (`src/board/blocked.ts`); a board whose lines all read is one line
+  (`src/board/blocked.ts`, printed by `src/commands/doctor-blocked.ts`);
+  a board whose lines all read is one line
   counting them, and a board carrying no such issue prints nothing at
   all. An id is called unknown only when the whole board was read: a
   numbers listing that failed or came back full leaves every id

@@ -30,7 +30,7 @@
  * has an issue for the id, and whether that issue is closed — and an
  * issue blocked by three ids costs one command rather than three. It is
  * sent only when some line actually named ids, for the reason
- * `../doctor-blocked.ts` records: a body with no line, a line with no
+ * `../../board/blocked-issues.ts` records: a body with no line, a line with no
  * id and a line naming itself are faults without it. {@link
  * BLOCKED_LIST_LIMIT} and {@link KNOWN_LIST_LIMIT} are that module's
  * constants, imported rather than respelled, so the two readings of the
@@ -139,6 +139,7 @@ import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
+import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../../board/blocked-issues.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
@@ -147,7 +148,6 @@ import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { plural } from '../../plan/plan-files.js';
-import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';

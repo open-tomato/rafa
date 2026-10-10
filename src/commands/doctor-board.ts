@@ -46,8 +46,9 @@
  *
  * `labels` mode only. Every open issue labelled `spec:blocked` whose `Blocked by:` line is
  * missing or unreadable, named under `Blocked issues:`
- * (`./doctor-blocked.ts`, which holds the `gh` commands, the lines and
- * why a board-wide id is checked only against a board read whole). It
+ * (`./doctor-blocked.ts` holds the lines, and
+ * `../board/blocked-issues.ts` the `gh` commands and why a board-wide
+ * id is checked only against a board read whole). It
  * is the report half of a dependency the spec keeps as data and refuses
  * to guess at.
  *
@@ -100,20 +101,21 @@
  * its refusal, since they were read by then and a person reading a halt
  * still wants the whole picture.
  */
-import type { BlockedIssuesReport } from './doctor-blocked.js';
 import type { DoctorBoardsReport } from './doctor-boards.js';
 import type { DoctorEpicsReport } from './doctor-epics.js';
 import type { DoctorMarksReport } from './doctor-marks.js';
 import type { DoctorRelationsReport } from './doctor-relations.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
+import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardStatus } from '../board/status.js';
 import type { BoardRelationshipMode, PrProvider } from '../config-sections.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { readBlockedIssues } from '../board/blocked-issues.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { readBoardStatus } from '../board/status.js';
 
-import { readBlockedIssues, renderBlockedIssues } from './doctor-blocked.js';
+import { renderBlockedIssues } from './doctor-blocked.js';
 import { readDoctorBoards, renderDoctorBoards } from './doctor-boards.js';
 import { readDoctorEpics, renderDoctorEpics } from './doctor-epics.js';
 import { readDoctorMarks, renderDoctorMarks } from './doctor-marks.js';

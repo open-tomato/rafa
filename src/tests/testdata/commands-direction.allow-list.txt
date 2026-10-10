@@ -9,8 +9,6 @@ src/next/settle-step -> src/commands/pr/merge-followups
 src/project/scaffold -> src/commands/init-release
 src/release/settle-tag -> src/commands/pr/merge-followups
 src/start/preflight-sync -> src/commands/doctor-effort-sync
-src/status/blocked-count -> src/commands/doctor-blocked
-src/status/sections -> src/commands/doctor-blocked
 src/status/sections -> src/commands/doctor-cleanup
 src/status/seen -> src/commands/doctor-cleanup
 src/stretch/pit-readings -> src/commands/ci/status

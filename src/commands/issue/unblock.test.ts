@@ -38,9 +38,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { KNOWN_LIST_LIMIT } from '../../board/blocked-issues.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 
 import { createIssueUnblockCommand, isUnblockFailure, runUnblock, unblockQuestion, UNBLOCK_USAGE } from './unblock.js';
 

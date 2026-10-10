@@ -34,10 +34,10 @@
 import type { BlockedCountOptions } from './blocked-count.js';
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BlockedReading } from '../board/blocked.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
-import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 import type { NextBoardOptions } from '../next/sources.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 

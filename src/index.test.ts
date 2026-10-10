@@ -618,6 +618,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/issue/unblock.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
+    ['../../board/blocked-issues.js', ['BLOCKED_LIST_LIMIT', 'KNOWN_LIST_LIMIT']],
     ['../../board/blocked.js', ['blockedFaultMessage', 'hasSpecBlockedLabel', 'readBlockedBy', 'SPEC_BLOCKED_LABEL']],
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/issue.js', ['createGhSpecIssueReader']],
@@ -626,7 +627,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../../config-sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../../plan/plan-files.js', ['plural']],
-    ['../doctor-blocked.js', ['BLOCKED_LIST_LIMIT', 'KNOWN_LIST_LIMIT']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'refreshNativeUnblock', 'unblockRelationshipsMode']],
   ]],
