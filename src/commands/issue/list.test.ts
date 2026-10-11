@@ -54,7 +54,7 @@ import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-captu
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 import { createRoadmapCommand } from '../roadmap.js';
 
-import { createIssueListCommand, readIssueListLine, readIssueQuery, renderIssueList, renderRoadmapList } from './list.js';
+import { createIssueListCommand, readIssueListLine, readIssueQuery, renderBugList, renderIssueList, renderRoadmapList } from './list.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-list-')));
@@ -120,7 +120,8 @@ const QUERY_REFUSALS: readonly (readonly [LineFlags, string])[] = [
 
 /** Each narrowing of the two `local` issues, and the lines it writes after the tracker. */
 const NARROWED: readonly (readonly [readonly string[], readonly string[]])[] = [
-  [['--type=bug'], ['  1  todo  bug  Timeouts in plan show']],
+  // A bug is listed in columns read back from its title: this one, filed before the template, is all summary.
+  [['--type=bug'], ['  #  state  module  action  summary', '  1  todo   -       -       Timeouts in plan show']],
   [['--state=done'], ['  2  done  chore  Document issue move']],
   [['--module=unassigned'], ['  2  done  chore  Document issue move']],
   [['--search=TWICE'], ['  1  todo  bug  Timeouts in plan show']],
@@ -168,6 +169,51 @@ function heldIssue(id: string, fields: Partial<Issue>): Issue {
     ...fields,
   };
 }
+
+/** The template a project that sets none reads a bug's title with. */
+const BUG_TEMPLATE = '?(${module}?( - ${action}): )${summary}';
+
+describe('the columns rafa issue list writes for bugs', () => {
+  it('names the tracker and says so when no bug matched, with no header', () => {
+    expect(renderBugList('local', [], BUG_TEMPLATE)).toEqual(['Tracker: local', 'No issues.']);
+  });
+
+  it('reads the module, the action and the summary back from each title, a part a title lacks as -', () => {
+    const issues = [
+      heldIssue('12', { type: 'bug', title: 'loop - start: resume does not find it' }),
+      heldIssue('7', { type: 'bug', title: 'board: sync skips a column' }),
+      heldIssue('3', { type: 'bug', state: 'done', title: 'Fix thing — context' }),
+    ];
+
+    expect(renderBugList('github', issues, BUG_TEMPLATE)).toEqual([
+      'Tracker: github',
+      '   #  state  module  action  summary',
+      '  12  todo   loop    start   resume does not find it',
+      '   7  todo   board   -       sync skips a column',
+      '   3  done   -       -       Fix thing — context',
+    ]);
+  });
+
+  it('widens a column to its widest cell, the header\'s word included', () => {
+    const issues = [heldIssue('1', { type: 'bug', state: 'in-review', title: 'effort-store - sync push: x' })];
+
+    expect(renderBugList('github', issues, BUG_TEMPLATE)).toEqual([
+      'Tracker: github',
+      '  #  state      module        action     summary',
+      '  1  in-review  effort-store  sync push  x',
+    ]);
+  });
+
+  it('prints a title the template cannot hold whole, as its summary', () => {
+    const issues = [heldIssue('1', { type: 'bug', title: 'plain title' })];
+
+    expect(renderBugList('github', issues, '[${project}] ${summary}')).toEqual([
+      'Tracker: github',
+      '  #  state  module  action  summary',
+      '  1  todo   -       -       plain title',
+    ]);
+  });
+});
 
 describe('the query rafa issue list makes', () => {
   it('holds each flag typed, --search as text and --limit as a number, and nothing for a flag left out', () => {
