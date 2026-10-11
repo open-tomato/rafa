@@ -9,6 +9,19 @@ a phase is a minor, a fix between phases is a patch. Each released
 version is tagged `v<version>` (`v0.1.0` was never tagged;
 `f9954e2..da0a76c` is its range).
 
+## 0.44.0 — 2026-10-11, Bug record — one set of fields, and a title rendered from them; Bug sweep 19 — a device keeps its claims when its store file moves
+<!-- rafa:fragments rafa-951-bug-record rafa-994-bug-sweep-19 rafa-lock-0-43-0 -->
+
+- issues: `rafa issue create --type=bug` files a bug from its fields (`--module`, `--action`, `--summary`, `--cause`, `--reproduce`, and optionally `--env`, `--proposed`, `--rerun`, `--project`, `--path`), each also read from a section of the body; it renders the title from a template, fills the rafa version, the commit, the workspace package and the place, takes local paths and named secrets out, and refuses a record missing a required field, naming each; a bug typed with a bare `--title` is refused the same way, and `--title` is required for every other type as before
+- issues: `rafa issue create --dry-run` prints the title and the body of an issue of any type, resolves no tracker and files nothing
+- issues: `rafa issue list --type=bug` prints a header and the columns id, state, module, action and summary, read back from each title; a title filed before the template lists whole under summary
+- config: an `issues` section with `titles.bug`, `titles.summaryMax`, `environments`, `vocabulary.modules` and `vocabulary.actions`
+- ports: an issue draft carries an optional `cause`, filed as the label `cause:<code>` on GitHub and kept in a local issue's file
+- extras: the tooling hook's gap report and the `qa-bug-reporter` agent file a bug through the new fields; a GitHub issue form, `.github/ISSUE_TEMPLATE/bug.yml`, holds the same fields
+- claims: a device keeps its claims when its effort store file gets a new device or inode at the same host and path, such as a project directory copied to a new disk or a backup restored in place: the store remembers the ids it replaced, and `rafa claim release`, `hand`, `take` and `accept`, `rafa plan create` and the claim-lost report read a claim or a handover naming one of them as this device's own, while every commit they push names the store's current id; a store copied to another host or path still inherits no claim
+- loop start: `rafa loop start` reads a claim made under a replaced store id as owned, on the remote and on the local branch, and re-signs the remote claim branch to the store's new id with one `take` commit, printing one line that names both ids; offline or on a refused push the run goes on with a warning; its refusal of another store's claim now says when this store's id was minted after the claim was made, with the date the claim goes stale under `claims.staleAfter` and the line `rafa claim take <n> --stale`
+- docs: `context/effort-store.md` describes the `store_replaced` table, which mints record into it or empty it, and how a copy differs from a clone
+
 ## 0.43.0 — 2026-10-11, Cause codes — one list of known error contexts that a project extends; Bug sweep 17 — packages linted, every command finds its own project; Logger port — leveled, themed diagnostics behind a replaceable contract; Library code stops importing from `src/commands/`; A red step keeps each failed case's error, and a file red only in the step gets no repair task; Commands dispatched at once in one process no longer leave a stale running command or active output; Commands dispatched at once in one process no longer read each other's logger or logger settings
 <!-- rafa:fragments rafa-949-cause-codes rafa-824-bug-sweep-17 rafa-950-logger-port rafa-904-spec-library-code-stops rafa-926-red-only-in-step fix-rafa-927-dispatch-async-scope fix-dispatch-logger-scope fix-package-build-plan-root-macos -->
 
