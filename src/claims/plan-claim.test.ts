@@ -37,6 +37,8 @@ const STUB = 'rafa-7-claim-race';
 const BRANCH = `feat/${STUB}`;
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
+/** The id device a's store carried before it re-minted in place as {@link STORE_A}. */
+const STORE_A_BEFORE = 'store-a-before';
 const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-claim-')));
@@ -141,6 +143,28 @@ function context(git: GitRunner, store: string | null, overrides: Partial<PlanCl
     now: new Date(),
     ...overrides,
   };
+}
+
+/** The context of device a after its store re-minted in place: {@link STORE_A}, having replaced {@link STORE_A_BEFORE}. */
+function reMintedContext(git: GitRunner, overrides: Partial<PlanClaimContext> = {}): PlanClaimContext {
+  return context(git, STORE_A, {
+    readStoreId: () => ({
+      ok: true,
+      storeId: STORE_A,
+      replacedIds: [STORE_A_BEFORE],
+      mintedAt: '2026-01-01T00:00:00.000Z',
+    }),
+    ...overrides,
+  });
+}
+
+/** Pushes a claim on the issue by `store` to `branch` from device a's clone, or throws; answers its sha. */
+function claimOnBranchBy(trio: Trio, store: string, branch: string): string {
+  const made = makeOwnershipCommit(trio.a, 'main', { action: 'claim', issue: ISSUE, store });
+  if (!made.ok) throw new Error(made.reason);
+  const pushed = pushNewClaimBranch(trio.a, made.sha, branch);
+  if (pushed.outcome !== 'pushed') throw new Error(`claim: ${JSON.stringify(pushed)}`);
+  return made.sha;
 }
 
 /** Pushes device a's claim on {@link BRANCH} through the module, or throws. */
@@ -250,6 +274,19 @@ describe('claimPlanIssue: a fresh claim', () => {
 
     expect(as(answer, 'claimed').via).toBe('held');
     expect(remoteTip(trio)).toBe(tip);
+  });
+
+  it('answers held, naming the store\'s own id and pushing nothing, for a claim naming an id the store replaced', async () => {
+    const trio = plantTrio('held-replaced');
+    const tip = claimOnBranchBy(trio, STORE_A_BEFORE, BRANCH);
+
+    const answer = as(await claimPlanIssue(request(), reMintedContext(trio.a)), 'claimed');
+    const stranger = as(await claimPlanIssue(request(), context(trio.a, STORE_A)), 'refused');
+
+    expect([answer.via, answer.storeId]).toEqual(['held', STORE_A]);
+    expect(stranger.owner).toBe(STORE_A_BEFORE);
+    expect(remoteTip(trio)).toBe(tip);
+    expect(recordAt(trio, tip)).toEqual({ action: 'claim', issue: ISSUE, store: STORE_A_BEFORE });
   });
 
   it('makes the claim commit on a local feat/<stub> and fast-forwards it, so its work reaches the remote', async () => {
@@ -387,6 +424,23 @@ describe('claimPlanIssue: branches that keep the issue taken', () => {
 
     expect(as(await claimPlanIssue(request(), context(trio.b, STORE_B)), 'claimed').via).toBe('claim');
     expect(remoteTip(trio)).not.toBeNull();
+  });
+
+  it('refuses as this device\'s own a claim on another branch naming an id the store replaced, naming the store\'s own id', async () => {
+    const trio = plantTrio('other-replaced');
+    const other = 'feat/rafa-7-other-name';
+    const tip = claimOnBranchBy(trio, STORE_A_BEFORE, other);
+
+    const answer = as(await claimPlanIssue(request(), reMintedContext(trio.a)), 'refused');
+    const stranger = as(await claimPlanIssue(request(), context(trio.a, STORE_A)), 'refused');
+
+    expect(answer.owner).toBe(STORE_A);
+    expect(answer.branch).toBe(other);
+    expect(answer.reason).toBe(`this device (store ${STORE_A}) already holds #${String(ISSUE)} on ${other}; plan it there with --stub=rafa-7-other-name`);
+    expect(stranger.owner).toBe(STORE_A_BEFORE);
+    expect(stranger.reason).toBe(`#${String(ISSUE)} is claimed by store ${STORE_A_BEFORE} on ${other}`);
+    expect(remoteTip(trio, other)).toBe(tip);
+    expect(remoteTip(trio)).toBeNull();
   });
 
   it('refuses a stale claim on another branch, naming the stub to take it over under', async () => {
