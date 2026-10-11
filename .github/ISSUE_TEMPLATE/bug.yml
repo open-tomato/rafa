@@ -1,0 +1,75 @@
+name: Bug
+description: Something fails. One set of fields, so a duplicate is found before it is filed twice.
+title: "module - action: summary"
+labels: ["type:bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. No local paths, no internal hostnames, no credentials.
+
+        Title it `module - action: summary`, for example `loop - start: resume does not find the worktree branch`. Leave the module and the action out of the title when you do not know them. From a terminal, `rafa issue create --type=bug` fills the same fields and renders the title for you.
+  - type: textarea
+    attributes:
+      label: What
+      description: What is wrong, and where you saw it.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduce
+      description: The steps, or the condition that revealed it. When you have no steps, say what was running when it showed.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Rerun
+      description: One command that shows it again, when there is one.
+  - type: textarea
+    attributes:
+      label: Artifact
+      description: The error output and its stack, as written. Take secrets and home paths out first.
+      render: text
+  - type: input
+    attributes:
+      label: Cause
+      description: "A code from `rafa bug codes`, or `<family>:new-context` when no leaf fits, or `unknown:new-context`."
+      placeholder: "git:new-context"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Proposed cause
+      description: "Beside a new-context cause: the leaf you would have used, as `<family>:<leaf>`."
+  - type: textarea
+    attributes:
+      label: Suspected cause
+      description: What you think went wrong, in words.
+  - type: input
+    attributes:
+      label: Module
+      description: The module the bug is in, lower-case, or `unknown`.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Action
+      description: What was running, a command, a step or a test, or `unknown`.
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Environment
+      description: The place it was seen. What was running belongs in Reproduce.
+      options:
+        - local
+        - ci
+        - prod
+        - unknown
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Versions
+      description: "One per line: `rafa: <version>`, `code: <short commit>`, `package: <name>@<version>`."
+      render: text

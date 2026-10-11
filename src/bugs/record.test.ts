@@ -1,5 +1,7 @@
 import type { BugRecord, BugRules } from './record.js';
 
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'bun:test';
 
 import { RAFA_CODES } from '../errors/rafa-codes.js';
@@ -195,6 +197,10 @@ describe('the body of a bug record', () => {
     expect(parseBugRecord(form)).toEqual({ ...EMPTY_BUG_RECORD, module: 'loop', reproduce: 'run it\ntwice', rerun: null, summary: 'x fails' });
   });
 
+  it('reads a fence that names a language, as a form\'s rendered field writes it', () => {
+    expect(parseBugRecord('### Artifact\n\n```text\nTypeError: x\n    at run\n```\n').artifact).toBe('TypeError: x\n    at run');
+  });
+
   it('reads a heading inside a fence as text, never as a section', () => {
     const artifact = '## What\n```\nnot the description\n```';
     const body = renderBugBody({ ...FULL, artifact });
@@ -218,6 +224,22 @@ describe('the body of a bug record', () => {
     expect(otherSections(body)).toBe('## Expected\n\nit files\n\n### Refs\n\n- `src/a.ts`\n');
     expect(otherSections(BODY)).toBe('');
     expect(otherSections('Seen twice.')).toBe('');
+  });
+
+  it('is what the web form writes: every field of the form is a heading of the record, the required ones required', () => {
+    const form = Bun.YAML.parse(readFileSync('.github/ISSUE_TEMPLATE/bug.yml', 'utf8')) as {
+      readonly labels: readonly string[];
+      readonly body: readonly { readonly type: string; readonly attributes: { readonly label?: string }; readonly validations?: { readonly required?: boolean } }[];
+    };
+    const fields = form.body.filter((field) => field.type !== 'markdown');
+    const labels = fields.map((field) => field.attributes.label ?? '');
+    const headings = BUG_FIELDS.filter((field) => field.shape !== 'unwritten').map((field) => field.heading);
+    const required = fields.filter((field) => field.validations?.required === true).map((field) => field.attributes.label);
+
+    expect(labels.filter((label) => !headings.includes(label))).toEqual([]);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(required).toEqual(['What', 'Reproduce', 'Cause', 'Module', 'Action', 'Environment']);
+    expect(form.labels).toEqual(['type:bug', 'needs-triage']);
   });
 
   it('names each field once, under a heading of its own', () => {
