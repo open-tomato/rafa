@@ -60,7 +60,7 @@ import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -68,10 +68,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
+import { readDeviceStoreId } from '../claims/device.js';
 import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../cli/command.js';
+import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
@@ -99,6 +101,10 @@ interface Trio {
   readonly origin: GitRunner;
   readonly a: GitRunner;
   readonly b: GitRunner;
+  /** Clone `a`'s directory, where its effort store sits under `.rafa/effort/`. */
+  readonly aRoot: string;
+  /** Clone `b`'s directory. */
+  readonly bRoot: string;
 }
 
 /** Runs git and throws with what it said when it fails: a fixture step, not a reading. */
@@ -128,10 +134,14 @@ function plantTrio(name: string): Trio {
   must(seed, ['add', '--all']);
   must(seed, ['commit', '--quiet', '-m', 'root']);
   must(seed, ['push', '--quiet', 'origin', 'HEAD:refs/heads/main']);
+  const aRoot = join(root, 'a');
+  const bRoot = join(root, 'b');
   return {
     origin: createGitRunner(originPath),
-    a: cloneInto(originPath, join(root, 'a'), 'device-a'),
-    b: cloneInto(originPath, join(root, 'b'), 'device-b'),
+    a: cloneInto(originPath, aRoot, 'device-a'),
+    b: cloneInto(originPath, bRoot, 'device-b'),
+    aRoot,
+    bRoot,
   };
 }
 
@@ -248,6 +258,41 @@ function racing(trio: Trio, times: number, meanwhile: () => void): { readonly gi
 function owned(claim: RunClaim): Extract<RunClaim, { outcome: 'owned' }> {
   if (claim.outcome !== 'owned') throw new Error(`expected owned, read ${claim.outcome}`);
   return claim;
+}
+
+/** The project every store this suite mints on disk records, since reading git in a clone would read its own commits. */
+const STORE_PROJECT = 'root-commit-preflight-claim-store';
+
+/** Mints the SQLite store at `path`, making it and recording `origin`, without reading git. */
+function mintStore(path: string, origin: string): void {
+  withSqliteStore(path, 'write', true, () => undefined, {
+    readProject: () => ({ rootCommit: STORE_PROJECT, remote: null }),
+    newStoreId: () => origin,
+  });
+}
+
+/** Writes to the existing SQLite store at `path`, minting `origin` when its identity is due one. */
+function writeStore(path: string, origin: string): void {
+  withSqliteStore(path, 'write', false, () => undefined, {
+    readProject: () => ({ rootCommit: STORE_PROJECT, remote: null }),
+    newStoreId: () => origin,
+  });
+}
+
+/**
+ * Renames a copy of the store at `path` over it: the host and the path
+ * stay as they were and the inode is another one, as a store moved to
+ * another filesystem and mounted back arrives.
+ */
+function renameCopyOver(path: string): void {
+  const moved = `${path}.moved`;
+  copyFileSync(path, moved);
+  renameSync(moved, path);
+}
+
+/** The seams of the real store on disk at `root`, over `git`, under `claims.staleAfter: '3d'`. */
+function onDiskSeams(git: GitRunner, root: string): StartPreflightClaim {
+  return { git, board: null, readStoreId: () => readDeviceStoreId(root, { store: 'sqlite' }), staleAfter: '3d' };
 }
 
 /** When every store is minted unless a case says otherwise: before any commit a case makes. */
@@ -595,6 +640,30 @@ describe('a claim the remote holds under an id this store replaced', () => {
     expect(remoteTip(trio)).toBe(work[1] ?? '');
     expect(remoteRecord(trio)).toEqual(CLAIM_BY_REPLACED);
     expect(race.calls.filter(isLeasedPush)).toHaveLength(2);
+  });
+});
+
+describe('a claim re-signed over a real store on disk, given a new inode at its own host and path', () => {
+  it('reads the claim held before a renamed copy mints a new id, then re-signs it to the id that mint takes', () => {
+    const trio = plantTrio('real-mint-resign');
+    const path = sqliteStorePath(trio.aRoot);
+    const ORIGINAL = 'store-on-disk-original';
+    const RESIGNED = 'store-on-disk-resigned';
+    mintStore(path, ORIGINAL);
+    const sha = pushClaim(trio.a, ORIGINAL);
+
+    renameCopyOver(path);
+    const beforeMint = readRunClaim(PLAN, onDiskSeams(trio.a, trio.aRoot));
+    const remoteBeforeMint = remoteTip(trio);
+
+    writeStore(path, RESIGNED);
+    const afterMint = owned(readRunClaim(PLAN, onDiskSeams(trio.a, trio.aRoot)));
+
+    expect(beforeMint).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: ORIGINAL, via: 'held', note: '', replacedId: null });
+    expect(remoteBeforeMint).toBe(sha);
+    expect([afterMint.via, afterMint.storeId, afterMint.replacedId]).toEqual(['re-signed', RESIGNED, ORIGINAL]);
+    expect(remoteRecord(trio)).toEqual({ action: 'take', issue: ISSUE, store: RESIGNED });
+    expect(parentOf(trio, remoteTip(trio))).toBe(sha);
   });
 });
 
