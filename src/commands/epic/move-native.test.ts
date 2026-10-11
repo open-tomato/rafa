@@ -42,10 +42,11 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { reasonQuestion, renderMoveComment, unaskedReasonMessage } from '../../board/epic-trail.js';
 import { createLabelsRelations } from '../../board/relations/labels.js';
 import { createNativeRelations } from '../../board/relations/native.js';
+import { readBoardRepository } from '../../board/repository.js';
 import { nativeBoardListFields, parseBoardListing } from '../../board/roadmap-board.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
-import { NATIVE_MODE, NATIVE_RETRY_HINT, nativeEpicLeft, nativeParentLine, readBoardRepository } from './move-native.js';
+import { NATIVE_MODE, NATIVE_RETRY_HINT, nativeEpicLeft, nativeParentLine } from './move-native.js';
 import { applyEpicMove, createEpicMoveCommand, readEpicMove } from './move.js';
 
 /** A temporary directory of this file's own. */

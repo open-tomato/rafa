@@ -1,0 +1,75 @@
+
+timeout.test.ts:
+(fail) times out [51.26ms]
+  ^ this test timed out after 50ms.
+
+thrown.test.ts:
+3 | class UndeclaredSpendError extends Error {
+4 |   override name = 'UndeclaredSpendError';
+5 | }
+6 | 
+7 | function guard(): void {
+8 |   throw new UndeclaredSpendError('rafa loop start spends through claude and declared none\nsecond line of the message');
+                                                                                                                          ^
+UndeclaredSpendError: rafa loop start spends through claude and declared none
+second line of the message
+      at guard (/tmp/scratch/thrown.test.ts:8:119)
+      at <anonymous> (/tmp/scratch/thrown.test.ts:13:5)
+(fail) stand-in claude > throws before any expect [0.19ms]
+(pass) stand-in claude > passes [0.02ms]
+
+assertion.test.ts:
+1 | import { expect, it } from 'bun:test';
+2 | 
+3 | it('fails an assertion', () => {
+4 |   expect({ a: 1 }).toEqual({ a: 2 });
+                       ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "a": 2,
++   "a": 1,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/tmp/scratch/assertion.test.ts:4:20)
+(fail) fails an assertion [0.17ms]
+
+sub/two.test.ts:
+1 | import { describe, expect, it } from 'bun:test';
+2 | 
+3 | describe('two', () => {
+4 |   it('first throws a plain error', () => {
+5 |     throw new Error('first boom');
+                                    ^
+error: first boom
+      at <anonymous> (/tmp/scratch/sub/two.test.ts:5:33)
+(fail) two > first throws a plain error [0.06ms]
+(pass) two > passes between [0.01ms]
+ 8 |   it('passes between', () => {
+ 9 |     expect(true).toBe(true);
+10 |   });
+11 | 
+12 |   it('second throws a string', () => {
+13 |     throw 'second boom';
+               ^
+error: second boom
+      at <anonymous> (/tmp/scratch/sub/two.test.ts:13:11)
+(fail) two > second throws a string [0.04ms]
+12 |   it('second throws a string', () => {
+13 |     throw 'second boom';
+14 |   });
+15 | 
+16 |   it('third rejects', async () => {
+17 |     await Promise.reject(new TypeError('third boom'));
+                                  ^
+TypeError: third boom
+      at <anonymous> (/tmp/scratch/sub/two.test.ts:17:30)
+(fail) two > third rejects [0.09ms]
+
+ 2 pass
+ 6 fail
+ 3 expect() calls
+Ran 8 tests across 4 files. [64.00ms]

@@ -55,10 +55,10 @@
  * {@link shadowLessonsById} decides which record a reader takes when
  * both scopes hold one `id`: the project's, and the user's is shadowed
  * by it. It is pure over records a caller already read, keyed by
- * whatever `id` the caller hands (`src/commands/instinct/
- * instinct-records.ts` files a record under its file stem). Two scopes
- * holding one trigger under different ids is not shadowing: that is a
- * conflict for the conflict table, and both records stand. A record
+ * whatever `id` the caller hands (`./scope-records.ts` files a record
+ * under its file stem). Two scopes holding one trigger under different
+ * ids is not shadowing: that is a conflict for the conflict table, and
+ * both records stand. A record
  * naming a scope outside {@link INSTINCT_SCOPES}, `rafa` above all,
  * is refused with a throw rather than ranked, since rafa holds no
  * lessons and a record claiming it came from a caller's cast.

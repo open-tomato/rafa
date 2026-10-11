@@ -25,9 +25,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PORT_VERSIONS } from '../adapters/registry.js';
 import { parseConfigText, resolveConfig } from '../config.js';
+import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';
 
-import { effortSyncRefusal, readDoctorEffortSync, renderDoctorEffortSync } from './doctor-effort-sync.js';
+import { effortSyncRefusal, renderDoctorEffortSync } from './doctor-effort-sync.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-doctor-effort-sync-')));
 afterAll(() => {

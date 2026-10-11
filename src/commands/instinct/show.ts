@@ -32,16 +32,17 @@
  * looked in named, since an absent `~/.rafa/instincts` is an ordinary
  * state and worth seeing in the message.
  */
-import type { InstinctRecordEntry, ScopeListing } from './instinct-records.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Instinct, InstinctEvidence } from '../../schema/instinct.js';
+import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 import type { InstinctScope } from '../../schema/tiers.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
+import { readScopes } from '../../schema/scope-records.js';
 import { expectOneArgument } from '../plan/plan-files.js';
 
-import { findRecords, instinctProject, readScopes } from './instinct-records.js';
+import { findRecords, instinctProject } from './instinct-records.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa instinct show <id>';

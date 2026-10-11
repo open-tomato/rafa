@@ -8,9 +8,9 @@
  * The store copied is always `<root>/.rafa/effort/`. The copy lands in
  * `--to`, resolved against the project root when relative, or in
  * `<root>/.rafa/scratch/effort-<stamp>/` by default, the stamp read off
- * the clock as `fix-schema`'s `fileStamp` spells it. The command prints
- * the directory and the `RAFA_EFFORT_DIR=` line to put in front of each
- * command that should use it.
+ * the clock as `fileStamp` (`src/effort/file-stamp.ts`) spells it. The
+ * command prints the directory and the `RAFA_EFFORT_DIR=` line to put
+ * in front of each command that should use it.
  *
  * It plans no schema and opens the SQLite file read-only, so a
  * development build may run it over the live store, and a loop running
@@ -30,12 +30,11 @@ import type { EffortCopyResult } from '../../effort/store/copy.js';
 import { join, resolve } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
+import { fileStamp } from '../../effort/file-stamp.js';
 import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '../../effort/store/copy.js';
 import { EFFORT_DIR_VARIABLE } from '../../effort/store/location.js';
 import { EFFORT_STORE_DIR } from '../../effort/store.js';
 import { expectNoArgument, requireProject } from '../plan/plan-files.js';
-
-import { fileStamp } from './fix-schema.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort copy';

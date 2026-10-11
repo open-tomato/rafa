@@ -29,6 +29,12 @@
  *     whose `<failure>` carries no `message` attribute (1.4.2 wrote one
  *     for the same test). Exit 1.
  *
+ * And one more under 1.3.14, described in `failure-lines.test.ts`:
+ *
+ *   - `failed-cases`: four files, six failures, none with a `message`
+ *     attribute: an error thrown before any `expect`, a failing
+ *     `toEqual`, a timeout, and three failures in one file. Exit 1.
+ *
  * Runs go through the spawner seam, which plants the recorded JUnit file
  * where it was asked to and answers the recorded stderr; no case spawns
  * `bun`.
@@ -43,11 +49,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
   CLAUDE_CODE_ENV,
+  FORCE_COLOR_ENV,
   parseJunitFailures,
+  parseJunitFiles,
   readNoTestFiles,
   readSummary,
   runSuite,
   suiteCommand,
+  SUITE_ENV_REMOVED,
   suiteEnv,
   suitePathArgument,
 } from './run.js';
@@ -211,6 +220,29 @@ describe('parseJunitFailures', () => {
   });
 });
 
+describe('parseJunitFiles', () => {
+  it('answers the test files in the order the report names them, a passing one included', () => {
+    expect(parseJunitFiles(fixture('failed-cases.junit.xml'))).toEqual(['timeout.test.ts', 'thrown.test.ts', 'assertion.test.ts', 'sub/two.test.ts']);
+    expect(parseJunitFiles(fixture('clean.junit.xml'))).toHaveLength(1);
+  });
+
+  it('names a file once, and never a describe block nested in it', () => {
+    expect(parseJunitFiles(fixture('mixed.junit.xml'))).toEqual(['a.test.ts', 'sub/b.test.ts']);
+    // Control: the report nests `outer` and `inner` as testsuites of their own.
+    expect(fixture('mixed.junit.xml')).toContain('<testsuite name="outer"');
+  });
+
+  it('leaves out a file that threw while it loaded, which the report does not hold', () => {
+    expect(parseJunitFiles(fixture('mixed.junit.xml'))).not.toContain('c.test.ts');
+    expect(fixture('mixed.stderr.txt')).toContain('c.test.ts:');
+  });
+
+  it('answers null for text that is not a whole report', () => {
+    expect(parseJunitFiles('')).toBeNull();
+    expect(parseJunitFiles('<testsuites><testsuite name="a.test.ts">')).toBeNull();
+  });
+});
+
 describe('parseJunitFailures, the message', () => {
   it('keeps the first line of a <failure message=...>, unescaped, and never the stack in its text', () => {
     const body = '<failure type="Error" message="boom &amp; &lt;x&gt; &quot;q&quot;&#10;second line">'
@@ -321,6 +353,17 @@ describe('suiteEnv', () => {
     expect(suiteEnv(base)).toEqual({ PATH: '/bin', HOME: '/h' });
     expect(base[CLAUDE_CODE_ENV]).toBe('1');
   });
+
+  it('drops FORCE_COLOR, whatever it is set to, and leaves NO_COLOR and the rest as they were', () => {
+    for (const value of ['1', '0', 'true', '']) {
+      const base = { [FORCE_COLOR_ENV]: value, NO_COLOR: '1', PATH: '/bin' };
+      expect(suiteEnv(base)).toEqual({ NO_COLOR: '1', PATH: '/bin' });
+      expect(base[FORCE_COLOR_ENV]).toBe(value);
+    }
+    expect(SUITE_ENV_REMOVED).toEqual([CLAUDE_CODE_ENV, FORCE_COLOR_ENV]);
+    // The control: a variable spelled close to it is no colour switch, and is kept.
+    expect(suiteEnv({ FORCE_COLOR_LEVEL: '3' })).toEqual({ FORCE_COLOR_LEVEL: '3' });
+  });
 });
 
 describe('runSuite', () => {
@@ -333,14 +376,62 @@ describe('runSuite', () => {
       exitCode: 1,
       summary: 'Ran 7 tests across 3 files. [3.00ms]',
       failures: [
-        { file: 'a.test.ts', name: 'outer > inner > fails "quoted" & <x>', message: TO_BE },
-        { file: 'sub/b.test.ts', name: 'b fails', message: 'boom' },
+        {
+          file: 'a.test.ts',
+          name: 'outer > inner > fails "quoted" & <x>',
+          message: TO_BE,
+          errorLines: [`error: ${TO_BE}`, 'Expected: 2', 'Received: 1'],
+        },
+        { file: 'sub/b.test.ts', name: 'b fails', message: 'boom', errorLines: ['error: boom'] },
       ],
       errors: 1,
       junit: 'read',
       unhandled: [{ file: 'c.test.ts', firstLine: 'error: Cannot find module \'./nope.js\' from \'/tmp/scratch/c.test.ts\'' }],
+      fileOrder: [['a.test.ts', 'sub/b.test.ts']],
     });
     expect(seen[0]?.options).toEqual({ cwd: dir, env: { PATH: '/bin' } });
+  });
+
+  it('answers one empty file order for a run that wrote no JUnit file', async () => {
+    const result = await runSuite({ cwd: dir, paths: ['nope'], junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('no-match', 1, []) });
+    expect(result.junit).toBe('missing');
+    expect(result.fileOrder).toEqual([[]]);
+  });
+
+  it('answers the error lines of a failure whose JUnit element says nothing, and keeps them beside the JUnit file', async () => {
+    const junitFile = join(dir, 'suite', 'task.junit.xml');
+    const result = await runSuite({ cwd: dir, junitFile, spawn: recordedSpawner('failed-cases', 1, []) });
+    // Control: the report itself carries no message for any of the six, so the lines below come from stderr alone.
+    expect(fixture('failed-cases.junit.xml')).not.toContain('message=');
+    expect(result.failures).toHaveLength(6);
+    expect(result.failures[1]).toEqual({
+      file: 'thrown.test.ts',
+      name: 'stand-in claude > throws before any expect',
+      errorLines: ['UndeclaredSpendError: rafa loop start spends through claude and declared none', 'second line of the message'],
+    });
+    expect(result.failures[0]?.errorLines).toEqual(['this test timed out after 50ms.']);
+    const kept = readFileSync(join(dir, 'suite', 'task.output.txt'), 'utf8');
+    expect(kept).toContain([
+      'thrown.test.ts:',
+      '(fail) stand-in claude > throws before any expect',
+      '  UndeclaredSpendError: rafa loop start spends through claude and declared none',
+      '  second line of the message',
+    ].join('\n'));
+    expect(kept.endsWith(' 2 pass\n 6 fail\n 3 expect() calls\nRan 8 tests across 4 files. [64.00ms]\n')).toBe(true);
+    // Control: neither a passing case nor a stack frame is kept.
+    expect(kept).not.toContain('(pass)');
+    expect(kept).not.toContain('/tmp/scratch');
+  });
+
+  it('leaves the error lines out of a failure whose (fail) line stderr does not hold', async () => {
+    const junitFile = join(dir, 'j.xml');
+    const spawn: SuiteSpawner = async () => {
+      copyFileSync(join(TESTDATA, 'failed-cases.junit.xml'), junitFile);
+      return { exitCode: 1, stderr: ' 2 pass\n 6 fail\nRan 8 tests across 4 files. [64.00ms]\n' };
+    };
+    const result = await runSuite({ cwd: dir, junitFile, spawn });
+    expect(result.failures).toHaveLength(6);
+    expect(result.failures.every((failure) => !('errorLines' in failure))).toBe(true);
   });
 
   it('creates the JUnit file\'s directory before the spawn', async () => {
@@ -422,5 +513,11 @@ describe('runSuite', () => {
     await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('clean', 0, seen) });
     expect(seen[0]?.options.env['PATH']).toBe(process.env['PATH']);
     expect(CLAUDE_CODE_ENV in (seen[0]?.options.env ?? {})).toBe(false);
+  });
+
+  it('spawns bun test without FORCE_COLOR, which would colour the lines the run reads', async () => {
+    const seen: SeenSpawn[] = [];
+    await runSuite({ cwd: dir, junitFile: join(dir, 'j.xml'), env: { PATH: '/bin', [FORCE_COLOR_ENV]: '1', TERM: 'xterm' }, spawn: recordedSpawner('clean', 0, seen) });
+    expect(seen[0]?.options.env).toEqual({ PATH: '/bin', TERM: 'xterm' });
   });
 });

@@ -28,9 +28,9 @@
  *  - The second-command case pairs a body whose line names ids with one
  *    that names none, and holds two commands against one.
  */
-import type { UnblockAsk } from './unblock.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
+import type { UnblockAsk } from '../../board/unblock.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,11 +38,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { KNOWN_LIST_LIMIT } from '../../board/blocked-issues.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
+import { isUnblockFailure, runUnblock, unblockQuestion } from '../../board/unblock.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-import { KNOWN_LIST_LIMIT } from '../doctor-blocked.js';
 
-import { createIssueUnblockCommand, isUnblockFailure, runUnblock, unblockQuestion, UNBLOCK_USAGE } from './unblock.js';
+import { createIssueUnblockCommand, UNBLOCK_USAGE } from './unblock.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-issue-unblock-')));

@@ -4,8 +4,8 @@
  * and never written to.
  *
  * In the `labels` mode, the default, that step is the unblock reading
- * (`./merge-unblock.ts`), which asks about each freed issue and takes
- * `spec:blocked` off; with the epic tick (`./merge-tick.ts`) it is what
+ * (`src/board/unblock-after-merge.ts`), which asks about each freed
+ * issue and takes `spec:blocked` off; with the epic tick (`src/board/epic-tick.ts`) it is what
  * the `labels` adapter's `afterMerge` runs (`src/board/relations/labels.ts`).
  * In the `native` mode a blocker is GitHub's blocked-by link, which
  * GitHub clears by itself when the blocking issue closes, and the
@@ -31,7 +31,7 @@
  * The `native` adapter tells a blocker on this board from one on
  * another, so it is made with the board's `owner/name`, read with one
  * `gh repo view --json nameWithOwner` (`readBoardRepository`,
- * `../epic/move-native.ts`). A merge closing an issue therefore sends
+ * `../../board/repository.ts`). A merge closing an issue therefore sends
  * two `gh` calls here, the repository and the listing, and a merge
  * closing none sends nothing at all, as the unblock reading does not.
  *
@@ -45,19 +45,20 @@
  * ## Why every failure is a warning
  *
  * The merge has already happened by the time this runs, as
- * `./merge-unblock.ts` records for its own reading. A repository `gh`
- * will not name and a listing it will not answer are each one
+ * `src/board/unblock-after-merge.ts` records for its own reading. A
+ * repository `gh` will not name and a listing it will not answer are each one
  * {@link freedProblemLine} warning, and `pr merge` keeps its exit code.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 
 import { selectBoardRelations } from '../../board/relations/select.js';
+import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { messageOf } from '../../config-sections.js';
-import { NATIVE_MODE, readBoardRepository } from '../epic/move-native.js';
-import { plural } from '../plan/plan-files.js';
+import { plural } from '../../plan/plan-files.js';
+import { NATIVE_MODE } from '../epic/move-native.js';
 
 import { INDENT } from './merge-cleanup.js';
 

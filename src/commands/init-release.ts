@@ -11,8 +11,11 @@
  * commented at their defaults, where an operator can read them and set them
  * by hand. The six settings the release-settle plan adds — four under
  * `release`, `pr.versionCollision` and `dangerous.acceptVersionCollision`
- * — are commented lines spelled here and placed by the scaffold, so the
- * file this step edits carries them at their defaults too.
+ * — are commented lines spelled in this step's library half,
+ * `src/release/scaffold.ts`, and placed by the scaffold, so the file
+ * this step edits carries them at their defaults too. This file is the
+ * command half: the question, the decision order and the printed line.
+ * It imports nothing from the library half and re-exports none of it.
  *
  * ## Asked once, and only when nobody has answered already
  *
@@ -77,7 +80,7 @@ import type { ReleaseFileSettings } from '../release/enabled.js';
 import { writeFileSync } from 'node:fs';
 
 import { describeValue, messageOf, RELEASE_AUTO } from '../config-sections.js';
-import { CONFIG_DEFAULTS, CONFIG_FILE, configFilePath } from '../config.js';
+import { CONFIG_FILE, configFilePath } from '../config.js';
 import { resolveReleaseEnabled } from '../release/enabled.js';
 import {
   readReleaseSetting,
@@ -85,27 +88,6 @@ import {
   releaseEnabledIn,
   withReleaseEnabled,
 } from '../release/setting.js';
-
-/**
- * The commented lines the config `rafa init` writes carries for the
- * four `release` settings that fold change fragments into a version,
- * each at its schema default. `src/project/scaffold.ts` places them
- * under `# release:`, after `heading`.
- */
-export const RELEASE_FRAGMENT_LINES = Object.freeze([
-  `#   fragments: ${CONFIG_DEFAULTS.releaseFragments}           # relative path, not under .rafa/, the change fragments are written into`,
-  `#   strategy: ${CONFIG_DEFAULTS.releaseStrategy}      # semver-by-level, the only strategy`,
-  `#   settle: ${CONFIG_DEFAULTS.releaseSettle}                 # push | pr, how settle lands the version on the base branch`,
-  `#   tag: ${CONFIG_DEFAULTS.releaseTag}                  # manual | settle, who tags a settled version`,
-]);
-
-/** The commented `pr.versionCollision` line, placed under `# pr:`. */
-export const PR_VERSION_COLLISION_LINE =
-  `#   versionCollision: ${CONFIG_DEFAULTS.prVersionCollision}       # allow | report | ask | refuse, how pr merge meets a missing or stale fragment`;
-
-/** The commented `dangerous.acceptVersionCollision` line, placed under `# dangerous:`. */
-export const DANGEROUS_VERSION_COLLISION_LINE =
-  `#   acceptVersionCollision: ${String(CONFIG_DEFAULTS.dangerousAcceptVersionCollision)}  # true has pr merge accept a version collision on every run`;
 
 /** The answers that mean no to the question, which is spelled `[Y/n]`. */
 const NO_ANSWERS: readonly string[] = ['n', 'no'];

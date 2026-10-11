@@ -10,7 +10,7 @@
  * - **CI**: the newest run on the branch, of one workflow when one is
  *   named, through `readNewestRun` (`../ci/runs.ts`), and for a red run
  *   its `--log-failed` text through the reader `rafa ci status` uses
- *   (`../commands/ci/status.ts`), whose cases `readFailedCases`
+ *   (`../ci/status-reading.ts`), whose cases `readFailedCases`
  *   (`../ci/failed-cases.ts`) groups by file. The reading is a
  *   {@link CiStatusReading}, rendered by `renderCiStatus`, so a pit stop
  *   and `rafa ci status --branch` print one run the same way.
@@ -35,12 +35,12 @@
  * green run or a zero count.
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { CiStatusReading } from '../commands/ci/status.js';
+import type { CiStatusReading } from '../ci/status-reading.js';
 import type { IssueRef, OpenIssue, Tracker } from '../ports/index.js';
 
 import { readFailedCases } from '../ci/failed-cases.js';
 import { readNewestRun } from '../ci/runs.js';
-import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../commands/ci/status.js';
+import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
 import { messageOf } from '../config-sections.js';
 
 /** The time an issue was filed, or null when the tracker does not say. */

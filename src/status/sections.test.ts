@@ -22,11 +22,11 @@
  */
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { GitResult, GitRunner } from '../pr/git.js';

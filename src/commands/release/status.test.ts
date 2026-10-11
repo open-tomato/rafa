@@ -43,25 +43,27 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { writeChanges } from '../../effort/store/changes.js';
-import { parseSemanticVersion } from '../../release/version.js';
-import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
-
 import {
   changelogVersions,
   compareReleaseTags,
   compareVersions,
+  readTags,
+  readUntagged,
+  releaseTagsOf,
+  untaggedVersions,
+} from '../../release/status-readings.js';
+import { parseSemanticVersion } from '../../release/version.js';
+import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+
+import {
   createReleaseStatusCommand,
   NOTHING,
   MISSING_CHANGELOG_CELL,
   readPending,
-  readTags,
-  readUntagged,
   readVersionFile,
-  releaseTagsOf,
   RELEASE_STATUS_USAGE,
   renderStatus,
   UNREADABLE,
-  untaggedVersions,
 } from './status.js';
 
 /** A temporary directory of this file's own. */

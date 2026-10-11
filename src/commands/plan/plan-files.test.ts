@@ -22,26 +22,28 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
 import { CONFIG_DEFAULTS } from '../../config.js';
-import { scopeAt } from '../../project/scope.js';
-import { plantProjectConfig } from '../../tests/cli-capture.js';
-
 import {
   checkbox,
   countTasks,
-  expectAtMostOneArgument,
-  expectNoArgument,
-  expectOneArgument,
   formatCounts,
   isFile,
   issueLine,
   planFileName,
   plansDirAt,
   plural,
-  readSwitch,
   rejectedPath,
+  stubOfPlanFile,
+} from '../../plan/plan-files.js';
+import { scopeAt } from '../../project/scope.js';
+import { plantProjectConfig } from '../../tests/cli-capture.js';
+
+import {
+  expectAtMostOneArgument,
+  expectNoArgument,
+  expectOneArgument,
+  readSwitch,
   resolvePlansDir,
   resolveProjectConfig,
-  stubOfPlanFile,
 } from './plan-files.js';
 
 /** A temporary directory of this file's own. */

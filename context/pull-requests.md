@@ -219,7 +219,7 @@ sentence replaces nothing.
    `spec:blocked` whose `Blocked by:` line names an issue this PR closes,
    asking `#<n> was blocked by #24, all closed. Remove spec:blocked? [y/N]`
    about each one whose blockers have all closed and removing the label on a
-   yes (`src/commands/pr/merge-unblock.ts`, over `rafa issue unblock`'s own
+   yes (`src/board/unblock-after-merge.ts`, over `rafa issue unblock`'s own
    `runUnblock`). `--yes` does not answer that question, and every failure of
    it is a warning rather than an exit code. Under
    `board.relationships: native` step 5 ticks no epic checklist and this
@@ -725,7 +725,8 @@ Ticking: `pr merge` ticks the PR's `Closes #<n>` line on every open
 no issue carries the label, after the merge (GitHub closes the issue; it does
 not tick a task-list box). Before the boards it ticks the same line on the
 checklist of the open epic the issue's `epic:<slug>` label names, printing one
-sentence per epic (`src/commands/pr/merge-tick.ts`).
+sentence per epic (`src/commands/pr/merge-tick.ts`, which runs
+`tickEpics` of `src/board/epic-tick.ts`).
 An edit conflict re-reads and retries once — and the only conflict signal
 there is, is the body the PATCH answers with. The issues REST API takes no
 `If-Match` and `gh` sends no conditional request, so a lost update comes
@@ -1010,7 +1011,7 @@ listing falls back to a full one.
 
 The sixth step of `pr merge` (lines 163–181) differs between modes:
 
-In **`labels` mode** (the default), the unblock reading (`src/commands/pr/merge-unblock.ts`)
+In **`labels` mode** (the default), the unblock reading (`src/board/unblock-after-merge.ts`)
 runs after the cleanup: it reads every open issue labelled `spec:blocked` whose
 `Blocked by:` line names an issue this PR closes. For each such issue whose
 blockers have all closed, it asks `#<n> was blocked by #24, all closed. Remove
@@ -1033,7 +1034,7 @@ sends one warning and prints nothing, as the merge has already happened.
 
 The freed reading in native mode sends two `gh` calls from the one board listing
 the command already holds: the board's repository (one `gh repo view --json
-nameWithOwner`, `readBoardRepository`, `src/commands/epic/move-native.ts`) to
+nameWithOwner`, `readBoardRepository`, `src/board/repository.ts`) to
 tell the board's issues from foreign blockers; and one native board listing (`gh
 api graphql` with `filterBy: {since}` on an incremental read, or a full listing
 on the first read). No per-blocker `gh issue view` is sent; a blocker's state

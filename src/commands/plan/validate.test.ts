@@ -43,6 +43,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CommandExit } from '../../cli/command.js';
 import { createCommandRegistry } from '../../cli/registry.js';
 import { parsePlan } from '../../plan/index.js';
+import { issueLine } from '../../plan/plan-files.js';
+import { validatePlan } from '../../plan/validate.js';
 import {
   dispatchCaptured,
   dispatchInProject,
@@ -54,8 +56,7 @@ import {
 } from '../../tests/cli-capture.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
-import { issueLine } from './plan-files.js';
-import { createPlanValidateCommand, validatePlan } from './validate.js';
+import { createPlanValidateCommand } from './validate.js';
 
 /** A temporary directory of this file's own. */
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-plan-validate-')));

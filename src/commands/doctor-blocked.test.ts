@@ -37,15 +37,10 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
+import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT, readBlockedIssues } from '../board/blocked-issues.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 
-import {
-  BLOCKED_HEADING,
-  BLOCKED_LIST_LIMIT,
-  KNOWN_LIST_LIMIT,
-  readBlockedIssues,
-  renderBlockedIssues,
-} from './doctor-blocked.js';
+import { BLOCKED_HEADING, renderBlockedIssues } from './doctor-blocked.js';
 
 /** One open issue labelled `spec:blocked`, as the listing answers it. */
 interface BlockedIssue {
