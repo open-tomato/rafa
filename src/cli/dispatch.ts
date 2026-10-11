@@ -25,6 +25,7 @@
  *      of its own (see "The scope a command runs in"), with its
  *      context's output as the active output
  *      (`src/adapters/output/active.ts`) in the invocation's output mode,
+ *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
  *      flags (`running.ts`), for a reader below its `run` to ask; a help
  *      request, a version request, a refusal and `no_project` run no
@@ -43,35 +44,47 @@
  *
  * ## The scope a command runs in
  *
- * The active output and the running command are what a module far below
- * a command's `run` asks for without a context handed down to it. Each
- * invocation carries its own in an async scope, an `AsyncLocalStorage`
- * each of the two modules holds (`runWithActiveOutput`,
- * `runAsRunningCommand`): they are read inside the command's `run` and
- * everything it awaits, and nothing of them is left once it ends,
- * whether it returns or throws. For these two the dispatcher sets and
- * puts back no module-level value; the logger below is still set and
- * put back as one, so two invocations that overlap can leave a logger
- * that is not the one active before them.
+ * The active output, the running command, the active logger and the
+ * logger settings are what a module far below a command's `run` asks
+ * for without a context handed down to it. Each invocation carries its
+ * own in an async scope, an `AsyncLocalStorage` each of the four modules
+ * holds (`runWithActiveOutput`, `runAsRunningCommand`,
+ * `runWithActiveLogger`, `runWithLoggerSettings`): they are read inside
+ * the command's `run` and everything it awaits, and nothing of them is
+ * left once it ends, whether it returns or throws. The dispatcher sets
+ * and puts back no module-level value.
  *
  * So invocations need not nest to stay apart. Two dispatched in one
- * process and awaited with `Promise.all` each read their own output and
- * record whichever ends first, and one a command dispatches from inside
- * its `run` reads the inner ones inside and the outer ones after. Until
- * #927 each invocation set the two module-level values and put the
- * previous ones back in a `finally`, a stack: two that overlapped and
- * ended in the order they started left the first's output and record for
- * the rest of the process, and the spend guard (`src/utils/claude.ts`)
- * then refused every session a later test file started, naming a command
- * that had ended.
+ * process and awaited with `Promise.all` each read their own output,
+ * record, logger and settings whichever ends first, and one a command
+ * dispatches from inside its `run` reads the inner ones inside and the
+ * outer ones after. Until #927 each invocation set the module-level
+ * values and put the previous ones back in a `finally`, a stack: two
+ * that overlapped and ended in the order they started left the first's
+ * output and record for the rest of the process, and the spend guard
+ * (`src/utils/claude.ts`) then refused every session a later test file
+ * started, naming a command that had ended. The logger and its settings
+ * were the same stack: each of the two read the other's while both ran,
+ * and the last to end left a logger and settings of a command that had
+ * ended.
  *
  * What a caller set at module level ahead of an invocation
- * (`setActiveOutput`, `setRunningCommand`) is hidden while the command
- * runs and read again after it. A set a command makes inside its `run`
- * writes the module-level value: the command goes on reading its
- * invocation's own, and the set value is what a reader outside every
- * invocation finds afterwards. Each module's note says which callbacks
- * read outside the scope.
+ * (`setActiveOutput`, `setRunningCommand`, `setActiveLogger`,
+ * `setActiveLoggerSettings`) is hidden while the command runs and read
+ * again after it. A set a command makes inside its `run` goes two ways:
+ *
+ *   - **The output and the running command** are set at module level.
+ *     The command goes on reading its invocation's own, and the set
+ *     value is what a reader outside every invocation finds afterwards.
+ *   - **The logger and its settings** are set in the invocation's scope.
+ *     The command reads the set value from then on, as it must when it
+ *     loads its config (see "The logger"), and nothing of it is left
+ *     once the command ends.
+ *
+ * Each module's note says which callbacks read outside the scope. The
+ * gate of "What a command writes through" asks for the active logger
+ * when a line is written, so a `warn` a command's output is handed from
+ * such a callback is gated by the module-level logger.
  *
  * ## The events, by mode
  *
@@ -104,15 +117,17 @@
  * `logger/console`, made with the invocation's verbosity and with colour
  * on only in text mode, where `FORCE_COLOR`, `NO_COLOR` and whether
  * stdout is a terminal decide it (`adapters/logger/colour.ts`). It is
- * set as the active logger (`adapters/logger/active.ts`) beside the
- * active output, with a resolver that makes any other `logger.kind` from
- * the same context, and what was active is put back when the command
- * ends, thrown or not.
+ * the active logger (`adapters/logger/active.ts`) of the invocation's
+ * scope, beside the active output, with a resolver that makes any other
+ * `logger.kind` from the same context. A reader outside the invocation
+ * never finds it, while the command runs or after it.
  *
- * The logger's settings start from the defaults for every invocation,
- * so nothing an earlier invocation of the process loaded applies. They
- * are set when the command loads its config (`config-load.ts`), and the
- * settings active before are put back with the logger.
+ * The logger's settings (`adapters/logger/settings.ts`) are held in the
+ * same scope and start from the defaults for every invocation, so
+ * nothing an earlier invocation loaded, or one running beside it,
+ * applies. They are set in that scope when the command loads its config
+ * (`config-load.ts`), which is why a set made inside the scope reaches
+ * it, and they end with the command.
  *
  * The dispatcher's own lines are not gated: a thrown error's stack goes
  * to the base output at `debug`, as before.
@@ -208,15 +223,16 @@ import type { CliContext } from './core/types.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
+import type { LoggerResolver } from '../adapters/logger/active.js';
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { CliEvent, CliEventResult, LogLevel, Output } from '../ports/index.js';
+import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '../ports/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { homedir } from 'node:os';
 
-import { activeLogger, restoreActiveLogger, setActiveLogger } from '../adapters/logger/active.js';
+import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
-import { activeLoggerSettings, DEFAULT_LOGGER_KIND, setActiveLoggerSettings } from '../adapters/logger/settings.js';
+import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
 import { runWithActiveOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
@@ -486,26 +502,32 @@ function streamIsTerminal(stream: OutputStream): boolean {
   return 'isTTY' in stream && stream.isTTY === true;
 }
 
-/**
- * Sets the logger a command runs with and answers how to put back what
- * was active; see "The logger" in the module note.
- */
-function setCommandLogger(base: CliContext, project: ProjectFound | null, settings: Settings): () => void {
+/** The logger a command runs with, and how any other `logger.kind` is made for it. */
+interface CommandLogger {
+  readonly logger: Logger;
+  readonly resolver: LoggerResolver;
+}
+
+/** Makes the logger a command runs with; see "The logger" in the module note. */
+function commandLogger(base: CliContext, project: ProjectFound | null, settings: Settings): CommandLogger {
   const context = {
     repoRoot: project?.root ?? settings.cwd(),
     verbosity: base.verbosity,
     colour: base.outputMode === 'text' && colourEnabled(settings.env, streamIsTerminal(settings.stdout)),
   };
-  const previousSettings = activeLoggerSettings();
-  setActiveLoggerSettings(null);
-  const previous = setActiveLogger(
-    CORE_ADAPTER_REGISTRY.resolve('logger', DEFAULT_LOGGER_KIND).create(context),
-    (kind) => CORE_ADAPTER_REGISTRY.resolve('logger', kind).create(context),
-  );
-  return () => {
-    restoreActiveLogger(previous);
-    setActiveLoggerSettings(previousSettings);
+  return {
+    logger: CORE_ADAPTER_REGISTRY.resolve('logger', DEFAULT_LOGGER_KIND).create(context),
+    resolver: (kind) => CORE_ADAPTER_REGISTRY.resolve('logger', kind).create(context),
   };
+}
+
+/**
+ * Runs `run` with `made` as the active logger and with logger settings
+ * of its own, starting from the defaults, each in an async scope; see
+ * "The scope a command runs in" in the module note.
+ */
+function runWithCommandLogger<T>(made: CommandLogger, run: () => T): T {
+  return runWithLoggerSettings(null, () => runWithActiveLogger(made.logger, made.resolver, run));
 }
 
 /** The context for a route, and the `invalid_spec` message when its command's spec was refused. */
@@ -546,13 +568,13 @@ async function runCommand(
     registry,
     project,
   });
-  const restoreLogger = setCommandLogger(base, project, settings);
+  const logger = commandLogger(base, project, settings);
   try {
-    await runAsRunningCommand(
+    await runWithCommandLogger(logger, async () => runAsRunningCommand(
       route.command,
       base.flags,
       async () => runWithActiveOutput(guarded.output, base.outputMode, async () => route.command.run(context)),
-    );
+    ));
     return success(guarded.payload());
   } catch (error) {
     if (!(error instanceof CommandExit)) {
@@ -576,8 +598,6 @@ async function runCommand(
         ? null
         : error.message,
     };
-  } finally {
-    restoreLogger();
   }
 }
 
@@ -600,10 +620,17 @@ function placeCommand(command: RafaCommand, settings: Settings): Placement {
   }
 }
 
-/** Awaits one half of the command hook, a throw swallowed into a `debug` line; see the module note. */
+/**
+ * Awaits one half of the command hook, a throw swallowed into a `debug`
+ * line; see the module note. The half runs with logger settings of its
+ * own, starting from the defaults: a hook that loads the project's
+ * config sets them (`config-load.ts`), and they end with the half, so
+ * they reach neither the module-level settings nor those of a command
+ * this invocation was dispatched from.
+ */
 async function callHook<T>(half: 'before' | 'after', call: () => Promise<T>, base: CliContext): Promise<T | null> {
   try {
-    return await call();
+    return await runWithLoggerSettings(null, call);
   } catch (error) {
     base.output.debug(`command hook ${half}: ${messageOf(error)}`);
     return null;

@@ -1,0 +1,11 @@
+---
+plan: fix-dispatch-logger-scope
+title: Commands dispatched at once in one process no longer read each other's logger or logger settings
+level: patch
+---
+
+- CLI: each invocation carries its logger and its logger settings in async scopes of its own (`AsyncLocalStorage`), beside its running command and its active output, so two commands dispatched in one process and awaited together each read their own, whichever ends first, and nothing is left once they end. Before, the dispatcher set both at module level and put the previous ones back when the command ended: while two overlapped, a command that had loaded `logger.level: error` wrote its warnings anyway, through the other's logger at the other's verbosity, and after both ended the process kept the logger and the settings of a command that had ended. A single `rafa` line runs one invocation, so this reached the test suite and any command running others in-process, not a plain run.
+- CLI: `setActiveLogger`, `restoreActiveLogger` and `setActiveLoggerSettings` act on the innermost scope when called inside a command, and on the module-level value otherwise, as the readers do. So the config a command loads inside its `run` sets that invocation's settings alone, and a set made inside a command ends with it. `runWithActiveLogger` (`src/adapters/logger/active.ts`) and `runWithLoggerSettings` (`src/adapters/logger/settings.ts`) are the scoped forms the dispatcher runs each command through.
+- CLI: each half of the command hook runs with logger settings of its own, so the project config a hook loads no longer stays at module level after the invocation, or replaces the settings of a command the invocation was dispatched from.
+- Tests: `src/cli/dispatch-logger-scope.test.ts` dispatches two and seven commands at once in both ending orders, a command inside another, and a command that throws or exits while another runs, one loading a config with `logger.level: error` and the other run with `-v -v`; each reads its own logger and settings from inside `run` and the defaults are read after.
+- Documentation: `context/logging.md` and `context/cli.md` describe the two scopes, the one rule for a set made inside a command, and which callbacks read outside the scope (a process signal listener, an abort listener it or `AbortSignal.timeout` fires).
