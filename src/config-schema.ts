@@ -20,10 +20,11 @@
  * `config-schema-triage.ts` the `triage` section and its readers,
  * `config-schema-errors.ts` the `errors` section and its readers,
  * `config-schema-logger.ts` the `logger` section and its readers,
+ * `config-schema-issues.ts` the `issues` section and its readers,
  * `config-schema-wrap-up.ts` the `loop.wrapUp` section and its reader,
  * `config-schema-loop-retries.ts` `loop.retries` and its reader,
  * `config-schema-loop-continue.ts` the four keys `loop start --continue`
- * reads and their readers, all eight spread in here, and
+ * reads and their readers, all nine spread in here, and
  * `config-schema-board-project.ts` the `board.project` limits and their
  * readers, spread in after `board.project.number`.
  * `config-schema-hub.ts` holds the `hub`
@@ -87,6 +88,7 @@
  * `config-schema-triage.ts` for a `triage` key,
  * `config-schema-errors.ts` for an `errors` key,
  * `config-schema-logger.ts` for a `logger` key,
+ * `config-schema-issues.ts` for an `issues` key,
  * `config-schema-wrap-up.ts` for a `loop.wrapUp` key,
  * `config-schema-loop-retries.ts` for `loop.retries`,
  * `config-schema-loop-continue.ts` for a `--continue` key,
@@ -120,6 +122,7 @@ import type {
 import type { BoardProjectLimitSettings } from './config-schema-board-project.js';
 import type { ErrorsSettings } from './config-schema-errors.js';
 import type { HubSettings } from './config-schema-hub.js';
+import type { IssuesConfigSettings } from './config-schema-issues.js';
 import type { LoggerConfigSettings } from './config-schema-logger.js';
 import type { LoopContinueSettings } from './config-schema-loop-continue.js';
 import type { LoopRetriesSettings } from './config-schema-loop-retries.js';
@@ -171,6 +174,7 @@ import {
 } from './config-schema-board-project.js';
 import { ERRORS_DEFAULTS, ERRORS_SETTINGS } from './config-schema-errors.js';
 import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
+import { ISSUES_DEFAULTS, ISSUES_SETTINGS } from './config-schema-issues.js';
 import { LOGGER_DEFAULTS, LOGGER_SETTINGS } from './config-schema-logger.js';
 import { LOOP_CONTINUE_DEFAULTS, LOOP_CONTINUE_SETTINGS } from './config-schema-loop-continue.js';
 import { LOOP_RETRIES_DEFAULTS, LOOP_RETRIES_SETTINGS } from './config-schema-loop-retries.js';
@@ -235,13 +239,14 @@ export const CONFIG_FILE = join('.rafa', 'config.yaml');
  * the `--continue` fields are {@link LoopContinueSettings}',
  * `loopWrapUpRetries` is {@link WrapUpSettings}', the
  * `board.project` limits are {@link BoardProjectLimitSettings}',
- * `errorsCodes` is {@link ErrorsSettings}', and the `logger` fields are
- * {@link LoggerConfigSettings}'.
+ * `errorsCodes` is {@link ErrorsSettings}', the `logger` fields are
+ * {@link LoggerConfigSettings}', and the `issues` fields are
+ * {@link IssuesConfigSettings}'.
  */
 export interface RafaConfig
   extends HubSettings, PrSettings, ReleaseSettings, DangerousReleaseSettings,
   TestsSettings, TriageSettings, LoopRetriesSettings, LoopContinueSettings,
-  WrapUpSettings, BoardProjectLimitSettings, ErrorsSettings, LoggerConfigSettings {
+  WrapUpSettings, BoardProjectLimitSettings, ErrorsSettings, LoggerConfigSettings, IssuesConfigSettings {
   /** The schema version the file was written for. `version`. */
   version: ConfigVersion;
   /** The backend the effort store writes through. `store`. */
@@ -436,6 +441,7 @@ export const CONFIG_DEFAULTS: Readonly<RafaConfig> = Object.freeze({
   ...RELEASE_DEFAULTS,
   ...ERRORS_DEFAULTS,
   ...LOGGER_DEFAULTS,
+  ...ISSUES_DEFAULTS,
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: Object.freeze([]),
@@ -552,6 +558,7 @@ export const SETTINGS: { readonly [K in ConfigSetting]: SettingSpec<K> } = {
   ...RELEASE_SETTINGS,
   ...ERRORS_SETTINGS,
   ...LOGGER_SETTINGS,
+  ...ISSUES_SETTINGS,
   cleanupStaleDays: { key: 'cleanup.staleDays', read: dayCount, cli: false },
   cleanupWorktreeIdleDays: {
     key: 'cleanup.worktreeIdleDays',

@@ -44,8 +44,12 @@ rafa issue list --module=cli-gap --search="<the step in a few words>"
 When none matches, file it:
 
 ```bash
-rafa issue create --type=bug --module=cli-gap --title="<the step rafa cannot do yet>" --body="<the raw line, the rafa line that came closest, what it lacks>"
+rafa issue create --type=bug --module=cli-gap --action="<the rafa action that came closest, or unknown>" --summary="<the step rafa cannot do yet>" --cause=cli:new-context --reproduce="<the raw line>" --body="<the rafa line that came closest, what it lacks>"
 ```
+
+A bug is filed from its fields, and rafa renders its title from them. A
+line that leaves one of the four out is refused, naming it. The action
+is lower-case, without the word `rafa`: `pr open`, `loop start`.
 
 When one matches, add the stretch's case to it:
 

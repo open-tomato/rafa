@@ -537,6 +537,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-epic-rows.js', ['hasEpicLines', 'readRoadmapEpicRows']],
     ['../../board/roadmap-rows.js', ['createPlanDirNames']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'ROADMAP_REFUSAL_EXIT']],
+    ['../../bugs/title.js', ['parseTitle']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-sections.js', ['messageOf']],
     ['../../plan/plan-files.js', ['plansDirAt']],
@@ -571,8 +572,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
-    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
+    ['./create-bug.js', ['BUG_FLAGS', 'readBugLine']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',

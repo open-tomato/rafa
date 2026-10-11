@@ -105,11 +105,26 @@ changes the area, re-run the step 3 search against the new terms. If no priority
 comes back, file without any priority label and leave prioritisation to triage;
 never guess one.
 
-**5. Draft the issue.** Write the body to a file (e.g. `/tmp/bug.md`) with these
-sections: Context, Reproduction, Expected, Actual, Environment, Regression range
-(when known), Artifact (the verbatim output), Refs (paths and symbols from the
-Artifact), Source agent output (verbatim, in a fence), Owner verdict (only
-when someone gave you one). Title as `Fix {noun} — {context}`.
+**5. Draft the issue.** Write the body to a file (e.g. `/tmp/bug.md`) with
+`## ` sections. rafa reads five of them as the bug's fields:
+
+- `What`: the context and the symptom.
+- `Reproduce`: the steps, or the condition that revealed it. Required, and
+  never "unknown": when no steps are known, say what was running when it
+  showed.
+- `Rerun`: one command that shows it again, when there is one.
+- `Artifact`: the verbatim output. rafa takes the error line from its first
+  line and keeps its first 60 lines.
+- `Suspected cause`: only when the source agent named one.
+
+Any other section is kept as you wrote it, after those: Expected, Actual,
+Regression range (when known), Refs (paths and symbols from the Artifact),
+Source agent output (verbatim, in a fence), Owner verdict (only when someone
+gave you one). Write no Environment or Versions section: rafa fills the
+place, its own version, the commit and the package.
+
+Write no title. rafa renders it from the fields you pass in step 7, as
+`<module> - <action>: <summary>`.
 
 The **Refs** section lists paths (e.g. `src/a.ts`) and symbols (code-shaped
 names like `handleClick`, `BUFFER_SIZE`, or `serve()`) extracted from the
@@ -126,20 +141,41 @@ reader must be able to see that something was removed and what kind of thing it
 was.
 
 **6. Confirm before filing.** Filing a new issue on a public repo publishes
-content under the org's name — show the user the rendered draft and the target
-labels/priority, and ask before creating. Do not file on your own initiative.
+content under the org's name — show the user the rendered draft (step 7's
+`--dry-run` prints it) and the target module, cause and priority, and ask
+before creating. Do not file on your own initiative.
 Commenting on an existing issue (step 3, hit case) does not need this
 confirmation — it only adds evidence to a record that already exists.
 
-**7. File it.**
+**7. File it.** Pick the cause code first. rafa ranks the closest ones for
+the error line:
 
 ```bash
-rafa issue create --type=bug --body-file /tmp/bug.md \
-  --label "<area>" --label "<priority>"
+rafa bug codes --suggest="<the error line>"
 ```
 
-Drop the priority label entirely if step 4 produced none, and the area label if
-routing stayed unresolved.
+Then file from the fields:
+
+```bash
+rafa issue create --type=bug --body-file=/tmp/bug.md \
+  --module=<module> --action=<action> --summary="<one line>" \
+  --cause=<code> --reproduce="<steps, or the revealing condition>" \
+  --priority=<priority>
+```
+
+- `--module` is the area from step 4, lower-case, and `--module=unknown` if
+  routing stayed unresolved. `--action` is what was running, a command, a step
+  or a test, or `unknown`.
+- `--summary` is one line saying what is wrong, with no module in front.
+- `--cause` is a code from the list. When no code fits, pass
+  `<family>:new-context` with `--proposed=<family>:<leaf>`, the leaf you
+  would have used, or `unknown:new-context` when no family fits either.
+- `--reproduce` can be left out when the body file has a `Reproduce` section.
+- Drop `--priority` entirely if step 4 produced none.
+
+For step 6, run the same line with `--dry-run` first: it prints the title and
+the body rafa would file, and files nothing. A line rafa refuses names each
+field it lacks; add them and run it again.
 
 **8. Report back** the issue number, the tracker url, the priority you were
 given, and the redactions you made. If `gh` was unreachable, say so explicitly,
@@ -156,6 +192,8 @@ write the report into the repo instead.
   vulnerability.
 - Do not guess a priority. Ask; if nobody sets one, file with no priority label
   and leave it for triage.
+- Do not write a title, or a module in front of the summary. rafa renders the
+  title from the fields, and a title typed by hand must agree with them.
 - Do not size the issue or estimate effort. You don't have the context, and
   guessing is worse than leaving it for triage.
 - Do not move issues across project boards or milestones — filing or commenting

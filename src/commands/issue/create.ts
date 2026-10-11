@@ -7,7 +7,8 @@
  * Read off the line before the chain is resolved, so a refused line
  * files nothing and runs no preflight:
  *
- *   - `title` from `--title`, required and not blank;
+ *   - `title` from `--title`, required and not blank for every type but
+ *     `bug`, whose title is rendered from its fields (see "A bug");
  *   - `body` from `--body`, or from `--body-file` (see below), empty
  *     when both are left out;
  *   - `type` from `--type`, one of the port's types, {@link DEFAULT_ISSUE_TYPE}
@@ -22,6 +23,31 @@
  *   - `opt: 0`, no project and no blocking issue, as triage files
  *     (`triage/triage.ts`): rafa keeps no OPT ledger, and each adapter
  *     numbers its own issues.
+ *
+ * ## A bug
+ *
+ * A `--type=bug` line is filed as a bug record (`./create-bug.ts`): its
+ * fields are read from `--module`, `--action`, `--summary`, `--env`,
+ * `--cause`, `--proposed`, `--reproduce`, `--rerun` and `--project`, from
+ * the sections of the body, and from a `--title` when one is typed. rafa
+ * fills the versions, the place and the error line, renders the title
+ * through `issues.titles.bug`, and refuses a record that is not complete,
+ * every problem on a line of its own, before the chain is resolved. A
+ * line of another type naming one of those flags is refused, so a field
+ * typed on the wrong line is never dropped without a word.
+ *
+ * `--module` has no declared default for that reason: a default would
+ * reach the flags of a bug line that names no module, and hide that the
+ * record lacks one. A line of another type still files under
+ * `TRIAGE_MODULE` when it names none.
+ *
+ * ## `--dry-run`
+ *
+ * Makes the draft as the line would file it, a spec's `Blocked by:` line
+ * read, then stops: no chain is resolved, no preflight runs and nothing
+ * is filed. Text mode prints `--dry-run: nothing was filed.`, the title,
+ * a line with the type, the module, the priority and a bug's cause, then
+ * the body. Json mode's result is an {@link IssueDryRun}.
  *
  * ## The body file
  *
@@ -98,9 +124,10 @@ import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { messageOf } from '../../config-sections.js';
 import { TRIAGE_MODULE } from '../../triage/triage.js';
-import { expectNoArgument } from '../plan/plan-files.js';
+import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 import { readSpecLine, settleSpecLine } from './create-blocked.js';
+import { BUG_FLAGS, readBugLine } from './create-bug.js';
 import {
   DEFAULT_ISSUE_SEAMS,
   issueName,
@@ -117,7 +144,18 @@ import {
 } from './issue-tracker.js';
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue create --title=<text> [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]';
+const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
+  + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
+  + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
+
+/** What a refusal of `--dry-run` typed with a value ends with. */
+const SWITCH_HINT = `Type it bare: ${USAGE}`;
+
+/** The type whose title is rendered from its fields. */
+const BUG_TYPE: IssueType = 'bug';
+
+/** What a draft with no priority is filed as, in a `--dry-run` listing. */
+const NO_PRIORITY = 'needs-triage';
 
 /** The `--body-file` value that reads standard input. */
 export const STDIN_PATH = '-';
@@ -132,6 +170,13 @@ export interface IssueCreateResult {
   readonly ref: IssueRef;
 }
 
+/** What json mode gives as the terminal result's `data` under `--dry-run`: the draft, and nothing filed. */
+export interface IssueDryRun {
+  readonly dryRun: true;
+  /** The draft the line would file. */
+  readonly draft: IssueDraft;
+}
+
 /**
  * The path `--body-file` names, or undefined when the line leaves it out;
  * a refusal with exit code 1 for a blank value and for one beside
@@ -144,6 +189,18 @@ export function readBodyFileFlag(flags: LineFlags): string | undefined {
 }
 
 /**
+ * The title a line names: required for every type but `bug`, whose line
+ * may leave it out (`''`); a refusal with exit code 1 for a line of
+ * another type naming a flag only a bug reads. See the module note.
+ */
+function readTitleFlag(flags: LineFlags, type: IssueType): string {
+  if (type === BUG_TYPE) return readNonBlankFlag(flags, 'title', USAGE) ?? '';
+  const stray = BUG_FLAGS.find((flag) => flags[flag] !== undefined);
+  if (stray !== undefined) throw lineRefusal(`--${stray} is read for --type=${BUG_TYPE} only`, USAGE);
+  return readRequiredFlag(flags, 'title', USAGE);
+}
+
+/**
  * The draft a line's flags make, its body from `--body` alone; a refusal
  * with exit code 1 for a flag refused, `--body` beside `--body-file`
  * among them. {@link readIssueLine} reads the body file. See the module
@@ -151,11 +208,12 @@ export function readBodyFileFlag(flags: LineFlags): string | undefined {
  */
 export function readIssueDraft(flags: LineFlags): IssueDraft {
   readBodyFileFlag(flags);
+  const type = readChoiceFlag(flags, 'type', ISSUE_TYPES, USAGE) ?? DEFAULT_ISSUE_TYPE;
   return {
     opt: 0,
-    title: readRequiredFlag(flags, 'title', USAGE),
+    title: readTitleFlag(flags, type),
     body: readTextFlag(flags, 'body', USAGE) ?? '',
-    type: readChoiceFlag(flags, 'type', ISSUE_TYPES, USAGE) ?? DEFAULT_ISSUE_TYPE,
+    type,
     module: readNonBlankFlag(flags, 'module', USAGE) ?? TRIAGE_MODULE,
     priority: readChoiceFlag(flags, 'priority', ISSUE_PRIORITIES, USAGE) ?? null,
     project: null,
@@ -196,11 +254,46 @@ export function renderCreated(ref: IssueRef): string[] {
   return [`Created ${issueName(ref)}.`, ...urlLines(ref)];
 }
 
-/** Files the issue a line describes; see the module note. */
-export async function createIssue(context: RafaContext, seams: IssueSeams): Promise<IssueCreateResult> {
+/** The lines text mode writes under `--dry-run`; see the module note. */
+export function renderDryRun(draft: IssueDraft): string[] {
+  const facts = [
+    `Type: ${draft.type}`,
+    `Module: ${draft.module}`,
+    `Priority: ${draft.priority ?? NO_PRIORITY}`,
+    ...draft.cause === undefined
+      ? []
+      : [`Cause: ${draft.cause}`],
+  ].join(' · ');
+  const body = draft.body.trimEnd();
+  return [
+    '--dry-run: nothing was filed.',
+    `Title: ${draft.title}`,
+    facts,
+    ...body === ''
+      ? []
+      : ['', ...body.split('\n')],
+  ];
+}
+
+/** True for a result of `--dry-run`. */
+export function isDryRun(result: IssueCreateResult | IssueDryRun): result is IssueDryRun {
+  return 'dryRun' in result;
+}
+
+/** Files the issue a line describes, or under `--dry-run` answers its draft; see the module note. */
+export async function createIssue(context: RafaContext, seams: IssueSeams): Promise<IssueCreateResult | IssueDryRun> {
   expectNoArgument(context.args, USAGE);
-  const read = await readIssueLine(context.flags, seams);
+  const dryRun = readSwitch('dry-run', context.flags['dry-run'], SWITCH_HINT);
+  const base = await readIssueLine(context.flags, seams);
+  // Under --dry-run no chain is resolved to write the config's warnings, so they are written here.
+  const warn = dryRun
+    ? (message: string): void => context.output.warn(message)
+    : (): void => undefined;
+  const read = base.type === BUG_TYPE
+    ? readBugLine(context, seams, base, { usage: USAGE, warn }).draft
+    : base;
   const blockedLine = readSpecLine(read);
+  if (dryRun) return { dryRun: true, draft: read };
   const { tracker, data } = await resolveIssueTracker(context, seams);
   const draft = blockedLine === null
     ? read
@@ -252,24 +345,27 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
     name: 'issue create',
     subject: 'issue',
     action: 'create',
-    summary: 'create an issue on the tracker from a title and a body',
+    summary: 'create an issue on the tracker from a title and a body, a bug from its fields',
     description: 'Files one issue on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
       + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-      + ' `--title` is required. The issue is of type `code` and module `unassigned` unless `--type` and'
-      + ' `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. The body is'
+      + ' `--title` is required for every type but `bug`. The issue is of type `code` and module `unassigned` unless'
+      + ' `--type` and `--module` say otherwise, and with no `--priority` the tracker marks it needs-triage. A'
+      + ' `--type=bug` line is filed from its fields: `--module`, `--action`, `--summary`, `--cause` and'
+      + ' `--reproduce`, each also read from a section of the body, with rafa filling the versions and the place,'
+      + ' rendering the title through `issues.titles.bug` and refusing a record missing a field, naming each. The body is'
       + ' `--body`, or what the file `--body-file` names holds, standard input for `-`. A spec whose body'
       + ' carries a `Blocked by: #24` line is filed blocked, and refused when the line names no issue, the'
       + ' issue itself or an issue the board does not hold. With `board.project.number` set, a GitHub issue is'
       + ' added to the project and its fields filled, any failure there a warning that keeps the exit code. Prints the'
       + ' tracker and id of the issue filed, and its URL when there is one. With `--output=json` the tracker'
-      + ' and the ref are the data of the terminal result event.',
+      + ' and the ref are the data of the terminal result event. `--dry-run` prints the title and body the line'
+      + ' would file, resolves no tracker and files nothing.',
     args: [],
     flags: [
       {
         name: 'title',
-        description: 'The title of the issue. Required.',
+        description: 'The title of the issue. Required for every type but bug, whose title is rendered from its fields.',
         type: 'string',
-        required: true,
       },
       {
         name: 'body',
@@ -289,20 +385,72 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
       },
       {
         name: 'module',
-        description: 'The module the issue belongs to.',
+        description: `The module the issue belongs to; ${TRIAGE_MODULE} when left out. A bug names one, or unknown.`,
         type: 'string',
-        default: TRIAGE_MODULE,
       },
       {
         name: 'priority',
         description: `How urgent the issue is: one of ${ISSUE_PRIORITIES.join(', ')}. Marked needs-triage when left out.`,
         type: 'string',
       },
+      {
+        name: 'summary',
+        description: 'A bug: one line saying what is wrong, the last part of its title.',
+        type: 'string',
+      },
+      {
+        name: 'action',
+        description: 'A bug: what was running, a command, a step or a test; or unknown.',
+        type: 'string',
+      },
+      {
+        name: 'cause',
+        description: 'A bug: its cause code from `rafa bug codes`, or <family>:new-context when no leaf fits.',
+        type: 'string',
+      },
+      {
+        name: 'proposed',
+        description: 'A bug: beside a new-context cause, the leaf you would have used, as <family>:<leaf>.',
+        type: 'string',
+      },
+      {
+        name: 'reproduce',
+        description: 'A bug: the steps, or the condition that revealed it. Never unknown.',
+        type: 'string',
+      },
+      {
+        name: 'rerun',
+        description: 'A bug: one command that shows it again.',
+        type: 'string',
+      },
+      {
+        name: 'env',
+        description: 'A bug: the place it was seen, one of local, ci, prod, a place `issues.environments` adds, or'
+          + ' unknown. Left out, ci when the CI variable is set and local otherwise.',
+        type: 'string',
+      },
+      {
+        name: 'project',
+        description: 'A bug: the project, where one tracker holds several.',
+        type: 'string',
+      },
+      {
+        name: 'path',
+        description: 'A bug: the file the error points at, which names the package its Versions section holds. Left'
+          + ' out, the first file of the project the artifact names.',
+        type: 'string',
+      },
+      {
+        name: 'dry-run',
+        description: 'Print the title and the body the line would file, resolve no tracker and file nothing.',
+        type: 'boolean',
+      },
     ],
     examples: [
       {
-        cmd: 'rafa issue create --title="Timeouts in plan show" --type=bug',
-        note: 'Files a bug with no priority, which the tracker marks needs-triage.',
+        cmd: 'rafa issue create --type=bug --module=loop --action=start --summary="resume does not find the worktree branch"'
+          + ' --reproduce="rafa loop start --continue after a stop" --cause=git:new-context --proposed=git:branch-not-found --dry-run',
+        note: 'Prints the title `loop - start: resume does not find the worktree branch` and the body of the bug, and files nothing.',
       },
       {
         cmd: 'rafa issue create --title="Document issue move" --priority=low --output=json',
@@ -316,6 +464,11 @@ export function createIssueCreateCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS
     outputs: ['text', 'json'],
     run: async (context) => {
       const created = await createIssue(context, seams);
+      if (isDryRun(created)) {
+        if (context.outputMode === 'json') context.output.result(created);
+        else for (const line of renderDryRun(created.draft)) context.output.info(line);
+        return;
+      }
       if (created.ref.warning !== undefined) context.output.warn(`${issueName(created.ref)}: ${created.ref.warning}`);
       if (context.outputMode === 'json') context.output.result(created);
       else for (const line of renderCreated(created.ref)) context.output.info(line);

@@ -240,6 +240,24 @@ describe('the issue file format', () => {
     expect(renderLocalIssue(record())).not.toContain('specBlocked');
   });
 
+  it('writes cause after specBlocked when the draft sets it, and no such key when it does not', () => {
+    const rendered = renderLocalIssue(record({ draft: draftFixture({ specBlocked: true, cause: 'git:no-identity' }) }));
+
+    const keys = [...rendered.matchAll(/^(\w+):/gm)].map((match) => match[1]);
+
+    expect(keys.slice(keys.indexOf('blockedBy'), keys.indexOf('blockedBy') + 4)).toEqual(['blockedBy', 'specBlocked', 'cause', 'state']);
+    expect(parseLocalIssue(rendered).draft.cause).toBe('git:no-identity');
+    expect(renderLocalIssue(record())).not.toContain('cause');
+    expect(parseLocalIssue(renderLocalIssue(record())).draft).not.toHaveProperty('cause');
+  });
+
+  it('refuses a cause that is no string', () => {
+    const rendered = renderLocalIssue(record({ draft: draftFixture({ cause: 'git:no-identity' }) }));
+
+    expect(() => parseLocalIssue(rendered.replace('cause: git:no-identity', 'cause: 3')))
+      .toThrow('cause is 3, expected absent or a string');
+  });
+
   it('throws when the frontmatter is missing', () => {
     expect(() => parseLocalIssue('## Context\n\nno frontmatter\n'))
       .toThrow('local tracker: the issue has no YAML frontmatter block');
@@ -252,6 +270,7 @@ describe('the issue file format', () => {
     'several blockers': { draft: draftFixture({ blockedBy: [100, 200, 300] }) },
     'a spec:blocked mark': { draft: draftFixture({ specBlocked: true }) },
     'a specBlocked written false': { draft: draftFixture({ specBlocked: false }) },
+    'a cause': { draft: draftFixture({ cause: 'git:no-identity' }) },
     'a body whose first line is ---': { draft: draftFixture({ body: '---\nEdge case body\n' }) },
     'a body holding --- mid-document': {
       draft: draftFixture({ body: 'Intro paragraph.\n\n---\n\nMore text follows.\n' }),

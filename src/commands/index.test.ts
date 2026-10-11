@@ -214,7 +214,10 @@ const OWN_DECLARATIONS: Readonly<Record<string, [string[], string[]]>> = {
   'loop wait': [[], ['session-id', 'until', 'timeout']],
   'issue list': [[], ['roadmap', 'all', 'full', 'check', 'labels', 'texts', 'refresh', 'state', 'type', 'module', 'search', 'limit']],
   'issue show': [['id'], []],
-  'issue create': [[], ['title', 'body', 'body-file', 'type', 'module', 'priority']],
+  'issue create': [[], [
+    'title', 'body', 'body-file', 'type', 'module', 'priority',
+    'summary', 'action', 'cause', 'proposed', 'reproduce', 'rerun', 'env', 'project', 'path', 'dry-run',
+  ]],
   'issue comment': [['id'], ['body']],
   'issue move': [['id', 'state'], []],
   'issue ready': [['n'], ['yes', 'hint']],

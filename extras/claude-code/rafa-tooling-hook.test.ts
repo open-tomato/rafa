@@ -146,6 +146,12 @@ describe('judgeLine: gh issue create', () => {
     expect(denied('gh issue create --title x --label type:bug,module:cli,priority:high')).toContain('`rafa issue create --title=x --type=bug --module=cli --priority=high`');
   });
 
+  test('says what else a bug needs, and nothing of it for another type', () => {
+    const note = 'A bug is filed from its fields: add `--action`, `--cause` and `--reproduce`';
+    expect(denied('gh issue create --title x --label type:bug,module:cli')).toContain(note);
+    expect(denied('gh issue create --title x --label type:spec')).not.toContain(note);
+  });
+
   test('maps short flags onto their long rafa flags', () => {
     expect(denied('gh issue create -t x -l type:spec -lmodule:hook -F spec.md')).toContain('`rafa issue create --title=x --type=spec --module=hook --body-file=spec.md`');
   });
@@ -203,7 +209,7 @@ describe('judgeLine: gh issue create', () => {
     const verdict = judgeLine('gh issue create -t x --label "type:spec"');
     expect(verdict?.decision).toBe('let-through');
     expect(verdict?.reason).toContain('cannot read a quoted --label');
-    expect(verdict?.reason).toContain('--title="rafa issue create has no <flag or field>"');
+    expect(verdict?.reason).toContain('--action="issue create" --summary="has no <flag or field>"');
   });
 
   test('lets two types through, since rafa takes one', () => {
@@ -333,8 +339,8 @@ describe('judgeLine: gh pr view --json', () => {
     const verdict = judgeLine('gh pr view 41 --json someFieldRafaLacks');
     expect(verdict?.decision).toBe('let-through');
     expect(verdict?.reason).toContain('does not answer the --json field someFieldRafaLacks.');
-    expect(verdict?.reason).toContain('rafa issue list --module=cli-gap --search="rafa pr show someFieldRafaLacks"');
-    expect(verdict?.reason).toContain('rafa issue create --type=bug --module=cli-gap --title="rafa pr show has no someFieldRafaLacks"');
+    expect(verdict?.reason).toContain('rafa issue list --module=cli-gap --search="pr show someFieldRafaLacks"');
+    expect(verdict?.reason).toContain('rafa issue create --type=bug --module=cli-gap --action="pr show" --summary="has no someFieldRafaLacks" --cause=cli:new-context --reproduce="<the gh line>"');
     expect(verdict?.reason.endsWith(reportOffer('rafa pr show', ['someFieldRafaLacks']))).toBe(true);
   });
 
@@ -365,16 +371,16 @@ describe('judgeLine: gh pr view --json', () => {
 describe('reportOffer', () => {
   test('ends with the ask-once rule and names the duplicate search before the report line', () => {
     const offer = reportOffer('rafa issue create', ['--epic']);
-    const search = offer.indexOf('rafa issue list --module=cli-gap --search="rafa issue create --epic"');
+    const search = offer.indexOf('rafa issue list --module=cli-gap --search="issue create --epic"');
     const ask = offer.indexOf('ask the person once');
-    const file = offer.indexOf('rafa issue create --type=bug --module=cli-gap --title="rafa issue create has no --epic" --body=');
+    const file = offer.indexOf('rafa issue create --type=bug --module=cli-gap --action="issue create" --summary="has no --epic" --cause=cli:new-context --reproduce="<the gh line>" --body=');
     expect(search).toBeGreaterThan(-1);
     expect(ask).toBeGreaterThan(search);
     expect(file).toBeGreaterThan(ask);
   });
 
   test('carries a placeholder when no single gap is named', () => {
-    expect(reportOffer('rafa pr show', [])).toContain('--title="rafa pr show has no <flag or field>"');
+    expect(reportOffer('rafa pr show', [])).toContain('--action="pr show" --summary="has no <flag or field>"');
   });
 });
 
@@ -452,6 +458,14 @@ describe('drift from what rafa describe says', () => {
     const declared = (entry('issue', 'create')?.flags ?? []).map((flag) => flag.name);
     expect(declared.length).toBeGreaterThan(0);
     expect(ISSUE_CREATE_FLAGS.filter((flag) => !declared.includes(flag))).toEqual([]);
+  });
+
+  test('every flag of the gap report\'s rafa issue create line is a flag of that command', () => {
+    const declared = (entry('issue', 'create')?.flags ?? []).map((flag) => flag.name);
+    const line = /`(rafa issue create [^`]+)`/.exec(reportOffer('rafa pr show', ['x']))?.[1] ?? '';
+    const written = [...line.matchAll(/--([a-z-]+)=/g)].map((match) => match[1] ?? '');
+    expect(written).toEqual(['type', 'module', 'action', 'summary', 'cause', 'reproduce', 'body']);
+    expect(written.filter((flag) => !declared.includes(flag))).toEqual([]);
   });
 
   test('every mapped flag of a full gh issue create line is a flag of that command', () => {
