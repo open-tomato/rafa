@@ -620,10 +620,17 @@ function placeCommand(command: RafaCommand, settings: Settings): Placement {
   }
 }
 
-/** Awaits one half of the command hook, a throw swallowed into a `debug` line; see the module note. */
+/**
+ * Awaits one half of the command hook, a throw swallowed into a `debug`
+ * line; see the module note. The half runs with logger settings of its
+ * own, starting from the defaults: a hook that loads the project's
+ * config sets them (`config-load.ts`), and they end with the half, so
+ * they reach neither the module-level settings nor those of a command
+ * this invocation was dispatched from.
+ */
 async function callHook<T>(half: 'before' | 'after', call: () => Promise<T>, base: CliContext): Promise<T | null> {
   try {
-    return await call();
+    return await runWithLoggerSettings(null, call);
   } catch (error) {
     base.output.debug(`command hook ${half}: ${messageOf(error)}`);
     return null;

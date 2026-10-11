@@ -174,10 +174,14 @@ called inside one, and on the module-level value otherwise.
   the config a command loads reaches its own logger and no other.
 - **Outside every command**, a set replaces the module-level value: the
   default logger and the default settings until something sets another.
-  A test sets it, and so does a config loaded around an invocation, by
-  the module loader (`src/modules/load.ts`) and the command hook
-  (`src/status/hook.ts`). No command reads it: it is hidden while a
-  command runs and read again after.
+  A test sets it, and so does the config the module loader reads before
+  the dispatch (`src/modules/load.ts`). No command reads it: it is
+  hidden while a command runs and read again after.
+- **Each half of the command hook** (`src/status/hook.ts`) runs with
+  settings of its own, starting from the defaults. The config it loads
+  sets them for that half alone: they reach neither the module-level
+  value nor, for an invocation dispatched from inside a command, the
+  settings of that outer command.
 
 The active output differs: `setActiveOutput` writes the module-level
 value even inside a command (`context/cli.md`).

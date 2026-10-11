@@ -60,7 +60,9 @@
  *
  * ## What reads outside the scope
  *
- * A scope follows the awaits and the callbacks started inside it. A
+ * A scope follows the awaits and the callbacks started inside it, by
+ * where the code runs and not by where it was written: a function made
+ * in one invocation and called from another reads the caller's. A
  * callback the runtime calls from elsewhere does not carry it, and reads
  * and sets the module-level logger. Measured under bun 1.3.14, three
  * listeners registered inside a scope read the module-level logger: a
