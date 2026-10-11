@@ -1154,12 +1154,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./release.js', ['findOwnedBranch', 'pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/claim/accept.js', [
+    ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/record.js', ['parseClaimMessage']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
-    ['./release.js', ['pushOnClaimTip', 'readClaimStoreId', 'readIssueArgument', 'readIssueBranches']],
+    ['./release.js', ['pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/claim/take.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
