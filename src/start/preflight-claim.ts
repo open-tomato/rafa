@@ -115,6 +115,42 @@
  *        device (store store-b)
  *        Nothing was checked and nothing was dispatched.
  *
+ * ## A store id minted after the claim
+ *
+ * A store that mints with no link to the id it carried before (a mint
+ * by a runtime older than `store_replaced`, or a store rolled back to a
+ * backup that predates a later mint) leaves this device's own claim
+ * under an id `holdsClaim` does not know. Nothing tells that claim from
+ * another device's, so the run is still refused, and the refusal of a
+ * claim the remote holds under another id says what changed when the
+ * store's `minted_at` (`mintedAt`, `claims/device.ts`) is LATER than
+ * the committer date of the remote's latest ownership commit, the one
+ * naming the holder. Under it, the date the claim goes stale and the
+ * command that takes it from then:
+ *
+ *     #7 is claimed by store store-a on feat/rafa-7-x, not by this
+ *     device (store store-b)
+ *     This store's id was minted on 2026-10-05T08:00:00.000Z, after
+ *     that claim was made (2026-10-01T08:00:00.000Z), so the claim may
+ *     be this device's own.
+ *     It is stale from 2026-10-04T08:00:00.000Z under claims.staleAfter
+ *     (3d), and from then this takes it:
+ *       rafa claim take 7 --stale
+ *
+ * Each of the two sentences is one line; they are wrapped here for the
+ * width. The stale date is the remote TIP's committer date plus
+ * `claims.staleAfter`, the reading `claims/stale.ts` makes and `rafa
+ * claim take` weighs, so work pushed after the claim moves it. It is
+ * worded as a date and compared with no clock: this check reads none.
+ * With `claims.staleAfter` at `disabled` the second line says that no
+ * claim goes stale and that `rafa claim take` would refuse this one,
+ * and names no command.
+ *
+ * Nothing is added when the store was minted before the claim or in its
+ * very second, when the store names no id, when either date cannot be
+ * read, or to any other refusal: a claim only the local branch holds is
+ * not one `rafa claim take` reads.
+ *
  * A run that holds its claim prints one line naming it, `info` for a
  * claim confirmed, just pushed or re-signed, and `warn` for one only
  * the last fetch vouches for or one that could not be re-signed. The
@@ -139,6 +175,7 @@ import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
+import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { RafaConfig } from '../config.js';
 import type { GitRunner } from '../pr/index.js';
 
@@ -158,7 +195,7 @@ import {
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../config-sections.js';
 import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { planStubFromPath } from '../utils/plan-stamp.js';
@@ -173,6 +210,8 @@ export interface StartPreflightClaim {
   readonly board: IssueBoard | null;
   /** This device's store id; `readDeviceStoreId` over the project. */
   readonly readStoreId: () => DeviceStoreId;
+  /** `claims.staleAfter`, which dates the stale claim a refusal names. */
+  readonly staleAfter: ClaimsStaleAfter;
 }
 
 /**
@@ -180,14 +219,14 @@ export interface StartPreflightClaim {
  * `git` in the project root, the `gh` issue board when the repository
  * resolves to `pr.provider: gh` and none otherwise, its label writes
  * refreshing the issue on the project (`../board/project/issue-board-refresh.ts`),
- * and this device's
- * store id read under `config.store`. Resolving the provider reads
+ * this device's
+ * store id read under `config.store`, and `claims.staleAfter`. Resolving the provider reads
  * `origin` unless `pr.provider` is configured; nothing else is read
  * until the check runs.
  */
 export function createStartPreflightClaim(
   repoRoot: string,
-  config: Pick<RafaConfig, 'prProvider' | 'store'> & RefreshConfig,
+  config: Pick<RafaConfig, 'prProvider' | 'store' | 'claimsStaleAfter'> & RefreshConfig,
 ): StartPreflightClaim {
   const provider = resolvePrProvider({ configured: config.prProvider, dir: repoRoot }).provider;
   return {
@@ -196,6 +235,7 @@ export function createStartPreflightClaim(
       ? createRefreshingGhIssueBoard({ gh: createGhRunner({ cwd: repoRoot }), config })
       : null,
     readStoreId: () => readDeviceStoreId(repoRoot, config),
+    staleAfter: config.claimsStaleAfter,
   };
 }
 
@@ -257,11 +297,18 @@ interface Readings {
   readonly offline: string | null;
 }
 
-/** A device whose store names an id: the id, and the ids that store replaced. */
+/** A device whose store names an id: the id, the ids that store replaced, and when it took the id. */
 interface NamedClaimant {
   readonly storeId: string;
   readonly replacedIds: readonly string[];
+  /** The store's `minted_at`, as an ISO string. */
+  readonly mintedAt: string;
 }
+
+/** What a decision reaches past the readings: git, and `claims.staleAfter`. */
+type DecisionSeams = Pick<StartPreflightClaim, 'git' | 'staleAfter'>;
+
+const MS_PER_HOUR = 3_600_000;
 
 /** Who this device claims as, with the ids its store replaced, or null with why it names nobody. */
 type Claimant =
@@ -306,7 +353,7 @@ function claimantOf(seams: StartPreflightClaim, issue: number): Claimant {
     throw new CommandExit(1, openingWith(`the store id to check the claim on #${String(issue)} could not be read`, messageOf(error)));
   }
   return device.ok
-    ? { storeId: device.storeId, replacedIds: device.replacedIds }
+    ? { storeId: device.storeId, replacedIds: device.replacedIds, mintedAt: device.mintedAt }
     : { storeId: null, why: device.reason };
 }
 
@@ -331,6 +378,58 @@ function asLastFetched(readings: Readings): string {
   return readings.offline === null
     ? ''
     : `, as the last fetch left it (${readings.offline})`;
+}
+
+/** The committer date of the commit `sha`, or null when git names none. */
+function committedAt(git: GitRunner, sha: string): Date | null {
+  const dated = git(['log', '-1', '--format=%ct', sha]);
+  const written = dated.stdout.trim();
+  const seconds = Number(written);
+  return dated.ok && written !== '' && Number.isSafeInteger(seconds)
+    ? new Date(seconds * 1000)
+    : null;
+}
+
+/**
+ * The line saying when the claim on `remote` goes stale and what takes
+ * it then, or that none does under `disabled`; null when
+ * `claims.staleAfter` and the tip's date spell no date to print.
+ */
+function staleLine(remote: FoundReading, issue: number, staleAfter: ClaimsStaleAfter): string | null {
+  if (staleAfter === CLAIMS_STALE_DISABLED) {
+    return `claims.staleAfter is ${CLAIMS_STALE_DISABLED}, so no claim goes stale and rafa claim take would refuse this one.`;
+  }
+  const hours = claimDurationHours(staleAfter);
+  const staleAt = hours === null
+    ? Number.NaN
+    : remote.tipCommittedAt.getTime() + hours * MS_PER_HOUR;
+  if (!Number.isFinite(staleAt) || Number.isNaN(new Date(staleAt).getTime())) return null;
+  return `It is stale from ${new Date(staleAt).toISOString()} under claims.staleAfter (${staleAfter}), and from then this takes it:`
+    + `\n  rafa claim take ${String(issue)} --stale`;
+}
+
+/**
+ * What the refusal of another store's claim on the remote adds when this
+ * store's id was minted after that claim was made, each line opening
+ * with a newline; empty otherwise. See "A store id minted after the
+ * claim" in the module note.
+ */
+function mintedAfterClaim(readings: Readings, claimant: Claimant, seams: DecisionSeams): string {
+  const { remote, issue } = readings;
+  if (claimant.storeId === null || remote.state !== 'found') return '';
+  const sha = latestOwnershipSha(remote);
+  const claimedAt = sha === null
+    ? null
+    : committedAt(seams.git, sha);
+  const mintedAt = new Date(claimant.mintedAt);
+  if (claimedAt === null || !(mintedAt.getTime() > claimedAt.getTime())) return '';
+
+  const minted = `This store's id was minted on ${mintedAt.toISOString()}, after that claim was made (${claimedAt.toISOString()}),`
+    + ' so the claim may be this device\'s own.';
+  return [minted, staleLine(remote, issue, seams.staleAfter)]
+    .filter((line) => line !== null)
+    .map((line) => `\n${line}`)
+    .join('');
 }
 
 /**
@@ -358,7 +457,7 @@ export function readRunClaim(planPath: string, seams: StartPreflightClaim): RunC
     : fetched.reason;
   if (!carriesClaim(local) && !carriesClaim(remote)) return NONE;
 
-  return decide({ issue, branch, local, remote, offline }, claimantOf(seams, issue), git, REREADS_AFTER_A_MOVED_TIP);
+  return decide({ issue, branch, local, remote, offline }, claimantOf(seams, issue), seams, REREADS_AFTER_A_MOVED_TIP);
 }
 
 /**
@@ -366,21 +465,23 @@ export function readRunClaim(planPath: string, seams: StartPreflightClaim): RunC
  * is how many more times a re-sign refused by a moved tip may read the
  * branch again.
  */
-function decide(readings: Readings, claimant: Claimant, git: GitRunner, rereads: number): RunClaim {
+function decide(readings: Readings, claimant: Claimant, seams: DecisionSeams, rereads: number): RunClaim {
   const { issue, branch, remote, local } = readings;
+  const { git } = seams;
   const refused = (owner: string | null, reason: string): RunClaim => ({ outcome: 'refused', issue, branch, owner, reason });
   const tag = `#${String(issue)}`;
 
   const remoteHolder = holderOf(remote);
   if (remote.state === 'found' && remoteHolder !== null && claimant.storeId !== null && holdsClaim(claimant, remoteHolder)) {
-    if (remoteHolder !== claimant.storeId) return resign({ ...readings, remote }, claimant, remoteHolder, git, rereads);
+    if (remoteHolder !== claimant.storeId) return resign({ ...readings, remote }, claimant, remoteHolder, seams, rereads);
     const via: OwnedVia = readings.offline === null
       ? 'held'
       : 'unconfirmed';
     return { outcome: 'owned', issue, branch, storeId: claimant.storeId, via, note: readings.offline ?? '', replacedId: null };
   }
   if (remoteHolder !== null) {
-    return refused(remoteHolder, `${tag} is claimed by store ${remoteHolder} on ${branch}${asLastFetched(readings)}, not by ${thisDevice(claimant)}`);
+    return refused(remoteHolder, `${tag} is claimed by store ${remoteHolder} on ${branch}${asLastFetched(readings)}, not by ${thisDevice(claimant)}`
+      + mintedAfterClaim(readings, claimant, seams));
   }
   if (remote.state === 'unreadable') {
     return refused(null, `the claim on ${REMOTE}/${branch} could not be read, so ${tag} stays taken: ${remote.reason}`);
@@ -412,10 +513,11 @@ function resign(
   readings: Readings & { readonly remote: FoundReading },
   claimant: NamedClaimant,
   replacedId: string,
-  git: GitRunner,
+  seams: DecisionSeams,
   rereads: number,
 ): RunClaim {
   const { issue, branch, remote } = readings;
+  const { git } = seams;
   const { storeId } = claimant;
   const owned = (via: OwnedVia, note: string): RunClaim => ({ outcome: 'owned', issue, branch, storeId, via, note, replacedId });
   if (readings.offline !== null) return owned('unconfirmed', readings.offline);
@@ -431,7 +533,7 @@ function resign(
   const offline = fetched.ok
     ? null
     : fetched.reason;
-  return decide({ ...readings, remote: readClaimBranch(git, branch), offline }, claimant, git, rereads - 1);
+  return decide({ ...readings, remote: readClaimBranch(git, branch), offline }, claimant, seams, rereads - 1);
 }
 
 /** Pushes this store's claim waiting on the local branch, without force, answering as `storeId`, the store's own id; see the module note. */

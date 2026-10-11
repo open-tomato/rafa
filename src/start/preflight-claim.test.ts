@@ -37,11 +37,27 @@
  * tip (3), a second reading with no bound (1), the take commit naming
  * the replaced id (5), a refused push read as a moved tip (1), and a
  * claim that could not be re-signed printed at `info` (1).
+ *
+ * The cases of a store id minted after the claim date their commits
+ * through `GIT_COMMITTER_DATE`, which the runner hands git from this
+ * process's environment, so the claim, the tip and the mint are three
+ * known moments and the refusal's text is asserted whole. Every other
+ * case's store is minted on 2026-01-01, before any commit a case makes,
+ * so none of them reads the sentence.
+ *
+ * Five mutations of that sentence were driven against this file alone
+ * on 2026-10-11, each restored sha256-identical, and each reddened at
+ * least one case: a mint in the claim's very second read as after it
+ * (1), the stale date counted from no tip date (2), `disabled` read as
+ * a duration (1), the claim dated by the tip in place of its latest
+ * ownership commit (5), and the sentence added whenever the claim's
+ * date could be read (6).
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
+import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -234,11 +250,31 @@ function owned(claim: RunClaim): Extract<RunClaim, { outcome: 'owned' }> {
   return claim;
 }
 
+/** When every store is minted unless a case says otherwise: before any commit a case makes. */
+const MINTED_LONG_BEFORE = '2026-01-01T00:00:00.000Z';
+
 /** The store id answer for `store` and the ids it replaced, or the NDJSON cause when null. */
-function storeIdOf(store: string | null, replacedIds: readonly string[] = []): DeviceStoreId {
+function storeIdOf(store: string | null, replacedIds: readonly string[] = [], mintedAt = MINTED_LONG_BEFORE): DeviceStoreId {
   return store === null
     ? { ok: false, cause: 'ndjson', reason: 'NDJSON store; Next safe step: rafa effort move --to=sqlite' }
-    : { ok: true, storeId: store, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' };
+    : { ok: true, storeId: store, replacedIds, mintedAt };
+}
+
+/** Runs `act` with every commit it makes dated `date`, by committer. */
+function committedOn<T>(date: string, act: () => T): T {
+  const before = process.env['GIT_COMMITTER_DATE'];
+  process.env['GIT_COMMITTER_DATE'] = date;
+  try {
+    return act();
+  } finally {
+    if (before === undefined) delete process.env['GIT_COMMITTER_DATE'];
+    else process.env['GIT_COMMITTER_DATE'] = before;
+  }
+}
+
+/** The seams of device `store`, minted at `mintedAt`, over `git` under `staleAfter`. */
+function seamsMintedAt(git: GitRunner, store: string | null, mintedAt: string, staleAfter: ClaimsStaleAfter = '3d'): StartPreflightClaim {
+  return { git, board: null, readStoreId: () => storeIdOf(store, [], mintedAt), staleAfter };
 }
 
 /** The seams device `store` checks through, over `git`, recording each store read; `replacedIds` are the ids that store replaced. */
@@ -250,6 +286,7 @@ function seamsOf(git: GitRunner, store: string | null, reads: string[] = [], rep
       reads.push('read');
       return storeIdOf(store, replacedIds);
     },
+    staleAfter: '3d',
   };
 }
 
@@ -561,6 +598,113 @@ describe('a claim the remote holds under an id this store replaced', () => {
   });
 });
 
+describe('a claim another store holds, read by a store whose id was minted after it', () => {
+  const CLAIMED_AT = '2026-10-01T08:00:00.000Z';
+  const WORKED_AT = '2026-10-02T09:30:00.000Z';
+  const HELD_BY_A = `#7 is claimed by store ${STORE_A} on ${BRANCH}, not by this device (store ${STORE_B})`;
+  const MINTED_AFTER = '2026-10-05T08:00:00.000Z';
+  const SENTENCE = `This store's id was minted on ${MINTED_AFTER}, after that claim was made (${CLAIMED_AT}), so the claim may be this device's own.`;
+
+  /** Store `a`'s claim dated {@link CLAIMED_AT} on the remote, under work dated {@link WORKED_AT}. */
+  function plantClaimUnderWork(name: string): Trio {
+    const trio = plantTrio(name);
+    committedOn(CLAIMED_AT, () => pushClaim(trio.a, STORE_A));
+    committedOn(WORKED_AT, () => pushWorkFromB(trio));
+    return trio;
+  }
+
+  it('adds the sentence, the date the claim goes stale counted from the tip, and the take line', () => {
+    const trio = plantClaimUnderWork('minted-after');
+
+    const claim = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER)));
+    const inHours = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER, '36h')));
+
+    expect(claim).toEqual({
+      owner: STORE_A,
+      reason: [
+        HELD_BY_A,
+        SENTENCE,
+        'It is stale from 2026-10-05T09:30:00.000Z under claims.staleAfter (3d), and from then this takes it:',
+        '  rafa claim take 7 --stale',
+      ].join('\n'),
+    });
+    expect(inHours.reason.split('\n')[2]).toBe('It is stale from 2026-10-03T21:30:00.000Z under claims.staleAfter (36h), and from then this takes it:');
+  });
+
+  it('adds it for a store minted one millisecond after the claim, and nothing for one minted in its very second or before it', () => {
+    const trio = plantClaimUnderWork('minted-before');
+    const reasonAt = (mintedAt: string): string => refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, mintedAt))).reason;
+
+    const justAfter = reasonAt('2026-10-01T08:00:00.001Z');
+    const sameSecond = reasonAt(CLAIMED_AT);
+    const before = reasonAt('2026-09-30T08:00:00.000Z');
+    const noDate = reasonAt('not a date');
+
+    expect(justAfter.split('\n')).toHaveLength(4);
+    expect(justAfter).toContain('minted on 2026-10-01T08:00:00.001Z, after that claim was made');
+    expect([sameSecond, before, noDate]).toEqual([HELD_BY_A, HELD_BY_A, HELD_BY_A]);
+  });
+
+  it('says that no claim goes stale under claims.staleAfter: disabled, naming no command; the same store under 3d names one', () => {
+    const trio = plantClaimUnderWork('minted-disabled');
+
+    const disabled = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER, 'disabled'))).reason;
+    const control = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER))).reason;
+
+    expect(disabled).toBe([
+      HELD_BY_A,
+      SENTENCE,
+      'claims.staleAfter is disabled, so no claim goes stale and rafa claim take would refuse this one.',
+    ].join('\n'));
+    expect(disabled).not.toContain('--stale');
+    expect(control).toContain('\n  rafa claim take 7 --stale');
+  });
+
+  it('dates the claim by the latest ownership commit: a take dated after the mint silences it', () => {
+    const trio = plantClaimUnderWork('minted-then-taken');
+    const before = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER))).reason;
+    committedOn('2026-10-06T08:00:00.000Z', () => pushFromB(trio, (tip) => ownershipOn(trio.b, tip, 'take', STORE_A)));
+
+    const after = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER))).reason;
+
+    expect(before).toContain(SENTENCE);
+    expect(after).toBe(HELD_BY_A);
+  });
+
+  it('adds nothing for a store that names no id, or for a claim that is this store\'s own', () => {
+    const trio = plantClaimUnderWork('minted-not-refused');
+
+    const noId = refusal(readRunClaim(PLAN, seamsMintedAt(trio.b, null, MINTED_AFTER))).reason;
+    const own = readRunClaim(PLAN, seamsMintedAt(trio.b, STORE_A, MINTED_AFTER));
+
+    expect(noId).not.toContain('minted on');
+    expect(own.outcome).toBe('owned');
+  });
+
+  it('prints the lines indented under the opening, the command one step further', async () => {
+    const trio = plantClaimUnderWork('minted-printed');
+
+    const run = await captured(() => {
+      try {
+        refuseUnownedClaim(PLAN, seamsMintedAt(trio.b, STORE_B, MINTED_AFTER));
+        return null;
+      } catch (error) {
+        if (!(error instanceof CommandExit)) throw error;
+        return error;
+      }
+    });
+
+    expect(run.value?.message).toBe([
+      '❌ Refusing to start: this device does not own the claim on #7.',
+      `   ${HELD_BY_A}`,
+      `   ${SENTENCE}`,
+      '   It is stale from 2026-10-05T09:30:00.000Z under claims.staleAfter (3d), and from then this takes it:',
+      '     rafa claim take 7 --stale',
+      '   Nothing was checked and nothing was dispatched.',
+    ].join('\n'));
+  });
+});
+
 describe('a claim waiting unpushed on the local branch', () => {
   it('pushes it without moving the local branch, and owns it', () => {
     const trio = plantTrio('retry');
@@ -729,6 +873,7 @@ describe('refuseUnownedClaim', () => {
       readStoreId: () => {
         throw new Error('database disk image is malformed');
       },
+      staleAfter: '3d',
     };
 
     const run = await captured(() => {
@@ -754,13 +899,14 @@ describe('createStartPreflightClaim', () => {
   it('holds no board under pr.provider: none and reads the store id under the configured store; gh holds one', () => {
     const root = realpathSync(mkdtempSync(join(scope, 'factory-')));
 
-    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson', ...NO_PROJECT });
-    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson', ...NO_PROJECT });
+    const none = createStartPreflightClaim(root, { prProvider: 'none', store: 'ndjson', claimsStaleAfter: '36h', ...NO_PROJECT });
+    const gh = createStartPreflightClaim(root, { prProvider: 'gh', store: 'ndjson', claimsStaleAfter: 'disabled', ...NO_PROJECT });
     const storeId = none.readStoreId();
 
     expect(none.board).toBeNull();
     expect(gh.board).not.toBeNull();
     expect(storeId).toMatchObject({ ok: false, cause: 'ndjson' });
+    expect([none.staleAfter, gh.staleAfter]).toEqual(['36h', 'disabled']);
     expect(none.git(['rev-parse', '--is-inside-work-tree']).ok).toBe(false);
   });
 });
