@@ -21,7 +21,9 @@
  *  5. **The path**, read BEFORE anything is redacted, since redaction
  *     takes local paths out: `--path`, else the first file of the
  *     checkout the artifact names, else the first the error line names.
- *     The package is the one that file belongs to
+ *     A relative `--path` is read from the directory rafa runs in, as
+ *     `--body-file` is, and refused when it lies outside the checkout or
+ *     names no file. The package is the one that file belongs to
  *     (`../../project/package-of.ts`), or the checkout's own with no file.
  *  6. **Redaction** of every free text, local paths then named secrets,
  *     as triage composes the two (`../../triage/triage.ts`).
@@ -39,11 +41,16 @@
  * lives, and a command run from a worktree resolves to it. The code that
  * failed is the worktree's, so the path, the package and the commit are
  * read in the checkout the command runs in: the top level `git` answers
- * from the directory rafa runs in ({@link IssueSeams.cwd}), or the
- * project root outside a repository. Both paths are taken out of the
- * text, the checkout's first: it lies under the root when it is a
- * worktree there, and the root taken out first would leave the
- * worktree's folders behind.
+ * from the directory rafa runs in ({@link IssueSeams.cwd}). A top level
+ * that holds the project root is no worktree: it is the repository the
+ * project is a folder of, or a home that is itself a repository, and the
+ * project root is read then, as it is outside any repository. Reading
+ * the top level there would name the outer repository's package.
+ *
+ * Both roots are taken out of the text in ONE pass
+ * (`localPathRedactor`, `../../triage/local-paths.ts`), the longer
+ * first. Two passes would leave the folders between the home and the
+ * project in a path under the main checkout.
  *
  * ## The draft
  *
@@ -64,6 +71,7 @@ import type { RafaContext } from '../../cli/command.js';
 import type { IssueDraft } from '../../ports/index.js';
 import type { GitRunner } from '../../pr/git.js';
 
+import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 import { suggestedEnvironment } from '../../bugs/places.js';
@@ -108,7 +116,7 @@ const FLAG_FIELDS: readonly (readonly [flag: string, field: keyof BugRecord])[] 
 ];
 
 /** The fields a title is read back into. */
-const TITLE_FIELDS = ['module', 'action', 'summary'] as const;
+const TITLE_FIELDS = ['project', 'module', 'action', 'summary'] as const;
 
 /** The fields holding free text, which is redacted before it is filed. */
 const FREE_TEXT_FIELDS: readonly (keyof BugRecord)[] = [
@@ -177,24 +185,40 @@ function withTitle(record: BugRecord, title: string, template: string, usage: st
   return { ...record, ...Object.fromEntries(taken) };
 }
 
-/** The checkout `git` runs in, or `root` outside a repository; see the module note. */
+/**
+ * The checkout a bug's files are read in: the top level `git` answers
+ * when it is a worktree apart from the project root, and `root` outside
+ * a repository or under a top level that holds it. See the module note.
+ */
 function checkoutOf(git: GitRunner, root: string): string {
   const toplevel = git(['rev-parse', '--show-toplevel']);
   const path = toplevel.stdout.trim();
-  return toplevel.ok && path !== ''
+  return toplevel.ok && path !== '' && !isInside(path, root)
     ? path
     : root;
 }
 
-/** The file the versions are read for, relative to the checkout `root`, or null; a refusal for a `--path` outside it. */
-function pathOf(record: BugRecord, flags: LineFlags, root: string, usage: string): string | null {
+/** Where a bug line's files are read: the checkout, and the directory rafa runs in. */
+interface Places {
+  readonly checkout: string;
+  readonly cwd: string;
+}
+
+/**
+ * The file the versions are read for, relative to the checkout, or
+ * null; a refusal for a `--path` outside the checkout and for one that
+ * names no file. See the module note.
+ */
+function pathOf(record: BugRecord, flags: LineFlags, places: Places, usage: string): string | null {
+  const { checkout, cwd } = places;
   const typed = readNonBlankFlag(flags, 'path', usage);
   if (typed === undefined) {
-    return firstProjectPath(record.artifact ?? '', root) ?? firstProjectPath(record.errorLine ?? '', root);
+    return firstProjectPath(record.artifact ?? '', checkout) ?? firstProjectPath(record.errorLine ?? '', checkout);
   }
-  const absolute = resolve(root, typed);
-  if (!isInside(root, absolute)) throw lineRefusal(`--path is outside the project: ${JSON.stringify(typed)}`, usage);
-  return relative(root, absolute);
+  const absolute = resolve(cwd, typed);
+  if (!isInside(checkout, absolute)) throw lineRefusal(`--path is outside the project: ${JSON.stringify(typed)}`, usage);
+  if (!existsSync(absolute)) throw lineRefusal(`--path names no file: ${JSON.stringify(typed)}`, usage);
+  return relative(checkout, absolute);
 }
 
 /** `record` with each free text passed through `redact`. */
@@ -274,15 +298,15 @@ export function readBugLine(context: RafaContext, seams: IssueSeams, base: Issue
   const project = issueProject(context);
   const config = issueSubjectConfig(project, warn);
   const rules = bugRulesOf(config);
-  const git = seams.git ?? createGitRunner((seams.cwd ?? ((): string => process.cwd()))());
+  const cwd = (seams.cwd ?? ((): string => process.cwd()))();
+  const git = seams.git ?? createGitRunner(cwd);
   const checkout = checkoutOf(git, project.root);
-  const inCheckout = localPathRedactor(checkout, project.home);
-  const inProject = localPathRedactor(project.root, project.home);
+  const local = localPathRedactor([checkout, project.root], project.home);
   const secrets = namedSecrets(config, context.env);
-  const redact = (text: string): string => redactSecrets(inProject(inCheckout(text)), secrets);
+  const redact = (text: string): string => redactSecrets(local(text), secrets);
 
   const typed = withTitle(withFlags(recordOfBody(base.body), context.flags, usage), base.title, rules.template, usage);
-  const path = pathOf(typed, context.flags, checkout, usage);
+  const path = pathOf(typed, context.flags, { checkout, cwd }, usage);
   const owner = path === null
     ? rootPackageOf(checkout)
     : packageOf(path, checkout);

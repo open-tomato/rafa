@@ -19,7 +19,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
 import { localIssuesDir, parseLocalIssue } from '../../adapters/tracker/local.js';
 import { RAFA_VERSION } from '../../cli/version.js';
-import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
+import { dispatchInProject, plantProject, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { createIssueCreateCommand } from './create.js';
 
@@ -87,9 +87,10 @@ function plantFile(project: PlantedProject, path: string, text: string): string 
   return file;
 }
 
-/** Dispatches `words` in `project`, the command reading git through {@link cleanGit}. */
+/** Dispatches `words` in `project`, the command reading git through {@link cleanGit} and running from the project root. */
 function run(words: readonly string[], project: PlantedProject, env: Readonly<Record<string, string>> = {}, seams: IssueSeams = {}) {
-  return dispatchInProject(words, SUBJECTS, [createIssueCreateCommand({ git: cleanGit, ...seams })], project, env);
+  const command = createIssueCreateCommand({ git: cleanGit, cwd: () => project.root, ...seams });
+  return dispatchInProject(words, SUBJECTS, [command], project, env);
 }
 
 /** The `local` issue `number` of a project, as its adapter parses the file. */
@@ -256,6 +257,45 @@ describe('a bug filed from a worktree of the project', () => {
     expect(body).not.toContain(project.root);
   });
 
+  it('takes the worktree\'s path and the main checkout\'s out of one text, with the project under the home', async () => {
+    const home = mkdtempSync(join(tempBase, 'home-'));
+    const root = join(home, 'clients', 'acme-corp', 'app');
+    plantProjectConfig(root, LOCAL_CONFIG);
+    const project: PlantedProject = { root, home };
+    const checkout = join(root, '.claude', 'worktrees', 'fix-1');
+    mkdirSync(checkout, { recursive: true });
+    const line = [
+      'issue', 'create', '--type=bug', '--module=loop', '--action=start', '--cause=git:new-context',
+      `--summary=fails under ${root}/src`,
+      `--reproduce=run ${checkout}/src/a.ts, then read ${root}/.rafa/config.yaml and ${home}/notes.txt`,
+    ];
+
+    const outcome = await run(line, project, {}, { git: gitAt(checkout) });
+    const { title, body } = localIssue(project, 1).draft;
+
+    expect(outcome.exitCode).toBe(0);
+    expect(body).toContain('run src/a.ts, then read .rafa/config.yaml and [redacted: HOME]/notes.txt');
+    expect(title).toBe('loop - start: fails under src');
+    expect(`${title}\n${body}`).not.toContain('acme-corp');
+    expect(`${title}\n${body}`).not.toContain(home);
+  });
+
+  it('reads a project in a subdirectory of its repository at the project root, never as the repository\'s package', async () => {
+    const project = plantCase();
+    const outer = dirname(project.root);
+    writeFileSync(join(outer, 'package.json'), '{"name":"mono-root","version":"0.0.1"}', 'utf8');
+    plantFile(project, 'package.json', '{"name":"@acme/app","version":"2.0.0"}');
+    plantFile(project, 'src/a.ts', '');
+    const file = plantFile(project, 'bug.md', '## Artifact\n\n```\nTypeError: x\n    at run (src/a.ts:1:1)\n```\n');
+
+    const outcome = await run([...DOD_LINE, `--body-file=${file}`], project, {}, { git: gitAt(outer) });
+    const { body } = localIssue(project, 1).draft;
+
+    expect(outcome.exitCode).toBe(0);
+    expect(body).toContain('package: @acme/app@2.0.0\npath: src/a.ts\n');
+    expect(body).not.toContain('mono-root');
+  });
+
   it('names the checkout\'s own package for a bug that names no file', async () => {
     const project = plantCase();
     plantFile(project, 'package.json', '{"name":"@acme/main","version":"9.9.9"}');
@@ -344,6 +384,27 @@ describe('the fields of a bug line', () => {
     expect(disagreeing.stderr).toContain('--title reads module as "loop", and --module says "board"');
   });
 
+  it('reads the project a --title holds under a template that names one, and refuses one that disagrees', async () => {
+    const config = `${LOCAL_CONFIG}issues:\n  titles:\n    bug: "?([\${project}] )?(\${module}?( - \${action}): )\${summary}"\n`;
+    const line = ['issue', 'create', '--type=bug', '--title=[api] loop - start: x fails', '--cause=git:new-context', '--reproduce=run it'];
+    const project = plantCase(config);
+
+    await run(line, project);
+    expect(localIssue(project, 1).draft.title).toBe('[api] loop - start: x fails');
+    expect(localIssue(project, 1).draft.body).toContain('## Project\n\n```\napi\n```');
+
+    const disagreeing = await run([...line, '--project=web'], plantCase(config));
+    expect(disagreeing.exitCode).toBe(1);
+    expect(disagreeing.stderr).toContain('--title reads project as "api", and --project says "web"');
+  });
+
+  it('takes the text a body file opens with as the description, beside its sections', async () => {
+    const project = plantCase();
+    const file = plantFile(project, 'bug.md', 'The loop stops after a resume.\n\n## Rerun\n\nbun test\n');
+
+    expect(await bodyOf([`--body-file=${file}`], project)).toContain('## What\n\n```\nThe loop stops after a resume.\n```');
+  });
+
   it('takes local paths and named secrets out of every free text', async () => {
     const project = plantCase();
     const secret = 'ghp_0123456789secret';
@@ -394,6 +455,20 @@ describe('a bug line refused', () => {
 
     expect(outcome.exitCode).toBe(1);
     expect(fake.calls()).toEqual([]);
+  });
+
+  it('reads a relative --path from the directory rafa runs in, and refuses one that names no file', async () => {
+    const project = plantCase();
+    plantFile(project, 'src/commands/create.ts', '');
+    const cwd = (): string => join(project.root, 'src', 'commands');
+
+    const outcome = await run([...DOD_LINE, '--path=create.ts'], project, {}, { cwd });
+    expect(outcome.exitCode).toBe(0);
+    expect(localIssue(project, 1).draft.body).toContain('path: src/commands/create.ts\n');
+
+    const missing = await run([...DOD_LINE, '--path=gone.ts'], plantCase());
+    expect(missing.exitCode).toBe(1);
+    expect(missing.stderr).toContain('--path names no file: "gone.ts"');
   });
 
   it('refuses a --path outside the project', async () => {
