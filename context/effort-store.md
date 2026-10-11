@@ -489,6 +489,18 @@ decides, `store-generation.ts` reads and writes the side record, and
 `settleStoreIdentity` after `bringForward`, so the `generation` column
 exists on every write open.
 
+**Replaced ids stay in `store_replaced`.** When a write open mints because
+the host, path, device, or inode differs, `settleUnderLock`
+(`src/effort/store/store-meta.ts`) records the outgoing id in `store_replaced`
+if the host and path both stay the same (minting with reasons `file`,
+`generation`, or both). This means the file is this device's store, moved to
+another filesystem or restored from a backup, and any claim made under the
+outgoing id is still this device's. A mint with the reason `host` or `path`
+empties the table instead, because that file is a copy at a new location and
+must inherit no claim. One host and one path hold one store file at a time,
+so a file found at those coordinates is this device's own store, and a
+replacement at either coordinate is not.
+
 ### Copy detection
 
 **`settleStoreIdentity` (`store-meta.ts`) mints a new origin when a
@@ -517,6 +529,17 @@ origin pair of each incoming row, holding two rows with the same pair
 from the local store (inserted before the copy) and the incoming store
 (the same insert, copied), and recording in its refusal entry what
 copied it.
+
+**A copy inherits no claim, and a clone reads as the same device.** A store
+copied to another path mints with the reason `path`, and one copied to
+another host with the reason `host`; both empty `store_replaced` so the copy
+must build its own claim history. A cloned machine — one whose storage was
+copied wholesale to another computer — has the same host id and the same path
+under the new hostname, and its store file has a new inode, so its first write
+mints with the reason `file` and records the original's id as replaced. Its
+next `loop start` then holds the original's claims until its own claims are
+made under its own id; give the clone its own machine id with `rafa device`
+before running rafa on it to keep the stores separate.
 
 ### Identity through rebuilds
 
@@ -714,9 +737,19 @@ busy timeout.
 `skill_invocations`, `plan_ci`, `store_meta`, `merges`,
 `merge_conflicts` and `store_replaced` are SQLite-only and stay out of
 the port's row map. Migration `store-replaced` creates the last one,
-`store_replaced` (`store_id` as its primary key, `replaced_at`): one row
-per id this store carried before its present one, `local` in
-`MERGE_RULES`, and absent from a store an older runtime left. The
+`store_replaced` (`store_id` as its primary key, `replaced_at`): one row per
+id this store carried before its present one, `local` in `MERGE_RULES`, never
+left the machine. `settleUnderLock` records the outgoing id into `store_replaced`
+when a mint detects a copy but keeps both the host and path (minting with
+reasons `file`, `generation`, or both), meaning the file is this device's
+store moved to another filesystem or restored from a backup, and any claim
+made under that id is still this device's. A mint with the reason `host` or
+`path` empties the table instead, because that file is a copy at a new
+location that must build its own claim history. `readReplacedStoreIds`
+(`src/effort/store/store-replaced.ts`) answers the ids, earliest first, or
+none for a store without the table or with it empty; `holdsClaim`
+(`src/claims/device.ts`) is true for the current id and each replaced one.
+The table is absent from a store an older runtime left. The
 three before it, which migration `store-meta` creates, are the store's
 own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
