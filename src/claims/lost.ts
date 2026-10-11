@@ -27,8 +27,11 @@
  * `holdsClaim` (`./device.ts`) decides whether the remote's holder is
  * this device: true for the store's id and for each id it replaced
  * (`replacedIds`), so a claim made before the store re-minted in place
- * is not read as lost. The `owned` reason names the store's own id,
- * never the replaced one the claim was made under.
+ * is not read as lost. The same comparison decides whether a pending
+ * handover (`pending.to`) names this device, so an offer made to a
+ * replaced id still carries into the report's next step. The `owned`
+ * reason and the next step's `--to=` both name the store's own id,
+ * never the replaced one the claim or the handover named.
  *
  * A device whose store names no id (`storeId: null`) holds no claim, so
  * a claim held by any store is read as held by another: the commits are
@@ -110,6 +113,8 @@ export type RefusedPushReading =
     readonly pending: PendingHandover | null;
     /** This device's store id, or null when its store names none. */
     readonly storeId: string | null;
+    /** The ids that store carried before; empty when `storeId` is null. */
+    readonly replacedIds: DeviceStoreIds['replacedIds'];
     /** The remote's tip, as the fetch left it: the new owner's branch. */
     readonly remoteTip: string;
     readonly kept: LostBranch;
@@ -178,7 +183,17 @@ export function readRefusedPush(git: GitRunner, input: RefusedPushInput): Refuse
     return { outcome: 'unknown', issue, branch, reason: `the claim on ${REMOTE}/${branch} could not be read` };
   }
   const { owner, pending } = remote.ownership;
-  return { outcome: 'lost', issue, branch, owner, pending, storeId, remoteTip: remote.tip, kept: keepCommits(git, branch) };
+  return {
+    outcome: 'lost',
+    issue,
+    branch,
+    owner,
+    pending,
+    storeId,
+    replacedIds: input.replacedIds,
+    remoteTip: remote.tip,
+    kept: keepCommits(git, branch),
+  };
 }
 
 /** This device's ids, or null when its store names none. */
@@ -269,8 +284,11 @@ function keptLine(lost: Extract<RefusedPushReading, { outcome: 'lost' }>): strin
 
 /** The report's last line: what this device can do next. */
 function nextStep(lost: Extract<RefusedPushReading, { outcome: 'lost' }>): string {
-  const { issue, storeId, pending, owner } = lost;
-  if (storeId !== null && pending?.to === storeId) {
+  const { issue, storeId, replacedIds, pending, owner } = lost;
+  const device = storeId === null
+    ? null
+    : { storeId, replacedIds };
+  if (device !== null && pending !== null && holdsClaim(device, pending.to)) {
     return `Next safe step: store ${owner} offered this device the claim; rafa claim accept ${String(issue)} takes it up.`;
   }
   return storeId === null

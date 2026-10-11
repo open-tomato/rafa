@@ -1147,6 +1147,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/claim/hand.js', [
+    ['../../claims/device.js', ['holdsClaim']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],

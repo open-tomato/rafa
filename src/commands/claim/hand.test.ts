@@ -422,6 +422,16 @@ describe('rafa claim hand, refused', () => {
     expectRefused(run, `--to=${STORE_A} is this device's own store; a handover names another store`, world, claim);
   });
 
+  it('when --to names an id this device\'s store replaced', async () => {
+    const world = plantWorld('self-replaced');
+    const claim = claimBranch(world.a, STORE_A);
+    const seams = { git: world.a, board: null, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) };
+
+    const run = await hand(world, ['7', `--to=${STORE_A_REPLACED}`], seams);
+
+    expectRefused(run, `--to=${STORE_A_REPLACED} is this device's own store; a handover names another store`, world, claim);
+  });
+
   it('when the remote holds no branch of the issue', async () => {
     const world = plantWorld('absent');
     claimBranch(world.a, STORE_A, 'feat/rafa-8-other');

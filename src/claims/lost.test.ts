@@ -271,6 +271,20 @@ describe('readRefusedPush when another store took the claim', () => {
     expect(lost.pending?.to).toBe(STORE_A);
     expect(claimLostReport(lost)).toContain('rafa claim accept 7 takes it up.');
   });
+
+  it('carries a handover the new owner offered to a replaced id of this store into the report\'s next step', () => {
+    const trio = plantTrio('offered-replaced');
+    claimAndWork(trio);
+    takeOver(trio);
+    handTo(trio, STORE_A);
+    pushRefused(trio);
+
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_NEW, replacedIds: [STORE_A] }));
+
+    expect(lost.owner).toBe(STORE_B);
+    expect(lost.pending?.to).toBe(STORE_A);
+    expect(claimLostReport(lost)).toContain('rafa claim accept 7 takes it up.');
+  });
 });
 
 describe('readRefusedPush when the claim was not lost', () => {

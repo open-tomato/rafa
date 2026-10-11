@@ -18,10 +18,12 @@
  * form a claim record's store id takes; `--withdraw` takes no value, so
  * a line typed `--withdraw 7` reads `7` as its value and is refused,
  * naming the order to type it in. The flags are read first so that line
- * is told so, rather than that it gave no argument. Then this device's store id, and a `--to` naming
- * that very store is refused. Then one fetch of the `feat/rafa-*`
- * branches and every remote branch of the issue, as `rafa claim release`
- * reads them (`./release.ts`). No network means no handover.
+ * is told so, rather than that it gave no argument. Then this device's
+ * store id, and a `--to` naming that very store, or an id it replaced
+ * (`holdsClaim`, `src/claims/device.ts`), is refused. Then one fetch of
+ * the `feat/rafa-*` branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`). No network means no
+ * handover.
  *
  * ## What it pushes
  *
@@ -72,6 +74,7 @@ import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } fr
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
+import { holdsClaim } from '../../claims/device.js';
 import { CommandExit } from '../../cli/command.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
@@ -195,7 +198,7 @@ export function handClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): C
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
   const device = readClaimDevice(seams, refuse);
   const { storeId } = device;
-  if (request.action === 'hand' && request.to === storeId) {
+  if (request.action === 'hand' && holdsClaim(device, request.to)) {
     throw refuse(`--${TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
   }
   const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, HANDING);
