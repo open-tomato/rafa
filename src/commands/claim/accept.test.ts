@@ -10,6 +10,10 @@
  * unmoved, beside the cases that move it, so a command that refused
  * everything, or pushed everything, fails one side. The board records
  * every call so the "no label changes" claim is a reading.
+ *
+ * A case over an id store B replaced reads the same remote twice: by a
+ * store that carries the replaced id, and by one that carries none, the
+ * control showing the answer comes from the replaced ids alone.
  */
 import type { ClaimCommandSeams } from './release.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
@@ -37,6 +41,8 @@ const BRANCH = 'feat/rafa-7-accept';
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
 const STORE_C = 'store-c';
+/** An id store B carried before its file was replaced in place. */
+const STORE_B_REPLACED = 'store-b-replaced';
 const SUBJECTS = [{ name: 'claim', summary: 'claims' }];
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-accept-')));
@@ -128,9 +134,9 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
   return { board: createGhIssueBoard({ gh }), calls };
 }
 
-/** A store id reader answering `storeId`. */
-function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+/** A store id reader answering `storeId`, with the ids that store replaced. */
+function storeIdOf(storeId: string, replacedIds: readonly string[] = []): () => DeviceStoreId {
+  return () => ({ ok: true, storeId, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** The command over `seams`, whatever project it runs in. */
@@ -146,6 +152,11 @@ async function accept(world: World, words: readonly string[], seams: ClaimComman
 /** The seams of device `b`, store B, over a recording board. */
 function seamsOfB(world: World, board = recordingBoard().board): ClaimCommandSeams {
   return { git: world.b, board, readStoreId: storeIdOf(STORE_B) };
+}
+
+/** The seams of device `b` once store B replaced `STORE_B_REPLACED`. */
+function seamsOfRemintedB(world: World): ClaimCommandSeams {
+  return { ...seamsOfB(world), readStoreId: storeIdOf(STORE_B, [STORE_B_REPLACED]) };
 }
 
 /** The latest ownership record on the remote's branch. */
@@ -177,9 +188,10 @@ function expectRefused(run: CapturedRun, text: string, world: World, tip: string
 
 describe('offerOf', () => {
   it('reads a branch that is absent or unreadable as no offer, naming it', () => {
-    expect(offerOf({ state: 'absent', branch: BRANCH }, ISSUE, STORE_B))
+    const device = { storeId: STORE_B, replacedIds: [] };
+    expect(offerOf({ state: 'absent', branch: BRANCH }, ISSUE, device))
       .toEqual({ state: 'refused', reason: `${BRANCH} is gone from origin` });
-    expect(offerOf({ state: 'unreadable', branch: BRANCH, reason: 'bad object' }, ISSUE, STORE_B))
+    expect(offerOf({ state: 'unreadable', branch: BRANCH, reason: 'bad object' }, ISSUE, device))
       .toEqual({ state: 'refused', reason: `the claim on ${BRANCH} could not be read: bad object` });
   });
 });
@@ -226,6 +238,31 @@ describe('rafa claim accept, by the receiver', () => {
     expect(run.exitCode).toBe(0);
     expect(must(world.origin, ['rev-parse', `${remoteTip(world) ?? ''}^`])).toBe(handed);
     expect(tipRecord(world)).toMatchObject({ kind: 'ownership', record: { action: 'accept', store: STORE_B } });
+  });
+
+  it('accepts a handover addressed to an id the store replaced, the accept commit naming the store\'s own id', async () => {
+    const world = plantWorld('to-replaced');
+    const handed = handedTo(world, STORE_B_REPLACED);
+
+    // The control: a store that replaced no id reads the same handover
+    // as another store's and pushes nothing.
+    const unlinked = await accept(world, ['7'], seamsOfB(world));
+
+    expectRefused(unlinked, 'no handover of #7 to this device', world, handed);
+    expect(unlinked.stderr).toContain(`no handover on ${BRANCH} names this device's store ${STORE_B}; store ${STORE_A} holds the claim`);
+
+    const run = await accept(world, ['7', '--output=json'], seamsOfRemintedB(world));
+
+    expect(run.exitCode).toBe(0);
+    const tip = remoteTip(world);
+    expect(must(world.origin, ['rev-parse', `${tip ?? ''}^`])).toBe(handed);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'accept', issue: ISSUE, store: STORE_B } });
+    expect(ownershipSeenByA(world)).toEqual({ state: 'held', owner: STORE_B, pending: null, ignored: [] });
+    const result = eventsOf(run.stdout).find((event) => event.type === 'result');
+    expect(result).toMatchObject({
+      data: { issue: ISSUE, branch: BRANCH, storeId: STORE_B, from: STORE_A, handSha: handed, sha: tip },
+    });
+    expect(run.stdout).not.toContain(STORE_B_REPLACED);
   });
 
   it('keeps the work commits on the branch and moves no local ref but the remote-tracking one', async () => {
@@ -326,6 +363,42 @@ describe('rafa claim accept, refused', () => {
     expect(second.stderr).toContain(`this device (store ${STORE_B}) already holds the claim on #7 on ${BRANCH}`);
   });
 
+  it('when the claim is held under an id the store replaced: already this device\'s, naming the store\'s own id', async () => {
+    const world = plantWorld('held-replaced');
+    const claimed = claimBranch(world.a, STORE_B_REPLACED);
+
+    const run = await accept(world, ['7'], seamsOfRemintedB(world));
+
+    expectRefused(run, 'no handover of #7 to this device', world, claimed);
+    expect(run.stderr).toContain(`this device (store ${STORE_B}) already holds the claim on #7 on ${BRANCH}`);
+    expect(run.stderr).not.toContain(STORE_B_REPLACED);
+
+    // The control: a store that replaced no id reads the holder as
+    // another store.
+    const unlinked = await accept(world, ['7'], seamsOfB(world));
+
+    expectRefused(unlinked, 'no handover of #7 to this device', world, claimed);
+    expect(unlinked.stderr).toContain(`no handover on ${BRANCH} names this device's store ${STORE_B}; store ${STORE_B_REPLACED} holds the claim`);
+  });
+
+  it('when a handover addressed to an id the store replaced was withdrawn, naming the withdraw commit', async () => {
+    const world = plantWorld('withdrawn-replaced');
+    handedTo(world, STORE_B_REPLACED);
+    const withdrawn = pushRecord(world, world.a, { action: 'withdraw', issue: ISSUE, store: STORE_A });
+
+    const run = await accept(world, ['7'], seamsOfRemintedB(world));
+
+    expectRefused(run, 'no handover of #7 to this device', world, withdrawn);
+    expect(run.stderr).toContain(`the handover to this device on ${BRANCH} was withdrawn by store ${STORE_A} (commit ${withdrawn})`);
+
+    // The control: to a store that replaced no id, no handover ever
+    // named it.
+    const unlinked = await accept(world, ['7'], seamsOfB(world));
+
+    expectRefused(unlinked, 'no handover of #7 to this device', world, withdrawn);
+    expect(unlinked.stderr).toContain(`no handover on ${BRANCH} names this device's store ${STORE_B}; store ${STORE_A} holds the claim`);
+  });
+
   it('when the branch carries no claim commit, or the claim was released with no handover', async () => {
     const world = plantWorld('unclaimed');
     const root = must(world.a, ['rev-parse', 'main']);
@@ -407,7 +480,7 @@ describe('rafa claim accept, refused', () => {
     let storeReads = 0;
     const readStoreId = (): DeviceStoreId => {
       storeReads += 1;
-      return { ok: true, storeId: STORE_B };
+      return { ok: true, storeId: STORE_B, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
     };
     const seams: ClaimCommandSeams = { git: world.b, board: null, readStoreId };
     const lines: readonly (readonly [readonly string[], string])[] = [

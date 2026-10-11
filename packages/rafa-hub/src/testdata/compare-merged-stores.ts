@@ -5,10 +5,10 @@
  * `hub-unreachable.integration.test.ts` both need once their devices and
  * the hub are supposed to hold the same rows.
  *
- * `schema_migrations`, `store_meta`, `merges` and `merge_conflicts` are
- * the store's own local bookkeeping (`context/effort-store.md`, "Tables
- * outside the port") and are set aside; every other table the merge
- * unions is compared. `commits.row_json`'s recomputed
+ * `schema_migrations`, `store_meta`, `store_replaced`, `merges` and
+ * `merge_conflicts` are the store's own local bookkeeping
+ * (`context/effort-store.md`, "Tables outside the port") and are set
+ * aside; every other table the merge unions is compared. `commits.row_json`'s recomputed
  * `minutesSincePrevious` is set aside too, since a merge rewrites it
  * from whichever side ran last, exactly as
  * `store/merge-commit-gaps.ts`'s own comparison does. The local `seq`
@@ -19,7 +19,7 @@ import { Database } from 'bun:sqlite';
 import { expect } from 'bun:test';
 
 /** Every table the merge unions, past the store's own local bookkeeping; see the module note. */
-export const LOCAL_ONLY_TABLES: ReadonlySet<string> = new Set(['schema_migrations', 'store_meta', 'merges', 'merge_conflicts']);
+export const LOCAL_ONLY_TABLES: ReadonlySet<string> = new Set(['schema_migrations', 'store_meta', 'store_replaced', 'merges', 'merge_conflicts']);
 
 /** One row read off a store, by column. */
 export type Row = Readonly<Record<string, unknown>>;

@@ -18,7 +18,7 @@ machine and are not combined. The `sessions`, `commits`, `findings`,
 `blockers`, `out_of_scope_bugs`, `changes`, `skill_invocations`,
 `preflight`, `dispatches`, and `plan_ci` tables are merged. The
 `report_absences`, `task_reports`, `schema_migrations`, `store_meta`,
-`merges` and `merge_conflicts` tables are local.
+`store_replaced`, `merges` and `merge_conflicts` tables are local.
 
 **A merged table's rule holds:** its identity columns (which match rows
 with NULL origin), the columns that can change after insert (each with

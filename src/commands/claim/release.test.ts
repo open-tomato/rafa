@@ -36,6 +36,8 @@ const ISSUE = 7;
 const BRANCH = 'feat/rafa-7-release';
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
+/** An id store A carried before its file was replaced in place. */
+const STORE_A_REPLACED = 'store-a-replaced';
 const SUBJECTS = [{ name: 'claim', summary: 'claims' }];
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-release-')));
@@ -134,9 +136,9 @@ function commandOver(seams: ClaimCommandSeams): RafaCommand {
   return createClaimReleaseCommand(() => seams);
 }
 
-/** A store id reader answering `storeId`. */
-function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+/** A store id reader answering `storeId`, with the ids that store replaced. */
+function storeIdOf(storeId: string, replacedIds: readonly string[] = []): () => DeviceStoreId {
+  return () => ({ ok: true, storeId, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** Dispatches `rafa claim release <words>` from the world's project over `seams`. */
@@ -184,6 +186,24 @@ describe('rafa claim release, by the owner', () => {
       ['issue', 'edit', '7', '--remove-label', CLAIMED_LABEL],
     ]);
     expect(run.stdout).toContain(`Released the claim on #7 (store ${STORE_A}) on ${BRANCH}: release commit ${tip ?? ''} pushed to origin.`);
+  });
+
+  it('releases a claim naming an id the store replaced, the release commit naming the store\'s own id', async () => {
+    const world = plantWorld('replaced');
+    const claim = claimBranch(world, world.a, STORE_A_REPLACED);
+    const { board, calls } = recordingBoard();
+    const seams = { git: world.a, board, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) };
+
+    const run = await release(world, ['7', '--output=json'], seams);
+
+    expect(run.exitCode).toBe(0);
+    const tip = remoteTip(world);
+    expect(must(world.origin, ['rev-parse', `${tip ?? ''}^`])).toBe(claim);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'release', issue: ISSUE, store: STORE_A } });
+    expect(must(world.origin, ['log', '-1', '--format=%B', `refs/heads/${BRANCH}`])).not.toContain(STORE_A_REPLACED);
+    expect(calls).toHaveLength(2);
+    const result = eventsOf(run.stdout).find((event) => event.type === 'result');
+    expect(result).toMatchObject({ data: { issue: ISSUE, branch: BRANCH, storeId: STORE_A, sha: tip } });
   });
 
   it('answers the branch, store and release commit as the json result', async () => {
@@ -256,6 +276,27 @@ describe('rafa claim release, refused', () => {
     const run = await release(world, ['7'], { git: world.b, board, readStoreId: storeIdOf(STORE_B) });
 
     expectRefused(run, `#7 is claimed by store ${STORE_A} on ${BRANCH}, not by this device (store ${STORE_B})`, world, claim, calls);
+  });
+
+  it('when the holder is an id another store replaced, naming this store\'s own id', async () => {
+    const world = plantWorld('replaced-stranger');
+    const claim = claimBranch(world, world.a, STORE_A_REPLACED);
+    const { board, calls } = recordingBoard();
+
+    const run = await release(world, ['7'], { git: world.b, board, readStoreId: storeIdOf(STORE_B, ['store-b-replaced']) });
+
+    expectRefused(run, `#7 is claimed by store ${STORE_A_REPLACED} on ${BRANCH}, not by this device (store ${STORE_B})`, world, claim, calls);
+  });
+
+  it('when this store holds the issue on two branches, one under a replaced id, naming both', async () => {
+    const world = plantWorld('two-replaced');
+    const first = claimBranch(world, world.a, STORE_A_REPLACED);
+    claimBranch(world, world.a, STORE_A, 'feat/rafa-7-second');
+    const { board, calls } = recordingBoard();
+
+    const run = await release(world, ['7'], { git: world.a, board, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) });
+
+    expectRefused(run, `this device (store ${STORE_A}) holds #7 on more than one branch: ${BRANCH}, feat/rafa-7-second`, world, first, calls);
   });
 
   it('when the claim was already released', async () => {

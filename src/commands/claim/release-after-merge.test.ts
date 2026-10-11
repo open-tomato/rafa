@@ -8,11 +8,17 @@
  * store id seam left at its default, `readDeviceStoreId`, and succeeds as
  * the owner: the merge moved no store id.
  *
- * The control comes first: the printed backup, a copy that is not the
- * store its id was minted for, is renamed back over the merged store
- * before the write, which mints a new store id, so the same
- * release is refused as another store's claim and pushes nothing. A
- * command that released for every store, or for none, fails one case.
+ * The control comes first: the merged store is written once under
+ * another host id, which mints a new store id as a copy does and keeps
+ * no replaced id, so the same release is refused as another store's
+ * claim and pushes nothing. A command that released for every store, or
+ * for none, fails one case.
+ *
+ * Between the two sits the store restored in place: the printed backup
+ * is renamed back over the merged store before the write, which mints a
+ * new store id and keeps the outgoing one as replaced
+ * (`src/effort/store/store-replaced.ts`). The claim names that replaced
+ * id, so the release succeeds, and its commit names the new id.
  *
  * Every case writes once before the command reads the store id, since a
  * read never mints and a read-only check passes while wrong.
@@ -48,12 +54,15 @@ const NOW = new Date('2026-10-02T12:00:00.000Z');
 const COLLECTED_AT = '2026-10-02T10:00:00.000Z';
 const ORIGIN = 'store-local';
 const RESTORED = 'store-restored';
+const COPIED = 'store-copied';
 const OTHER_ORIGIN = 'store-other';
 const PROJECT = { rootCommit: 'a1b2c3d4', remote: null };
 const INSTALLED: RuntimeIdentity = { kind: 'installed', entry: '/home/u/.rafa/runtime/0.24.1/cli.js' };
 const SUBJECTS = [{ name: 'effort', summary: 'the effort store' }, { name: 'claim', summary: 'claims' }];
 /** This machine's host id: the rebuild's carry reads it itself, so the mints record it too. */
 const HOST = readHostId();
+/** A host id no machine reports, for a write that reads the store as a copy. */
+const OTHER_HOST = `${HOST}-another-host`;
 const BACKUP_LINE = /copied to (\S+\.bak)/;
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-after-merge-')));
@@ -193,8 +202,22 @@ function remoteState(device: Device): { tip: string; record: ReturnType<typeof p
 }
 
 describe('rafa claim release after rafa effort merge', () => {
-  it('is refused as another store\'s claim when the store\'s backup was renamed back over it before the write', async () => {
+  it('is refused as another store\'s claim when the write after the merge ran under another host id', async () => {
     const device = plantDevice('control');
+    const before = remoteState(device);
+    await mergeOther(device);
+    const onAnotherHost: StoreIdentitySeams = { ...seamsOf(COPIED), readHostId: () => OTHER_HOST };
+    expect(writeOpen(device.storePath, onAnotherHost)).toBe(COPIED);
+
+    const run = await release(device);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.text).toContain(`#${String(ISSUE)} is claimed by store ${ORIGIN} on ${BRANCH}, not by this device (store ${COPIED})`);
+    expect(remoteState(device)).toEqual(before);
+  });
+
+  it('succeeds under the new store id when the store\'s backup was renamed back over it before the write', async () => {
+    const device = plantDevice('restored');
     const before = remoteState(device);
     const backup = await mergeOther(device);
     renameSync(backup, device.storePath);
@@ -202,9 +225,11 @@ describe('rafa claim release after rafa effort merge', () => {
 
     const run = await release(device);
 
-    expect(run.exitCode).toBe(1);
-    expect(run.text).toContain(`#${String(ISSUE)} is claimed by store ${ORIGIN} on ${BRANCH}, not by this device (store ${RESTORED})`);
-    expect(remoteState(device)).toEqual(before);
+    expect(run.exitCode).toBe(0);
+    expect(run.text).toContain(`Released the claim on #${String(ISSUE)} (store ${RESTORED}) on ${BRANCH}`);
+    const after = remoteState(device);
+    expect(must(device.origin, ['rev-parse', `${after.tip}^`])).toBe(before.tip);
+    expect(after.record).toEqual({ kind: 'ownership', record: { action: 'release', issue: ISSUE, store: RESTORED } });
   });
 
   it('succeeds as the owner when one write followed the merge', async () => {
