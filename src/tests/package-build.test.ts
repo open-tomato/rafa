@@ -355,8 +355,12 @@ import { hostToolDirs } from './stand-in-gh.js';
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-/** The binary the manifest maps, as the phase 0 spec gives it. */
-const BIN = { rafa: './dist/cli.js' };
+/**
+ * The binary the manifest maps, spelled as npm writes a `bin` target:
+ * with no leading `./`. `npm publish` cleans a target that carries one
+ * and warns that it corrected the manifest (measured on npm 11.1.0).
+ */
+const BIN = { rafa: 'dist/cli.js' };
 
 /** The exports map the manifest carries, as the phase 0 spec gives it. */
 const EXPORTS = {
@@ -795,8 +799,9 @@ describe('the build script, run in a copy of the package', () => {
   });
 
   it('writes every file the binary and the exports map name', () => {
-    const targets = [...new Set([...Object.values(BIN), ...Object.values(EXPORTS)])];
-    const missing = targets.filter((target) => !existsSync(join(PACKAGE_DIR, target)));
+    const named = [...Object.values(BIN), ...Object.values(EXPORTS)];
+    const targets = [...new Set(named.map((target) => join(PACKAGE_DIR, target)))];
+    const missing = targets.filter((target) => !existsSync(target));
 
     expect(targets).toHaveLength(6);
     expect(missing).toEqual([]);

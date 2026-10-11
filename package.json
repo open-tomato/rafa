@@ -33,7 +33,7 @@
   ],
   "module": "./dist/index.js",
   "bin": {
-    "rafa": "./dist/cli.js"
+    "rafa": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/index.js",
