@@ -12,7 +12,10 @@
  * and the earlier session may have done any part of that or none. So
  * the prompt is {@link buildWrapUpPrompt}'s, built with no open pull
  * request, which gives it the `gh pr create --base <base>` bullet over
- * the run's base as `runWrapUp` resolved it once, and one bullet
+ * the run's base as `runWrapUp` resolved it once, with the list of the
+ * test files red only in a suite step the first one carried
+ * (`start/step-only-report.ts`), since the retry is the session whose
+ * pull request body holds it, and one bullet
  * more: {@link missingPullRequestBullet}, saying the pull request is
  * missing and quoting the earlier session's final message.
  *
@@ -48,6 +51,7 @@
  */
 import type { ClaudeSettingSource } from '../config.js';
 import type { SessionServing } from './serving.js';
+import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { ReleasePreparation } from '../release/prepare.js';
@@ -69,6 +73,8 @@ export interface WrapUpRetryPrompt {
   readonly lessons: readonly InstinctRecord[];
   /** The earlier wrap-up session's final message: its captured stdout. */
   readonly previousMessage: string;
+  /** The test files red only in a suite step, as the first wrap-up was given them; none when left out. */
+  readonly stepOnly?: readonly RunStepOnly[];
 }
 
 /** The earlier message, each line quoted and indented under the bullet. */
@@ -100,7 +106,7 @@ export function missingPullRequestBullet(branch: string, previousMessage: string
  * line. The caller stamps it (`start/stamp.ts`), as it does the first.
  */
 export function buildWrapUpRetryPrompt(retry: WrapUpRetryPrompt): string {
-  const first = buildWrapUpPrompt(retry.branch, retry.base, retry.planContent, null, retry.release, retry.lessons);
+  const first = buildWrapUpPrompt(retry.branch, retry.base, retry.planContent, null, retry.release, retry.lessons, retry.stepOnly);
   const [classifierKey, ...rest] = first.split('\n');
   return [
     classifierKey,
@@ -127,6 +133,8 @@ export interface WrapUpRetryRun {
   readonly learning: WrapUpLearning | null;
   /** The run's checkout, where the session is spawned. */
   readonly checkout: string;
+  /** The test files red only in a suite step, listed for the pull request body; none when left out. */
+  readonly stepOnly?: readonly RunStepOnly[];
   /** The spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
 }
@@ -138,8 +146,9 @@ export interface WrapUpRetryRun {
  */
 export function retryWrapUp(run: WrapUpRetryRun): Promise<string> {
   const { branch, base, planContent, previousMessage } = run;
+  const stepOnly = run.stepOnly ?? [];
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, base, planContent, release: null, lessons, previousMessage }),
+    buildPrompt: (lessons) => buildWrapUpRetryPrompt({ branch, base, planContent, release: null, lessons, previousMessage, stepOnly }),
     settingSources: run.settingSources,
     serving: run.serving,
     learning: run.learning,

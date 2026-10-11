@@ -38,6 +38,10 @@
  * are each other's control in the same way, and every threshold case
  * is paired with one where the same lesson moves across the line.
  *
+ * One more group covers the section listing the test files the run's
+ * suite steps read red only in the step (`start/step-only-report.ts`):
+ * present with such a file, absent, heading and all, with none.
+ *
  * The last group covers what `preserveProgress` does with the run's
  * `pr.provider` (#847), over a scratch checkout with its lookup and its
  * spawner answered through the seams. Under `none` the lookup seam is
@@ -67,6 +71,7 @@ import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { parsePromoted } from './promoted.js';
+import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';
 import { buildWrapUpPrompt, lessonsToPromote, preserveProgress, PROGRESS_PRESERVED_NO_PROVIDER } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
@@ -447,6 +452,50 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
       return reading.answers.map((answer) => answer.kind);
     });
     expect(kinds).toEqual([['promoted'], ['skipped']]);
+  });
+});
+
+describe('the wrap-up prompt\'s files red only in a suite step', () => {
+  const items = runStepOnlyOf([{
+    kind: 'task',
+    scope: 'affected',
+    command: ['bun', 'test'],
+    exitCode: 1,
+    summary: 'Ran 3 tests across 2 files. [1.00ms]',
+    failures: [{ file: 'src/utils/claude.test.ts', name: 'claude > first' }],
+    newFailures: [],
+    stepOnly: [{ file: 'src/utils/claude.test.ts', tests: ['claude > first'], errorLines: ['UndeclaredSpendError: declared none'], position: 2, before: ['src/a.test.ts'] }],
+  }]);
+
+  test('writes no section and no heading when the run holds none', () => {
+    for (const prompt of [buildWrapUpPrompt(BRANCH, BASE, PLAN, null), buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], [])]) {
+      expect(prompt).not.toContain(STEP_ONLY_HEADING);
+      expect(prompt).not.toContain('green when run alone');
+    }
+
+    // The control: one such file brings the section in, so the absence
+    // above is the empty list's.
+    expect(buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], items)).toContain(`## ${STEP_ONLY_HEADING}`);
+  });
+
+  test('lists each file as the run\'s end prints it, and asks for the list in the pull request body under a heading', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], items);
+
+    expect(prompt).toContain(stepOnlySection(items).join('\n'));
+    expect(prompt).toContain('- `src/utils/claude.test.ts`: 1 test (`claude > first`) red in 1 step (task) and green when run alone; first error: "UndeclaredSpendError: declared none"; run after src/a.test.ts.');
+    expect(prompt).toContain(`under the heading \`### ${STEP_ONLY_HEADING}\``);
+  });
+
+  test('keeps the classifier key first, the section below the bullets and above the lessons and the plan', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)], items);
+    const section = prompt.indexOf(`## ${STEP_ONLY_HEADING}`);
+
+    expect(prompt.split('\n')[0]).toBe('* Read `@progress.txt` in full.');
+    expect(classifyPromptContent(prompt)).toBe('wrap-up');
+    expect(section).toBeGreaterThan(prompt.indexOf('* Do not include Claude attribution'));
+    expect(section).toBeLessThan(prompt.indexOf(SECTION));
+    expect(section).toBeLessThan(prompt.indexOf('The plan this run executed follows'));
+    expect(prompt.endsWith(`\n${PLAN}`)).toBe(true);
   });
 });
 

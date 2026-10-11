@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="7" assertions="2" failures="7" skipped="0" time="0.0093">
+  <testsuite name="noise.test.ts" file="noise.test.ts" tests="7" assertions="2" failures="7" skipped="0" time="0" hostname="fixture-host">
+    <testcase name="logs then throws" classname="" time="0.00021" file="noise.test.ts" line="3" assertions="0">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="throws with a cause" classname="" time="0.000073" file="noise.test.ts" line="9" assertions="0">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="throws an object" classname="" time="0.000049" file="noise.test.ts" line="13" assertions="0">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="throws with no stack" classname="" time="0.000068" file="noise.test.ts" line="17" assertions="0">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="fails toBe" classname="" time="0.000061" file="noise.test.ts" line="23" assertions="1">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="name ends in brackets [x]" classname="" time="0.000052" file="noise.test.ts" line="27" assertions="1">
+      <failure type="AssertionError" />
+    </testcase>
+    <testcase name="long message" classname="" time="0.000042" file="noise.test.ts" line="31" assertions="0">
+      <failure type="AssertionError" />
+    </testcase>
+  </testsuite>
+</testsuites>

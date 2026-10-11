@@ -95,7 +95,11 @@ describe('inheritedFailureOf', () => {
     const { failures } = await runSuite({ cwd: dir, junitFile, spawn });
 
     expect(readFileSync(join(TESTDATA, 'no-message.junit.xml'), 'utf8')).toContain('<failure type="AssertionError" />');
-    expect(failures).toEqual([{ file: 'src/parse/parse.test.ts', name: 'parse > drops the last line' }]);
+    expect(failures).toEqual([{
+      file: 'src/parse/parse.test.ts',
+      name: 'parse > drops the last line',
+      errorLines: ['error: expect(received).toBe(expected)', 'Expected: 2', 'Received: 1'],
+    }]);
     expect(inheritedFailureOf(BUG, failures)).toEqual(failures[0]!);
     // Control: a bug naming another case of that file is not taken for it.
     const otherCase = { what: BUG.what, artifact: ARTIFACT.replace('drops the last line', 'keeps the first line') };

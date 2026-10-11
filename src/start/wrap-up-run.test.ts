@@ -210,7 +210,7 @@ function plantedModule(body: readonly string[]): string {
 const PREPARE = 'const release = prepareReleaseStage({ repoRoot, settings, planStub, planContent });';
 
 /** The wrap-up session, handed the record step 1 answered. */
-const SESSION = 'await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider);';
+const SESSION = 'await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider, { stepOnly });';
 
 /** Step 3, over that same record. */
 const FINISH = 'await finishRelease({ repoRoot, preparation: release });';
@@ -259,7 +259,7 @@ describe('the release stage as runWrapUp wires it', () => {
 
   it('hands the session and the finish the very record the preparation answered', () => {
     expect(callTo(CALLS, 'prepareReleaseStage').bound).toBe('release');
-    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving', 'wrapUpLearning', 'base', 'checkout', 'readProvider().provider']);
+    expect(callTo(CALLS, 'preserveProgress').args).toEqual(['planContent', 'settingSources', 'release', 'serving', 'wrapUpLearning', 'base', 'checkout', 'readProvider().provider', '{ stepOnly }']);
     expect(callTo(CALLS, 'finishRelease').args[0]).toContain('preparation: release');
   });
 
@@ -301,8 +301,8 @@ describe('the two directories runWrapUp points each call at', () => {
 
   it('runs the release, the wrap-up and the CI gate in the checkout', () => {
     expect(callTo(CALLS, 'prepareReleaseStage').args[0]).toContain('checkout,');
-    // The checkout is the session's last directory; the run's provider follows it.
-    expect(callTo(CALLS, 'preserveProgress').args.slice(-2)).toEqual(['checkout', 'readProvider().provider']);
+    // The checkout is the session's last directory; the run's provider follows it, then the extras.
+    expect(callTo(CALLS, 'preserveProgress').args.slice(-3)).toEqual(['checkout', 'readProvider().provider', '{ stepOnly }']);
     expect(callTo(CALLS, 'finishRelease').args[0]).toContain('repoRoot: checkout');
     expect(callTo(CALLS, 'prLifecycleSeamsIn').args).toEqual(['checkout']);
   });

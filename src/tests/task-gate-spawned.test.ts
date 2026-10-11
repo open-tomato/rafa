@@ -279,7 +279,9 @@ describe('rafa loop start over a one-task fixture plan whose task commits a trac
     const seen = observe();
 
     expect(seen.output).toContain(`❌ The runner's task step after "${TASK}" found failures the suite baseline does not hold.`);
-    expect(seen.output).toContain(`New failing test files: ${SWEEP_PATH} (1 test).`);
+    // The step ran the sweep alone once more (`tests.retakeRedAlone`, on by default), and it was red there too.
+    expect(seen.output).toContain(`New failing test files: ${SWEEP_PATH} (1 test, red again when run alone).`);
+    expect(seen.output).not.toContain('Red only in the step');
     expect(seen.output).not.toContain('found ESLint errors');
     expect(seen.taskStep?.scope).toBe('affected');
     expect(seen.taskStep?.newFailures.map((failure) => failure.file)).toEqual([SWEEP_PATH]);

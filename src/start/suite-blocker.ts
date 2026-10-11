@@ -3,8 +3,45 @@
  * blocker text, and the repair task that carries it.
  *
  * {@link blockerText} names each new failing test file with its count,
- * the command running them (`bun test <files>`), and the errors or the
- * missing summary when those made the step red. Errors outside any test
+ * the command running them (`bun test <files>`), what Bun printed for
+ * them, and the errors or the missing summary when those made the step
+ * red. What Bun printed is the first error line of each new failure
+ * (`suite/failure-lines.ts`), which the JUnit report does not hold:
+ * quoted by file, each distinct line once with how many of the file's
+ * tests printed it. The blocker is one tracker line, the repair task's
+ * comment, so the quote is kept to a few hundred characters: the first
+ * {@link ERROR_LINES_QUOTED} distinct line of a file, cut at
+ * {@link ERROR_LINE_QUOTED_LENGTH} characters with `...` after the cut,
+ * for the first {@link ERROR_FILES_QUOTED} files, and a count of the
+ * lines and of the files left out. Every line, uncut, is on the step's
+ * record and in its output file (`suite/run.ts`). The lines are kept
+ * and quoted whatever `tests.retakeRedAlone` says: that key switches
+ * the retake alone. A
+ * file whose failures carry no line is left out of that sentence, and
+ * the sentence is left out when none does.
+ *
+ * A step that reran its newly red files alone (`suite-retake-alone.ts`)
+ * hands the reading on. A file red again alone has that said after its
+ * count, `src/a.test.ts (2 tests, red again when run alone)`: it fails
+ * on its own, so the command the blocker gives reproduces it. A file
+ * green alone is no longer among the new failures; the blocker's last
+ * sentence lists each with its count, as red only in the step and not
+ * the repair's to fix, so a session that sees one fail in a wider run
+ * leaves it. A file green alone that ran after test files the step's own
+ * diff names stays a new failure
+ * ({@link AloneReading.afterTouched}): its count is followed by `green
+ * when run alone`, it is left out of the `make them pass` command, which
+ * would run it green, and a sentence of its own names it with the
+ * changed files run before it, the nearest {@link TOUCHED_BEFORE_NAMED}
+ * and a count of the rest, for the first {@link AFTER_TOUCHED_NAMED}
+ * such files, then the command that runs those changed files and the
+ * file in the step's order, which is what fails it. A file past the
+ * retake's cap has `not run alone` after its count, and one sentence
+ * says how many were not and that they may be order-dependent too; when
+ * every file that was run alone read red only in the step, it also
+ * names the first of those to go red, with the files before it, as
+ * where the cause they likely share is. A file whose
+ * retake did not read is named with its count alone. Errors outside any test
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
@@ -45,6 +82,7 @@
  * repair blocked again ({@link RepairWritten.inserted} false), which the
  * caller halts on.
  */
+import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
 
@@ -67,6 +105,83 @@ function failingFiles(failures: readonly SuiteFailure[]): readonly (readonly [st
   const counts = new Map<string, number>();
   for (const failure of failures) counts.set(failure.file, (counts.get(failure.file) ?? 0) + 1);
   return [...counts.entries()];
+}
+
+/** How many distinct error lines of one file the blocker quotes before it counts the rest. */
+export const ERROR_LINES_QUOTED = 1;
+
+/** How many files' error lines the blocker quotes before it counts the rest. */
+export const ERROR_FILES_QUOTED = 3;
+
+/** The most characters of one error line the blocker quotes; a longer one is cut there and ends in `...`. */
+export const ERROR_LINE_QUOTED_LENGTH = 100;
+
+/** What marks a quoted line cut at {@link ERROR_LINE_QUOTED_LENGTH}. */
+const QUOTE_CUT_MARK = '...';
+
+/** `line` as the blocker quotes it: whole, or cut at {@link ERROR_LINE_QUOTED_LENGTH}. */
+function quotedLine(line: string): string {
+  return line.length > ERROR_LINE_QUOTED_LENGTH
+    ? `${line.slice(0, ERROR_LINE_QUOTED_LENGTH)}${QUOTE_CUT_MARK}`
+    : line;
+}
+
+/** `left` things left out, as `and 1 more <thing>` or `and N more <thing>s`. */
+function leftOut(left: number, thing: string): string {
+  return `and ${left} more ${left === 1
+    ? thing
+    : `${thing}s`}`;
+}
+
+/** `count` as `1 test` or `N tests`. */
+function testCount(count: number): string {
+  return `${count} ${count === 1
+    ? 'test'
+    : 'tests'}`;
+}
+
+/** Each distinct first error line among `failures` and how many of them printed it, in first-seen order. */
+function firstErrorLines(failures: readonly SuiteFailure[]): readonly (readonly [string, number])[] {
+  const counts = new Map<string, number>();
+  for (const failure of failures) {
+    const line = failure.errorLines?.[0];
+    if (line !== undefined) counts.set(line, (counts.get(line) ?? 0) + 1);
+  }
+  return [...counts.entries()];
+}
+
+/** One file's quoted error lines, as `<file> "<line>" (N tests), ...`, or null when its failures carry none. */
+function quotedFile(file: string, failures: readonly SuiteFailure[]): string | null {
+  const lines = firstErrorLines(failures.filter((failure) => failure.file === file));
+  if (lines.length === 0) return null;
+  const quoted = lines.slice(0, ERROR_LINES_QUOTED).map(([line, count]) => `"${quotedLine(line)}" (${testCount(count)})`);
+  const left = lines.length - quoted.length;
+  const more = left > 0
+    ? [leftOut(left, 'line')]
+    : [];
+  return `${file} ${[...quoted, ...more].join(', ')}`;
+}
+
+/**
+ * The first error lines Bun printed for `failures`, by file, `; ` apart,
+ * or null when none carries a line: the first
+ * {@link ERROR_FILES_QUOTED} files, {@link ERROR_LINES_QUOTED} line of
+ * each, cut at {@link ERROR_LINE_QUOTED_LENGTH} characters, and how
+ * many of each were left out. See the module note.
+ */
+export function quotedErrors(failures: readonly SuiteFailure[]): string | null {
+  const files = failingFiles(failures).flatMap(([file]) => {
+    const quoted = quotedFile(file, failures);
+    return quoted === null
+      ? []
+      : [quoted];
+  });
+  if (files.length === 0) return null;
+  const left = files.length - ERROR_FILES_QUOTED;
+  const more = left > 0
+    ? [leftOut(left, 'file')]
+    : [];
+  return [...files.slice(0, ERROR_FILES_QUOTED), ...more].join('; ');
 }
 
 /** How many errors outside any test {@link unhandledNames} names before it counts the rest. */
@@ -123,23 +238,108 @@ function errorsText(newErrors: number, errors: readonly UnhandledError[]): strin
   return `${counted}; Bun's stderr named them as ${unhandledNames(errors)}.${run}`;
 }
 
+/** What follows the count of a file whose retake alone was red too. */
+const RED_ALONE_NOTE = ', red again when run alone';
+
+/** What follows the count of a file green alone that ran after files the step's diff names. */
+const GREEN_ALONE_NOTE = ', green when run alone';
+
+/** The most changed files the blocker names before one file green alone, the nearest ones; the rest are counted. */
+export const TOUCHED_BEFORE_NAMED = 5;
+
+/** The most files green alone after changed files the blocker names with those files; the rest are counted. */
+export const AFTER_TOUCHED_NAMED = 5;
+
+/** What follows the count of a file past the retake's cap. */
+const NOT_RUN_ALONE_NOTE = ', not run alone';
+
+/** What of a step's retakes alone the blocker says; see the module note. */
+export type AloneSaid = Omit<AloneReading, 'interrupted'>;
+
+/**
+ * The blocker's sentences on `notRun`, the newly red files the step did
+ * not run alone: that they were not and may be order-dependent too, and,
+ * when every one of the `taken` files run alone read red only in the
+ * step, the first of those to go red as where their shared cause is.
+ */
+function notRunText(notRun: number, alone: AloneSaid): string {
+  const { taken } = alone;
+  const were = notRun === 1
+    ? '1 file was'
+    : `${notRun} files were`;
+  const said = `${were} not run alone, past the ${taken} the step runs alone, and may be order-dependent too: one green alone is not yours to fix.`;
+  const [first] = alone.stepOnly;
+  if (first === undefined || alone.stepOnly.length !== taken) return said;
+  const after = first.before.length === 0
+    ? ''
+    : `, after ${first.before.join(', ')}`;
+  return `${said} Every one of the ${taken} run alone was green alone, so these likely share one cause: ${first.file} was the first to go red${after}.`;
+}
+
+/** One file green alone, as `<file> after <changed files>`, the nearest {@link TOUCHED_BEFORE_NAMED} named. */
+function afterTouchedName(entry: AfterTouched): string {
+  const named = entry.touched.slice(-TOUCHED_BEFORE_NAMED);
+  const left = entry.touched.length - named.length;
+  const more = left > 0
+    ? ` and ${left} more`
+    : '';
+  return `${entry.file} after ${named.join(', ')}${more}`;
+}
+
+/**
+ * The blocker's sentences on the files green alone that ran after files
+ * the step's diff names: each with those files, and the one command
+ * running the named changed files and then the files themselves.
+ */
+function afterTouchedText(entries: readonly AfterTouched[]): string {
+  const listed = entries.slice(0, AFTER_TOUCHED_NAMED);
+  const left = entries.length - listed.length;
+  const more = left > 0
+    ? [leftOut(left, 'file')]
+    : [];
+  const before = listed.flatMap((entry) => entry.touched.slice(-TOUCHED_BEFORE_NAMED));
+  const paths = [...new Set([...before, ...listed.map((entry) => entry.file)])];
+  const seen = listed.length === 1
+    ? 'to see it fail: a file run before it leaves the state it meets'
+    : 'to see them fail: a file run before them leaves the state they meet';
+  return `Green when run alone, red after files this change touches: ${[...listed.map(afterTouchedName), ...more].join('; ')}. Run bun test ${paths.map(runnablePath).join(' ')} ${seen}.`;
+}
+
+/** How the blocker opens its list of the files red in the step and green alone. */
+const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
+
 /**
  * The blocker a red step writes: the new failing files with their
- * counts and the command running them, then the errors outside any test
- * by file and first line, or the missing summary, when those made it
- * red. `label` names the step.
+ * counts, the command running them and what Bun printed for them, then
+ * the errors outside any test by file and first line, or the missing
+ * summary, when those made it red. `label` names the step. `alone` is
+ * what the step's newly red files read when run alone, when they were:
+ * see the module note.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: AloneSaid): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
+  const afterTouched = (alone?.afterTouched ?? []).filter((entry) => files.some(([file]) => file === entry.file));
   if (files.length > 0) {
-    const named = files.map(([file, count]) => `${file} (${count} ${count === 1
-      ? 'test'
-      : 'tests'})`);
-    parts.push(`New failing test files: ${named.join(', ')}. Run bun test ${files.map(([file]) => runnablePath(file)).join(' ')} and make them pass.`);
+    const notRun = (alone?.notRun ?? []).filter((file) => files.some(([named]) => named === file));
+    const notes = new Map([
+      ...(alone?.redAlone ?? []).map((file) => [file, RED_ALONE_NOTE] as const),
+      ...afterTouched.map((entry) => [entry.file, GREEN_ALONE_NOTE] as const),
+      ...notRun.map((file) => [file, NOT_RUN_ALONE_NOTE] as const),
+    ]);
+    const named = files.map(([file, count]) => `${file} (${testCount(count)}${notes.get(file) ?? ''})`);
+    parts.push(`New failing test files: ${named.join(', ')}.`);
+    const run = files.filter(([file]) => notes.get(file) !== GREEN_ALONE_NOTE).map(([file]) => runnablePath(file));
+    if (run.length > 0) parts.push(`Run bun test ${run.join(' ')} and make them pass.`);
+    const quoted = quotedErrors(verdict.fresh);
+    if (quoted !== null) parts.push(`What Bun printed for them: ${quoted}.`);
+    if (alone !== undefined && notRun.length > 0) parts.push(notRunText(notRun.length, alone));
   }
+  if (afterTouched.length > 0) parts.push(afterTouchedText(afterTouched));
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
+  const stepOnly = alone?.stepOnly ?? [];
+  if (stepOnly.length > 0) parts.push(`${STEP_ONLY_LEAD}: ${stepOnly.map((entry) => `${entry.file} (${testCount(entry.tests.length)})`).join(', ')}.`);
   return parts.join(' ');
 }
 

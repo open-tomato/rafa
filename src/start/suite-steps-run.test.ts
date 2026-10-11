@@ -156,7 +156,7 @@ function stepsWith(
     checkout: dir,
     trackerPath,
     sessionId: SESSION,
-    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [] },
+    settings: { testsFullSuiteTriggers: ['package.json'], testsIntegration: [], testsAlwaysRun: [], testsRetakeRedAlone: false },
     planContent: TRACKER,
     gh: () => Promise.reject(new Error('gh is not read by these cases')),
     calls,

@@ -1,0 +1,87 @@
+
+noise.test.ts:
+warming up:
+  at the wrong place
+1 | import { expect, it } from 'bun:test';
+2 | 
+3 | it('logs then throws', () => {
+4 |   console.error('warming up:');
+5 |   console.error('  at the wrong place');
+6 |   throw new Error('after noise');
+                                   ^
+error: after noise
+      at <anonymous> (/tmp/scratch/noise.test.ts:6:32)
+(fail) logs then throws [0.21ms]
+ 5 |   console.error('  at the wrong place');
+ 6 |   throw new Error('after noise');
+ 7 | });
+ 8 | 
+ 9 | it('throws with a cause', () => {
+10 |   throw new Error('outer', { cause: new Error('inner') });
+                                                             ^
+error: outer
+      at <anonymous> (/tmp/scratch/noise.test.ts:10:57)
+(fail) throws with a cause [0.07ms]
+ 9 | it('throws with a cause', () => {
+10 |   throw new Error('outer', { cause: new Error('inner') });
+11 | });
+12 | 
+13 | it('throws an object', () => {
+14 |   throw { code: 7 };
+                       ^
+error
+      at <anonymous> (/tmp/scratch/noise.test.ts:14:19)
+(fail) throws an object [0.05ms]
+15 | });
+16 | 
+17 | it('throws with no stack', () => {
+18 |   const error = new Error('stackless');
+19 |   error.stack = '';
+20 |   throw error;
+             ^
+error: stackless
+      at <anonymous> (/tmp/scratch/noise.test.ts:20:9)
+(fail) throws with no stack [0.07ms]
+19 |   error.stack = '';
+20 |   throw error;
+21 | });
+22 | 
+23 | it('fails toBe', () => {
+24 |   expect(1).toBe(2);
+                 ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/tmp/scratch/noise.test.ts:24:13)
+(fail) fails toBe [0.06ms]
+23 | it('fails toBe', () => {
+24 |   expect(1).toBe(2);
+25 | });
+26 | 
+27 | it('name ends in brackets [x]', () => {
+28 |   expect('a').toContain('b');
+                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "b"
+Received: "a"
+
+      at <anonymous> (/tmp/scratch/noise.test.ts:28:15)
+(fail) name ends in brackets [x] [0.05ms]
+27 | it('name ends in brackets [x]', () => {
+28 |   expect('a').toContain('b');
+29 | });
+30 | 
+31 | it('long message', () => {
+32 |   throw new Error('x'.repeat(400));
+                                      ^
+error: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      at <anonymous> (/tmp/scratch/noise.test.ts:32:34)
+(fail) long message [0.04ms]
+
+ 0 pass
+ 7 fail
+ 2 expect() calls
+Ran 7 tests across 1 file. [9.00ms]
