@@ -45,9 +45,14 @@ them.
 | versions | `--path` names the file | `Versions` | rafa | always written |
 
 A flag wins over its section. A `--title` is read back through the
-template: a field only the title gives is taken from it, and one that
-disagrees with a flag is refused. Sections of a body file that are no
-field (`Expected`, `Refs`) are kept as written, after the record's own.
+template: a field only the title gives is taken from it, the project
+among them, and one that disagrees with a flag is refused.
+
+Nothing a body file holds is dropped. The text ahead of its first
+heading is the description when no `What` section holds one. What the
+record does not read is kept as written, after the record's own
+sections: that text beside a `What` section, a section that is no field
+(`Expected`, `Refs`), and the second section under one heading.
 
 A record with a problem is refused before any tracker is resolved, every
 problem on a line of its own, each opening with the field it names
@@ -62,9 +67,16 @@ text is fenced, so an `@name` or a `#12` inside it never pings or links
 on the tracker.
 
 `parseBugRecord` reads `##` and `###` headings, a value in a fence or as
-text, and a heading inside a fence as text. `###` and `_No response_` are
-what the GitHub issue form writes (`.github/ISSUE_TEMPLATE/bug.yml`); a
-test holds the form's labels to the record's headings.
+text, and a heading inside a fence as text. A fence is three or more
+backticks or tildes, indented by three spaces at most, closed by a line
+of the same mark at least as long. The body is walked once, so a pasted
+log of a hundred thousand lines parses in a fraction of a second.
+
+`###` and `_No response_` are what the GitHub issue form writes
+(`.github/ISSUE_TEMPLATE/bug.yml`); a test holds the form's labels to
+the record's headings. The form prefills no title: GitHub files a
+prefilled title as written when nobody edits it, and it would list as a
+module named `module`.
 
 ### The title template
 
@@ -109,14 +121,21 @@ for the module or another wording.
   directory up to the checkout's root, the first `package.json` holding a
   `name`. The `workspaces` globs are never read. The file is `--path`,
   else the first file of the checkout the artifact names
-  (`src/bugs/stack-path.ts`); with none, the checkout's own package.
+  (`src/bugs/stack-path.ts`); with none, the checkout's own package. A
+  relative `--path` is read from the directory rafa runs in, and one
+  outside the checkout, or naming no file, is refused.
 - **The checkout** is the one the command runs in. A project's root is
   its main checkout, and a command run from a worktree resolves to it,
   so the path, the package and the commit are read from the top level
-  `git` answers in the directory rafa runs in.
+  `git` answers in the directory rafa runs in. A top level that HOLDS
+  the project root is no worktree: the project is a folder of a larger
+  repository, and its own root is read, never the outer repository's
+  package.
 - **Redaction** takes the checkout's and the project's paths, the home
-  and every named secret out of each free text, as triage does, after
-  the path is read.
+  and every named secret out of each free text and so out of the title,
+  after the path is read. Both roots go in one pass, the longer first
+  (`localPathRedactor` takes a list): two passes leave the folders
+  between the home and the project in a path under the main checkout.
 
 ### The cause on the tracker
 
