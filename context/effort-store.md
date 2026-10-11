@@ -711,9 +711,13 @@ busy timeout.
 
 `findings`, `blockers`, `out_of_scope_bugs`, `changes`,
 `report_absences`, `task_reports`, `preflight`, `dispatches`,
-`skill_invocations`, `plan_ci`, `store_meta`, `merges` and
-`merge_conflicts` are SQLite-only and stay out of the port's row map.
-The last three, which migration `store-meta` creates, are the store's
+`skill_invocations`, `plan_ci`, `store_meta`, `merges`,
+`merge_conflicts` and `store_replaced` are SQLite-only and stay out of
+the port's row map. Migration `store-replaced` creates the last one,
+`store_replaced` (`store_id` as its primary key, `replaced_at`): one row
+per id this store carried before its present one, `local` in
+`MERGE_RULES`, and absent from a store an older runtime left. The
+three before it, which migration `store-meta` creates, are the store's
 own identity and its merge trail: `store_meta` holds one row (`id = 1`)
 naming the origin the store stamps, its project and the host, path and
 file identity it was minted under; `merges` records each merge and

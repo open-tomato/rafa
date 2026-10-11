@@ -9,8 +9,8 @@
  * `origin_seq` since migration `row-origins`, with the partial unique
  * index `<table>_by_origin` over the pair, and is one of the
  * `ORIGIN_TABLES` (`origins.ts`). A `local` table never leaves its
- * machine: the migration log, the store's identity row and the merge
- * trail describe this one file, and a merge neither reads them from the
+ * machine: the migration log, the store's identity row, the ids it
+ * replaced and the merge trail describe this one file, and a merge neither reads them from the
  * other store nor writes them from it.
  *
  * ## Identity
@@ -121,6 +121,7 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   plan_ci: appendOnly('pr', 'head_sha', 'read_at'),
   schema_migrations: { scope: 'local' },
   store_meta: { scope: 'local' },
+  store_replaced: { scope: 'local' },
   merges: { scope: 'local' },
   merge_conflicts: { scope: 'local' },
 };
