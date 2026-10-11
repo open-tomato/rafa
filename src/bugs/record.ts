@@ -32,9 +32,17 @@
  * the tracker. The summary has no section: the title holds it.
  *
  * {@link parseBugRecord} reads `##` and `###` headings, a value in a
- * fence or as text, and a heading inside a fence as text. `###` and
+ * fence or as text, and a heading inside a fence as text. A fence is
+ * three or more backticks or tildes, indented by three spaces at most,
+ * closed by a line of the same mark at least as long. `###` and
  * `_No response_` are what a GitHub issue form writes
  * (`.github/ISSUE_TEMPLATE/bug.yml`).
+ *
+ * Nothing a filer wrote is dropped without a word. The text ahead of the
+ * first heading is the description when no `What` section holds one, and
+ * {@link otherSections} answers the rest for the caller to file after
+ * the record's own sections: that text beside a `What` section, a
+ * section that is no field, and the second section under one heading.
  *
  * ## The check
  *
@@ -153,8 +161,8 @@ export interface BugRules {
 /** A `##` or `###` heading, its text captured. */
 const HEADING = /^#{2,3} (.+?)\s*$/;
 
-/** A line opening a fence, its backticks captured. */
-const FENCE_OPEN = /^(`{3,})/;
+/** A line opening a fence: up to three spaces, then three or more backticks or tildes, captured. */
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 
 /** What a GitHub issue form writes for a field left empty. */
 const NO_RESPONSE = '_No response_';
@@ -175,52 +183,41 @@ interface Section {
   readonly lines: readonly string[];
 }
 
-/** The sections a walk has closed, the one still open, and the fence a line is inside of. */
-interface Walk {
-  readonly closed: readonly Section[];
-  readonly open: Section | null;
-  readonly fence: string | null;
+/** A body walked once: the lines ahead of its first heading, then its sections in order. */
+interface Sections {
+  readonly lead: readonly string[];
+  readonly sections: readonly Section[];
 }
 
-/** `walk` after one more line; a heading inside a fence is a line of its section. */
-function walked(walk: Walk, line: string): Walk {
-  const heading = walk.fence === null
-    ? HEADING.exec(line)?.[1]
-    : undefined;
-  if (heading !== undefined) {
-    return {
-      closed: walk.open === null
-        ? walk.closed
-        : [...walk.closed, walk.open],
-      open: { written: line, heading: heading.trim(), lines: [] },
-      fence: null,
-    };
+/** True when `line` closes the fence `fence` opened: the same mark, at least as long, and nothing else. */
+function closesFence(fence: string, line: string): boolean {
+  const mark = line.trim();
+  return mark.length >= fence.length && mark === fence.charAt(0).repeat(mark.length);
+}
+
+/**
+ * A body's sections, a heading inside a fence read as a line of its
+ * section. One pass, each line appended to the section it falls in: a
+ * body is a pasted log as often as a paragraph, and a walk copying a
+ * section per line took seconds on a few thousand lines.
+ */
+function sectionsOf(body: string): Sections {
+  const lead: string[] = [];
+  const sections: { written: string; heading: string; lines: string[] }[] = [];
+  let fence: string | null = null;
+  for (const line of body.split(/\r?\n/)) {
+    const heading = fence === null
+      ? HEADING.exec(line)?.[1]
+      : undefined;
+    if (heading !== undefined) {
+      sections.push({ written: line, heading: heading.trim(), lines: [] });
+      continue;
+    }
+    if (fence === null) fence = FENCE_OPEN.exec(line)?.[1] ?? null;
+    else if (closesFence(fence, line)) fence = null;
+    (sections.at(-1)?.lines ?? lead).push(line);
   }
-  const fence = walk.fence === null
-    ? FENCE_OPEN.exec(line)?.[1] ?? null
-    : nextFence(walk.fence, line);
-  return {
-    closed: walk.closed,
-    open: walk.open === null
-      ? null
-      : { ...walk.open, lines: [...walk.open.lines, line] },
-    fence,
-  };
-}
-
-/** The fence still open after `line`: none when the line closes it. */
-function nextFence(fence: string, line: string): string | null {
-  return line.trim() === fence
-    ? null
-    : fence;
-}
-
-/** A body's sections, in order. The text ahead of the first heading belongs to none. */
-function sectionsOf(body: string): readonly Section[] {
-  const walk = body.split(/\r?\n/).reduce(walked, { closed: [], open: null, fence: null });
-  return walk.open === null
-    ? walk.closed
-    : [...walk.closed, walk.open];
+  return { lead, sections };
 }
 
 /** `lines` without the blank ones at either end. */
@@ -235,7 +232,7 @@ function trimmedLines(lines: readonly string[]): readonly string[] {
 function valueOf(lines: readonly string[]): string | null {
   const kept = trimmedLines(lines);
   const fence = FENCE_OPEN.exec(kept[0] ?? '')?.[1];
-  const inner = fence !== undefined && kept.length > 1 && kept.at(-1)?.trim() === fence
+  const inner = fence !== undefined && kept.length > 1 && closesFence(fence, kept.at(-1) ?? '')
     ? kept.slice(1, -1)
     : kept;
   const text = inner.join('\n').trim();
@@ -249,38 +246,82 @@ function fieldOf(heading: string): BugFieldSpec | undefined {
   return BUG_FIELDS.find((field) => field.heading.toLowerCase() === heading.toLowerCase());
 }
 
+/**
+ * A body sorted into what the record reads and what it does not: the
+ * text ahead of the first heading, the first section under each field's
+ * heading, and every other section, a field's heading used a second time
+ * among them, in the order read.
+ */
+interface SortedBody {
+  readonly lead: string;
+  readonly fields: ReadonlyMap<keyof BugRecord, Section>;
+  readonly others: readonly Section[];
+}
+
+/** `body`, sorted; see {@link SortedBody}. */
+function sortedBody(body: string): SortedBody {
+  const { lead, sections } = sectionsOf(body);
+  const fields = new Map<keyof BugRecord, Section>();
+  const others: Section[] = [];
+  for (const section of sections) {
+    const field = fieldOf(section.heading);
+    if (field === undefined || fields.has(field.key)) others.push(section);
+    else fields.set(field.key, section);
+  }
+  return { lead: trimmedLines(lead).join('\n'), fields, others };
+}
+
+/** The value of the section a sorted body holds for `key`, or null. */
+function fieldValue(sorted: SortedBody, key: keyof BugRecord): string | null {
+  const section = sorted.fields.get(key);
+  return section === undefined
+    ? null
+    : valueOf(section.lines);
+}
+
 /** True when `body` holds a section of the record. */
 export function hasBugSections(body: string): boolean {
-  return sectionsOf(body).some((section) => fieldOf(section.heading) !== undefined);
+  return sortedBody(body).fields.size > 0;
 }
 
-/** The record `body` holds: each field from the first section under its heading. See the module note. */
+/**
+ * The record `body` holds: each field from the first section under its
+ * heading. The text ahead of the first heading is the description when
+ * no `What` section holds one, so a paragraph written above the sections
+ * is never dropped. See the module note.
+ */
 export function parseBugRecord(body: string): BugRecord {
-  const sections = sectionsOf(body);
-  return Object.fromEntries(BUG_FIELDS.map(({ key, heading }) => {
-    const section = sections.find((candidate) => candidate.heading.toLowerCase() === heading.toLowerCase());
-    return [key, section === undefined
-      ? null
-      : valueOf(section.lines)];
-  })) as unknown as BugRecord;
+  const sorted = sortedBody(body);
+  const read = Object.fromEntries(BUG_FIELDS.map(({ key }) => [key, fieldValue(sorted, key)])) as unknown as BugRecord;
+  return read.what === null && sorted.lead !== ''
+    ? { ...read, what: sorted.lead }
+    : read;
 }
 
-/** The sections of `body` whose heading names no record field, as written and in order; `''` for none. */
-export function otherSections(body: string): string {
-  const others = sectionsOf(body)
-    .filter((section) => fieldOf(section.heading) === undefined)
-    .map((section) => [section.written, ...trimmedLinesKeepingLead(section.lines)].join('\n'));
-  return others.length === 0
-    ? ''
-    : `${others.join('\n\n')}\n`;
-}
-
-/** A section's lines without the blank ones closing it, one blank line ahead of its text. */
-function trimmedLinesKeepingLead(lines: readonly string[]): readonly string[] {
-  const kept = trimmedLines(lines);
+/** A section as written: its heading, a blank line, then its lines without the blank ones closing it. */
+function writtenSection(section: Section): string {
+  const kept = trimmedLines(section.lines);
   return kept.length === 0
-    ? []
-    : ['', ...kept];
+    ? section.written
+    : [section.written, '', ...kept].join('\n');
+}
+
+/**
+ * What `body` holds that {@link parseBugRecord} does not read, as
+ * written and in order; `''` for nothing. That is the text ahead of the
+ * first heading when a `What` section took its place as the description,
+ * every section whose heading names no field, and a section under a
+ * field's heading used a second time.
+ */
+export function otherSections(body: string): string {
+  const sorted = sortedBody(body);
+  const lead = sorted.lead !== '' && fieldValue(sorted, 'what') !== null
+    ? [sorted.lead]
+    : [];
+  const kept = [...lead, ...sorted.others.map(writtenSection)];
+  return kept.length === 0
+    ? ''
+    : `${kept.join('\n\n')}\n`;
 }
 
 /** The body a record is filed with; `''` for a record holding nothing. See the module note. */

@@ -1,6 +1,7 @@
 import type { BugRecord, BugRules } from './record.js';
 
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
@@ -208,6 +209,48 @@ describe('the body of a bug record', () => {
     expect(parseBugRecord(body).artifact).toBe(artifact);
   });
 
+  it('takes the text ahead of the first heading as the description when no What section holds one', () => {
+    const body = 'Intro paragraph.\nSecond line.\n\n## Reproduce\n\nrun it\n';
+
+    expect(parseBugRecord(body)).toMatchObject({ what: 'Intro paragraph.\nSecond line.', reproduce: 'run it' });
+    expect(otherSections(body)).toBe('');
+  });
+
+  it('keeps the text ahead of the first heading beside a What section, ahead of the other sections', () => {
+    const body = 'Intro.\n\n## What\n\nx\n\n## Expected\n\ny\n';
+
+    expect(parseBugRecord(body).what).toBe('x');
+    expect(otherSections(body)).toBe('Intro.\n\n## Expected\n\ny\n');
+  });
+
+  it('keeps a section named twice: the first is the field, the second is kept as written', () => {
+    const body = '## Reproduce\n\na\n\n## Notes\n\nn\n\n## Reproduce\n\nb\n';
+
+    expect(parseBugRecord(body).reproduce).toBe('a');
+    expect(otherSections(body)).toBe('## Notes\n\nn\n\n## Reproduce\n\nb\n');
+  });
+
+  it('reads a tilde fence, an indented fence and a closing fence longer than its opener as fences', () => {
+    expect(parseBugRecord('## Artifact\n\n~~~\n## What\nnot it\n~~~\n\n## What\n\nreal\n'))
+      .toMatchObject({ what: 'real', artifact: '## What\nnot it' });
+    expect(parseBugRecord('## Artifact\n\n  ```\n## What\n  ```\n')).toMatchObject({ what: null, artifact: '## What' });
+    expect(parseBugRecord('## Artifact\n\n```\nx\n````\n\n## Module\n\nloop\n')).toMatchObject({ artifact: 'x', module: 'loop' });
+  });
+
+  it('reads a fence of backticks as still open at a line of tildes', () => {
+    expect(parseBugRecord('## Artifact\n\n```\n~~~\n## What\n```\n').artifact).toBe('~~~\n## What');
+  });
+
+  it('reads a long body in one pass: a hundred thousand lines in well under two seconds', () => {
+    const body = `## Artifact\n\n\`\`\`\n${'a line of output\n'.repeat(100_000)}\`\`\`\n\n## Module\n\nloop\n`;
+    const started = performance.now();
+
+    const record = parseBugRecord(body);
+
+    expect(record.module).toBe('loop');
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
   it('reads a heading in any case, and the first of two', () => {
     expect(parseBugRecord('## MODULE\n\nloop\n\n## module\n\nboard\n').module).toBe('loop');
   });
@@ -227,7 +270,7 @@ describe('the body of a bug record', () => {
   });
 
   it('is what the web form writes: every field of the form is a heading of the record, the required ones required', () => {
-    const form = Bun.YAML.parse(readFileSync('.github/ISSUE_TEMPLATE/bug.yml', 'utf8')) as {
+    const form = Bun.YAML.parse(readFileSync(join(import.meta.dir, '..', '..', '.github', 'ISSUE_TEMPLATE', 'bug.yml'), 'utf8')) as {
       readonly labels: readonly string[];
       readonly body: readonly { readonly type: string; readonly attributes: { readonly label?: string }; readonly validations?: { readonly required?: boolean } }[];
     };
@@ -242,9 +285,16 @@ describe('the body of a bug record', () => {
     expect(form.labels).toEqual(['type:bug', 'needs-triage']);
   });
 
+  it('prefills no title on the web form: GitHub would file an unedited one as the title', () => {
+    const form = Bun.YAML.parse(readFileSync(join(import.meta.dir, '..', '..', '.github', 'ISSUE_TEMPLATE', 'bug.yml'), 'utf8')) as object;
+
+    expect(form).not.toHaveProperty('title');
+    expect(form).toHaveProperty('name', 'Bug');
+  });
+
   it('names each field once, under a heading of its own', () => {
     const headings = BUG_FIELDS.map((field) => field.heading.toLowerCase());
     expect(new Set(headings).size).toBe(headings.length);
-    expect(BUG_FIELDS.map((field) => field.key).sort()).toEqual(Object.keys(EMPTY_BUG_RECORD).sort());
+    expect(BUG_FIELDS.map((field): string => field.key).sort()).toEqual(Object.keys(EMPTY_BUG_RECORD).sort());
   });
 });

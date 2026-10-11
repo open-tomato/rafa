@@ -1,6 +1,5 @@
 name: Bug
 description: Something fails. One set of fields, so a duplicate is found before it is filed twice.
-title: "module - action: summary"
 labels: ["type:bug", "needs-triage"]
 body:
   - type: markdown
