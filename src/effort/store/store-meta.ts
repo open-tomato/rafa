@@ -1,8 +1,9 @@
 /**
  * The store's own identity row: reading what `store_meta` records,
- * minting a new origin into it on a writing open that needs one, and
- * rotating the store's generation on every writing open and on every
- * rebuild that keeps the store's origin.
+ * minting a new origin into it on a writing open that needs one,
+ * settling on that mint which ids `store_replaced` holds, and rotating
+ * the store's generation on every writing open and on every rebuild
+ * that keeps the store's origin.
  *
  * ## What a writing open writes
  *
@@ -65,6 +66,41 @@
  * stamps none. Git is only asked on a mint, never on a write that keeps
  * the origin, and before the lock is taken: under it, git is asked only
  * for a store that came due a mint while this open waited.
+ *
+ * ## The ids a mint replaces
+ *
+ * `store_meta` holds one row, so a mint writes the new origin over the
+ * old one. A claim names the id of the store that made it, and a store
+ * file given a new device or inode under its own host and path is still
+ * this device's store. So a mint settles `store_replaced`
+ * (`store-replaced.ts`) by its reasons, in the transaction that writes
+ * the new row:
+ *
+ *   - `file`, `generation`, or both: the host and the path were kept.
+ *     One host and one path hold one store file at a time, so this is
+ *     the device's own store, moved or rolled back. The outgoing id is
+ *     recorded with the time the new row takes as `minted_at`, read from
+ *     the clock once, and every id recorded before it stays. `generation`
+ *     alone is what a crash between the side record's rename and the
+ *     commit leaves, and both together what a backup renamed back over
+ *     the store after a write leaves.
+ *   - `host` or `path` among them, whatever else moved: the file is a
+ *     copy, and a copy carries the original's table inside it. The table
+ *     is emptied and the outgoing id is not recorded, so a copy inherits
+ *     no claim.
+ *   - `unminted`: no id is outgoing, and nothing is written.
+ *
+ * A write that keeps the origin, and a mint that knows no project and
+ * writes nothing, leave the table as it was. The record and the row
+ * commit together: a side record that fails to write rolls both back.
+ *
+ * `withSqliteStore` settles after `bringForward`, which has applied
+ * `store-replaced` by then, so the table is there on every writing open.
+ * A mint that keeps the host and the path over a store without it
+ * throws SQLite's `no such table: store_replaced` and writes nothing,
+ * since an id that cannot be kept is not reported as kept. A mint an
+ * older runtime made recorded nothing, and neither did any mint from
+ * before the table: those ids are in no store.
  *
  * ## Device and inode as SQLite integers
  *
@@ -156,9 +192,17 @@ import {
   readProjectIdentity,
   readStoreFileFacts,
 } from './store-identity.js';
+import { clearReplacedStoreIds, recordReplacedStoreId } from './store-replaced.js';
 
 /** The width of the unsigned device and inode values. */
 const STORED_INTEGER_BITS = 64;
+
+/**
+ * The reasons that make the file a mint finds a copy of the store its
+ * row was minted for, at another host or path. A mint with neither
+ * among its reasons found the device's own store.
+ */
+const COPY_REASONS: readonly MintReason[] = ['host', 'path'];
 
 /**
  * What a store open reads the machine and the clock through. Every
@@ -174,7 +218,7 @@ export interface StoreIdentitySeams {
   readonly newStoreId?: () => string;
   /** A new generation. `crypto.randomUUID` when absent. */
   readonly newGeneration?: () => string;
-  /** The time a mint records. `new Date()` when absent. */
+  /** The time a mint records, in the row and for the id it replaces. `new Date()` when absent. */
   readonly now?: () => Date;
 }
 
@@ -198,7 +242,7 @@ export type IdentityOutcome =
   | { readonly action: 'none' }
   /** A write to the store its origin was minted for: only a new generation written. */
   | { readonly action: 'keep'; readonly storeId: string }
-  /** A write that recorded the new origin `storeId` and a new generation. */
+  /** A write that recorded the new origin `storeId` and a new generation, and settled `store_replaced`. */
   | { readonly action: 'mint'; readonly storeId: string; readonly reasons: readonly MintReason[] }
   /** A write that was due a mint and wrote nothing, knowing no project. */
   | { readonly action: 'no-project'; readonly reasons: readonly MintReason[] };
@@ -287,18 +331,18 @@ function projectFor(
 }
 
 /**
- * Replaces the store's one `store_meta` row with a new origin minted for
- * `facts`, holding `generation`.
+ * Replaces the store's one `store_meta` row with a new origin minted at
+ * `mintedAt` for `facts`, holding `generation`.
  */
 function writeStoreMeta(
   db: Database,
   facts: StoreIdentityFacts,
   project: KnownProject,
   generation: string,
+  mintedAt: Date,
   seams: StoreIdentitySeams,
 ): string {
   const storeId = (seams.newStoreId ?? randomUUID)();
-  const mintedAt = (seams.now?.() ?? new Date()).toISOString();
   db.query(
     'INSERT OR REPLACE INTO store_meta (id, store_id, project_root_commit, project_remote,'
       + ' host_id, store_path, file_dev, file_ino, minted_at, generation) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -310,10 +354,33 @@ function writeStoreMeta(
     facts.storePath,
     toStoredInteger(facts.fileDev),
     toStoredInteger(facts.fileIno),
-    mintedAt,
+    mintedAt.toISOString(),
     generation,
   );
   return storeId;
+}
+
+/**
+ * Settles `store_replaced` for a mint at `mintedAt`, for `reasons`, over
+ * the row `outgoing` (null for an unminted store). A mint with `host` or
+ * `path` among its reasons found a copy: the table is emptied and the
+ * outgoing id is not recorded. Any other mint over a row kept the host
+ * and the path: the outgoing id is recorded with `mintedAt`. An unminted
+ * store has no outgoing id and nothing is written. Begins no
+ * transaction, so each write commits or rolls back with the caller's.
+ */
+function settleReplacedIds(
+  db: Database,
+  outgoing: StoreMeta | null,
+  reasons: readonly MintReason[],
+  mintedAt: Date,
+): void {
+  if (reasons.some((reason) => COPY_REASONS.includes(reason))) {
+    clearReplacedStoreIds(db);
+    return;
+  }
+  if (outgoing === null) return;
+  recordReplacedStoreId(db, outgoing.storeId, mintedAt);
 }
 
 /**
@@ -321,8 +388,12 @@ function writeStoreMeta(
  * generation into the row and the side record on a keep, a new origin
  * with a new generation on a mint, nothing when a mint knows no project.
  * The project is the one read before the lock, or, for a store that came
- * due a mint only while this open waited, the one read now. The row is written before the side record and both before the commit,
- * so a side record that fails to write rolls the row back with it.
+ * due a mint only while this open waited, the one read now. A mint also
+ * settles `store_replaced` over the row read under the lock, the id it
+ * is about to write over: recorded when the mint keeps the host and the
+ * path, the table emptied when either moved ({@link settleReplacedIds}).
+ * The rows are written before the side record and both before the
+ * commit, so a side record that fails to write rolls them back with it.
  */
 function settleUnderLock(
   db: Database,
@@ -344,7 +415,9 @@ function settleUnderLock(
 
   const project = prefetched ?? projectFor(facts.storePath, current, seams);
   if (project === null) return { action: 'no-project', reasons: decision.reasons };
-  const storeId = writeStoreMeta(db, facts, project, generation, seams);
+  const mintedAt = seams.now?.() ?? new Date();
+  settleReplacedIds(db, current, decision.reasons, mintedAt);
+  const storeId = writeStoreMeta(db, facts, project, generation, mintedAt, seams);
   writeStoreGeneration(facts.storePath, generation);
   return { action: 'mint', storeId, reasons: decision.reasons };
 }
@@ -354,7 +427,10 @@ function settleUnderLock(
  * with `access`: nothing on a read; on a write, under the write lock,
  * the recorded origin kept for the same file or a new one minted for an
  * unminted store or a copy, and a new generation written to the row and
- * the side record either way. See the module note.
+ * the side record either way. A mint over a recorded origin also
+ * settles `store_replaced`: the outgoing id recorded when the host and
+ * the path were kept, the table emptied when either moved. See the
+ * module note.
  */
 export function settleStoreIdentity(
   db: Database,
