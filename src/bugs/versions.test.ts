@@ -2,7 +2,8 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { codeVersionOf, errorLineOf, suggestedEnvironment, versionsText } from './versions.js';
+import { suggestedEnvironment } from './places.js';
+import { codeVersionOf, errorLineOf, versionsText } from './versions.js';
 
 /** A git answering each first argument with what `answers` holds, recording every call. */
 function plantGit(answers: Readonly<Record<string, Partial<GitResult>>>): { readonly git: GitRunner; readonly calls: string[][] } {

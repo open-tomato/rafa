@@ -90,7 +90,7 @@ const USER_PATH = '/home/someone/.rafa/config.yaml';
 /** The known-keys tail of a warning about a top-level unknown key. */
 const KNOWN = '(known keys: version, store, effort, hub, plan, specs, tracker, learning, '
   + 'output, prerequisites, tracking, modules, allowList, loop, pr, board, '
-  + 'roadmap, claims, triage, release, errors, logger, cleanup, dangerous, status, tiers, routing, task, tests)';
+  + 'roadmap, claims, triage, release, errors, logger, issues, cleanup, dangerous, status, tiers, routing, task, tests)';
 
 /** Every setting, in the order a layer holds them. */
 const SETTINGS: readonly ConfigSetting[] = [
@@ -161,6 +161,11 @@ const SETTINGS: readonly ConfigSetting[] = [
   'loggerModules',
   'loggerCallSite',
   'loggerApi',
+  'issuesTitleBug',
+  'issuesSummaryMax',
+  'issuesEnvironments',
+  'issuesVocabularyModules',
+  'issuesVocabularyActions',
   'cleanupStaleDays',
   'cleanupWorktreeIdleDays',
   'cleanupKeep',
@@ -248,6 +253,11 @@ const DEFAULTS: RafaConfig = {
   loggerModules: new Map(),
   loggerCallSite: false,
   loggerApi: false,
+  issuesTitleBug: '?(${module}?( - ${action}): )${summary}',
+  issuesSummaryMax: 80,
+  issuesEnvironments: [],
+  issuesVocabularyModules: [],
+  issuesVocabularyActions: [],
   cleanupStaleDays: 30,
   cleanupWorktreeIdleDays: 7,
   cleanupKeep: [],
@@ -389,6 +399,14 @@ const FULL = [
   '  modules: { board: { level: error } }',
   '  callSite: true',
   '  api: true',
+  'issues:',
+  '  titles:',
+  '    bug: "?([${project}] )${summary}"',
+  '    summaryMax: 70',
+  '  environments: [staging]',
+  '  vocabulary:',
+  '    modules: [auth, billing]',
+  '    actions: [login]',
   'cleanup:',
   '  staleDays: 60',
   '  worktreeIdleDays: 14',
@@ -500,6 +518,11 @@ const FULL_VALUES: RafaConfig = {
   loggerModules: new Map([['board', 'error']]),
   loggerCallSite: true,
   loggerApi: true,
+  issuesTitleBug: '?([${project}] )${summary}',
+  issuesSummaryMax: 70,
+  issuesEnvironments: ['staging'],
+  issuesVocabularyModules: ['auth', 'billing'],
+  issuesVocabularyActions: ['login'],
   cleanupStaleDays: 60,
   cleanupWorktreeIdleDays: 14,
   cleanupKeep: ['release/*', 'keep-me'],
@@ -580,7 +603,7 @@ describe('CONFIG_DEFAULTS', () => {
       .filter((value) => Array.isArray(value));
 
     expect(Object.isFrozen(CONFIG_DEFAULTS)).toBe(true);
-    expect(lists).toHaveLength(12);
+    expect(lists).toHaveLength(15);
     expect(lists.filter((list) => !Object.isFrozen(list))).toEqual([]);
   });
 });
@@ -1080,6 +1103,31 @@ describe('parseConfigText', () => {
         'logger.api', 'logger:\n  api: 1',
         'logger.api is 1, expected true or false',
         'logger:\n  api: true', 'loggerApi', true,
+      ],
+      [
+        'issues.titles.bug', 'issues:\n  titles:\n    bug: "${summary"',
+        'issues.titles.bug is "${summary", expected a title template: "${" at 0 is never closed',
+        'issues:\n  titles:\n    bug: "${summary}"', 'issuesTitleBug', '${summary}',
+      ],
+      [
+        'issues.titles.summaryMax', 'issues:\n  titles:\n    summaryMax: 19',
+        'issues.titles.summaryMax is 19, expected a whole number from 20 to 120',
+        'issues:\n  titles:\n    summaryMax: 60', 'issuesSummaryMax', 60,
+      ],
+      [
+        'issues.environments', 'issues:\n  environments: [ci]',
+        'issues.environments[0] is "ci", expected a place name in lower-case kebab-case, other than local, ci, prod and unknown',
+        'issues:\n  environments: [qa]', 'issuesEnvironments', ['qa'],
+      ],
+      [
+        'issues.vocabulary.modules', 'issues:\n  vocabulary:\n    modules: [Auth]',
+        'issues.vocabulary.modules[0] is "Auth", expected a module name in lower-case letters, digits, ".", "_" and "-", other than unknown',
+        'issues:\n  vocabulary:\n    modules: [auth]', 'issuesVocabularyModules', ['auth'],
+      ],
+      [
+        'issues.vocabulary.actions', 'issues:\n  vocabulary:\n    actions: [Login]',
+        'issues.vocabulary.actions[0] is "Login", expected an action in lower-case letters, digits, ".", "_", "-" and spaces, other than unknown',
+        'issues:\n  vocabulary:\n    actions: [login]', 'issuesVocabularyActions', ['login'],
       ],
       [
         'cleanup.staleDays', 'cleanup:\n  staleDays: 0',

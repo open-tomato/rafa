@@ -1,15 +1,13 @@
 /**
  * The context rafa fills in a bug record itself (#951): the code
- * version, the place, the `Versions` section and the error line.
+ * version, the `Versions` section and the error line. The place it
+ * suggests is `./places.ts`'s.
  *
  *   - **The code version** is the short commit of the checkout and
  *     whether a TRACKED file has changes, as `git describe --dirty`
  *     counts them: an untracked file is no change to the code that ran.
  *     Outside a repository there is no commit, and the section says
  *     `unknown`.
- *   - **The place** rafa suggests is `ci` when the `CI` variable is set
- *     to anything but nothing, `0` or `false`, and `local` otherwise. A
- *     filer's `--env` wins over it.
  *   - **The `Versions` section** holds one `name: value` line for the
  *     rafa version, the code version, the package the error's file
  *     belongs to (`src/project/package-of.ts`) and that file's path,
@@ -32,17 +30,11 @@ export interface CodeVersion {
   readonly dirty: boolean;
 }
 
-/** The places every project has, in the order a refusal lists them. */
-export const BUILT_IN_ENVIRONMENTS = ['local', 'ci', 'prod'] as const;
-
 /** What follows the commit of a tree with changes. */
 export const DIRTY_MARK = '-dirty';
 
 /** What the section says for a checkout with no commit. */
 export const NO_COMMIT = 'unknown';
-
-/** The values of `CI` that say the run is not one. */
-const CI_OFF: readonly string[] = ['', '0', 'false'];
 
 /** The code version of the checkout `git` runs in; see the module note. */
 export function codeVersionOf(git: GitRunner): CodeVersion {
@@ -51,13 +43,6 @@ export function codeVersionOf(git: GitRunner): CodeVersion {
   if (!head.ok || commit === '') return { commit: null, dirty: false };
   const status = git(['status', '--porcelain', '--untracked-files=no']);
   return { commit, dirty: status.ok && status.stdout.trim() !== '' };
-}
-
-/** The place rafa suggests for a run with the environment `env`; see the module note. */
-export function suggestedEnvironment(env: Readonly<Record<string, string | undefined>>): 'ci' | 'local' {
-  return CI_OFF.includes((env['CI'] ?? '').trim().toLowerCase())
-    ? 'local'
-    : 'ci';
 }
 
 /** What the `Versions` section is written from. */
