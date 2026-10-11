@@ -60,9 +60,9 @@ import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { chmodSync, copyFileSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
@@ -664,6 +664,37 @@ describe('a claim re-signed over a real store on disk, given a new inode at its 
     expect([afterMint.via, afterMint.storeId, afterMint.replacedId]).toEqual(['re-signed', RESIGNED, ORIGINAL]);
     expect(remoteRecord(trio)).toEqual({ action: 'take', issue: ISSUE, store: RESIGNED });
     expect(parentOf(trio, remoteTip(trio))).toBe(sha);
+  });
+
+  it('empties store_replaced on the copy\'s first write, so the claim check refuses it on the original\'s claim', () => {
+    const trio = plantTrio('real-copy-another-path');
+    const originalPath = sqliteStorePath(trio.aRoot);
+    const ORIGINAL = 'store-on-disk-original-elsewhere';
+    const COPY = 'store-on-disk-copy-elsewhere';
+    mintStore(originalPath, ORIGINAL);
+    const sha = pushClaim(trio.a, ORIGINAL);
+
+    const copyRoot = realpathSync(mkdtempSync(join(scope, 'real-copy-another-path-copy-')));
+    const copyPath = sqliteStorePath(copyRoot);
+    mkdirSync(dirname(copyPath), { recursive: true });
+    copyFileSync(originalPath, copyPath);
+
+    withSqliteStore(copyPath, 'write', false, () => undefined, {
+      readProject: () => ({ rootCommit: STORE_PROJECT, remote: null }),
+      newStoreId: () => COPY,
+      now: () => new Date(MINTED_LONG_BEFORE),
+    });
+    const copyId = readDeviceStoreId(copyRoot, { store: 'sqlite' });
+    const claim = refusal(readRunClaim(PLAN, onDiskSeams(trio.a, copyRoot)));
+
+    if (!copyId.ok) throw new Error(`expected the copy to mint an id, read ${copyId.cause}`);
+    expect(copyId.storeId).toBe(COPY);
+    expect(copyId.replacedIds).toEqual([]);
+    expect(claim).toEqual({
+      owner: ORIGINAL,
+      reason: `#7 is claimed by store ${ORIGINAL} on ${BRANCH}, not by this device (store ${COPY})`,
+    });
+    expect(remoteTip(trio)).toBe(sha);
   });
 });
 
