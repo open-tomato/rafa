@@ -38,6 +38,8 @@ const BRANCH = 'feat/rafa-7-hand';
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
 const STORE_C = 'store-c';
+/** An id store A carried before its file was replaced in place. */
+const STORE_A_REPLACED = 'store-a-replaced';
 const SUBJECTS = [{ name: 'claim', summary: 'claims' }];
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claim-hand-')));
@@ -129,9 +131,9 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
   return { board: createGhIssueBoard({ gh }), calls };
 }
 
-/** A store id reader answering `storeId`. */
-function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' });
+/** A store id reader answering `storeId`, with the ids that store replaced. */
+function storeIdOf(storeId: string, replacedIds: readonly string[] = []): () => DeviceStoreId {
+  return () => ({ ok: true, storeId, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** The command over `seams`, whatever project it runs in. */
@@ -207,6 +209,35 @@ describe('rafa claim hand --to, by the owner', () => {
     expect(run.stdout).toContain(`Handed the claim on #7 (store ${STORE_A}) on ${BRANCH} over to store ${STORE_B}:`
       + ` hand commit ${tip ?? ''} pushed to origin. This device stays the owner until store ${STORE_B} runs rafa claim accept 7.`);
     expect(run.stdout).not.toContain('It replaces');
+  });
+
+  it('hands over a claim naming an id the store replaced, the hand commit naming the store\'s own id', async () => {
+    const world = plantWorld('replaced');
+    const claim = claimBranch(world.a, STORE_A_REPLACED);
+    const seams = { git: world.a, board: null, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) };
+
+    const run = await hand(world, ['7', `--to=${STORE_B}`, '--output=json'], seams);
+
+    expect(run.exitCode).toBe(0);
+    const tip = remoteTip(world);
+    expect(must(world.origin, ['rev-parse', `${tip ?? ''}^`])).toBe(claim);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'hand', issue: ISSUE, store: STORE_A, to: STORE_B } });
+    expect(must(world.origin, ['log', '-1', '--format=%B', `refs/heads/${BRANCH}`])).not.toContain(STORE_A_REPLACED);
+    const result = eventsOf(run.stdout).find((event) => event.type === 'result');
+    expect(result).toMatchObject({ data: { action: 'hand', storeId: STORE_A, to: STORE_B, sha: tip } });
+  });
+
+  it('withdraws a handover of a claim naming an id the store replaced, under the store\'s own id', async () => {
+    const world = plantWorld('replaced-withdraw');
+    claimBranch(world.a, STORE_A_REPLACED);
+    const offered = pushRecord(world, world.a, { action: 'hand', issue: ISSUE, store: STORE_A_REPLACED, to: STORE_B });
+    const seams = { git: world.a, board: null, readStoreId: storeIdOf(STORE_A, [STORE_A_REPLACED]) };
+
+    const run = await hand(world, ['7', '--withdraw'], seams);
+
+    expect(run.exitCode).toBe(0);
+    expect(must(world.origin, ['rev-parse', `${remoteTip(world) ?? ''}^`])).toBe(offered);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'withdraw', issue: ISSUE, store: STORE_A } });
   });
 
   it('reads --to given as a separate word', async () => {
@@ -310,6 +341,17 @@ describe('rafa claim hand, refused', () => {
 
     expectRefused(run, 'this device does not own the claim on #7, so nothing was pushed', world, claim);
     expect(run.stderr).toContain(`#7 is claimed by store ${STORE_A} on ${BRANCH}, not by this device (store ${STORE_B})`);
+  });
+
+  it('when the holder is an id another store replaced, naming this store\'s own id', async () => {
+    const world = plantWorld('replaced-stranger');
+    const claim = claimBranch(world.a, STORE_A_REPLACED);
+    const seams = { git: world.b, board: null, readStoreId: storeIdOf(STORE_B, ['store-b-replaced']) };
+
+    const run = await hand(world, ['7', `--to=${STORE_C}`], seams);
+
+    expectRefused(run, 'this device does not own the claim on #7, so nothing was pushed', world, claim);
+    expect(run.stderr).toContain(`#7 is claimed by store ${STORE_A_REPLACED} on ${BRANCH}, not by this device (store ${STORE_B})`);
   });
 
   it('when the receiver holds a pending handover but has not accepted it', async () => {

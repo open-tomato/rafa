@@ -1136,6 +1136,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./move.js', ['applyEpicMove', 'readEpicMove']],
   ]],
   ['./commands/claim/release.js', [
+    ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/git.js', ['claimBranchIssue', 'fetchClaimBranches', 'makeOwnershipCommit', 'pushOwnershipCommit', 'readClaimBranch']],
     ['../../claims/labels.js', ['unlabelReleased']],
     ['../../cli/command.js', ['CommandExit']],
@@ -1150,7 +1151,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
-    ['./release.js', ['findOwnedBranch', 'pushOnClaimTip', 'readClaimStoreId', 'readIssueArgument', 'readIssueBranches']],
+    ['./release.js', ['findOwnedBranch', 'pushOnClaimTip', 'readClaimDevice', 'readIssueArgument', 'readIssueBranches']],
   ]],
   ['./commands/claim/accept.js', [
     ['../../claims/record.js', ['parseClaimMessage']],

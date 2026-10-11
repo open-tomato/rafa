@@ -27,6 +27,16 @@
  * RECORD, not from staleness: an owner may release its claim at any
  * age and at either stage.
  *
+ * ## Whose claim it is
+ *
+ * `holdsClaim` (`src/claims/device.ts`) decides whether a branch's
+ * claim is this device's: the holder is the store's id, or an id the
+ * store carried before its file got a new device or inode under the
+ * same host and path. A claim naming such a replaced id is released as
+ * any other of this device's. The release commit, the result and every
+ * refusal name the store's own id, never the replaced one the claim was
+ * made under, so the record the remote keeps says which store let go.
+ *
  * No local ref, index or working tree moves. The push itself writes
  * `refs/remotes/origin/<branch>` (measured in `src/claims/plan-claim.ts`),
  * and a local `feat/<stub>` is left where it was: its work commits are
@@ -60,19 +70,23 @@
  *
  * The reading and pushing steps are exported, each taking the refusal
  * its caller makes and a {@link ClaimDoing} for the words, so
- * `./hand.ts` reads the line, the store id, the issue's branches and
- * this store's claim, and pushes its commit, exactly as a release does,
- * and `./accept.ts` reads the line, the store id and the issue's
+ * `./hand.ts` reads the line, the store's ids, the issue's branches
+ * and this store's claim, and pushes its commit, exactly as a release
+ * does, and `./accept.ts` reads the line, the store id and the issue's
  * branches the same way and pushes its commit the same way.
+ * {@link readClaimDevice} answers the store's id with the ids it
+ * replaced, for a caller that compares a holder; {@link readClaimStoreId}
+ * answers the id alone.
  */
 import type { IssueBoard } from '../../board/issue-board.js';
-import type { DeviceStoreId } from '../../claims/device.js';
+import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { RafaConfig } from '../../config.js';
 import type { GitRunner } from '../../pr/index.js';
 
+import { holdsClaim } from '../../claims/device.js';
 import {
   claimBranchIssue,
   fetchClaimBranches,
@@ -153,8 +167,14 @@ export function readIssueArgument(args: readonly string[], usage: string): numbe
   return Number(word);
 }
 
-/** This device's store id, or a refusal made by `refuseWith` saying why it has none. */
-export function readClaimStoreId(seams: ClaimCommandSeams, refuseWith: (message: string) => CommandExit): string {
+/** The ids a claim's holder is compared with: the store's own and the ones it replaced. */
+export type ClaimDevice = Pick<DeviceStoreIds, 'storeId' | 'replacedIds'>;
+
+/**
+ * This device's store id and the ids that store replaced, or a refusal
+ * made by `refuseWith` saying why it has none.
+ */
+export function readClaimDevice(seams: ClaimCommandSeams, refuseWith: (message: string) => CommandExit): ClaimDevice {
   let device: DeviceStoreId;
   try {
     device = seams.readStoreId();
@@ -162,7 +182,12 @@ export function readClaimStoreId(seams: ClaimCommandSeams, refuseWith: (message:
     throw refuseWith(`the effort store could not be read for this device's store id: ${messageOf(error)}`);
   }
   if (!device.ok) throw refuseWith(device.reason);
-  return device.storeId;
+  return { storeId: device.storeId, replacedIds: device.replacedIds };
+}
+
+/** This device's store id, or a refusal made by `refuseWith` saying why it has none. */
+export function readClaimStoreId(seams: ClaimCommandSeams, refuseWith: (message: string) => CommandExit): string {
+  return readClaimDevice(seams, refuseWith).storeId;
 }
 
 /**
@@ -196,19 +221,22 @@ function notOwnedReason(reading: ClaimBranchReading, issue: number, storeId: str
 }
 
 /**
- * The one branch of the issue this store holds, or a refusal made by
- * `refuseWith` naming what the others say and closing with `doing.nothing`.
+ * The one branch of the issue this device holds, under its store's id
+ * or one that store replaced (`holdsClaim`), or a refusal made by
+ * `refuseWith` naming what the others say and closing with
+ * `doing.nothing`. A refusal names the store's own id.
  */
 export function findOwnedBranch(
   readings: readonly ClaimBranchReading[],
-  owner: { readonly issue: number; readonly storeId: string },
+  owner: { readonly issue: number; readonly device: ClaimDevice },
   refuseWith: (message: string) => CommandExit,
   doing: ClaimDoing,
 ): FoundBranch {
-  const { issue, storeId } = owner;
+  const { issue, device } = owner;
+  const { storeId } = device;
   const owned = readings.filter((reading): reading is FoundBranch => reading.state === 'found'
     && reading.ownership.state === 'held'
-    && reading.ownership.owner === storeId);
+    && holdsClaim(device, reading.ownership.owner));
   const [only] = owned;
   if (owned.length === 1 && only !== undefined) return only;
   if (owned.length > 1) {
@@ -247,8 +275,9 @@ export async function releaseClaim(context: RafaContext, makeSeams: ClaimSeamsFa
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams = makeSeams(project.root, config);
-  const storeId = readClaimStoreId(seams, refuse);
-  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, storeId }, refuse, RELEASING);
+  const device = readClaimDevice(seams, refuse);
+  const { storeId } = device;
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, RELEASING);
   const sha = pushOnClaimTip(seams.git, reading, { action: 'release', issue, store: storeId }, refuse, RELEASING);
   const label = await unlabelReleased(seams.board, issue);
   const labelWarning = label.outcome === 'warning'

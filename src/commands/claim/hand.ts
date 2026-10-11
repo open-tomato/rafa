@@ -27,7 +27,10 @@
  *
  * The one branch of the issue whose claim this store holds gets one
  * empty commit made on its remote tip and pushed with
- * `--force-with-lease` on that tip (`src/claims/git.ts`):
+ * `--force-with-lease` on that tip (`src/claims/git.ts`). A claim
+ * naming an id the store replaced is this store's too, as
+ * `rafa claim release` reads it (`./release.ts`), and the commit pushed
+ * over it names the store's own id, never the replaced one:
  *
  * | Line | Pending handover | Commit |
  * |---|---|---|
@@ -77,7 +80,7 @@ import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 import {
   findOwnedBranch,
   pushOnClaimTip,
-  readClaimStoreId,
+  readClaimDevice,
   readIssueArgument,
   readIssueBranches,
 } from './release.js';
@@ -190,11 +193,12 @@ export function handClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): C
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
-  const storeId = readClaimStoreId(seams, refuse);
+  const device = readClaimDevice(seams, refuse);
+  const { storeId } = device;
   if (request.action === 'hand' && request.to === storeId) {
     throw refuse(`--${TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
   }
-  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, storeId }, refuse, HANDING);
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, HANDING);
   const { record, to, replaced } = recordFor(reading, request, issue, storeId);
   const sha = pushOnClaimTip(seams.git, reading, record, refuse, HANDING);
   return { issue, branch: reading.branch, action: request.action, storeId, to, replaced, sha };
