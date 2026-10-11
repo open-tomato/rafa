@@ -5,9 +5,9 @@
  *
  * Until something sets another, it is a console logger at verbosity 0
  * with no colour, writing through the active output. The dispatcher
- * sets one per command, made with that invocation's verbosity and
- * colour, and puts the previous one back afterwards
- * ({@link setActiveLogger} answers the state to restore).
+ * runs every command with a logger of its own, made with that
+ * invocation's verbosity and colour, in a scope
+ * (`src/cli/dispatch.ts`), and sets no module-level logger.
  *
  * ## Where it is held
  *
@@ -22,7 +22,7 @@
  *     however it ends, nothing of it is left.
  *   - **The module-level value.** Outside every scope the reader answers
  *     one module-level logger and the setters replace it, the default
- *     until something sets another.
+ *     until something sets another. No module but a test sets it.
  *
  * A scope belongs to one run, so runs need not nest to stay apart. Two
  * that overlap in one process, started together and awaited with

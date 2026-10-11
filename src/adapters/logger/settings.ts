@@ -22,10 +22,15 @@
  *     (`node:async_hooks`). Inside that function, and in everything it
  *     awaits or starts, the reader answers the scope's settings and the
  *     setter replaces them. Once the function ends, however it ends,
- *     nothing of them is left.
+ *     nothing of them is left. The dispatcher runs every command this
+ *     way, starting from the defaults (`src/cli/dispatch.ts`), so the
+ *     config a command loads sets that invocation's settings alone.
  *   - **The module-level value.** Outside every scope the reader answers
  *     one module-level value and the setter replaces it, the defaults
- *     until something sets another.
+ *     until something sets another. A config loaded outside every
+ *     command sets it, as the module loader (`src/modules/load.ts`) and
+ *     the command hook (`src/status/hook.ts`) load one around an
+ *     invocation; no command reads it.
  *
  * A scope belongs to one run, so runs need not nest to stay apart. Two
  * that overlap in one process, started together and awaited with

@@ -142,17 +142,52 @@ Where the runtime removes the calling frame altogether, as for
 ### The active logger, and when config reaches it
 
 `src/adapters/logger/active.ts` holds the logger the process writes
-through, beside the active output. The dispatcher sets one per command
-(`setCommandLogger`, `src/cli/dispatch.ts`), made with the invocation's
-verbosity and colour, and puts the previous one back afterwards.
+through, beside the active output. The dispatcher makes one per command
+(`commandLogger`, `src/cli/dispatch.ts`), with the invocation's verbosity
+and colour, and runs the command with it in an async scope
+(`runWithActiveLogger`), an `AsyncLocalStorage`.
 
 A command's logger exists before the project is found, and the command
-loads its config later. So the settings are module state: `loadConfig`
-hands them over once a config is read, before it prints that load's own
-warnings, and a logger reads them at each entry. Until then the defaults
-and the verbosity flags apply. Every invocation starts from the defaults,
-so a command that loads no config runs at the defaults whatever the file
-says.
+loads its config later. So the settings are held apart from the logger,
+in `src/adapters/logger/settings.ts`, in a scope of the same invocation
+(`runWithLoggerSettings`): `loadConfig` sets them once a config is read,
+before it prints that load's own warnings, and a logger reads them at
+each entry. Until then the defaults and the verbosity flags apply. Every
+invocation starts from the defaults, so a command that loads no config
+runs at the defaults whatever the file says.
+
+Both scopes end with the command, whether it returns or throws, and the
+dispatcher sets no module-level value. So two commands dispatched in one
+process and awaited with `Promise.all` each read their own logger and
+their own settings, whichever ends first, and a command dispatched from
+inside another starts from the defaults and leaves the outer one's as
+they were (#927; `src/cli/dispatch-logger-scope.test.ts`).
+
+### Setting the logger or the settings
+
+`setActiveLogger`, `restoreActiveLogger` and `setActiveLoggerSettings`
+follow one rule with the readers: each acts on the innermost scope when
+called inside one, and on the module-level value otherwise.
+
+- **Inside a command**, a set replaces that invocation's logger or
+  settings, and nothing of it is left once the command ends. This is how
+  the config a command loads reaches its own logger and no other.
+- **Outside every command**, a set replaces the module-level value: the
+  default logger and the default settings until something sets another.
+  A test sets it, and so does a config loaded around an invocation, by
+  the module loader (`src/modules/load.ts`) and the command hook
+  (`src/status/hook.ts`). No command reads it: it is hidden while a
+  command runs and read again after.
+
+The active output differs: `setActiveOutput` writes the module-level
+value even inside a command (`context/cli.md`).
+
+A callback the runtime calls from outside the scope reads and sets the
+module-level value. Measured under bun 1.3.14, a `process.on` signal
+listener registered inside the scope, an abort listener it fires and an
+abort listener an `AbortSignal.timeout` fires did; a timer, a microtask
+and the code after an await read the invocation's, and so did a signal
+listener wrapped with `AsyncResource.bind` where it was registered.
 
 ### The gate on `Output`
 
@@ -169,6 +204,13 @@ is written, as `debug: <message>`, at verbosity 2 or with `logger.level:
 debug`.
 
 A logger whose `enabled` throws hides nothing: the line is written.
+
+The gate asks for the active logger when the line is written. A line a
+command's output is handed from a callback outside the scope, a signal
+listener as measured above, is therefore gated by the module-level
+logger, whatever that invocation loaded. No signal or abort listener
+under `src/` writes through an output or a logger (`context/cli.md` lists
+them).
 
 ### Moving a module
 
