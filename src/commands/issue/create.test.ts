@@ -19,7 +19,7 @@
  *
  * A spec's `Blocked by:` line is driven on the fake and on `local` over
  * a board whose first issue a case files itself: a line naming it files
- * the spec marked blocked, beside a bug with the same line filed
+ * the spec marked blocked, beside a chore with the same line filed
  * unmarked, and a line naming the issue being filed, an issue the board
  * lacks or no issue at all is refused with the issue count unchanged,
  * the last before any `gh` runs.
@@ -99,7 +99,9 @@ afterAll(() => {
 const SPAWN_TIMEOUT = 30_000;
 
 /** The usage line a refusal names. */
-const USAGE = 'rafa issue create --title=<text> [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]';
+const USAGE = 'rafa issue create (--title=<text> | --type=bug --summary=<text> --module=<name> --action=<name> --cause=<code>'
+  + ' --reproduce=<text>) [--body=<text> | --body-file=<path>] [--type=<type>] [--module=<name>] [--priority=<priority>]'
+  + ' [--env=<place>] [--proposed=<code>] [--rerun=<command>] [--project=<name>] [--path=<file>] [--dry-run]';
 
 /** The subject the dispatched cases route under. */
 const SUBJECTS = [{ name: 'issue', summary: 'issues' }];
@@ -116,8 +118,11 @@ const GITHUB_CONFIG = 'tracker:\n  default: github\n  fallback: [local]\n';
 /** What the `github` preflight answers over a fake with no host logged in. */
 const NOT_LOGGED_IN = 'gh auth status: You are not logged into any GitHub hosts. To log in, run: gh auth login';
 
-/** The words of a line filing a bug with a body. */
-const BUG_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=bug', '--body=Seen twice.'];
+/**
+ * The words of a line filing an issue with a body. A chore, since a bug is
+ * filed from its fields: `./create-bug.test.ts` holds those lines.
+ */
+const FILED_LINE = ['issue', 'create', '--title=Timeouts in plan show', '--type=chore', '--body=Seen twice.'];
 
 /** Each set of flags the draft refuses, and the problem its refusal names. */
 const DRAFT_REFUSALS: readonly (readonly [LineFlags, string])[] = [
@@ -319,7 +324,7 @@ describe('rafa issue create, dispatched', () => {
   it('files a local issue under the project, recording no fallback reason', async () => {
     const project = plantCase(LOCAL_CONFIG);
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand()], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand()], project);
     const issue = localIssue(project, 1);
 
     expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
@@ -328,7 +333,7 @@ describe('rafa issue create, dispatched', () => {
       opt: 0,
       title: 'Timeouts in plan show',
       body: 'Seen twice.',
-      type: 'bug',
+      type: 'chore',
       module: 'unassigned',
       priority: null,
       project: null,
@@ -340,7 +345,7 @@ describe('rafa issue create, dispatched', () => {
   it('gives the tracker and the ref as the data of the one result event in json mode', async () => {
     const project = plantCase(LOCAL_CONFIG);
 
-    const outcome = await dispatchInProject([...BUG_LINE, '--output=json'], SUBJECTS, [createIssueCreateCommand()], project);
+    const outcome = await dispatchInProject([...FILED_LINE, '--output=json'], SUBJECTS, [createIssueCreateCommand()], project);
     const events = eventsOf(outcome.stdout);
 
     expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
@@ -358,7 +363,7 @@ describe('rafa issue create, dispatched', () => {
     const fake = createFakeGh();
     const project = plantCase(GITHUB_CONFIG);
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
 
     expect(outcome).toEqual({
       exitCode: 0,
@@ -369,7 +374,7 @@ describe('rafa issue create, dispatched', () => {
     expect([...(fake.issue('1')?.labels ?? [])].sort((a, b) => a.localeCompare(b))).toEqual([
       'module:unassigned',
       'needs-triage',
-      'type:bug',
+      'type:chore',
     ]);
     expect(existsSync(localIssuesDir(project.root))).toBe(false);
   });
@@ -400,7 +405,7 @@ describe('rafa issue create, dispatched', () => {
     const fake = createFakeGh({ authOk: false });
     const project = plantCase(GITHUB_CONFIG);
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: fake.run })], project);
 
     expect(outcome).toEqual({
       exitCode: 0,
@@ -467,7 +472,7 @@ describe('rafa issue create, dispatched', () => {
     const command = createIssueCreateCommand({ gh: fake.run });
 
     const refused = await dispatchInProject(['issue', 'create', '--title=x', '--type=feature'], SUBJECTS, [command], project);
-    const untitled = await dispatchInProject(['issue', 'create', '--type=bug'], SUBJECTS, [command], project);
+    const untitled = await dispatchInProject(['issue', 'create', '--type=chore'], SUBJECTS, [command], project);
     const argument = await dispatchInProject(['issue', 'create', 'bug', '--title=x'], SUBJECTS, [command], project);
     const refusedState = [fake.calls().length, existsSync(localIssuesDir(project.root))];
     const taken = await dispatchInProject(['issue', 'create', '--title=x'], SUBJECTS, [command], project);
@@ -486,14 +491,14 @@ describe('rafa issue create, dispatched', () => {
 });
 
 describe('rafa issue create, a spec\'s Blocked by: line', () => {
-  it('files a spec naming an issue the gh fake holds with spec:blocked, and a bug with the same line without it', async () => {
+  it('files a spec naming an issue the gh fake holds with spec:blocked, and a chore with the same line without it', async () => {
     const fake = createFakeGh();
     const project = plantCase(GITHUB_CONFIG);
     const command = createIssueCreateCommand({ gh: fake.run });
 
-    const first = await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+    const first = await dispatchInProject(FILED_LINE, SUBJECTS, [command], project);
     const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1\n\nThe spec.'], SUBJECTS, [command], project);
-    const bug = await dispatchInProject(['issue', 'create', '--title=A bug', '--type=bug', '--body=Blocked by: #1'], SUBJECTS, [command], project);
+    const bug = await dispatchInProject(['issue', 'create', '--title=A chore', '--type=chore', '--body=Blocked by: #1'], SUBJECTS, [command], project);
 
     expect([first.exitCode, spec, bug.exitCode]).toEqual([
       0,
@@ -521,7 +526,7 @@ describe('rafa issue create, a spec\'s Blocked by: line', () => {
     const fake = createFakeGh();
     const project = plantCase(GITHUB_CONFIG);
     const command = createIssueCreateCommand({ gh: fake.run });
-    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+    await dispatchInProject(FILED_LINE, SUBJECTS, [command], project);
 
     const itself = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #2'], SUBJECTS, [command], project);
     const unknown = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1 #7'], SUBJECTS, [command], project);
@@ -557,7 +562,7 @@ describe('rafa issue create, a spec\'s Blocked by: line', () => {
   it('records specBlocked in the local issue file for a line naming a local issue, and refuses one naming itself', async () => {
     const project = plantCase(LOCAL_CONFIG);
     const command = createIssueCreateCommand();
-    await dispatchInProject(BUG_LINE, SUBJECTS, [command], project);
+    await dispatchInProject(FILED_LINE, SUBJECTS, [command], project);
 
     const spec = await dispatchInProject(['issue', 'create', '--title=A spec', '--type=spec', '--body=Blocked by: #1'], SUBJECTS, [command], project);
     const itself = await dispatchInProject(['issue', 'create', '--title=Another', '--type=spec', '--body=Blocked by: #3'], SUBJECTS, [command], project);
@@ -580,11 +585,11 @@ describe('rafa issue create, spawned', () => {
     chmodSync(gh, 0o755);
     const warning = 'warn: tracker chain: github unavailable: gh auth status: stand-in gh: not logged in [tracker:unavailable]';
 
-    const created = runRafa(scratch, scratch.repo, ['issue', 'create', '--title=Spawned issue', '--type=bug']);
+    const created = runRafa(scratch, scratch.repo, ['issue', 'create', '--title=Spawned issue', '--type=chore']);
     const listed = runRafa(scratch, scratch.repo, ['issues', 'list']);
 
     expect(created).toEqual({ exitCode: 0, stdout: `${warning}\nCreated local issue 1.\n`, stderr: '' });
-    expect(listed).toEqual({ exitCode: 0, stdout: `${warning}\nTracker: local\n  1  todo  bug  Spawned issue\n`, stderr: '' });
+    expect(listed).toEqual({ exitCode: 0, stdout: `${warning}\nTracker: local\n  1  todo  chore  Spawned issue\n`, stderr: '' });
     expect(readFileSync(ghLog, 'utf8')).toBe('auth status\nauth status\n');
     expect(existsSync(join(scratch.repo, '.rafa', 'issues', '1.md'))).toBe(true);
   }, SPAWN_TIMEOUT);
@@ -634,7 +639,7 @@ describe('rafa issue create and the project', () => {
     const wired = projectGh();
     const project = plantCase(GITHUB_CONFIG);
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
 
     expect(outcome.exitCode).toBe(0);
     expect(wired.apiCalls()).toBe(0);
@@ -644,7 +649,7 @@ describe('rafa issue create and the project', () => {
     const wired = projectGh();
     const project = plantCase(projectConfig(PROJECT_NUMBER));
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
     const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
     const lines = outcome.stdout.split('\n');
 
@@ -662,7 +667,7 @@ describe('rafa issue create and the project', () => {
     const wired = projectGh();
     const project = plantCase(projectConfig(PROJECT_NUMBER + 1));
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: wired.gh })], project);
 
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toBe([
@@ -679,7 +684,7 @@ describe('rafa issue create and the project', () => {
     const project = plantCase(projectConfig(PROJECT_NUMBER));
     const recorder = recordRetries();
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: recorder.seams.sleep })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: recorder.seams.sleep })], project);
     const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
     const lines = outcome.stdout.split('\n');
 
@@ -698,7 +703,7 @@ describe('rafa issue create and the project', () => {
     const flaky = flakyGh(wired.gh, [TIMED_OUT_STDERR], isAdd);
     const project = plantCase(`${projectConfig(PROJECT_NUMBER)}    retries: false\n`);
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
     const items = await createGhProjectPort(wired.project.gh).items(fakeProjectId({ owner: PROJECT_OWNER, number: PROJECT_NUMBER }));
 
     expect(outcome.exitCode).toBe(0);
@@ -712,7 +717,7 @@ describe('rafa issue create and the project', () => {
     const flaky = flakyGh(wired.gh, [TIMED_OUT_STDERR], isAdd);
     const project = plantCase(projectConfig(PROJECT_NUMBER));
 
-    const outcome = await dispatchInProject([...BUG_LINE, '--output=json'], SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
+    const outcome = await dispatchInProject([...FILED_LINE, '--output=json'], SUBJECTS, [createIssueCreateCommand({ gh: flaky.gh, sleep: () => Promise.resolve() })], project);
     const retries = eventsOf(outcome.stdout).filter((event) => event.type === 'event' && event.name === 'retry');
 
     expect(outcome.exitCode).toBe(0);
@@ -723,7 +728,7 @@ describe('rafa issue create and the project', () => {
     const project = plantCase(`${LOCAL_CONFIG}board:\n  project:\n    number: ${String(PROJECT_NUMBER)}\n`);
     const gh: GhRunner = () => Promise.reject(new Error('no gh call was planted'));
 
-    const outcome = await dispatchInProject(BUG_LINE, SUBJECTS, [createIssueCreateCommand({ gh })], project);
+    const outcome = await dispatchInProject(FILED_LINE, SUBJECTS, [createIssueCreateCommand({ gh })], project);
 
     expect(outcome).toEqual({ exitCode: 0, stdout: 'Created local issue 1.\n', stderr: '' });
   });

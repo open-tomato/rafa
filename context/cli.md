@@ -1793,7 +1793,15 @@ New; it replaces no earlier text. What a row or an action added to
   the query its flags make and reads each ref it answers with `get`, and
   `github`'s `find` refuses every `--state`. `show` reads one issue;
   `create` files a draft with default type `code` (changed by `--type`),
-  module `unassigned` and no priority unless a flag names one. Its body
+  module `unassigned` and no priority unless a flag names one. A
+  `--type=bug` line is filed as a bug record (`issue/create-bug.ts`,
+  `context/bug-record.md`): its fields come from the bug flags and the
+  body's sections, its title is rendered through `issues.titles.bug`, and
+  a record missing a field is refused before the chain is resolved, so
+  `--title` is required for every type but `bug`. `--dry-run` prints the
+  draft of any type and resolves no tracker. `list --type=bug` prints
+  the columns id, state, module, action and summary, read back from each
+  title. Its body
   is `--body` or the bytes of the file `--body-file` names (standard input
   for `-`, a seam of the factory); the two are refused together and an
   unreadable path refused before the chain is resolved. When `--type=spec`,

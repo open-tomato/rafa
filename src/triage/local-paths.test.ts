@@ -72,6 +72,21 @@ describe('localPathRedactor', () => {
     expect(redact(`-I/Users/bob/inc -I${REPO}/include`)).toBe(`-I${HOME_MARKER}/inc -Iinclude`);
   });
 
+  it('takes several roots in one pass, longest first, so a worktree under the project under the home reads relative', () => {
+    const root = '/Users/ana/clients/acme-corp/app';
+    const redact = localPathRedactor([`${root}/.claude/worktrees/fix-1`, root], '/Users/ana');
+
+    expect(redact(`at ${root}/.claude/worktrees/fix-1/src/a.ts; config ${root}/.rafa/config.yaml; see /Users/ana/notes`))
+      .toBe('at src/a.ts; config .rafa/config.yaml; see [redacted: HOME]/notes');
+  });
+
+  it('reads one root in a list as that root alone, and a root named twice once', () => {
+    const text = 'at /repo/src/a.ts and /repo';
+
+    expect(localPathRedactor(['/repo'], '/home/ana')(text)).toBe(localPathRedactor('/repo', '/home/ana')(text));
+    expect(localPathRedactor(['/repo', '/repo'], '/home/ana')(text)).toBe('at src/a.ts and .');
+  });
+
   it('control: a sibling of the root sharing its prefix is not taken as under it', () => {
     expect(redact(`${REPO}-old/src/a.ts`)).toBe(`${HOME_MARKER}/projects/rafa-old/src/a.ts`);
   });

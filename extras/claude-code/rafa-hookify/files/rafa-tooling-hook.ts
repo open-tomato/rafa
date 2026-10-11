@@ -132,7 +132,14 @@ const useRafa = (instead: string, rafa: string, notes: readonly string[] = []): 
  * The offer every let-through reason ends with: search for an open report
  * of the gap, ask the person once, and file one under `module:cli-gap`.
  * `missing` names what `command` lacks; with none or several named, the
- * search and title carry a `<flag or field>` placeholder.
+ * search and summary carry a `<flag or field>` placeholder.
+ *
+ * The report is a bug, so it is filed from the fields a bug needs: its
+ * action is `command` without the word `rafa`, the shape an action takes,
+ * its summary says what the command lacks, its cause is `cli:new-context`
+ * and its reproduce step is the `gh` line used in its place. The search
+ * drops `rafa` too: a title rafa renders does not hold it, and a title
+ * filed before still matches the words left.
  */
 export const reportOffer = (command: string, missing: readonly string[]): string => {
   const gap = missing.length === 1
@@ -141,7 +148,8 @@ export const reportOffer = (command: string, missing: readonly string[]): string
   const each = missing.length > 1
     ? ', once for each one named'
     : '';
-  return `If rafa should have a line for this, report the gap: first run \`rafa issue list --module=cli-gap --search="${command} ${gap}"\`${each}, and when an open report covers it, say which one and file nothing. Otherwise ask the person once whether to report it, never filing unasked; on a yes, run \`rafa issue create --type=bug --module=cli-gap --title="${command} has no ${gap}" --body=…\` with the gh line, this reason, the rafa line and what it lacks in the body, and no local path.`;
+  const action = command.replace(/^rafa /, '');
+  return `If rafa should have a line for this, report the gap: first run \`rafa issue list --module=cli-gap --search="${action} ${gap}"\`${each}, and when an open report covers it, say which one and file nothing. Otherwise ask the person once whether to report it, never filing unasked; on a yes, run \`rafa issue create --type=bug --module=cli-gap --action="${action}" --summary="has no ${gap}" --cause=cli:new-context --reproduce="<the gh line>" --body=…\` with this reason, the rafa line and what it lacks in the body, and no local path.`;
 };
 
 const letThrough = (instead: string, why: string, command: string, missing: readonly string[]): Verdict => ({
@@ -388,6 +396,9 @@ const judgeIssueCreate = (instead: string, words: string[]): Verdict => {
       ...flags.some((flag) => flag.startsWith('--title='))
         ? []
         : ['`rafa issue create` needs a `--title`, which this line leaves out: add one.'],
+      ...flags.includes('--type=bug')
+        ? ['A bug is filed from its fields: add `--action`, `--cause` and `--reproduce`, and a module with `--module`; `rafa issue create --help` says what each holds.']
+        : [],
       ...leavesSpecBlocked
         ? ['Leave `spec:blocked` off: rafa adds it itself when the body file carries a `Blocked by: #<n>` line.']
         : [],

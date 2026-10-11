@@ -48,7 +48,7 @@ async function fixtureBoard() {
   const command = createIssueCreateCommand({ gh: fake.run });
   const run = (...flags: string[]) => dispatchInProject(['issue', 'create', '--title=A spec', ...flags], SUBJECTS, [command], project);
   for (let index = 0; index < BOARD_SIZE; index += 1) {
-    const filed = await run('--type=bug', `--body=Filler ${String(index)}`);
+    const filed = await run('--type=chore', `--body=Filler ${String(index)}`);
     expect(filed.exitCode).toBe(0);
   }
   return { project, fake, run, scope };

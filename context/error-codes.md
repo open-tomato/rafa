@@ -39,6 +39,11 @@ family the list uses has one line in `FAMILY_DESCRIPTIONS`.
 The list grows from fixes. A bug filed as `<family>:new-context` gets its
 code added by the change that fixes it.
 
+A bug's cause is held to the list when it is filed: `rafa issue create
+--type=bug` refuses a `--cause` the list lacks and names the line to file
+it with instead, `--cause=<family>:new-context --proposed=<the code>`
+(`context/bug-record.md`).
+
 ### The older unions and the drift guard
 
 Four per-module unions existed before the list: `ROUTE_REFUSALS` and

@@ -279,6 +279,13 @@ export interface IssueDraft {
    * which names OPT ledger numbers.
    */
   specBlocked?: boolean;
+  /**
+   * rafa's own field, absent from the source: the cause code a bug was
+   * filed with (`context/error-codes.md`). The `github` adapter files it
+   * as the label `cause:<code>` and the `local` adapter records it in the
+   * issue file. Absent files no such mark.
+   */
+  cause?: string;
 }
 
 /** An issue as a tracker holds it: the draft, where it lives, its state. */
