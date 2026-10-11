@@ -52,6 +52,8 @@ const BRANCH = `feat/${STUB}`;
 const PLAN = `/project/.rafa/plans/PLAN-${STUB}.md`;
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
+/** An id store `a` carried before it re-minted in place. */
+const STORE_A_REPLACED = 'store-a-replaced';
 
 /** The project refresh's keys, no project set: a label write sends no refresh. */
 const NO_PROJECT: RefreshConfig = { boardProjectNumber: null, boardProjectRetries: false, boardProjectRetryWaitSeconds: 1, boardProjectWriteBatchSize: 5, boardProjectWritePauseMs: 0, boardRelationships: 'labels', roadmapIssue: null, releaseFragments: '.changes' };
@@ -141,21 +143,21 @@ function goOffline(git: GitRunner): void {
   must(git, ['remote', 'set-url', 'origin', join(scope, 'nowhere.git')]);
 }
 
-/** The store id answer for `store`, or the NDJSON cause when null. */
-function storeIdOf(store: string | null): DeviceStoreId {
+/** The store id answer for `store` and the ids it replaced, or the NDJSON cause when null. */
+function storeIdOf(store: string | null, replacedIds: readonly string[] = []): DeviceStoreId {
   return store === null
     ? { ok: false, cause: 'ndjson', reason: 'NDJSON store; Next safe step: rafa effort move --to=sqlite' }
-    : { ok: true, storeId: store, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
+    : { ok: true, storeId: store, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' };
 }
 
-/** The seams device `store` checks through, over `git`, recording each store read. */
-function seamsOf(git: GitRunner, store: string | null, reads: string[] = []): StartPreflightClaim {
+/** The seams device `store` checks through, over `git`, recording each store read; `replacedIds` are the ids that store replaced. */
+function seamsOf(git: GitRunner, store: string | null, reads: string[] = [], replacedIds: readonly string[] = []): StartPreflightClaim {
   return {
     git,
     board: null,
     readStoreId: () => {
       reads.push('read');
-      return storeIdOf(store);
+      return storeIdOf(store, replacedIds);
     },
   };
 }
@@ -263,6 +265,21 @@ describe('a claim the remote holds', () => {
     expect(control.outcome).toBe('owned');
   });
 
+  it('owns a claim that names an id this store replaced, answering the store\'s own id and pushing nothing; a store that replaced none is refused', () => {
+    const trio = plantTrio('held-replaced');
+    const sha = pushClaim(trio.a, STORE_A_REPLACED);
+
+    const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED]));
+    const control = refusal(readRunClaim(PLAN, seamsOf(trio.a, STORE_A)));
+
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '' });
+    expect(remoteTip(trio)).toBe(sha);
+    expect(control).toEqual({
+      owner: STORE_A_REPLACED,
+      reason: `#7 is claimed by store ${STORE_A_REPLACED} on ${BRANCH}, not by this device (store ${STORE_A})`,
+    });
+  });
+
   it('refuses a device whose store names no claimant, naming the owner and why this device names none', () => {
     const trio = plantTrio('no-store-id');
     pushClaim(trio.a, STORE_A);
@@ -366,6 +383,21 @@ describe('a claim waiting unpushed on the local branch', () => {
     expect(calls.filter((call) => call[0] === 'push')).toEqual([]);
     expect(tipAt(trio.a, `refs/heads/${BRANCH}`)).toBe(sha);
     expect(control.outcome).toBe('owned');
+    expect(remoteTip(trio)).toBe(sha);
+  });
+
+  it('pushes a waiting claim that names an id this store replaced, answering the store\'s own id; a store that replaced none is refused and pushes nothing', () => {
+    const trio = plantTrio('retry-replaced');
+    const sha = leaveClaim(trio.a, STORE_A_REPLACED);
+
+    const control = refusal(readRunClaim(PLAN, seamsOf(trio.a, STORE_A)));
+    const remoteAfterControl = remoteTip(trio);
+    const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED]));
+
+    expect(control.owner).toBe(STORE_A_REPLACED);
+    expect(control.reason).toBe(`#7 is claimed by store ${STORE_A_REPLACED} on the local ${BRANCH}, not by this device (store ${STORE_A})`);
+    expect(remoteAfterControl).toBeNull();
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'pushed', note: '' });
     expect(remoteTip(trio)).toBe(sha);
   });
 

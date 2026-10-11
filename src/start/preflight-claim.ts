@@ -21,9 +21,21 @@
  * `feat/rafa-*` branches and the remote's `feat/<stub>` as it left it
  * (`claims/git.ts`). A branch that carries no claim commit on either
  * side is a run as today: nothing more is read and nothing is printed.
- * Otherwise this device's store id is read (`claims/device.ts`); a store
- * that names none leaves this device holding no claim, and a store that
- * cannot be read at all refuses the run.
+ * Otherwise this device's store id is read (`claims/device.ts`), with
+ * the ids that store replaced; a store that names none leaves this
+ * device holding no claim, and a store that cannot be read at all
+ * refuses the run.
+ *
+ * ## Which holder is this store
+ *
+ * `holdsClaim` (`claims/device.ts`) is the one comparison between a
+ * holder and this device, for the remote's holder and the local one
+ * alike: a claim that names the store's id, or an id the store replaced,
+ * is "held by this store" in the table below. The answer, the printed
+ * line and a refusal name the store's own id, never the replaced one
+ * the claim was made under. The retry pushes the waiting commit as it
+ * was made, so a claim left under a replaced id reaches the remote
+ * naming that id.
  *
  * ## What the remote decides
  *
@@ -83,7 +95,7 @@ import type { GitRunner } from '../pr/index.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../board/project/issue-board-refresh.js';
-import { readDeviceStoreId } from '../claims/device.js';
+import { holdsClaim, readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue, fetchClaimBranches, pushNewClaimBranch, readClaimBranch, readLocalClaimBranch } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
@@ -167,8 +179,10 @@ interface Readings {
   readonly offline: string | null;
 }
 
-/** Who this device claims as, or null with why it names nobody. */
-type Claimant = { readonly storeId: string } | { readonly storeId: null; readonly why: string };
+/** Who this device claims as, with the ids its store replaced, or null with why it names nobody. */
+type Claimant =
+  | { readonly storeId: string; readonly replacedIds: readonly string[] }
+  | { readonly storeId: null; readonly why: string };
 
 /** The ownership a reading carries, or null for one that is absent or unreadable. */
 function ownershipOf(reading: ClaimBranchReading): Ownership | null {
@@ -208,7 +222,7 @@ function claimantOf(seams: StartPreflightClaim, issue: number): Claimant {
     throw new CommandExit(1, openingWith(`the store id to check the claim on #${String(issue)} could not be read`, messageOf(error)));
   }
   return device.ok
-    ? { storeId: device.storeId }
+    ? { storeId: device.storeId, replacedIds: device.replacedIds }
     : { storeId: null, why: device.reason };
 }
 
@@ -270,11 +284,11 @@ function decide(readings: Readings, claimant: Claimant, git: GitRunner): RunClai
   const tag = `#${String(issue)}`;
 
   const remoteHolder = holderOf(remote);
-  if (remoteHolder !== null && remoteHolder === claimant.storeId) {
+  if (claimant.storeId !== null && holdsClaim(claimant, remoteHolder)) {
     const via: OwnedVia = readings.offline === null
       ? 'held'
       : 'unconfirmed';
-    return { outcome: 'owned', issue, branch, storeId: remoteHolder, via, note: readings.offline ?? '' };
+    return { outcome: 'owned', issue, branch, storeId: claimant.storeId, via, note: readings.offline ?? '' };
   }
   if (remoteHolder !== null) {
     return refused(remoteHolder, `${tag} is claimed by store ${remoteHolder} on ${branch}${asLastFetched(readings)}, not by ${thisDevice(claimant)}`);
@@ -283,7 +297,7 @@ function decide(readings: Readings, claimant: Claimant, git: GitRunner): RunClai
     return refused(null, `the claim on ${REMOTE}/${branch} could not be read, so ${tag} stays taken: ${remote.reason}`);
   }
   const localHolder = holderOf(local);
-  if (localHolder !== null && localHolder === claimant.storeId) return pushWaiting(readings, localHolder, git);
+  if (claimant.storeId !== null && holdsClaim(claimant, localHolder)) return pushWaiting(readings, claimant.storeId, git);
 
   const remoteOwnership = ownershipOf(remote);
   if (remoteOwnership?.state === 'released') {
@@ -299,7 +313,7 @@ function decide(readings: Readings, claimant: Claimant, git: GitRunner): RunClai
   return NONE;
 }
 
-/** Pushes this store's claim waiting on the local branch, without force; see the module note. */
+/** Pushes this store's claim waiting on the local branch, without force, answering as `storeId`, the store's own id; see the module note. */
 function pushWaiting(readings: Readings, storeId: string, git: GitRunner): RunClaim {
   const { issue, branch, local } = readings;
   const refused = (owner: string | null, reason: string): RunClaim => ({ outcome: 'refused', issue, branch, owner, reason });
