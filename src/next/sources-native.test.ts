@@ -34,7 +34,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createNativeRelations } from '../board/relations/native.js';
-import { plansDirAt } from '../commands/plan/plan-files.js';
+import { plansDirAt } from '../plan/plan-files.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { writePositionFile } from '../project/position.js';
 

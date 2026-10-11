@@ -1,6 +1,8 @@
 /**
  * `rafa loop status`: one session, with its tasks done over total and a
- * rough ETA.
+ * rough ETA. This is the command half: the blocked tasks of a checklist
+ * and the blocker each trails are read by its library half,
+ * `../../loop/blocked-tasks.ts`, which any folder may take.
  *
  * ## What it reads
  *
@@ -11,14 +13,14 @@
  * and the task it names. The plan's tracker gives the tasks done, blocked
  * and open over the whole plan, read from the plan itself before the run
  * made its tracker, and nothing when neither file is there. The phase the
- * run is in sits beside the tasks done over total (`loop-sessions.ts`,
- * "A session's tasks"): `task`, `wrap-up`, `pull-request`, `ci` or
+ * run is in sits beside the tasks done over total (`phasedCounts`,
+ * `loop-sessions.ts`): `task`, `wrap-up`, `pull-request`, `ci` or
  * `repair`, and `task` for a record from a rafa older than the field.
  *
  * A session reading `running` or `paused` also gets its rough ETA from the
- * effort store (`loop-sessions.ts`, "The rough ETA"). A store that cannot
- * be read is warned about, and the status is given without one. A session
- * that has ended gets none.
+ * effort store (`loop/session-readings.ts`, "The rough ETA"). A store that
+ * cannot be read is warned about, and the status is given without one. A
+ * session that has ended gets none.
  *
  * A record reading `paused` while it still names a task has a pause that
  * has not taken effect: the run holds once that task ends, and the status
@@ -28,13 +30,9 @@
  *
  * Every `- [BLOCKED]` line of that checklist is shown with the blocker
  * comment it trails, which is what the run wrote when the task ended
- * blocked: the budget note, the nothing-reported note, or the triage
- * assessment (`utils/tracker.ts`, `writeTrackerBlocker`). The comment is
- * read off the LINE, through `splitBlockerComment`, because the plan
- * model takes it off a task's text and so does not hold it. A line the
- * run blocked before comments were written, or one whose comment is
- * blank, reads as none, and the status says so rather than showing a
- * blocked task with nothing under it.
+ * blocked (`blockedTasks`, `loop/blocked-tasks.ts`, "The blockers"). A
+ * line that trails none, or a blank one, reads as none, and the status
+ * says so rather than showing a blocked task with nothing under it.
  *
  * ## What it writes
  *
@@ -50,48 +48,39 @@
  *
  * Exit code 1: the refusals `loop-sessions.ts` names.
  */
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist, SessionEta } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { BlockedTask } from '../../loop/blocked-tasks.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../plan/plan-files.js';
+import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { messageOf } from '../../config-sections.js';
-import { sessionPhase } from '../../loop/sessions.js';
-import { splitBlockerComment } from '../../utils/tracker.js';
-import { countTasks, expectNoArgument } from '../plan/plan-files.js';
-
+import { blockedTasks } from '../../loop/blocked-tasks.js';
 import {
   estimateEta,
-  etaLine,
   isLive,
-  phasedCounts,
-  phaseNote,
-  pickSession,
   readSessionChecklist,
   readSessionFinishes,
   resolveLoopSeams,
-  sessionIdFlag,
   sessionLine,
+} from '../../loop/session-readings.js';
+import { sessionPhase } from '../../loop/sessions.js';
+import { countTasks } from '../../plan/plan-files.js';
+import { expectNoArgument } from '../plan/plan-files.js';
+
+import {
+  etaLine,
+  phasedCounts,
+  phaseNote,
+  pickSession,
+  sessionIdFlag,
 } from './loop-sessions.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa loop status [-s|--session-id=<id>]';
 
-/** A blocked task line, as `utils/tracker.ts` writes one. The capture is its text, the comment included. */
-const BLOCKED_TASK_LINE = /^- \[BLOCKED\] (.+)/;
-
 /** What a blocked task whose line trails no comment is shown with. */
 const NO_BLOCKER = 'the line trails no blocker comment';
-
-/** One blocked task of the checklist, with what its line trails. See the module note. */
-export interface BlockedTask {
-  /** Its line in the checklist, counting from one, as a record's task line does. */
-  readonly line: number;
-  /** The task's sentence, its declaration and its blocker comment off. */
-  readonly text: string;
-  /** The comment's text, unescaped, or null when the line trails none or a blank one. */
-  readonly blocker: string | null;
-}
 
 /** One session's status. See the module note. */
 export interface SessionStatus {
@@ -102,26 +91,6 @@ export interface SessionStatus {
   readonly tasks: TaskCounts | null;
   readonly blocked: readonly BlockedTask[];
   readonly eta: SessionEta | null;
-}
-
-/** The comment the checklist line at `lineNum` trails, or null when it is no blocked line or trails none. */
-function blockerAt(checklist: SessionChecklist, lineNum: number): string | null {
-  const capture = BLOCKED_TASK_LINE.exec(checklist.lines[lineNum] ?? '')?.[1];
-  return capture === undefined
-    ? null
-    : splitBlockerComment(capture.trim()).blocker;
-}
-
-/** Every blocked task of `checklist`, in file order, with the blocker its line trails. */
-export function blockedTasks(checklist: SessionChecklist | null): readonly BlockedTask[] {
-  if (checklist === null) return [];
-  return checklist.tasks
-    .filter((task) => task.status === 'blocked')
-    .map((task) => ({
-      line: task.lineNum + 1,
-      text: task.text,
-      blocker: blockerAt(checklist, task.lineNum),
-    }));
 }
 
 /** The lines one blocked task writes: its own, then its blocker, indented and one line per line of it. */

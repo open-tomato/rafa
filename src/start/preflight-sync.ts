@@ -6,7 +6,7 @@
  * ## What it reads
  *
  * The same reading as the `effort sync` row of `rafa doctor`, taken
- * through `readDoctorEffortSync` (`commands/doctor-effort-sync.ts`) so the
+ * through `readDoctorEffortSync` (`effort/sync/doctor-reading.ts`) so the
  * two can never disagree: the resolved config's `effortSync` selected
  * through `selectSync` over `CORE_ADAPTER_REGISTRY` for a kind core
  * holds (`local`, `file`), and over the registry `loadModules` answers
@@ -34,11 +34,11 @@
  *
  * That is `preflight-sync.test.ts`'s reading, its long line wrapped here.
  */
-import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../commands/doctor-effort-sync.js';
 import type { ResolvedConfig } from '../config.js';
+import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
 
 import { CommandExit } from '../cli/command.js';
-import { readDoctorEffortSync } from '../commands/doctor-effort-sync.js';
+import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 
 /** What the sync-strategy check reads, and the seams it loads modules through. */
 export interface StartPreflightSync {

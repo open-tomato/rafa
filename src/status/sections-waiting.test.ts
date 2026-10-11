@@ -15,9 +15,9 @@
  */
 import type { StatusConfig, StatusSeams, StatusSections } from './sections.js';
 import type { GhResult } from '../adapters/tracker/github.js';
+import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
-import type { BlockedIssuesReport } from '../commands/doctor-blocked.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { GitResult, GitRunner } from '../pr/git.js';

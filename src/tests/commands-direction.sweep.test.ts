@@ -1,0 +1,157 @@
+/**
+ * The commands-direction sweep: pins the direction rule behind epic #801's
+ * first acceptance criterion against the live tree, not a fixture.
+ *
+ * The rule: a non-test file outside `src/commands/` holds no import whose
+ * target is inside `src/commands/` — static, `import type`, `export …
+ * from`, or dynamic `import()` — except `src/rafa.ts` and `src/plan.ts`,
+ * exempt as the CLI's own layer. `scripts/survey/commands-direction.ts`
+ * (`readCommandsEdges`) does the reading; its own unit tests cover it over
+ * planted trees. This file is the other half: it runs it over every file
+ * git tracks under `src/` and each `packages/<name>/src/`, and reddens on
+ * any measured edge at all.
+ *
+ * The rule once allowed a tracked list of exceptions
+ * (`commands-direction.allow-list.txt` and `commands-direction.first-list.txt`
+ * under `testdata/`), shrunk by one line per split task until the last
+ * split carried the count to zero. Those two files and the allow-list
+ * comparison they fed (`checkCommandsDirection`) are gone along with their
+ * unit tests: there is nothing left to allow, so a single edge is a red.
+ *
+ * The files read are printed once, at load time, before any assertion
+ * runs, so a run that silently read nothing (an empty `sources` map, a
+ * resolver that matches no file) cannot pass by reporting an empty edge
+ * list for the wrong reason.
+ *
+ * A second check guards the edge case the plan's close-out names: a split
+ * that leaves an `export … from` of the library half behind in the
+ * command file, which keeps the edge alive for every outside importer
+ * that still reaches through the command path (a command-to-library
+ * import, the normal direction, is not this; only a re-export is).
+ * {@link SPLIT_MODULES} is the table of command files and their library
+ * half, seeded here with the three modules of the "most-imported readers"
+ * stage and grown by one row per later split.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'bun:test';
+import ts from 'typescript';
+
+import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
+import { listTrackedFiles } from '../../scripts/survey/files.js';
+import { bunResolver } from '../../scripts/survey/import-graph.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * The line this sweep prints before it asserts: how many files it read,
+ * named, so a vacuous run (an empty read set) cannot pass silently.
+ *
+ * @param read - The files `readCommandsEdges` read.
+ * @returns One line naming the count and the files.
+ */
+function filesReadLine(read: readonly string[]): string {
+  return `commands-direction: read ${read.length} file(s): ${read.join(', ')}`;
+}
+
+/** One split module: the command file and the library half a prior task moved its shared readers to. */
+interface SplitModule {
+  /** The command file, inside `src/commands/`, repository-relative. */
+  readonly commandFile: string;
+  /** Its library half, outside `src/commands/`, repository-relative. */
+  readonly libraryHalf: string;
+}
+
+/**
+ * The split modules measured so far: the command file and the library half
+ * its readers moved to. Grows by one row per split task; see the plan's
+ * "most-imported readers" and "remaining modules" stages.
+ */
+const SPLIT_MODULES: readonly SplitModule[] = [
+  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/plan/plan-files.ts' },
+  { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/loop/session-readings.ts' },
+  { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
+  { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
+  { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },
+  { commandFile: 'src/commands/plan/validate.ts', libraryHalf: 'src/plan/validate.ts' },
+  { commandFile: 'src/commands/loop/status.ts', libraryHalf: 'src/loop/blocked-tasks.ts' },
+  { commandFile: 'src/commands/doctor-blocked.ts', libraryHalf: 'src/board/blocked-issues.ts' },
+  { commandFile: 'src/commands/doctor-cleanup.ts', libraryHalf: 'src/cleanup/settings.ts' },
+  { commandFile: 'src/commands/doctor-effort-sync.ts', libraryHalf: 'src/effort/sync/doctor-reading.ts' },
+  { commandFile: 'src/commands/effort/fix-schema.ts', libraryHalf: 'src/effort/file-stamp.ts' },
+  { commandFile: 'src/commands/instinct/instinct-records.ts', libraryHalf: 'src/schema/scope-records.ts' },
+  { commandFile: 'src/commands/init-release.ts', libraryHalf: 'src/release/scaffold.ts' },
+  { commandFile: 'src/commands/ci/status.ts', libraryHalf: 'src/ci/status-reading.ts' },
+  { commandFile: 'src/commands/issue/unblock.ts', libraryHalf: 'src/board/unblock.ts' },
+  { commandFile: 'src/commands/pr/merge-tick.ts', libraryHalf: 'src/board/epic-tick.ts' },
+  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
+  { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+  { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+];
+
+/**
+ * The modules an `export … from` declaration of `text` resolves to; a
+ * plain `import … from` (the command half reading its library half, the
+ * normal direction) is not one of these and is left out.
+ *
+ * @param text - A source text.
+ * @param from - Its repository-relative path, for the resolver.
+ * @param resolve - The resolver to use.
+ * @returns Each resolved target, in source order; a specifier that
+ *   resolves to nothing is left out.
+ */
+function exportFromTargets(text: string, from: string, resolve: (specifier: string, from: string) => string | undefined): string[] {
+  const sourceFile = ts.createSourceFile(from, text, ts.ScriptTarget.Latest, true);
+  const targets: string[] = [];
+  sourceFile.forEachChild((node) => {
+    if (!ts.isExportDeclaration(node) || node.moduleSpecifier === undefined || !ts.isStringLiteral(node.moduleSpecifier)) {
+      return;
+    }
+    const target = resolve(node.moduleSpecifier.text, from);
+    if (target !== undefined) {
+      targets.push(target);
+    }
+  });
+  return targets;
+}
+
+const tracked = listTrackedFiles(REPO_ROOT);
+const sources = new Map<string, string>();
+for (const path of tracked.all) {
+  sources.set(path, readFileSync(join(REPO_ROOT, path), 'utf8'));
+}
+
+const resolve = bunResolver(REPO_ROOT);
+const reading = readCommandsEdges({ files: tracked.all, resolve, sources });
+
+// Printed once, at load time, so a vacuous run (an empty read set) shows
+// up in every test's output rather than only in one of them.
+console.log(filesReadLine(reading.read));
+
+describe('the commands-direction sweep', () => {
+  it('reads a non-empty file set, proving the scan is not vacuous', () => {
+    expect(reading.read.length).toBeGreaterThan(0);
+    expect(reading.missing).toEqual([]);
+  });
+
+  it('holds no import from outside src/commands/ into it', () => {
+    const lines = reading.edges.map(edgeLine);
+    expect(lines, `import(s) into src/commands/ from outside it, split the library half out: ${lines.join(', ')}`).toEqual([]);
+  });
+});
+
+for (const { commandFile, libraryHalf } of SPLIT_MODULES) {
+  describe(`the command half of ${commandFile}`, () => {
+    it(`holds no \`export … from\` of its library half, ${libraryHalf}`, () => {
+      const text = sources.get(commandFile);
+      expect(text, `${commandFile} was not read`).toBeDefined();
+      const targets = exportFromTargets(text ?? '', commandFile, resolve);
+      expect(
+        targets,
+        `${commandFile} re-exports its library half, drop the \`export … from\` of ${libraryHalf}: ${targets.join(', ')}`,
+      ).not.toContain(libraryHalf);
+    });
+  });
+}

@@ -13,7 +13,7 @@
  * write refused. That change is made by the pid probe, which runs after
  * the records are read.
  */
-import type { LoopSessionSeams } from './loop-sessions.js';
+import type { LoopSessionSeams } from '../../loop/session-readings.js';
 import type { SessionRecord } from '../../loop/sessions.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';

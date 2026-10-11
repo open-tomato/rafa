@@ -4,7 +4,7 @@
  * `git` is one of `MODULE_SYNC_STRATEGIES` (`effort/sync/select.ts`),
  * which core ships no adapter for, so both commands read the same
  * `SyncModuleMissing` refusal through `readDoctorEffortSync`
- * (`commands/doctor-effort-sync.ts`) and `refuseUnservedSync`
+ * (`effort/sync/doctor-reading.ts`) and `refuseUnservedSync`
  * (`start/preflight-sync.ts`).
  *
  * `doctor-effort-sync.test.ts` and `preflight-sync.test.ts` already drive

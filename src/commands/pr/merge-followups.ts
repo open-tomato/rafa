@@ -36,7 +36,8 @@
  * naming `rafa release tag` itself where it leaves the tag to the
  * operator. So the tag line is settle's to print, not the merge's.
  *
- * {@link versionTag} stays spelled here: `src/commands/release/tag.ts`
+ * The tag's spelling left with it: `versionTag` is
+ * `src/release/version-tag.ts`'s, where `src/commands/release/tag.ts`
  * and `src/release/settle-tag.ts` both build the tag they write from it.
  *
  * ## The update waits for a live loop
@@ -76,7 +77,18 @@
  * where planting a repository for each would measure the planting.
  * `merge-followups.test.ts` drives all of them; `merge-cleanup.ts`
  * gathers them.
+ *
+ * ## The library halves
+ *
+ * This file is the command half of a split and re-exports neither
+ * symbol that left it: `versionTag` is in
+ * `src/release/version-tag.ts`, and {@link SettleWaiting}, the shape of
+ * what the settle dry run folded, is in `src/pr/settle-waiting.ts`,
+ * since `src/next/settle-step.ts` reads it too and library code imports
+ * nothing under `src/commands/`.
  */
+import type { SettleWaiting } from '../../pr/settle-waiting.js';
+
 import { RAFA_PACKAGE_NAME } from '../../runtime/install.js';
 
 /** Which follow-up a line names. */
@@ -92,19 +104,6 @@ export interface FollowUp {
   readonly command: string;
   /** Why it applies, in a phrase, lower case and with no full stop. */
   readonly why: string;
-}
-
-/**
- * What the settle dry run folded on the base branch: the fragments
- * waiting there and the version they fold into.
- */
-export interface SettleWaiting {
-  /** The base branch the fragments wait on, e.g. `main`. */
-  readonly base: string;
-  /** How many fragments the fold took, `level: none` ones included. */
-  readonly fragments: number;
-  /** The version settle would write. */
-  readonly version: string;
 }
 
 /** What {@link readFollowUps} decides from; see the module note. */
@@ -145,11 +144,6 @@ function trimmedOrNull(value: unknown): string | null {
   return trimmed === ''
     ? null
     : trimmed;
-}
-
-/** The tag naming `version`, in this repository's spelling: `v0.4.0`. */
-export function versionTag(version: string): string {
-  return `v${version}`;
 }
 
 /**

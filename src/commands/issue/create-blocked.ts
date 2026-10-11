@@ -29,7 +29,7 @@
  * `github` adapter lists `--state all` (`adapters/tracker/github.ts`),
  * and `local` every issue file it can read. A closed issue is still an
  * issue the board has: a blocker is cleared by being closed, and calling
- * a closed one unknown is the false report `src/commands/doctor-blocked.ts`
+ * a closed one unknown is the false report `src/board/blocked-issues.ts`
  * reads `--state all` to avoid. A listing that rejects refuses the
  * command, naming the tracker, as any other tracker call does.
  *
@@ -54,7 +54,7 @@
  * board and no number is predicted: the line is read without `known`,
  * so only `no-ids` refuses it, the spec is filed with `specBlocked`, and
  * {@link SpecLineSettled.unchecked} carries the sentence saying why,
- * which `create` writes at `warn`. That is `doctor-blocked.ts`'s rule,
+ * which `create` writes at `warn`. That is `blocked-issues.ts`'s rule,
  * for the same reason.
  *
  * ## The fault sentence

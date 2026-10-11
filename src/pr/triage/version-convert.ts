@@ -114,11 +114,11 @@ import type { GitRunner } from '../git.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { compareVersions } from '../../commands/release/status.js';
 import { messageOf } from '../../config-sections.js';
 import { directoryPrefix } from '../../release/fragment-tree.js';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
+import { compareVersions } from '../../release/status-readings.js';
 import { gitPathOf, parseSemanticVersion, readManifestVersion, RELEASE_REMOTE, replaceManifestVersion } from '../../release/version.js';
 import { gitSaid } from '../git.js';
 

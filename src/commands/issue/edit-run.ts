@@ -128,8 +128,8 @@ import {
 } from '../../board/trust.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { fileStamp } from '../../effort/file-stamp.js';
 import { createGitRunner } from '../../pr/git.js';
-import { fileStamp } from '../effort/fix-schema.js';
 
 import {
   issueName,

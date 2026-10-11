@@ -14,7 +14,7 @@
  *
  * The command then reads the record every `STOP_POLL_MS` milliseconds
  * until it reads `stopped` or `done`, for at most `STOP_WAIT_MS`, both in
- * `loop-sessions.ts`. Once it does, it reads the line of the task the
+ * `loop/session-readings.ts`. Once it does, it reads the line of the task the
  * record ended at in the plan's tracker, and says what the line holds:
  * `[BLOCKED]` for a task the stop interrupted, `[x]` for one that finished
  * before the signal landed. A record ending with no task was running none.
@@ -40,23 +40,25 @@
  * refuses for any reason but the pid being gone. A record that cannot be
  * read after the signal is refused too, the signal having been sent.
  */
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from './loop-sessions.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../loop/session-readings.js';
 import type { SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
 
 import { messageOf } from '../../config-sections.js';
+import {
+  isLive,
+  planLabel,
+  readSessionChecklist,
+  refusal,
+  resolveLoopSeams,
+} from '../../loop/session-readings.js';
 import { errorCode, readSession, SessionRecordError } from '../../loop/sessions.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
   checkboxAt,
-  isLive,
   pickSession,
-  planLabel,
-  readSessionChecklist,
-  refusal,
-  resolveLoopSeams,
   sessionIdFlag,
 } from './loop-sessions.js';
 

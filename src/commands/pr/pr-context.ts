@@ -36,9 +36,9 @@
  * `<n>` when the line names one, and otherwise the open pull request of
  * the branch checked out AT THE PROJECT ROOT — not at the process's
  * working directory, which is a subdirectory of it as often as not, and
- * may be another checkout entirely. `loop-sessions.ts` reads a branch at
- * a root for the same reason, and `utils/git.ts`'s reader, which reads
- * the process's own directory, is why neither imports it.
+ * may be another checkout entirely. `loop/session-readings.ts` reads a
+ * branch at a root for the same reason, and `utils/git.ts`'s reader,
+ * which reads the process's own directory, is why neither imports it.
  *
  * Three readings of `git rev-parse --abbrev-ref HEAD`, measured on git
  * 2.51 (2026-09-18), shape {@link pickPullRequest}:

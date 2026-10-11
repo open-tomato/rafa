@@ -3,7 +3,11 @@
  * four of the five groups `rafa cleanup` lists would hold — Merged,
  * Stale, Not pushed and Worktrees, never Run records — read by
  * `src/cleanup/`'s {@link readCleanup} and counted by
- * {@link cleanupCounts}.
+ * {@link cleanupCounts}. This is the command half of
+ * `../cleanup/settings.ts`, which holds the settings the reading runs
+ * with (`doctorCleanupSettings`) and the input they are read from
+ * (`DoctorCleanupInput`), for `rafa status` and the status hook to
+ * read with the same ones.
  *
  * ## Without fetching
  *
@@ -12,7 +16,7 @@
  * as of the last fetch that ran, which is `rafa cleanup`'s to refresh.
  * The only remote call is the pull request provider's merged listing,
  * and it goes through the `gh` runner `doctor` already opened for the
- * board rows ({@link DoctorCleanupInput.gh}), so a project whose
+ * board rows (`DoctorCleanupInput.gh`), so a project whose
  * provider is not `gh` reads no provider at all, exactly as
  * `rafa cleanup` does with `pr.provider: none`, and its Stale and
  * Not-pushed rows are still counted.
@@ -39,13 +43,12 @@
  * result's `cleanup`. Neither changes `doctor`'s exit code, and nothing
  * here deletes, prints or writes anything.
  */
-import type { GhRunner } from '../adapters/tracker/github.js';
-import type { CleanupCounts, CleanupSeams, CleanupSettings } from '../cleanup/index.js';
-import type { RafaConfig } from '../config.js';
+import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
+import type { DoctorCleanupInput } from '../cleanup/settings.js';
 import type { PullRequests } from '../pr/types.js';
 
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { createGhPullRequests } from '../pr/index.js';
 
 /** The command the row points at. */
@@ -59,40 +62,10 @@ export interface DoctorCleanupSeams {
   readonly cleanupNow?: () => Date;
 }
 
-/** What {@link readDoctorCleanup} reads from. */
-export interface DoctorCleanupInput {
-  /** The project root: git runs here, and its `.rafa/runs/` holds the loop's sessions. */
-  readonly root: string;
-  /** The home `~/.rafa/worktrees/` is under. */
-  readonly home: string;
-  /** The resolved config the four settings are read from. */
-  readonly config: Pick<RafaConfig, 'prBase' | 'cleanupKeep' | 'cleanupStaleDays' | 'cleanupWorktreeIdleDays'>
-    & Partial<Pick<RafaConfig, 'loopWorktreeDir'>>;
-  /** The `gh` runner `doctor` opened for the board, or null for a provider that is not `gh`. */
-  readonly gh: GhRunner | null;
-}
-
 /** The counts, or the detail of a reading git refused. */
 export type DoctorCleanupReading =
   | { readonly ok: true; readonly counts: CleanupCounts }
   | { readonly ok: false; readonly detail: string };
-
-/** The settings `input` reads with: the config's, `fetch` false; see the module note. */
-export function doctorCleanupSettings(input: DoctorCleanupInput, now: Date): CleanupSettings {
-  const { config } = input;
-  return {
-    fetch: false,
-    base: config.prBase,
-    keep: config.cleanupKeep,
-    staleDays: config.cleanupStaleDays,
-    worktreeIdleDays: config.cleanupWorktreeIdleDays,
-    now,
-    home: input.home,
-    cwd: input.root,
-    projectRoot: input.root,
-    worktreeDir: config.loopWorktreeDir ?? CONFIG_DEFAULTS.loopWorktreeDir,
-  };
-}
 
 /** The four counts for the project, read without fetching; see the module note. Never a rejection. */
 export async function readDoctorCleanup(input: DoctorCleanupInput, seams: DoctorCleanupSeams = {}): Promise<DoctorCleanupReading> {

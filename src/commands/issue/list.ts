@@ -215,9 +215,10 @@ import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { plansDirAt } from '../../plan/plan-files.js';
 import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
-import { expectNoArgument, plansDirAt, readSwitch } from '../plan/plan-files.js';
+import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
 import {

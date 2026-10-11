@@ -86,7 +86,7 @@ import type {
 } from './refresh.js';
 import type { ProjectWritesResult } from './writes.js';
 
-import { readBoardRepository } from '../../commands/epic/move-native.js';
+import { readBoardRepository } from '../repository.js';
 
 import { createGhProjectPort } from './gh.js';
 import { openPhase } from './progress.js';
