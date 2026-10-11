@@ -23,6 +23,14 @@
  *     `~/.bun/bin/bun` reads `[redacted: HOME]/.bun/bin/bun` whoever ran
  *     it, and `/Users/bob:12` keeps its `:12`.
  *
+ * A caller with two checkouts of one repository names both roots, as a
+ * list: a bug filed from a worktree names files of the worktree and of
+ * the main checkout, which holds the config. They are taken out in the
+ * same pass, so the longer is matched first. Two redactors run one after
+ * the other would not do: the first marks the home inside the other
+ * root's paths, the second then finds no root, and the folders between
+ * the home and the project stay in the text.
+ *
  * The root and the home are each matched as given and at their real
  * location, when that differs (a `/tmp` root is `/private/tmp` on macOS),
  * so a path a tool printed resolved is taken out too.
@@ -92,14 +100,18 @@ interface Root {
 }
 
 /**
- * The function that takes the repository root and the home directory out
- * of a text; see the module note.
+ * The function that takes the repository root, or each of several, and
+ * the home directory out of a text; see the module note.
  */
-export function localPathRedactor(repoRoot: string, home: string): (text: string) => string {
+export function localPathRedactor(repoRoot: string | readonly string[], home: string): (text: string) => string {
   const asHome = (pattern: string): Root => ({ pattern, under: `${HOME_MARKER}/`, bare: HOME_MARKER });
   const asRepo = (pattern: string): Root => ({ pattern, under: '', bare: '.' });
+  const repoRoots = typeof repoRoot === 'string'
+    ? [repoRoot]
+    : repoRoot;
+  const repoForms = [...new Set(repoRoots.flatMap((root) => forms(root)))];
   const literals: Root[] = [
-    ...forms(repoRoot).filter(isRoot)
+    ...repoForms.filter(isRoot)
       .map((root) => asRepo(literalPattern(root))),
     ...forms(home).filter(isRoot)
       .map((root) => asHome(literalPattern(root))),
