@@ -130,7 +130,7 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
 
 /** A store id reader answering `storeId`. */
 function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+  return () => ({ ok: true, storeId, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** The command over `seams`, whatever project it runs in. */
@@ -407,7 +407,7 @@ describe('rafa claim accept, refused', () => {
     let storeReads = 0;
     const readStoreId = (): DeviceStoreId => {
       storeReads += 1;
-      return { ok: true, storeId: STORE_B };
+      return { ok: true, storeId: STORE_B, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
     };
     const seams: ClaimCommandSeams = { git: world.b, board: null, readStoreId };
     const lines: readonly (readonly [readonly string[], string])[] = [

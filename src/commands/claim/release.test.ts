@@ -136,7 +136,7 @@ function commandOver(seams: ClaimCommandSeams): RafaCommand {
 
 /** A store id reader answering `storeId`. */
 function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+  return () => ({ ok: true, storeId, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** Dispatches `rafa claim release <words>` from the world's project over `seams`. */

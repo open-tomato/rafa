@@ -142,7 +142,7 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
 
 /** A store id reader answering `storeId`. */
 function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+  return () => ({ ok: true, storeId, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** A label reader answering `labels` for any issue. */
@@ -446,7 +446,7 @@ describe('rafa claim take refuses', () => {
     let storeReads = 0;
     const readStoreId = (): DeviceStoreId => {
       storeReads += 1;
-      return { ok: true, storeId: STORE_B };
+      return { ok: true, storeId: STORE_B, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
     };
     const lines: readonly (readonly [readonly string[], string])[] = [
       [['seven'], '"seven" is no issue number'],

@@ -1,7 +1,9 @@
 /**
  * This device's store id: the `store_meta.store_id` of the project's
  * effort store, the id every claim commit this device makes names in
- * its `Rafa-Claim-Store` trailer (`./record.ts`).
+ * its `Rafa-Claim-Store` trailer (`./record.ts`). Beside it, the ids
+ * the store carried before, and the one answer to whether a claim is
+ * this device's.
  *
  * ## Read through the store's own open
  *
@@ -14,6 +16,27 @@
  * since an open with SQLite's create flag would make it. No `Database`
  * is opened here: `store-sources.sweep.test.ts` refuses one outside its
  * allow-list.
+ *
+ * ## The ids the store replaced
+ *
+ * A store file that gets a new device or inode under the same host and
+ * path mints a new id on its next write, and keeps the outgoing one in
+ * `store_replaced` (`src/effort/store/store-replaced.ts`). A claim made
+ * under such an id is still this device's, so {@link readDeviceStoreId}
+ * answers them as `replacedIds`, the earliest replaced first, read by
+ * `readReplacedStoreIds` inside the same read open as the id. A store
+ * an older runtime left has no such table, and reads as no replaced
+ * ids, the same as a table with no row. `mintedAt` is the row's
+ * `minted_at`: when the store took the id it carries now.
+ *
+ * ## Whether a claim is this device's
+ *
+ * {@link holdsClaim} is the single comparison between a claim's holder
+ * and this device: true for the store's id and for each replaced one,
+ * false for any other id and for no holder. It answers who holds the
+ * claim and nothing else. A message or a pushed commit names the
+ * store's own `storeId`, never the replaced id the claim was made
+ * under.
  *
  * ## When there is no id
  *
@@ -46,14 +69,25 @@ import { existsSync } from 'node:fs';
 import { MOVE_TO_SQLITE } from '../effort/store/merge-store.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { readStoreMeta } from '../effort/store/store-meta.js';
+import { readReplacedStoreIds } from '../effort/store/store-replaced.js';
 
 /** Why this device has no store id to claim under. */
 export type NoStoreIdCause = 'ndjson' | 'absent' | 'unminted';
 
+/** The ids this device's store answers to, and when it took the present one. */
+export interface DeviceStoreIds {
+  /** The store's minted id, the one a claim commit made now names. */
+  readonly storeId: string;
+  /** The ids the store carried before, the earliest replaced first; none for a store that never re-minted in place. */
+  readonly replacedIds: readonly string[];
+  /** When the store's present id was minted, as an ISO string. */
+  readonly mintedAt: string;
+}
+
 /** What {@link readDeviceStoreId} answers. */
 export type DeviceStoreId =
-  /** The store's minted id. */
-  | { readonly ok: true; readonly storeId: string }
+  /** The store's minted id, with the ids it replaced and its mint time. */
+  | ({ readonly ok: true } & DeviceStoreIds)
   /** No id, with the cause and a reason to print. */
   | { readonly ok: false; readonly cause: NoStoreIdCause; readonly reason: string };
 
@@ -79,7 +113,8 @@ function absentReason(path: string): string {
 }
 
 /**
- * This device's store id, read from the effort store of the project at
+ * This device's store id, the ids that store replaced and the time the
+ * id was minted, read from the effort store of the project at
  * `repoRoot` that `config.store` names, or the cause and reason it has
  * none. Opens the store only for a read, and only when its file exists,
  * so it creates and mints nothing. Throws what the store's open throws
@@ -91,8 +126,30 @@ export function readDeviceStoreId(repoRoot: string, config: Pick<RafaConfig, 'st
   const path = sqliteStorePath(repoRoot);
   if (!existsSync(path)) return { ok: false, cause: 'absent', reason: absentReason(path) };
 
-  const meta = withSqliteStore(path, 'read', false, (db) => readStoreMeta(db));
-  return meta === null
+  const ids = withSqliteStore(path, 'read', false, (db): DeviceStoreIds | null => {
+    const meta = readStoreMeta(db);
+    if (meta === null) return null;
+    return {
+      storeId: meta.storeId,
+      replacedIds: readReplacedStoreIds(db).map((replaced) => replaced.storeId),
+      mintedAt: meta.mintedAt,
+    };
+  });
+  return ids === null
     ? { ok: false, cause: 'unminted', reason: unmintedReason(path) }
-    : { ok: true, storeId: meta.storeId };
+    : { ok: true, ...ids };
+}
+
+/**
+ * Whether the claim held by `holder` is this device's: true when
+ * `holder` is the store's id or one of the ids it replaced, false for
+ * any other id and for a claim nobody holds (`null`). See the module
+ * note.
+ */
+export function holdsClaim(
+  device: Pick<DeviceStoreIds, 'storeId' | 'replacedIds'>,
+  holder: string | null,
+): boolean {
+  if (holder === null) return false;
+  return holder === device.storeId || device.replacedIds.includes(holder);
 }

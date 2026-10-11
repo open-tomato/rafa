@@ -135,7 +135,7 @@ function context(git: GitRunner, store: string | null, overrides: Partial<PlanCl
     board: null,
     readStoreId: () => store === null
       ? { ok: false, cause: 'ndjson', reason: 'NDJSON store; Next safe step: rafa effort move --to=sqlite' }
-      : { ok: true, storeId: store },
+      : { ok: true, storeId: store, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' },
     staleAfter: '3d',
     claimsAhead: 'off',
     now: new Date(),

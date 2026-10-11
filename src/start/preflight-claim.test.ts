@@ -145,7 +145,7 @@ function goOffline(git: GitRunner): void {
 function storeIdOf(store: string | null): DeviceStoreId {
   return store === null
     ? { ok: false, cause: 'ndjson', reason: 'NDJSON store; Next safe step: rafa effort move --to=sqlite' }
-    : { ok: true, storeId: store };
+    : { ok: true, storeId: store, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
 }
 
 /** The seams device `store` checks through, over `git`, recording each store read. */

@@ -908,7 +908,7 @@ describe('verifyPullRequest, on a refused push of a claim branch', () => {
 
 describe('refusedPushReaderIn, over a bare remote and two clones', () => {
   const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-pr-lifecycle-lost-')));
-  const STORE_A: DeviceStoreId = { ok: true, storeId: 'store-a' };
+  const STORE_A: DeviceStoreId = { ok: true, storeId: 'store-a', replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
 
   afterAll(() => {
     rmSync(scope, { recursive: true, force: true });
@@ -1020,7 +1020,7 @@ describe('refusedPushReaderIn, over a bare remote and two clones', () => {
   it('reads this store\'s own claim as not lost', () => {
     const planted = plantTakenClaim('owned');
 
-    const reading = refusedPushReaderIn(planted.aDir, () => ({ ok: true, storeId: 'store-b' }))(CLAIM_BRANCH);
+    const reading = refusedPushReaderIn(planted.aDir, () => ({ ok: true, storeId: 'store-b', replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' }))(CLAIM_BRANCH);
 
     // The control on the store id: the same branch, read as its owner.
     expect(reading.outcome === 'not-lost' && reading.cause).toBe('owned');
