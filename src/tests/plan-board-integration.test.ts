@@ -74,9 +74,9 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
+import type { EpicTickResult } from '../board/epic-tick.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
-import type { EpicTickResult } from '../commands/pr/merge-tick.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
@@ -209,7 +209,7 @@ const PROBE_WITH_PROMPT = [
   '  create: (context) => ({',
   '    create: async (request) => {',
   '      const specContent = readFileSync(join(context.repoRoot, request.specPath), "utf8");',
-  '      const prompt = context.planPrompt(specContent, request.stub);',
+  '      const prompt = context.planPrompt(specContent, request.stub, join(context.repoRoot, context.planDir));',
   '      const planPath = context.planDir + "/PLAN-" + request.stub + ".md";',
   '      mkdirSync(join(context.repoRoot, context.planDir), { recursive: true });',
   '      writeFileSync(',

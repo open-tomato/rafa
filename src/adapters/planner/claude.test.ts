@@ -52,6 +52,33 @@
  * generating case, which records the call whole), and the root handed over
  * unresolved reddened the relative-root case alone.
  *
+ * ## The absolute plan path
+ *
+ * The prompt names the plan by its absolute path under the root, so the
+ * session writes the file the planner looks for whatever directory it is
+ * in. {@link pathPrompt} is a builder holding nothing but the two paths
+ * it makes of the directory it is handed, as `buildPlanPrompt` makes
+ * them. The nested-caller case moves this process into a directory
+ * nested under the root for the length of one `create` and drives a
+ * session that IGNORES the directory it is spawned in: it writes the
+ * plan at the path the prompt names, read against the caller's
+ * directory. That is the session of #171 at its worst, and it lands the
+ * plan under the root only when the path it was told is absolute.
+ *
+ * Four mutations of `claude.ts` were driven on 2026-10-10 over this
+ * file alone, one at a time, the module restored from a scratch copy
+ * and verified with `shasum -c` after each. 31 pass and 0 fail either
+ * side:
+ *
+ *   - the builder handed the plans directory as configured, relative:
+ *     3 fail, the two prompt-path cases and the nested-caller case.
+ *   - the `cwd` dropped from the spawn: 4 fail, the three of 2026-09-29
+ *     and the nested-caller case.
+ *   - the refusal naming the plan's relative path where the absolute
+ *     one goes: 2 fail, both refusal cases that read the whole line.
+ *   - the root handed over unresolved: 2 fail, the relative-root spawn
+ *     case and the relative-root refusal case.
+ *
  * Six mutations of `claude.ts` were driven on 2026-09-19 over this file,
  * `src/adapters/registry.test.ts` and `src/ports/index.test.ts`, one at
  * a time, the module restored from a scratch copy and verified with
@@ -103,11 +130,12 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
@@ -212,6 +240,11 @@ function recordingSession(
 /** A prompt holding both things the planner hands its builder. */
 function buildPrompt(specContent: string, stub: string): string {
   return `prompt for ${stub}\n${specContent}`;
+}
+
+/** A prompt holding the two files a builder names in the plans directory it is handed, one a line. */
+function pathPrompt(_specContent: string, stub: string, planDir: string): string {
+  return `${planFilePath(planDir, `PLAN-${stub}.md`)}\n${planFilePath(planDir, `PREREQUISITES-${stub}.md`)}`;
 }
 
 /** A planner over `root`, made with `spawn`, {@link PLAN_DIR} and the default setting sources. */
@@ -369,6 +402,75 @@ describe('a claude planner generating a plan', () => {
     expect(session.calls.map((call) => call.cwd)).toEqual([root]);
   });
 
+  it('hands the builder the plans directory under the root, so the prompt holds the absolute plan path', async () => {
+    const root = freshRoot();
+    const session = recordingSession(root, { writes: [PLAN] });
+
+    const generated = await plannerOver(root, session.spawn, { buildPrompt: pathPrompt }).create(REQUEST);
+
+    expect(isAbsolute(root)).toBe(true);
+    expect(session.calls.map((call) => call.prompt)).toEqual([`${join(root, PLAN)}\n${join(root, PREREQUISITES)}`]);
+    // The paths answered stay relative to the root: the control that only the prompt's changed.
+    expect(generated.planPath).toBe(PLAN);
+  });
+
+  it('resolves the prompt paths against the absolute root when made with a relative one', async () => {
+    const root = freshRoot();
+    const relativeRoot = relative(process.cwd(), root);
+    const session = recordingSession(root, { writes: [PLAN] });
+
+    await plannerOver(relativeRoot, session.spawn, { buildPrompt: pathPrompt }).create(REQUEST);
+
+    expect(isAbsolute(relativeRoot)).toBe(false);
+    expect(session.calls.map((call) => call.prompt)).toEqual([`${join(root, PLAN)}\n${join(root, PREREQUISITES)}`]);
+  });
+
+  it('hands the builder an absolute plans directory as it is', async () => {
+    const root = freshRoot();
+    const outside = join(tempDir, `plans-outside-${made}`);
+    const prompts: string[] = [];
+    const spawn: CapturingSpawner = async (_args, prompt) => {
+      prompts.push(prompt);
+      writeFileSync(join(outside, 'PLAN-probe.md'), 'the plan\n', 'utf8');
+      return { exitCode: 0, stdout: '' };
+    };
+
+    await plannerOver(root, spawn, { planDir: outside, buildPrompt: pathPrompt }).create(REQUEST);
+
+    expect(prompts).toEqual([`${join(outside, 'PLAN-probe.md')}\n${join(outside, 'PREREQUISITES-probe.md')}`]);
+  });
+
+  it('spawns in the root and names the plan under it when the caller runs from a directory nested under it', async () => {
+    const root = freshRoot();
+    const nested = join(root, '.claude', 'worktrees', 'nested', 'src');
+    mkdirSync(nested, { recursive: true });
+    const cwds: (string | undefined)[] = [];
+    const callerDirs: string[] = [];
+    // A session that ignores the directory it is spawned in: it writes the
+    // plan at the path the prompt names, read against the caller's directory.
+    const spawn: CapturingSpawner = async (_args, prompt, options) => {
+      cwds.push(options?.cwd);
+      callerDirs.push(process.cwd());
+      const named = resolve(process.cwd(), prompt.split('\n')[0] ?? '');
+      mkdirSync(join(named, '..'), { recursive: true });
+      writeFileSync(named, 'the plan\n', 'utf8');
+      return { exitCode: 0, stdout: '' };
+    };
+    const before = process.cwd();
+
+    process.chdir(nested);
+    const outcome = await plannerOver(root, spawn, { buildPrompt: pathPrompt }).create(REQUEST)
+      .finally(() => process.chdir(before));
+
+    expect(process.cwd()).toBe(before);
+    // The control: the session did run with the caller nested under the root.
+    expect(callerDirs.map((dir) => relative(realpathSync(root), dir))).toEqual([relative(root, nested)]);
+    expect(cwds).toEqual([root]);
+    expect(outcome.planPath).toBe(PLAN);
+    expect(readFileSync(join(root, PLAN), 'utf8')).toBe('the plan\n');
+    expect(existsSync(join(nested, '.rafa'))).toBe(false);
+  });
+
   it('is frozen', () => {
     const root = freshRoot();
 
@@ -396,10 +498,42 @@ describe('a claude planner rejecting', () => {
 
     expect(error).toBeInstanceOf(ClaudePlannerError);
     expect(error).toMatchObject({
-      message: `The session finished but .rafa/plans/PLAN-probe.md was not created under ${root}`
-        + ' — inspect the output above.',
+      message: `The session finished but .rafa/plans/PLAN-probe.md was not created under ${root}:`
+        + ` no file at ${join(root, PLAN)} — inspect the output above.`,
       exitCode: 1,
     });
+  });
+
+  it('names the absolute root and the absolute path it looked for when made with a relative root', async () => {
+    const root = freshRoot();
+    const relativeRoot = relative(process.cwd(), root);
+    const nested = join(root, 'nested');
+    // A session that wrote the plan under a directory nested under the root, as #171's did.
+    const spawn: CapturingSpawner = async () => {
+      mkdirSync(join(nested, PLAN_DIR), { recursive: true });
+      writeFileSync(join(nested, PLAN), 'the plan\n', 'utf8');
+      return { exitCode: 0, stdout: '' };
+    };
+
+    const error = await rejectionOf(plannerOver(relativeRoot, spawn).create(REQUEST));
+
+    expect(isAbsolute(relativeRoot)).toBe(false);
+    expect(error).toBeInstanceOf(ClaudePlannerError);
+    expect((error as Error).message).toContain(`was not created under ${root}: no file at ${join(root, PLAN)} `);
+    expect((error as Error).message).not.toContain(`under ${relativeRoot}`);
+  });
+
+  it('names an absolute plan as it is, with the root beside it', async () => {
+    const root = freshRoot();
+    const outside = join(tempDir, `plans-outside-${made}`);
+    const plan = join(outside, 'PLAN-probe.md');
+    const session = recordingSession(root);
+
+    const error = await rejectionOf(plannerOver(root, session.spawn, { planDir: outside }).create(REQUEST));
+
+    expect((error as Error).message).toBe(
+      `The session finished but ${plan} was not created under ${root}: no file at ${plan} — inspect the output above.`,
+    );
   });
 
   it('reads no plan of another stub as the one it was asked for', async () => {

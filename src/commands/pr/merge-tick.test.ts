@@ -19,21 +19,16 @@
  * epic cases read `epicCalls()`, the reads and writes of the epics'
  * bodies, and assert each sentence through `epicTickSentence` itself.
  */
-import type { EpicTickResult } from './merge-tick.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
+import type { EpicTickResult } from '../../board/epic-tick.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { BOARDS_LIST_ARGS, BOARDS_LIST_COMMAND } from '../../board/boards.js';
+import { epicTickProblemLine, epicTickSentence } from '../../board/epic-tick.js';
 import { BOARD_LISTING_LIMIT, boardListingCommand } from '../../board/roadmap-board.js';
 
-import {
-  epicTickProblemLine,
-  epicTickSentence,
-  noBoardListsLine,
-  tickProblemLine,
-  tickRoadmapAfterMerge,
-} from './merge-tick.js';
+import { noBoardListsLine, tickProblemLine, tickRoadmapAfterMerge } from './merge-tick.js';
 
 /** The roadmap body every case plants. */
 const ROADMAP = '- [ ] #20 plans from the board\n- [ ] #33 the board setup\n';

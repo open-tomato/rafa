@@ -62,10 +62,10 @@ import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 const SEAMS: ManifestSeams = { rafaVersion: '0.2.0', portVersions: PORT_VERSIONS };
 
 /** The feature types, as a refusal lists them. */
-const TYPES = 'output, tracker, store, planner, learning, skills, agents, mcp, commands, sync';
+const TYPES = 'output, tracker, store, planner, learning, skills, agents, mcp, commands, sync, logger';
 
 /** The port types, as a refusal lists them. */
-const PORTS = 'tracker, store, learning, output, planner, sync';
+const PORTS = 'tracker, store, learning, output, planner, sync, logger';
 
 /** The sentence every refusal of `learning` ends with. */
 const CLOSED = 'which core closes to third parties: a module never provides a learning source';
@@ -85,7 +85,7 @@ function manifestOf(raw: unknown, seams: ManifestSeams = SEAMS): ModuleManifest 
 }
 
 /** The port feature types, which state a port version. */
-const PORTED: readonly string[] = ['tracker', 'store', 'planner', 'output', 'sync'];
+const PORTED: readonly string[] = ['tracker', 'store', 'planner', 'output', 'sync', 'logger'];
 
 /** A manifest listing `type` alone and providing `value` for it. */
 function providing(type: string, value: unknown): Record<string, unknown> {
@@ -538,6 +538,17 @@ describe('validateManifest on requires.ports', () => {
       `rafa.requires.ports carries "issues", which is none of: ${PORTS}`,
     ]);
     expect(problemsOf(commandsModule({ requires: { rafa: '>=0.1', ports: [1] } }))).toEqual(['rafa.requires.ports is a list, expected a mapping']);
+  });
+});
+
+describe('validateManifest on logger', () => {
+  it('accepts a logger adapter at the logger port version core serves', () => {
+    expect(manifestOf(providing('logger', { kind: 'winston', entry: './logger.ts' })).provides)
+      .toEqual({ logger: { kind: 'winston', entry: './logger.ts' } });
+  });
+
+  it('refuses a logger entry naming no kind', () => {
+    expect(problemsOf(providing('logger', { entry: './logger.ts' }))).toEqual(['rafa.provides.logger.kind is missing']);
   });
 });
 

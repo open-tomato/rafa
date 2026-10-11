@@ -24,10 +24,12 @@
  * refused for its words reads no config and resolves nothing: no
  * preflight runs for it, and no `gh`.
  *
- * Each kind passed over is written through the command's output as
- * `tracker chain: <kind> unavailable: <reason>`, a `warn` line in text
- * mode and a `warn` `log` event in json mode, before the action acts. A
- * chain landing nowhere is refused with its own message.
+ * Each kind passed over is reported by the chain's child logger as
+ * `tracker chain: <kind> unavailable: <reason>`, with the cause code
+ * `tracker:unavailable`: a `warn:` line ending in the code in text mode,
+ * and a `warn` `log` event with the code under `fields` in json mode,
+ * before the action acts. A chain landing nowhere is refused with its
+ * own message.
  *
  * ## An id names an issue on the tracker landed on
  *
@@ -241,9 +243,12 @@ export function issueSubjectConfig(project: ProjectFound, warn: (message: string
 }
 
 /**
- * The tracker an action acts on, resolved through the chain with the
- * command's output taking every warning; a refusal with exit code 1 for
- * a config refused and a chain landing nowhere. See the module note.
+ * The tracker an action acts on, resolved through the chain; a refusal
+ * with exit code 1 for a config refused and a chain landing nowhere. A
+ * config's unknown-key warnings go to the command's output. A tracker
+ * the chain passes over is reported by the chain's own child logger
+ * (`adapters/tracker/resolve.ts`), which writes through the same output
+ * and carries the cause code. See the module note.
  */
 export async function resolveIssueTracker(context: RafaContext, seams: IssueSeams): Promise<IssueTracker> {
   const project = issueProject(context);
@@ -258,7 +263,6 @@ export async function resolveIssueTracker(context: RafaContext, seams: IssueSeam
       config,
       context: { repoRoot: project.root, gh: seams.gh },
       registry: seams.registry,
-      log: warn,
     });
   } catch (error) {
     throw new CommandExit(1, `❌ ${messageOf(error)}`);

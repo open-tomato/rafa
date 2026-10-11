@@ -180,7 +180,7 @@ describe('rafa issue show, dispatched', () => {
     expect(fake.issue('1')?.title).toBe('The github issue one');
     expect(outcome).toEqual({
       exitCode: 0,
-      stdout: `warn: tracker chain: github unavailable: ${NOT_LOGGED_IN}\n${LOCAL_TEXT.join('\n')}\n`,
+      stdout: `warn: tracker chain: github unavailable: ${NOT_LOGGED_IN} [tracker:unavailable]\n${LOCAL_TEXT.join('\n')}\n`,
       stderr: '',
     });
   });

@@ -25,12 +25,12 @@ import type { RoadmapBody } from '../roadmap-tick.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { epicTickSentence, tickEpics } from '../../commands/pr/merge-tick.js';
-import { unblockAfterMerge } from '../../commands/pr/merge-unblock.js';
 import { blockedFaultMessage, readBlockedBy } from '../blocked.js';
+import { epicTickSentence, tickEpics } from '../epic-tick.js';
 import { epicLines } from '../epic-walk.js';
 import { groupByEpicLabel, readEpics } from '../epics.js';
 import { BOARD_LIST_FIELDS } from '../roadmap-board.js';
+import { unblockAfterMerge } from '../unblock-after-merge.js';
 
 import {
   labelsRelationsFixture,

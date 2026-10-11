@@ -5,7 +5,9 @@
  * In order: the session record names no task, the operator is told the
  * wrap-up is starting, step 1 of the release writes the plan's change
  * fragment (`start/release-stage.ts`), the wrap-up session is spawned
- * with that record (`start/wrap-up.ts`), the loop guard reads the
+ * with that record and the list of the test files the run's suite steps
+ * read red only in the step (`start/wrap-up.ts`,
+ * `start/step-only-report.ts`), the loop guard reads the
  * checkout against the HEAD the session's commits left
  * (`start/checkout-watch.ts`), step 3 of the release verifies, commits
  * and pushes the fragment, the pull request is DELIVERED (below), and,
@@ -33,7 +35,9 @@
  * follow the opened line.
  * A repository whose `pr.provider` resolves to `none` has no pull request
  * to deliver, and none of this runs: the CI gate's own `none` path
- * pushes the branch as before.
+ * pushes the branch as before. The wrap-up session is handed that
+ * provider, and under `none` looks up no pull request either
+ * (`start/wrap-up.ts`).
  *
  * Step 3 writes the release's forecast or failure sentence into the
  * pull request body, and finds none to write it to when the first
@@ -104,6 +108,7 @@ import type { PassedOverTask } from './loop-events.js';
 import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { SessionServing } from './serving.js';
 import type { RunSession } from './session.js';
+import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
 import type { PullRequestSummary } from '../pr/index.js';
@@ -124,13 +129,14 @@ import { retargetPullRequest } from './pr-retarget.js';
 import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease, planTitleIn, prepareReleaseStage } from './release-stage.js';
 import { fragmentNotesIn, openRunnerPullRequest, runnerPrSeamsIn } from './runner-pr.js';
+import { readRunStepOnly } from './step-only-report.js';
 import { retryWrapUp } from './wrap-up-retry.js';
 import { openPullRequestNumber, preserveProgress } from './wrap-up.js';
 
 /** What {@link runWrapUp} runs the wrap-up over, each as `start()` settled it. */
 export interface WrapUpRunInput {
-  /** The run's session record: told the wrap-up started, each phase of the CI gate, and that the run finished. */
-  readonly session: Pick<RunSession, 'wrapUpStarted' | 'pullRequestStarted' | 'ciStarted' | 'repairStarted' | 'finished'>;
+  /** The run's session record: its id, and told the wrap-up started, each phase of the CI gate, and that the run finished. */
+  readonly session: Pick<RunSession, 'id' | 'wrapUpStarted' | 'pullRequestStarted' | 'ciStarted' | 'repairStarted' | 'finished'>;
   /** The project root, holding `.rafa/`: the store and this device's store id are read there. */
   readonly repoRoot: string;
   /** The checkout git and the wrap-up session run in (`start/checkout.ts`). */
@@ -184,6 +190,10 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
 
   const passedOver = input.passedOver ?? [];
   session.wrapUpStarted();
+  // The test files the run's suite steps read red only in the step, off
+  // the run's record: the wrap-up session and each retry are asked to
+  // list them in the pull request body (`start/step-only-report.ts`).
+  const stepOnly = readRunStepOnly(repoRoot, session.id);
   activeOutput().info(passedOver.length === 0
     ? '\n✅ All tasks completed!'
     : `\n⚠️  Wrapping up with ${passedOver.length} passed-over task(s) left open (--force-wrap-up): the pull request becomes a draft listing them.`);
@@ -207,18 +217,22 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   // the runner's own open, the retarget of a delivered pull request,
   // and the CI gate's repair prompts, which name `origin/<base>`.
   const base = resolveBaseBranch(createGitRunner(checkout), settings.prBase);
+  // The run's `pr.provider`, read off this config and the checkout's
+  // `origin` by every reader below. The wrap-up session is handed it so
+  // that under `none` it looks up no pull request and its closing line
+  // promises no retry (`start/wrap-up.ts`).
+  const readProvider = () => resolvePrProvider({
+    configured: settings.prProvider ?? null,
+    dir: checkout,
+  });
   emitLoopEvent({ kind: 'wrap-up', phase: 'session' });
-  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout);
+  const finalMessage = await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider, { stepOnly });
   // The `pr` or `no-pr` event, in every output mode, at the delivery's
   // place below and never here: over the number the delivery holds when
   // it holds one, else over this lookup, made after the retries and the
   // runner (see `emitPullRequestEvent`). A `none` provider has no pull
   // request to ask: its lookup answers the reason and never runs
   // `gh pr list`.
-  const readProvider = () => resolvePrProvider({
-    configured: settings.prProvider ?? null,
-    dir: checkout,
-  });
   const lookup = (): Promise<number | string | null> => readProvider().provider === 'none'
     ? Promise.resolve(NO_PROVIDER_REASON)
     : openPullRequestNumber(checkout, expected.branch);
@@ -255,7 +269,7 @@ export async function runWrapUp(input: WrapUpRunInput): Promise<void> {
   if (readProvider().provider !== 'none') {
     const delivery = await deliverPullRequest(
       { branch: expected.branch, retries: settings.loopWrapUpRetries, previousMessage: finalMessage },
-      deliverySeamsIn({ ...input, base, fragment: finish.fragment }),
+      deliverySeamsIn({ ...input, base, fragment: finish.fragment, stepOnly }),
     );
     // A forced wrap-up's pull request becomes a draft listing the tasks
     // it passed over BEFORE its `pr` event, so no reader of the events
@@ -526,12 +540,14 @@ export function runnerPrInputFor(source: RunnerPrSource): RunnerPrInput | null {
   };
 }
 
-/** What {@link deliverySeamsIn} closes over: the run's input, its base and the fragment step 3 committed. */
+/** What {@link deliverySeamsIn} closes over: the run's input, its base, the fragment step 3 committed and the step-only list. */
 export interface DeliveryContext extends WrapUpRunInput {
   /** The run's base branch, as `runWrapUp` resolved it once; never resolved again here. */
   readonly base: string;
   /** The fragment `finishRelease` committed, relative to the checkout, or null. */
   readonly fragment: string | null;
+  /** The test files red only in a suite step, as `runWrapUp` read them once; each retry lists them. */
+  readonly stepOnly: readonly RunStepOnly[];
 }
 
 /** The report for a plan that names no issue number to title the pull request with. */
@@ -557,6 +573,7 @@ export function deliverySeamsIn(context: DeliveryContext): PullRequestDeliverySe
       serving: context.serving,
       learning: context.wrapUpLearning,
       checkout,
+      stepOnly: context.stepOnly,
     }),
     openRunnerPullRequest: async () => {
       const runnerInput = runnerPrInputFor({

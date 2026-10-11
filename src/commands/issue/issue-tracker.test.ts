@@ -231,7 +231,11 @@ describe('the tracker, through the chain', () => {
 
     expect(run.exitCode).toBe(0);
     expect(events.map((event) => event.type)).toEqual(['start', 'log', 'result']);
-    expect(events[1]).toMatchObject({ level: 'warn', message: `tracker chain: github unavailable: ${NOT_LOGGED_IN}` });
+    expect(events[1]).toMatchObject({
+      level: 'warn',
+      message: `tracker chain: github unavailable: ${NOT_LOGGED_IN}`,
+      fields: { module: 'tracker', action: 'chain', code: 'tracker:unavailable' },
+    });
     expect(events[2]).toMatchObject({
       ok: true,
       data: { kind: 'local', degraded: true, fallbackReason: `github: ${NOT_LOGGED_IN}` },

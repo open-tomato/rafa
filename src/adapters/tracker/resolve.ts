@@ -12,7 +12,8 @@
  * ## Never silent
  *
  * The source's rule is kept as it was written: falling back is never
- * silent. Every failed attempt is logged, and it is folded into a
+ * silent. Every failed attempt is reported, unless the config asks for
+ * no warnings (see "Quieting" below), and it is always folded into a
  * `fallbackReason` that travels with the tracker the chain lands on.
  * Silent degradation is what produced the loose-markdown problem the
  * source's harness replaced.
@@ -43,7 +44,7 @@
  *   - The preflight rejects. The reason is `preflight rejected: ` followed
  *     by the rejection's message.
  *
- * Each failure is logged as `tracker chain: <kind> unavailable:
+ * Each failure is reported as `tracker chain: <kind> unavailable:
  * <reason>`, before the next kind is tried. It is recorded as
  * `<kind>: <reason>` and joined to the earlier ones with `; `.
  *
@@ -78,11 +79,22 @@
  *     the copy counts it as a failed attempt. The port says a preflight
  *     never throws, but an add-on's is the first code the chain runs
  *     that core did not write.
- *   - Reporting. `log` defaults to the active output's `warn`
- *     (`src/adapters/output/active.ts`), read when the report is made,
- *     as the `local` adapter's `warn` is. The source's log line opened
- *     with `[issue-tracker]` and held an em dash; the copy's opens with
+ *   - Reporting. With no `log` named, each failure is a `warn` entry of
+ *     a child logger bound to module `tracker` and action `chain`
+ *     (`src/adapters/logger/active.ts`), read when the report is made,
+ *     carrying the cause code `tracker:unavailable`. It reads
+ *     `warn: tracker chain: <kind> unavailable: <reason>
+ *     [tracker:unavailable]` in text mode, and is the module the logger
+ *     port was first tried on (`context/logging.md`). A `log` that is
+ *     named still gets the plain line, `tracker chain: <kind>
+ *     unavailable: <reason>`. The source's log line opened with
+ *     `[issue-tracker]` and held an em dash; the copy's opens with
  *     `tracker chain:`, as the refusal does.
+ *   - Quieting. A config that sets `logger.level` or the `tracker`
+ *     module's level to `error` asks for no warnings, and gets none from
+ *     the logger path. The fallback is still not silent where it
+ *     counts: the `fallbackReason` travels with the tracker landed on,
+ *     and the attempts are in the resolution.
  *   - Names. `Resolution` is {@link TrackerResolution}, `AttemptLog` is
  *     {@link TrackerAttempt}, and `ResolveOptions` is
  *     {@link ResolveTrackerOptions}. The resolution and its attempts are
@@ -93,7 +105,7 @@ import type { PreflightResult, Tracker, TrackerKind } from '../../ports/index.js
 import type { AdapterContext, AdapterRegistry } from '../registry.js';
 
 import { messageOf } from '../../config-sections.js';
-import { activeOutput } from '../output/active.js';
+import { activeLogger } from '../logger/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../registry.js';
 
 /** What every report and refusal opens with. */
@@ -137,7 +149,7 @@ export interface ResolveTrackerOptions {
   readonly context: Omit<AdapterContext, 'fallbackReason'>;
   /** Where each kind's adapter is resolved. `CORE_ADAPTER_REGISTRY` when left out. */
   readonly registry?: AdapterRegistry;
-  /** Reports each failed attempt. The active output's `warn` when left out. */
+  /** Reports each failed attempt. A child of the active logger when left out; see the module note. */
   readonly log?: (message: string) => void;
 }
 
@@ -146,9 +158,21 @@ type AttemptOutcome =
   | { readonly ok: true; readonly tracker: Tracker }
   | { readonly ok: false; readonly reason: string };
 
-/** Reports through the output active when the report is made. */
-function warnThroughActiveOutput(message: string): void {
-  activeOutput().warn(message);
+/** The cause code of a tracker the chain passed over. */
+const UNAVAILABLE_CODE = 'tracker:unavailable';
+
+/** What the chain's logger binds to every entry. */
+const LOG_BINDINGS = Object.freeze({ module: 'tracker', action: 'chain' });
+
+/** Reports `kind` passed over for `reason`: to `log` when one is named, else through the active logger. */
+function reportUnavailable(log: ResolveTrackerOptions['log'], kind: TrackerKind, reason: string): void {
+  const message = `${kind} unavailable: ${reason}`;
+  if (log !== undefined) {
+    log(`${PREFIX}: ${message}`);
+    return;
+  }
+  activeLogger().child(LOG_BINDINGS)
+    .log({ level: 'warn', message, code: UNAVAILABLE_CODE });
 }
 
 /** `tracker.default`, then each `tracker.fallback` kind, each kind once, first place named. */
@@ -190,7 +214,6 @@ async function attempt(
  */
 export async function resolveTracker(options: ResolveTrackerOptions): Promise<TrackerResolution> {
   const registry = options.registry ?? CORE_ADAPTER_REGISTRY;
-  const log = options.log ?? warnThroughActiveOutput;
   let attempts: readonly TrackerAttempt[] = [];
   let failures: readonly string[] = [];
 
@@ -211,7 +234,7 @@ export async function resolveTracker(options: ResolveTrackerOptions): Promise<Tr
 
     attempts = [...attempts, Object.freeze({ kind, ok: false, reason: outcome.reason })];
     failures = [...failures, `${kind}: ${outcome.reason}`];
-    log(`${PREFIX}: ${kind} unavailable: ${outcome.reason}`);
+    reportUnavailable(options.log, kind, outcome.reason);
   }
 
   throw new Error(`${PREFIX}: no tracker available; tried ${failures.join(FAILURE_SEPARATOR)}`);

@@ -17,7 +17,7 @@ spells out, and the shapes the lint config forces.
   Shared refusals and readers live in the subject that first needed them
   rather than in a neutral module: eighteen command modules import
   `../plan/plan-files.js`, and `src/commands/release/tag.ts` takes
-  `versionTag` from `../pr/merge-followups.js` so two commands cannot
+  `versionTag` from `../../release/version-tag.js` so two writers cannot
   spell one tag differently. Reach for the existing helper — a second
   spelling of a refusal is the real smell, as `release status`'s
   hand-rolled `Expected no arguments` is beside `plan-files.ts`'s shared
@@ -66,11 +66,15 @@ spells out, and the shapes the lint config forces.
   `bun run check-types` runs the root `tsc --noEmit`, whose `tsconfig.json`
   excludes `packages`, then `bun run --filter './packages/*' check-types`,
   each package's own `tsc --noEmit`; a package's `tsconfig.json`
-  includes its test files. `bun run lint` reaches none of it:
-  `eslint.config.mjs` ignores `packages/**`, and a package file linted
-  with `--no-ignore` reports `import/no-unresolved` on both subpaths,
-  because `eslint.base.mjs`'s resolver reads only the root
-  `tsconfig.json`.
+  includes its test files. `bun run lint` lints it from the root config
+  like `src/`, its `testdata/` folders included, and so does the
+  runner's lint step on a task's diff. The two subpaths resolve for
+  `import/no-unresolved` because `eslint.base.mjs`'s resolver lists
+  `./packages/*/tsconfig.json` beside the root `tsconfig.json`; without
+  that entry, `bunx eslint packages` reported 21 `import/no-unresolved`
+  errors (measured on ESLint 9.39.5). Two globs make several projects,
+  so the resolver also sets `noWarnOnMultipleProjects`, or every run
+  prints `Multiple projects found` to stderr.
 
 ### References
 
@@ -186,3 +190,37 @@ replaces the dynamic import's roster with a parameter; order matters,
 because a seam landing before the three moves leaves the 13-file c1/c6
 cycle in place. Once `#905`'s shared-contract move cuts the code into
 packages, the sweep reads packages instead of clusters.
+
+### The library boundary
+
+**Commands and their supporting code go into `src/commands/`, library
+code the rest of the codebase reads goes into the subject folders at
+`src/`.** A non-test file outside `src/commands/` holds no import whose
+target is inside it — not static `import`, not `import type`, not
+`export … from`, and not dynamic `import()`. This rule forces every
+feature that more than one command might want into the library half
+first, before a second command is even written.
+
+**Two files are exempt by name:** `src/rafa.ts` (the bin entry, which
+loads the command registry and dispatches on `process.argv`) and
+`src/plan.ts` (the body of the `rafa plan create` command). Both are the
+CLI's own layer, not library code. A sweep (`src/tests/commands-direction.sweep.test.ts`)
+names every non-test import edge and fails when a library file brings in
+the command half.
+
+**Edge case: a reader so widely used that it lives in the commands
+folder.** `src/commands/plan/plan-files.ts` has 71 importers, because
+the first command that needed it (`rafa plan create`) wrote it there.
+When a second command wants it, the symbol moves to `src/plan/plan-files.ts`
+and the command file imports from there. The sweep reads the move with
+the list: a command file that exports its own library half is a failure
+until the re-export is gone. Symbols imported from inside `src/commands/`
+by test files are never swept; `classifyFile` of `scripts/survey/files.ts`
+decides what a test is.
+
+**Symbols take their subject folder from the import graph survey.** The
+eight-cluster map in `docs/survey/cluster-map.json` decides the folder;
+the acceptance criteria's cut table in `#905` confirms the place before
+a task moves a symbol. A file with no mapping takes the cluster most of
+its folder's mapped files hold; if a file's folder holds no mapped file,
+the task extends the map with a new survey run.

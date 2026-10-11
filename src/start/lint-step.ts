@@ -21,13 +21,16 @@
  * `--no-renames` lists a renamed file under its new path.
  *
  * `--no-warn-ignored` keeps a diff of only ignored files green. Measured
- * on ESLint 9.39.5 at this repository's root: over `packages/**` files,
+ * on ESLint 9.39.5 at this repository's root: over a `.claude/**` file,
  * which `eslint.config.mjs` ignores, and over `.yml` and hook files no
  * config block matches, ESLint exits 0 and its JSON report is `[]`; the
  * control without the flag prints `File ignored because of a matching
  * ignore pattern` and `File ignored because no matching configuration
  * was supplied` as warnings, still exiting 0. A binary file no config
- * matches adds no entry either.
+ * matches adds no entry either. Files under `packages/` are linted, not
+ * ignored: a `.ts` and a `README.md` there each get a report entry, and
+ * a planted package file with a double-quoted string exits 1 with
+ * `@stylistic/quotes` named.
  *
  * The run adds `--format json`, so the step reads each file's error
  * count instead of parsing the stylish report; the command the blocker

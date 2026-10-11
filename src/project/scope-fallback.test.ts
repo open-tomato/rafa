@@ -31,6 +31,12 @@
  * parent folder holding a config was read against the `scope.ts` of
  * the base commit, where it answered the parent folder and failed.
  *
+ * Two more on-disk cases pin #471 against the current `scope.ts`, both
+ * passing without a change to it: a worktree nested inside the main
+ * checkout at `.claude/worktrees/<name>` under a parent folder holding
+ * its own config answers the main checkout, and a plain non-git tree
+ * finds its `.rafa/` by walking up from a nested subdirectory.
+ *
  * Eight mutations of `scope.ts` were driven against this file and
  * `scope.test.ts` one at a time, each an exact string found once, with
  * `scope.ts` restored byte-identical after each, and every one reddened
@@ -260,6 +266,19 @@ describe('resolveScope from a linked worktree on disk', () => {
   });
 });
 
+describe('resolveScope in a plain non-git directory tree on disk', () => {
+  it('finds the .rafa/ above a nested subdirectory by walking up', () => {
+    const top = freshDir();
+    plantConfig(top);
+    const start = join(top, 'a', 'b', 'c');
+    mkdirSync(start, { recursive: true });
+
+    const resolution = resolveScope(start, { home, mainCheckout: isolatedMainCheckout });
+
+    expect(rootOf(resolution)).toBe(top);
+  });
+});
+
 describe('resolveScope from a linked worktree under a parent folder holding .rafa/config.yaml', () => {
   it('answers the main checkout, not the parent folder, from the worktree beside it', () => {
     const { base, main, beside } = plantRepository();
@@ -285,6 +304,22 @@ describe('resolveScope from a linked worktree under a parent folder holding .raf
 
     expect(rootOf(resolveScope(main, { home, mainCheckout: seam }))).toBe(main);
     expect(calls).toEqual([]);
+  });
+
+  it('answers the main checkout from a worktree nested inside it at .claude/worktrees, not the parent folder', () => {
+    const { base, main } = plantRepository();
+    plantConfig(base);
+    plantConfig(main);
+    const claudeTree = join(main, '.claude', 'worktrees', 'task');
+    git(main, ['worktree', 'add', '-q', '-b', 'claude-task', claudeTree]);
+    const start = join(claudeTree, 'src', 'deep');
+    mkdirSync(start, { recursive: true });
+
+    const fromTree = resolveScope(claudeTree, { home, mainCheckout: isolatedMainCheckout });
+    const fromNested = resolveScope(start, { home, mainCheckout: isolatedMainCheckout });
+
+    expect(rootOf(fromTree)).toBe(main);
+    expect(rootOf(fromNested)).toBe(main);
   });
 
   it('goes on above the top level to the parent folder when the main checkout holds no config', () => {

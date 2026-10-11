@@ -44,6 +44,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
+import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../logger/settings.js';
 import { setActiveOutput } from '../output/active.js';
 import { createTextOutput } from '../output/text.js';
 import { createAdapterRegistry } from '../registry.js';
@@ -141,6 +142,7 @@ afterAll(() => {
 
 afterEach(() => {
   setActiveOutput(null);
+  setActiveLoggerSettings(null);
 });
 
 describe('resolveTracker', () => {
@@ -373,7 +375,7 @@ describe('resolveTracker', () => {
     expect(made.map((entry) => entry.kind)).toEqual(['github']);
   });
 
-  it('reports through the active output when no log is named', async () => {
+  it('reports through a child logger, with the cause code, when no log is named', async () => {
     const { registry } = stubRegistry({ github: { preflight: { ok: false, reason: 'down' } }, local: {} });
     const chunks: string[] = [];
     setActiveOutput(createTextOutput({
@@ -392,7 +394,48 @@ describe('resolveTracker', () => {
       registry,
     });
 
-    expect(chunks.join('')).toBe('warn: tracker chain: github unavailable: down\n');
+    expect(chunks.join('')).toBe('warn: tracker chain: github unavailable: down [tracker:unavailable]\n');
+  });
+
+  it('reports nothing when the tracker module\'s level is error and no log is named', async () => {
+    const { registry } = stubRegistry({ github: { preflight: { ok: false, reason: 'down' } }, local: {} });
+    const chunks: string[] = [];
+    setActiveOutput(createTextOutput({
+      verbosity: 0,
+      stream: {
+        write: (chunk) => {
+          chunks.push(chunk);
+          return true;
+        },
+      },
+    }));
+    setActiveLoggerSettings({ ...DEFAULT_LOGGER_SETTINGS, modules: new Map([['tracker', 'error']]) });
+
+    const resolution = await resolveTracker({
+      config: { trackerDefault: 'github', trackerFallback: ['local'] },
+      context: { repoRoot: '/nonexistent' },
+      registry,
+    });
+
+    expect(chunks).toEqual([]);
+    expect(resolution.degraded).toBe(true);
+  });
+
+  it('hands a named log the line as it always read, whatever the logger\'s level', async () => {
+    const { registry } = stubRegistry({ github: { preflight: { ok: false, reason: 'down' } }, local: {} });
+    const lines: string[] = [];
+    setActiveLoggerSettings({ ...DEFAULT_LOGGER_SETTINGS, level: 'error' });
+
+    await resolveTracker({
+      config: { trackerDefault: 'github', trackerFallback: ['local'] },
+      context: { repoRoot: '/nonexistent' },
+      registry,
+      log: (message) => {
+        lines.push(message);
+      },
+    });
+
+    expect(lines).toEqual(['tracker chain: github unavailable: down']);
   });
 
   it('answers a frozen resolution with frozen attempts', async () => {

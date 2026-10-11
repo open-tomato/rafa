@@ -31,13 +31,21 @@
  * the project root, which holds the store; the two are one directory
  * unless the loop runs in a linked worktree.
  *
+ * Under `pr.provider: none` there is no pull request to read (#847):
+ * {@link preserveProgress} is handed the provider the caller resolved
+ * and then makes neither lookup, the session's prompt is built as for a
+ * branch with no open pull request, and the line a session that exits 0
+ * ends with names the provider as `none` and promises no retry, since
+ * `start/wrap-up-run.ts` delivers nothing under it.
+ *
  * The prompt's first line is the `wrap-up` classifier key, and
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that literal from.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource, PrProvider } from '../config.js';
 import type { TaskLearning } from './dispatch.js';
 import type { SessionServing } from './serving.js';
+import type { RunStepOnly } from './step-only-report.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ReleasePrepared, ReleasePreparation, ReleaseSkipped } from '../release/prepare.js';
@@ -56,6 +64,7 @@ import { getCurrentBranch } from '../utils/git.js';
 import { checkWrapUpAnswer, readHead } from './promoted-check.js';
 import { serveSession } from './serving.js';
 import { withStamp } from './stamp.js';
+import { stepOnlySection } from './step-only-report.js';
 
 /**
  * Assembles the prompt the end-of-run wrap-up session is given.
@@ -120,6 +129,14 @@ import { withStamp } from './stamp.js';
  * them under `## Lessons to promote` with the `rafa:promoted` block the
  * session answers them in (`start/promoted.ts` reads it). With no
  * lesson the section is not written at all, not even its heading.
+ *
+ * `stepOnly` is the test files the run's suite steps read red only in
+ * the step, green when run alone, as `readRunStepOnly`
+ * (`start/step-only-report.ts`) reads them off the run's record. They
+ * blocked nothing, so the pull request body is where a reviewer learns
+ * of them: `stepOnlySection` lists them below the bullets and above the
+ * lessons, with the heading the session is asked to put them under.
+ * With no such file that section is not written either.
  */
 export function buildWrapUpPrompt(
   branch: string,
@@ -128,6 +145,7 @@ export function buildWrapUpPrompt(
   openPullRequest: number | null = null,
   release: ReleasePreparation | null = null,
   lessons: readonly InstinctRecord[] = [],
+  stepOnly: readonly RunStepOnly[] = [],
 ): string {
   return [
     '* Read `@progress.txt` in full.',
@@ -143,6 +161,7 @@ export function buildWrapUpPrompt(
     `* Commit these changes and push them to the CURRENT branch (${branch}). Never create a branch here: the work under review is this branch's, and a second branch splits one plan across two reviews.`,
     pullRequestStep(branch, base, openPullRequest),
     '* Do not include Claude attribution in the commit or PR message.',
+    ...stepOnlySection(stepOnly),
     ...lessonsSection(lessons),
     '',
     'The plan this run executed follows, in full.',
@@ -436,7 +455,18 @@ export async function lessonsToPromote(learning: WrapUpLearning | null): Promise
  * nothing, and `start/wrap-up-run.ts` then retries the wrap-up or opens
  * the pull request itself, which is what the line says.
  *
- * `seams` is what the tests answer in place of `gh` and `claude`: the
+ * `provider` is the run's `pr.provider` as the caller resolved it
+ * (`resolvePrProvider`, `pr/provider.ts`). Under `none` neither lookup
+ * is made, whatever `extras` holds: the prompt is built with no open
+ * pull request, and the line printed is {@link PROGRESS_PRESERVED_NO_PROVIDER},
+ * which promises no retry because the caller delivers no pull request
+ * under that provider. It is required, as `checkout` is: a default of
+ * `gh` would ask `gh` in a repository that has none to ask.
+ *
+ * `extras` holds `stepOnly`, the test files the run's suite steps read
+ * red only in the step, which the prompt lists for the pull request
+ * body ({@link buildWrapUpPrompt}); none when left out. It also holds
+ * what the tests answer in place of `gh` and `claude`: the
  * lookup made both before the session (for the prompt) and after it
  * (for that line), and the spawner. Left out, they are
  * {@link openPullRequestNumber} and `spawnClaudeCaptured`.
@@ -454,22 +484,28 @@ export async function preserveProgress(
   learning: WrapUpLearning | null,
   base: string,
   checkout: string,
-  seams: PreserveProgressSeams = {},
+  provider: PrProvider,
+  extras: PreserveProgressExtras = {},
 ): Promise<string> {
-  const lookup = seams.lookup ?? openPullRequestNumber;
+  const lookup = extras.lookup ?? openPullRequestNumber;
   const branch = getCurrentBranch(checkout);
-  const openPullRequest = await lookup(checkout, branch);
+  const hasProvider = provider !== 'none';
+  const openPullRequest = hasProvider
+    ? await lookup(checkout, branch)
+    : null;
   return runWrapUpSession({
-    buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons),
+    buildPrompt: (lessons) => buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons, extras.stepOnly),
     settingSources,
     serving,
     learning,
     checkout,
     branch,
-    succeeded: async () => progressPreservedLine(await lookup(checkout, branch)),
-    ...(seams.spawn === undefined
+    succeeded: hasProvider
+      ? async () => progressPreservedLine(await lookup(checkout, branch))
+      : PROGRESS_PRESERVED_NO_PROVIDER,
+    ...(extras.spawn === undefined
       ? {}
-      : { spawn: seams.spawn }),
+      : { spawn: extras.spawn }),
   });
 }
 
@@ -479,6 +515,12 @@ export interface PreserveProgressSeams {
   readonly lookup?: (checkout: string, branch: string) => Promise<number | null>;
   /** The spawner; `spawnClaudeCaptured` when left out. */
   readonly spawn?: CapturingSpawner;
+}
+
+/** What {@link preserveProgress} takes beyond the run's own settings: the list for the prompt, and the tests' seams. */
+export interface PreserveProgressExtras extends PreserveProgressSeams {
+  /** The test files the run's suite steps read red only in the step; none when left out. */
+  readonly stepOnly?: readonly RunStepOnly[];
 }
 
 /**
@@ -491,6 +533,14 @@ export function progressPreservedLine(openPullRequest: number | null): string {
     ? '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.'
     : `\n✅ Progress preserved; pull request #${openPullRequest} is open on this branch.`;
 }
+
+/**
+ * The line {@link preserveProgress} prints once its session exits 0
+ * under `pr.provider: none`, with no lookup made: it names the provider
+ * and says no retry follows, where {@link progressPreservedLine}'s
+ * no-pull-request line promises one.
+ */
+export const PROGRESS_PRESERVED_NO_PROVIDER = '\n✅ Progress preserved; pr.provider is none, so no pull request is looked up or opened, and no wrap-up retry follows.';
 
 /** What {@link runWrapUpSession} spawns one wrap-up session from. */
 export interface WrapUpSessionRun {

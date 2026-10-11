@@ -55,7 +55,7 @@
  */
 import type { GitRunner } from '../pr/index.js';
 
-import { plural } from '../commands/plan/plan-files.js';
+import { plural } from '../plan/plan-files.js';
 import { gitSaid } from '../pr/index.js';
 import { hasDiverged, parseBaseStanding } from '../start/branch-decision.js';
 

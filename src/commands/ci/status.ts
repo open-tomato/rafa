@@ -4,6 +4,12 @@
  * it is red, the bun cases it failed by file and case. Starts no Claude
  * session and declares no `spends`.
  *
+ * This is the command half: the line it reads, the `gh` seam, the json
+ * event and the command. Its library half, `src/ci/status-reading.ts`,
+ * holds the reading's shape, the verdict, the exit code of each verdict,
+ * the failed-log reader and the text lines, which
+ * `src/stretch/pit-readings.ts` reads too.
+ *
  * ## What it reads, in order
  *
  * The line first: no word, `--branch` required and not blank, and
@@ -41,13 +47,13 @@
  * non-zero exit, and is the terminal result's data when the run is green.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { FailedCaseFile } from '../../ci/failed-cases.js';
-import type { BranchRun } from '../../ci/runs.js';
+import type { CiStatusReading } from '../../ci/status-reading.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { readFailedCases } from '../../ci/failed-cases.js';
 import { readNewestRun } from '../../ci/runs.js';
+import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../../ci/status-reading.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { readNonBlankFlag, readRequiredFlag } from '../issue/issue-tracker.js';
@@ -59,28 +65,8 @@ export const CI_STATUS_USAGE = 'rafa ci status --branch=<branch> [--workflow=<na
 /** The name of the json event every reading is written as. */
 export const CI_STATUS_EVENT = 'ci-status';
 
-/** What a run reads as. */
-export type CiVerdict = 'green' | 'red' | 'none' | 'running';
-
-/** The exit code of each verdict; see the module note. */
-export const CI_STATUS_EXIT: Readonly<Record<CiVerdict, number>> = Object.freeze({
-  green: 0,
-  red: 1,
-  none: 2,
-  running: 3,
-});
-
 /** The exit code of a refusal and of a `gh` failure: apart from every verdict. */
 export const CI_STATUS_FAILED_EXIT = 4;
-
-/** How many characters of the commit the text prints, as `git` abbreviates by default. */
-export const SHORT_COMMIT_LENGTH = 7;
-
-/** The only conclusion that reads green. */
-const GREEN_CONCLUSION = 'success';
-
-/** Recorded in the stderr of `gh run view --log-failed` for a run whose log was dropped. */
-const LOG_DROPPED = 'log not found';
 
 /** How the command reaches `gh`. */
 export interface CiStatusSeams {
@@ -93,45 +79,9 @@ export const DEFAULT_CI_STATUS_SEAMS: CiStatusSeams = Object.freeze({
   gh: (root: string): GhRunner => createGhRunner({ cwd: root }),
 });
 
-/** What one line read; json mode's data. */
-export interface CiStatusReading {
-  readonly branch: string;
-  /** The workflow the line named, or null for any. */
-  readonly workflow: string | null;
-  readonly verdict: CiVerdict;
-  /** The newest run, or null when the branch has none. */
-  readonly run: BranchRun | null;
-  /**
-   * The failed cases of a red run by file; null for a run that is not
-   * red and for a red run whose log `gh` no longer holds.
-   */
-  readonly failed: readonly FailedCaseFile[] | null;
-  /** The exit code the verdict ends with. */
-  readonly exitCode: number;
-}
-
 /** A refusal of the line, with the usage. */
 function refusal(problem: string): CommandExit {
   return new CommandExit(CI_STATUS_FAILED_EXIT, `❌ rafa ci status: ${problem}\nUsage: ${CI_STATUS_USAGE}`);
-}
-
-/** The verdict on `run`; see the module note. */
-export function verdictOf(run: BranchRun | null): CiVerdict {
-  if (run === null) return 'none';
-  if (run.state !== 'completed') return 'running';
-  return run.conclusion === GREEN_CONCLUSION
-    ? 'green'
-    : 'red';
-}
-
-/** The `--log-failed` text of run `id`, or null when `gh` no longer holds it. */
-export async function readFailedLog(gh: GhRunner, id: number): Promise<string | null> {
-  const args = ['run', 'view', String(id), '--log-failed'];
-  const result = await gh(args);
-  if (result.ok) return result.stdout;
-  if (result.stderr.includes(LOG_DROPPED)) return null;
-  const detail = result.stderr.trim() || result.stdout.trim() || 'it exited non-zero and wrote nothing';
-  throw new Error(`gh ${args.join(' ')} failed: ${detail}`);
 }
 
 /** The line's branch and workflow, refusing a stray word and a missing or blank flag. */
@@ -178,43 +128,6 @@ export async function readCiStatus(context: RafaContext, seams: CiStatusSeams): 
   } catch (error) {
     throw new CommandExit(CI_STATUS_FAILED_EXIT, `❌ rafa ci status: ${messageOf(error)}`);
   }
-}
-
-/** The run's state as one word: its conclusion once finished, its status before. */
-function stateWord(run: BranchRun): string {
-  return run.state === 'completed'
-    ? run.conclusion ?? 'completed'
-    : run.state;
-}
-
-/** The headline of a reading. */
-function headline(reading: CiStatusReading): string {
-  const { run } = reading;
-  const where = reading.workflow === null
-    ? reading.branch
-    : `${reading.branch} (${reading.workflow})`;
-  if (run === null) return `⚪ No run on ${where}.`;
-  const mark = { green: '✅', red: '❌', running: '⏳', none: '⚪' }[reading.verdict];
-  const commit = run.commit.slice(0, SHORT_COMMIT_LENGTH);
-  return `${mark} ${where}: ${run.workflow} run ${String(run.id)} is ${stateWord(run)} on ${commit}.`;
-}
-
-/** The lines naming a red run's failed cases. */
-function failedLines(failed: readonly FailedCaseFile[] | null): string[] {
-  if (failed === null) return ['   The run\'s log is no longer on GitHub, so its failed cases cannot be read.'];
-  if (failed.length === 0) return ['   No bun test case failed: the run went red outside the tests.'];
-  return failed.flatMap((file) => [
-    `   ${file.file ?? '(no file named)'}`,
-    ...file.cases.map((name) => `     - ${name}`),
-  ]);
-}
-
-/** Every line text mode prints for a reading. */
-export function renderCiStatus(reading: CiStatusReading): string[] {
-  const head = headline(reading);
-  return reading.verdict === 'red'
-    ? [head, ...failedLines(reading.failed)]
-    : [head];
 }
 
 /** The command, reaching `gh` through `seams`; see the module note. */

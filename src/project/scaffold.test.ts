@@ -222,20 +222,22 @@ describe('the config files', () => {
       '#   fullSuiteTriggers: ["bunfig.toml", "tsconfig*.json", "package.json", "bun.lock", "bun.lockb"]',
       '#   integration: ["**/*-integration.test.ts", "**/*.integration.test.ts", "**/*-spawned*.test.ts", "**/*-cli.test.ts"]',
       '#   alwaysRun: ["src/**/*.sweep.test.ts"]',
+      '#   retakeRedAlone: true',
     ]);
     expect([resolved.config.testsFullSuiteTriggers, resolved.config.testsIntegration, resolved.config.testsAlwaysRun])
       .toEqual([CONFIG_DEFAULTS.testsFullSuiteTriggers, CONFIG_DEFAULTS.testsIntegration, CONFIG_DEFAULTS.testsAlwaysRun]);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun])
-      .toEqual(['file', 'file', 'file']);
+    expect(resolved.config.testsRetakeRedAlone).toBe(true);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
+      .toEqual(['file', 'file', 'file', 'file']);
   });
 
   it('answers each tests setting from the default once its line is dropped, so the reading above can fail', () => {
-    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration|alwaysRun):/.test(line));
+    const lines = CONFIG_SETTINGS_LINES.filter((line) => !/^# {3}(?:fullSuiteTriggers|integration|alwaysRun|retakeRedAlone):/.test(line));
     const resolved = resolveConfig({ file: parseConfigText(uncommented(['version: 1', ...lines].join('\n')), 'c.yaml') });
 
-    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 3);
-    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun])
-      .toEqual(['default', 'default', 'default']);
+    expect(lines).toHaveLength(CONFIG_SETTINGS_LINES.length - 4);
+    expect([resolved.sources.testsFullSuiteTriggers, resolved.sources.testsIntegration, resolved.sources.testsAlwaysRun, resolved.sources.testsRetakeRedAlone])
+      .toEqual(['default', 'default', 'default', 'default']);
   });
 
   it('carries the triage section, threshold at 0.3 and candidates at 3, which resolve from the file once uncommented', () => {

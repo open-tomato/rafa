@@ -44,8 +44,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { changelogVersions, compareVersions } from '../commands/release/status.js';
-
+import { changelogVersions, compareVersions } from './status-readings.js';
 import { parseSemanticVersion } from './version.js';
 
 /** A receipt line: the comment alone on its line, ids separated by whitespace. */

@@ -151,13 +151,14 @@ import {
 } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { plansDirAt } from '../../plan/plan-files.js';
 import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { roadmapBoard } from '../issue/list.js';
 import { unknownLine } from '../issue/roadmap-epic-table.js';
 import { renderRoadmapTable } from '../issue/roadmap-table.js';
-import { plansDirAt, readSwitch } from '../plan/plan-files.js';
+import { readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
 
 /** The usage line a refusal names. */

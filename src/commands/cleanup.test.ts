@@ -21,6 +21,9 @@
  * - The Not-pushed row answered `y` IS deleted with `-D`, and answered
  *   `n` is not, over the same keys: so the second question is proved
  *   to decide, not merely to be printed.
+ * - A held Not-pushed row asks no second question and is withheld; the
+ *   same row without its holder, over the same keys, IS asked and
+ *   deleted, so the missing question is read against a run that asks.
  * - A ticked run record's files are gone after the final yes, and the
  *   same files planted again are still there after a no, so the removal
  *   is proved to follow the answer and the files to have been there.
@@ -146,6 +149,22 @@ const WT_DIRTY: WorktreeRow = {
   tickable: false,
   ticked: false,
   reason: '1 untracked',
+};
+
+/** The Not-pushed branch {@link WT_DIRTY} has checked out, read as if no worktree held it. */
+const UNHELD_NOT_PUSHED: NotPushedRow = {
+  group: 'not-pushed',
+  branch: branch('dirty', { upstream: null, ahead: null }),
+  ticked: false,
+  commits: 3,
+  reason: 'no upstream; 3 commits not on any remote',
+};
+
+/** The same row as `src/cleanup/groups.ts` reads it held by {@link WT_DIRTY}. */
+const HELD_NOT_PUSHED: NotPushedRow = {
+  ...UNHELD_NOT_PUSHED,
+  heldBy: { path: WT_DIRTY.path, name: 'wt-dirty', blockers: ['dirty'] },
+  reason: `${UNHELD_NOT_PUSHED.reason}; checked out in wt-dirty (dirty)`,
 };
 
 const RUN: RunRow = {
@@ -370,6 +389,32 @@ describe('rafa cleanup with a terminal', () => {
     const outcome = await run([], { keys, answers: ['y', 'y'] });
     expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(3, 1, 0)]);
     expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, 'branch -D wip']);
+  });
+
+  it('asks no second question for a ticked Not-pushed row an untickable worktree holds, and withholds it', async () => {
+    const keys = [DOWN, DOWN, DOWN, SPACE, ENTER];
+    const outcome = await run([], { read: reading({ notPushed: [HELD_NOT_PUSHED] }), keys, answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 1, 0)]);
+    expect(gitLines(outcome.recorded)).toEqual(DEFAULT_STEPS);
+    expect(outcome.stdout).toContain('not removed: dirty: checked out in wt-dirty (dirty), which is not removed');
+  });
+
+  it('still asks the second question for the same row once no worktree holds it (control)', async () => {
+    const keys = [DOWN, DOWN, DOWN, SPACE, ENTER];
+    const outcome = await run([], { read: reading({ notPushed: [UNHELD_NOT_PUSHED] }), keys, answers: ['y', 'y'] });
+    expect(outcome.recorded.asked).toEqual([notPushedQuestion(UNHELD_NOT_PUSHED), cleanupQuestion(3, 1, 0)]);
+    expect(gitLines(outcome.recorded)).toEqual([...DEFAULT_STEPS, 'branch -D dirty']);
+    expect(outcome.stdout).not.toContain('not removed:');
+  });
+
+  it('asks about an unheld Not-pushed row and not a held one ticked beside it, under --dry-run too', async () => {
+    const keys = [DOWN, DOWN, DOWN, GROUP, ENTER];
+    const outcome = await run(['--dry-run'], { read: reading({ notPushed: [HELD_NOT_PUSHED, NOT_PUSHED] }), keys, answers: ['y'] });
+    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED)]);
+    expect(outcome.stdout).toContain('not removed: dirty: checked out in wt-dirty (dirty), which is not removed');
+    expect(outcome.stdout).toContain('git branch -D wip');
+    expect(outcome.stdout).not.toContain('git branch -D dirty');
   });
 
   it('deletes a ticked Stale row with -D on the final yes alone', async () => {

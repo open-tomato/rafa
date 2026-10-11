@@ -291,7 +291,7 @@ export interface BoardRelations {
   readonly removeBlocker: (listing: readonly BoardIssue[], change: BlockerChange) => Promise<readonly RelationWrite[]>;
   /**
    * The step `rafa pr merge` runs once the merge is done: today's
-   * `merge-unblock.ts` and `merge-tick.ts` steps in `labels`, nothing in
+   * `unblock-after-merge.ts` and `epic-tick.ts` steps in `labels`, nothing in
    * `native`. Never rejects.
    */
   readonly afterMerge: (request: AfterMergeRequest) => Promise<readonly RelationWrite[]>;

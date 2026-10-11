@@ -69,4 +69,29 @@ describe('rafa release status in a linked worktree under a parent project', () =
     expect(run.stdout).toContain(`package.json: ${PROJECT_VERSION}`);
     expect(run.stdout).not.toContain(PARENT_VERSION);
   });
+
+  it('reads the main checkout version from a nested directory of the worktree in json mode', () => {
+    // Arrange
+    const scratch = plantScratchRepo(tempBase);
+    const parent = join(scratch.repo, '..');
+    plantProjectConfig(scratch.repo, 'version: 1\nrelease:\n  versionFile: package.json\n  changelog: CHANGELOG.md\n');
+    plantProjectConfig(parent, 'version: 1\nrelease:\n  versionFile: parent.json\n  changelog: CHANGELOG.md\n');
+    writeFileSync(join(parent, 'parent.json'), JSON.stringify({ name: 'parent', version: PARENT_VERSION }));
+    writeFileSync(join(scratch.repo, 'package.json'), JSON.stringify({ name: 'demo', version: PROJECT_VERSION }));
+    writeFileSync(join(scratch.repo, '.gitignore'), '.rafa/\n');
+    git(scratch.repo, scratch.home, ['add', '.gitignore', 'package.json']);
+    git(scratch.repo, scratch.home, ['commit', '-q', '-m', 'init']);
+    const worktree = join(parent, 'linked');
+    git(scratch.repo, scratch.home, ['worktree', 'add', '-q', '-b', 'feature', worktree]);
+    const nested = join(worktree, 'deep', 'er');
+    mkdirSync(nested, { recursive: true });
+
+    // Act
+    const run = runRafa(scratch, nested, ['release', 'status', '--output=json']);
+
+    // Assert
+    expectExit(run, 0, scratch);
+    expect(run.stdout).toContain(`"version":"${PROJECT_VERSION}"`);
+    expect(run.stdout).not.toContain(PARENT_VERSION);
+  });
 });

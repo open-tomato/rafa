@@ -43,6 +43,13 @@
  * the guard's blocker; a dispatch handed no guard spawns into the same
  * removed checkout, which shows the halt is the guard's.
  *
+ * Also for the guard `start()` runs right before the render
+ * (`haltBeforeSession`, `start/session-guard.ts`), over the same
+ * worktree: removed after the first guard held, the second one marks the
+ * task `[BLOCKED]` with the guard's blocker and prints no line about the
+ * store, while the render run into that removed checkout without it
+ * prints the store line and marks nothing.
+ *
  * The rest of the module is driven elsewhere: the prompt and the flags in
  * `tests/declaration-dispatch.test.ts`, the session id and the report rows
  * in `tests/task-report.test.ts`. Every store here sits under a fresh root
@@ -86,6 +93,7 @@ import {
   renderProgressForDispatch,
   storeTaskReport,
 } from './dispatch.js';
+import { haltBeforeSession } from './session-guard.js';
 import { alwaysRunLines, BASE_PROMPT_PREFIX, typeCheckLines } from './task-gate-lines.js';
 
 /** A fence, kept out of the template literals. */
@@ -1423,6 +1431,45 @@ describe('dispatchTask, running the loop guard just before its spawn', () => {
 
     expect(spawned).toEqual([planted.checkout]);
     expect(dispatch.halted).toBe(false);
+    expect(readFileSync(planted.trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  /** The line the render prints when it fails, which names the store. */
+  const STORE_LINE = '   Nothing was dispatched. Make the store readable, then run again.';
+
+  it('blocks the task on the guard\'s text, with no line about the store, when the worktree is removed between the first guard and the render', () => {
+    const planted = plantWorktree();
+    const held = { expected: expectationOf(planted), trackerPath: planted.trackerPath, taskInfo: { lineNum: 1 } };
+    // The guard at the top of the turn holds; the suite steps run next.
+    expect(haltBeforeSession(held)).toBe(false);
+    expect(errors).toEqual([]);
+    rmSync(planted.checkout, { recursive: true, force: true });
+
+    // What `start()` runs before the render: the guard, and the render only when it held.
+    const halted = haltBeforeSession(held);
+    const rendered = halted
+      ? null
+      : renderProgressForDispatch(planted.root, 'demo', planted.checkout);
+
+    expect(halted).toBe(true);
+    expect(rendered).toBeNull();
+    const task = findNextTask(readFileSync(planted.trackerPath, 'utf8'));
+    expect(task?.status).toBe('blocked');
+    expect(task?.blocker).toBe(CHECKOUT_MOVED);
+    expect(errors[0]).toBe(`\n${haltHeadline(planted.checkout)}`);
+    expect(errors).toContain(`   Found:    no checkout: ${planted.checkout} does not exist`);
+    expect(errors).not.toContain(STORE_LINE);
+  });
+
+  it('prints the store line and marks nothing when the render runs into the removed worktree unguarded, so the halt above is the guard\'s', () => {
+    // The control for the case above, and what #848 reported.
+    const planted = plantWorktree();
+    rmSync(planted.checkout, { recursive: true, force: true });
+
+    expect(renderProgressForDispatch(planted.root, 'demo', planted.checkout)).toBe(false);
+
+    expect(errors[0]).toStartWith('\n❌ progress.txt could not be rendered from the findings store: ');
+    expect(errors).toContain(STORE_LINE);
     expect(readFileSync(planted.trackerPath, 'utf8')).toBe(TRACKER);
   });
 });

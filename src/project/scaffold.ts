@@ -69,13 +69,13 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { messageOf } from '../config-sections.js';
+import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
   RELEASE_FRAGMENT_LINES,
-} from '../commands/init-release.js';
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
+} from '../release/scaffold.js';
 import { DEFAULT_ROUTES } from '../tiers/routing.js';
 
 import { scopeAt } from './scope.js';
@@ -175,6 +175,15 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   heading: "${CONFIG_DEFAULTS.releaseHeading}"`,
   ...RELEASE_FRAGMENT_LINES,
   `#   publishCommand: ${CONFIG_DEFAULTS.releasePublishCommand}      # the publish line release tag prints and never runs`,
+  '# errors:',
+  '#   codes: []                    # cause codes this project adds to rafa\'s list, each code/description/hint/level/since',
+  '# logger:',
+  `#   level: ${CONFIG_DEFAULTS.loggerLevel}                  # error | warn | debug, the loudest diagnostics written`,
+  `#   theme: ${CONFIG_DEFAULTS.loggerTheme}               # default | plain, which writes no colour`,
+  '#   modules: {}                  # a level per module: board: { level: debug }',
+  `#   callSite: ${String(CONFIG_DEFAULTS.loggerCallSite)}              # name the calling file on debug lines`,
+  `#   api: ${String(CONFIG_DEFAULTS.loggerApi)}                   # write the metadata of each request to a service`,
+  `#   kind: ${CONFIG_DEFAULTS.loggerKind}                # the logger adapter`,
   '# cleanup:',
   `#   staleDays: ${String(CONFIG_DEFAULTS.cleanupStaleDays)}                # days before rafa cleanup lists a branch as Stale`,
   `#   worktreeIdleDays: ${String(CONFIG_DEFAULTS.cleanupWorktreeIdleDays)}          # days before rafa cleanup lists a worktree as idle`,
@@ -198,6 +207,7 @@ export const CONFIG_SETTINGS_LINES = Object.freeze([
   `#   fullSuiteTriggers: ${globsLine(CONFIG_DEFAULTS.testsFullSuiteTriggers)}  # a task whose diff matches one runs the full suite`,
   `#   integration: ${globsLine(CONFIG_DEFAULTS.testsIntegration)}  # test files every stage step runs`,
   `#   alwaysRun: ${globsLine(CONFIG_DEFAULTS.testsAlwaysRun)}  # test files a task step runs beside its changed-file tests`,
+  `#   retakeRedAlone: ${String(CONFIG_DEFAULTS.testsRetakeRedAlone)}  # whether a step reruns each newly red test file alone; false turns off that retake and nothing else`,
 ]);
 
 /** The line every file opens its settings with. */

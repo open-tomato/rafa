@@ -23,13 +23,13 @@ import { readFileSync } from 'node:fs';
 import { activeOutput } from '../adapters/output/active.js';
 import { stageStepScope } from '../suite/scope.js';
 
+import { takeRetakes } from './suite-retake-alone.js';
 import {
   addToLedger,
   dueStages,
   readDiff,
   readHead,
   readStageLedger,
-  retakeOnErrors,
   runWithAlwaysRun,
   seamsOf,
   settleStep,
@@ -49,12 +49,18 @@ function stageSince(trackerPath: string, baseline: SuiteBaseline | null): string
   return taken.at(-1)?.commit ?? baseline?.commit ?? null;
 }
 
+/** A stage step's run, and the stage's diff it was chosen over, or null when there was none to read. */
+interface StageRunRead {
+  readonly run: StageRun;
+  readonly diff: readonly string[] | null;
+}
+
 /** The stage step's run: its paths, the fallback without `Owns:`, or the whole project when its diff did not read. */
-async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null): Promise<StageRun> {
+async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSeams>, baseline: SuiteBaseline | null): Promise<StageRunRead> {
   const since = stageSince(context.trackerPath, baseline);
-  if (since === null) return { scope: 'full' };
+  if (since === null) return { run: { scope: 'full' }, diff: null };
   const diff = readDiff(seams.git, since);
-  if (diff === null) return { scope: 'full' };
+  if (diff === null) return { run: { scope: 'full' }, diff };
   const scope = stageStepScope({
     diff,
     owns: await context.owns(),
@@ -62,8 +68,8 @@ async function stageRunOf(context: SuiteStepContext, seams: Required<SuiteStepSe
     testFiles: seams.listTestFiles(context.checkout),
   });
   return scope.scope === 'affected'
-    ? { scope: 'affected', since }
-    : { scope: 'paths', paths: scope.paths };
+    ? { run: { scope: 'affected', since }, diff }
+    : { run: { scope: 'paths', paths: scope.paths }, diff };
 }
 
 /** The runs `run` asks for: the fallback joins the `tests.alwaysRun` files as a second run, the others none. */
@@ -93,7 +99,7 @@ function stageStepReason(run: StageRun): SessionStepReason | undefined {
 export async function runStageStep(context: SuiteStepContext, stage: DueStage, baseline: SuiteBaseline | null): Promise<StepOutcome> {
   const seams = seamsOf(context);
   const commit = readHead(seams.git);
-  const run = await stageRunOf(context, seams, baseline);
+  const { run, diff } = await stageRunOf(context, seams, baseline);
   const label = `stage step for "${stage.name}"`;
   if (run.scope === 'paths' && run.paths.length === 0) {
     activeOutput().info(`🧪 ${label}: no test file under the Owns: folders it changed and no integration file; nothing to run.`);
@@ -103,7 +109,7 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   const runs = stageRuns(context, seams, run);
   const result = await runWithAlwaysRun(context, seams, 'stage', runs);
   const settling: Settling = { kind: 'stage', scope: recordedScope(run), reason: stageStepReason(run), label, result, baseline, repair: { kind: 'stage' } };
-  const outcome = settleStep(context, seams, await retakeOnErrors(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs)));
+  const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs), () => diff));
   if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;
 }

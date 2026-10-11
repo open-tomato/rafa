@@ -92,6 +92,13 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['releaseSettle', 'release.settle'],
   ['releaseTag', 'release.tag'],
   ['releasePublishCommand', 'release.publishCommand'],
+  ['errorsCodes', 'errors.codes'],
+  ['loggerKind', 'logger.kind'],
+  ['loggerLevel', 'logger.level'],
+  ['loggerTheme', 'logger.theme'],
+  ['loggerModules', 'logger.modules'],
+  ['loggerCallSite', 'logger.callSite'],
+  ['loggerApi', 'logger.api'],
   ['cleanupStaleDays', 'cleanup.staleDays'],
   ['cleanupWorktreeIdleDays', 'cleanup.worktreeIdleDays'],
   ['cleanupKeep', 'cleanup.keep'],
@@ -108,6 +115,7 @@ const KEYS: readonly (readonly [ConfigSetting, string])[] = [
   ['testsFullSuiteTriggers', 'tests.fullSuiteTriggers'],
   ['testsIntegration', 'tests.integration'],
   ['testsAlwaysRun', 'tests.alwaysRun'],
+  ['testsRetakeRedAlone', 'tests.retakeRedAlone'],
 ];
 
 /** The settings a flag may name: every one the file spells as a string. */
@@ -145,6 +153,8 @@ const TOP = [
   'claims',
   'triage',
   'release',
+  'errors',
+  'logger',
   'cleanup',
   'dangerous',
   'status',
@@ -164,7 +174,7 @@ describe('SETTINGS', () => {
     expect(spelled).toEqual(KEYS.map((pair) => [...pair]));
   });
 
-  it('carries item keys for the two lists of mappings and for nothing else', () => {
+  it('carries item keys for the lists of mappings and for nothing else', () => {
     const withItems = SETTING_NAMES
       .filter((setting) => SETTINGS[setting].itemKeys !== undefined)
       .map((setting) => [setting, SETTINGS[setting].itemKeys]);
@@ -173,6 +183,7 @@ describe('SETTINGS', () => {
       ['prerequisitesRequired', ['tool', 'env', 'service', 'lsp', 'probe']],
       ['prerequisitesOptional', ['tool', 'env', 'service', 'lsp', 'probe', 'reason']],
       ['modules', ['npm', 'github', 'path', 'ref']],
+      ['errorsCodes', ['code', 'description', 'hint', 'level', 'since']],
     ]);
   });
 });
@@ -211,10 +222,12 @@ describe('SECTIONS', () => {
       'cleanup',
       'dangerous',
       'effort',
+      'errors',
       'hub',
       'learning',
       'learning.bless',
       'learning.promote',
+      'logger',
       'loop',
       'loop.continue',
       'loop.forceWrapUp',

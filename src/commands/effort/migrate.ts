@@ -37,13 +37,14 @@ import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
+import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';
 import { migrateStore, MigrateRefusal } from '../../effort/store/migrate.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';
 import { expectNoArgument, readSwitch, requireProject } from '../plan/plan-files.js';
 
-import { fileStamp, keepsIdLine } from './fix-schema.js';
+import { keepsIdLine } from './fix-schema.js';
 
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa effort migrate';

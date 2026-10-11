@@ -11,7 +11,7 @@
  * The second plan, `other`, counts 1 done and 4 open, so 4 are left.
  */
 import type { LoopRow } from './report-trend.js';
-import type { TaskCounts } from '../commands/plan/plan-files.js';
+import type { TaskCounts } from '../plan/plan-files.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

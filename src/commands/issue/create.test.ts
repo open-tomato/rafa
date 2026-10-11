@@ -404,7 +404,7 @@ describe('rafa issue create, dispatched', () => {
 
     expect(outcome).toEqual({
       exitCode: 0,
-      stdout: `warn: tracker chain: github unavailable: ${NOT_LOGGED_IN}\nCreated local issue 1.\n`,
+      stdout: `warn: tracker chain: github unavailable: ${NOT_LOGGED_IN} [tracker:unavailable]\nCreated local issue 1.\n`,
       stderr: '',
     });
     expect(localIssue(project, 1).fallbackReason).toBe(`github: ${NOT_LOGGED_IN}`);
@@ -578,7 +578,7 @@ describe('rafa issue create, spawned', () => {
     const gh = join(scratch.bin, 'gh');
     writeFileSync(gh, ['#!/bin/sh', `echo "$*" >> '${ghLog}'`, 'echo "stand-in gh: not logged in" >&2', 'exit 1', ''].join('\n'), 'utf8');
     chmodSync(gh, 0o755);
-    const warning = 'warn: tracker chain: github unavailable: gh auth status: stand-in gh: not logged in';
+    const warning = 'warn: tracker chain: github unavailable: gh auth status: stand-in gh: not logged in [tracker:unavailable]';
 
     const created = runRafa(scratch, scratch.repo, ['issue', 'create', '--title=Spawned issue', '--type=bug']);
     const listed = runRafa(scratch, scratch.repo, ['issues', 'list']);

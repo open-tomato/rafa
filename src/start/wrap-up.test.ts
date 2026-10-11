@@ -37,15 +37,29 @@
  * `learning.promote.*` keys. The section's presence and its absence
  * are each other's control in the same way, and every threshold case
  * is paired with one where the same lesson moves across the line.
+ *
+ * One more group covers the section listing the test files the run's
+ * suite steps read red only in the step (`start/step-only-report.ts`):
+ * present with such a file, absent, heading and all, with none.
+ *
+ * The last group covers what `preserveProgress` does with the run's
+ * `pr.provider` (#847), over a scratch checkout with its lookup and its
+ * spawner answered through the seams. Under `none` the lookup seam is
+ * never called and the closing line names `none` and promises no retry;
+ * under `gh` the same seams record one lookup before the session and
+ * one after it, and the two existing lines come out byte for byte. The
+ * `gh` cases are the control for the `none` ones: the recorder that
+ * reads empty there holds two entries here.
  */
 import type { WrapUpLearning } from './wrap-up.js';
 import type { AdapterContext } from '../adapters/registry.js';
+import type { PrProvider } from '../config.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
@@ -53,10 +67,12 @@ import { resolveBaseBranch } from '../cleanup/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { actionHash } from '../learning/index.js';
 import { serializeFragment } from '../release/fragment.js';
+import { PLAN_DONE, scratchPlanter, STUB } from '../tests/loop-scratch.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { parsePromoted } from './promoted.js';
-import { buildWrapUpPrompt, lessonsToPromote } from './wrap-up.js';
+import { runStepOnlyOf, STEP_ONLY_HEADING, stepOnlySection } from './step-only-report.js';
+import { buildWrapUpPrompt, lessonsToPromote, preserveProgress, PROGRESS_PRESERVED_NO_PROVIDER } from './wrap-up.js';
 
 /** The branch a case builds its prompt on. */
 const BRANCH = 'feat/rafa-20-pr-commands';
@@ -439,6 +455,50 @@ describe('the wrap-up prompt\'s lessons to promote', () => {
   });
 });
 
+describe('the wrap-up prompt\'s files red only in a suite step', () => {
+  const items = runStepOnlyOf([{
+    kind: 'task',
+    scope: 'affected',
+    command: ['bun', 'test'],
+    exitCode: 1,
+    summary: 'Ran 3 tests across 2 files. [1.00ms]',
+    failures: [{ file: 'src/utils/claude.test.ts', name: 'claude > first' }],
+    newFailures: [],
+    stepOnly: [{ file: 'src/utils/claude.test.ts', tests: ['claude > first'], errorLines: ['UndeclaredSpendError: declared none'], position: 2, before: ['src/a.test.ts'] }],
+  }]);
+
+  test('writes no section and no heading when the run holds none', () => {
+    for (const prompt of [buildWrapUpPrompt(BRANCH, BASE, PLAN, null), buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], [])]) {
+      expect(prompt).not.toContain(STEP_ONLY_HEADING);
+      expect(prompt).not.toContain('green when run alone');
+    }
+
+    // The control: one such file brings the section in, so the absence
+    // above is the empty list's.
+    expect(buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], items)).toContain(`## ${STEP_ONLY_HEADING}`);
+  });
+
+  test('lists each file as the run\'s end prints it, and asks for the list in the pull request body under a heading', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [], items);
+
+    expect(prompt).toContain(stepOnlySection(items).join('\n'));
+    expect(prompt).toContain('- `src/utils/claude.test.ts`: 1 test (`claude > first`) red in 1 step (task) and green when run alone; first error: "UndeclaredSpendError: declared none"; run after src/a.test.ts.');
+    expect(prompt).toContain(`under the heading \`### ${STEP_ONLY_HEADING}\``);
+  });
+
+  test('keeps the classifier key first, the section below the bullets and above the lessons and the plan', () => {
+    const prompt = buildWrapUpPrompt(BRANCH, BASE, PLAN, null, null, [lesson('a-lesson-1a2b3c4d', 3, 0.7)], items);
+    const section = prompt.indexOf(`## ${STEP_ONLY_HEADING}`);
+
+    expect(prompt.split('\n')[0]).toBe('* Read `@progress.txt` in full.');
+    expect(classifyPromptContent(prompt)).toBe('wrap-up');
+    expect(section).toBeGreaterThan(prompt.indexOf('* Do not include Claude attribution'));
+    expect(section).toBeLessThan(prompt.indexOf(SECTION));
+    expect(section).toBeLessThan(prompt.indexOf('The plan this run executed follows'));
+    expect(prompt.endsWith(`\n${PLAN}`)).toBe(true);
+  });
+});
+
 describe('lessonsToPromote', () => {
   /** The contexts the stub adapter was made with. */
   let made: AdapterContext[] = [];
@@ -534,5 +594,114 @@ describe('lessonsToPromote', () => {
     expect(await lessonsToPromote(learningOf({ kind: 'absent' }))).toEqual([]);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('`absent` learning adapter');
+  });
+});
+
+describe('preserveProgress under the run\'s pull request provider', () => {
+  const planter = scratchPlanter('rafa-wrap-up-provider-');
+  afterAll(planter.remove);
+
+  /** The branch every case's scratch checkout is on. */
+  const ON_BRANCH = `feat/${STUB}`;
+
+  /** The line under `gh` when the lookup after the session finds none, as it read before #847. */
+  const NO_PR_YET = '\n✅ Progress preserved; no pull request is open on this branch yet — the loop retries the wrap-up or opens one itself.';
+
+  afterEach(() => {
+    setActiveOutput(null);
+  });
+
+  /** What one {@link preserveWith} run recorded. */
+  interface Preserved {
+    /** Every `info` line written. */
+    readonly infos: readonly string[];
+    /** Each lookup made, as `before:<branch>` or `after:<branch>` of the session. */
+    readonly lookups: readonly string[];
+    /** The prompt each spawned session was given. */
+    readonly prompts: readonly string[];
+  }
+
+  /**
+   * One `preserveProgress` under `provider` over a scratch checkout, its
+   * session exiting 0 and its lookup answering `before` ahead of the
+   * session and `after` once it has ended.
+   */
+  async function preserveWith(provider: PrProvider, before: number | null, after: number | null): Promise<Preserved> {
+    const infos: string[] = [];
+    const lookups: string[] = [];
+    const prompts: string[] = [];
+    setActiveOutput(sinkOutput({
+      info: (line) => {
+        infos.push(line);
+      },
+    }));
+    const scratch = planter.plant({ branch: ON_BRANCH, plan: PLAN_DONE });
+    let ended = false;
+    await preserveProgress(PLAN_DONE, ['project'], null, null, null, 'main', scratch.repo, provider, {
+      lookup: (_checkout, branch) => {
+        lookups.push(`${ended
+          ? 'after'
+          : 'before'}:${branch}`);
+        return Promise.resolve(ended
+          ? after
+          : before);
+      },
+      spawn: (_args, prompt) => {
+        prompts.push(prompt);
+        ended = true;
+        return Promise.resolve({ exitCode: 0, stdout: '' });
+      },
+    });
+    return { infos, lookups, prompts };
+  }
+
+  test('never calls the lookup seam under none, and prints a line naming none', async () => {
+    const run = await preserveWith('none', 612, 612);
+
+    expect(run.lookups).toEqual([]);
+    expect(run.infos).toEqual([PROGRESS_PRESERVED_NO_PROVIDER]);
+    expect(run.infos[0]).toContain('pr.provider is none');
+    expect(run.prompts).toHaveLength(1);
+
+    // The control: the same seams under `gh` are asked twice and the
+    // line names the number they answer, so the empty recorder above is
+    // the provider's doing.
+    const asked = await preserveWith('gh', 612, 612);
+    expect(asked.lookups).toEqual([`before:${ON_BRANCH}`, `after:${ON_BRANCH}`]);
+    expect(asked.infos).toEqual(['\n✅ Progress preserved; pull request #612 is open on this branch.']);
+  });
+
+  test('promises no retry under none, where the gh line for no pull request promises one', async () => {
+    const none = await preserveWith('none', null, null);
+    const gh = await preserveWith('gh', null, null);
+
+    expect(none.infos).toEqual(['\n✅ Progress preserved; pr.provider is none, so no pull request is looked up or opened, and no wrap-up retry follows.']);
+    expect(none.infos[0]).not.toContain('the loop retries the wrap-up');
+    expect(none.infos[0]).not.toContain('opens one itself');
+
+    expect(gh.infos).toEqual([NO_PR_YET]);
+    expect(gh.infos[0]).not.toContain('pr.provider is none');
+  });
+
+  test('builds the session\'s prompt as for a branch with no open pull request under none', async () => {
+    const none = await preserveWith('none', 612, 612);
+
+    expect(none.prompts[0]).toContain(`* No open PR was found for ${ON_BRANCH}: open one with \`gh pr create --base main\`.`);
+    expect(none.prompts[0]).not.toContain('PR #612 is already open');
+
+    // The control: under `gh` the lookup made before the session reaches
+    // the prompt, so the absence above is the lookup never being made.
+    const gh = await preserveWith('gh', 612, 612);
+    expect(gh.prompts[0]).toContain(`* PR #612 is already open for ${ON_BRANCH}`);
+  });
+
+  test('leaves both gh lookups and both gh lines as they were', async () => {
+    const none = await preserveWith('gh', null, null);
+    const late = await preserveWith('gh', null, 612);
+
+    expect(none.lookups).toEqual([`before:${ON_BRANCH}`, `after:${ON_BRANCH}`]);
+    expect(none.infos).toEqual([NO_PR_YET]);
+    expect(late.lookups).toEqual([`before:${ON_BRANCH}`, `after:${ON_BRANCH}`]);
+    expect(late.infos).toEqual(['\n✅ Progress preserved; pull request #612 is open on this branch.']);
   });
 });

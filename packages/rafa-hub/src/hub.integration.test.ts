@@ -9,8 +9,8 @@
  * through HTTP requests to a running hub, never by calling an adapter
  * directly. No case reaches api.github.com.
  */
-import type { HubServer } from './server.js';
 import type { StandInGitHub } from './identity/testdata/stand-in-github.js';
+import type { HubServer } from './server.js';
 import type { WirePayload } from '@open-tomato/rafa/store';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

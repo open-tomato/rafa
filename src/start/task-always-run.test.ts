@@ -129,6 +129,13 @@ describe('foldResults', () => {
     expect(folded.exitCode).toBe(1);
   });
 
+  it('keeps each run\'s file order as its own list, the first run\'s first, and an empty one for a run that holds none', () => {
+    const folded = foldResults(result('changed', { fileOrder: [['src/a.test.ts', 'src/b.test.ts']] }), result('sweep', { fileOrder: [['src/x.sweep.test.ts']] }), STOP);
+    expect(folded.fileOrder).toEqual([['src/a.test.ts', 'src/b.test.ts'], ['src/x.sweep.test.ts']]);
+    // A result built by no run holds no order: its place is kept, so the second run's list stays the second.
+    expect(foldResults(result('changed'), result('sweep', { fileOrder: [['src/x.sweep.test.ts']] }), STOP).fileOrder).toEqual([[], ['src/x.sweep.test.ts']]);
+  });
+
   it('holds a failure both runs name once: a changed sweep runs in both', () => {
     const folded = foldResults(result('changed', { exitCode: 1, failures: [SWEPT] }), result('sweep', { exitCode: 1, failures: [SWEPT] }), STOP);
     expect(folded.failures).toEqual([SWEPT]);
