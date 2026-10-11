@@ -1,0 +1,10 @@
+---
+plan: fix-rafa-927-dispatch-async-scope
+title: Commands dispatched at once in one process no longer leave a stale running command or active output
+level: patch
+---
+
+- CLI: each invocation carries its running command and its active output in an async scope of its own (`AsyncLocalStorage`), so two commands dispatched in one process and awaited together each read their own, whichever ends first, and nothing is left recorded once they end. Before, two that overlapped and ended in the order they started left the first one's record and output for the rest of the process: the one still running read no record, so the spend guard skipped it, and every Claude session started afterwards was refused with `UndeclaredSpendError`, naming a command that had already ended. A single `rafa` line runs one invocation, so this reached the test suite and any command running others in-process, not a plain run.
+- CLI: `setActiveOutput` and `setRunningCommand` still set the module-level values a reader outside every invocation answers, and inside an invocation they change nothing the command reads. `runWithActiveOutput` (`src/adapters/output/active.ts`) and `runAsRunningCommand` (`src/cli/running.ts`) are the scoped forms the dispatcher runs each command through.
+- Tests: `src/cli/dispatch-scope.test.ts` dispatches two and seven commands at once in both ending orders, a command inside another, and a command that throws or exits while another runs, each reading its own record and output from inside `run` and none after; `src/tests/spend-guard-dispatch.test.ts` starts a stand-in session after two overlapped dispatches and reaches it. `src/commands/effort/schema.test.ts`, whose seven dispatches under `Promise.all` left `effort schema` recorded for every later test file, is unchanged and now leaves nothing.
+- Documentation: `context/cli.md` describes the scope, what a set made at module level does, and which callbacks read outside the scope (a process signal listener, an abort listener it or `AbortSignal.timeout` fires).

@@ -16,7 +16,7 @@ module's note is the long form.
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output and the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
@@ -2705,9 +2705,37 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
-  (`src/adapters/output/active.ts`), set in the invocation's output mode,
-  which `activeOutputMode()` answers. The output and the mode active
-  before are put back afterwards, when the command throws too.
+  (`src/adapters/output/active.ts`), in the invocation's output mode,
+  which `activeOutputMode()` answers. Both are held in an async scope of
+  the invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`),
+  beside the running command (`runAsRunningCommand`,
+  `src/cli/running.ts`): they are read inside the command's `run` and
+  everything it awaits, and nothing is left once it ends, when the
+  command throws too. The dispatcher sets no module-level value, so two
+  invocations dispatched in one process and awaited with `Promise.all`
+  each read their own whichever ends first, and one dispatched from
+  inside a command reads the inner ones inside and the outer ones after
+  (#927; `src/cli/dispatch-scope.test.ts`).
+- **The module-level output and record are a test's to set**
+  (`setActiveOutput`, `setRunningCommand`). A reader outside every
+  invocation answers them, the default output and no record until one is
+  set. One set ahead of an invocation is hidden while the command runs
+  and read again after it. One set inside a command's `run` writes the
+  module-level value and changes nothing the command reads.
+- **A callback the runtime calls from outside the scope reads the
+  module-level values.** Measured under bun 1.3.14: a `process.on`
+  signal listener registered inside a scope, an abort listener it fires
+  and an abort listener an `AbortSignal.timeout` fires read no scope,
+  while a timer, a child process's `data` listener, a `readline` `line`
+  listener and the code after an await such a handler settles read the
+  invocation's. No such callback under `src/` reads the active output or
+  the running command: the four `process.on('SIGINT')` listeners
+  (`src/start.ts`, `src/start/runtime.ts`, `src/commands/stretch/start.ts`,
+  `src/cli/prompt/terminal.ts`) flag the interrupt, signal the sessions,
+  do nothing or restore the terminal, and `loop start` writes its lines
+  after the await returns; `src/` registers no abort listener. One that
+  has to read either wraps the listener with `AsyncResource.bind` where
+  it registers it.
 - **A command runs with a logger of its own** (`setCommandLogger`): the
   registry's `logger/console`, made with the invocation's verbosity and
   with colour on only in text mode, by `FORCE_COLOR`, `NO_COLOR` and
@@ -2715,7 +2743,10 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   runs, with a resolver for any other `logger.kind`. The logger settings
   start from the defaults for every invocation, are set when the command
   loads its config, and are put back afterwards with the logger that was
-  active. `context/logging.md` is the page for the port.
+  active. `context/logging.md` is the page for the port. The logger and
+  its settings are module-level values set and put back as a stack, not
+  held in the invocation's scope: two invocations that overlap can leave
+  a logger other than the one active before them.
 - **The context's output gates `warn`, `error` and `debug`** on that
   logger: a line passes only when `activeLogger().enabled(<level>)`, so
   `logger.level: error` quiets every warning a command writes through its
@@ -2775,8 +2806,9 @@ A command without a `spends` declaration declares nothing.
 The spend guard in `src/utils/claude.ts` refuses to start a session for a
 running command when its `spends` declaration does not cover the run. The
 running command is the one the dispatcher recorded with its parsed flags
-(`src/cli/running.ts`), checked before `Bun.spawn` so a refused run starts
-no process:
+(`src/cli/running.ts`), in the async scope of the invocation the session
+is started from, checked before `Bun.spawn` so a refused run starts no
+process:
 
 - A command declaring `always` or `through` covers every run.
 - A command declaring `with <flag>` covers only a run carrying that `flag`,
