@@ -591,8 +591,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../config-sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
-    ['../plan/plan-files.js', ['expectNoArgument']],
+    ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
+    ['./create-bug.js', ['BUG_FLAGS', 'readBugLine']],
     ['./issue-tracker.js', [
       'DEFAULT_ISSUE_SEAMS',
       'issueName',
