@@ -36,7 +36,10 @@
  * false for any other id and for no holder. It answers who holds the
  * claim and nothing else. A message or a pushed commit names the
  * store's own `storeId`, never the replaced id the claim was made
- * under.
+ * under. The one exception is `loop start`'s claim check, whose line
+ * names both ids for a claim the remote holds under a replaced one,
+ * which it re-signs to the store's own
+ * (`src/start/preflight-claim.ts`).
  *
  * ## When there is no id
  *

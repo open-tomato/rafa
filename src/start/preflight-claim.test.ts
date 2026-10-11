@@ -23,6 +23,20 @@
  * carries read as none (5), a released remote passed (1), another
  * store's local claim passed (1), and a stub naming no issue checked
  * anyway (35).
+ *
+ * The re-sign's cases plant what the push meets with real git: a
+ * `pre-receive` hook in the bare repository for a push git refuses, and
+ * a runner that lets clone `b` push to the claim branch just before
+ * clone `a`'s leased push for a tip that moved. Only the commit that
+ * could not be made is scripted, since real git makes it.
+ *
+ * Seven mutations of the re-sign were driven against this file alone on
+ * 2026-10-11, each restored sha256-identical, and each reddened at least
+ * one case: a replaced holder read as held with no re-sign (9), the
+ * re-sign's offline guard dropped (2), no second reading after a moved
+ * tip (3), a second reading with no bound (1), the take commit naming
+ * the replaced id (5), a refused push read as a moved tip (1), and a
+ * claim that could not be re-signed printed at `info` (1).
  */
 import type { RunClaim, StartPreflightClaim } from './preflight-claim.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
@@ -30,7 +44,7 @@ import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { GitRunner } from '../pr/index.js';
 
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,7 +52,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
-import { makeOwnershipCommit } from '../claims/git.js';
+import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
+import { parseClaimMessage } from '../claims/record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../cli/command.js';
 import { createGitRunner } from '../pr/index.js';
@@ -118,7 +133,7 @@ function remoteTip(trio: Trio): string | null {
 }
 
 /** An ownership commit by `store` on `parent`, or a throw. */
-function ownershipOn(git: GitRunner, parent: string, action: 'claim' | 'release', store: string): string {
+function ownershipOn(git: GitRunner, parent: string, action: 'claim' | 'release' | 'take', store: string): string {
   const made = makeOwnershipCommit(git, parent, { action, issue: ISSUE, store });
   if (!made.ok) throw new Error(made.reason);
   return made.sha;
@@ -141,6 +156,82 @@ function leaveClaim(git: GitRunner, store: string): string {
 /** Points the clone's `origin` at a path that holds no repository. */
 function goOffline(git: GitRunner): void {
   must(git, ['remote', 'set-url', 'origin', join(scope, 'nowhere.git')]);
+}
+
+/** Points the clone's `origin` back at the trio's bare repository. */
+function goOnline(trio: Trio, git: GitRunner): void {
+  must(git, ['remote', 'set-url', 'origin', must(trio.origin, ['rev-parse', '--absolute-git-dir'])]);
+}
+
+/** What the remote's latest ownership commit records, read off the bare repository, or null when it carries none. */
+function remoteRecord(trio: Trio): unknown {
+  const reading = readLocalClaimBranch(trio.origin, BRANCH);
+  if (reading.state !== 'found') throw new Error(`expected the remote's ${BRANCH}, read ${reading.state}`);
+  const latest = reading.commits.at(-1);
+  if (latest === undefined) return null;
+  const parsed = parseClaimMessage(latest.message);
+  return parsed.kind === 'ownership'
+    ? parsed.record
+    : parsed;
+}
+
+/** The one parent of the commit `sha`, read off the bare repository. */
+function parentOf(trio: Trio, sha: string | null): string {
+  return must(trio.origin, ['rev-parse', '--verify', `${String(sha)}^1`]);
+}
+
+/** Makes the bare repository refuse every push, through a `pre-receive` hook that exits 1. */
+function refusePushes(trio: Trio): void {
+  const hooks = join(must(trio.origin, ['rev-parse', '--absolute-git-dir']), 'hooks');
+  const hook = join(hooks, 'pre-receive');
+  writeFileSync(hook, '#!/bin/sh\necho "refused by the planted hook" >&2\nexit 1\n', 'utf8');
+  chmodSync(hook, 0o755);
+  must(trio.origin, ['config', 'core.hooksPath', hooks]);
+}
+
+/** A commit `make` builds on the remote's tip, pushed to the claim branch from clone `b`. */
+function pushFromB(trio: Trio, make: (tip: string) => string): string {
+  must(trio.b, ['fetch', '--quiet', 'origin', `+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}`]);
+  const tip = remoteTip(trio);
+  if (tip === null) throw new Error(`the remote holds no ${BRANCH} to push onto`);
+  const sha = make(tip);
+  must(trio.b, ['push', '--quiet', 'origin', `${sha}:refs/heads/${BRANCH}`]);
+  return sha;
+}
+
+/** A work commit on the remote's tip, pushed from clone `b`. */
+function pushWorkFromB(trio: Trio): string {
+  return pushFromB(trio, (tip) => must(trio.b, ['commit-tree', `${tip}^{tree}`, '-p', tip, '-m', 'feat: work']));
+}
+
+/** True for the leased push of an ownership commit. */
+function isLeasedPush(args: readonly string[]): boolean {
+  return args[0] === 'push' && args.some((arg) => arg.startsWith('--force-with-lease='));
+}
+
+/**
+ * Clone `a`'s runner, recording every argv, with `meanwhile` run just
+ * before each of its first `times` leased pushes: what another device
+ * pushes between this device's fetch and its push.
+ */
+function racing(trio: Trio, times: number, meanwhile: () => void): { readonly git: GitRunner; readonly calls: (readonly string[])[] } {
+  const calls: (readonly string[])[] = [];
+  let raced = 0;
+  const git: GitRunner = (args) => {
+    if (isLeasedPush(args) && raced < times) {
+      raced += 1;
+      meanwhile();
+    }
+    calls.push(args);
+    return trio.a(args);
+  };
+  return { git, calls };
+}
+
+/** The owned answer, or a throw naming what was read instead. */
+function owned(claim: RunClaim): Extract<RunClaim, { outcome: 'owned' }> {
+  if (claim.outcome !== 'owned') throw new Error(`expected owned, read ${claim.outcome}`);
+  return claim;
 }
 
 /** The store id answer for `store` and the ids it replaced, or the NDJSON cause when null. */
@@ -247,7 +338,7 @@ describe('a claim the remote holds', () => {
 
     const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A));
 
-    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '' });
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '', replacedId: null });
     expect(remoteTip(trio)).toBe(sha);
   });
 
@@ -263,21 +354,6 @@ describe('a claim the remote holds', () => {
       reason: `#7 is claimed by store ${STORE_A} on ${BRANCH}, not by this device (store ${STORE_B})`,
     });
     expect(control.outcome).toBe('owned');
-  });
-
-  it('owns a claim that names an id this store replaced, answering the store\'s own id and pushing nothing; a store that replaced none is refused', () => {
-    const trio = plantTrio('held-replaced');
-    const sha = pushClaim(trio.a, STORE_A_REPLACED);
-
-    const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED]));
-    const control = refusal(readRunClaim(PLAN, seamsOf(trio.a, STORE_A)));
-
-    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '' });
-    expect(remoteTip(trio)).toBe(sha);
-    expect(control).toEqual({
-      owner: STORE_A_REPLACED,
-      reason: `#7 is claimed by store ${STORE_A_REPLACED} on ${BRANCH}, not by this device (store ${STORE_A})`,
-    });
   });
 
   it('refuses a device whose store names no claimant, naming the owner and why this device names none', () => {
@@ -326,6 +402,165 @@ describe('a claim the remote holds', () => {
   });
 });
 
+describe('a claim the remote holds under an id this store replaced', () => {
+  const replaced = [STORE_A_REPLACED];
+  const TAKE_BY_A = { action: 'take', issue: ISSUE, store: STORE_A };
+  const CLAIM_BY_REPLACED = { action: 'claim', issue: ISSUE, store: STORE_A_REPLACED };
+
+  it('re-signs it with one take commit on the remote tip naming the store\'s own id, moving no local ref; a store that replaced none is refused and pushes nothing', () => {
+    const trio = plantTrio('re-sign');
+    const sha = pushClaim(trio.a, STORE_A_REPLACED);
+    must(trio.a, ['update-ref', `refs/heads/${BRANCH}`, sha]);
+
+    const control = refusal(readRunClaim(PLAN, seamsOf(trio.a, STORE_A)));
+    const remoteAfterControl = remoteTip(trio);
+    const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], replaced));
+    const resigned = remoteTip(trio);
+    const again = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], replaced));
+
+    expect(control).toEqual({
+      owner: STORE_A_REPLACED,
+      reason: `#7 is claimed by store ${STORE_A_REPLACED} on ${BRANCH}, not by this device (store ${STORE_A})`,
+    });
+    expect(remoteAfterControl).toBe(sha);
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 're-signed', note: '', replacedId: STORE_A_REPLACED });
+    expect(resigned).not.toBe(sha);
+    expect(parentOf(trio, resigned)).toBe(sha);
+    expect(remoteRecord(trio)).toEqual(TAKE_BY_A);
+    expect(tipAt(trio.a, `refs/heads/${BRANCH}`)).toBe(sha);
+    expect(again).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '', replacedId: null });
+    expect(remoteTip(trio)).toBe(resigned);
+  });
+
+  it('owns it unconfirmed while the remote cannot be reached, making no commit and trying no push; the reachable control re-signs it', () => {
+    const trio = plantTrio('re-sign-offline');
+    const sha = pushClaim(trio.a, STORE_A_REPLACED);
+    const calls: (readonly string[])[] = [];
+    const recording: GitRunner = (args) => {
+      calls.push(args);
+      return trio.a(args);
+    };
+    goOffline(trio.a);
+
+    const claim = owned(readRunClaim(PLAN, seamsOf(recording, STORE_A, [], replaced)));
+    const remoteWhileOffline = remoteTip(trio);
+    goOnline(trio, trio.a);
+    const control = owned(readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], replaced)));
+
+    expect([claim.via, claim.storeId, claim.replacedId]).toEqual(['unconfirmed', STORE_A, STORE_A_REPLACED]);
+    expect(claim.note).toContain('does not appear to be a git repository');
+    expect(calls.filter((call) => call[0] === 'push' || call[0] === 'commit-tree')).toEqual([]);
+    expect(remoteWhileOffline).toBe(sha);
+    expect(control.via).toBe('re-signed');
+    expect(remoteRecord(trio)).toEqual(TAKE_BY_A);
+  });
+
+  it('owns it with the refusal as its note when git refuses the push, leaving the remote as it was; the same remote without the hook re-signs it', () => {
+    const trio = plantTrio('re-sign-refused');
+    const control = plantTrio('re-sign-refused-control');
+    const sha = pushClaim(trio.a, STORE_A_REPLACED);
+    pushClaim(control.a, STORE_A_REPLACED);
+    refusePushes(trio);
+
+    const claim = owned(readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], replaced)));
+    const controlClaim = owned(readRunClaim(PLAN, seamsOf(control.a, STORE_A, [], replaced)));
+
+    expect([claim.via, claim.storeId, claim.replacedId]).toEqual(['not-re-signed', STORE_A, STORE_A_REPLACED]);
+    expect(claim.note).toStartWith(`could not push ${BRANCH} to origin: `);
+    expect(claim.note).toContain('refused by the planted hook');
+    expect(claim.note).toContain('[remote rejected] (pre-receive hook declined)');
+    expect(remoteTip(trio)).toBe(sha);
+    expect(remoteRecord(trio)).toEqual(CLAIM_BY_REPLACED);
+    expect(controlClaim.via).toBe('re-signed');
+    expect(remoteRecord(control)).toEqual(TAKE_BY_A);
+  });
+
+  it('owns it with a note when the take commit cannot be made, trying no push', () => {
+    const trio = plantTrio('re-sign-no-commit');
+    const sha = pushClaim(trio.a, STORE_A_REPLACED);
+    const pushes: (readonly string[])[] = [];
+    const git: GitRunner = (args) => {
+      if (args[0] === 'commit-tree') return { ok: false, stdout: '', stderr: 'fatal: unable to write commit object' };
+      if (args[0] === 'push') pushes.push(args);
+      return trio.a(args);
+    };
+
+    const claim = readRunClaim(PLAN, seamsOf(git, STORE_A, [], replaced));
+
+    expect(claim).toEqual({
+      outcome: 'owned',
+      issue: ISSUE,
+      branch: BRANCH,
+      storeId: STORE_A,
+      via: 'not-re-signed',
+      note: `could not make the take commit on ${sha}: fatal: unable to write commit object`,
+      replacedId: STORE_A_REPLACED,
+    });
+    expect(pushes).toEqual([]);
+    expect(remoteTip(trio)).toBe(sha);
+  });
+
+  it('reads the branch again when the lease is refused by a tip that gained work, and re-signs on the new tip, dropping no commit', () => {
+    const trio = plantTrio('re-sign-moved-work');
+    pushClaim(trio.a, STORE_A_REPLACED);
+    const work: string[] = [];
+    const race = racing(trio, 1, () => {
+      work.push(pushWorkFromB(trio));
+    });
+
+    const claim = owned(readRunClaim(PLAN, seamsOf(race.git, STORE_A, [], replaced)));
+
+    expect([claim.via, claim.replacedId, claim.note]).toEqual(['re-signed', STORE_A_REPLACED, '']);
+    expect(work).toHaveLength(1);
+    expect(parentOf(trio, remoteTip(trio))).toBe(work[0] ?? '');
+    expect(remoteRecord(trio)).toEqual(TAKE_BY_A);
+    expect(race.calls.filter(isLeasedPush)).toHaveLength(2);
+  });
+
+  it('refuses on the second reading when another store took the claim meanwhile, naming it and leaving its commit the tip', () => {
+    const trio = plantTrio('re-sign-moved-taken');
+    pushClaim(trio.a, STORE_A_REPLACED);
+    const theirs: string[] = [];
+    const race = racing(trio, 1, () => {
+      theirs.push(pushFromB(trio, (tip) => ownershipOn(trio.b, tip, 'take', STORE_B)));
+    });
+
+    const claim = refusal(readRunClaim(PLAN, seamsOf(race.git, STORE_A, [], replaced)));
+
+    expect(claim).toEqual({
+      owner: STORE_B,
+      reason: `#7 is claimed by store ${STORE_B} on ${BRANCH}, not by this device (store ${STORE_A})`,
+    });
+    expect(remoteTip(trio)).toBe(theirs[0] ?? '');
+    expect(race.calls.filter(isLeasedPush)).toHaveLength(1);
+  });
+
+  it('reads the branch again once only: a lease refused a second time is owned with a note, after two pushes and no third', () => {
+    const trio = plantTrio('re-sign-moved-twice');
+    pushClaim(trio.a, STORE_A_REPLACED);
+    const work: string[] = [];
+    const race = racing(trio, 2, () => {
+      work.push(pushWorkFromB(trio));
+    });
+
+    const claim = readRunClaim(PLAN, seamsOf(race.git, STORE_A, [], replaced));
+
+    expect(claim).toEqual({
+      outcome: 'owned',
+      issue: ISSUE,
+      branch: BRANCH,
+      storeId: STORE_A,
+      via: 'not-re-signed',
+      note: `${BRANCH} moved on origin a second time while its take commit was being pushed`,
+      replacedId: STORE_A_REPLACED,
+    });
+    expect(work).toHaveLength(2);
+    expect(remoteTip(trio)).toBe(work[1] ?? '');
+    expect(remoteRecord(trio)).toEqual(CLAIM_BY_REPLACED);
+    expect(race.calls.filter(isLeasedPush)).toHaveLength(2);
+  });
+});
+
 describe('a claim waiting unpushed on the local branch', () => {
   it('pushes it without moving the local branch, and owns it', () => {
     const trio = plantTrio('retry');
@@ -334,7 +569,7 @@ describe('a claim waiting unpushed on the local branch', () => {
 
     const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A));
 
-    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'pushed', note: '' });
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'pushed', note: '', replacedId: null });
     expect(remoteTip(trio)).toBe(sha);
     expect(tipAt(trio.a, `refs/heads/${BRANCH}`)).toBe(sha);
   });
@@ -374,7 +609,7 @@ describe('a claim waiting unpushed on the local branch', () => {
     goOffline(trio.a);
 
     const { owner, reason } = refusal(readRunClaim(PLAN, seamsOf(recording, STORE_A)));
-    must(trio.a, ['remote', 'set-url', 'origin', must(trio.origin, ['rev-parse', '--absolute-git-dir'])]);
+    goOnline(trio, trio.a);
     const control = readRunClaim(PLAN, seamsOf(trio.a, STORE_A));
 
     expect(owner).toBeNull();
@@ -386,19 +621,23 @@ describe('a claim waiting unpushed on the local branch', () => {
     expect(remoteTip(trio)).toBe(sha);
   });
 
-  it('pushes a waiting claim that names an id this store replaced, answering the store\'s own id; a store that replaced none is refused and pushes nothing', () => {
+  it('pushes a waiting claim that names an id this store replaced as it was made, and the next check re-signs it; a store that replaced none is refused and pushes nothing', () => {
     const trio = plantTrio('retry-replaced');
     const sha = leaveClaim(trio.a, STORE_A_REPLACED);
 
     const control = refusal(readRunClaim(PLAN, seamsOf(trio.a, STORE_A)));
     const remoteAfterControl = remoteTip(trio);
     const claim = readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED]));
+    const remoteAfterRetry = remoteTip(trio);
+    const next = owned(readRunClaim(PLAN, seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED])));
 
     expect(control.owner).toBe(STORE_A_REPLACED);
     expect(control.reason).toBe(`#7 is claimed by store ${STORE_A_REPLACED} on the local ${BRANCH}, not by this device (store ${STORE_A})`);
     expect(remoteAfterControl).toBeNull();
-    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'pushed', note: '' });
-    expect(remoteTip(trio)).toBe(sha);
+    expect(claim).toEqual({ outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'pushed', note: '', replacedId: null });
+    expect(remoteAfterRetry).toBe(sha);
+    expect([next.via, next.replacedId]).toEqual(['re-signed', STORE_A_REPLACED]);
+    expect(remoteRecord(trio)).toEqual({ action: 'take', issue: ISSUE, store: STORE_A });
   });
 
   it('refuses a local claim another store holds when the remote holds none', () => {
@@ -452,6 +691,35 @@ describe('refuseUnownedClaim', () => {
     expect(unconfirmed.warn[0]).toEndWith(`the last fetch left ${BRANCH} held by this device (store ${STORE_A}), so the run goes on.`);
   });
 
+  it('prints one info line naming both ids for a re-signed claim; one that cannot be re-signed and one unconfirmed are each one warning naming both', async () => {
+    const trio = plantTrio('re-sign-lines');
+    pushClaim(trio.a, STORE_A_REPLACED);
+    const seams = seamsOf(trio.a, STORE_A, [], [STORE_A_REPLACED]);
+    const noCommit: GitRunner = (args) => (args[0] === 'commit-tree'
+      ? { ok: false, stdout: '', stderr: 'fatal: unable to write commit object' }
+      : trio.a(args));
+    const tip = remoteTip(trio);
+
+    const failed = await captured(() => refuseUnownedClaim(PLAN, { ...seams, git: noCommit }));
+    goOffline(trio.a);
+    const offline = await captured(() => refuseUnownedClaim(PLAN, seams));
+    goOnline(trio, trio.a);
+    const resigned = await captured(() => refuseUnownedClaim(PLAN, seams));
+
+    const holder = `this device (store ${STORE_A}) under store ${STORE_A_REPLACED}, an id that store replaced`;
+    expect([failed.info, failed.warn]).toEqual([[], [
+      `⚠️  Could not re-sign the claim on #7: could not make the take commit on ${String(tip)}: fatal: unable to write commit object;`
+      + ` ${BRANCH} was read as held by ${holder}, so the run goes on.`,
+    ]]);
+    expect(offline.info).toEqual([]);
+    expect(offline.warn).toHaveLength(1);
+    expect(offline.warn[0]).toStartWith('⚠️  Could not confirm the claim on #7: could not fetch');
+    expect(offline.warn[0]).toEndWith(`the last fetch left ${BRANCH} held by ${holder}, so the run goes on.`);
+    expect([resigned.info, resigned.warn]).toEqual([[
+      `🔒 Re-signed the claim on #7 on origin/${BRANCH} from store ${STORE_A_REPLACED}, an id this device's store replaced, to store ${STORE_A}.`,
+    ], []]);
+  });
+
   it('refuses a store whose id cannot be read, naming what its open threw', async () => {
     const trio = plantTrio('store-throws');
     pushClaim(trio.a, STORE_A);
@@ -498,12 +766,12 @@ describe('createStartPreflightClaim', () => {
 });
 
 describe('markInDevelopment', () => {
-  const owned: RunClaim = { outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '' };
+  const held: RunClaim = { outcome: 'owned', issue: ISSUE, branch: BRANCH, storeId: STORE_A, via: 'held', note: '', replacedId: null };
 
   it('swaps the labels in one write on a first dispatch of an owned claim', async () => {
     const world = boardWorld();
 
-    const run = await captured(() => markInDevelopment(owned, world.board, true));
+    const run = await captured(() => markInDevelopment(held, world.board, true));
 
     expect(world.calls).toEqual([
       ['issue', 'edit', '7', '--remove-label', CLAIMED_LABEL, '--add-label', IN_DEVELOPMENT_LABEL],
@@ -514,10 +782,10 @@ describe('markInDevelopment', () => {
   it('writes nothing on a resume, or for a run with no claim; the first-dispatch control writes', async () => {
     const world = boardWorld();
 
-    await captured(() => markInDevelopment(owned, world.board, false));
+    await captured(() => markInDevelopment(held, world.board, false));
     await captured(() => markInDevelopment({ outcome: 'none' }, world.board, true));
     const writtenBefore = world.calls.length;
-    await captured(() => markInDevelopment(owned, world.board, true));
+    await captured(() => markInDevelopment(held, world.board, true));
 
     expect(writtenBefore).toBe(0);
     expect(world.calls).toHaveLength(1);
@@ -526,8 +794,8 @@ describe('markInDevelopment', () => {
   it('warns when the board is not gh or refuses the write, and never throws', async () => {
     const failing = boardWorld(true);
 
-    const noBoard = await captured(() => markInDevelopment(owned, null, true));
-    const refused = await captured(() => markInDevelopment(owned, failing.board, true));
+    const noBoard = await captured(() => markInDevelopment(held, null, true));
+    const refused = await captured(() => markInDevelopment(held, failing.board, true));
 
     expect(noBoard.warn).toEqual([
       `⚠️  claim labels: #7 was not moved from ${CLAIMED_LABEL} to ${IN_DEVELOPMENT_LABEL}: the board is not gh; the claim stands in git`,
