@@ -130,3 +130,20 @@ describe('the entry point in a fresh process', () => {
     expect(run.stdout.trim()).toBe(`rafa ${version}`);
   });
 });
+
+/** The plan and loop barrels, and the store's entry, each loaded first. */
+const PLAN_LOOP_STORE_FIRST: string[] = [
+  join('core', 'plan', 'index.ts'),
+  join('core', 'plan', 'block-reader.ts'),
+  join('core', 'loop', 'index.ts'),
+  join('core', 'loop', 'readings.ts'),
+  join('effort', 'store', 'index.ts'),
+];
+
+describe('each plan and loop barrel, and the store entry, loaded first in a fresh process', () => {
+  test.each(PLAN_LOOP_STORE_FIRST)('%s loads first and exits 0', async (file) => {
+    const run = await spawnBun(['-e', BARREL_CHILD, join(SRC, file)]);
+    expectExit(run, 0);
+    expect((JSON.parse(run.stdout.trim()) as { names: number }).names).toBeGreaterThan(0);
+  });
+});
