@@ -15,11 +15,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 
 import { resolveBaseBranch } from '../cleanup/index.js';
+import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 
 import { buildWrapUpPrompt } from './wrap-up.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const PROMPT_MODULES = ['wrap-up.ts', 'pr-lifecycle.ts', 'wrap-up-run.ts', 'runner-pr.ts'];
 const LITERAL = 'origin/main';
