@@ -14,11 +14,13 @@
  * then, before anything else is read.
  *
  * `--create-branch` is read by `src/start/run-setup.ts` ahead of its
- * branch guard, and only on `main` or `master`: it answers yes to the question the run
- * would otherwise ask a terminal (`start/branch.ts`). It is declared
- * beside `--any-branch` because the two are the pair an operator on the
- * base chooses between — leave the base, or stay on it deliberately —
- * and `--any-branch` outranks it.
+ * branch guard, and only on `main` or `master` or with no branch checked
+ * out: it answers yes to the question the run would otherwise ask a
+ * terminal (`start/branch.ts`). It is declared beside `--any-branch`
+ * because the two are the pair an operator on the base chooses between —
+ * leave the base, or stay on it deliberately — and `--any-branch`
+ * outranks it there. With no branch checked out `--any-branch` waives
+ * nothing, and the run is refused without the other.
  *
  * `--as-worktree` is declared beside them for the same reason: it is
  * the third answer to that question, the plan's branch in a worktree

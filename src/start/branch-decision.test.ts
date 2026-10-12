@@ -41,10 +41,8 @@ import {
   branchNameFor,
   branchSteps,
   BRANCH_PREFIX,
-  DETACHED_HEAD,
   detachedHeadRefusal,
   hasDiverged,
-  isDetachedHead,
   localRef,
   NO_BRANCH,
   parseBaseStanding,
@@ -54,7 +52,6 @@ import {
   REMOTE,
   remoteTrackingRef,
   standsOn,
-  SWITCH_TO_BASE,
   trackedChanges,
   treeRefusal,
   YES_ANSWERS,
@@ -142,33 +139,46 @@ describe('the branch a plan runs on', () => {
 });
 
 describe('a detached HEAD', () => {
-  it('is the literal HEAD git answers, and no branch name is read as one', () => {
-    expect(DETACHED_HEAD).toBe('HEAD');
-    expect(isDetachedHead('HEAD')).toBe(true);
-    // Controls: a default branch, a plan branch, and names that only contain or resemble it.
-    expect(isDetachedHead('main')).toBe(false);
-    expect(isDetachedHead('feat/rafa-49')).toBe(false);
-    expect(isDetachedHead('feat/HEAD')).toBe(false);
-    expect(isDetachedHead('head')).toBe(false);
-    expect(isDetachedHead('')).toBe(false);
+  /** The way onto the plan's branch as a caller hands it in, a blank line ahead of it. */
+  const BRANCH_WAY: readonly string[] = [
+    '\n   Pass --create-branch to create feat/rafa-49 from the latest',
+    '   origin/<base> and run there.',
+  ];
+
+  it('is a standing and never the word HEAD, which is read as a name like any other', () => {
+    expect(standsOn({ ...PLAN, base: 'HEAD', standing: 'no-branch' })).toBe(NO_BRANCH);
+    // Controls: the word on the default standing is a base's name, and so is a name that contains it.
+    expect(standsOn({ ...PLAN, base: 'HEAD' })).toBe('HEAD');
+    expect(standsOn({ ...PLAN, base: 'feat/HEAD' })).toBe('feat/HEAD');
+    expect(anyBranchStandsAside({ anyBranch: true })).toBe(true);
   });
 
-  it('is refused naming git switch <base> and the worktree flag as the two ways on', () => {
-    const lines = detachedHeadRefusal('--as-worktree').split('\n');
+  it('is refused naming the way onto the plan\'s branch first and the worktree flag second', () => {
+    const refusal = detachedHeadRefusal(BRANCH_WAY, '--as-worktree');
 
-    expect(lines[0]).toStartWith('❌ Refusing to run on a detached HEAD');
-    expect(SWITCH_TO_BASE).toBe('git switch <base>');
-    const switchLine = lines.find((line) => line.includes(SWITCH_TO_BASE));
-    const worktreeLine = lines.find((line) => line.includes('--as-worktree'));
-    expect(switchLine).toBeDefined();
-    expect(worktreeLine).toBeDefined();
-    // The two ways are a column: each explanation starts at the same offset.
-    expect(switchLine?.indexOf('back onto')).toBe(worktreeLine?.indexOf('run the plan'));
+    expect(refusal).toBe([
+      '❌ Refusing to run on a detached HEAD: no branch is checked out, and a run',
+      '   commits to, pushes and opens its pull request from a branch of its own.',
+      ...BRANCH_WAY,
+      '\n   Or pass --as-worktree to run the plan in a worktree of its own, leaving',
+      '   this checkout where it is.',
+    ].join('\n'));
+    expect(refusal.indexOf('--create-branch')).toBeGreaterThan(-1);
+    expect(refusal.indexOf('--create-branch')).toBeLessThan(refusal.indexOf('--as-worktree'));
+    // `git switch <base>`, which the refusal once named first, is a way it no longer names.
+    expect(refusal).not.toContain('git switch');
   });
 
   it('names the worktree flag it is handed, not one of its own', () => {
-    expect(detachedHeadRefusal('--elsewhere')).toContain('--elsewhere');
-    expect(detachedHeadRefusal('--elsewhere')).not.toContain('--as-worktree');
+    expect(detachedHeadRefusal(BRANCH_WAY, '--elsewhere')).toContain('--elsewhere');
+    expect(detachedHeadRefusal(BRANCH_WAY, '--elsewhere')).not.toContain('--as-worktree');
+  });
+
+  it('names no worktree at all when handed no flag, and ends on the way it was handed', () => {
+    const refusal = detachedHeadRefusal(BRANCH_WAY, null);
+
+    expect(refusal).not.toContain('worktree');
+    expect(refusal).toEndWith(BRANCH_WAY.join('\n'));
   });
 });
 

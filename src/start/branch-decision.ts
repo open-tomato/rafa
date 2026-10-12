@@ -113,8 +113,10 @@
  *    feat/<stub>`, and `The run is still on a detached HEAD.`
  *
  * No plan stub, and no terminal without `--create-branch`, stand aside
- * here as they do on the base. What a caller makes of a `stand-aside` or
- * a declined offer on this standing is the caller's.
+ * here as they do on the base. A run left on this standing, the offer
+ * having stood aside or been declined, is refused by the guard in
+ * `src/start/run-setup.ts` with {@link detachedHeadRefusal}, under
+ * `--any-branch` as without it.
  *
  * Measured on git 2.53.0 under Linux with `LC_ALL=C` set (2026-10-12),
  * in a clone of a bare remote after `git switch --detach`, the remote
@@ -139,13 +141,13 @@
  *  - `git status --porcelain` wrote ` M a.txt` and `?? untracked.txt`,
  *    as it does on a branch.
  *
- * No run reaches this standing yet. `git rev-parse --abbrev-ref HEAD`
- * answers the literal `HEAD` when no branch is checked out (measured on
- * git 2.53.0 under Linux, 2026-10-01, in a repository after `git switch
- * --detach`: stdout `HEAD`, exit 0), and `src/start/run-setup.ts` still
- * reads its branch that way and refuses the word before any offer is
- * made ({@link isDetachedHead}, {@link detachedHeadRefusal}), whatever
- * flags the line carries.
+ * The standing is a caller's reading and never a word matched here.
+ * `git rev-parse --abbrev-ref HEAD` answers the literal `HEAD` when no
+ * branch is checked out (measured on git 2.53.0 under Linux, 2026-10-01,
+ * in a repository after `git switch --detach`: stdout `HEAD`, exit 0),
+ * which is also a name a ref can carry, so `src/start/run-checkout.ts`
+ * reads the run's branch with `readCheckedOutBranch` (`src/utils/git.ts`),
+ * which answers null there, and hands this standing on in its place.
  *
  * ## Being ahead is not being diverged
  *
@@ -178,34 +180,31 @@ const MAX_LISTED_CHANGES = 10;
 /** A count of commits, as `git rev-list --count` writes one. */
 const COUNT = /^\d+$/;
 
-/** What `git rev-parse --abbrev-ref HEAD` answers when no branch is checked out; see the module note. */
-export const DETACHED_HEAD = 'HEAD';
-
-/** The first way on from a detached HEAD, as {@link detachedHeadRefusal} prints it. */
-export const SWITCH_TO_BASE = 'git switch <base>';
-
-/** True when `branch` is the reading of a detached HEAD rather than a branch's name. */
-export function isDetachedHead(branch: string): boolean {
-  return branch === DETACHED_HEAD;
-}
-
 /**
- * The refusal a run on a detached HEAD answers, naming both ways on:
- * back onto a branch with `git switch <base>`, or `--as-worktree`, which
- * runs the plan in a worktree of its own. `worktreeFlag` is the flag as
- * the run's line spells it.
+ * The refusal a run left with no branch checked out answers, the offer
+ * of `feat/<stub>` not having been taken: what is wrong, then the ways
+ * on in the order a run would take them.
+ *
+ * `branchWay` is named first: the lines that put the run on the plan's
+ * branch, opening with the blank line that sets them apart. Its caller
+ * spells them, the flag being the caller's: `--create-branch` and the
+ * branch it creates, or the `git` line for a plan whose file names no
+ * stub. `worktreeFlag` is named second: the flag that runs the plan in a
+ * worktree of its own, as the run's line spells it, or null where it
+ * could not help and is left out.
  */
-export function detachedHeadRefusal(worktreeFlag: string): string {
-  const ways: readonly (readonly [string, string])[] = [
-    [SWITCH_TO_BASE, 'back onto the branch the plan is cut from, such as main, then run again'],
-    [worktreeFlag, 'run the plan in a worktree of its own, leaving this checkout where it is'],
-  ];
-  const width = Math.max(...ways.map(([way]) => way.length));
+export function detachedHeadRefusal(branchWay: readonly string[], worktreeFlag: string | null): string {
+  const worktreeWay = worktreeFlag === null
+    ? []
+    : [
+      `\n${INDENT}Or pass ${worktreeFlag} to run the plan in a worktree of its own, leaving`,
+      `${INDENT}this checkout where it is.`,
+    ];
   return [
     '❌ Refusing to run on a detached HEAD: no branch is checked out, and a run',
     `${INDENT}commits to, pushes and opens its pull request from a branch of its own.`,
-    `${INDENT}Two ways on:`,
-    ...ways.map(([way, what]) => `${INDENT}  ${way.padEnd(width)}   ${what}`),
+    ...branchWay,
+    ...worktreeWay,
   ].join('\n');
 }
 

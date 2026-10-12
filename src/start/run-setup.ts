@@ -17,23 +17,28 @@
  * `start/run-config.ts` and `start/runtime.ts`, and not here.
  *
  * {@link resolveRunBranch} and {@link guardRunBranch} are the branch
- * step: on `main` or `master` the run is offered the plan's own branch
- * (`start/branch.ts`), and whichever branch that answers is the one the
- * guard reads and the session record names. Once the plan file is known
- * to exist, `start()` reaches the first through `start/run-checkout.ts`,
- * which makes no offer under `--as-worktree`, and calls the second right
- * after on whichever branch that answered.
+ * step: on `main` or `master`, or with no branch checked out, the run is
+ * offered the plan's own branch (`start/branch.ts`), and whichever
+ * branch that answers is the one the guard reads and the session record
+ * names. Once the plan file is known to exist, `start()` reaches the
+ * first through `start/run-checkout.ts`, which makes no offer under
+ * `--as-worktree`, and calls the second right after on whichever branch
+ * that answered.
  *
- * A detached HEAD is refused first, by {@link resolveRunBranch} and on
- * every line that reaches it — `--create-branch`, `--any-branch` or
- * neither — since each of them runs on the checkout's own HEAD and none
- * has a branch to run on there. The refusal names `git switch <base>`
- * and `--as-worktree`, the route that leaves the checkout alone and so
- * never reaches it. It is thrown before `start()` opens the session
- * record, so a refused run leaves nothing under `.rafa/runs/`.
+ * No branch is treated like the default branch. A run started on a
+ * detached HEAD is offered `feat/<stub>` as a run on `main` is, cut from
+ * the latest `origin/<base>` of the base its caller read for it, and
+ * `--create-branch` answers that yes. Where the offer is not taken the
+ * run is still on no branch, which {@link resolveRunBranch} answers as
+ * null and the guard refuses, naming `--create-branch` and the branch it
+ * would create first and `--as-worktree`, the route that leaves the
+ * checkout alone and so never reaches the offer, second. `--any-branch`
+ * changes none of it: the flag waives WHICH branch the run is on, not
+ * that it is on one. The refusal is thrown before `start()` opens the
+ * session record, so a refused run leaves nothing under `.rafa/runs/`.
  *
  * The guard's two warnings go through the active output
- * (`adapters/output/active.ts`), and its refusal is thrown as a
+ * (`adapters/output/active.ts`), and its refusals are thrown as a
  * `CommandExit` with exit code 1.
  *
  * {@link refuseWorktreeBesideCreateBranch} runs ahead of all of it, on
@@ -43,6 +48,7 @@
  * contradictory things and is refused before anything is read.
  */
 import type { RafaConfig } from '../config-schema.js';
+import type { RunStanding } from './branch-decision.js';
 import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
 
@@ -50,7 +56,7 @@ import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { isLoopRetryCount } from '../config-schema-loop-retries.js';
 
-import { branchNameFor, detachedHeadRefusal, isDetachedHead, REMOTE } from './branch-decision.js';
+import { branchNameFor, detachedHeadRefusal, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';
 import { readContinueArgs } from './continue-args.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from './pr-lifecycle.js';
@@ -77,6 +83,13 @@ const ROADMAP_FLAG = '--roadmap';
 
 /** What the refusal calls a plan whose file names no stub. */
 const UNNAMED_PLAN = 'this-plan';
+
+/**
+ * What the refusal calls the base of a run with no branch checked out:
+ * the placeholder the command's help spells it with. The guard is handed
+ * the run's branch and not the base read for it.
+ */
+const UNREAD_BASE = '<base>';
 
 /**
  * Throws `CommandExit` with exit code 1 when the words carry both
@@ -147,65 +160,77 @@ export interface RunBranchRequest {
   readonly checkout: string;
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;
-  /** The branch the run was started on. */
+  /**
+   * The branch the run was started on, or under `standing: 'no-branch'`
+   * the base its caller read for the run, which `feat/<stub>` is cut
+   * from on `origin`.
+   */
   readonly base: string;
+  /**
+   * Where the run was started: on the branch `base` names, or with no
+   * branch checked out at all. `on-base` when left out.
+   */
+  readonly standing?: RunStanding;
   /** The words of the run's line, which the two branch flags are read from. */
   readonly args: readonly string[];
 }
 
 /**
  * The branch the rest of the run reads: the one it was started on, or
- * the plan's own branch once the offer to leave the base has been made
- * and taken.
+ * the plan's own branch once the offer to leave where it stands has been
+ * made and taken, or null when it was started on no branch and is still
+ * on none.
  *
- * A detached HEAD — `base` read as the literal `HEAD` — is refused
- * before anything else, with exit code 1 and no git run: it is no
- * branch, so there is nothing to offer from it and nothing to run on.
- * `--any-branch` does not let it through, since the flag waives the
- * check on WHICH branch the run is on, not that it is on one.
+ * The offer is made on a branch {@link DEFAULT_BRANCHES} names and with
+ * no branch checked out (`standing: 'no-branch'`), which is exactly what
+ * {@link guardRunBranch} refuses. Everywhere else the run is already on
+ * a branch of its own and there is nothing to offer, so no git runs and
+ * no question is asked — a run on `feat/<stub>` costs this function one
+ * array lookup.
  *
- * The offer is only made on a branch {@link DEFAULT_BRANCHES} names,
- * which is exactly the set {@link guardRunBranch} refuses. Everywhere
- * else the run is already on a branch of its own and there is nothing to
- * offer, so no git runs and no question is asked — a run on
- * `feat/<stub>` costs this function one array lookup.
+ * Where it is made, `start/branch.ts` has the whole of it: which
+ * question is asked, what `--create-branch` stands in for, which steps a
+ * yes runs on either standing, and which refusal a modified tracked
+ * file, a failed fetch or a diverged base throws. Only a `moved` outcome
+ * answers a new branch. `stood-aside` and `declined` both answer where
+ * the run was left: the base, which the guard then refuses or lets
+ * through under `--any-branch`, or null for no branch, which it refuses
+ * under every line. A base that is the word `HEAD` is a name like any
+ * other here; a detached HEAD is the standing, read by the caller
+ * (`start/run-checkout.ts`), and never that word.
  *
- * On the base, `start/branch.ts` has the whole of it: which question is
- * asked, what `--create-branch` stands in for, and which refusal a
- * modified tracked file, a failed fetch or a diverged base throws. Only
- * a `moved` outcome answers a new branch; `stood-aside` and `declined`
- * both answer the base, and the guard then refuses or lets it through
- * exactly as it did before this offer existed.
- *
- * The answer is the branch handed to BOTH {@link guardRunBranch} and
- * `openRunSession`, so a run that moved is guarded on, and records, the
- * branch it is actually on.
+ * The answer is the branch handed to BOTH {@link guardRunBranch} and,
+ * past it, `openRunSession`, so a run that moved is guarded on, and
+ * records, the branch it is actually on.
  */
 export async function resolveRunBranch(
   request: RunBranchRequest,
   seams: BranchSeams = DEFAULT_BRANCH_SEAMS,
-): Promise<string> {
-  const { args, base } = request;
-  if (isDetachedHead(base)) throw new CommandExit(1, `${detachedHeadRefusal(AS_WORKTREE_FLAG)}\n${NOTHING_DISPATCHED}`);
-  if (!DEFAULT_BRANCHES.includes(base)) return base;
+): Promise<string | null> {
+  const { args, base, standing } = request;
+  const noBranch = standing === 'no-branch';
+  if (!noBranch && !DEFAULT_BRANCHES.includes(base)) return base;
 
   const outcome = await offerRunBranch({
     repoRoot: request.checkout,
     planStub: request.planStub,
     base,
+    standing,
     anyBranch: args.includes(ANY_BRANCH_FLAG),
     createBranch: args.includes(CREATE_BRANCH_FLAG),
   }, seams);
 
-  return outcome.kind === 'moved'
-    ? outcome.branch
+  if (outcome.kind === 'moved') return outcome.branch;
+  return noBranch
+    ? null
     : base;
 }
 
 /**
  * The middle of the refusal: how to get onto the plan's branch. Named
  * after the plan's stub when there is one, and the `git` line when there
- * is not; see {@link guardRunBranch}.
+ * is not; see {@link guardRunBranch}. `base` is the branch the plan's
+ * own is created from on {@link REMOTE}, or {@link UNREAD_BASE}.
  */
 function branchOffer(planStub: string | null, base: string): readonly string[] {
   if (planStub === null) {
@@ -223,8 +248,31 @@ function branchOffer(planStub: string | null, base: string): readonly string[] {
 }
 
 /**
- * Refuses to run a plan on the default branch, and warns on a branch
- * that names no plan.
+ * The refusal of a run with no branch checked out: the offer's own lines
+ * first, then `--as-worktree`. A plan whose file names no stub is handed
+ * neither flag as a way on, since both build the branch name out of the
+ * stub and the worktree route refuses a plan with none
+ * (`start/worktree.ts`): it gets the `git` line alone, which cuts a
+ * branch where HEAD stands.
+ */
+function refuseNoBranch(planStub: string | null): never {
+  const worktreeFlag = planStub === null
+    ? null
+    : AS_WORKTREE_FLAG;
+  const refusal = detachedHeadRefusal(branchOffer(planStub, UNREAD_BASE), worktreeFlag);
+  throw new CommandExit(1, `${refusal}\n${NOTHING_DISPATCHED}`);
+}
+
+/**
+ * Refuses to run a plan on the default branch or on no branch at all,
+ * and warns on a branch that names no plan. Past it `branch` is a
+ * branch's name, which the signature asserts for its caller.
+ *
+ * No branch, a detached HEAD read as null, is refused first and on every
+ * line, `--any-branch` included: the flag waives which branch the run is
+ * on, and a run commits to, pushes and opens its pull request from one.
+ * The refusal is {@link refuseNoBranch}'s. It is reached only where the
+ * offer of `feat/<stub>` was not taken ({@link resolveRunBranch}).
  *
  * Measured: one run executed on `main`. It produced 21 commits and 74
  * sessions and cost three things — no PR, so the wrap-up's CI stage
@@ -256,15 +304,17 @@ function branchOffer(planStub: string | null, base: string): readonly string[] {
  * Attribution no longer depends on it either, the stamp having taken
  * that job over.
  *
- * The refusal is thrown as a `CommandExit` with exit code 1 whose
+ * Either refusal is thrown as a `CommandExit` with exit code 1 whose
  * message is the whole refusal, the lines the guard printed before it
  * threw, joined. Both warnings go through the active output.
  */
 export function guardRunBranch(
   planStub: string | null,
-  branch: string,
+  branch: string | null,
   args: readonly string[],
-): void {
+): asserts branch is string {
+  if (branch === null) refuseNoBranch(planStub);
+
   if (args.includes(ANY_BRANCH_FLAG)) {
     activeOutput().warn(`\n⚠️  ${ANY_BRANCH_FLAG}: running on \`${branch}\` without the branch check.`);
     return;

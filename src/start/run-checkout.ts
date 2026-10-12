@@ -8,8 +8,9 @@
  *  - Without `--as-worktree` the checkout is the working tree the run
  *    was started in ({@link resolveRunDirs}), and the branch is the one
  *    it stands on, or the plan's own once the offer made on `main` or
- *    `master` has been taken ({@link resolveRunBranch}). This is the
- *    route every run took before the flag existed, unchanged.
+ *    `master`, or with no branch checked out, has been taken
+ *    ({@link resolveRunBranch}). It is null for a run started on no
+ *    branch that took no offer, which the guard refuses next.
  *  - Under `--as-worktree` the plan's `feat/<stub>` is added as a linked
  *    worktree at `loop.worktreeDir/<stub>` ({@link addRunWorktree}), or
  *    the worktree an earlier start left there on that branch is reused,
@@ -36,7 +37,8 @@
  * `pr.base` when it is set, else the branch `origin/HEAD` names, else
  * the default base. It is the reading the wrap-up makes for the pull
  * request (`./wrap-up-run.ts`), so the branch is cut from the base it
- * is later merged into. The reading is the `base` seam.
+ * is later merged into. The reading is the `base` seam, and a run
+ * started on a detached HEAD without the flag makes the same one.
  *
  * The branch checked out where the run was started is NOT the base. It
  * was once: a run started on a branch `origin` had not got then fetched
@@ -55,9 +57,15 @@
  * with other work on it that is behind the base is only reported
  * (`./worktree.ts`).
  *
- * Without the flag none of this is read: the run's branch, and the base
- * the offer is made on, is what `getCurrentBranch` answers in the
- * started checkout.
+ * Without the flag the run's branch is that same `readCheckedOutBranch`
+ * reading in the started checkout, and on a branch it is all that is
+ * read: the branch is the one the offer is made on, and no base is
+ * looked up. On a detached HEAD it answers null, never the word `HEAD`,
+ * and no branch is treated like the default branch: the offer is handed
+ * the run's base, read as above, and the `no-branch` standing, so
+ * `feat/<stub>` is cut from the latest `origin/<base>` when the offer is
+ * taken (`./branch.ts`). When it is not, the run is still on no branch
+ * and the settled branch is null.
  *
  * Every refusal on the way — a checkout git could not read, a branch
  * offer that could not be taken, a worktree git would not add — is the
@@ -70,7 +78,7 @@ import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { createGitRunner } from '../pr/git.js';
-import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
+import { readCheckedOutBranch } from '../utils/git.js';
 
 import { resolveRunDirs } from './checkout.js';
 import { AS_WORKTREE_FLAG, resolveRunBranch } from './run-setup.js';
@@ -82,7 +90,10 @@ export interface RunCheckoutRequest {
   readonly projectRoot: string;
   /** `loop.worktreeDir` as the config holds it, read under `--as-worktree` only. */
   readonly worktreeDir: string;
-  /** `pr.base` as the config holds it, null when unset, read under `--as-worktree` only. */
+  /**
+   * `pr.base` as the config holds it, null when unset, read under
+   * `--as-worktree` and for a run started on a detached HEAD.
+   */
   readonly prBase: string | null;
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;
@@ -92,29 +103,35 @@ export interface RunCheckoutRequest {
 
 /** The run's two directories and the branch its checkout is on. */
 export interface RunCheckout extends RunDirs {
-  /** The branch the guard reads and the session record names. */
-  readonly branch: string;
+  /**
+   * The branch the guard reads and, past it, the session record names:
+   * null when the run was started on a detached HEAD and took no offer,
+   * which the guard refuses.
+   */
+  readonly branch: string | null;
 }
 
 /** How the settling reaches git; each defaults to the module the run uses. */
 export interface RunCheckoutSeams {
   /** The run's directories before any worktree. `resolveRunDirs` when absent. */
   readonly dirs?: (projectRoot: string) => RunDirs;
-  /** The branch checked out in a directory, read without `--as-worktree`. `getCurrentBranch` when absent. */
-  readonly currentBranch?: (dir: string) => string;
   /**
-   * The branch checked out in a directory, null on a detached HEAD, read
-   * under `--as-worktree` for the base line alone. `readCheckedOutBranch`
-   * when absent.
+   * The branch checked out in a directory, null on a detached HEAD: the
+   * run's own branch without `--as-worktree`, and under it read for the
+   * base line alone. `readCheckedOutBranch` when absent.
    */
   readonly checkedOutBranch?: (dir: string) => string | null;
   /**
-   * The base under `--as-worktree`, from the project root and `pr.base`.
+   * The run's base, from the project root and `pr.base`, read under
+   * `--as-worktree` and on a detached HEAD without it.
    * `resolveBaseBranch` over git in that root when absent.
    */
   readonly base?: (projectRoot: string, prBase: string | null) => string;
-  /** The branch offer on the base. `resolveRunBranch` when absent. */
-  readonly offer?: (request: RunBranchRequest) => Promise<string>;
+  /**
+   * The branch offer, answering the branch the run is left on, null for
+   * none. `resolveRunBranch` when absent.
+   */
+  readonly offer?: (request: RunBranchRequest) => Promise<string | null>;
   /** The worktree `--as-worktree` adds. `addRunWorktree` when absent. */
   readonly worktree?: (request: WorktreeRequest) => WorktreeOutcome;
 }
@@ -145,10 +162,10 @@ function baseLine(base: string, prBase: string | null, startedOn: string | null)
 
 /**
  * Settles where the run works: the checkout it was started in and the
- * branch it stands on or was offered, or, under `--as-worktree`, the
- * worktree added for the plan's branch, cut from the run's base, and
- * that branch. The project root is `request.projectRoot` either way. See
- * the module note.
+ * branch it stands on or was offered, null when it stands on none and
+ * took no offer, or, under `--as-worktree`, the worktree added for the
+ * plan's branch, cut from the run's base, and that branch. The project
+ * root is `request.projectRoot` either way. See the module note.
  */
 export async function settleRunCheckout(
   request: RunCheckoutRequest,
@@ -156,15 +173,18 @@ export async function settleRunCheckout(
 ): Promise<RunCheckout> {
   const { projectRoot, planStub, args } = request;
   const started = (seams.dirs ?? resolveRunDirs)(projectRoot);
+  const startedOn = (seams.checkedOutBranch ?? readCheckedOutBranch)(started.checkout);
+  const runBase = (): string => (seams.base ?? readBase)(projectRoot, request.prBase);
 
   if (!args.includes(AS_WORKTREE_FLAG)) {
-    const base = (seams.currentBranch ?? getCurrentBranch)(started.checkout);
-    const branch = await (seams.offer ?? resolveRunBranch)({ checkout: started.checkout, planStub, base, args });
+    const stands: Pick<RunBranchRequest, 'base' | 'standing'> = startedOn === null
+      ? { base: runBase(), standing: 'no-branch' }
+      : { base: startedOn };
+    const branch = await (seams.offer ?? resolveRunBranch)({ checkout: started.checkout, planStub, ...stands, args });
     return Object.freeze({ projectRoot, checkout: started.checkout, branch });
   }
 
-  const base = (seams.base ?? readBase)(projectRoot, request.prBase);
-  const startedOn = (seams.checkedOutBranch ?? readCheckedOutBranch)(started.checkout);
+  const base = runBase();
   if (startedOn !== base) {
     activeOutput().info(baseLine(base, request.prBase, startedOn));
   }
