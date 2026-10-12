@@ -194,10 +194,11 @@ is the gate for those.
 **Files are mapped to clusters via `docs/survey/cluster-map.json`,**
 the file-to-cluster assignment from the eight-cluster import graph survey
 run. A file with no mapping takes the cluster most of its folder's mapped
-files hold. If a file's folder holds no mapped file, the sweep fails,
-naming the file and that you must extend the map with a new survey run.
-The sweep prints the file coverage line and a count of files placed by
-folder majority.
+files hold. If a file's folder holds no mapped file, the file stays
+unplaced and the sweep does not fail on it: a cycle through it is still
+found, and the file counts toward no cluster. The sweep prints the file
+coverage line, a count of files placed by folder majority, and a count
+of the unplaced ones; a new survey run that extends the map places them.
 
 **The map traces the 68-file cycle that crossed package lines before
 rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:
