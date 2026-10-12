@@ -1218,6 +1218,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
     ['../../config.js', ['configFilePath']],
+    ['../../utils/agent-shell.js', ['AGENT_SHELL_ENV', 'isAgentShell']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
   ['./commands/ci/status.js', [
