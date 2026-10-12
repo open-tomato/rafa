@@ -323,32 +323,77 @@ project root owns `.rafa/` and the config; the checkout is where
 (or in a directory you configure); without it, the checkout IS the project
 root, and you run the loop where you already are.
 
+**The base is read one way, by the start and by the wrap-up.** It is
+`pr.base` when the config sets it (`rafa config set pr.base=<branch>`), else
+the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
+(`src/cleanup/branches.ts`) reads it in the project root for both: the start
+for the branch it cuts and the worktree it adds, the wrap-up for the pull
+request. The base is an address written on the plan. The branch checked out
+where the run was started is never the base, and where the person stands
+when they start the run is no part of it.
+
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
 The branch is created as `feat/<stub>` from the latest `origin/<base>`,
-where `<base>` is the tracking branch of the default branch. This feature
+where `<base>` is the branch checked out, `main` or `master`. This feature
 requires `--create-branch` to be explicit, preserving the safety of the
 existing print-only behavior when the flag is absent. Use it alongside
 `--plan=<path>` or the default plan under `plan.dir`, the default being
 `.rafa/plans/` unless the config `plan.dir` names another.
 
+**On a detached HEAD, `--create-branch` cuts the branch from the base, and the
+refusal without it names the flag.** Without `--create-branch` the run is
+refused before its first task: the refusal says no branch is checked out,
+names `--create-branch`, and, for a plan whose file names a stub,
+`--as-worktree`. With it, or with a yes to the question a terminal asks, the
+run fetches `origin/<base>` and creates `feat/<stub>` from the fetched ref
+with `--no-track`, so the new branch takes no upstream. A failed fetch refuses
+first, so the branch is never cut from a stale base. `HEAD` is never handed on
+as a branch name. `--any-branch` does not let a detached HEAD through: it
+waives which branch the run is on, not that it is on one. Under
+`--as-worktree` the run makes no offer and needs no flag: its worktree is cut
+from the same base, and the detached checkout is left as it was.
+
+**`--as-worktree` adds a plan's worktree in two steps, and retries only the
+upstream.** For a plan whose branch already exists on `origin`, the add is
+`git worktree add --no-track`, and the upstream is a second step:
+`git branch --set-upstream-to=origin/<branch> <branch>`. Git keeps one
+`.git/config` for every worktree of a clone and refuses a second writer while
+its lock is held rather than waiting, so two plans started at once in one
+clone could lose one upstream (issue #960). The second step is tried up to
+`UPSTREAM_TRIES` (5) times, with `UPSTREAM_PAUSE_MS` (200) between tries, and
+only while git reports the config as locked (`src/start/worktree-upstream.ts`).
+A run that gives up removes the worktree it added, keeps the local branch, and
+names the branch and that line. A run started again finds the branch and
+leaves its upstream as it was found, so the line is run by hand first. Any
+other failure leaves the worktree in place and says so. A rafa lock file
+around each add was rejected: git already locks the file, and a lock of
+rafa's own would outlive a run killed while holding it.
+
+**A run started from a scratch branch still compares its plan with the
+base.** Started from a session worktree on `scratch/notes`, `--as-worktree`
+cuts the plan's branch from `pr.base` or `origin/HEAD`, as above, and prints
+one line naming that base, where it was read from, and the branch the run was
+started on: `The worktree's base is main, read from origin/HEAD (the default
+when it names none), not scratch/notes`. A run started on the base prints
+nothing, and a run started on a detached HEAD says `not a detached HEAD`.
+
 **An existing branch under `--as-worktree` catches up with its base when it
-holds only claims.** `rafa plan create` claims a plan by pushing
-`feat/<stub>` at the base's tip, so a run started later finds a branch cut
-from a base that has moved since. When `--as-worktree` takes a branch that
-already exists (local, remote-only, or held by the worktree an earlier
-start left), it fetches `origin/<base>` (the base, never the branch) and
-reads the branch's commits past it (`src/start/claim-catch-up.ts`). A
-branch holding only `claim(rafa-<n>): …` commits is merged with
-`git merge origin/<base>` in the run's worktree before the first task, a
-merge and never a rewrite of the pushed branch, and one line names the
-commits taken and their range. A branch holding any other commit is never
-merged: one warning says how many commits behind `origin/<base>` it is, and
-the run goes on. A branch at or ahead of `origin/<base>` prints nothing
-new. A failed fetch is a warning, the branch then read against
-`origin/<base>` as it stood; a failed merge is aborted and refuses the run.
-`--create-branch` without `--as-worktree` switches to an existing branch as
-it is, with no catch-up.
+holds only claims.** `rafa plan create` claims a plan by pushing `feat/<stub>`
+at the base's tip, so a run started later finds a branch cut from a base that
+has moved since. When `--as-worktree` takes a branch that already exists
+(local, remote-only, or held by the worktree an earlier start left), it
+fetches `origin/<base>` (the base, read as above, never the branch) and reads
+the branch's commits past it (`src/start/claim-catch-up.ts`). A branch holding
+only `claim(rafa-<n>): …` commits is merged with `git merge origin/<base>` in
+the run's worktree before the first task, a merge and never a rewrite of the
+pushed branch, and one line names the commits taken and their range. A branch
+holding any other commit is never merged: one warning says how many commits
+behind `origin/<base>` it is, and the run goes on. A branch at or ahead of
+`origin/<base>` prints nothing new. A failed fetch is a warning, the branch
+then read against `origin/<base>` as it stood; a failed merge is aborted and
+refuses the run. `--create-branch` without `--as-worktree` switches to an
+existing branch as it is, with no catch-up.
 
 **The loop guard halts the loop if the checkout's branch changes.** Every
 loop watches the checkout's branch and HEAD. If you switch branches in
@@ -629,13 +674,6 @@ starts), and `🍅 #<n> <phase>` when in any other phase, preventing display of
 counts past the total. Commands like `rafa loop status` and `rafa loop list`
 print the phase name beside the done/total count. A run record from an older
 rafa without a `phase` field reads as `task` for backwards compatibility.
-
-**A detached HEAD is refused at `loop start`.** The branch check that runs
-before the first task rejects any `loop start` attempt when the working tree
-is on a detached HEAD, whether or not `--create-branch` is passed. The refusal
-message names two alternatives: switch to a branch with `git switch <base>`
-or use `--as-worktree` to create a separate working tree. No route accepts
-`HEAD` as a valid branch name, preventing silent errors from later operations.
 
 **SIGINT during a suite step is a stop, not a suite failure.** When the runner
 is recording a suite step (baseline, task, stage, or pre-wrap-up) and receives
