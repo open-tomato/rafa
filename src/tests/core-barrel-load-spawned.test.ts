@@ -92,3 +92,41 @@ describe('each config-schema section file loaded first in a fresh process', () =
     expect(result.read.length).toBeGreaterThan(0);
   });
 });
+
+const CORE_DIR = join(SRC, 'core');
+
+/** The command, output, adapters and git barrels: one folder, one `index.ts`. */
+const FOLDER_BARRELS: string[] = ['command', 'output', 'adapters', 'git'];
+
+/** The child's program: load one barrel first and count what it exports. */
+const BARREL_CHILD = `
+const loaded = await import(process.argv[1]);
+console.log(JSON.stringify({ names: Object.keys(loaded).length }));
+`;
+
+async function spawnBun(args: readonly string[]): Promise<CapturedRun> {
+  const child = Bun.spawn(['bun', ...args], { cwd: SRC, stdout: 'pipe', stderr: 'pipe' });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { exitCode, stdout, stderr };
+}
+
+describe('each command, output, adapters and git barrel loaded first in a fresh process', () => {
+  test.each(FOLDER_BARRELS)('core/%s/index.ts loads first and exits 0', async (folder) => {
+    const run = await spawnBun(['-e', BARREL_CHILD, join(CORE_DIR, folder, 'index.ts')]);
+    expectExit(run, 0);
+    expect((JSON.parse(run.stdout.trim()) as { names: number }).names).toBeGreaterThan(0);
+  });
+});
+
+describe('the entry point in a fresh process', () => {
+  test('bun src/rafa.ts --version prints the version of the root package.json', async () => {
+    const { version } = (await Bun.file(join(SRC, '..', 'package.json')).json()) as { version: string };
+    const run = await spawnBun([join(SRC, 'rafa.ts'), '--version']);
+    expectExit(run, 0);
+    expect(run.stdout.trim()).toBe(`rafa ${version}`);
+  });
+});
