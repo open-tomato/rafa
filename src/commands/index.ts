@@ -371,9 +371,9 @@
  *     removed after one question; listed only, removing nothing, without
  *     a terminal or with `--output=json`. It starts no session.
  *   - `self-update [--force]`, top-level: builds the rafa checkout and
- *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
- *     `plan.dir` holds a task and while this version's runtime directory
- *     is already there, which `--force` replaces whole.
+ *     installs it as `~/.rafa/bin/rafa`, refusing while a loop of the
+ *     project is live and while this version's runtime directory is
+ *     already there, which `--force` replaces whole.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.
  *

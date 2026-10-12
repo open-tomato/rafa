@@ -93,6 +93,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
   { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'src/runtime/live-loops.ts' },
 ];
 
 /**

@@ -1429,9 +1429,15 @@ New; it replaces no earlier text. What a row or an action added to
   In the project root it reads
   `package.json`, refusing one not named `@open-tomato/rafa`, then
   `plan.dir` as `loop start` resolves the config, then each
-  `PLAN_TRACKER*.md` directly in `plan.dir`, refusing while one holds an
-  open or blocked task; the project root and subdirectories of `plan.dir`
-  are not looked in. Then, still before building, it refuses while
+  `PLAN_TRACKER*.md` directly in `plan.dir`; the project root and
+  subdirectories of `plan.dir` are not looked in. A tracker holding an
+  open or blocked task holds the install back only while a loop is live,
+  read through the `liveLoops` seam of `InstallSeams` (`liveLoopsOf`,
+  `src/runtime/live-loops.ts`, over the repo root when left out): with
+  none live it installs with one `warn` line naming each such tracker,
+  and with one live, which the command reaches only under
+  `dangerous.selfUpdateDuringLoop`, it refuses unless `--force` is on the
+  line. Then, still before building, it refuses while
   `~/.rafa/runtime/<version>/` is already there, naming that directory and
   the version, unless `--force` is on the line: a version is installed
   once, and a loop may be running from that directory. Then it runs
