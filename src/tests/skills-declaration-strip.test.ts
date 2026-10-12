@@ -39,8 +39,8 @@
  * That is what lets `not.toContain('skills')` stand for the whole string
  * rather than for one line of it.
  */
+import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
-import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -82,7 +82,7 @@ import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../cl
 import { readDeviceStoreId } from '../../claims/device.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */

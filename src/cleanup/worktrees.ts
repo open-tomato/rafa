@@ -89,15 +89,15 @@
  * {@link WorktreesUnread}; a failure reading one worktree is that
  * worktree's `unreadable` blocker.
  */
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
 import { readSessions, runsDir } from '../loop/sessions.js';
-import { createGitRunner, gitSaid } from '../pr/git.js';
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { worktreeDirAt } from '../start/worktree-dir.js';

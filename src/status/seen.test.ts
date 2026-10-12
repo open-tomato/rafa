@@ -16,7 +16,7 @@
 import type { SeenInput, SeenSeams, SeenSnapshot } from './seen.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { WorktreeSeams } from '../cleanup/worktrees.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

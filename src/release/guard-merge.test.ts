@@ -13,7 +13,7 @@ import type { MergeGuardSettings } from './guard-merge.js';
 import type { GuardRead, GuardReading, GuardVerdict } from './guard.js';
 import type { SettleSettings } from './settle.js';
 import type { VersionCollisionMode } from '../core/config/sections.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 
 import { guardReaction, mergeGuardSettings, readMergeGuard } from './guard-merge.js';
 

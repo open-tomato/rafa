@@ -31,7 +31,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { EpicOpenWork } from '../../board/epic-horizon.js';
 import type { HorizonChange } from '../../board/epic-trail.js';
 import type { RafaCommand , Prompter } from '../../core/command/index.js';
-import type { GitResult, GitRunner } from '../../pr/git.js';
+import type { GitResult, GitRunner } from '../../core/git/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

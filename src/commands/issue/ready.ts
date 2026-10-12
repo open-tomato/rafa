@@ -140,8 +140,8 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 import type { BoardRelationshipMode } from '../../core/config/sections.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { GitRunner } from '../../pr/git.js';
 
 import { createGhRunner, moduleOfLabels, typeOfLabels } from '../../adapters/tracker/github.js';
 import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
@@ -159,8 +159,8 @@ import {
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
-import { createGitRunner } from '../../pr/git.js';
 import { answeredYes } from '../../start/branch-decision.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';

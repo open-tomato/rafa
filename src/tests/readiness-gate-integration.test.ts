@@ -38,7 +38,7 @@ import type { IssueBoard } from '../board/issue-board.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { ReadinessGap } from '../board/readiness.js';
 import type { SpecReviewReading } from '../board/spec-review.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

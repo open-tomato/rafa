@@ -133,8 +133,8 @@ import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
 import type { RoadmapSeams } from './spec-source-roadmap.js';
 import type { ResolvedSpec, SpecSourceResolution } from './spec-source.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { HopRecord } from '../next/hop-record.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
 import type { Place, Position } from '../project/position.js';
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

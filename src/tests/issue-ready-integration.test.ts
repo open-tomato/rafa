@@ -35,7 +35,7 @@
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
 import type { Prompter } from '../core/command/index.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -121,7 +121,7 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
@@ -142,7 +142,7 @@ import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';

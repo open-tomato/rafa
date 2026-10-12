@@ -51,7 +51,7 @@
  */
 import { spawnSync } from 'node:child_process';
 
-import { messageOf } from '../core/config/sections.js';
+import { messageOf } from '../config/config-sections.js';
 
 /** What one git command answered. Never a throw; see the module note. */
 export interface GitResult {

@@ -92,7 +92,7 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
 import type { RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { applyHorizonChange, EPIC_HORIZON_REFUSAL_EXIT, readHorizonChange } from '../../board/epic-horizon.js';
@@ -110,8 +110,8 @@ import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { plansDirAt } from '../../plan/plan-files.js';
-import { createGitRunner } from '../../pr/git.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';

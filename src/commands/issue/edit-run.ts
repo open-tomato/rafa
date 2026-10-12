@@ -93,8 +93,8 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EditKind, EditStateInput, EditStateReading } from '../../board/issue-edit-state.js';
 import type { BoardTrust, EditorLogin, EditorRefusal, TrustReading } from '../../board/trust.js';
 import type { RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { EditableIssue, IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -128,8 +128,8 @@ import {
 } from '../../board/trust.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
-import { createGitRunner } from '../../pr/git.js';
 
 import {
   issueName,

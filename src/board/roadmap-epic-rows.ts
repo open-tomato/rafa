@@ -133,7 +133,7 @@ import type { SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { messageOf } from '../core/config/sections.js';
 

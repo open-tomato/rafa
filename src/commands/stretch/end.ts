@@ -86,7 +86,7 @@
  */
 import type { StretchRecord } from './start.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { MergedPullRequest } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { PrSeams } from '../pr/pr-context.js';
@@ -99,8 +99,8 @@ import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
 import { CommandExit } from '../../core/command/index.js';
 import { configFilePath } from '../../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
-import { createGitRunner } from '../../pr/git.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';

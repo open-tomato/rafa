@@ -263,12 +263,12 @@ import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-sou
 import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardRelationshipMode } from '../core/config/sections.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Output } from '../ports/index.js';
-import type { GitRunner } from '../pr/git.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { createGitRunner } from '../core/git/index.js';
 import { activeOutput } from '../core/output/index.js';
-import { createGitRunner } from '../pr/git.js';
 import { normalizeRemote } from '../schema/project-id.js';
 
 import { createGhBoardLister } from './boards.js';

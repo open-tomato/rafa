@@ -84,8 +84,8 @@
  */
 import type { ConfigSetEdit } from '../../config-set.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { PidProbe } from '../../loop/sessions.js';
-import type { GitRunner } from '../../pr/git.js';
 import type { StretchFolderSeams } from '../../stretch/folder.js';
 import type { OperatorRole } from '../../stretch/launch.js';
 import type { OperatorsSeams } from '../../stretch/operators.js';
@@ -99,9 +99,9 @@ import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
 import { CommandExit } from '../../core/command/index.js';
 import { configFilePath } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../../core/git/index.js';
 import { readSessions } from '../../loop/sessions.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
-import { createGitRunner, gitSaid } from '../../pr/git.js';
 import {
   agentFilePath,
   defaultSeams,

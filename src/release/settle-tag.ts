@@ -69,7 +69,7 @@ import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { ReleaseTagMode } from '../core/config/sections.js';
 
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 
 import { pushSaid } from './settle-push.js';
 import { versionTag } from './version-tag.js';

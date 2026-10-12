@@ -46,9 +46,9 @@ import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 import { messageOf } from '../core/config/sections.js';
+import { createGitRunner } from '../core/git/index.js';
 import { activeOutput } from '../core/output/index.js';
 import { errorCode, isSessionId, runsDir } from '../loop/sessions.js';
-import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */

@@ -14,7 +14,7 @@
  * `main`.
  */
 import type { StretchEndSeams } from './end.js';
-import type { GitResult } from '../../pr/git.js';
+import type { GitResult } from '../../core/git/index.js';
 import type { PullRequestsAnswers } from '../../pr/pull-requests-double.js';
 import type { MergedPullRequest, PullRequestDraft, PullRequestSummary } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';

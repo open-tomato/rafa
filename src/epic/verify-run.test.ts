@@ -11,7 +11,7 @@
  */
 import type { CriterionCheck } from './verify-plan.js';
 import type { CheckAnswered, CheckResult, VerifyRunOptions, VerifyRunRan } from './verify-run.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { CapturedSession, CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
 
 import { spawnSync } from 'node:child_process';
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { SESSION_ID_FLAG } from '../start/dispatch.js';
 import { claudeArgs } from '../utils/claude.js';

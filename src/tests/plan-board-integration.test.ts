@@ -77,7 +77,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { EpicTickResult } from '../board/epic-tick.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import {

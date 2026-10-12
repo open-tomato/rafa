@@ -40,7 +40,7 @@
  * the blocker comment off the line (1), and telling the operator that the
  * task was blocked by its own report (1).
  */
-import type { CommitAttempt } from '../utils/commit.js';
+import type { CommitAttempt } from '../core/git/index.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

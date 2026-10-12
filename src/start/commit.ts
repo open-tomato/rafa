@@ -7,8 +7,8 @@
  * what the report holds the task back on ({@link readReportHolds}),
  * commits and marks through {@link commitFinishedTask}, and answers the
  * outcome the loop stores the report under. `start()` stops the run on
- * every outcome but `done`. The commit goes through `utils/commit.ts`
- * unless the `commit` seam names another runner.
+ * every outcome but `done`. The commit goes through
+ * `core/git/commit.ts` unless the `commit` seam names another runner.
  *
  * A session that left NEITHER a report the loop could read NOR a commit
  * is held rather than ticked, on one hold line per absence; either
@@ -22,14 +22,14 @@
  * lines through `info`, and a refused commit and what held a task
  * through `error`.
  */
+import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { ReportPresent } from '../report/parse.js';
-import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import { commitTaskWork } from '../core/git/index.js';
 import { activeOutput } from '../core/output/index.js';
 import { parseReport } from '../report/parse.js';
-import { commitTaskWork } from '../utils/commit.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 
@@ -263,7 +263,7 @@ function holdsAfterCommit(
  * `.rafa/plans/` edit, a `progress.txt` append or a `/tmp` capture changes no
  * tracked file and has still done what it was asked, and its report says
  * so; blocking it would stall a plan on its most ordinary shape. See
- * `utils/commit.ts` for the rest of that reasoning.
+ * `core/git/commit.ts` for the rest of that reasoning.
  *
  * The two absences TOGETHER are the shape neither of those answers.
  * `reported: false` beside a `nothing-to-commit` attempt is a session

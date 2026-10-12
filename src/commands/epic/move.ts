@@ -146,7 +146,7 @@ import type { BoardRelations, RelationWrite } from '../../board/relations/port.j
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { branchNameOf } from '../../board/epic-horizon.js';
@@ -164,7 +164,7 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
 import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';

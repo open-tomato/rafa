@@ -84,14 +84,14 @@ import type { ChangelogInsertPoint } from './changelog.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { FoldFragment } from './strategy.js';
 import type { ReleaseStrategy } from '../core/config/sections.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
+import { gitSaid } from '../core/git/index.js';
 import { errorCode } from '../loop/sessions.js';
-import { gitSaid } from '../pr/git.js';
 
 import { insertChangelogEntry } from './changelog.js';
 import { readFragmentTree } from './fragment-tree.js';

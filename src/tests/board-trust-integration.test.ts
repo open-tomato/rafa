@@ -55,7 +55,7 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SpecIssue } from '../board/issue.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { PullRequestComment } from '../pr/index.js';
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';

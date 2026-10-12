@@ -25,8 +25,8 @@
  * finished task's attempt made, so the loop's own commits never trip the
  * guard before the next dispatch or the next commit. An attempt that made no commit leaves
  * it where it was. A `committed` attempt whose sha git did not answer
- * (`utils/commit.ts` keeps that shape) cannot be told from a commit made
- * outside the loop, so it leaves the expectation where it was too, and
+ * (`core/git/commit.ts` keeps that shape) cannot be told from a commit
+ * made outside the loop, so it leaves the expectation where it was too, and
  * the next guard halts on it rather than guessing.
  *
  * ## The halt before a dispatch
@@ -92,7 +92,7 @@
  * restore line is printed for the operator to run.
  */
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
-import type { CommitAttempt } from '../utils/commit.js';
+import type { CommitAttempt } from '../core/git/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { CommandExit } from '../core/command/index.js';

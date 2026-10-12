@@ -221,8 +221,8 @@ import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT }
 import { parseTitle } from '../../bugs/title.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { plansDirAt } from '../../plan/plan-files.js';
-import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';

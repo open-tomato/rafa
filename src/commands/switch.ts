@@ -115,7 +115,7 @@ import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { RafaConfig } from '../core/config/index.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
@@ -131,7 +131,7 @@ import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';

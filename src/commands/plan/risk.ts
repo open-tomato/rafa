@@ -53,9 +53,9 @@ import { resolve } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { CommandExit } from '../../core/command/index.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { isFile, plural } from '../../plan/plan-files.js';
 import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
-import { createGitRunner } from '../../pr/git.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 
 import { expectAtMostOneArgument, readSwitch, requireProject, resolveProjectConfig } from './plan-files.js';

@@ -15,7 +15,7 @@ import type { Fragment } from './fragment.js';
 import type { SettlePrOutcome } from './settle-pr.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { PullRequestsAnswers, PullRequestsDouble } from '../pr/pull-requests-double.js';
 import type { PullRequestDetail, PullRequestDraft, PullRequestSummary } from '../pr/types.js';
 
@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

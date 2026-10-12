@@ -53,14 +53,14 @@
  * too, with the body's error as its `cause`, so neither is lost.
  */
 import type { BaseVersionOptions } from './version.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
-import { createGitRunner, gitSaid } from '../pr/git.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
 
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from './version.js';
 

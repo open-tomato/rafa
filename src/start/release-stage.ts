@@ -76,13 +76,13 @@
  *
  * `--only` is the default mode when paths are given and is spelled out
  * anyway, so the line says which of the two commit modes it means.
- * `--cleanup=whitespace` is spelled for the reason `utils/commit.ts`
- * spells it: a machine-wide `commit.cleanup=strip` would otherwise
- * delete a message line opening with a hash.
+ * `--cleanup=whitespace` is spelled for the reason
+ * `core/git/commit.ts` spells it: a machine-wide `commit.cleanup=strip`
+ * would otherwise delete a message line opening with a hash.
  *
- * The middle reading is the one place the `pr/git.ts` runner is thinner
- * than this module would like. `git diff --cached --quiet` uses its
- * exit code as an answer — 0 for nothing staged, 1 for something — and
+ * The middle reading is the one place the `core/git/git.ts` runner is
+ * thinner than this module would like. `git diff --cached --quiet` uses
+ * its exit code as an answer — 0 for nothing staged, 1 for something — and
  * {@link GitResult} carries `ok` and no status, so an exit 128 reads
  * here as "something is staged". That is the harmless direction: the
  * commit that follows fails on the same fault and reports what git

@@ -89,8 +89,8 @@ import type { PlanNames } from '../../board/roadmap-rows.js';
 import type { AdapterRegistry } from '../../core/adapters/index.js';
 import type { RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { DoctorRefsSeams } from '../doctor-refs.js';
 

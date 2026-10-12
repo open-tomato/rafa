@@ -199,7 +199,7 @@ import type { ReadinessGap } from './readiness.js';
 import type { BlockersReading } from './relations/port.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapLine, RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
 
 import { existsSync, readdirSync } from 'node:fs';

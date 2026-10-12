@@ -93,12 +93,12 @@ import type { BranchHolder, MergedRow, NotPushedRow, StaleRow } from './groups.j
 import type { PastHeadRead } from './past-head.js';
 import type { RunRow } from './runs.js';
 import type { WorktreeRow } from './worktrees.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { rmSync } from 'node:fs';
 
 import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
 import { heldReason as checkedOutReason } from './groups.js';

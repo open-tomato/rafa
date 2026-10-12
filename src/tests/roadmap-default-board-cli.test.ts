@@ -44,7 +44,7 @@ import { parseBoardListing } from '../board/roadmap-board.js';
 import { createPlanDirNames, readRoadmapRows } from '../board/roadmap-rows.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { renderRoadmapTable } from '../commands/issue/roadmap-table.js';
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

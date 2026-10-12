@@ -78,7 +78,7 @@
  */
 import type { Fragment } from './fragment.js';
 import type { ReleaseFileEdit, ReleasePrepared, ReleaseSettings } from './prepare.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';

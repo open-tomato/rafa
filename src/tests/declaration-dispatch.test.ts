@@ -146,9 +146,9 @@
  * pairs the default with such sources over the same roots.
  */
 import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
-import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import {

@@ -13,8 +13,8 @@
  * ```
  *
  * Each is callable on its own and none of them knows about the other
- * two: the git seam is {@link GitRunner} from `src/pr/git.ts`, the
- * level is whatever `./level.ts` resolved, and the write takes a path
+ * two: the git seam is {@link GitRunner} from `src/core/git/git.ts`,
+ * the level is whatever `./level.ts` resolved, and the write takes a path
  * and a string. So `./version.test.ts` drives the middle step from
  * literals, the first from a fake runner beside one real repository,
  * and the last in a temporary directory.
@@ -111,13 +111,13 @@
  * equal to the parse of the original. A candidate that fails either
  * check is skipped and the next pair tried.
  */
+import type { GitRunner } from '../core/git/index.js';
 import type { PlanReleaseLevel } from '../plan/parse.js';
-import type { GitRunner } from '../pr/git.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { messageOf } from '../core/config/sections.js';
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 
 /** The remote the base version is read from, unless a caller names another. */
 export const RELEASE_REMOTE = 'origin';

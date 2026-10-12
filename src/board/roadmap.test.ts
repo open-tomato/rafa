@@ -89,7 +89,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
 import type { ClaimsStaleAfter } from '../core/config/sections.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

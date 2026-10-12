@@ -214,7 +214,7 @@ export interface NextSources {
   readonly plans: PlansDir;
   /** The session records under `.rafa/runs/`, read at most once per answer. */
   readonly runs: () => readonly SessionRecord[];
-  /** git at the project root: the `pr` subject's seam (`src/pr/git.ts`). */
+  /** git at the project root: the git seam of core (`src/core/git/git.ts`). */
   readonly git: GitRunner;
   /** The pull request provider, resolved at the project root. */
   readonly pulls: PullRequests;

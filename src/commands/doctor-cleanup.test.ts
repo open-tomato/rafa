@@ -24,7 +24,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { CleanupCounts, CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { DoctorCleanupInput } from '../cleanup/settings.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { PullRequests } from '../pr/types.js';
 
 import { join } from 'node:path';

@@ -63,7 +63,7 @@
 import type { ChangelogNote } from './changelog.js';
 import type { ReleasePrepared, ReleaseSettings } from './prepare.js';
 import type { ReleaseVerificationContext } from './verify.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

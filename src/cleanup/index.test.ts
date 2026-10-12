@@ -7,8 +7,8 @@
  * the reading rather than assumed to.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';

@@ -22,8 +22,8 @@
  * Every case plants its tracker under this file's own temporary
  * directory; nothing here reads a real plan, the home or a real session.
  */
-import type { CommitAttempt, CommitOptions } from './commit.js';
 import type { TaskInfo } from './tracker.js';
+import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
 
 import {

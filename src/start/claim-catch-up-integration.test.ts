@@ -9,7 +9,7 @@
  *    `origin/main` and left unmerged: the worktree lacks the base's new
  *    commit and the branch tip is where it was.
  */
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

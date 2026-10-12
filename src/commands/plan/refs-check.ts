@@ -154,8 +154,8 @@ import { announceAcceptStaleRefs, enforceRefsGate, readAcceptRefsFlag, refsAccep
 import { readSpecSourceFlags } from '../../board/spec-source.js';
 import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
 import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../../core/git/index.js';
 import { activeOutput } from '../../core/output/index.js';
-import { createGitRunner, gitSaid } from '../../pr/git.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
 /** The `name` in `package.json` of a project root that is rafa itself. */

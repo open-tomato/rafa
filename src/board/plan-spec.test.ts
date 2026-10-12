@@ -170,8 +170,8 @@ import type { RefreshOffer } from './snapshot-settle.js';
 import type { BoardTrust } from './trust.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { Prompter } from '../core/command/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Output } from '../ports/index.js';
-import type { GitRunner } from '../pr/git.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

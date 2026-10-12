@@ -28,7 +28,7 @@ import type { SpecIssue, SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { RefsCell, RoadmapRefs, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapPullRequest, RoadmapSearch } from './roadmap.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

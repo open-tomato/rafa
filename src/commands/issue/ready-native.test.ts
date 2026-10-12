@@ -15,7 +15,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -20,7 +20,7 @@ import type { Fragment } from './fragment.js';
 import type { SettlePushOutcome } from './settle-push.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleSettings } from './settle.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';

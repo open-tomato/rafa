@@ -195,8 +195,8 @@ import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CommandExit } from '../core/command/index.js';
 import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../core/config/sections.js';
+import { createGitRunner } from '../core/git/index.js';
 import { activeOutput } from '../core/output/index.js';
-import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { planStubFromPath } from '../utils/plan-stamp.js';
 

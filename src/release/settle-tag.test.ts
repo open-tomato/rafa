@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';

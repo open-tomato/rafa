@@ -52,7 +52,7 @@
  */
 import type { ChangelogNote } from './changelog.js';
 import type { ReleasePreparationInput, ReleaseSettings } from './prepare.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

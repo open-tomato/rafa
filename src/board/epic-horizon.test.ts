@@ -27,7 +27,7 @@ import type { EpicState } from './epics.js';
 import type { BoardComment, IssueBoard } from './issue-board.js';
 import type { BoardIssue } from './roadmap-board.js';
 import type { RoadmapPullRequest } from './roadmap.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { describe, expect, test } from 'bun:test';
 

@@ -5,8 +5,8 @@
  * from git itself rather than from this file's script.
  */
 import type { WorktreeRead, WorktreeRow, WorktreeSeams } from './worktrees.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
