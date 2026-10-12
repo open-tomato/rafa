@@ -16,7 +16,7 @@
  * list of mappings does.
  */
 
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type { Reader, Reading } from './core/config/sections.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
 

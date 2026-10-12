@@ -94,7 +94,7 @@ import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, FoundBranch } from './
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimState } from '../../claims/stale.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { ClaimsStaleAfter } from '../../core/config/sections.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';

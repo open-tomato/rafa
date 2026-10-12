@@ -53,7 +53,7 @@
  */
 import type { WrapUpLearning } from './wrap-up.js';
 import type { AdapterContext } from '../adapters/registry.js';
-import type { PrProvider } from '../config.js';
+import type { PrProvider } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { GitRunner } from '../pr/index.js';

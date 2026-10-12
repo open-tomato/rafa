@@ -58,11 +58,11 @@
  * directory.
  */
 import type { ProjectPart } from './init-board-project.js';
-import type { ConfigFile } from '../config.js';
+import type { ConfigFile } from '../core/config/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { configFilePath, parseConfigText } from '../config.js';
+import { configFilePath, parseConfigText } from '../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The setting this module writes, as a row and a refusal name it. */

@@ -115,7 +115,7 @@ import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
-import { CONFIG_FILE } from '../config-schema.js';
+import { CONFIG_FILE } from '../core/config/index.js';
 import { gitSaid } from '../pr/git.js';
 
 import { buildSettle, releaseCommitSubject } from './settle.js';

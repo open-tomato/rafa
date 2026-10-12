@@ -11,7 +11,7 @@
  * read off the module, so a module that renames a key or moves a
  * default fails rather than agreeing with itself.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 import { join } from 'node:path';
 
@@ -25,13 +25,13 @@ import {
   RETRIES_ON_CONTINUE_MAX,
   RETRIES_ON_CONTINUE_MIN,
 } from './config-schema-loop-continue.js';
-import { SETTINGS } from './config-schema.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
-} from './config.js';
+  SETTINGS,
+} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

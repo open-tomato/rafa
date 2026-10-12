@@ -86,7 +86,7 @@
 import type { SearchBlockIssue, SearchMatch } from './block.js';
 import type { RankedCandidate } from './rank.js';
 import type { ScratchCopy } from './scratch.js';
-import type { ClaudeSettingSource } from '../../config.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { EffortStore, SessionEffortRow } from '../../effort/store/types.js';
 import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
 import type { InventoryKind, InventoryRecord } from '../record.js';

@@ -51,7 +51,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
 import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

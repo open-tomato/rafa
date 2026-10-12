@@ -13,7 +13,7 @@
  * with that one thing put back.
  */
 import type { ModuleSettings } from './load.js';
-import type { ModuleSource } from '../config-items.js';
+import type { ModuleSource } from '../core/config/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../adapters/registry.js';
-import { parseConfigText, resolveConfig } from '../config.js';
+import { parseConfigText, resolveConfig } from '../core/config/index.js';
 
 import { loadInvocationModules, loadModules, moduleSettings } from './load.js';
 

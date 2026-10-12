@@ -66,7 +66,7 @@
  * Push and pull are async only to fill the port: each runs to its end
  * before it answers, and a throw is answered as a rejection.
  */
-import type { StoreBackend } from '../../config.js';
+import type { StoreBackend } from '../../core/config/sections.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '../../ports/index.js';
 import type { DevelopmentProbe } from '../store/development-build.js';
 import type { MergeOptions } from '../store/merge-store.js';

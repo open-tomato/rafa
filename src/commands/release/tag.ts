@@ -178,7 +178,7 @@ import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { changelogVersions, readTags } from '../../release/status-readings.js';

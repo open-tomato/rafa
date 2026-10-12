@@ -91,7 +91,7 @@
  */
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { GhProviderReading, MergeMethod, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -101,7 +101,7 @@ import { execFileSync } from 'node:child_process';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../../pr/index.js';
 import { mergeGuardSettings } from '../../release/guard-merge.js';

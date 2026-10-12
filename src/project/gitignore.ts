@@ -122,7 +122,7 @@
  * `print`, the active output's `warn` when none is given, read at each
  * notice as `config-load.ts` reads it. Nothing here reads the home.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

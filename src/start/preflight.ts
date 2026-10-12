@@ -291,10 +291,11 @@
  *
  * Every line goes through the active output (`adapters/output/active.ts`).
  */
-import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
+import type { PrerequisiteItem, RafaConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
@@ -321,7 +322,7 @@ import {
   unresolvedSkillLine,
 } from '../agents/roster.js';
 import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';

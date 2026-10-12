@@ -13,12 +13,12 @@
  * resolved config names. It takes the config already resolved, the
  * `config` field of what `loadConfig` and `resolveConfig` answer, and
  * never reads a `.rafa/config.yaml` itself. Resolution has one owner,
- * the config: `src/config.ts` ranks the command line over the project's
- * file over the user scope's over the default, and `src/config-load.ts`
- * is the only place that reads either file and warns about it. A
- * selector that loaded the config again would read the files a second
- * time, warn twice, and answer a file's backend over a flag its caller
- * had already ranked above it.
+ * the config: `src/core/config/config.ts` ranks the command line over
+ * the project's file over the user scope's over the default, and
+ * `src/config-load.ts` is the only place that reads either file and
+ * warns about it. A selector that loaded the config again would read
+ * the files a second time, warn twice, and answer a file's backend over
+ * a flag its caller had already ranked above it.
  *
  * Selecting touches nothing on disk. Both backends open without reading
  * or creating anything, so a store's first-run rules stay the backend's
@@ -38,9 +38,10 @@
  * The resolver refuses such a name already, so reaching this refusal
  * means a caller built its config by hand, and falling back would write
  * rows into a store other than the one it named: the silent success
- * `src/config.ts` refuses, for the same reason. The registry looks the
- * name up in a `Map` rather than by indexing an object, because an index
- * answers more than the registry holds. Measured before the registry,
+ * `src/core/config/config.ts` refuses, for the same reason. The
+ * registry looks the name up in a `Map` rather than by indexing an
+ * object, because an index answers more than the registry holds.
+ * Measured before the registry,
  * with this module's record of openers indexed in place of its `Map`,
  * `constructor` indexed it to `Object`, which called on the repo root
  * returns a string wrapper, so the selection threw nothing and handed
@@ -92,12 +93,12 @@
  * the SQLite one, so the entry needs Bun even to select NDJSON.
  */
 import type { EffortRowKind, EffortStore } from './types.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 
 export type { TrustedPermission } from '../../board/trust.js';
-export type { StoreBackend } from '../../config.js';
+export type { StoreBackend } from '../../core/config/sections.js';
 export type {
   MaterialisedWire,
   MaterialiseOptions,
@@ -127,7 +128,7 @@ export type {
 } from './types.js';
 
 export { TRUSTED_PERMISSIONS } from '../../board/trust.js';
-export { STORE_BACKENDS } from '../../config.js';
+export { STORE_BACKENDS } from '../../core/config/sections.js';
 export {
   decodeWirePayload,
   encodeWirePayload,

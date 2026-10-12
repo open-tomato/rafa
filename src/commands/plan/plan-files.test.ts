@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../../cli/command.js';
-import { CONFIG_DEFAULTS } from '../../config.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
 import {
   checkbox,
   countTasks,

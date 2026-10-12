@@ -23,7 +23,7 @@
  * printed: the session's own stdout reaches the operator through the
  * door's tee, and the caller (`./continue-run.ts`) says what was decided.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 
 import { randomUUID } from 'node:crypto';

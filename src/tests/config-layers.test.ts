@@ -41,9 +41,11 @@ import type {
   ConfigSetting,
   ConfigSource,
   RafaConfig,
+} from '../core/config/index.js';
+import type {
   RouteTarget,
   TierPin,
-} from '../config.js';
+} from '../core/config/sections.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,7 +55,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { loadConfig } from '../config-load.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
 import { setActiveStoreSettings } from '../effort/store/settings.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-config-layers-'));

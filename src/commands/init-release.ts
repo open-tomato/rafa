@@ -79,7 +79,7 @@ import type { ReleaseFileSettings } from '../release/enabled.js';
 
 import { writeFileSync } from 'node:fs';
 
-import { CONFIG_FILE, configFilePath } from '../config.js';
+import { CONFIG_FILE, configFilePath } from '../core/config/index.js';
 import { describeValue, messageOf, RELEASE_AUTO } from '../core/config/sections.js';
 import { resolveReleaseEnabled } from '../release/enabled.js';
 import {

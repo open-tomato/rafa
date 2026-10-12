@@ -83,7 +83,7 @@ import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { GitRunner } from '../../pr/index.js';
 
 import { holdsClaim } from '../../claims/device.js';

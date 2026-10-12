@@ -70,7 +70,7 @@
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
 import type { TrustReading } from '../board/trust.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/provider.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 

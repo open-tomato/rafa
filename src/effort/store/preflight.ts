@@ -108,7 +108,7 @@ import type { Database } from 'bun:sqlite';
 
 import { existsSync } from 'node:fs';
 
-import { PREREQUISITE_KINDS } from '../../config.js';
+import { PREREQUISITE_KINDS } from '../../core/config/index.js';
 
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';

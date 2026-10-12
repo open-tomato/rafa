@@ -43,7 +43,7 @@
  * `.rafa/` is gitignored whole, so the file is never tracked.
  */
 import type { WorktreeSeams } from '../cleanup/index.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { PidProbe, SessionState } from '../loop/sessions.js';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';

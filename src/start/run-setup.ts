@@ -42,9 +42,9 @@
  * switching the main checkout, so a line naming both asks for two
  * contradictory things and is refused before anything is read.
  */
-import type { RafaConfig } from '../config-schema.js';
 import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';

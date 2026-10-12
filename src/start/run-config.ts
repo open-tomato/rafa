@@ -26,7 +26,7 @@
  * (`adapters/output/active.ts`), at warn level.
  */
 import type { ConfigRoots } from '../config-load.js';
-import type { ConfigSource, ResolvedConfig } from '../config.js';
+import type { ConfigSource, ResolvedConfig } from '../core/config/index.js';
 import type { StoreEnvironment } from '../effort/store/location.js';
 import type { PlanIssue } from '../plan/index.js';
 

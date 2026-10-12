@@ -49,10 +49,10 @@
  * verifies or commits, and would leave the dirty tree the runner then
  * refuses to open a pull request over (`start/runner-pr.ts`).
  */
-import type { ClaudeSettingSource } from '../config.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { ReleasePreparation } from '../release/prepare.js';
 import type { CapturingSpawner } from '../utils/claude.js';

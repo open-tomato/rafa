@@ -97,7 +97,7 @@ import { dirname, join } from 'node:path';
 import { readRemoteHead } from '../../cleanup/branches.js';
 import { CommandExit } from '../../cli/command.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { configFilePath } from '../../config.js';
+import { configFilePath } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { readSessions } from '../../loop/sessions.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';

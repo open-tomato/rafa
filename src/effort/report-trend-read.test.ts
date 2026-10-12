@@ -16,7 +16,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
 import { plantProject, plantProjectConfig } from '../tests/cli-capture.js';
 import { parseTaskDeclaration, resolveDeclarationFlags } from '../utils/declaration.js';
 

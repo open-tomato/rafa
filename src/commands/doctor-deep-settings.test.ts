@@ -36,7 +36,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_FILE } from '../config.js';
+import { CONFIG_FILE } from '../core/config/index.js';
 import { buildInventory } from '../inventory/index.js';
 import { INSTALLED_PLUGINS_PATH, PLUGINS_RECORD_VERSION } from '../inventory/plugins.js';
 

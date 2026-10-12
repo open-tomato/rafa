@@ -21,7 +21,7 @@
  */
 import type { HubContactSeams } from './contact.js';
 import type { AdapterContext } from '../../adapters/registry.js';
-import type { ResolvedConfig } from '../../config.js';
+import type { ResolvedConfig } from '../../core/config/index.js';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,7 +33,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError, parseConfigText, resolveConfig } from '../../config.js';
+import { ConfigError, parseConfigText, resolveConfig } from '../../core/config/index.js';
 
 import {
   createHubContact,

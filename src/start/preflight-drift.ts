@@ -37,7 +37,7 @@
  */
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { DriftBranches } from '../claims/drift.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { readdirSync } from 'node:fs';
 

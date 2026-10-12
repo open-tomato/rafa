@@ -70,7 +70,7 @@
  * is absorbed — the rule `effort/store.ts` applies to its own files —
  * and anything at the path that cannot be read is refused.
  */
-import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
+import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './core/config/index.js';
 
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
@@ -78,7 +78,7 @@ import { isAbsolute } from 'node:path';
 import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { activeOutput } from './adapters/output/active.js';
 import { loggerSettingsOf } from './config-schema-logger.js';
-import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
+import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './core/config/index.js';
 import { describeValue, messageOf } from './core/config/sections.js';
 import { setActiveStoreSettings } from './effort/store/settings.js';
 

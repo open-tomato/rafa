@@ -11,20 +11,20 @@
  * module that renames a key or moves a default fails rather than
  * agreeing with itself.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
 import { globList, TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
-import { SETTINGS } from './config-schema.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
-} from './config.js';
+  SETTINGS,
+} from './core/config/index.js';
 import { flag } from './core/config/sections.js';
 
 /** The label every file case parses under. No file is read at it. */

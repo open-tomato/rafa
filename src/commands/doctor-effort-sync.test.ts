@@ -14,7 +14,7 @@
  * never made, and the cases that read one hold it absent after, so the
  * row is read as touching no disk.
  */
-import type { ResolvedConfig } from '../config.js';
+import type { ResolvedConfig } from '../core/config/index.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { PORT_VERSIONS } from '../adapters/registry.js';
-import { parseConfigText, resolveConfig } from '../config.js';
+import { parseConfigText, resolveConfig } from '../core/config/index.js';
 import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';
 

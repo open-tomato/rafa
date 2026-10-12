@@ -73,7 +73,7 @@
  * package imports the entry as `./plan/index.js`. `index.test.ts` pins
  * all three resolutions.
  */
-export type { InjectMode } from '../config.js';
+export type { InjectMode } from '../core/config/sections.js';
 export type {
   MalformedPrerequisite,
   MarkdownPrerequisite,
@@ -134,7 +134,7 @@ export type {
   PlanTaskStatus,
 } from './parse.js';
 
-export { INJECT_MODES } from '../config.js';
+export { INJECT_MODES } from '../core/config/sections.js';
 export {
   loadPlanPrerequisites,
   mergePlanPrerequisites,

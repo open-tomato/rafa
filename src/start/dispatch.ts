@@ -90,13 +90,12 @@
  * text, prints the halt, and the dispatch answers
  * {@link TaskDispatch.halted} with no session spawned.
  */
-import type { ClaudeSettingSource, InjectMode } from '../config.js';
 import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
 import type { AdapterRegistry } from '../adapters/registry.js';
-import type { SkillResolverName } from '../core/config/sections.js';
+import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core/config/sections.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { PlanInjection } from '../plan/index.js';

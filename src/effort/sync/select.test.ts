@@ -30,7 +30,7 @@
  * failed all five test files under those paths at load, no case passing.
  */
 import type { AdapterContext, AnyAdapter } from '../../adapters/registry.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { Sync } from '../../ports/index.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
-import { parseConfigText, resolveConfig } from '../../config.js';
+import { parseConfigText, resolveConfig } from '../../core/config/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import {

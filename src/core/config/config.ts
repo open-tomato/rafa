@@ -170,11 +170,12 @@ import type {
   ConfigExtra,
   Mapping,
   ValueAt,
-} from './core/config/sections.js';
+} from './config-sections.js';
 
 import { join } from 'node:path';
 
-import { hubUrlProblems } from './config-schema-hub.js';
+import { hubUrlProblems } from '../../config-schema-hub.js';
+
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -189,7 +190,7 @@ import {
   describeValue,
   isMapping,
   messageOf,
-} from './core/config/sections.js';
+} from './config-sections.js';
 
 export type {
   CommandLineSetting,
@@ -197,7 +198,7 @@ export type {
   RafaConfig,
 } from './config-schema.js';
 export { CONFIG_DEFAULTS, CONFIG_FILE } from './config-schema.js';
-export type { HubContext, HubTimeout } from './config-schema-hub.js';
+export type { HubContext, HubTimeout } from '../../config-schema-hub.js';
 export type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -216,7 +217,7 @@ export type {
   SyncStrategy,
   TierPin,
   TierSwitch,
-} from './core/config/sections.js';
+} from './config-sections.js';
 export {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -228,7 +229,7 @@ export {
   RELEASE_AUTO,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './core/config/sections.js';
+} from './config-sections.js';
 export type {
   ModuleSource,
   ModuleSourceKind,

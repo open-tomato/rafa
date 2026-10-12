@@ -135,7 +135,7 @@ import type { UncheckedCriterion } from '../../board/epic-trail.js';
 import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { EpicCost } from '../../effort/epic-cost.js';
 import type { FindingsWriterSeams } from '../../effort/store/findings.js';
 import type { EffortStore } from '../../effort/store/types.js';

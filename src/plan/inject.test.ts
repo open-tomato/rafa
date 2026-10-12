@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { INJECT_MODES } from '../config.js';
+import { INJECT_MODES } from '../core/config/sections.js';
 import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import { renderInjection } from './inject.js';

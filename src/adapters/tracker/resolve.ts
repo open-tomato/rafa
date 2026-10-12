@@ -100,7 +100,7 @@
  *     {@link ResolveTrackerOptions}. The resolution and its attempts are
  *     frozen, as the trackers are.
  */
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { PreflightResult, Tracker, TrackerKind } from '../../ports/index.js';
 import type { AdapterContext, AdapterRegistry } from '../registry.js';
 

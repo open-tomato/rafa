@@ -11,9 +11,10 @@
  * `config.ts` stays under the size cap.
  *
  * The file is `config-sections.ts` and not `config/index.ts` on purpose.
- * From `src/`, `./config.js` resolves to `src/config.ts`, and a
- * `src/config/` directory beside it would set the trap
- * `context/source.md` records for `./plan`.
+ * While both sat in `src/`, `./config.js` resolved to `src/config.ts`
+ * (now `src/core/config/config.ts`), and a `src/config/` directory
+ * beside it would have set the trap `context/source.md` records for
+ * `./plan`.
  *
  * ## What a reader answers
  *

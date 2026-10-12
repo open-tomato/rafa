@@ -92,7 +92,7 @@
  * space there, so the line stays one line.
  */
 import type { PreflightItems } from './prerequisites-md.js';
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../core/config/sections.js';

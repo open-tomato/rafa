@@ -100,10 +100,10 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
  */
+import type { RunSession } from './session.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../config.js';
-import type { RunSession } from './session.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type {
   CheckRow,
   PrProviderReading,
@@ -120,7 +120,7 @@ import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
 import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import {
   compareUrl,

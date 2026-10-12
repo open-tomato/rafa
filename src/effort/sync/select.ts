@@ -61,13 +61,13 @@
  * child `bun` and resolves `sync/local` there.
  */
 import type { AdapterContext, AdapterRegistry } from '../../adapters/registry.js';
-import type { RafaConfig, SyncStrategy } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { SyncStrategy } from '../../core/config/sections.js';
 import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { hubContextOf } from '../../config-schema-hub.js';
-import { SYNC_STRATEGIES } from '../../config.js';
-import { describeValue } from '../../core/config/sections.js';
+import { describeValue, SYNC_STRATEGIES } from '../../core/config/sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync';

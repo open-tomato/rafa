@@ -114,7 +114,7 @@ import type { EpicRelations, Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { GitRunner } from '../pr/git.js';
 import type { Place, Position } from '../project/position.js';
 

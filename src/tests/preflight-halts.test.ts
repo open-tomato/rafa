@@ -36,7 +36,7 @@
  * probe logs the directory it ran in, so the append order of one log
  * file is the order the fork ran them in.
  */
-import type { PrerequisiteItem } from '../config.js';
+import type { PrerequisiteItem } from '../core/config/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { PreflightTiers } from '../preflight/run.js';
 
@@ -59,7 +59,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { resolveConfig } from '../config.js';
+import { resolveConfig } from '../core/config/index.js';
 import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';

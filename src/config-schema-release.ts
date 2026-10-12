@@ -131,7 +131,7 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type {
   MergeMethod,
   PrProvider,

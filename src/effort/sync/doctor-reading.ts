@@ -41,7 +41,7 @@
  * itself never says it twice.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
-import type { ResolvedConfig } from '../../config.js';
+import type { ResolvedConfig } from '../../core/config/index.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';

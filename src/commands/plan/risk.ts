@@ -43,7 +43,7 @@
  * than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { AccountSeams } from '../../plan/risk/accounts.js';
 import type { RiskFinding, RiskReport } from '../../plan/risk.js';
 import type { ProjectFound } from '../../project/scope.js';

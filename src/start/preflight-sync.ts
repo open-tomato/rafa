@@ -34,7 +34,7 @@
  *
  * That is `preflight-sync.test.ts`'s reading, its long line wrapped here.
  */
-import type { ResolvedConfig } from '../config.js';
+import type { ResolvedConfig } from '../core/config/index.js';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
 
 import { CommandExit } from '../cli/command.js';

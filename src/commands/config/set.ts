@@ -43,7 +43,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 import { CommandExit } from '../../cli/command.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { configFilePath } from '../../config.js';
+import { configFilePath } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { expectOneArgument, requireProject } from '../plan/plan-files.js';
 

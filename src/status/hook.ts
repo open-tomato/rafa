@@ -45,7 +45,7 @@
 import type { SeenConfig, SeenInput, SeenReading, SeenSnapshot } from './seen.js';
 import type { CommandHook } from '../cli/dispatch.js';
 import type { CommandRoute } from '../cli/route.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { loadConfig } from '../config-load.js';

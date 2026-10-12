@@ -90,7 +90,7 @@ import { VENDOR_COMMAND } from '../../agents/roster.js';
 import { pathDirectories } from '../../check/references.js';
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { buildInventory } from '../../inventory/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';

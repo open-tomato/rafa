@@ -145,7 +145,7 @@
  * `rafa loop start --plan=` takes them against the root.
  */
 import type { SpecReviewReading } from '../../board/spec-review.js';
-import type { ClaudeSettingSource } from '../../config.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
 import type { CapturingSpawner } from '../../utils/claude.js';
 

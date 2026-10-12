@@ -85,11 +85,10 @@
  * so none is answered by the prototype, and the manifest reads every key
  * as data (`manifest.ts`).
  */
+import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
 import type { AdapterRegistry, AnyAdapter } from '../adapters/registry.js';
 import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
-import type { ModuleSource } from '../config-items.js';
-import type { ResolvedConfig } from '../config.js';
-import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
+import type { ModuleSource, ResolvedConfig } from '../core/config/index.js';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -97,7 +96,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { importModuleEntry } from '../cli/modules.js';
 import { loadConfig } from '../config-load.js';
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 

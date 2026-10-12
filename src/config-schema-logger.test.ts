@@ -7,7 +7,7 @@
  * refusal sits beside an accepting control, and every key and message is
  * SPELLED, never read off the module.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +18,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { activeLoggerSettings, setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { loadConfig } from './config-load.js';
 import { loggerSettingsOf } from './config-schema-logger.js';
-import { CONFIG_DEFAULTS, SETTINGS } from './config-schema.js';
+import { CONFIG_DEFAULTS, SETTINGS } from './core/config/index.js';
 import { projectConfigText } from './project/scaffold.js';
 import { plantProject } from './tests/cli-capture.js';
 

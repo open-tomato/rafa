@@ -78,7 +78,7 @@ import type { SettleProjectRefresh } from './settle-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RefreshItems } from '../../board/project/add-issue.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { GitRunner, PullRequests } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { SettleDelivered, SettleTagOutcome } from '../../release/settle-tag.js';

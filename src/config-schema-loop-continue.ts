@@ -45,7 +45,7 @@
  * None is a `CommandLineSetting`: the flags that outrank a key for one
  * run (`--retry=<n>`) are read by `start/run-setup.ts`.
  */
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { join } from 'node:path';

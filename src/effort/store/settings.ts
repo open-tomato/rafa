@@ -22,7 +22,7 @@
  * case that sets a value sets `null` after it, or every file bun runs
  * later opens its stores with that case's timeout.
  */
-import { CONFIG_DEFAULTS } from '../../config-schema.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
 import {
   BUSY_TIMEOUT_MAX_MS,
   BUSY_TIMEOUT_MIN_MS,

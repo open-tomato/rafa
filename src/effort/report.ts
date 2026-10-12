@@ -179,7 +179,7 @@ import { homedir } from 'node:os';
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
 import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';

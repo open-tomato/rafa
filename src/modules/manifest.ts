@@ -86,13 +86,13 @@
  * {@link validateManifest} through {@link ManifestSeams}, so a case holds
  * a module against a version core does not run.
  */
-import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config-items.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
 import type { Reading, ValueAt } from '../core/config/sections.js';
 import type { PortType, PortVersions } from '../ports/index.js';
 
 import { version as RUNNING_VERSION } from '../../package.json';
 import { PORT_VERSIONS } from '../adapters/registry.js';
-import { optionalPrerequisite, requiredPrerequisite } from '../config-items.js';
+import { optionalPrerequisite, requiredPrerequisite } from '../core/config/index.js';
 import { describeValue, isMapping, listOf } from '../core/config/sections.js';
 
 /** The manifest version this module reads. */

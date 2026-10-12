@@ -72,10 +72,9 @@
  * itself reads back right. It is the control that makes a hand-written
  * line edit safe to write.
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
-import { knownKeysAbove, SECTIONS, SETTING_BY_KEY, SETTING_NAMES } from './config-schema.js';
-import { parseConfigText } from './config.js';
+import { knownKeysAbove, parseConfigText, SECTIONS, SETTING_BY_KEY, SETTING_NAMES } from './core/config/index.js';
 import { isMapping, messageOf } from './core/config/sections.js';
 
 /** The deepest key, in dotted parts, this edit sets. */

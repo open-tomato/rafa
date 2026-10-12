@@ -113,7 +113,7 @@
  * command. Every check runs whatever the ones before it answered.
  */
 import type { CriterionCheck } from './verify-plan.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { RafaBlock } from '../plan/blocks.js';
 import type { GitRunner } from '../pr/git.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';

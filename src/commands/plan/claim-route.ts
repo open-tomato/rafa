@@ -72,7 +72,7 @@ import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { AheadRequest } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { ClaimsAhead } from '../../core/config/sections.js';
 import type { Output } from '../../ports/index.js';
 

@@ -123,6 +123,7 @@
  * facts reads and the field writes print their phases where the command
  * renders them (`../board/project/progress.ts`).
  */
+import type { BoardStepResult } from './init-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
 import type { ProgressFeed } from '../board/project/progress.js';
@@ -130,8 +131,7 @@ import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-r
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { RafaConfig } from '../config.js';
-import type { BoardStepResult } from './init-board.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';

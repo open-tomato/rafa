@@ -146,7 +146,7 @@ import { fileURLToPath } from 'node:url';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { configFilePath } from '../config.js';
+import { configFilePath } from '../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';

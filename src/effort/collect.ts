@@ -164,7 +164,6 @@
  * `file` are not contacted. {@link collectEffort} makes no contact, so
  * a caller handing it a store syncs nothing.
  */
-import type { ResolvedConfig } from '../config.js';
 import type { SkillCollectSummary, SkillLog, SkillScope } from './collect-skills.js';
 import type {
   CommitLogOptions,
@@ -177,6 +176,7 @@ import type {
   SessionEffortRow,
   SessionMode,
 } from './store/types.js';
+import type { ResolvedConfig } from '../core/config/index.js';
 
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -185,7 +185,7 @@ import { resolve } from 'node:path';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';

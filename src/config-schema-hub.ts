@@ -67,8 +67,7 @@
  * adapter could reach; the refusal above keeps that from happening
  * under `service`.
  */
-import type { SettingSpec } from './config-schema.js';
-import type { ConfigSource } from './config.js';
+import type { ConfigSource, SettingSpec } from './core/config/index.js';
 import type { Reader, SyncStrategy } from './core/config/sections.js';
 
 import { describeValue, refused, text } from './core/config/sections.js';

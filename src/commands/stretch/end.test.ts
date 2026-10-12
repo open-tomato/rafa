@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { configFilePath } from '../../config.js';
+import { configFilePath } from '../../core/config/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { appendItem, itemsPath } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

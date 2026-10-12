@@ -68,7 +68,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { INJECT_MODES } from '../config.js';
+import { INJECT_MODES } from '../core/config/sections.js';
 import {
   loadPlanPrerequisites,
   mergePlanPrerequisites,

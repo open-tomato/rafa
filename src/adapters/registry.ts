@@ -106,10 +106,11 @@
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { ClaudeSettingSource, HubContext, StoreBackend } from '../config.js';
 import type { OutputStream } from './output/stream.js';
 import type { PlanPromptBuilder } from './planner/claude.js';
 import type { GhRunner } from './tracker/github.js';
+import type { HubContext } from '../core/config/index.js';
+import type { ClaudeSettingSource, StoreBackend } from '../core/config/sections.js';
 import type { SelectedEffortStore } from '../effort/store/index.js';
 import type {
   Learning,
@@ -125,8 +126,8 @@ import type { CapturingSpawner } from '../utils/claude.js';
 
 import { homedir } from 'node:os';
 
-import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
-import { describeValue } from '../core/config/sections.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { describeValue, STORE_BACKENDS } from '../core/config/sections.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
 import { createFileSync } from '../effort/sync/file.js';

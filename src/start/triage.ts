@@ -104,9 +104,9 @@
  * what was written, filed or commented on through `info`, and everything
  * that was not through `warn`.
  */
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RafaConfig } from '../config.js';
 import type { TaskDispatch } from './dispatch.js';
+import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
 import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';

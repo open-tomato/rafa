@@ -145,7 +145,7 @@
  * `reads no home definition unless the setting sources include user`
  * pairs the default with such sources over the same roots.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';

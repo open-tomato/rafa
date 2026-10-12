@@ -167,7 +167,7 @@ import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { Epic } from '../board/epics.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { BlockedTask } from '../loop/blocked-tasks.js';
 import type { PidProbe, SessionRecord } from '../loop/sessions.js';
 import type { NextOwnerGateOptions } from '../next/owner-gate.js';

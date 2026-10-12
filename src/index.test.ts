@@ -17,6 +17,17 @@
  * containment case, and one added to both reds the spelled list, so
  * neither grows the root unseen.
  *
+ * The first config module is read through its barrel,
+ * `src/core/config/index.ts`, the one path a file outside `src/core/`
+ * may import it by. The barrel is wider than the root: it also holds
+ * the schema's indexes and the item readers, which the tree reads and
+ * the package does not publish. Those twelve names are spelled under
+ * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
+ * name added to the barrel still reds it until the name is added to the
+ * root or to that list. The ten runtime names `config.ts` re-exports
+ * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
+ * other barrel, `sections.ts`, and are held by the spelled list alone.
+ *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
  * dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
@@ -116,26 +127,28 @@ import { TRUSTED_PERMISSIONS } from './board/trust.js';
 import { loadConfig, readConfigFile } from './config-load.js';
 import * as configLoadModule from './config-load.js';
 import {
+  CONFIG_DEFAULTS,
+  CONFIG_FILE,
+  ConfigError,
+  configFilePath,
+  MODULE_SOURCE_KINDS,
+  parseConfigText,
+  PREREQUISITE_KINDS,
+  resolveConfig,
+} from './core/config/index.js';
+import * as configBarrel from './core/config/index.js';
+import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
-  CONFIG_DEFAULTS,
-  CONFIG_FILE,
   CONFIG_VERSIONS,
-  ConfigError,
-  configFilePath,
   INJECT_MODES,
-  MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
-  parseConfigText,
   PR_PROVIDERS,
-  PREREQUISITE_KINDS,
   RELEASE_AUTO,
-  resolveConfig,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './config.js';
-import * as configModule from './config.js';
+} from './core/config/sections.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import {
@@ -356,6 +369,30 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
+/**
+ * The runtime names the config barrel holds and the root does not
+ * publish: the schema's indexes and the item readers.
+ */
+const CONFIG_BARREL_ONLY: readonly string[] = [
+  'MODULE_SOURCE_KEYS',
+  'OPTIONAL_ITEM_KEYS',
+  'REQUIRED_ITEM_KEYS',
+  'SECTIONS',
+  'SETTINGS',
+  'SETTING_BY_KEY',
+  'SETTING_NAMES',
+  'isCommandLineSetting',
+  'knownKeysAbove',
+  'moduleSource',
+  'optionalPrerequisite',
+  'requiredPrerequisite',
+];
+
+/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
+const configModule: Record<string, unknown> = Object.fromEntries(
+  Object.entries(configBarrel).filter(([name]) => !CONFIG_BARREL_ONLY.includes(name)),
+);
+
 /** The modules whose every runtime name the root also carries. */
 const CONTAINED: readonly (readonly [string, Record<string, unknown>])[] = [
   ['the ./plan entry', planEntry],
@@ -426,7 +463,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../plan/plan-files.js', ['formatCounts', 'issueLine', 'plural']],
     ['../../plan/store-rules.js', ['storeRuleLine']],
     ['../../plan/validate.js', ['validatePlan']],
@@ -446,7 +483,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../plan/needs.js', ['isUnmet', 'readPlanNeeds', 'readSpecNeeds']],
     ['../../plan/plan-files.js', ['isFile', 'plural']],
@@ -748,7 +785,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/dashboard.js', [
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../effort/dashboard-format.js', ['formatDashboard']],
     ['../../effort/dashboard.js', ['readDashboard']],
     ['../../effort/report-args.js', ['parseReportArgs']],
@@ -820,7 +857,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/module/list.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
@@ -836,7 +873,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../schema/tiers.js', ['SKILL_TIERS']],
@@ -871,7 +908,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/terminal.js', ['processTerminal', 'refuseWithoutTerminal']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../inventory/browse.js', ['browse']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
@@ -950,7 +987,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/release/status.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/attribution.js', ['planStubsFromFileNames', 'resolvePlanStub']],
     ['../../effort/store/changes.js', ['readPlanChanges']],
@@ -979,7 +1016,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/release/tag.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
     ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
     ['../../release/status-readings.js', ['changelogVersions', 'readTags']],
@@ -1216,7 +1253,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/config/set.js', [
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
+    ['../../core/config/index.js', ['configFilePath']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
@@ -1234,7 +1271,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cleanup/branches.js', ['readRemoteHead']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
+    ['../../core/config/index.js', ['configFilePath']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../loop/sessions.js', ['readSessions']],
     ['../../next/sources.js', ['DEFAULT_BASE_BRANCH']],
@@ -1289,7 +1326,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cleanup/branches.js', ['readRemoteHead']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
+    ['../../core/config/index.js', ['configFilePath']],
     ['../../core/config/sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../../next/sources.js', ['DEFAULT_BASE_BRANCH']],
     ['../../pr/git.js', ['createGitRunner']],
@@ -1380,7 +1417,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../config-load.js', ['loadConfig']],
-    ['../config.js', ['ConfigError', 'configFilePath']],
+    ['../core/config/index.js', ['ConfigError', 'configFilePath']],
     ['../core/config/sections.js', ['messageOf']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../project/bin-path.js', ['readBinPath']],
@@ -1408,7 +1445,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
     ['../config-load.js', ['loadConfig']],
-    ['../config.js', ['ConfigError']],
+    ['../core/config/index.js', ['ConfigError']],
     ['../core/config/sections.js', ['messageOf']],
     ['../effort/sync/doctor-reading.js', ['readDoctorEffortSync']],
     ['../plan/plan-files.js', ['isFile']],
@@ -1449,7 +1486,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/self-update.js', [
     ['../cli/command.js', ['CommandExit']],
     ['../config-load.js', ['loadConfig']],
-    ['../config-schema.js', ['SETTINGS']],
+    ['../core/config/index.js', ['SETTINGS']],
     ['../core/config/sections.js', ['messageOf']],
     ['../loop/sessions.js', ['isPidAlive', 'readSessions']],
     ['../project/bin-path.js', ['readBinPath']],
@@ -1568,6 +1605,15 @@ describe('the package root entry', () => {
 
     expect(names.length).toBeGreaterThan(0);
     expect(missing).toEqual([]);
+  });
+
+  it('leaves off the root exactly the config barrel names spelled as the barrel\'s alone', () => {
+    const onRoot: Record<string, unknown> = entry;
+    const offRoot = Object.keys(configBarrel)
+      .filter((name) => !(name in onRoot))
+      .sort();
+
+    expect(offRoot).toEqual([...CONFIG_BARREL_ONLY].sort());
   });
 });
 

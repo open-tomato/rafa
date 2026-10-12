@@ -130,7 +130,7 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { TableStyle } from '../issue/roadmap-table.js';
 

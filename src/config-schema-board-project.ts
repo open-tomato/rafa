@@ -63,7 +63,7 @@
  * gives in `config-schema-readings.ts`: every command that refreshes the
  * project must write it the same way, which one run's flag would split.
  */
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 
 import { refused } from './core/config/sections.js';

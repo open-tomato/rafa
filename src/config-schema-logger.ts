@@ -36,7 +36,7 @@
  * command line's say over what is written.
  */
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type { Reader } from './core/config/sections.js';
 import type { LogLevel } from './ports/index.js';
 

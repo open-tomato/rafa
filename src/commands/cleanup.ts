@@ -91,7 +91,7 @@ import type { RafaCommand, RafaContext } from '../cli/command.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { ProjectFound } from '../project/scope.js';
 

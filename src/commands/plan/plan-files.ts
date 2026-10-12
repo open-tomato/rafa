@@ -36,13 +36,13 @@
  * as set and the plan as absent.
  */
 import type { RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { PlansDir } from '../../plan/plan-files.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { plansDirAt } from '../../plan/plan-files.js';
 
 /**

@@ -27,8 +27,7 @@
  * module's own answer.
  */
 import type { AgentRoster, AgentRosterRoots } from './roster.js';
-import type { ClaudeSettingSource } from '../config.js';
-import type { TierPin } from '../core/config/sections.js';
+import type { ClaudeSettingSource, TierPin } from '../core/config/sections.js';
 import type { TierSettings } from '../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -39,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { withSourceHeader } from '../commands/agent/vendor.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import {

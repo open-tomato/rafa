@@ -103,7 +103,6 @@
  * (`adapters/output/active.ts`), as the rest of `loop start` does.
  */
 import type { CheckoutExpectation } from './checkout-guard.js';
-import type { ClaudeSettingSource, RafaConfig } from '../config.js';
 import type { PassedOverTask } from './loop-events.js';
 import type { RunnerPrInput, RunnerPrOpened } from './runner-pr.js';
 import type { SessionServing } from './serving.js';
@@ -111,6 +110,8 @@ import type { RunSession } from './session.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
 import type { WrapUpRetries } from '../config-schema-wrap-up.js';
+import type { RafaConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { PullRequestSummary } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';

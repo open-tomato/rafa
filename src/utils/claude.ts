@@ -181,7 +181,7 @@
  * level `warn`; in events mode nothing, since that output drops `warn`.
  */
 import type { RunningCommand } from '../cli/running.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { commandSpelling } from '../cli/command.js';

@@ -86,7 +86,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { pathDirectories } from '../../check/references.js';
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
 import { isFile, plural } from '../../plan/plan-files.js';

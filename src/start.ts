@@ -356,7 +356,7 @@
  * `interrupted`, no task is marked, and the run returns, its record
  * `stopped`, as it does when a pause's hold ends on the signal.
  */
-import type { ResolvedConfig } from './config.js';
+import type { ResolvedConfig } from './core/config/index.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { TaskHandout } from './start/handout.js';
@@ -370,7 +370,7 @@ import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
-import { ConfigError } from './config.js';
+import { ConfigError } from './core/config/index.js';
 import { messageOf } from './core/config/sections.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';

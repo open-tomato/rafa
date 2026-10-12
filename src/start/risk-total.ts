@@ -19,7 +19,7 @@
  * the run. The throw is written as a warning naming the plan and what
  * was thrown, and the run goes on to the notices.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { AccountSeams } from '../plan/risk/accounts.js';
 import type { Output } from '../ports/index.js';
 

@@ -110,7 +110,7 @@
  */
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -129,7 +129,7 @@ import {
 } from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { formatCounts, issueLine, plural } from '../../plan/plan-files.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';

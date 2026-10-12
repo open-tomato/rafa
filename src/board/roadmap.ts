@@ -143,7 +143,7 @@ import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { boardId, BRANCH_PREFIX } from './naming.js';

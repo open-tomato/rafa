@@ -121,21 +121,6 @@ import type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
 } from './config-items.js';
-import type { BoardProjectLimitSettings } from './config-schema-board-project.js';
-import type { ErrorsSettings } from './config-schema-errors.js';
-import type { HubSettings } from './config-schema-hub.js';
-import type { IssuesConfigSettings } from './config-schema-issues.js';
-import type { LoggerConfigSettings } from './config-schema-logger.js';
-import type { LoopContinueSettings } from './config-schema-loop-continue.js';
-import type { LoopRetriesSettings } from './config-schema-loop-retries.js';
-import type {
-  DangerousReleaseSettings,
-  PrSettings,
-  ReleaseSettings,
-} from './config-schema-release.js';
-import type { TestsSettings } from './config-schema-tests.js';
-import type { TriageSettings } from './config-schema-triage.js';
-import type { WrapUpSettings } from './config-schema-wrap-up.js';
 import type {
   BoardRelationshipMode,
   ClaimsAhead,
@@ -152,9 +137,47 @@ import type {
   SyncStrategy,
   TierPin,
   TierSwitch,
-} from './core/config/sections.js';
+} from './config-sections.js';
+import type { BoardProjectLimitSettings } from '../../config-schema-board-project.js';
+import type { ErrorsSettings } from '../../config-schema-errors.js';
+import type { HubSettings } from '../../config-schema-hub.js';
+import type { IssuesConfigSettings } from '../../config-schema-issues.js';
+import type { LoggerConfigSettings } from '../../config-schema-logger.js';
+import type { LoopContinueSettings } from '../../config-schema-loop-continue.js';
+import type { LoopRetriesSettings } from '../../config-schema-loop-retries.js';
+import type {
+  DangerousReleaseSettings,
+  PrSettings,
+  ReleaseSettings,
+} from '../../config-schema-release.js';
+import type { TestsSettings } from '../../config-schema-tests.js';
+import type { TriageSettings } from '../../config-schema-triage.js';
+import type { WrapUpSettings } from '../../config-schema-wrap-up.js';
 
 import { join } from 'node:path';
+
+import {
+  BOARD_PROJECT_LIMIT_DEFAULTS,
+  BOARD_PROJECT_LIMIT_SETTINGS,
+} from '../../config-schema-board-project.js';
+import { ERRORS_DEFAULTS, ERRORS_SETTINGS } from '../../config-schema-errors.js';
+import { HUB_DEFAULTS, HUB_SETTINGS } from '../../config-schema-hub.js';
+import { ISSUES_DEFAULTS, ISSUES_SETTINGS } from '../../config-schema-issues.js';
+import { LOGGER_DEFAULTS, LOGGER_SETTINGS } from '../../config-schema-logger.js';
+import { LOOP_CONTINUE_DEFAULTS, LOOP_CONTINUE_SETTINGS } from '../../config-schema-loop-continue.js';
+import { LOOP_RETRIES_DEFAULTS, LOOP_RETRIES_SETTINGS } from '../../config-schema-loop-retries.js';
+import {
+  DANGEROUS_RELEASE_DEFAULTS,
+  DANGEROUS_RELEASE_SETTINGS,
+  PR_DEFAULTS,
+  PR_SETTINGS,
+  RELEASE_DEFAULTS,
+  RELEASE_SETTINGS,
+} from '../../config-schema-release.js';
+import { TESTS_DEFAULTS, TESTS_SETTINGS } from '../../config-schema-tests.js';
+import { TRIAGE_DEFAULTS, TRIAGE_SETTINGS } from '../../config-schema-triage.js';
+import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from '../../config-schema-wrap-up.js';
+import { DEFAULT_ROUTING } from '../../tiers/routing.js';
 
 import {
   MODULE_SOURCE_KEYS,
@@ -165,26 +188,11 @@ import {
   requiredPrerequisite,
 } from './config-items.js';
 import {
-  BOARD_PROJECT_LIMIT_DEFAULTS,
-  BOARD_PROJECT_LIMIT_SETTINGS,
-} from './config-schema-board-project.js';
-import { ERRORS_DEFAULTS, ERRORS_SETTINGS } from './config-schema-errors.js';
-import { HUB_DEFAULTS, HUB_SETTINGS } from './config-schema-hub.js';
-import { ISSUES_DEFAULTS, ISSUES_SETTINGS } from './config-schema-issues.js';
-import { LOGGER_DEFAULTS, LOGGER_SETTINGS } from './config-schema-logger.js';
-import { LOOP_CONTINUE_DEFAULTS, LOOP_CONTINUE_SETTINGS } from './config-schema-loop-continue.js';
-import { LOOP_RETRIES_DEFAULTS, LOOP_RETRIES_SETTINGS } from './config-schema-loop-retries.js';
-import {
-  DANGEROUS_RELEASE_DEFAULTS,
-  DANGEROUS_RELEASE_SETTINGS,
-  PR_DEFAULTS,
-  PR_SETTINGS,
-  RELEASE_DEFAULTS,
-  RELEASE_SETTINGS,
-} from './config-schema-release.js';
-import { TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
-import { TRIAGE_DEFAULTS, TRIAGE_SETTINGS } from './config-schema-triage.js';
-import { WRAP_UP_DEFAULTS, WRAP_UP_SETTINGS } from './config-schema-wrap-up.js';
+  directory,
+  routeTable,
+  tierPins,
+  trackerKind,
+} from './config-readers.js';
 import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -195,7 +203,6 @@ import {
   confidence,
   CONFIG_VERSIONS,
   dayCount,
-  directory,
   flag,
   githubLogin,
   INJECT_MODES,
@@ -207,17 +214,13 @@ import {
   projectNumber,
   projectUrl,
   recurrenceCount,
-  routeTable,
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,
   SYNC_STRATEGIES,
   text,
-  tierPins,
   tierSwitch,
-  trackerKind,
-} from './core/config/sections.js';
-import { DEFAULT_ROUTING } from './tiers/routing.js';
+} from './config-sections.js';
 
 /**
  * The config file, relative to the directory it sits under: the project

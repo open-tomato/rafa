@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { nodeStretchFs } from '../../stretch/folder.js';
 import { nodeOperatorsFs } from '../../stretch/operators.js';
 import { nodePromptFs } from '../../stretch/prompt.js';

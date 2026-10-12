@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { configFilePath } from '../config.js';
+import { configFilePath } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { gitIdentityEnv } from './git-identity.js';

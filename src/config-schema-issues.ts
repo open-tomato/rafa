@@ -40,7 +40,7 @@
  */
 import type { BugRules } from './bugs/record.js';
 import type { ErrorsSettings } from './config-schema-errors.js';
-import type { SettingSpec } from './config-schema.js';
+import type { SettingSpec } from './core/config/index.js';
 import type { Reader, Reading } from './core/config/sections.js';
 
 import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';

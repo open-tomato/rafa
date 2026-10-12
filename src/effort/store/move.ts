@@ -64,7 +64,7 @@ import type { EffortRow, EffortRowKind } from './types.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { configFilePath, parseConfigText } from '../../config.js';
+import { configFilePath, parseConfigText } from '../../core/config/index.js';
 import { isMapping, messageOf } from '../../core/config/sections.js';
 
 import { openNdjsonStore } from './ndjson.js';

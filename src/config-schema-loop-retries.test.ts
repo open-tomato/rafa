@@ -17,13 +17,13 @@ import {
   LOOP_RETRIES_MIN,
   loopRetries,
 } from './config-schema-loop-retries.js';
-import { SETTINGS } from './config-schema.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
-} from './config.js';
+  SETTINGS,
+} from './core/config/index.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

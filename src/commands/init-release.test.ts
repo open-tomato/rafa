@@ -49,7 +49,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,

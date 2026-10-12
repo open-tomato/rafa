@@ -18,7 +18,7 @@ import type { Dashboard } from '../../effort/dashboard.js';
 import { homedir } from 'node:os';
 
 import { CommandExit } from '../../cli/command.js';
-import { ConfigError } from '../../config.js';
+import { ConfigError } from '../../core/config/index.js';
 import { formatDashboard } from '../../effort/dashboard-format.js';
 import { readDashboard } from '../../effort/dashboard.js';
 import { parseReportArgs } from '../../effort/report-args.js';

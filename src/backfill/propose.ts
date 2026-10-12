@@ -106,7 +106,7 @@
  */
 import type { ProposalAnswer, ProposalCandidate } from './proposal-batch.js';
 import type { ProposalFile, ProposalNeed, ProposalRow } from './proposal-file.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

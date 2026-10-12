@@ -135,7 +135,7 @@ import type { CreatedIssue, IssueBoard } from '../../board/issue-board.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config-schema.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { LineFlags } from '../issue/issue-tracker.js';
 

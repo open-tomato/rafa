@@ -52,9 +52,9 @@
  * every one of them.
  */
 import type { PlanTask } from './parse.js';
-import type { ClaudeSettingSource } from '../config.js';
 import type { AccountSeams, AccountSettings } from './risk/accounts.js';
 import type { CommandFinding, PathSeams, RiskLevel } from './risk/commands.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 
 import { readFileSync } from 'node:fs';

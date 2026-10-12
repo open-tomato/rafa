@@ -7,7 +7,7 @@
  * ## The source cases
  *
  * `src/plan.ts`, `src/effort/collect.ts`, `src/effort/report.ts`,
- * `src/config.ts` and `src/config-load.ts` hold no
+ * `src/core/config/config.ts` and `src/config-load.ts` hold no
  * `console` member and no `process.exit` in their code, read with the
  * walk in `source-uses.ts`, whose control is `loop-output.test.ts`'s.
  * Each but `config.ts` calls `activeOutput()`; `config.ts` writes nothing,
@@ -80,7 +80,7 @@ const ROUTED_MODULES: readonly (readonly [string, boolean])[] = [
   ['plan.ts', true],
   ['effort/collect.ts', true],
   ['effort/report.ts', true],
-  ['config.ts', false],
+  ['core/config/config.ts', false],
   ['config-load.ts', true],
 ];
 

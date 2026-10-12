@@ -134,7 +134,7 @@ import type {
   OptionalPrerequisiteItem,
   PrerequisiteItem,
   RafaConfig,
-} from '../config.js';
+} from '../core/config/index.js';
 
 import { basename, dirname, join } from 'node:path';
 
