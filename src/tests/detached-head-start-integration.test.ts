@@ -3,7 +3,7 @@
  * `bun src/rafa.ts loop start` through `runRafa` in a scratch git
  * repository. `src/start/run-setup.test.ts` pins the refusal over the
  * functions; this proves the whole command refuses with a non-zero exit,
- * naming both ways on, before it creates a branch or opens a session
+ * naming the way on, before it creates a branch or opens a session
  * record under `.rafa/runs/`.
  */
 import type { ScratchRepo } from './cli-capture.js';
@@ -53,7 +53,7 @@ function plantDetachedScratch(): ScratchRepo {
 }
 
 describe('rafa loop start --create-branch on a detached HEAD', () => {
-  it('exits non-zero naming both ways on, creating no branch and no run record', () => {
+  it('exits non-zero naming the way on, creating no branch and no run record', () => {
     const scratch = plantDetachedScratch();
     const branchesBefore = git(scratch, 'branch', '--list', '--format=%(refname)');
 
@@ -61,8 +61,7 @@ describe('rafa loop start --create-branch on a detached HEAD', () => {
 
     expect(run.exitCode, describeRun(run, scratch)).not.toBe(0);
     expect(run.stderr).toContain('Refusing to run on a detached HEAD');
-    expect(run.stderr).toContain('git switch <base>');
-    expect(run.stderr).toContain('--as-worktree');
+    expect(run.stderr).toContain('git checkout -b');
     expect(git(scratch, 'branch', '--list', '--format=%(refname)')).toBe(branchesBefore);
     expect(git(scratch, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
     const runsDir = join(scratch.repo, '.rafa', 'runs');

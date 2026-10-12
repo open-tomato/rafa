@@ -178,6 +178,8 @@ function plant(): ScratchRepo {
   const base = currentBranch(scratch);
   git(scratch, scratch.repo, 'remote', 'add', 'origin', originPath);
   git(scratch, scratch.repo, 'push', '-q', '-u', 'origin', base);
+  // The run reads its base from origin/HEAD, which a bare clone-less remote add leaves unset.
+  git(scratch, scratch.repo, 'remote', 'set-head', 'origin', base);
 
   // A second branch, cut from the same seed, for the main checkout to
   // switch to mid-task — standing in for unrelated work happening in the
