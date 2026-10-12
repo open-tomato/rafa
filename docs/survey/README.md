@@ -49,7 +49,10 @@ not drifted from the current repository.
   `packages/*/src/` at commit 1e088cc, which the file names in full under `commit`. The mode writes this file alone
   and leaves `test-index.{json,md}` above as they are; it refuses to run when a tracked file in scope differs from
   `HEAD`. It is not one of the four maps, so `scripts/survey/maps.test.ts` does not check it. JSON: 2-space indent,
-  sorted keys, `commit`, `tests` keyed by path, `unindexed`.
+  sorted keys, `commit`, `tests` keyed by path, `unindexed`. It is read back by
+  `bun scripts/survey/test-index.ts --against=docs/survey/test-index.baseline.json`, which writes nothing and exits 1
+  naming each test file whose index rose: a test file `scripts/survey/core-moves.ts` moves is held under its old path,
+  `src/core/` counts as one folder, and the walk stops at a core barrel.
 
 ### Cluster contract traces
 
