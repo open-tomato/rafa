@@ -53,7 +53,7 @@ import type { CapturingSpawner } from '../utils/claude.js';
 
 import { posix } from 'node:path';
 
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
 import { activeOutput } from '../core/output/index.js';
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';

@@ -97,8 +97,8 @@
  *
  * Nine mutations of `plan.ts` were driven on 2026-09-14 over this file,
  * `src/adapters/planner/claude.test.ts` and
- * `src/adapters/registry.test.ts`, one run each, with 79 pass before and
- * after and the module restored byte-identical (sha256), and every one
+ * `src/core/adapters/registry.test.ts`, one run each, with 79 pass before
+ * and after and the module restored byte-identical (sha256), and every one
  * reddened at least one case. The command resolving core's registry in
  * place of the one handed over reddened the five cases that reach the
  * planner. The run's sources replaced, the resolved spec path handed over
@@ -302,7 +302,7 @@ const PROBE = [
   'import { join } from "node:path";',
   `import { parseSpecReview } from ${JSON.stringify(join(SRC_DIR, 'board', 'spec-review.ts'))};`,
   `import { ClaudePlannerError } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'planner', 'claude.ts'))};`,
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,

@@ -25,7 +25,7 @@
  * own, and a selection that is never used leaves no trace.
  *
  * The backend is the `store` adapter of that name in core's adapter
- * registry, `src/adapters/registry.ts`, which registers both backends
+ * registry, `src/core/adapters/registry.ts`, which registers both backends
  * from a record closed over the config's backend names. A name added to
  * `STORE_BACKENDS` therefore fails to compile there until a backend
  * opens it, rather than being accepted by the config and refused by the
@@ -95,7 +95,7 @@
 import type { EffortRowKind, EffortStore } from './types.js';
 import type { RafaConfig } from '../../core/config/index.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
 
 export type { TrustedPermission } from '../../board/trust.js';
 export type { StoreBackend } from '../../core/config/sections.js';

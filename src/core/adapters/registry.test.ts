@@ -122,11 +122,11 @@
  * case, the refusal of an add-on taking `local` over, and the refusal
  * naming the kinds held.
  */
-import type { DescribedInstinctRecord } from './learning/local.js';
 import type { AdapterContext, AnyAdapter } from './registry.js';
-import type { SessionEffortRow } from '../effort/store/types.js';
-import type { InstinctRecord, Sync, Tracker } from '../ports/index.js';
-import type { CapturingSpawner } from '../utils/claude.js';
+import type { DescribedInstinctRecord } from '../../adapters/learning/local.js';
+import type { SessionEffortRow } from '../../effort/store/types.js';
+import type { InstinctRecord, Sync, Tracker } from '../../ports/index.js';
+import type { CapturingSpawner } from '../../utils/claude.js';
 
 import {
   existsSync,
@@ -144,27 +144,27 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import ts from 'typescript';
 
-import { parseSpecReview } from '../board/spec-review.js';
-import { actionHash } from '../learning/index.js';
-import { scratchHomeEnv } from '../tests/scratch-home-env.js';
+import { draftFixture } from '../../adapters/tracker/contract.js';
+import { createFakeGh } from '../../adapters/tracker/github-fake.js';
+import { parseLocalIssue } from '../../adapters/tracker/local.js';
+import { parseSpecReview } from '../../board/spec-review.js';
+import { actionHash } from '../../learning/index.js';
+import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 
 import {
   CORE_ADAPTER_REGISTRY,
   createAdapterRegistry,
   PORT_VERSIONS,
 } from './registry.js';
-import { draftFixture } from './tracker/contract.js';
-import { createFakeGh } from './tracker/github-fake.js';
-import { parseLocalIssue } from './tracker/local.js';
 
 /** The repository root, whose tsconfig the compiler reads under. */
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** The registry itself, as a child process imports it. */
 const REGISTRY_ENTRY = fileURLToPath(new URL('./registry.ts', import.meta.url));
 
 /** The ports entry, whose literal version types the value is held to. */
-const PORTS_ENTRY = fileURLToPath(new URL('../ports/index.ts', import.meta.url));
+const PORTS_ENTRY = fileURLToPath(new URL('../../ports/index.ts', import.meta.url));
 
 /** The port types, in the order a refusal lists them. */
 const PORT_TYPES = 'tracker, store, learning, output, planner, sync, logger';

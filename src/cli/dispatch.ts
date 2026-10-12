@@ -234,7 +234,7 @@ import { homedir } from 'node:os';
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
 import { CommandExit , versionLine } from '../core/command/index.js';
 import { runWithActiveOutput } from '../core/output/index.js';
 import { resolveScope, ScopeError } from '../project/scope.js';

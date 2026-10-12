@@ -61,7 +61,7 @@ import type { CheckoutExpectation } from './checkout-guard.js';
 import type { DispatchGuard, TaskLearning, TaskReportStoreOptions, TaskSessionRunner } from './dispatch.js';
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
-import type { AdapterContext } from '../adapters/registry.js';
+import type { AdapterContext } from '../core/adapters/index.js';
 import type { TierPin } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
@@ -75,7 +75,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { renderLessonsSection, renderSkillsSection } from '../task/sections.js';

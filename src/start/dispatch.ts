@@ -94,7 +94,7 @@ import type { CheckoutExpectation, CheckoutGuardSeams } from './checkout-guard.j
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { TypeCheckRecipe } from './type-step.js';
-import type { AdapterRegistry } from '../adapters/registry.js';
+import type { AdapterRegistry } from '../core/adapters/index.js';
 import type { ClaudeSettingSource, InjectMode, SkillResolverName } from '../core/config/sections.js';
 import type { FindingOutcome } from '../effort/store/findings.js';
 import type { InstinctRecord } from '../learning/index.js';

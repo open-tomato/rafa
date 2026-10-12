@@ -47,7 +47,7 @@
  *     when no directory holds one, with {@link ScopeError},
  *     {@link scopeAt}, {@link initHint} and the filesystem seam the walk
  *     reads.
- *   - The whole adapter registry, `adapters/registry.ts`:
+ *   - The whole adapter registry, `core/adapters/registry.ts`:
  *     {@link createAdapterRegistry}, {@link CORE_ADAPTER_REGISTRY}, which
  *     holds core's own adapters keyed by port type and kind, and
  *     {@link PORT_VERSIONS}, the version core serves of each port.
@@ -120,7 +120,7 @@ export type {
   AdapterRegistry,
   AnyAdapter,
   PortImplementations,
-} from './adapters/registry.js';
+} from './core/adapters/index.js';
 export type { ConfigRoots } from './core/config/load.js';
 export type {
   CommandLineSetting,
@@ -251,7 +251,7 @@ export type {
   ScopeSeams,
 } from './project/scope.js';
 
-export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
+export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
 export { loadConfig, readConfigFile } from './core/config/load.js';
 export {
   CONFIG_DEFAULTS,

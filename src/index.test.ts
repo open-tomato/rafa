@@ -124,9 +124,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
-import * as registryModule from './adapters/registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
+import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
+import * as registryModule from './core/adapters/index.js';
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -954,7 +954,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/instinct/list.js', [
     ['../../adapters/learning/held.js', ['toHeldRecords']],
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
     ['../../core/command/index.js', ['CommandExit']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../learning/index.js', ['triggerKey']],
@@ -971,14 +971,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./instinct-records.js', ['findRecords', 'instinctProject']],
   ]],
   ['./commands/instinct/flag.js', [
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
     ['../../core/command/index.js', ['CommandExit']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['expectTwoArguments']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/instinct/promote.js', [
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
     ['../../core/command/index.js', ['CommandExit']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../learning/index.js', ['promotable']],

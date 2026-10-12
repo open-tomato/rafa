@@ -106,12 +106,10 @@
  * `local` tracker records is the one its own context named, and the
  * labels a `github` tracker remembers making are the ones it made itself.
  */
-import type { OutputStream } from './output/stream.js';
-import type { PlanPromptBuilder } from './planner/claude.js';
-import type { GhRunner } from './tracker/github.js';
-import type { HubContext } from '../core/config/index.js';
-import type { ClaudeSettingSource, StoreBackend } from '../core/config/sections.js';
-import type { SelectedEffortStore } from '../effort/store/index.js';
+import type { OutputStream } from '../../adapters/output/stream.js';
+import type { PlanPromptBuilder } from '../../adapters/planner/claude.js';
+import type { GhRunner } from '../../adapters/tracker/github.js';
+import type { SelectedEffortStore } from '../../effort/store/index.js';
 import type {
   Learning,
   Logger,
@@ -121,26 +119,27 @@ import type {
   PortVersions,
   Sync,
   Tracker,
-} from '../ports/index.js';
-import type { CapturingSpawner } from '../utils/claude.js';
+} from '../../ports/index.js';
+import type { CapturingSpawner } from '../../utils/claude.js';
+import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
+import type { HubContext } from '../config/config.js';
 
 import { homedir } from 'node:os';
 
-import { CONFIG_DEFAULTS } from '../core/config/index.js';
-import { describeValue, STORE_BACKENDS } from '../core/config/sections.js';
-import { openNdjsonStore } from '../effort/store/ndjson.js';
-import { openSqliteStore } from '../effort/store/sqlite.js';
-import { createFileSync } from '../effort/sync/file.js';
-import { createLocalSync } from '../effort/sync/select.js';
-
-import { createLocalLearning, localInstinctsDir } from './learning/local.js';
-import { createConsoleLogger } from './logger/console.js';
-import { createEventsOutput } from './output/events.js';
-import { createJsonOutput } from './output/json.js';
-import { createTextOutput } from './output/text.js';
-import { createClaudePlanner } from './planner/claude.js';
-import { createGhRunner, createGithubTracker } from './tracker/github.js';
-import { createLocalTracker, localIssuesDir } from './tracker/local.js';
+import { createLocalLearning, localInstinctsDir } from '../../adapters/learning/local.js';
+import { createConsoleLogger } from '../../adapters/logger/console.js';
+import { createEventsOutput } from '../../adapters/output/events.js';
+import { createJsonOutput } from '../../adapters/output/json.js';
+import { createTextOutput } from '../../adapters/output/text.js';
+import { createClaudePlanner } from '../../adapters/planner/claude.js';
+import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
+import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
+import { openNdjsonStore } from '../../effort/store/ndjson.js';
+import { openSqliteStore } from '../../effort/store/sqlite.js';
+import { createFileSync } from '../../effort/sync/file.js';
+import { createLocalSync } from '../../effort/sync/select.js';
+import { CONFIG_DEFAULTS } from '../config/config-schema.js';
+import { describeValue, STORE_BACKENDS } from '../config/config-sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'adapter registry';

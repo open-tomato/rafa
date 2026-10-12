@@ -41,8 +41,8 @@
  * failed in the copied entry's opener record (TS2741).
  *
  * The opener record and the name lookup then moved into the adapter
- * registry, `src/adapters/registry.ts`. Four of the readings above were
- * taken again there on 2026-09-14, one run each, with the suite at 27
+ * registry, `src/core/adapters/registry.ts`. Four of the readings above
+ * were taken again there on 2026-09-14, one run each, with the suite at 27
  * pass before and after and every module restored byte-identical. The
  * openers swapped in the registry's record reddened nine cases. The
  * registry's `find` indexing an object rather than its `Map` reddened the

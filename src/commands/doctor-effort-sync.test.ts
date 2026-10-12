@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { PORT_VERSIONS } from '../adapters/registry.js';
+import { PORT_VERSIONS } from '../core/adapters/index.js';
 import { parseConfigText, resolveConfig } from '../core/config/index.js';
 import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 import { MODULE_SYNC_STRATEGIES } from '../effort/sync/select.js';

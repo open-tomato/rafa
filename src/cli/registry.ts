@@ -55,8 +55,8 @@
  * ## A registry is a value
  *
  * {@link CommandRegistry.mount} answers a new registry and leaves the
- * one it was called on unchanged, as `src/adapters/registry.ts` does and
- * for its reason: bun runs every test file in one process. The lists a
+ * one it was called on unchanged, as `src/core/adapters/registry.ts` does
+ * and for its reason: bun runs every test file in one process. The lists a
  * registry answers are frozen copies of what it was handed.
  */
 import type { RafaCommand } from '../core/command/index.js';

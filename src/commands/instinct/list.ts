@@ -77,7 +77,7 @@ import type { Instinct, InstinctScope } from '../../schema/instinct.js';
 import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 
 import { toHeldRecords } from '../../adapters/learning/held.js';
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { triggerKey } from '../../learning/index.js';

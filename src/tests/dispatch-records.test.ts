@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../core/adapters/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { dispatchTask, storeTaskReport } from '../start/dispatch.js';

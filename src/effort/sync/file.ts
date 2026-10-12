@@ -59,7 +59,7 @@
  * The project's resolved `store` is handed in, never read here, for the
  * reason `mergeStore` gives: resolution has one owner, the config. Core
  * registers the strategy as `sync/file` in `CORE_ADAPTER_REGISTRY`
- * (`src/adapters/registry.ts`), whose `create` reads it off the
+ * (`src/core/adapters/registry.ts`), whose `create` reads it off the
  * context's `store` and refuses a context naming none: defaulting it to
  * `sqlite` would carry an NDJSON project's store without its sessions.
  *

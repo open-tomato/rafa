@@ -49,7 +49,7 @@ import type { Resolution } from '../tiers/resolve.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
 import { activeOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { SKILL_RESOLVER_BY_NAME } from '../task/resolve-skills.js';

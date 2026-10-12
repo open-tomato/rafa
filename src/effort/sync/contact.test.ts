@@ -20,7 +20,7 @@
  * holding the project config the helper reads.
  */
 import type { HubContactSeams } from './contact.js';
-import type { AdapterContext } from '../../adapters/registry.js';
+import type { AdapterContext } from '../../core/adapters/index.js';
 import type { ResolvedConfig } from '../../core/config/index.js';
 import type { Sync, SyncPullRequest, SyncPushRequest } from '../../ports/index.js';
 
@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { ConfigError, parseConfigText, resolveConfig } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 

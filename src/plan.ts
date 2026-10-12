@@ -213,12 +213,12 @@
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
-import type { AdapterRegistry } from './adapters/registry.js';
 import type { GhRunner } from './adapters/tracker/github.js';
 import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
+import type { AdapterRegistry } from './core/adapters/index.js';
 import type { RafaConfig } from './core/config/index.js';
 import type { RouteTarget } from './core/config/sections.js';
 import type { TierSettings } from './tiers/resolve.js';
@@ -229,7 +229,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { planFilePath } from './adapters/planner/claude.js';
-import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
@@ -240,6 +239,7 @@ import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
+import { CORE_ADAPTER_REGISTRY } from './core/adapters/index.js';
 import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';

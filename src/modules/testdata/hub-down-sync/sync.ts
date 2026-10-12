@@ -11,7 +11,7 @@
  * one. The error is a plain `Error` so renamed: a module imports no
  * value from core.
  */
-import type { AdapterContext } from '../../../adapters/registry.js';
+import type { AdapterContext } from '../../../core/adapters/index.js';
 import type { Sync } from '../../../ports/index.js';
 
 import { appendFileSync, mkdirSync } from 'node:fs';

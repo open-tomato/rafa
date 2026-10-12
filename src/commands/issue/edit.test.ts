@@ -22,9 +22,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
 import { renderUpdateBlock } from '../../board/issue-edit-body.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { requireEditingTracker } from './edit-run.js';

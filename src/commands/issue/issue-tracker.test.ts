@@ -29,8 +29,8 @@ import { join, sep } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
 import { createFakeGh } from '../../adapters/tracker/github-fake.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { CommandExit } from '../../core/command/index.js';
 import { configFilePath } from '../../core/config/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';

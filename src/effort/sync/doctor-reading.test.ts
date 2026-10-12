@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { parseConfigText, resolveConfig } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 

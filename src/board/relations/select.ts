@@ -3,7 +3,7 @@
  * shaped like `selectEffortStore` (`../../effort/store/index.ts`): a
  * module-local table keyed by mode, and a `TypeError` naming the modes
  * when the configured value is none of them, never a silent fall back to
- * `labels`. It registers no port type in `../../adapters/registry.ts`;
+ * `labels`. It registers no port type in `src/core/adapters/registry.ts`;
  * the table below is the only place a mode meets its adapter.
  *
  * Selecting makes the adapter and sends nothing: every `gh` call waits

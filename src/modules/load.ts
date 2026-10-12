@@ -86,15 +86,15 @@
  * as data (`manifest.ts`).
  */
 import type { ManifestSeams, ModuleFeatureType, ModuleManifest } from './manifest.js';
-import type { AdapterRegistry, AnyAdapter } from '../adapters/registry.js';
 import type { ModuleCommandEntry, ModuleImporter } from '../cli/modules.js';
+import type { AdapterRegistry, AnyAdapter } from '../core/adapters/index.js';
 import type { ModuleSource, ResolvedConfig } from '../core/config/index.js';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { importModuleEntry } from '../cli/modules.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';

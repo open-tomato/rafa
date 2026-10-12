@@ -80,7 +80,7 @@
  *     case and the relative-root refusal case.
  *
  * Six mutations of `claude.ts` were driven on 2026-09-19 over this file,
- * `src/adapters/registry.test.ts` and `src/ports/index.test.ts`, one at
+ * `src/core/adapters/registry.test.ts` and `src/ports/index.test.ts`, one at
  * a time, the module restored from a scratch copy and verified with
  * `shasum -c` after each. 108 pass and 0 fail either side, and each
  * count below is that run's own:
@@ -99,7 +99,7 @@
  *     gate put here rather than in `rafa plan`: 15 fail.
  *
  * Thirteen mutations of `claude.ts` were driven on 2026-09-14 over this
- * file, `src/adapters/registry.test.ts` and `src/plan.test.ts`, one run
+ * file, `src/core/adapters/registry.test.ts` and `src/plan.test.ts`, one run
  * each, with 79 pass before and after, the module restored byte-identical
  * (sha256), and a PATH on which no `claude` resolves. The plans directory
  * was `.plans/` then. Every one reddened at least one case:

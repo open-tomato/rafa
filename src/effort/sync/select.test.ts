@@ -15,12 +15,16 @@
  * that is never made, and each case that selects holds it absent after,
  * so selecting and the `local` strategy are read as touching no disk.
  *
- * The import cycle between this module and `src/adapters/registry.ts` is
+ * The import cycle between this module and
+ * `src/core/adapters/registry.ts` is
  * read in a child `bun` per import order, since this file has already
- * imported both by the time a case runs.
+ * imported both by the time a case runs. The registry's side is entered
+ * through its barrel, `src/core/adapters/index.ts`, as this module
+ * enters it.
  *
  * Three mutations were driven on 2026-09-29 over this file,
- * `src/adapters/registry.test.ts`, `src/tests/adapter-registry.test.ts`
+ * `src/core/adapters/registry.test.ts`,
+ * `src/tests/adapter-registry.test.ts`
  * and `src/modules/`, with `registry.ts` and `select.ts` restored and
  * verified with `sha256sum -c`. The `sync/local` entry removed reddened
  * sixteen cases, both import-order cases among them. The
@@ -29,7 +33,7 @@
  * them. `select.ts` reading `CORE_ADAPTER_REGISTRY` at its top level
  * failed all five test files under those paths at load, no case passing.
  */
-import type { AdapterContext, Adapter } from '../../adapters/registry.js';
+import type { AdapterContext, Adapter } from '../../core/adapters/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { Sync } from '../../ports/index.js';
 
@@ -40,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { parseConfigText, resolveConfig } from '../../core/config/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
@@ -300,7 +304,7 @@ describe('the lines a SyncModuleMissing names', () => {
 
 describe('the import cycle with the adapter registry', () => {
   const SELECT_ENTRY = fileURLToPath(new URL('./select.ts', import.meta.url));
-  const REGISTRY_ENTRY = fileURLToPath(new URL('../../adapters/registry.ts', import.meta.url));
+  const BARREL_ENTRY = fileURLToPath(new URL('../../core/adapters/index.ts', import.meta.url));
 
   /** Runs a child `bun` importing `first` before the other module, answering its exit code and stdout. */
   const importing = (first: string, second: string): { exitCode: number; stdout: string } => {
@@ -318,8 +322,8 @@ describe('the import cycle with the adapter registry', () => {
   };
 
   it.each([
-    ['select.ts', SELECT_ENTRY, REGISTRY_ENTRY],
-    ['registry.ts', REGISTRY_ENTRY, SELECT_ENTRY],
+    ['select.ts', SELECT_ENTRY, BARREL_ENTRY],
+    ['the adapters barrel', BARREL_ENTRY, SELECT_ENTRY],
   ])('resolves sync/local when %s is imported first', (_label, first, second) => {
     expect(importing(first, second)).toEqual({
       exitCode: 0,

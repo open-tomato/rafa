@@ -81,13 +81,13 @@
  * reading it is a fault, and is rethrown as the command's own read
  * would throw it.
  */
-import type { AdapterRegistry } from '../../adapters/registry.js';
+import type { AdapterRegistry } from '../../core/adapters/index.js';
 import type { ResolvedConfig } from '../../core/config/index.js';
 import type { ConfigRoots } from '../../core/config/load.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { describeValue, messageOf } from '../../core/config/sections.js';
