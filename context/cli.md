@@ -1499,7 +1499,7 @@ New; it replaces no earlier text. What a row or an action added to
   ranks one. `--all` searches skills as well, agents first, one session
   per kind. `--no-model` runs the ranking alone, prints it and stops: no
   session starts and no effort row is written. The command's `spends`
-  declaration is `unless --no-model`, so the spend guard refuses a
+  declaration is `unless --no-model`, so the spend guard warns about a
   session a run carrying that flag would start. Text mode prints, per
   kind, a heading, then each kept match with its quote and its `path:line`
   and the dropped line, or "not answerable from these files", or the
@@ -1642,7 +1642,7 @@ New; it replaces no earlier text. What a row or an action added to
   `--no-model` runs the ranking alone, prints it and stops: no session
   starts, no scratch copy is made and no effort row is written. The
   command's `spends` declaration is `unless --no-model`, so the spend
-  guard refuses a session a run carrying that flag would start. Text mode
+  guard warns about a session a run carrying that flag would start. Text mode
   prints, per kind, a heading naming the kind, the question and the
   project, then the kept matches with each quote and its `path:line` and
   the dropped line, or "not answerable from these files", or the numbered
@@ -2824,12 +2824,12 @@ session does:
 
 A command without a `spends` declaration declares nothing.
 
-The spend guard in `src/utils/claude.ts` refuses to start a session for a
-running command when its `spends` declaration does not cover the run. The
-running command is the one the dispatcher recorded with its parsed flags
+The spend guard in `src/utils/claude.ts` warns when the running command's
+`spends` declaration does not cover the session it starts, and starts the
+session anyway: usage is at most a warning, never a gate. The running
+command is the one the dispatcher recorded with its parsed flags
 (`src/cli/running.ts`), in the async scope of the invocation the session
-is started from, checked before `Bun.spawn` so a refused run starts no
-process:
+is started from, checked once per session before `Bun.spawn`:
 
 - A command declaring `always` or `through` covers every run.
 - A command declaring `with <flag>` covers only a run carrying that `flag`,
@@ -2842,11 +2842,19 @@ process:
 - A run with no recorded command, as for a caller that never went through
   the dispatcher, is not checked.
 
-A refusal throws `UndeclaredSpendError` (`src/utils/claude.ts`) with a
-message naming the command as typed after `rafa` and saying to declare
-`spends` on it, with the flag missing for a `with` form and present for an
-`unless` one. Thrown from a command's `run`, it ends the invocation as
-`command_error` with exit 1 (`src/cli/dispatch.ts`).
+The warning is one `warn` line, `⚠️  ` and then a sentence naming the
+command as typed after `rafa`, the session it started, and the fault: no
+`spends` at all, a `with` flag missing, or an `unless` flag present. It
+ends by saying to declare `spends` on the command to cover this run. It
+changes no exit code. In text mode it is a `warn:` line on stdout, the
+text output's one stream; in json mode a `log` event at level `warn`; in
+events mode nothing, since that output drops `warn`, so the watch line
+shows no warning. Refusing the session was rejected: a missing declaration
+is a gap in the command, and stopping a run for it cost three loop restarts
+in #863. A config key turning the refusal back on was rejected too, since
+usage is never a gate. Until 2026-10-07 the guard threw instead, and a
+command an earlier test file left recorded refused every later session in
+the same process (#863).
 
 ### Help
 

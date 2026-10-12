@@ -93,6 +93,8 @@
  * `config-schema-loop-retries.ts` for `loop.retries`,
  * `config-schema-loop-continue.ts` for a `--continue` key,
  * `config-schema-board-project.ts` for a `board.project` limit —
+ * its text and value for both the project and the user layer in
+ * `src/tests/config-layers.test.ts`,
  * its reader in `config-sections.ts`, one line in `config.ts`'s
  * layer literal and one commented line in `project/scaffold.ts`'s
  * template, which `scaffold.test.ts` holds it to, and nothing else
