@@ -20,7 +20,7 @@ import type { SuiteBaseline } from '../suite/baseline.js';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { stageStepScope } from '../suite/scope.js';
 
 import { takeRetakes } from './suite-retake-alone.js';

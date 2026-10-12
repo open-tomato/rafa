@@ -44,8 +44,8 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../../core/output/index.js';
 import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../logger/settings.js';
-import { setActiveOutput } from '../output/active.js';
 import { createTextOutput } from '../output/text.js';
 import { createAdapterRegistry } from '../registry.js';
 

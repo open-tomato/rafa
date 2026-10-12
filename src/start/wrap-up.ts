@@ -14,7 +14,7 @@
  * {@link runWrapUpSession}, handed this one's final message, and then by
  * the PR the runner opens itself (`start/wrap-up-run.ts`). The line naming
  * whether the session succeeded goes
- * through the active output (`adapters/output/active.ts`): `info` on
+ * through the active output (`core/output/active.ts`): `info` on
  * success, and `error` on a failure, which does not stop `start()`.
  * So does a warning for each rafa-tier winner the session is not
  * served, at `warn`.
@@ -53,8 +53,8 @@ import type { CapturingSpawner } from '../utils/claude.js';
 
 import { posix } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { activeOutput } from '../core/output/index.js';
 import { promotable } from '../learning/index.js';
 import { mechanicalConflictBullet } from '../pr/conflict-sentence.js';
 import { createGitRunner, ghPullRequestsIn } from '../pr/index.js';

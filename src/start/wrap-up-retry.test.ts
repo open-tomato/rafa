@@ -21,7 +21,7 @@ import type { CapturedSpawnOptions } from '../utils/claude.js';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

@@ -149,12 +149,12 @@ import { readFileSync } from 'node:fs';
 import path from 'path';
 
 import { version } from '../../../package.json';
-import { activeOutput } from '../../adapters/output/active.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { announceAcceptStaleRefs, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
 import { readSpecSourceFlags } from '../../board/spec-source.js';
 import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
 import { messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 import { createGitRunner, gitSaid } from '../../pr/git.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 

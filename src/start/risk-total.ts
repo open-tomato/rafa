@@ -25,8 +25,8 @@ import type { Output } from '../ports/index.js';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { activeOutput } from '../core/output/index.js';
 import { assessPlanRisk, riskTotalLine } from '../plan/risk.js';
 import { createGitRunner } from '../pr/git.js';
 

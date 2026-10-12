@@ -106,7 +106,7 @@
  * commands read about the run, while its work is the tracker's and the
  * store's, both written by then.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  * A run that is let through prints nothing here but the hop record's
  * warning above.
  */
@@ -125,9 +125,9 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { randomUUID } from 'node:crypto';
 import { relative } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {
   beginSession,

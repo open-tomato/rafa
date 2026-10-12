@@ -12,7 +12,7 @@ import type { PullRequestDetail } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

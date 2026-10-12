@@ -117,8 +117,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/parse.js';
 import { rejectedPath } from '../plan/plan-files.js';
 import { sinkOutput } from '../tests/output-sinks.js';

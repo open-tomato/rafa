@@ -30,15 +30,15 @@
  * body that cannot be written is one warning line and nothing more: the
  * pull request is a draft either way.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { PassedOverTask } from './loop-events.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { PullRequests } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';

@@ -24,7 +24,7 @@
  *      its deprecation lines when it has any and runs in an async scope
  *      of its own (see "The scope a command runs in"), with its
  *      context's output as the active output
- *      (`src/adapters/output/active.ts`) in the invocation's output mode,
+ *      (`src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
  *      flags (`running.ts`), for a reader below its `run` to ask; a help
@@ -234,9 +234,9 @@ import { homedir } from 'node:os';
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
-import { runWithActiveOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
 import { CommandExit , versionLine } from '../core/command/index.js';
+import { runWithActiveOutput } from '../core/output/index.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
 import { assembleContext } from './core/assembleContext.js';

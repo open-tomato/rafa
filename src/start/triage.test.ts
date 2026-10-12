@@ -79,9 +79,9 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { bugKeyOf, createPrivateTriageTracker, privateTriageDir } from '../triage/triage.js';

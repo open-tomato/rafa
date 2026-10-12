@@ -127,7 +127,7 @@
  * (errors outside any test, no summary), end the run with
  * {@link DECISION_STOP_EXIT} and a `halt` naming the count.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { FinishedTask } from './commit.js';
 import type { ContinueArgs } from './continue-args.js';
@@ -145,8 +145,8 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { heldOnNothingLeftBehind } from './commit.js';

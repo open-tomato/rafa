@@ -118,7 +118,7 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { commitFinishedTask, finishCleanExit, NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 import { findNextTask } from '../utils/tracker.js';
 

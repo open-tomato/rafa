@@ -97,8 +97,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { assumptionsHeading } from '../board/review-stamp.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
 import { sinkOutput } from '../tests/output-sinks.js';

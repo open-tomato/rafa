@@ -14,10 +14,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createEventsOutput } from '../adapters/output/events.js';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { createTextOutput } from '../adapters/output/text.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { runsDir } from '../loop/sessions.js';
 

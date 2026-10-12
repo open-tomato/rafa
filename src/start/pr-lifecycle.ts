@@ -78,7 +78,7 @@
  * same place only outside a worktree.
  *
  * What the gate tells the operator goes through the active output
- * (`adapters/output/active.ts`): the wait, each poll, a green verdict
+ * (`core/output/active.ts`): the wait, each poll, a green verdict
  * and a merged PR through `info`; a skipped check, a PR not found, a
  * deadline passed, a PR with no checks and a red one through `warn`; and
  * a failed repair session and the escalation through `error`. A repair
@@ -115,13 +115,13 @@ import type {
 } from '../pr/index.js';
 import type { ClaudeSpawner } from '../utils/claude.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
 import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import {
   compareUrl,
   createGitRunner,

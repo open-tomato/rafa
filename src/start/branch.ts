@@ -70,8 +70,8 @@ import type { BranchOffer, BranchPlan, BranchRoute, BranchStep, StandAsideReason
 import type { Prompter } from '../core/command/index.js';
 import type { GitRunner, WorkingTreeStatus } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit , createLinePrompter } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { createGitRunner, gitSaid, parseWorkingTree } from '../pr/index.js';
 
 import {

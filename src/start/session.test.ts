@@ -34,8 +34,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { readSessions, runsDir, sessionFilePath } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';

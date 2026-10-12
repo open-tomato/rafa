@@ -116,7 +116,7 @@
  * ## Json mode and the usage check
  *
  * The json-mode cases run the same kind of stand-in with a recording
- * output set as the active output in `json` (`adapters/output/active.ts`)
+ * output set as the active output in `json` (`core/output/active.ts`)
  * and the `process.stdout.write` spy still in place, so a byte reaching
  * stdout is a reading beside the lines the output was handed. The split
  * character is forced as above, the marker created by the output's first
@@ -175,8 +175,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { restoreRunningCommand, setRunningCommand } from '../cli/running.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

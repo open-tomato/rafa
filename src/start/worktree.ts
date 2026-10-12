@@ -124,8 +124,8 @@ import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
 import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { createGitRunner, gitSaid, parseWorktrees } from '../pr/index.js';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';

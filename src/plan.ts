@@ -63,7 +63,7 @@
  * is not the root still writes the file the adapter looks for (#171).
  *
  * The command writes every line the operator reads through the active
- * output (`adapters/output/active.ts`), at `info`, each message as
+ * output (`core/output/active.ts`), at `info`, each message as
  * `console.log` printed it in phase 0. It refuses by throwing
  * `CommandExit` (`core/command/command.ts`) and never by
  * `process.exit`, so the
@@ -228,7 +228,6 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { activeOutput } from './adapters/output/active.js';
 import { planFilePath } from './adapters/planner/claude.js';
 import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { createGhRunner } from './adapters/tracker/github.js';
@@ -244,6 +243,7 @@ import { enforceStoreRules } from './commands/plan/store-check.js';
 import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';
+import { activeOutput } from './core/output/index.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';

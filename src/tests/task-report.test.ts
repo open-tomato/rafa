@@ -135,7 +135,7 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { projectConfigText } from '../project/scaffold.js';

@@ -71,7 +71,7 @@
  * project it acts on, which behind the terminal is the nearest directory
  * at or above the working directory holding `.rafa/config.yaml`, and
  * prints what the command prints. Each writes through the active output
- * (`src/adapters/output/active.ts`), the `text` adapter on
+ * (`src/core/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
  * `process.exit`: a refusal throws `CommandExit`
  * (`src/core/command/command.ts`)

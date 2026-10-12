@@ -51,7 +51,7 @@ import type { CliEventLog, LogBindings, LogEntry, Logger, Output } from '../../p
 import { basename } from 'node:path';
 
 import { messageOf } from '../../core/config/sections.js';
-import { activeOutput, activeOutputMode } from '../output/active.js';
+import { activeOutput, activeOutputMode } from '../../core/output/index.js';
 
 import { exchangeLine, filterExchange, scrubUrls } from './api-filter.js';
 import { paint } from './colour.js';

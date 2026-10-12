@@ -31,9 +31,9 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { resolveRunDirs } from './checkout.js';

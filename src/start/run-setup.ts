@@ -33,7 +33,7 @@
  * record, so a refused run leaves nothing under `.rafa/runs/`.
  *
  * The guard's two warnings go through the active output
- * (`adapters/output/active.ts`), and its refusal is thrown as a
+ * (`core/output/active.ts`), and its refusal is thrown as a
  * `CommandExit` with exit code 1.
  *
  * {@link refuseWorktreeBesideCreateBranch} runs ahead of all of it, on
@@ -46,9 +46,9 @@ import type { BranchSeams } from './branch.js';
 import type { ContinueArgs } from './continue-args.js';
 import type { RafaConfig } from '../core/config/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { isLoopRetryCount } from '../config-schema-loop-retries.js';
 import { CommandExit } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 
 import { branchNameFor, detachedHeadRefusal, isDetachedHead, REMOTE } from './branch-decision.js';
 import { DEFAULT_BRANCH_SEAMS, offerRunBranch } from './branch.js';

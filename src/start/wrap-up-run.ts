@@ -100,7 +100,7 @@
  * precede the retries and the runner.
  *
  * Every line written here goes through the active output
- * (`adapters/output/active.ts`), as the rest of `loop start` does.
+ * (`core/output/active.ts`), as the rest of `loop start` does.
  */
 import type { CheckoutExpectation } from './checkout-guard.js';
 import type { PassedOverTask } from './loop-events.js';
@@ -114,11 +114,11 @@ import type { RafaConfig } from '../core/config/index.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { PullRequestSummary } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 

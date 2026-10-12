@@ -78,12 +78,12 @@
  * file bun runs later writes through that case's output, in that case's
  * mode.
  */
-import type { OutputMode } from '../../core/config/sections.js';
 import type { Output } from '../../ports/index.js';
+import type { OutputMode } from '../config/config-sections.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { createTextOutput } from './text.js';
+import { createTextOutput } from '../../adapters/output/text.js';
 
 /** An output and the mode it renders in, as one scope holds them. */
 interface ScopedOutput {

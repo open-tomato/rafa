@@ -45,11 +45,11 @@
  *
  * It replaces that scope's settings, and never the module-level value.
  * This is where the settings differ from the active output
- * (`../output/active.ts`), whose scope cannot be replaced from inside
- * it: the config naming the settings is loaded inside the run that
- * reads them, so the setter has to reach the run it is called in. The
- * scope therefore holds a cell, and a set swaps the frozen settings the
- * cell holds.
+ * (`src/core/output/active.ts`), whose scope cannot be replaced from
+ * inside it: the config naming the settings is loaded inside the run
+ * that reads them, so the setter has to reach the run it is called in.
+ * The scope therefore holds a cell, and a set swaps the frozen settings
+ * the cell holds.
  *
  * ## What reads outside the scope
  *

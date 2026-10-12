@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { eventsFileOf } from '../loop/events-file.js';
 import { readSession, runsDir, sessionFilePath } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';

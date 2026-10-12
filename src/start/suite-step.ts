@@ -215,7 +215,7 @@
  * the plan's `Owns:` folders through {@link SuiteStepContext.owns},
  * which {@link planOwnsReader} builds over a `gh` runner, reading them
  * at most once per run. Every line goes through the active output
- * (`adapters/output/active.ts`).
+ * (`core/output/active.ts`).
  *
  * ## Where the stage step lives
  *
@@ -255,8 +255,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { runsDir, updateSession } from '../loop/sessions.js';
 import { parsePlan } from '../plan/parse.js';
 import { createGitRunner, gitSaid } from '../pr/index.js';

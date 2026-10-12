@@ -34,7 +34,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { runsDir, sessionFilePath, updateSession } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

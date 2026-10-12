@@ -66,13 +66,13 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';

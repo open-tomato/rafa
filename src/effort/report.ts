@@ -176,10 +176,10 @@ import type { ConfigRoots } from '../core/config/load.js';
 
 import { homedir } from 'node:os';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';
@@ -724,7 +724,7 @@ function writeSkillsReport(plans: readonly string[] | null, json: boolean, repoR
  * `rafa effort report` — the command entry, over `repoRoot`, the project
  * root the dispatcher resolved (`src/commands/wrap.ts`).
  *
- * Writes through the active output (`adapters/output/active.ts`), in the
+ * Writes through the active output (`core/output/active.ts`), in the
  * mode the dispatcher set beside it. In json mode the report is the
  * command's result, the `data` of the invocation's terminal result event.
  * In text mode each table line goes at `info`, and `--json` writes the

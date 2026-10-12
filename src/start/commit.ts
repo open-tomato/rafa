@@ -18,7 +18,7 @@
  * that wait in place of the bare "no report".
  *
  * What the operator is told goes through the active output
- * (`adapters/output/active.ts`): the done, commit and nothing-to-commit
+ * (`core/output/active.ts`): the done, commit and nothing-to-commit
  * lines through `info`, and a refused commit and what held a task
  * through `error`.
  */
@@ -27,7 +27,7 @@ import type { ReportPresent } from '../report/parse.js';
 import type { CommitAttempt, CommitOptions } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { parseReport } from '../report/parse.js';
 import { commitTaskWork } from '../utils/commit.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';

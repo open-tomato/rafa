@@ -1,5 +1,5 @@
 /**
- * Tests for the process-wide active output (`src/adapters/output/active.ts`).
+ * Tests for the process-wide active output (`src/core/output/active.ts`).
  *
  * The default is read once, before any case sets an output, and each
  * case after is held against that reading. What the default writes is
@@ -49,7 +49,7 @@
  * the module-level output, and the same listener wrapped with
  * `AsyncResource.bind` where it is registered reads the scope's.
  */
-import type { OutputStream } from './stream.js';
+import type { OutputStream } from '../../adapters/output/stream.js';
 import type { Output } from '../../ports/index.js';
 
 import { AsyncResource } from 'node:async_hooks';
@@ -57,8 +57,9 @@ import { EventEmitter } from 'node:events';
 
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
+import { createJsonOutput } from '../../adapters/output/json.js';
+
 import { activeOutput, activeOutputMode, runWithActiveOutput, setActiveOutput } from './active.js';
-import { createJsonOutput } from './json.js';
 
 /** The output active when this file was loaded, before any case set one. */
 const DEFAULT_OUTPUT = activeOutput();

@@ -165,9 +165,9 @@ import type { RoadmapOutcome, RoadmapSeams, RoadmapStop, RoadmapWalk } from './s
 import type { AheadCandidate } from '../claims/ahead.js';
 import type { Output } from '../ports/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { nextUndoneLine } from '../claims/ahead.js';
 import { CommandExit } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 
 import {
   CLAIM_AHEAD_FLAG,

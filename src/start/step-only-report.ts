@@ -50,7 +50,7 @@
  *     no file the section is not written at all, not even its heading.
  *   - {@link announceRunStepOnly} prints the list at the run's end
  *     (`start.ts`, in the `finally` every way out passes), as warnings
- *     through the active output (`adapters/output/active.ts`), and
+ *     through the active output (`core/output/active.ts`), and
  *     prints nothing with no file.
  *
  * A pull request the runner opens itself (`start/runner-pr.ts`), after
@@ -59,7 +59,7 @@
  */
 import type { SessionStep, SessionStepKind, SessionStepOnly } from '../loop/sessions.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { readSession, sessionSteps } from '../loop/sessions.js';
 
 /** The heading the list goes under, in the prompt and in the pull request body. */

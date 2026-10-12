@@ -49,8 +49,8 @@ import type { Resolution } from '../tiers/resolve.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { activeOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { SKILL_RESOLVER_BY_NAME } from '../task/resolve-skills.js';
 import { selectLessons } from '../task/select-lessons.js';

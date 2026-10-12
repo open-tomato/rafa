@@ -43,9 +43,9 @@ import type { GeneratedPlan, Output } from '../../ports/index.js';
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
-import { activeOutput } from '../../adapters/output/active.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 import { isFile, plural, rejectedPath } from '../../plan/plan-files.js';
 import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';
 import { prerequisitesPathForPlan } from '../../preflight/prerequisites-md.js';

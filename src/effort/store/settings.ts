@@ -1,6 +1,6 @@
 /**
  * The settings every effort store open reads: one module-level value
- * with a setter, as `adapters/output/active.ts` holds the active
+ * with a setter, as `core/output/active.ts` holds the active
  * output, rather than an argument threaded through the dozen callers of
  * `withSqliteStore`, none of which has anything to say about locks.
  *

@@ -76,9 +76,9 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
 import { setActiveLoggerSettings } from '../../adapters/logger/settings.js';
-import { activeOutput } from '../../adapters/output/active.js';
 import { loggerSettingsOf } from '../../config-schema-logger.js';
 import { setActiveStoreSettings } from '../../effort/store/settings.js';
+import { activeOutput } from '../output/active.js';
 
 import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
@@ -142,7 +142,7 @@ function readUserConfigFile({ root, home }: ConfigRoots): ConfigFile | null {
 
 /**
  * The default warning sink: the active output's `warn`
- * (`adapters/output/active.ts`), read at each warning, so a command
+ * (`core/output/active.ts`), read at each warning, so a command
  * under the dispatcher warns through its invocation's output.
  */
 function printWarning(message: string): void {

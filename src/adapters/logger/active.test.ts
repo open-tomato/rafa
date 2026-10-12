@@ -11,8 +11,8 @@ import type { Logger } from '../../ports/index.js';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../../core/output/index.js';
 import { consoleHarness, keptOutput } from '../../tests/logger-harness.js';
-import { setActiveOutput } from '../output/active.js';
 
 import { activeLogger, restoreActiveLogger, runWithActiveLogger, setActiveLogger } from './active.js';
 import { DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from './settings.js';

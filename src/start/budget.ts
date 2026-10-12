@@ -46,7 +46,7 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { BUDGET_FLAG } from '../utils/declaration.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 

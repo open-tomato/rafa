@@ -290,7 +290,7 @@
  *       checked: it is probed on a first dispatch alone, and
  *       PLAN_TRACKER-demo.md already holds a ticked task
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
@@ -312,7 +312,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import {
   collidingPlanSkills,
   missingAgentLine,
@@ -325,6 +324,7 @@ import {
 import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';

@@ -40,8 +40,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { RELEASE_AUTO } from '../core/config/sections.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { writeChanges } from '../effort/store/changes.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests, createGitRunner } from '../pr/index.js';
@@ -248,7 +248,7 @@ const SYSTEM_PATH = ['/usr/bin', '/bin'].join(delimiter);
  * script it writes sits outside this repository's own tree.
  */
 const RELEASE_STAGE_MODULE = fileURLToPath(new URL('../start/release-stage.ts', import.meta.url));
-const OUTPUT_ACTIVE_MODULE = fileURLToPath(new URL('../adapters/output/active.ts', import.meta.url));
+const OUTPUT_ACTIVE_MODULE = fileURLToPath(new URL('../core/output/index.ts', import.meta.url));
 const OUTPUT_SINKS_MODULE = fileURLToPath(new URL('./output-sinks.ts', import.meta.url));
 
 /**

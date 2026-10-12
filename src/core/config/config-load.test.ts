@@ -64,9 +64,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { setActiveOutput } from '../../adapters/output/active.js';
 import { activeStoreSettings, setActiveStoreSettings } from '../../effort/store/settings.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
+import { setActiveOutput } from '../output/active.js';
 
 import { loadConfig, readConfigFile } from './config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from './config.js';

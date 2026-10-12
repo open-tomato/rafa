@@ -113,13 +113,13 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { PORT_VERSIONS } from '../adapters/registry.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
 import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';

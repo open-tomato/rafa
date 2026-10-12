@@ -69,7 +69,7 @@
  *
  * The session's `warn` lines are read off an output set at module
  * level, which is the one a caller outside every dispatch writes
- * through (`adapters/output/active.ts`). Its control was run on
+ * through (`core/output/active.ts`). Its control was run on
  * 2026-10-12: with `runAsRunningCommand` also leaving its record at
  * module level, this case alone of the four was red, its list holding
  * one line that named `rafa plan waits`, and `cli/running.ts` was
@@ -85,9 +85,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { claudeArgs, spawnClaude } from '../utils/claude.js';
 
 import { sinkOutput } from './output-sinks.js';

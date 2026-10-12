@@ -37,12 +37,12 @@
  * `task: null` that cannot be written is warned about the same way, and
  * the hold goes on.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { SessionState } from '../loop/sessions.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { readSession, updateSession } from '../loop/sessions.js';
 
 /** How long a held loop waits between two reads of its record. */

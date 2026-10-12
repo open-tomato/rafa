@@ -14,8 +14,8 @@ import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { homedir } from 'node:os';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit , createLinePrompter , RAFA_VERSION } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 
 import { offerNotices } from './notices.js';
 

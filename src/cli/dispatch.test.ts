@@ -108,9 +108,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
-import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
 import { CommandExit , versionLine } from '../core/command/index.js';
+import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
 import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 

@@ -275,7 +275,7 @@
  * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts`,
  * `start/continue-run.ts` and `start/forced-draft.ts` write goes
  * through the active output
- * (`adapters/output/active.ts`): what went to `console.log` through
+ * (`core/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
  * `error`, each message as it was. Under the dispatcher that is the
  * invocation's output, so json mode reads each as a `log` event.
@@ -369,10 +369,10 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { messageOf } from './core/config/sections.js';
+import { activeOutput } from './core/output/index.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';

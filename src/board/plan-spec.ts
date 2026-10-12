@@ -266,8 +266,8 @@ import type { BoardRelationshipMode } from '../core/config/sections.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { activeOutput } from '../core/output/index.js';
 import { createGitRunner } from '../pr/git.js';
 import { normalizeRemote } from '../schema/project-id.js';
 

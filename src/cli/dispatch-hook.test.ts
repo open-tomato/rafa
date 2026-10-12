@@ -40,8 +40,8 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { dispatch } from './dispatch.js';

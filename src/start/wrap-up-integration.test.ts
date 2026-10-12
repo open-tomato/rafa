@@ -34,9 +34,9 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 
 import { localInstinctsDir } from '../adapters/learning/local.js';
-import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { RELEASE_AUTO } from '../core/config/sections.js';
+import { activeOutput, setActiveOutput } from '../core/output/index.js';
 import { writeChanges } from '../effort/store/changes.js';
 import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';

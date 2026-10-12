@@ -108,7 +108,7 @@
  * ## What reaches the operator
  *
  * A session's stdout reaches the operator in the mode of the active
- * output (`adapters/output/active.ts`). In text mode it is the bytes the
+ * output (`core/output/active.ts`). In text mode it is the bytes the
  * session wrote, in the order it wrote them: {@link spawnClaude} inherits
  * the stream, and {@link spawnClaudeCaptured} writes each chunk to
  * `process.stdout` as it arrives. In json mode those bytes would put
@@ -183,9 +183,9 @@
 import type { RunningCommand } from '../cli/running.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { runningCommand } from '../cli/running.js';
 import { commandSpelling } from '../core/command/index.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 
 import { sessionSpawnEnv } from './session-env.js';
 
@@ -457,7 +457,7 @@ function writeWholeLines(text: string, write: (line: string) => void): string {
  * answers all of them decoded as one string.
  *
  * The mode is read once, before the first chunk, off the active output
- * (`adapters/output/active.ts`). In text mode each chunk is written to
+ * (`core/output/active.ts`). In text mode each chunk is written to
  * `process.stdout` as its bytes. In any other mode nothing is: each line
  * the decoded text completes goes to that output's `info`, which json
  * writes as an event and events drops, and what follows the last newline

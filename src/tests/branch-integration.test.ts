@@ -45,8 +45,8 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { createGitRunner } from '../pr/index.js';
 import { offerRunBranch } from '../start/branch.js';
 

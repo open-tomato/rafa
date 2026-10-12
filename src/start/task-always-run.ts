@@ -59,7 +59,7 @@
 import type { GitRunner } from '../pr/index.js';
 import type { JunitReading, SuiteFailure, SuiteResult } from '../suite/run.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { gitSaid } from '../pr/index.js';
 import { suitePathArgument } from '../suite/run.js';
 

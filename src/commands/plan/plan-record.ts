@@ -42,7 +42,7 @@
  * three records share it.
  *
  * Every line goes through the active output
- * (`adapters/output/active.ts`), as every line `plan create` prints
+ * (`core/output/active.ts`), as every line `plan create` prints
  * does, so `./plan-record.test.ts` reads the bytes of each message off
  * a sink.
  */
@@ -51,7 +51,6 @@ import type { PlanFieldStamp } from '../../board/plan-field.js';
 import fs from 'fs';
 import path from 'path';
 
-import { activeOutput } from '../../adapters/output/active.js';
 import { SKIP_REVIEW_FLAG } from '../../board/gate.js';
 import { issueFieldLine, stampPlanIssue } from '../../board/plan-field.js';
 import {
@@ -61,6 +60,7 @@ import {
   stampReviewSkipped,
 } from '../../board/review-stamp.js';
 import { messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 
 /**
  * Records one line in the generated plan's `rafa:plan` block, answering

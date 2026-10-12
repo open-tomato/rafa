@@ -11,7 +11,7 @@
  * `run` seam names another runner.
  *
  * What the operator is told goes through the active output
- * (`adapters/output/active.ts`): the task, its routing and what was
+ * (`core/output/active.ts`): the task, its routing and what was
  * stored through `info`; a declaration token dropped, a plan injection
  * that fell back, an overfull `progress.txt` and a stored report's
  * warnings through `warn`; and a store that could not be rendered or
@@ -110,7 +110,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { randomUUID } from 'crypto';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { writeDispatch } from '../effort/store/dispatches.js';
 import { renderInjection } from '../plan/index.js';
 import { reportLessons } from '../report/lessons.js';

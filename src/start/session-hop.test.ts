@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { readSession } from '../loop/sessions.js';
 import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
 import { hop, positionAt, rehome, writePositionFile } from '../project/position.js';

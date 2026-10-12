@@ -21,8 +21,8 @@ import type { Resolution } from '../tiers/resolve.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createAdapterRegistry, PORT_VERSIONS } from '../adapters/registry.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { resolveTiers } from '../tiers/resolve.js';
 import { parseTaskDeclaration } from '../utils/declaration.js';

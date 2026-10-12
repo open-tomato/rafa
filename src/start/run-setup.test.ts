@@ -40,8 +40,8 @@ import type { GitResult } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';

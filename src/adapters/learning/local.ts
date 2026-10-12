@@ -135,7 +135,7 @@
  *
  *   - A `.md` file the schema refuses, in either scope, is skipped and
  *     reported through `warn`, which defaults to the active output's
- *     `warn` (`src/adapters/output/active.ts`), read when the report is
+ *     `warn` (`src/core/output/active.ts`), read when the report is
  *     made. The other files are read, and a push never writes over it.
  *   - A flag line that cannot be read rejects the pull, naming the file
  *     and the line, because a bundle skipping it could hold an instinct
@@ -161,6 +161,7 @@ import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 import { actionHash, bless, merge, triggerKey } from '../../learning/index.js';
 import {
   INSTINCT_DOMAINS,
@@ -172,7 +173,6 @@ import {
 } from '../../schema/instinct.js';
 import { readScope } from '../../schema/scope-records.js';
 import { RAFA_INSTINCTS_PATH } from '../../schema/tiers.js';
-import { activeOutput } from '../output/active.js';
 
 import { toHeldInstinct, toHeldRecords } from './held.js';
 

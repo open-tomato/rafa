@@ -128,8 +128,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { describeValue, messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { HOP_FILE } from '../next/hop-record.js';
 
 import { POSITION_FILE } from './position.js';
@@ -371,7 +371,7 @@ export function exposureNotice(root: string): string {
 
 /**
  * The default notice sink: the active output's `warn`
- * (`adapters/output/active.ts`), read at each notice.
+ * (`core/output/active.ts`), read at each notice.
  */
 function printWarning(message: string): void {
   activeOutput().warn(message);

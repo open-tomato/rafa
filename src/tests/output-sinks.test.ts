@@ -10,7 +10,7 @@ import type { CliEvent } from '../ports/index.js';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { activeOutput, setActiveOutput } from '../adapters/output/active.js';
+import { activeOutput, setActiveOutput } from '../core/output/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

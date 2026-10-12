@@ -41,12 +41,12 @@ import type { RafaConfig } from '../core/config/index.js';
 
 import { readdirSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { errorCode, isSessionId, runsDir } from '../loop/sessions.js';
 import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';

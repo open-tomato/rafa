@@ -56,8 +56,8 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
