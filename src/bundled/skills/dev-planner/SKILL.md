@@ -537,7 +537,7 @@ When the spec adds or changes anything in `.rafa/effort/`:
 When planning work on rafa commands: every command that can start a Claude
 Code session must declare its `spends` field on its `RafaCommand` definition.
 The field tells the help system, `describe` output, and the spawn guard in
-`src/utils/claude.ts` what Claude usage the command declares. It is optional,
+`src/core/loop/claude.ts` what Claude usage the command declares. It is optional,
 and takes one of four shapes:
 
 - `{ when: 'always'; what: string }` — the command always starts a session
