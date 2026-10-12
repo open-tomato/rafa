@@ -56,7 +56,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, posix, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SRC_ROOT = join(REPO_ROOT, 'src');
@@ -181,7 +185,7 @@ describe('the labels baseline captures', () => {
     expect(() => execFileSync('bun', ['test', baseline], {
       cwd: REPO_ROOT,
       stdio: 'pipe',
-      timeout: 150_000,
+      timeout: SWEEP_TIMEOUT,
     })).not.toThrow();
-  }, 150_000);
+  }, SWEEP_TIMEOUT);
 });

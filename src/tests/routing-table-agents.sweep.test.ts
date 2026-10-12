@@ -123,7 +123,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PAGE_PATH = 'context/workflow.md';

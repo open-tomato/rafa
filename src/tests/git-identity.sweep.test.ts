@@ -1,6 +1,10 @@
 import { join, relative } from 'node:path';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setDefaultTimeout, test } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 const SWEEP_ROOTS = ['src', 'packages'];

@@ -36,12 +36,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
 import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
 import { listTrackedFiles } from '../../scripts/survey/files.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
