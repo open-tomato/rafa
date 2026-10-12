@@ -123,10 +123,10 @@ that a running loop may be using, so run `rafa loop list` and
 
 `rafa pr merge` refuses in three cases a suggestion can check first:
 
-- **Pull request into `main`.** A pull request into the base branch reports
-  the `verify` check. Merge by handing over `rafa pr wait <n>`, waiting for
-  the checks to pass or fail, then `rafa pr merge <n>`. Never use
-  `--skip-checks` on a PR into `main`.
+- **Pull request into `main` or `integration`.** A pull request into
+  either reports the `verify` check. Merge by handing over
+  `rafa pr wait <n>`, waiting for the checks to pass or fail, then
+  `rafa pr merge <n>`. Never use `--skip-checks` on either.
 - **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
   reports no check. Merge by handing over `rafa pr merge <n>
   --skip-checks`.
@@ -166,19 +166,24 @@ the hook may let the `gh` command through with a reason naming it. Before
 filing a new issue, search for existing gap reports:
 
 ```bash
-rafa issue list --module=cli-gap --search="<command> <flag>"
+rafa issue list --module=cli-gap --search="<action> <flag>"
 ```
 
 If nothing matches, ask once (this conversation) before filing a bug:
 
 ```bash
-rafa issue create --type=bug --module=cli-gap \
-  --title="<command> has no <flag or field>" --body="…"
+rafa issue create --type=bug --module=cli-gap --action="<action>" \
+  --summary="has no <flag or field>" --cause=cli:new-context \
+  --reproduce="<the gh line used in its place>" --body="…"
 ```
 
-Replace `<command>` with the rafa subject and action (e.g. `issue create`,
-`pr show`), and `<flag or field>` with the missing flag or JSON field name.
-In the body, describe what it does and why rafa needs it.
+Replace `<action>` with the rafa subject and action, without the word
+`rafa` (e.g. `issue create`, `pr show`), and `<flag or field>` with the
+missing flag or JSON field name. A bug is filed from its fields, so the
+line carries the four a bug needs: rafa renders the title from them, as
+`cli-gap - pr show: has no <field>`, and refuses a bug that leaves one
+out, naming it. In the body, describe what the flag or field does and why
+rafa needs it.
 
 ## The mappings
 

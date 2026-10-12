@@ -29,7 +29,7 @@
  * |---|---|
  * | another branch of the issue that keeps it taken, or is this device's or a takeover candidate | `refused`, naming the branch to plan on (`--stub`) |
  * | `feat/<stub>` absent | a claim commit pushed WITHOUT force; the remote's refusal is the compare-and-set |
- * | `feat/<stub>` held by this store, stale or not | `claimed` via `held`: nothing is pushed |
+ * | `feat/<stub>` held by this device, stale or not | `claimed` via `held`: nothing is pushed |
  * | `feat/<stub>` released, or a stale `rafa:claimed` claim | a take commit on its tip, pushed with the tip as lease |
  * | `feat/<stub>` held by another store, stale in development included | `refused` naming the owner |
  * | `feat/<stub>` with no claim commit, or unreadable | `refused`, owner null: taken as a branch always was |
@@ -41,6 +41,24 @@
  * (`weighBranchClaim`), with the labels the run read off the issue; a
  * run with no labels (`--spec`) weighs none, which reads as in
  * development and so never as a takeover candidate.
+ *
+ * ## Whose claim it is
+ *
+ * `holdsClaim` (`./device.ts`) decides whether a branch's claim is this
+ * device's: the holder is the store's id, or an id the store carried
+ * before its file got a new device or inode under the same host and
+ * path. Both readings above ask it. A `feat/<stub>` claimed under such
+ * a replaced id answers `claimed` via `held`, and nothing is pushed
+ * over it: bringing the branch to the store's id is `loop start`'s
+ * claim check. Another branch of the issue claimed under one refuses
+ * as this device's own, naming the stub to plan under. Either answer
+ * carries the store's own id, as `storeId` or as `owner` and in the
+ * reason, never the replaced one the claim was made under. "Another
+ * store" in the table is a holder that is neither.
+ *
+ * A local tip is pushed again as it stands only when it names the
+ * store's own id (see below), which stays an equality: a commit this
+ * run pushes never names a replaced id.
  *
  * ## The local branch
  *
@@ -93,7 +111,7 @@
  * labels the request read off C, and never `rafa:in-development`.
  */
 import type { AheadClaim, AheadRequest, AtomicClaimRef } from './ahead.js';
-import type { DeviceStoreId } from './device.js';
+import type { DeviceStoreId, DeviceStoreIds } from './device.js';
 import type { ClaimBranchReading } from './git.js';
 import type { IssueBoard } from '../board/issue-board.js';
 import type { ClaimsAhead, ClaimsStaleAfter } from '../config-sections.js';
@@ -106,6 +124,7 @@ import { gitSaid } from '../pr/index.js';
 import { BRANCH_PREFIX, branchNameFor, localRef, REMOTE } from '../start/branch-decision.js';
 
 import { aheadEnabled, aheadNotClaimed, pushClaimsAtomic, resolveAheadTarget } from './ahead.js';
+import { holdsClaim } from './device.js';
 import {
   claimBranchIssue,
   fetchClaimBranches,
@@ -190,7 +209,7 @@ export interface PlanClaimContext {
   readonly git: GitRunner;
   /** The board labels are written to, or null when it is not `gh`. */
   readonly board: IssueBoard | null;
-  /** This device's store id; `readDeviceStoreId` over the project. */
+  /** This device's store id and the ids that store replaced; `readDeviceStoreId` over the project. */
   readonly readStoreId: () => DeviceStoreId;
   /** `claims.staleAfter`. */
   readonly staleAfter: ClaimsStaleAfter;
@@ -204,7 +223,10 @@ export interface PlanClaimContext {
 interface Attempt {
   readonly issue: number;
   readonly branch: string;
+  /** The store's own id: the one a commit this attempt pushes names. */
   readonly storeId: string;
+  /** The ids the store carried before: a claim under one is this device's. */
+  readonly replacedIds: DeviceStoreIds['replacedIds'];
   readonly base: string;
   readonly labels: readonly string[] | null;
 }
@@ -272,6 +294,7 @@ export async function claimPlanIssue(request: PlanClaimRequest, context: PlanCla
     issue: target.issue,
     branch: target.branch,
     storeId: device.storeId,
+    replacedIds: device.replacedIds,
     base: request.base ?? 'HEAD',
     labels: request.labels,
   };
@@ -402,8 +425,9 @@ function otherBranchRefusal(attempt: Attempt, reading: ClaimBranchReading, conte
   const weighed = weighBranchClaim(reading, { labels: attempt.labels ?? [], staleAfter: context.staleAfter, now: context.now });
   if (weighed.state === 'released' || weighed.state === 'none' || weighed.state === 'unreadable') return null;
   const { owner } = weighed;
-  if (owner === attempt.storeId) {
-    return refused(attempt, branch, owner, `this device (store ${owner}) already holds ${issue} on ${branch}; plan it there with --stub=${stubOf(branch)}`);
+  if (holdsClaim(attempt, owner)) {
+    const { storeId } = attempt;
+    return refused(attempt, branch, storeId, `this device (store ${storeId}) already holds ${issue} on ${branch}; plan it there with --stub=${stubOf(branch)}`);
   }
   return weighed.state === 'stale-claimed'
     ? refused(attempt, branch, owner, `${issue} is claimed by store ${owner} on ${branch}, stale; take it over by planning there with --stub=${stubOf(branch)}`)
@@ -423,7 +447,7 @@ function claimOwnBranch(attempt: Attempt, reading: ClaimBranchReading, context: 
   const weighed = weighBranchClaim(reading, { labels: attempt.labels ?? [], staleAfter: context.staleAfter, now: context.now });
   if (weighed.state === 'released' || weighed.state === 'stale-claimed') return { kind: 'take', tip: reading.tip };
   if (weighed.state === 'none' || weighed.state === 'unreadable') return unreadable();
-  if (weighed.owner === attempt.storeId) return { kind: 'held' };
+  if (holdsClaim(attempt, weighed.owner)) return { kind: 'held' };
   const note = weighed.state === 'stale-in-development'
     ? ', stale but in development, which is never taken over automatically'
     : '';

@@ -272,6 +272,33 @@ describe('creating an issue', () => {
     expect(fake.hasLabel(SPEC_BLOCKED_LABEL)).toBe(false);
   });
 
+  it('files a draft\'s cause as a cause: label, made before filing', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'bug', priority: 'low', cause: 'git:no-identity' }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:bug', 'cause:git:no-identity', 'priority:low']);
+    expect(fake.calls()).toContainEqual(['label', 'create', 'cause:git:no-identity', '--force']);
+  });
+
+  it('files no cause: label for a draft with no cause', async () => {
+    const { tracker, fake } = overFake();
+
+    const ref = await tracker.create(draftFixture({ type: 'bug', priority: 'low' }));
+
+    expect(fake.issue(ref.externalId)?.labels).toEqual(['module:auth', 'type:bug', 'priority:low']);
+  });
+
+  it('files a cause whose label is 50 characters, the most GitHub takes', async () => {
+    const { tracker, fake } = overFake();
+    const cause = `git:${'a'.repeat(40)}`;
+
+    const ref = await tracker.create(draftFixture({ cause }));
+
+    expect(`cause:${cause}`).toHaveLength(50);
+    expect(fake.issue(ref.externalId)?.labels).toContain(`cause:${cause}`);
+  });
+
   it('makes every label before filing, each once', async () => {
     const { tracker, fake } = overFake();
 
@@ -339,6 +366,9 @@ describe('creating an issue', () => {
     ['title', { title: 42 }, 'title is 42, expected a string'],
     ['opt', { opt: '260' }, 'opt is "260", expected a number'],
     ['specBlocked', { specBlocked: 'yes' }, 'specBlocked is "yes", expected absent or a boolean'],
+    ['cause', { cause: 3 }, 'cause is 3, expected absent or a string holding no comma, at most 44 characters'],
+    ['cause', { cause: 'a:b,c:d' }, 'cause is "a:b,c:d", expected absent or a string holding no comma, at most 44 characters'],
+    ['cause', { cause: `git:${'a'.repeat(41)}` }, `cause is "git:${'a'.repeat(41)}", expected absent or a string holding no comma, at most 44 characters`],
   ])('refuses a draft whose %s no get could answer, sending nothing', async (_field, overrides, problem) => {
     const { tracker, fake } = overFake();
     const draft = { ...draftFixture(), ...overrides } as unknown as ReturnType<typeof draftFixture>;

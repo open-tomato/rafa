@@ -5,10 +5,14 @@
  * side record, and which opens never touch either. Every store is a
  * real file under `tmpdir()`, so a copy, a restore and a rename are the
  * filesystem's own; the host id, the project and each generation are
- * injected, and no case reads this machine's host id or spawns git.
+ * injected, and no case reads this machine's host id or spawns git. One
+ * group reads `store_replaced` after each kind of mint: the outgoing id
+ * recorded where the host and the path were kept, the table emptied
+ * where either moved.
  */
-import type { ProjectIdentity } from './store-identity.js';
+import type { MintReason, ProjectIdentity } from './store-identity.js';
 import type { IdentityOutcome, StoreIdentitySeams, StoreMeta } from './store-meta.js';
+import type { ReplacedStoreId } from './store-replaced.js';
 
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,6 +34,7 @@ import {
   settleStoreIdentity,
   toStoredInteger,
 } from './store-meta.js';
+import { readReplacedStoreIds } from './store-replaced.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-store-meta-')));
 afterAll(() => {
@@ -407,6 +412,197 @@ describe('settleStoreIdentity', () => {
       db.close();
     }
     expect(metaOf(path)?.storeId).toBe('host-a-store-1');
+  });
+});
+
+const FIRST_MOVE = new Date('2026-10-01T08:00:00.000Z');
+
+const SECOND_MOVE = new Date('2026-10-02T09:30:00.000Z');
+
+/** `seams` with a clock that answers `time`, the time a mint records. */
+function at(seams: StoreIdentitySeams, time: Date): StoreIdentitySeams {
+  return { ...seams, now: () => time };
+}
+
+/** The ids the file at `path` holds replaced, read on a connection of its own. */
+function replacedOf(path: string): readonly ReplacedStoreId[] {
+  const db = new Database(path, { readonly: true });
+  try {
+    return readReplacedStoreIds(db);
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Renames a copy of the store at `path` over it, as a store moved to
+ * another filesystem and mounted back arrives. The host, the path and
+ * the side record stay as they were. The inode is another one, whatever
+ * numbers the host reuses, since the copy was made while the file the
+ * row names still held its own.
+ */
+function moveInPlace(path: string): void {
+  const moved = `${path}.moved`;
+  copyFileSync(path, moved);
+  renameSync(moved, path);
+}
+
+/**
+ * A store minted by `seams` as `host-a-store-1`, moved in place and
+ * minted again at `FIRST_MOVE`, with the ids it then holds replaced.
+ */
+function movedStore(name: string, seams: StoreIdentitySeams): { path: string; replaced: readonly ReplacedStoreId[] } {
+  const { path } = mintedStore(name, seams);
+  moveInPlace(path);
+  settleWrite(path, at(seams, FIRST_MOVE));
+  return { path, replaced: replacedOf(path) };
+}
+
+/** What leaves a store due a mint that keeps its host and path: a title, the reasons of that mint, and the arrangement. */
+type SamePlaceMint = readonly [string, readonly MintReason[], (path: string, seams: StoreIdentitySeams) => void];
+
+const SAME_PLACE_MINTS: readonly SamePlaceMint[] = [
+  [
+    'the file alone, a copy renamed over the store',
+    ['file'],
+    (path) => {
+      moveInPlace(path);
+    },
+  ],
+  [
+    'the generation alone, a side record one rotation ahead of the row',
+    ['generation'],
+    (path) => {
+      writeStoreGeneration(path, 'gen-ahead');
+    },
+  ],
+  [
+    'the file and the generation, a backup renamed back over the store after a write',
+    ['file', 'generation'],
+    (path, seams) => {
+      const backup = `${path}.bak`;
+      copyFileSync(path, backup);
+      openAs(path, 'write', seams);
+      renameSync(backup, path);
+    },
+  ],
+];
+
+describe('store_replaced through a mint', () => {
+  it.each(SAME_PLACE_MINTS)('records the outgoing id, at the time of the mint, on a mint for %s', (_title, reasons, arrange) => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('replaced-same-place', seams);
+    arrange(path, seams);
+    const before = replacedOf(path);
+    let clockReads = 0;
+    const clocked: StoreIdentitySeams = {
+      ...seams,
+      now: () => {
+        clockReads += 1;
+        return FIRST_MOVE;
+      },
+    };
+
+    const outcome = settleWrite(path, clocked);
+
+    expect(before).toEqual([]);
+    expect(outcome).toEqual({ action: 'mint', storeId: 'host-a-store-2', reasons });
+    expect(replacedOf(path)).toEqual([{ storeId: meta.storeId, replacedAt: '2026-10-01T08:00:00.000Z' }]);
+    expect(metaOf(path)?.mintedAt).toBe('2026-10-01T08:00:00.000Z');
+    expect(clockReads).toBe(1);
+  });
+
+  it('empties the table on a mint with path among its reasons, a copy at another path, and the original keeps its own', () => {
+    const { seams } = seamsOf();
+    const original = movedStore('replaced-path', seams);
+    const copy = freshPath('replaced-path-copy');
+    copyFileSync(original.path, copy);
+    const carriedOver = replacedOf(copy);
+
+    const outcome = settleWrite(copy, at(seams, SECOND_MOVE));
+
+    expect(carriedOver).toEqual([{ storeId: 'host-a-store-1', replacedAt: '2026-10-01T08:00:00.000Z' }]);
+    expect(outcome).toEqual({ action: 'mint', storeId: 'host-a-store-3', reasons: ['path', 'file', 'generation'] });
+    expect(replacedOf(copy)).toEqual([]);
+    expect(replacedOf(original.path)).toEqual(carriedOver);
+  });
+
+  it('empties the table on a mint for the host, the same file written from another host', () => {
+    const { path, replaced } = movedStore('replaced-host', seamsOf('host-a').seams);
+
+    const outcome = settleWrite(path, at(seamsOf('host-b').seams, SECOND_MOVE));
+
+    expect(replaced).toEqual([{ storeId: 'host-a-store-1', replacedAt: '2026-10-01T08:00:00.000Z' }]);
+    expect(outcome).toEqual({ action: 'mint', storeId: 'host-b-store-1', reasons: ['host'] });
+    expect(replacedOf(path)).toEqual([]);
+  });
+
+  it('keeps both ids through two moves in a row, each with the time of its own mint', () => {
+    const { seams } = seamsOf();
+    const { path } = mintedStore('replaced-twice', seams);
+
+    moveInPlace(path);
+    const first = settleWrite(path, at(seams, FIRST_MOVE));
+    moveInPlace(path);
+    const second = settleWrite(path, at(seams, SECOND_MOVE));
+
+    expect([first, second]).toEqual([
+      { action: 'mint', storeId: 'host-a-store-2', reasons: ['file'] },
+      { action: 'mint', storeId: 'host-a-store-3', reasons: ['file'] },
+    ]);
+    expect(replacedOf(path)).toEqual([
+      { storeId: 'host-a-store-1', replacedAt: '2026-10-01T08:00:00.000Z' },
+      { storeId: 'host-a-store-2', replacedAt: '2026-10-02T09:30:00.000Z' },
+    ]);
+    expect(metaOf(path)?.storeId).toBe('host-a-store-3');
+  });
+
+  it('records nothing on the first mint of a store, which has no outgoing id', () => {
+    const { path, meta } = mintedStore('replaced-unminted', seamsOf().seams);
+
+    expect(meta.storeId).toBe('host-a-store-1');
+    expect(replacedOf(path)).toEqual([]);
+  });
+
+  it('leaves the ids it holds as they were on a write that keeps the origin', () => {
+    const { seams } = seamsOf();
+    const { path, replaced } = movedStore('replaced-keep', seams);
+
+    const outcome = settleWrite(path, at(seams, SECOND_MOVE));
+
+    expect(replaced).toHaveLength(1);
+    expect(outcome).toEqual({ action: 'keep', storeId: 'host-a-store-2' });
+    expect(replacedOf(path)).toEqual(replaced);
+  });
+
+  it('rolls the recorded id back with the row when the side record refuses the generation, and records it on the write that passes, the control', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('replaced-rollback', seams);
+    moveInPlace(path);
+    const refused: StoreIdentitySeams = { ...at(seams, FIRST_MOVE), newGeneration: () => 'gen-padded ' };
+
+    expect(() => settleWrite(path, refused)).toThrow('store generation must be non-empty, unpadded and on one line');
+    const afterRefusal = [metaOf(path)?.storeId, replacedOf(path)];
+    const passed = settleWrite(path, at(seams, SECOND_MOVE));
+
+    expect(afterRefusal).toEqual([meta.storeId, []]);
+    expect(passed).toEqual({ action: 'mint', storeId: 'host-a-store-3', reasons: ['file'] });
+    expect(replacedOf(path)).toEqual([{ storeId: meta.storeId, replacedAt: '2026-10-02T09:30:00.000Z' }]);
+  });
+
+  it('throws SQLite\'s error and keeps the row on a mint over a store whose table was dropped, which no open leaves', () => {
+    const { seams } = seamsOf();
+    const { path, meta } = mintedStore('replaced-no-table', seams);
+    const db = new Database(path, { readwrite: true });
+    try {
+      db.run('DROP TABLE store_replaced');
+    } finally {
+      db.close();
+    }
+    moveInPlace(path);
+
+    expect(() => settleWrite(path, at(seams, FIRST_MOVE))).toThrow('no such table: store_replaced');
+    expect(metaOf(path)?.storeId).toBe(meta.storeId);
   });
 });
 

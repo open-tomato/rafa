@@ -18,16 +18,21 @@
  * form a claim record's store id takes; `--withdraw` takes no value, so
  * a line typed `--withdraw 7` reads `7` as its value and is refused,
  * naming the order to type it in. The flags are read first so that line
- * is told so, rather than that it gave no argument. Then this device's store id, and a `--to` naming
- * that very store is refused. Then one fetch of the `feat/rafa-*`
- * branches and every remote branch of the issue, as `rafa claim release`
- * reads them (`./release.ts`). No network means no handover.
+ * is told so, rather than that it gave no argument. Then this device's
+ * store id, and a `--to` naming that very store, or an id it replaced
+ * (`holdsClaim`, `src/claims/device.ts`), is refused. Then one fetch of
+ * the `feat/rafa-*` branches and every remote branch of the issue, as
+ * `rafa claim release` reads them (`./release.ts`). No network means no
+ * handover.
  *
  * ## What it pushes
  *
  * The one branch of the issue whose claim this store holds gets one
  * empty commit made on its remote tip and pushed with
- * `--force-with-lease` on that tip (`src/claims/git.ts`):
+ * `--force-with-lease` on that tip (`src/claims/git.ts`). A claim
+ * naming an id the store replaced is this store's too, as
+ * `rafa claim release` reads it (`./release.ts`), and the commit pushed
+ * over it names the store's own id, never the replaced one:
  *
  * | Line | Pending handover | Commit |
  * |---|---|---|
@@ -69,6 +74,7 @@ import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } fr
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
+import { holdsClaim } from '../../claims/device.js';
 import { CommandExit } from '../../cli/command.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
@@ -77,7 +83,7 @@ import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 import {
   findOwnedBranch,
   pushOnClaimTip,
-  readClaimStoreId,
+  readClaimDevice,
   readIssueArgument,
   readIssueBranches,
 } from './release.js';
@@ -190,11 +196,12 @@ export function handClaim(context: RafaContext, makeSeams: ClaimSeamsFactory): C
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
-  const storeId = readClaimStoreId(seams, refuse);
-  if (request.action === 'hand' && request.to === storeId) {
+  const device = readClaimDevice(seams, refuse);
+  const { storeId } = device;
+  if (request.action === 'hand' && holdsClaim(device, request.to)) {
     throw refuse(`--${TO_FLAG}=${request.to} is this device's own store; a handover names another store`);
   }
-  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, storeId }, refuse, HANDING);
+  const reading = findOwnedBranch(readIssueBranches(seams.git, issue, refuse), { issue, device }, refuse, HANDING);
   const { record, to, replaced } = recordFor(reading, request, issue, storeId);
   const sha = pushOnClaimTip(seams.git, reading, record, refuse, HANDING);
   return { issue, branch: reading.branch, action: request.action, storeId, to, replaced, sha };

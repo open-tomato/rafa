@@ -29,7 +29,7 @@
  * | `stale-in-development`, another store's | given | taken |
  * | `stale-in-development`, another store's | left out | refused, naming `--stale` |
  * | `held`, another store's: not stale, or `staleAfter` is `disabled` | either | refused, naming how long it has stood |
- * | held by this store, at any age | either | refused: nothing to take |
+ * | held by this device, at any age | either | refused: nothing to take |
  * | `released` | either | taken: nobody holds it |
  * | no claim commit, or unreadable | either | refused: the branch stays taken |
  * | absent | either | passed over |
@@ -43,6 +43,18 @@
  * `--stale` widens the takeover to a claim in development and to
  * nothing else: it never makes a claim stale that has not stood
  * `claims.staleAfter`, and a `disabled` setting keeps every claim.
+ *
+ * ## Whose claim it is
+ *
+ * `holdsClaim` (`src/claims/device.ts`) decides whether a branch's
+ * claim is this device's: the holder is the store's id, or an id the
+ * store carried before its file got a new device or inode under the
+ * same host and path. A claim naming such a replaced id reads as
+ * already this device's, so it is refused as nothing to take, stale or
+ * not and with `--stale` or without: this command pushes no commit
+ * over it. "Another store's" in the table is a holder that is neither.
+ * The refusal names the store's own id, never the replaced one the
+ * claim was made under, and so does the take commit of any takeover.
  *
  * ## The labels
  *
@@ -78,7 +90,7 @@
  * branch that moved on the remote between the fetch and the push; and a
  * push git refused otherwise.
  */
-import type { ClaimCommandSeams, ClaimDoing, FoundBranch } from './release.js';
+import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, FoundBranch } from './release.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimState } from '../../claims/stale.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
@@ -88,6 +100,7 @@ import type { RafaConfig } from '../../config.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
 import { idleText } from '../../board/roadmap-claims.js';
+import { holdsClaim } from '../../claims/device.js';
 import { readClaimState } from '../../claims/stale.js';
 import { CommandExit } from '../../cli/command.js';
 import { CLAIMS_STALE_DISABLED, messageOf } from '../../config-sections.js';
@@ -95,7 +108,7 @@ import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
-import { pushOnClaimTip, readClaimStoreId, readIssueArgument, readIssueBranches } from './release.js';
+import { pushOnClaimTip, readClaimDevice, readIssueArgument, readIssueBranches } from './release.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa claim take <n> [--stale]';
@@ -144,7 +157,8 @@ export interface ClaimTakeResult {
 /** What {@link takeOf} weighs a branch against. */
 export interface TakeWeights {
   readonly issue: number;
-  readonly storeId: string;
+  /** This device's store id and the ids that store replaced: a claim under any of them is this device's. */
+  readonly device: ClaimDevice;
   /** The issue's labels, empty when they could not be read. */
   readonly labels: readonly string[];
   /** Why the labels could not be read, or null. */
@@ -205,8 +219,8 @@ function idleMsOf(tip: Date, now: Date): number {
 function weighedTake(branch: string, idleMs: number, state: ClaimState, weights: TakeWeights): TakeReading {
   const issue = `#${String(weights.issue)}`;
   if (state.state === 'released') return { state: 'takeable', from: state.releasedBy, was: 'released', idleMs: null };
-  if (state.owner === weights.storeId) {
-    return { state: 'refused', reason: `this device (store ${weights.storeId}) already holds the claim on ${issue} on ${branch}; there is nothing to take` };
+  if (holdsClaim(weights.device, state.owner)) {
+    return { state: 'refused', reason: `this device (store ${weights.device.storeId}) already holds the claim on ${issue} on ${branch}; there is nothing to take` };
   }
   if (state.state === 'held') return { state: 'refused', reason: freshReason(branch, state.owner, idleMs, weights) };
   if (state.state === 'stale-claimed' || weights.stale) {
@@ -283,12 +297,13 @@ export async function takeClaim(context: RafaContext, makeSeams: ClaimTakeSeamsF
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams = makeSeams(project.root, config);
-  const storeId = readClaimStoreId(seams, refuse);
+  const device = readClaimDevice(seams, refuse);
+  const { storeId } = device;
   const readings = readIssueBranches(seams.git, issue, refuse);
   const labels = await readLabels(seams, issue, readings);
   const weights: TakeWeights = {
     issue,
-    storeId,
+    device,
     labels: labels.labels,
     labelWarning: labels.warning,
     staleAfter: config.claimsStaleAfter,

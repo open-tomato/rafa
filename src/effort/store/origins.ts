@@ -63,8 +63,8 @@
  * The twelve tables a merge unions, each carrying `origin_store` and
  * `origin_seq` since migration `row-origins`. Every production insert
  * into one of them is stamped; `schema_migrations`, `store_meta`,
- * `merges` and `merge_conflicts` are the store's own bookkeeping and
- * carry no origin.
+ * `store_replaced`, `merges` and `merge_conflicts` are the store's own
+ * bookkeeping and carry no origin.
  */
 export const ORIGIN_TABLES = [
   'sessions',

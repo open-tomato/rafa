@@ -162,6 +162,11 @@
  * {@link IssueListResult}: the tracker, the query `find` was handed, and
  * each issue as `get` answered it.
  *
+ * A list narrowed to `--type=bug` is written in columns instead
+ * ({@link renderBugList}): a header, then each bug's id, state, module,
+ * action and summary, the last three read back from its title through
+ * the project's template. Json mode is the same data either way.
+ *
  * Under `--roadmap`, text mode writes `Roadmap: #<n>`, then the table
  * `renderRoadmapTable` (`./roadmap-table.ts`) spells, fitted to the
  * terminal's width and uncut with no terminal, or `No issues.` when no
@@ -201,7 +206,7 @@ import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
 import type { BoardRelationshipMode } from '../../config-sections.js';
-import type { Issue, IssueQuery, TrackerKind } from '../../ports/index.js';
+import type { Issue, IssueQuery, IssueType, TrackerKind } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { ISSUE_STATES, ISSUE_TYPES } from '../../adapters/tracker/issue-values.js';
@@ -213,6 +218,7 @@ import { createGhBoardListing, keepListing } from '../../board/roadmap-board.js'
 import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
+import { parseTitle } from '../../bugs/title.js';
 import { CommandExit } from '../../cli/command.js';
 import { messageOf } from '../../config-sections.js';
 import { plansDirAt } from '../../plan/plan-files.js';
@@ -390,6 +396,50 @@ export function renderIssueList(kind: TrackerKind, issues: readonly Issue[]): st
   return [head, ...rows.map((row) => `  ${row}`)];
 }
 
+/** The cell of a column a bug's title did not fill. */
+export const EMPTY_CELL = '-';
+
+/** The words heading the columns of a list of bugs. */
+const BUG_HEADER = ['#', 'state', 'module', 'action', 'summary'] as const;
+
+/** A bug's row: its id, its state, then its title read back through `template`. */
+function bugCells(issue: Issue, template: string): readonly string[] {
+  const read = parseTitle(template, issue.title);
+  return [
+    issue.ref.externalId,
+    issue.state,
+    read?.module ?? EMPTY_CELL,
+    read?.action ?? EMPTY_CELL,
+    read?.summary ?? issue.title,
+  ];
+}
+
+/**
+ * The lines text mode writes for a list of bugs: the tracker, a header,
+ * then a row per bug with its id, state, module, action and summary, the
+ * last three read back from its title through `template`
+ * (`../../bugs/title.ts`). A part a title lacks is {@link EMPTY_CELL},
+ * and a title the template cannot hold is printed whole as its summary,
+ * so a bug filed before the template still lists. Each column is as wide
+ * as its widest cell, the id padded to the right as the plain list pads
+ * it and the last column not padded.
+ */
+export function renderBugList(kind: TrackerKind, issues: readonly Issue[], template: string): string[] {
+  const head = `Tracker: ${kind}`;
+  if (issues.length === 0) return [head, 'No issues.'];
+
+  const table = [BUG_HEADER, ...issues.map((issue) => bugCells(issue, template))];
+  const widths = BUG_HEADER.map((_, column) => Math.max(...table.map((cells) => (cells[column] ?? '').length)));
+  const last = BUG_HEADER.length - 1;
+  const rows = table.map((cells) => cells.map((cell, column) => {
+    if (column === 0) return cell.padStart(widths[column] ?? 0);
+    return column === last
+      ? cell
+      : cell.padEnd(widths[column] ?? 0);
+  }).join('  '));
+  return [head, ...rows.map((row) => `  ${row}`)];
+}
+
 /** True when `row` passes every narrowing `filter` holds but the limit; see the module note. */
 function matchesFilter(row: RoadmapRow, filter: RoadmapFilter): boolean {
   const { issue } = row;
@@ -548,6 +598,18 @@ export async function listIssues(context: RafaContext, seams: IssueSeams): Promi
   return { tracker: data, query, issues };
 }
 
+/** The type listed in columns read back from each title. */
+const BUG_TYPE: IssueType = 'bug';
+
+/**
+ * The template a bug's title is read back with, `issues.titles.bug`. Its
+ * config's warnings are dropped: `resolveIssueTracker` already wrote them
+ * for the same config.
+ */
+function bugTemplate(context: RafaContext): string {
+  return issueSubjectConfig(issueProject(context), () => undefined).issuesTitleBug;
+}
+
 /** Runs one `issue list` line with `seams`, either listing, writing it in the line's output mode. */
 export async function runIssueList(context: RafaContext, seams: IssueSeams): Promise<void> {
   const line = readIssueListLine(context.flags);
@@ -557,7 +619,10 @@ export async function runIssueList(context: RafaContext, seams: IssueSeams): Pro
       context.output.result(listed);
       return;
     }
-    for (const text of renderIssueList(listed.tracker.kind, listed.issues)) context.output.info(text);
+    const lines = listed.query.type === BUG_TYPE
+      ? renderBugList(listed.tracker.kind, listed.issues, bugTemplate(context))
+      : renderIssueList(listed.tracker.kind, listed.issues);
+    for (const text of lines) context.output.info(text);
     return;
   }
 
@@ -669,7 +734,8 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
     summary: 'list the issues on the tracker, or the Roadmap\'s lines in its order, narrowed by type, module or text',
     description: 'Lists the issues on the tracker `tracker.default` names in `.rafa/config.yaml`, or on the first'
       + ' `tracker.fallback` kind whose preflight passes when it fails, each kind passed over warned about.'
-      + ' Prints the tracker, then one row per issue: its id, state, type and title. Each flag narrows the'
+      + ' Prints the tracker, then one row per issue: its id, state, type and title; under `--type=bug`, a header'
+      + ' and the columns id, state, module, action and summary, read back from each title. Each flag narrows the'
       + ' list, and a flag left out narrows by nothing. The github tracker holds an issue open or closed, so'
       + ' it refuses `--state`, and lists 30 issues unless `--limit` says otherwise. With `--roadmap` it lists'
       + ' the unticked lines of the Roadmap issue (`roadmap.issue`, else the lowest-numbered open type:roadmap'
@@ -699,7 +765,7 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
       },
       {
         cmd: 'rafa issue list --type=bug --search=timeout',
-        note: 'Lists the bugs whose title or body holds the word timeout.',
+        note: 'Lists the bugs whose title or body holds the word timeout, in the columns id, state, module, action and summary.',
       },
       {
         cmd: 'rafa issue list --limit=5 --output=json',

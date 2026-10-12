@@ -215,10 +215,11 @@ export function prLifecycleSeamsIn(dir: string, spawn: ClaudeSpawner = spawnClau
 /**
  * The reading {@link PrLifecycleSeams.readRefusedPush} makes: git run in
  * `dir`, the checkout whose push was refused, and this device's store id
- * from `readStoreId`. A store that names no id is read as no claimant
- * (`claims/lost.ts`); a store whose read THROWS answers `unknown` rather
- * than guess at one, so no claim of this device's is read as lost. A
- * branch that is no claim branch reads no store and runs no git.
+ * and the ids it replaced from `readStoreId`. A store that names no id
+ * is read as no claimant (`claims/lost.ts`); a store whose read THROWS
+ * answers `unknown` rather than guess at one, so no claim of this
+ * device's is read as lost. A branch that is no claim branch reads no
+ * store and runs no git.
  */
 export function refusedPushReaderIn(
   dir: string,
@@ -226,17 +227,17 @@ export function refusedPushReaderIn(
 ): (branch: string) => RefusedPushReading {
   return (branch) => {
     const issue = claimBranchIssue(branch);
-    if (issue === null) return readRefusedPush(createGitRunner(dir), { branch, storeId: null });
+    if (issue === null) return readRefusedPush(createGitRunner(dir), { branch, storeId: null, replacedIds: [] });
     let device: DeviceStoreId;
     try {
       device = readStoreId();
     } catch (error) {
       return { outcome: 'unknown', issue, branch, reason: `this device's store id could not be read: ${messageOf(error)}` };
     }
-    const storeId = device.ok
-      ? device.storeId
-      : null;
-    return readRefusedPush(createGitRunner(dir), { branch, storeId });
+    const claimant = device.ok
+      ? { storeId: device.storeId, replacedIds: device.replacedIds }
+      : { storeId: null, replacedIds: [] };
+    return readRefusedPush(createGitRunner(dir), { branch, ...claimant });
   };
 }
 

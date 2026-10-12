@@ -35,6 +35,9 @@ const LOST = 'lost/rafa-7-claim-lost';
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
 
+/** The id device `a`'s store carries after re-minting in place, with `STORE_A` the id it replaced. */
+const STORE_NEW = 'store-new';
+
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-claims-lost-')));
 
 afterAll(() => {
@@ -175,7 +178,7 @@ describe('readRefusedPush when another store took the claim', () => {
     pushRefused(trio);
     const calls: string[][] = [];
 
-    const lost = asLost(readRefusedPush(recording(trio.a, calls), { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(recording(trio.a, calls), { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(lost).toMatchObject({ issue: 7, branch: BRANCH, owner: STORE_B, pending: null, storeId: STORE_A, remoteTip: newTip });
     expect(lost.kept).toEqual({ state: 'created', name: LOST, sha: work });
@@ -193,10 +196,10 @@ describe('readRefusedPush when another store took the claim', () => {
     const { work } = claimAndWork(trio);
     takeOver(trio);
     pushRefused(trio);
-    readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A });
+    readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
     const calls: string[][] = [];
 
-    const lost = asLost(readRefusedPush(recording(trio.a, calls), { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(recording(trio.a, calls), { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(lost.kept).toEqual({ state: 'existing', name: LOST, sha: work });
     expect(calls.some((argv) => argv[0] === 'update-ref')).toBe(false);
@@ -209,7 +212,7 @@ describe('readRefusedPush when another store took the claim', () => {
     pushRefused(trio);
     must(trio.a, ['update-ref', `refs/heads/${LOST}`, claim]);
 
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(lost.kept).toEqual({ state: 'advanced', name: LOST, sha: work });
     expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBe(work);
@@ -223,7 +226,7 @@ describe('readRefusedPush when another store took the claim', () => {
     const other = workOn(trio.a, must(trio.a, ['rev-parse', 'main']), 'an earlier lost run');
     must(trio.a, ['update-ref', `refs/heads/${LOST}`, other]);
 
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(lost.kept).toMatchObject({ state: 'failed', name: LOST, sha: work });
     expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBe(other);
@@ -237,7 +240,7 @@ describe('readRefusedPush when another store took the claim', () => {
     pushRefused(trio);
     must(trio.a, ['update-ref', '-d', `refs/heads/${BRANCH}`]);
 
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(lost.kept).toEqual({ state: 'failed', name: LOST, sha: null, reason: `the local ${BRANCH} could not be read` });
     expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBeNull();
@@ -249,7 +252,7 @@ describe('readRefusedPush when another store took the claim', () => {
     takeOver(trio);
     pushRefused(trio);
 
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: null }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: null, replacedIds: [] }));
 
     expect(lost.kept).toEqual({ state: 'created', name: LOST, sha: work });
     expect(claimLostReport(lost)).toContain('not by this device, whose store names no claimant.');
@@ -262,7 +265,21 @@ describe('readRefusedPush when another store took the claim', () => {
     handTo(trio, STORE_A);
     pushRefused(trio);
 
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
+
+    expect(lost.owner).toBe(STORE_B);
+    expect(lost.pending?.to).toBe(STORE_A);
+    expect(claimLostReport(lost)).toContain('rafa claim accept 7 takes it up.');
+  });
+
+  it('carries a handover the new owner offered to a replaced id of this store into the report\'s next step', () => {
+    const trio = plantTrio('offered-replaced');
+    claimAndWork(trio);
+    takeOver(trio);
+    handTo(trio, STORE_A);
+    pushRefused(trio);
+
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_NEW, replacedIds: [STORE_A] }));
 
     expect(lost.owner).toBe(STORE_B);
     expect(lost.pending?.to).toBe(STORE_A);
@@ -278,12 +295,32 @@ describe('readRefusedPush when the claim was not lost', () => {
     must(trio.b, ['push', '--quiet', 'origin', `${otherWork}:refs/heads/${BRANCH}`]);
     pushRefused(trio);
 
-    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A });
+    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'owned' });
     expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBeNull();
     // Control: the same remote, read by a device of another store, is lost.
-    expect(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_B }).outcome).toBe('lost');
+    expect(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_B, replacedIds: [] }).outcome).toBe('lost');
+  });
+
+  it('answers owned, naming the store\'s own id, when the remote claim names an id this store replaced', () => {
+    const trio = plantTrio('replaced');
+    claimAndWork(trio);
+    const otherWork = workOn(trio.b, remoteTipAsB(trio), 'work from elsewhere');
+    must(trio.b, ['push', '--quiet', 'origin', `${otherWork}:refs/heads/${BRANCH}`]);
+    pushRefused(trio);
+
+    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_NEW, replacedIds: [STORE_A] });
+
+    expect(reading).toEqual({
+      outcome: 'not-lost',
+      branch: BRANCH,
+      cause: 'owned',
+      reason: `this device (store ${STORE_NEW}) still holds the claim on origin/${BRANCH}`,
+    });
+    expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBeNull();
+    // Control: the same remote, read by the same store with no replaced id, is lost.
+    expect(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_NEW, replacedIds: [] }).outcome).toBe('lost');
   });
 
   it('answers released when the latest ownership commit is a release', () => {
@@ -296,7 +333,7 @@ describe('readRefusedPush when the claim was not lost', () => {
     expect(pushOwnershipCommit(trio.b, made.sha, BRANCH, lease).outcome).toBe('pushed');
     pushRefused(trio);
 
-    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A });
+    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'released' });
     expect(tipOf(trio.a, `refs/heads/${LOST}`)).toBeNull();
@@ -307,7 +344,7 @@ describe('readRefusedPush when the claim was not lost', () => {
     const main = must(trio.b, ['rev-parse', 'main']);
     must(trio.b, ['push', '--quiet', 'origin', `${workOn(trio.b, main, 'plain work')}:refs/heads/${BRANCH}`]);
 
-    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A });
+    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'no-claim' });
   });
@@ -315,7 +352,7 @@ describe('readRefusedPush when the claim was not lost', () => {
   it('answers absent when the remote has no such branch', () => {
     const trio = plantTrio('absent');
 
-    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A });
+    const reading = readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'absent', branch: BRANCH });
   });
@@ -327,7 +364,7 @@ describe('readRefusedPush when the claim was not lost', () => {
       return { ok: true, stdout: '', stderr: '' };
     };
 
-    const reading = readRefusedPush(git, { branch: 'feat/no-issue', storeId: STORE_A });
+    const reading = readRefusedPush(git, { branch: 'feat/no-issue', storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'not-lost', cause: 'not-a-claim-branch' });
     expect(calls).toEqual([]);
@@ -341,7 +378,7 @@ describe('readRefusedPush when the claim was not lost', () => {
       return refusal;
     };
 
-    const reading = readRefusedPush(git, { branch: BRANCH, storeId: STORE_A });
+    const reading = readRefusedPush(git, { branch: BRANCH, storeId: STORE_A, replacedIds: [] });
 
     expect(reading).toMatchObject({ outcome: 'unknown', issue: 7, branch: BRANCH });
     expect(reading.outcome === 'unknown' && reading.reason).toContain('fatal: unable to access origin');
@@ -355,7 +392,7 @@ describe('claimLostReport', () => {
     const { work } = claimAndWork(trio);
     takeOver(trio);
     pushRefused(trio);
-    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A }));
+    const lost = asLost(readRefusedPush(trio.a, { branch: BRANCH, storeId: STORE_A, replacedIds: [] }));
 
     expect(claimLostReport(lost)).toBe([
       `❌ Claim lost: #7 is claimed by store ${STORE_B} on ${BRANCH}, not by this device (store ${STORE_A}).`,

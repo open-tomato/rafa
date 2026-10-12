@@ -130,7 +130,10 @@
  * never both, and `blockedBy` as `blocked-by:OPT-<number>` labels, the
  * port still naming those OPT numbers. rafa's own `specBlocked`, absent
  * from the source, is sent as the board's `spec:blocked` label when true
- * and as nothing otherwise; `get` does not read it back. `get` answers `code` for a
+ * and as nothing otherwise; `get` does not read it back. rafa's own
+ * `cause`, a bug's cause code, is sent as a `cause:<code>` label when the
+ * draft holds one, refused when the label would pass GitHub's 50
+ * characters, and not read back either. `get` answers `code` for a
  * missing or foreign type label, null for a priority label, and
  * `unassigned` for a module label. `find` refuses any state, naming the
  * states that share its open or closed bucket, and lists `--state all`,
@@ -213,7 +216,15 @@ export const GITHUB_LABELS = Object.freeze({
   blockedByPrefix: 'blocked-by:OPT-',
   /** The board's `SPEC_BLOCKED_LABEL`, spelled here because this adapter imports nothing from `src/board/`. */
   specBlocked: 'spec:blocked',
+  /** What opens the label a bug's cause code is filed as (`context/error-codes.md`). */
+  causePrefix: 'cause:',
 });
+
+/** The most characters GitHub accepts in a label's name. */
+export const GITHUB_LABEL_MAX_LENGTH = 50;
+
+/** The most characters a cause holds, so its label is one GitHub accepts. */
+const CAUSE_MAX_LENGTH = GITHUB_LABEL_MAX_LENGTH - GITHUB_LABELS.causePrefix.length;
 
 /** The fields `get` asks `gh issue view` for. */
 const VIEW_FIELDS = 'number,title,body,state,stateReason,labels,url';
@@ -383,6 +394,11 @@ function isLabelPart(value: unknown): value is string {
   return typeof value === 'string' && !value.includes(',');
 }
 
+/** True for no cause, and for one `gh` sends as one label of a length GitHub accepts. */
+function isCauseLabelPart(value: unknown): boolean {
+  return value === undefined || (isLabelPart(value) && value.length <= CAUSE_MAX_LENGTH);
+}
+
 /** A flag and its value, or nothing when the value is absent. */
 function optionalFlag(name: string, value: string | undefined): string[] {
   return value === undefined
@@ -417,6 +433,7 @@ const DRAFT_CHECKS: readonly DraftCheck[] = [
     'a list of positive whole numbers',
   ],
   ['specBlocked', (value) => value === undefined || typeof value === 'boolean', 'absent or a boolean'],
+  ['cause', isCauseLabelPart, `absent or a string holding no comma, at most ${CAUSE_MAX_LENGTH} characters`],
 ];
 
 /** The first thing wrong with a draft, or null when nothing is. */
@@ -440,6 +457,9 @@ function labelsFor(draft: IssueDraft): string[] {
     ...(draft.specBlocked === true
       ? [GITHUB_LABELS.specBlocked]
       : []),
+    ...(draft.cause === undefined
+      ? []
+      : [`${GITHUB_LABELS.causePrefix}${draft.cause}`]),
     priority,
   ];
 }

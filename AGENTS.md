@@ -57,6 +57,7 @@ back into every turn and the split would save nothing.
   inherited failures, the state read on a repeat, and similarity settings.
 - `context/error-codes.md` — cause codes: the `<family>:<leaf>` list,
   reserved values, a project's `errors.codes`, and `rafa bug codes`.
+- `context/bug-record.md` — a bug's fields, body sections and title template.
 - `context/logging.md` — the `Logger` port, levels and the `api` type, the
   console adapter, the gate on `Output`, config, and moving a module.
 - `context/terminology.md` — formal and colloquial names: the ledger,

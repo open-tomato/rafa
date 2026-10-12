@@ -13,8 +13,9 @@
  * ## What is read
  *
  * The line first: exactly one argument, the issue number
- * (`readIssueArgument`). Then this device's store id, then one fetch of
- * the `feat/rafa-*` branches and every remote branch of the issue, as
+ * (`readIssueArgument`). Then this device's store id with the ids that
+ * store replaced (`readClaimDevice`), then one fetch of the
+ * `feat/rafa-*` branches and every remote branch of the issue, as
  * `rafa claim release` reads them (`./release.ts`). No network means no
  * acceptance.
  *
@@ -37,6 +38,18 @@
  *
  * A claim this store already holds is refused apart, naming it, since
  * there is nothing to accept.
+ *
+ * ## Which ids are this store's
+ *
+ * `holdsClaim` (`src/claims/device.ts`) is the comparison behind both
+ * "to this store" and "this store already holds": true for the store's
+ * id and for an id the store carried before its file got a new device
+ * or inode under the same host and path. So a handover addressed to
+ * such a replaced id is pending to this device and accepted, a `hand`
+ * to one counts as a handover to this store in the table above, and a
+ * claim held under one is refused as already this device's. Every
+ * refusal, the result and the accept commit name the store's own id,
+ * never the replaced one the handover or the claim names.
  *
  * ## What it pushes
  *
@@ -67,18 +80,19 @@
  * the remote between the fetch and the push; and a push git refused
  * otherwise.
  */
-import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
+import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 
+import { holdsClaim } from '../../claims/device.js';
 import { parseClaimMessage } from '../../claims/record.js';
 import { CommandExit } from '../../cli/command.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 
-import { pushOnClaimTip, readClaimStoreId, readIssueArgument, readIssueBranches } from './release.js';
+import { pushOnClaimTip, readClaimDevice, readIssueArgument, readIssueBranches } from './release.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa claim accept <n>';
@@ -141,14 +155,15 @@ function endedReason(after: ReadCommit, branch: string): string {
   return `the handover to this device on ${branch} was ended by a ${record.action} commit of store ${record.store} (commit ${sha})`;
 }
 
-/** Why a found branch whose claim is not pending to `storeId` offers nothing, read from its history. */
-function noOfferReason(reading: FoundBranch, issue: number, storeId: string): string {
+/** Why a found branch whose claim is not pending to `device` offers nothing, read from its history. */
+function noOfferReason(reading: FoundBranch, issue: number, device: ClaimDevice): string {
   const { branch, ownership } = reading;
-  if (ownership.state === 'held' && ownership.owner === storeId) {
+  const { storeId } = device;
+  if (ownership.state === 'held' && holdsClaim(device, ownership.owner)) {
     return `this device (store ${storeId}) already holds the claim on #${String(issue)} on ${branch}`;
   }
   const commits = ownershipCommits(reading);
-  const handedHere = commits.map(({ record }) => record.action === 'hand' && record.to === storeId);
+  const handedHere = commits.map(({ record }) => record.action === 'hand' && holdsClaim(device, record.to));
   const last = handedHere.lastIndexOf(true);
   const after = commits[last + 1];
   if (last !== -1 && after !== undefined) return endedReason(after, branch);
@@ -158,30 +173,32 @@ function noOfferReason(reading: FoundBranch, issue: number, storeId: string): st
 }
 
 /**
- * Whether `reading` holds a handover pending to `storeId`, or why not;
- * see the module note's table.
+ * Whether `reading` holds a handover pending to `device`, under its
+ * store's id or one that store replaced, or why not; see the module
+ * note's table.
  */
-export function offerOf(reading: ClaimBranchReading, issue: number, storeId: string): OfferReading {
+export function offerOf(reading: ClaimBranchReading, issue: number, device: ClaimDevice): OfferReading {
   const { branch } = reading;
   if (reading.state === 'absent') return { state: 'refused', reason: `${branch} is gone from ${REMOTE}` };
   if (reading.state === 'unreadable') {
     return { state: 'refused', reason: `the claim on ${branch} could not be read: ${reading.reason}` };
   }
   const { ownership } = reading;
-  if (ownership.state === 'held' && ownership.pending?.to === storeId) {
+  if (ownership.state === 'held' && ownership.pending !== null && holdsClaim(device, ownership.pending.to)) {
     return { state: 'pending', from: ownership.owner, handSha: ownership.pending.sha };
   }
-  return { state: 'refused', reason: noOfferReason(reading, issue, storeId) };
+  return { state: 'refused', reason: noOfferReason(reading, issue, device) };
 }
 
-/** The one branch of the issue with a handover pending to this store, or a refusal naming what each says. */
-function findOffer(readings: readonly ClaimBranchReading[], issue: number, storeId: string): { readonly reading: FoundBranch; readonly from: string; readonly handSha: string } {
+/** The one branch of the issue with a handover pending to this device, or a refusal naming what each says and the store's own id. */
+function findOffer(readings: readonly ClaimBranchReading[], issue: number, device: ClaimDevice): { readonly reading: FoundBranch; readonly from: string; readonly handSha: string } {
   const offers = readings.flatMap((reading) => {
-    const offer = offerOf(reading, issue, storeId);
+    const offer = offerOf(reading, issue, device);
     return offer.state === 'pending' && reading.state === 'found'
       ? [{ reading, from: offer.from, handSha: offer.handSha }]
       : [];
   });
+  const { storeId } = device;
   const [only] = offers;
   if (offers.length === 1 && only !== undefined) return only;
   if (offers.length > 1) {
@@ -189,7 +206,7 @@ function findOffer(readings: readonly ClaimBranchReading[], issue: number, store
     throw refuse(`#${String(issue)} is handed over to this device (store ${storeId}) on more than one branch: ${names}; ${ACCEPTING.nothing}`);
   }
   const reasons = readings.map((reading) => {
-    const offer = offerOf(reading, issue, storeId);
+    const offer = offerOf(reading, issue, device);
     return offer.state === 'refused'
       ? offer.reason
       : '';
@@ -203,8 +220,9 @@ export function acceptClaim(context: RafaContext, makeSeams: ClaimSeamsFactory):
   const project = requireProject(context, COMMAND);
   const config = resolveProjectConfig(project, COMMAND, (message) => context.output.warn(message));
   const seams: ClaimCommandSeams = makeSeams(project.root, config);
-  const storeId = readClaimStoreId(seams, refuse);
-  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse), issue, storeId);
+  const device = readClaimDevice(seams, refuse);
+  const { storeId } = device;
+  const { reading, from, handSha } = findOffer(readIssueBranches(seams.git, issue, refuse), issue, device);
   const sha = pushOnClaimTip(seams.git, reading, { action: 'accept', issue, store: storeId }, refuse, ACCEPTING);
   return { issue, branch: reading.branch, storeId, from, handSha, sha };
 }

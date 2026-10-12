@@ -568,6 +568,22 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   ALTER TABLE sessions ADD COLUMN worktree TEXT;
   `,
   },
+  // The ids this store carried before its present one, one row each with
+  // the time the id was replaced. A fourth table that never leaves this
+  // machine: a store file found under the host and path its row names is
+  // this device's own store, moved or rolled back, and a claim made
+  // under an id held here is still this device's. A store without the
+  // table, as an older runtime leaves it, has replaced no id.
+  {
+    id: 'store-replaced',
+    breaks: [],
+    sql: `
+  CREATE TABLE store_replaced (
+    store_id    TEXT NOT NULL PRIMARY KEY CHECK (store_id <> ''),
+    replaced_at TEXT NOT NULL CHECK (replaced_at <> '')
+  );
+  `,
+  },
 ];
 
 /**

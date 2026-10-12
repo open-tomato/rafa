@@ -17,12 +17,21 @@
  * | Reading of the remote | Answer |
  * |---|---|
  * | `held` by another store, a handover pending or not | `lost`, naming the new owner |
- * | `held` by this store | `not-lost` (`owned`): the refusal is not about the claim |
+ * | `held` by this store, under its id or one it replaced | `not-lost` (`owned`): the refusal is not about the claim |
  * | `released` | `not-lost` (`released`): nobody owns it, so nobody took it |
  * | no claim commit on the branch | `not-lost` (`no-claim`): a branch as today |
  * | absent | `not-lost` (`absent`): the remote has no such branch |
  * | a branch that is no claim branch | `not-lost` (`not-a-claim-branch`), with no git run |
  * | a failed fetch, or an unreadable branch | `unknown`, with what git said |
+ *
+ * `holdsClaim` (`./device.ts`) decides whether the remote's holder is
+ * this device: true for the store's id and for each id it replaced
+ * (`replacedIds`), so a claim made before the store re-minted in place
+ * is not read as lost. The same comparison decides whether a pending
+ * handover (`pending.to`) names this device, so an offer made to a
+ * replaced id still carries into the report's next step. The `owned`
+ * reason and the next step's `--to=` both name the store's own id,
+ * never the replaced one the claim or the handover named.
  *
  * A device whose store names no id (`storeId: null`) holds no claim, so
  * a claim held by any store is read as held by another: the commits are
@@ -58,6 +67,7 @@
  * with the old value the sha it held, it moved the ref. `lost.test.ts`
  * drives the absent, fast-forward and refused rows over planted clones.
  */
+import type { DeviceStoreIds } from './device.js';
 import type { ClaimBranchReading } from './git.js';
 import type { PendingHandover } from './record.js';
 import type { GitRunner } from '../pr/index.js';
@@ -65,6 +75,7 @@ import type { GitRunner } from '../pr/index.js';
 import { gitSaid } from '../pr/index.js';
 import { BRANCH_PREFIX, localRef, REMOTE } from '../start/branch-decision.js';
 
+import { holdsClaim } from './device.js';
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from './git.js';
 
 /** What every branch that keeps a lost claim's commits is called: this, and the plan's stub. */
@@ -102,6 +113,8 @@ export type RefusedPushReading =
     readonly pending: PendingHandover | null;
     /** This device's store id, or null when its store names none. */
     readonly storeId: string | null;
+    /** The ids that store carried before; empty when `storeId` is null. */
+    readonly replacedIds: DeviceStoreIds['replacedIds'];
     /** The remote's tip, as the fetch left it: the new owner's branch. */
     readonly remoteTip: string;
     readonly kept: LostBranch;
@@ -125,6 +138,8 @@ export interface RefusedPushInput {
   readonly branch: string;
   /** This device's store id, or null when its store names none. */
   readonly storeId: string | null;
+  /** The ids that store carried before; none for a store that names no id. */
+  readonly replacedIds: DeviceStoreIds['replacedIds'];
 }
 
 /** The old value `git update-ref` reads as "the ref must not exist yet". */
@@ -150,6 +165,9 @@ export function lostBranchFor(branch: string): string {
  */
 export function readRefusedPush(git: GitRunner, input: RefusedPushInput): RefusedPushReading {
   const { branch, storeId } = input;
+  const device = storeId === null
+    ? null
+    : { storeId, replacedIds: input.replacedIds };
   const issue = claimBranchIssue(branch);
   if (issue === null) {
     return { outcome: 'not-lost', branch, cause: 'not-a-claim-branch', reason: `${branch} is not a claim branch, so it carries no claim to lose` };
@@ -159,17 +177,30 @@ export function readRefusedPush(git: GitRunner, input: RefusedPushInput): Refuse
     return { outcome: 'unknown', issue, branch, reason: fetched.reason };
   }
   const remote = readClaimBranch(git, branch);
-  const notLost = notLostReading(issue, remote, storeId);
+  const notLost = notLostReading(issue, remote, device);
   if (notLost !== null) return notLost;
   if (remote.state !== 'found' || remote.ownership.state !== 'held') {
     return { outcome: 'unknown', issue, branch, reason: `the claim on ${REMOTE}/${branch} could not be read` };
   }
   const { owner, pending } = remote.ownership;
-  return { outcome: 'lost', issue, branch, owner, pending, storeId, remoteTip: remote.tip, kept: keepCommits(git, branch) };
+  return {
+    outcome: 'lost',
+    issue,
+    branch,
+    owner,
+    pending,
+    storeId,
+    replacedIds: input.replacedIds,
+    remoteTip: remote.tip,
+    kept: keepCommits(git, branch),
+  };
 }
 
+/** This device's ids, or null when its store names none. */
+type Claimant = Pick<DeviceStoreIds, 'storeId' | 'replacedIds'> | null;
+
 /** The answer for every reading but a claim another store holds, or null for that one. */
-function notLostReading(issue: number, remote: ClaimBranchReading, storeId: string | null): RefusedPushReading | null {
+function notLostReading(issue: number, remote: ClaimBranchReading, device: Claimant): RefusedPushReading | null {
   const { branch } = remote;
   if (remote.state === 'unreadable') {
     return { outcome: 'unknown', issue, branch, reason: `the claim on ${REMOTE}/${branch} could not be read: ${remote.reason}` };
@@ -189,8 +220,8 @@ function notLostReading(issue: number, remote: ClaimBranchReading, storeId: stri
       reason: `the claim on ${REMOTE}/${branch} was released by store ${ownership.releasedBy}, so no store holds it`,
     };
   }
-  return ownership.owner === storeId
-    ? { outcome: 'not-lost', branch, cause: 'owned', reason: `this device (store ${ownership.owner}) still holds the claim on ${REMOTE}/${branch}` }
+  return device !== null && holdsClaim(device, ownership.owner)
+    ? { outcome: 'not-lost', branch, cause: 'owned', reason: `this device (store ${device.storeId}) still holds the claim on ${REMOTE}/${branch}` }
     : null;
 }
 
@@ -253,8 +284,11 @@ function keptLine(lost: Extract<RefusedPushReading, { outcome: 'lost' }>): strin
 
 /** The report's last line: what this device can do next. */
 function nextStep(lost: Extract<RefusedPushReading, { outcome: 'lost' }>): string {
-  const { issue, storeId, pending, owner } = lost;
-  if (storeId !== null && pending?.to === storeId) {
+  const { issue, storeId, replacedIds, pending, owner } = lost;
+  const device = storeId === null
+    ? null
+    : { storeId, replacedIds };
+  if (device !== null && pending !== null && holdsClaim(device, pending.to)) {
     return `Next safe step: store ${owner} offered this device the claim; rafa claim accept ${String(issue)} takes it up.`;
   }
   return storeId === null

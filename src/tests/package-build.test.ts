@@ -82,13 +82,24 @@
  * handed, and that prompt is held equal to what `buildPlanPrompt` makes of the source
  * template and the source skill, with the skill index `readPlanSkillIndex`
  * reads for the scratch repository over the source rafa tier, which the
- * build's `bundled/` copies byte for byte. It runs three times: through
- * `dist/cli.js` and through the root bundle's `planCommand`, both inside
- * the scratch package, and through a copy of the build outside the
- * package. Two controls run the same command from a copy of the build
+ * build's `bundled/` copies byte for byte. It runs four times: through
+ * `dist/cli.js` and twice through the root bundle's `planCommand`, all
+ * inside the scratch package, and through a copy of the build outside
+ * the package. Two controls run the same command from a copy of the build
  * outside the package, one without `plan-prompt.md` and one without
  * `bundled/skills/dev-planner/SKILL.md`, and each refuses before any
  * session starts, so the check can see a template that is not there.
+ *
+ * The prompt names the plan by absolute path under the planner's root,
+ * and the two entries hand the planner different roots. `dist/cli.js`
+ * hands it the project the dispatcher resolved, a real path, and
+ * `planCommand` the root its caller typed, resolved absolute with no
+ * symlink followed. The two are one string on a Linux runner and two on
+ * macOS, where the temporary directory is `/var/...` and its real path
+ * `/private/var/...`. So each case names the root its entry runs on, and
+ * one more hands `planCommand` the scratch repository through a symlink
+ * and holds the prompt to the link, which is red on every platform when
+ * the expected prompt is built from the real path.
  *
  * The `dist/cli.js` run also holds the session's argument list to the
  * base arguments and `--setting-sources project,local`, the sources a run
@@ -344,8 +355,12 @@ import { hostToolDirs } from './stand-in-gh.js';
 /** The repository root: this file sits in `src/tests/`. */
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-/** The binary the manifest maps, as the phase 0 spec gives it. */
-const BIN = { rafa: './dist/cli.js' };
+/**
+ * The binary the manifest maps, spelled as npm writes a `bin` target:
+ * with no leading `./`. `npm publish` cleans a target that carries one
+ * and warns that it corrected the manifest (measured on npm 11.1.0).
+ */
+const BIN = { rafa: 'dist/cli.js' };
 
 /** The exports map the manifest carries, as the phase 0 spec gives it. */
 const EXPORTS = {
@@ -702,17 +717,31 @@ function filesUnder(directory: string): string[] {
  * The prompt `rafa plan` builds from the source template and skill for
  * {@link SPEC}, with the skill index read for `scratch` under the config
  * it resolves there, over the source rafa tier. The plans directory is
- * the scratch repository's, absolute, as the `claude` planner hands it
- * to the builder.
+ * absolute, as the `claude` planner hands it to the builder: under
+ * `root`, the root the planner was made with, as that root is spelled.
+ * The planner resolves it absolute and follows no symlink, so the two
+ * callers name different roots for one scratch repository wherever its
+ * path holds a link, as every temporary directory does on macOS
+ * (`/var` for `/private/var`): `rafa plan` runs on {@link dispatchedRoot},
+ * and `planCommand` on the root its caller hands it.
  */
-function expectedPlanPrompt(scratch: PlanScratch): string {
+function expectedPlanPrompt(scratch: PlanScratch, root: string): string {
   const template = readFileSync(join(REPO_ROOT, 'src', 'plan-prompt.md'), 'utf8');
   const skill = readFileSync(join(REPO_ROOT, SKILL), 'utf8');
   const home = scratch.env['HOME'] ?? '';
   const { config } = loadConfig({ root: scratch.repo, home });
   const index = readPlanSkillIndex(scratch.repo, home, config, join(REPO_ROOT, 'src', 'plan.ts'));
-  const planDir = join(realpathSync(scratch.repo), '.rafa', 'plans');
+  const planDir = join(root, '.rafa', 'plans');
   return buildPlanPrompt(template, skill, SPEC, 'spec', planDir, undefined, undefined, index);
+}
+
+/**
+ * The root `rafa plan` runs on when spawned in the scratch repository:
+ * the project the dispatcher resolved, a real path with every symlink
+ * followed (`src/project/scope.ts`).
+ */
+function dispatchedRoot(scratch: PlanScratch): string {
+  return realpathSync(scratch.repo);
 }
 
 describe('the package manifest', () => {
@@ -770,8 +799,9 @@ describe('the build script, run in a copy of the package', () => {
   });
 
   it('writes every file the binary and the exports map name', () => {
-    const targets = [...new Set([...Object.values(BIN), ...Object.values(EXPORTS)])];
-    const missing = targets.filter((target) => !existsSync(join(PACKAGE_DIR, target)));
+    const named = [...Object.values(BIN), ...Object.values(EXPORTS)];
+    const targets = [...new Set(named.map((target) => join(PACKAGE_DIR, target)))];
+    const missing = targets.filter((target) => !existsSync(target));
 
     expect(targets).toHaveLength(6);
     expect(missing).toEqual([]);
@@ -996,7 +1026,7 @@ describe('the prompt templates in the build', () => {
     const scratch = plantPlanScratch('cli');
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('project,local'));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
@@ -1007,7 +1037,7 @@ describe('the prompt templates in the build', () => {
     const plan = run([process.execPath, join(DIST, 'cli.js'), 'plan', ...PLAN_ARGS], scratch.repo, scratch.env);
 
     expect(readFileSync(scratch.args, 'utf8')).toBe(planSessionArgs('local,user'));
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 
@@ -1033,7 +1063,24 @@ describe('the prompt templates in the build', () => {
     ].join('\n'), 'utf8');
     const plan = run([process.execPath, probe], scratch.repo, scratch.env);
 
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, scratch.repo));
+    expect(plan.exitCode).toBe(1);
+  }, 30_000);
+
+  it('names the plan under the root planCommand is handed through a link, as that root is spelled', () => {
+    const scratch = plantPlanScratch('library-link');
+    const link = join(scratch.root, 'link');
+    symlinkSync(scratch.repo, link, 'dir');
+    const probe = join(scratch.root, 'probe.ts');
+    writeFileSync(probe, [
+      `const { planCommand } = await import(${JSON.stringify(join(DIST, 'index.js'))});`,
+      `await planCommand(${JSON.stringify(PLAN_ARGS)}, ${JSON.stringify(link)});`,
+      '',
+    ].join('\n'), 'utf8');
+    const plan = run([process.execPath, probe], link, scratch.env);
+
+    expect(realpathSync(link)).not.toBe(link);
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, link));
     expect(plan.exitCode).toBe(1);
   }, 30_000);
 
@@ -1044,7 +1091,7 @@ describe('the prompt templates in the build', () => {
 
     expect(planFormatPath(copy)).toBe(join(copy, PLAN_FORMAT_IN_TIER));
     expect(existsSync(join(copy, '..', 'src'))).toBe(false);
-    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch));
+    expect(readFileSync(scratch.prompt, 'utf8')).toBe(expectedPlanPrompt(scratch, dispatchedRoot(scratch)));
     expectExit(plan, 1, planScratchPaths(scratch));
   }, 30_000);
 

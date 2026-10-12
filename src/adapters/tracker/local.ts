@@ -15,7 +15,8 @@
  * frontmatter, then the body exactly as the draft held it. The
  * frontmatter holds, in this order, the draft's `opt`, `type`, `module`,
  * `priority`, `project`, `title` and `blockedBy`, then its
- * `specBlocked` when the draft sets it, then the issue's `state`, its
+ * `specBlocked` and its `cause` when the draft sets them, then the
+ * issue's `state`, its
  * `fallbackReason`, the `capturedAt` it was created at and its
  * `comments`, each comment written as `<now>: <body>`.
  * `Bun.YAML.stringify` writes the block and `Bun.YAML.parse` reads it
@@ -189,6 +190,8 @@ interface LocalIssueFrontmatter {
   blockedBy: readonly number[];
   /** rafa's own, absent from the source: written only when the draft sets it. */
   specBlocked?: boolean;
+  /** rafa's own, absent from the source: the bug's cause code, written only when the draft sets it. */
+  cause?: string;
   state: IssueState;
   fallbackReason: string | null;
   capturedAt: string;
@@ -246,6 +249,7 @@ const FIELD_CHECKS = {
   title: [isString, 'a string'],
   blockedBy: [listOf(isFiniteNumber), 'a list of numbers'],
   specBlocked: [orAbsent(isBoolean), 'absent or a boolean'],
+  cause: [orAbsent(isString), 'absent or a string'],
   state: [oneOf(ISSUE_STATES), `one of: ${ISSUE_STATES.join(', ')}`],
   fallbackReason: [orNull(isString), 'a string or null'],
   capturedAt: [isString, 'a string'],
@@ -334,6 +338,9 @@ export function renderLocalIssue(record: LocalIssueRecord): string {
     ...(draft.specBlocked === undefined
       ? {}
       : { specBlocked: draft.specBlocked }),
+    ...(draft.cause === undefined
+      ? {}
+      : { cause: draft.cause }),
     state: record.state,
     fallbackReason: record.fallbackReason,
     capturedAt: record.capturedAt,
@@ -395,6 +402,9 @@ export function parseLocalIssue(contents: string, sourcePath?: string): LocalIss
       ...(fields.specBlocked === undefined
         ? {}
         : { specBlocked: fields.specBlocked }),
+      ...(fields.cause === undefined
+        ? {}
+        : { cause: fields.cause }),
     },
     fallbackReason: fields.fallbackReason,
     capturedAt: fields.capturedAt,

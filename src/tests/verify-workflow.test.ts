@@ -1,7 +1,7 @@
 /**
  * The `verify` workflow at `.github/workflows/verify.yml`: the gates that
- * run on every pull request into `main` and on every push to a
- * `stretch/**` branch. The root eslint config lints no YAML, so this test
+ * run on every pull request into `main` or `integration` and on every
+ * push to a `stretch/**` branch. The root eslint config lints no YAML, so this test
  * is the file's only gate. Pull requests into `stretch/**` report no
  * check, which keeps `rafa pr merge <pr> --skip-checks` working there.
  */
@@ -95,9 +95,9 @@ describe('the verify workflow', () => {
     expect(Object.keys(WORKFLOW)).not.toContain('true');
   });
 
-  it('runs on pull requests into main and pushes to stretch/** only', () => {
+  it('runs on pull requests into main and integration, and pushes to stretch/** only', () => {
     expect(Object.keys(WORKFLOW.on).sort()).toEqual(['pull_request', 'push']);
-    expect(branchesOf(WORKFLOW, 'pull_request')).toEqual(['main']);
+    expect(branchesOf(WORKFLOW, 'pull_request')).toEqual(['main', 'integration']);
     expect(branchesOf(WORKFLOW, 'push')).toEqual(['stretch/**']);
   });
 
