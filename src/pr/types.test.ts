@@ -140,6 +140,7 @@ const RECORDS = [
   '};',
   'const detail: T.PullRequestDetail = {',
   '  ...summary, body: "Closes #20", headRefOid: "deadbeef",',
+  '  headCommittedAt: "2026-10-12T11:59:59Z",',
   '  mergeable: "mergeable", mergeStateStatus: "CLEAN", labels: ["type:spec"],',
   '  closes: [{ number: 20, repository: "open-tomato/rafa", url: "https://github.com/open-tomato/rafa/issues/20" }],',
   '};',

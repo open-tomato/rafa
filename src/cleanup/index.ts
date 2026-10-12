@@ -103,6 +103,7 @@ export { readRunRecords } from './runs.js';
 export {
   cleanupCommandLine,
   cleanupSteps,
+  deletedNotPushed,
   dryRunLines,
   forcedFlagRefusal,
   removeRunStep,

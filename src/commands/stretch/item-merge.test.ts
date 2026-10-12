@@ -7,9 +7,10 @@
  * runs and merged at {@link MERGE_SHA} after it; `run list` is the
  * recorded fake of `src/ci/runs-fake.ts`, one list of runs per read so a
  * case can move the run from in progress to completed; `run view
- * --log-failed` answers the captured log of `src/ci/testdata/`; and
- * `issue view` answers each bug's filing time. The events file, the
- * session record, the ledger and `stretch.json` are real files.
+ * --log-failed` answers the captured log of `src/ci/testdata/`. Each
+ * open bug carries its own `createdAt`, so `issue view` is not modelled.
+ * The events file, the session record, the ledger and `stretch.json` are
+ * real files.
  *
  * Controls: every refusal and every loop without a pull request reads
  * the ledger as absent beside a full run that finds it written, and the
@@ -39,7 +40,6 @@ import {
   CI_POLL_MS,
   CI_READ_TRIES,
   CI_WAIT_MS,
-  ghFiledAt,
   mergeDryRunLines,
   noPullRequestLine,
   PR_VIEW_FIELDS,
@@ -86,8 +86,10 @@ function verifyRun(fields: Partial<FakeRun> = {}): FakeRun {
   };
 }
 
-function bug(id: string, title: string): OpenIssue {
-  return { ref: { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` }, title, body: '' };
+/** An open bug filed at `createdAt`. */
+function bug(id: string, title: string, createdAt: string): OpenIssue {
+  const ref: OpenIssue['ref'] = { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` };
+  return { ref, title, body: '', createdAt };
 }
 
 /** What a case changes about the fakes. */
@@ -107,8 +109,6 @@ interface CaseOptions {
   /** How many `run list` reads fail before the fake answers. */
   readonly failedListReads?: number;
   readonly bugs?: readonly OpenIssue[];
-  /** Each bug's filing time, by number. */
-  readonly filed?: Readonly<Record<string, string>>;
 }
 
 interface Case {
@@ -166,12 +166,6 @@ function plant(options: CaseOptions = {}): Case {
       return createFakeRunsGh(runs).gh(args);
     }
     if (args[0] === 'run' && args[1] === 'view') return answer({ ok: true, stdout: THREE_CASES, stderr: '' });
-    if (args[0] === 'issue' && args[1] === 'view') {
-      const at = options.filed?.[args[2] ?? ''];
-      return answer(at === undefined
-        ? { ok: false, stdout: '', stderr: 'GraphQL: Could not resolve to an issue' }
-        : { ok: true, stdout: `${JSON.stringify({ createdAt: at })}\n`, stderr: '' });
-    }
     return answer({ ok: false, stdout: '', stderr: `fake gh: not modelled: ${args.join(' ')}` });
   };
 
@@ -198,7 +192,6 @@ function plant(options: CaseOptions = {}): Case {
     isAlive: (pid) => pid === LOOP_PID,
     gh: () => gh,
     tracker: () => ({ openIssues: async () => Promise.resolve([...(options.bugs ?? [])]) }),
-    filedAt: ghFiledAt,
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
@@ -236,8 +229,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
         [verifyRun({ status: 'in_progress', conclusion: '' })],
         [verifyRun()],
       ],
-      bugs: [bug('870', 'filed during the item'), bug('700', 'filed long ago')],
-      filed: { 870: '2026-10-07T09:10:00Z', 700: '2026-09-01T00:00:00Z' },
+      bugs: [bug('870', 'filed during the item', '2026-10-07T09:10:00Z'), bug('700', 'filed long ago', '2026-09-01T00:00:00Z')],
     });
 
     const outcome = await run(planted);
@@ -275,8 +267,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
 
   it('counts new bugs from the last ledger line written before this one, not from its own', async () => {
     const planted = plant({
-      bugs: [bug('871', 'after the last item'), bug('869', 'before the last item')],
-      filed: { 871: '2026-10-07T09:05:00Z', 869: '2026-10-07T07:00:00Z' },
+      bugs: [bug('871', 'after the last item', '2026-10-07T09:05:00Z'), bug('869', 'before the last item', '2026-10-07T07:00:00Z')],
     });
     appendItem(planted.project.root, 4, {
       issue: '604',
@@ -296,8 +287,40 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).not.toContain('#869');
   });
 
+  it('lists the bugs filed since the ledger\'s last line oldest first, from the listing alone, with no issue view per bug', async () => {
+    const planted = plant({
+      bugs: [
+        bug('874', 'filed last', '2026-10-07T09:08:00Z'),
+        bug('869', 'filed before the last item', '2026-10-07T07:00:00Z'),
+        bug('873', 'filed first', '2026-10-07T08:30:00Z'),
+      ],
+    });
+    appendItem(planted.project.root, 4, {
+      issue: '604',
+      plan: 'rafa-604-config-set',
+      pullRequest: 880,
+      mergeCommit: OLD_SHA,
+      closes: ['Closes #604'],
+      at: '2026-10-07T08:00:00.000Z',
+    });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expectInOrder(outcome.stdout, [
+      'Bugs: 3 open.',
+      'Filed since 2026-10-07T08:00:00.000Z: 2.',
+      '   #873 filed first',
+      '   #874 filed last',
+    ]);
+    expect(outcome.stdout).not.toContain('Filed since the last item: not read');
+    expect(outcome.stdout).not.toContain('#869');
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue' && args[1] === 'view')).toEqual([]);
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue')).toEqual([]);
+  });
+
   it('counts new bugs from stretch.json\'s start when the ledger is empty', async () => {
-    const planted = plant({ bugs: [bug('872', 'during the stretch')], filed: { 872: '2026-10-07T06:00:00Z' } });
+    const planted = plant({ bugs: [bug('872', 'during the stretch', '2026-10-07T06:00:00Z')] });
     mkdirSync(join(planted.project.root, '.rafa', 'stretch', '4'), { recursive: true });
     writeFileSync(stretchRecordPath(planted.project.root, 4), JSON.stringify({ startedAt: '2026-10-07T05:00:00.000Z' }));
 
@@ -527,29 +550,6 @@ describe('viewPull', () => {
 
     expect(read).rejects.toMatchObject({ exitCode: 2 });
     await expect(read).rejects.toThrow(said);
-  });
-});
-
-describe('ghFiledAt', () => {
-  it('reads createdAt, and null where gh fails or answers something else', async () => {
-    const answers: Record<string, GhResult> = {
-      1: { ok: true, stdout: '{"createdAt":"2026-10-05T15:08:56Z"}\n', stderr: '' },
-      2: { ok: false, stdout: '', stderr: 'GraphQL: Could not resolve' },
-      3: { ok: true, stdout: '{"createdAt":"soon"}', stderr: '' },
-      4: { ok: true, stdout: 'nope', stderr: '' },
-    };
-    const asked: string[][] = [];
-    const read = ghFiledAt(async (args) => {
-      asked.push([...args]);
-      return Promise.resolve(answers[args[2] ?? ''] ?? { ok: false, stdout: '', stderr: '' });
-    });
-    const ref = (id: string): OpenIssue['ref'] => ({ opt: 0, kind: 'github', externalId: id, url: null });
-
-    expect((await read(ref('1')))?.toISOString()).toBe('2026-10-05T15:08:56.000Z');
-    expect(await read(ref('2'))).toBeNull();
-    expect(await read(ref('3'))).toBeNull();
-    expect(await read(ref('4'))).toBeNull();
-    expect(asked[0]).toEqual(['issue', 'view', '1', '--json', 'createdAt']);
   });
 });
 

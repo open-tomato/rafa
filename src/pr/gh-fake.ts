@@ -72,6 +72,12 @@
  * the same write to the base, which every later read then answers as
  * `baseRefName`.
  *
+ * A pull request's head is committed at its `updatedAt` unless the seed
+ * names a `headCommittedAt`, and `pr view --json commits` writes that one
+ * commit. So a planted pull request has an OLD head, the fake's instants
+ * being fixed ones in the past, and a case about a head pushed a moment
+ * ago plants the instant it means, or null for a head `gh` does not list.
+ *
  * `gh pr create` is modelled from its help text alone, which says the
  * new pull request's URL is printed: the fake opens the pull request
  * under the next free number, by `rafa-fake`, and writes that URL and

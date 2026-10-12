@@ -23,9 +23,9 @@
  *      (`./past-head.ts`), so deleting it loses nothing. A Stale or
  *      Not-pushed row is `-D`: the caller hands it
  *      over only once the person ticked it and, for Not pushed, answered
- *      the question naming its commit count. A Not-pushed row an
- *      untickable worktree holds is handed over unasked, and is
- *      withheld below.
+ *      the question naming its commit count. A Not-pushed row that is
+ *      withheld below is handed over unasked; see "Which Not-pushed
+ *      rows are asked about".
  *   3. Last, every ticked run record (`./runs.ts`), `rm <record>
  *      [<events file>]`: one step per record, removing the record and,
  *      when the row names one, its events file. An unticked run row is no
@@ -56,6 +56,19 @@
  * for it and a Stale or Not-pushed one never becomes a `git branch -D`
  * (#852): git refuses to delete a branch a worktree has checked out,
  * and that worktree is not removed.
+ *
+ * ## Which Not-pushed rows are asked about
+ *
+ * The question naming a Not-pushed row's commits is the caller's, and
+ * which rows get it is decided here: {@link deletedNotPushed} names the
+ * ticked Not-pushed rows of a selection that become a `delete-branch`
+ * step, by the same rule {@link cleanupSteps} builds its steps with, so
+ * the two cannot drift apart. A row a ticked, removable worktree holds
+ * (#978) and a row an untickable worktree holds (#860) are both left
+ * out: each is withheld whatever is answered, so a question about
+ * commits it will not lose would have no effect. The caller asks the
+ * named rows alone and hands every other ticked row on unasked, to be
+ * withheld with its reason.
  *
  * ## The force guard
  *
@@ -139,7 +152,7 @@ export interface CleanupSelection {
   readonly merged: readonly MergedRow[];
   /** The Stale rows the person ticked and confirmed. */
   readonly stale: readonly StaleRow[];
-  /** The Not-pushed rows the person ticked and confirmed by the second question, and the ticked ones an untickable worktree holds, unasked. */
+  /** The Not-pushed rows the person ticked and confirmed by the second question, and the ticked ones {@link deletedNotPushed} leaves out, unasked. */
   readonly notPushed: readonly NotPushedRow[];
   /** The run-record rows; only the ticked ones become steps. None when left out. */
   readonly runs?: readonly RunRow[];
@@ -267,6 +280,17 @@ interface BranchPick {
   readonly unheld: PastHeadRead | null;
 }
 
+/** A ticked Stale or Not-pushed row as a pick: never Merged, always `-D`. */
+function unmergedPick(row: StaleRow | NotPushedRow): BranchPick {
+  return {
+    name: row.branch.name,
+    merged: false,
+    forced: true,
+    holder: row.heldBy ?? null,
+    unheld: null,
+  };
+}
+
 /** The ticked branch rows, Merged first, each with its flag. */
 function branchPicks(selection: CleanupSelection): readonly BranchPick[] {
   return [
@@ -279,13 +303,7 @@ function branchPicks(selection: CleanupSelection): readonly BranchPick[] {
         ? null
         : row.pastHead,
     })),
-    ...[...selection.stale, ...selection.notPushed].map((row) => ({
-      name: row.branch.name,
-      merged: false,
-      forced: true,
-      holder: row.heldBy ?? null,
-      unheld: null,
-    })),
+    ...[...selection.stale, ...selection.notPushed].map((row) => unmergedPick(row)),
   ];
 }
 
@@ -339,6 +357,25 @@ function holders(rows: readonly WorktreeRow[]): ReadonlyMap<string, string> {
     : [[row.branch, row.path] as const])));
 }
 
+/** The ticked worktrees of `selection` as the two maps {@link branchStep} reads: removable, then untickable. */
+function heldBranches(selection: CleanupSelection): readonly [ReadonlyMap<string, string>, ReadonlyMap<string, string>] {
+  return [
+    holders(selection.worktrees.filter((row) => row.tickable)),
+    holders(selection.worktrees.filter((row) => !row.tickable)),
+  ];
+}
+
+/**
+ * The ticked Not-pushed rows of `selection` that become a
+ * `delete-branch` step, in the order handed over: the only ones worth
+ * asking about. A row any ticked worktree holds, or an untickable one
+ * holds (its `heldBy`), is left out; see the module note.
+ */
+export function deletedNotPushed(selection: CleanupSelection): readonly NotPushedRow[] {
+  const [removed, blocked] = heldBranches(selection);
+  return selection.notPushed.filter((row) => isStep(branchStep(unmergedPick(row), removed, blocked)));
+}
+
 /**
  * The steps the ticked rows turn into: worktree removals first, then
  * branch deletes, then the ticked run records, and every ticked row that
@@ -348,8 +385,8 @@ function holders(rows: readonly WorktreeRow[]): ReadonlyMap<string, string> {
 export function cleanupSteps(selection: CleanupSelection): CleanupPlan {
   const removable = selection.worktrees.filter((row) => row.tickable);
   const untickable = selection.worktrees.filter((row) => !row.tickable);
-  const branchEntries = branchPicks(selection)
-    .map((pick) => branchStep(pick, holders(removable), holders(untickable)));
+  const [removed, blocked] = heldBranches(selection);
+  const branchEntries = branchPicks(selection).map((pick) => branchStep(pick, removed, blocked));
   return Object.freeze({
     steps: Object.freeze([
       ...removable.map((row) => removeWorktreeStep(row.path)),

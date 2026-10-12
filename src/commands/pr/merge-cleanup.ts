@@ -91,8 +91,8 @@ import { join } from 'node:path';
 import { CommandExit } from '../../cli/command.js';
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
+import { liveLoopsOf } from '../../runtime/live-loops.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';
-import { liveLoopsOf } from '../self-update.js';
 
 import { readFollowUps, readPackageFacts } from './merge-followups.js';
 

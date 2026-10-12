@@ -122,6 +122,13 @@
  * is refused either way. `OpenIssue` left unexported reddened the name
  * list and the unknown-type call, which names it.
  *
+ * `createdAt` arrived on `OpenIssue` on 2026-10-12 with one refusal, of
+ * a tracker whose open issues carry none, and a null one in the
+ * conforming probe's reader. One mutation of the entry was driven that
+ * day against this file, at 40 pass unmutated, restored from a scratch
+ * copy and verified with `sha256sum -c`: `createdAt` made optional
+ * reddened that refusal alone.
+ *
  * The optional `editable` and `edit` pair arrived on 2026-10-06 with
  * the names `EditableIssue` and `IssueEdit`, a third tracker in the
  * conforming probe that implements the pair, a call writing a body, a
@@ -274,7 +281,7 @@ function trackerLiteral(kind: string, transition: string | null, openIssues: str
 }
 
 /** An `openIssues` answering one open issue of the type it is handed. */
-const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b" }]';
+const OPEN_ISSUES = 'async (type) => [{ ref: { opt: 0, kind: "local", externalId: type, url: null }, title: "t", body: "b", createdAt: null }]';
 
 /**
  * A tracker literal as {@link trackerLiteral} writes it, under `name`,
@@ -443,10 +450,21 @@ const REFUSALS: readonly Refusal[] = [
     source: probeSource(...trackerLiteral(
       '"local"',
       'async () => ({})',
-      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t" }]',
+      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t", createdAt: null }]',
     )),
     code: 2322,
     names: 'Property \'body\' is missing',
+  },
+  {
+    title: 'a tracker whose open issues carry no createdAt',
+    file: 'tracker-open-issues-no-created-at.ts',
+    source: probeSource(...trackerLiteral(
+      '"local"',
+      'async () => ({})',
+      'async () => [{ ref: { opt: 0, kind: "local", externalId: "1", url: null }, title: "t", body: "b" }]',
+    )),
+    code: 2322,
+    names: 'Property \'createdAt\' is missing',
   },
   {
     title: 'a tracker whose openIssues accepts less than the port hands it',

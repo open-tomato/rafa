@@ -133,7 +133,6 @@ function plant(options: CaseOptions = {}): Case {
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
     tracker: () => ({ openIssues: async () => Promise.resolve([]) }),
-    filedAt: () => undefined,
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();

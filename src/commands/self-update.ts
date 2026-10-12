@@ -15,8 +15,9 @@
  *
  * It installs the project root through `installRuntime`: refuses a
  * `package.json` that is not rafa's, reads `plan.dir`, refuses while a
- * tracker there has an open or blocked task, refuses while
- * `~/.rafa/runtime/<version>/` is already there, runs `bun run build`,
+ * tracker there has an open or blocked task and a loop is live, refuses
+ * while `~/.rafa/runtime/<version>/` is already there, warns once of the
+ * trackers with a task left it installs beside, runs `bun run build`,
  * copies `dist/` into that directory and links `~/.rafa/bin/rafa` at the
  * copied `cli.js`. The home is the project's, the dispatcher's.
  * Each step is an `info` line. The build's output is read, not handed
@@ -36,21 +37,37 @@
  * replace. While one is live the command exits 1 before building, one
  * line per loop naming its branch, its pid and its session, oldest
  * first, unless `dangerous.selfUpdateDuringLoop` is `true` in the
- * config, which installs anyway. `--force` keeps its own meaning and
- * does not override the wait. The config is read for the key only while
+ * config, which lets the install start. `--force` does not override the
+ * wait. The config is read for the key only while
  * a loop is live, its warnings dropped because the install reads it
  * again and warns then, so a project with no live loop reads as before.
  * A record that cannot be read, or a config `loadConfig` refuses, exits
  * 2: a loop the command cannot rule out is never read as none.
+ *
+ * ## A tracker with a task left
+ *
+ * A tracker in `plan.dir` with an open or blocked task holds the install
+ * back only while a loop is live (`runtime/install.ts`, whose note is
+ * the long form). The wait above has answered that by the time the
+ * install runs, so with no loop live the install goes on, one `warn`
+ * line naming each such tracker and its line: a plan stopped halfway
+ * leaves a tracker no loop will clear, and the update no longer waits
+ * on it. A loop is live at the install only under
+ * `dangerous.selfUpdateDuringLoop`, and there a tracker with a task left
+ * still exits 1, naming each one, unless `--force` is on the line, which
+ * installs with the same warning. Both readings of the live loops go
+ * through `liveLoopsOf` (`runtime/live-loops.ts`) with the one pid probe.
  *
  * ## `--force`
  *
  * A version is installed once: the second install under the same version
  * would swap the runner under a loop running from that directory, so it
  * is refused. `--force` installs anyway, replacing the directory whole,
- * so nothing the old build left is kept. The flag is a boolean, and a
- * value other than `true` or `false` is refused with exit code 1. `bun
- * run snapshot --force` does the same from a checkout.
+ * so nothing the old build left is kept. It installs beside a tracker
+ * with a task left under a live loop too, as the section above says. The
+ * flag is a boolean, and a value other than `true` or `false` is refused
+ * with exit code 1. `bun run snapshot --force` does the same from a
+ * checkout.
  *
  * After an install it warns when `~/.rafa/bin` is not on the context's
  * `PATH` ahead of `~/.bun/bin` (`project/bin-path.ts`): the link is in
@@ -62,7 +79,8 @@
  * 0 installed. 1 for a positional word, for a `--force` value that is
  * neither `true` nor `false`, for a live loop without
  * `dangerous.selfUpdateDuringLoop`, the refusal naming each loop's branch
- * and pid, for a tracker with a task left, the
+ * and pid, for a tracker with a task left while a loop is live without
+ * `--force`, the
  * refusal naming each tracker, its line and its task, and for a runtime
  * directory already there without `--force`, the refusal naming the
  * directory and the version. 2 when it
@@ -98,9 +116,10 @@ import { CommandExit } from '../cli/command.js';
 import { loadConfig } from '../config-load.js';
 import { SETTINGS } from '../config-schema.js';
 import { messageOf } from '../config-sections.js';
-import { isPidAlive, readSessions } from '../loop/sessions.js';
+import { isPidAlive } from '../loop/sessions.js';
 import { readBinPath } from '../project/bin-path.js';
 import { exitCodeFor, installRuntime, outcomeProblem, runBuild } from '../runtime/install.js';
+import { liveLoopsOf } from '../runtime/live-loops.js';
 
 import { expectNoArgument } from './plan/plan-files.js';
 
@@ -149,15 +168,6 @@ export function readForceFlag(value: string | boolean | undefined): boolean {
 /** The config key that installs past a live loop. */
 export const DURING_LOOP_KEY = SETTINGS.dangerousSelfUpdateDuringLoop.key;
 
-/**
- * The loops recorded under `<root>/.rafa/runs/` that read `running` or
- * `paused`, their pid alive, oldest first. Throws `SessionRecordError`
- * for a record that cannot be read.
- */
-export function liveLoopsOf(root: string, isAlive: PidProbe = isPidAlive): readonly SessionRecord[] {
-  return readSessions(root, { isAlive }).filter((record) => record.state === 'running' || record.state === 'paused');
-}
-
 /** The refusal's lines while `loops` are live; see the module note. */
 export function liveLoopRefusalLines(loops: readonly SessionRecord[]): string[] {
   return [
@@ -195,7 +205,8 @@ async function runSelfUpdate(context: RafaContext, seams: SelfUpdateSeams): Prom
   expectNoArgument(context.args, USAGE);
   const force = readForceFlag(context.flags['force']);
   const project = projectOf(context);
-  refuseDuringLiveLoop(project, seams.isAlive ?? isPidAlive);
+  const isAlive = seams.isAlive ?? isPidAlive;
+  refuseDuringLiveLoop(project, isAlive);
   const info = (line: string): void => context.output.info(line);
   const warn = (line: string): void => context.output.warn(line);
   const outcome = installRuntime({
@@ -204,6 +215,7 @@ async function runSelfUpdate(context: RafaContext, seams: SelfUpdateSeams): Prom
     build: (repoRoot) => seams.build(repoRoot, { info, warn }),
     log: info,
     warn,
+    liveLoops: (repoRoot) => liveLoopsOf(repoRoot, isAlive),
   }, { force });
   if (outcome.kind !== 'done') {
     throw new CommandExit(exitCodeFor(outcome), (outcomeProblem(outcome, project.root) ?? []).join('\n'));
@@ -230,8 +242,10 @@ export function createSelfUpdateCommand(seams: SelfUpdateSeams = DEFAULT_SELF_UP
       + ' the copied `cli.js`, the directory and the link landing by a rename so a loop running from that'
       + ' runtime never meets a torn file. It refuses with exit code 1, before building, while a loop of the'
       + ' project is live, naming each loop\'s branch and pid, unless `dangerous.selfUpdateDuringLoop` is true;'
-      + ' `--force` does not override that wait. It refuses with exit code 1 too while a plan tracker'
-      + ' in `plan.dir` holds an open or blocked task, naming each one, and while that runtime directory is'
+      + ' `--force` does not override that wait. A plan tracker in `plan.dir` holding an open or blocked task'
+      + ' holds the install back only while a loop is live: with none live it warns once, naming each such'
+      + ' tracker, and installs; with that key true and a loop live it refuses with exit code 1, naming each'
+      + ' one, unless `--force` is on the line. It refuses with exit code 1 too while that runtime directory is'
       + ' already there, naming it and the version: a version is installed once, and `--force` replaces the'
       + ' directory whole. It exits 2 when it could not run: a session record it cannot read, a'
       + ' `package.json` that is not rafa\'s, a config or tracker it cannot read, or a build, copy or link'
@@ -241,14 +255,15 @@ export function createSelfUpdateCommand(seams: SelfUpdateSeams = DEFAULT_SELF_UP
     flags: [
       {
         name: 'force',
-        description: 'Replace a `~/.rafa/runtime/<version>/` already there, whole, instead of refusing it.',
+        description: 'Replace a `~/.rafa/runtime/<version>/` already there, whole, instead of refusing it, and'
+          + ' install beside a plan tracker holding a task while a loop is live.',
         type: 'boolean',
       },
     ],
     examples: [
       {
         cmd: 'rafa self-update',
-        note: 'Builds the checkout and points `~/.rafa/bin/rafa` at the copy, once every plan is finished.',
+        note: 'Builds the checkout and points `~/.rafa/bin/rafa` at the copy, once no loop of the project is live.',
       },
       {
         cmd: 'rafa self-update --force',

@@ -45,10 +45,21 @@ merge — `verifyPullRequest` (`src/start/pr-lifecycle.ts`) keeps those, and
 the deadline and the poll interval are that gate's own constants. The same
 `waitForChecks` the loop's own CI gate uses, so one `pr wait` and the loop
 agree about what green means and how often a pull request is asked. Green
-exits 0; red exits 1; a pull request with NO checks at all exits 1 too, and
-is answered at once rather than waited out, since a PR that does not merge
-cleanly schedules no run and no amount of waiting makes one; the deadline
-passing with checks still running exits 3. A green wait writes its report
+exits 0; red exits 1; a pull request with NO checks at all exits 1 too,
+with the head line `no check registered yet`. Zero checks are polled
+again at the poll interval while the head is younger than
+`FIRST_CHECK_GRACE_MS` (120 seconds, `src/pr/checks.ts`), since GitHub
+registers a push's runs some seconds after the push; past that grace the
+ending is `none` at once. The age is the head commit's committed date
+(`headCommittedAt` on the pull request's detail), not the push time, so an
+old commit pushed just now gets no grace, and a head whose date the
+provider does not answer gets none either. Only `pr wait` passes that
+date: the loop's CI gate and `pr triage --resolve` poll as they did. A
+`none` ending says the pull request does not merge cleanly, and that no
+run is scheduled for it, only when one more read of its detail says
+`conflicting`; any other reading gets `rafa pr wait <n>` to ask again and
+`rafa pr show <n>`, and says nothing about merging. The deadline passing
+with checks still running exits 3. A green wait writes its report
 through the output and then names the one step that follows, which for
 checks that have just passed is the merge (`src/next/ending.ts`,
 `--no-hint` to turn it off); every other ending carries the report as the
@@ -234,7 +245,12 @@ sentence replaces nothing.
    waiting on `origin/<base>` fold into a version, so settle is the
    merge's last line (`src/commands/pr/merge-followups.ts`). While a loop
    of the project is live, the update's line ends `run it after the loop
-   on <branch> finishes`, since `rafa self-update` refuses until then.
+   on <branch> finishes`, since `rafa self-update` refuses while that loop
+   is live. A tracker in `plan.dir` with an open or blocked task stops the
+   update only then: read while a loop is live, it exits 1 and names each
+   tracker, unless `--force` is on the line. With no loop live the update
+   goes on and warns once, naming each such tracker, so a tracker a parked
+   plan left behind does not hold it (`src/runtime/install.ts`).
    Both are only printed: `pr merge` never runs settle, and `rafa release
    tag` is no longer named here, since settle tags or names the tag itself.
 8. Last, name the one step that follows — with the base pulled and both
@@ -367,6 +383,14 @@ Run again:
   when none is pending and the PR is still not green, assess again and EDIT
   the same comment (one triage comment per PR, history in its edits); when
   green, say green.
+- A conflicting head is never green, whatever its checks say: with
+  `mergeable: conflicting` (or `mergeStateStatus: DIRTY` while `mergeable`
+  is `unknown`) it is assessed and classed `conflict-*` whether its rows
+  are green, red or absent. Two stored-comment rules come first: a triage
+  already stored at the same head is shown, and a moved head with a check
+  still running shows the old triage as `pending`, conflict or not.
+  `unknown` with any other merge state and green checks still says green
+  (`src/pr/triage/rerun.ts`).
 - `--no-comment` reads an existing comment and writes none.
 
 Which PR, with no `<n>` and no PR on the current branch: list red PRs. One:
@@ -429,7 +453,10 @@ rejected.
 - Then the existing CI wait. A fresh assessment of class `green` OR
   `no-checks` counts as resolved (`endOfAttempt`,
   `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
-  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
+  repository that schedules no checks reads `no-checks`. Nothing counts as
+  resolved while the PR still conflicts (`stillConflicts`), green checks
+  included: they are what a green, conflicting PR brings into its run.
+  Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,

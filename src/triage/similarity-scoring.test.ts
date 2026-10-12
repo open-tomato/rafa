@@ -67,6 +67,7 @@ function openIssueOf(filing: Filing): OpenIssue {
     ref: { opt: filing.cause, kind: 'github', externalId: String(filing.cause), url: null },
     title: filing.what,
     body,
+    createdAt: null,
   };
 }
 

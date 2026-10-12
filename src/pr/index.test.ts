@@ -36,6 +36,7 @@ describe('the pull request barrel', () => {
     expect(barrel.parseChecks).toBe(checks.parseChecks);
     expect(barrel.verdictOf).toBe(checks.verdictOf);
     expect(barrel.waitForChecks).toBe(checks.waitForChecks);
+    expect(barrel.FIRST_CHECK_GRACE_MS).toBe(checks.FIRST_CHECK_GRACE_MS);
   });
 
   it('answers the port values of ./types.js themselves', () => {

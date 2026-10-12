@@ -180,6 +180,15 @@ export interface PullRequestDetail extends PullRequestSummary {
   readonly body: string;
   /** The head commit, which a triage comment is pinned to. */
   readonly headRefOid: string;
+  /**
+   * When the head commit was committed, ISO 8601, as the provider
+   * answers it; null when it does not. It is the commit's own date and
+   * NOT the push time, so a commit made earlier and pushed just now
+   * reads as old. `rafa pr wait` reads it for the grace a young head
+   * gets before zero checks reads as none (`FIRST_CHECK_GRACE_MS` in
+   * `./checks.js`), and null means no grace.
+   */
+  readonly headCommittedAt: string | null;
   readonly mergeable: Mergeability;
   /**
    * GitHub's `mergeStateStatus` verbatim — `CLEAN`, `BLOCKED`, `DIRTY`,
@@ -219,7 +228,10 @@ export interface MergedPullRequest {
 /** A PR's checks, and the one verdict over them. */
 export interface ChecksReading {
   readonly rows: readonly CheckRow[];
-  /** `none` when the PR has no checks at all, which a conflict produces. */
+  /**
+   * `none` when the PR has no checks at all, which a conflict produces,
+   * and so does a head pushed before its first check registered.
+   */
   readonly verdict: ChecksVerdict;
 }
 

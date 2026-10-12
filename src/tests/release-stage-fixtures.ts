@@ -213,6 +213,7 @@ export function detail(body: string): PullRequestDetail {
     ...SUMMARY,
     body,
     headRefOid: 'deadbeef',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

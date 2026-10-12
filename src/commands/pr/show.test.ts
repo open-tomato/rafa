@@ -126,6 +126,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     updatedAt: '2026-09-18T11:00:00Z',
     body: 'what this pull request does',
     headRefOid: HEAD_OID,
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

@@ -60,6 +60,16 @@
  * every-state case alone, since the contract closes no issue as
  * released; the skip reported under `find` the skip case alone.
  *
+ * Four mutations of the `createdAt` that `openIssues` answers were
+ * driven on 2026-10-12 over `src/adapters/tracker/`, the module restored
+ * byte-identical (sha256) after each: three at 453 pass before, and the
+ * fourth at 454, once the month case that holds it was written.
+ * `capturedAt` answered unchecked reddened the five no-time cases then
+ * written; the shape check dropped, the three of them `Date.parse`
+ * reads; a null answered always, the contract's `createdAt` case, the
+ * every-state case, the kept-time case and those five; and `Date.parse`
+ * dropped, the month case alone.
+ *
  * Six mutations of `editable` and `edit` were driven on 2026-10-06 over
  * this file, at 111 pass before, restored byte-identical (sha256) after.
  * `open` answered true always reddened the contract's closed case and
@@ -736,13 +746,44 @@ describe('open issues over local issues', () => {
     }
     await tracker.create(draftFixture({ opt: 0, type: 'chore', title: 'A chore' }));
 
-    expect(await tracker.openIssues?.('bug')).toEqual([
-      { ref: { opt: 0, kind: 'local', externalId: '1', url: null }, title: 'In backlog', body: 'Held backlog.\n' },
-      { ref: { opt: 0, kind: 'local', externalId: '2', url: null }, title: 'In todo', body: 'Held todo.\n' },
-      { ref: { opt: 0, kind: 'local', externalId: '3', url: null }, title: 'In in-progress', body: 'Held in-progress.\n' },
-      { ref: { opt: 0, kind: 'local', externalId: '4', url: null }, title: 'In in-review', body: 'Held in-review.\n' },
+    expect(await tracker.openIssues?.('bug')).toStrictEqual([
+      { ref: { opt: 0, kind: 'local', externalId: '1', url: null }, title: 'In backlog', body: 'Held backlog.\n', createdAt: NOW },
+      { ref: { opt: 0, kind: 'local', externalId: '2', url: null }, title: 'In todo', body: 'Held todo.\n', createdAt: NOW },
+      { ref: { opt: 0, kind: 'local', externalId: '3', url: null }, title: 'In in-progress', body: 'Held in-progress.\n', createdAt: NOW },
+      { ref: { opt: 0, kind: 'local', externalId: '4', url: null }, title: 'In in-review', body: 'Held in-review.\n', createdAt: NOW },
     ]);
     expect(ids((await tracker.openIssues?.('chore'))?.map(({ ref }) => ref) ?? [])).toEqual(['8']);
+  });
+
+  it('answers each open issue with the capturedAt its file holds, kept through a comment and a transition', async () => {
+    const dir = freshDir('open-created');
+    const first = await localTracker(dir).create(draftFixture({ opt: 0, title: 'First' }));
+    const later = localTracker(dir, { now: () => LATER });
+    await later.create(draftFixture({ opt: 0, title: 'Second' }));
+    await later.comment(first, 'still here');
+    await later.transition(first, 'in-progress');
+
+    expect((await later.openIssues?.('bug'))?.map((issue) => [issue.title, issue.createdAt]))
+      .toEqual([['First', NOW], ['Second', LATER]]);
+    expect(readIssue(dir, 1).capturedAt).toBe(NOW);
+  });
+
+  it.each([
+    ['a word', 'yesterday'],
+    ['an empty string', ''],
+    ['a month that does not exist', '2026-13-27T18:04:00Z'],
+    ['a bare number, which Date.parse reads as the year 2001', '1'],
+    ['a date with no time', '2026-07-27'],
+    ['a time with no offset', '2026-07-27T18:04:00'],
+  ])('answers a null createdAt for a capturedAt that is no time, %s, beside a dated issue', async (_label, capturedAt) => {
+    const dir = freshDir('open-undated');
+    const tracker = localTracker(dir);
+    await tracker.create(draftFixture({ opt: 0, title: 'Dated' }));
+    writeFileSync(join(dir, '2.md'), renderLocalIssue(record({ capturedAt, draft: draftFixture({ opt: 0, title: 'Undated' }) })));
+
+    expect((await tracker.openIssues?.('bug'))?.map((issue) => [issue.title, issue.createdAt]))
+      .toEqual([['Dated', NOW], ['Undated', null]]);
+    expect(readIssue(dir, 2).capturedAt).toBe(capturedAt);
   });
 
   it('answers no open issues for a directory that does not exist, creating none', async () => {

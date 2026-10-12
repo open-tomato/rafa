@@ -90,7 +90,8 @@ import { scratchHomeEnv } from '../../tests/scratch-home-env.js';
 
 import { draftFixture, runTrackerContract } from './contract.js';
 import { createFakeGh } from './github-fake.js';
-import { createGhRunner, createGithubTracker, GITHUB_LABELS, OPEN_ISSUES_LIMIT } from './github.js';
+import { OPEN_ISSUES_LIMIT } from './github-open-issues.js';
+import { createGhRunner, createGithubTracker, GITHUB_LABELS } from './github.js';
 
 /** The URL of issue 1 in the fake's default repository. */
 const ISSUE_1_URL = 'https://github.com/open-tomato/rafa/issues/1';
@@ -692,7 +693,7 @@ describe('finding issues', () => {
 });
 
 describe('reading open issues', () => {
-  it('sends one gh issue list for open issues of the type label, asking for the text', async () => {
+  it('sends one gh issue list for open issues of the type label, asking for the text and the time', async () => {
     const { tracker, fake } = overFake();
     await tracker.create(draftFixture({ type: 'bug' }));
     const before = fake.calls().length;
@@ -700,13 +701,14 @@ describe('reading open issues', () => {
     await tracker.openIssues?.('bug');
 
     expect(fake.calls().slice(before)).toEqual([[
-      'issue', 'list', '--state', 'open', '--json', 'number,url,labels,title,body', '--limit', String(OPEN_ISSUES_LIMIT),
+      'issue', 'list', '--state', 'open', '--json', 'number,url,labels,title,body,createdAt', '--limit', String(OPEN_ISSUES_LIMIT),
       '--label', 'type:bug',
     ]]);
   });
 
-  it('answers each open bug newest first, with opt 0, the url, the module label, the title and the body', async () => {
-    const { tracker, fake } = overFake();
+  it('answers each open bug newest first, with opt 0, the url, the module label, the title, the body and the time', async () => {
+    const times = ['2026-10-05T15:08:56Z', '2026-10-06T08:00:00Z', '2026-10-08T19:15:57Z', '2026-10-12T05:50:18Z'];
+    const { tracker, fake } = overFake({ now: () => times.shift() ?? '' });
     await tracker.create(draftFixture({ title: 'First bug', body: 'One.\n' }));
     await tracker.create(draftFixture({ title: 'A spike', type: 'spike' }));
     await tracker.create(draftFixture({ title: 'Second bug', body: 'Two.\n', module: 'billing' }));
@@ -719,9 +721,25 @@ describe('reading open issues', () => {
         ref: { opt: 0, kind: 'github', externalId: '3', url: 'https://github.com/open-tomato/rafa/issues/3', module: 'billing' },
         title: 'Second bug',
         body: 'Two.\n',
+        createdAt: '2026-10-08T19:15:57Z',
       },
-      { ref: { opt: 0, kind: 'github', externalId: '1', url: ISSUE_1_URL }, title: 'First bug', body: 'One.\n' },
+      {
+        ref: { opt: 0, kind: 'github', externalId: '1', url: ISSUE_1_URL },
+        title: 'First bug',
+        body: 'One.\n',
+        createdAt: '2026-10-05T15:08:56Z',
+      },
     ]);
+  });
+
+  it('answers a null time for an issue whose createdAt is no time, listing it with the dated one beside it', async () => {
+    const { tracker, fake } = overFake({ now: () => '2026-10-05T15:08:56Z' });
+    await tracker.create(draftFixture({ title: 'Dated' }));
+    await tracker.create(draftFixture({ title: 'Undated' }));
+    fake.update('2', (issue) => ({ ...issue, createdAt: 'not a time' }));
+
+    expect((await tracker.openIssues?.('bug'))?.map((issue) => [issue.title, issue.createdAt]))
+      .toEqual([['Undated', null], ['Dated', '2026-10-05T15:08:56Z']]);
   });
 
   it('refuses a type the port does not name, sending nothing, beside one it names', async () => {
@@ -749,13 +767,22 @@ describe('reading open issues', () => {
     await expect(tracker.openIssues?.('bug')).rejects.toThrow(`github tracker: gh issue list ${problem}`);
   });
 
-  it('answers a row holding its title and body, beside the refused ones', async () => {
+  it('answers a row holding its title and body, beside the refused ones, with a null time for its missing createdAt', async () => {
     const row = '[{"number":1,"url":"u","labels":[],"title":"t","body":"b"}]';
     const tracker = createGithubTracker({ gh: scripted(() => wrote(row)).run });
 
-    expect(await tracker.openIssues?.('bug')).toEqual([
-      { ref: { opt: 0, kind: 'github', externalId: '1', url: 'u' }, title: 't', body: 'b' },
+    expect(await tracker.openIssues?.('bug')).toStrictEqual([
+      { ref: { opt: 0, kind: 'github', externalId: '1', url: 'u' }, title: 't', body: 'b', createdAt: null },
     ]);
+  });
+
+  it('refuses a row for its number before its title, as find refuses one', async () => {
+    const row = '[{"number":"1","url":"u","labels":[],"body":"b"}]';
+    const tracker = createGithubTracker({ gh: scripted(() => wrote(row)).run });
+
+    await expect(tracker.openIssues?.('bug')).rejects.toThrow(
+      'github tracker: gh issue list answered row 0 with number "1", expected an issue number',
+    );
   });
 
   it('rejects with what gh wrote when the listing fails', async () => {

@@ -139,6 +139,28 @@
  *     ascending, not in the order the body names them
  *     (`open-tomato/rafa#763`).
  *
+ * Read the same way on 2026-10-12, off `gh` 2.102.0 with read-only
+ * commands, for the head commit's date:
+ *
+ *   - `gh pr view <n> --json commits` writes a list, each entry
+ *     `{"authoredDate","authors","committedDate","messageBody",
+ *     "messageHeadline","oid"}` and each author
+ *     `{"email","id","login","name"}`, with `id` and `login` empty
+ *     strings for an author no account answers for (`cli/cli#14540`).
+ *     Both dates are ISO 8601 instants such as `2026-09-26T04:46:04Z`.
+ *   - The list is the FIRST 100 commits, oldest first, and no more:
+ *     `cli/cli#14515`, 1050 commits by `gh api repos/cli/cli/pulls/14515`,
+ *     answered 100 entries in `committedDate` order whose last `oid` was
+ *     not the pull request's `headRefOid`. A one-commit pull request
+ *     answers the one entry, whose `oid` is the `headRefOid`.
+ *
+ * The fake holds one fact about a pull request's commits, the head's
+ * committed date, and writes ONE entry from it, under the `headRefOid`:
+ * the recorded shape of a one-commit pull request. A pull request whose
+ * date is null writes an empty list, which is not a shape `gh` was seen
+ * to write and stands for the recorded case of a head the list does not
+ * hold, the adapter reading both as no date.
+ *
  * NOT recorded, because reading one would write to a repository: what
  * `gh pr merge`, `gh pr edit`, a comment POST and a comment PATCH write
  * when they succeed, and what any of them writes when it fails. So the
@@ -213,6 +235,14 @@ export interface FakePullRequest {
   readonly headRefName: string;
   readonly baseRefName: string;
   readonly headRefOid: string;
+  /**
+   * When the head commit was committed, ISO 8601, or null for a head
+   * `--json commits` does not list; see the module note. The pull
+   * request's `updatedAt` when a seed leaves it out, so a planted pull
+   * request is as old as it says it is and a case that wants a young
+   * head names the instant.
+   */
+  readonly headCommittedAt: string | null;
   readonly isCrossRepository: boolean;
   readonly state: 'OPEN' | 'CLOSED' | 'MERGED';
   /**
@@ -245,6 +275,7 @@ export const PULL_FIELDS: ReadonlySet<string> = new Set([
   'body',
   'closingIssuesReferences',
   'comments',
+  'commits',
   'headRefName',
   'headRefOid',
   'isCrossRepository',
@@ -291,7 +322,7 @@ const IN_FLIGHT_STATES: ReadonlySet<string> = new Set([
 /** A finished check's `completedAt` is a real instant; a running one's is this. */
 const NEVER_COMPLETED = '0001-01-01T00:00:00Z';
 
-/** What a seed leaves out, minus the number, the author, the head and the merge instant. */
+/** What a seed leaves out, minus the number, the author, the head, its date and the merge instant. */
 const PULL_DEFAULTS = {
   title: 'a pull request',
   body: '',
@@ -305,7 +336,10 @@ const PULL_DEFAULTS = {
   updatedAt: '2026-09-18T11:00:00Z',
   checks: [],
   comments: [],
-} as const satisfies Omit<FakePullRequest, 'number' | 'author' | 'headRefName' | 'headRefOid' | 'mergedAt'>;
+} as const satisfies Omit<
+  FakePullRequest,
+  'number' | 'author' | 'headRefName' | 'headRefOid' | 'headCommittedAt' | 'mergedAt'
+>;
 
 /** The author a seed that names none carries. */
 const DEFAULT_AUTHOR: FakePrAuthor = Object.freeze({ login: 'octo', isBot: false, name: 'Octo Cat' });
@@ -384,7 +418,8 @@ export function pullUrl(repo: string, number: number): string {
  *
  * A `MERGED` seed that names no `mergedAt` is merged at its `updatedAt`,
  * a merge being the last time a merged pull request moved; any other
- * state is merged at null.
+ * state is merged at null. A seed that names no `headCommittedAt` has a
+ * head committed at its `updatedAt`.
  */
 export function fillSeed(seed: FakePullRequestSeed): FakePullRequest {
   const updatedAt = seed.updatedAt ?? PULL_DEFAULTS.updatedAt;
@@ -393,6 +428,7 @@ export function fillSeed(seed: FakePullRequestSeed): FakePullRequest {
     author: DEFAULT_AUTHOR,
     headRefName: `feat/pr-${seed.number}`,
     headRefOid: String(seed.number).padStart(40, '0'),
+    headCommittedAt: updatedAt,
     mergedAt: seed.state === 'MERGED'
       ? updatedAt
       : null,
@@ -466,6 +502,24 @@ function renderClosingIssue(issue: FakeClosingIssue, repo: string): Record<strin
   };
 }
 
+/** The one commit `--json commits` writes for the head, or none; see the module note. */
+function renderCommits(pull: FakePullRequest): Record<string, unknown>[] {
+  if (pull.headCommittedAt === null) return [];
+  return [{
+    authoredDate: pull.headCommittedAt,
+    authors: [{
+      email: `${pull.author.login}@users.noreply.github.com`,
+      id: `MDQ6VXNlcmZha2U${pull.author.login}`,
+      login: pull.author.login,
+      name: pull.author.name ?? pull.author.login,
+    }],
+    committedDate: pull.headCommittedAt,
+    messageBody: '',
+    messageHeadline: pull.title,
+    oid: pull.headRefOid,
+  }];
+}
+
 /** The fields asked for, in the code-unit order `gh` writes them in. */
 function pick(values: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
   return Object.fromEntries([...fields].sort().map((field) => [field, values[field]]));
@@ -484,6 +538,7 @@ export function renderPull(
     body: pull.body,
     closingIssuesReferences: pull.closes.map((issue) => renderClosingIssue(issue, repo)),
     comments: pull.comments.map((comment) => renderEmbeddedComment(comment, url)),
+    commits: renderCommits(pull),
     headRefName: pull.headRefName,
     headRefOid: pull.headRefOid,
     isCrossRepository: pull.isCrossRepository,

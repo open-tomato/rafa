@@ -79,7 +79,6 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { BranchRun } from '../../ci/runs.js';
 import type { RafaContext } from '../../cli/command.js';
 import type { Tracker } from '../../ports/index.js';
-import type { FiledAtReader } from '../../stretch/pit-readings.js';
 
 import { readFileSync } from 'node:fs';
 
@@ -143,10 +142,8 @@ export interface ItemMergeSeams {
   readonly runRafa: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>) => Promise<number | null>;
   /** The `gh` runner for the project root. */
   readonly gh: (root: string) => GhRunner;
-  /** The tracker the open bugs are read from. */
+  /** The tracker the open bugs are read from, each with the time it was filed. */
   readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues'>;
-  /** Each bug's filing time, or undefined to leave the bugs filed since unread. */
-  readonly filedAt: (gh: GhRunner) => FiledAtReader | undefined;
   /** Waits `ms` milliseconds. */
   readonly sleep: (ms: number) => Promise<void>;
   readonly now: () => Date;
@@ -437,10 +434,7 @@ async function mergeItem(context: RafaContext, item: WaitedItem, number: number,
     ? ', closing no issue'
     : `, ${closes.join(', ')}`}`);
 
-  const readings = await readPitReadings(
-    { gh, tracker: seams.tracker(gh), filedAt: seams.filedAt(gh) },
-    { branch: merged.base, since },
-  );
+  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since });
   for (const line of renderPitReadings(readings)) info(line);
 }
 
@@ -463,27 +457,4 @@ export async function afterLoopWait(context: RafaContext, item: WaitedItem, wait
     : waitExit;
   throw new CommandExit(code, `❌ ${COMMAND_NAME}: rafa loop wait --session-id=${item.sessionId} ended with exit code`
     + ` ${String(waitExit)} and no pull request to merge; nothing was merged.`);
-}
-
-/** Reads the time issue `ref` was filed through `gh issue view`, null when `gh` does not say. */
-export function ghFiledAt(gh: GhRunner): FiledAtReader {
-  return async (ref) => {
-    const result = await gh(['issue', 'view', ref.externalId, '--json', 'createdAt']);
-    if (!result.ok) return null;
-    let row: unknown;
-    try {
-      row = JSON.parse(result.stdout) as unknown;
-    } catch {
-      return null;
-    }
-    const at = isMapping(row)
-      ? row['createdAt']
-      : undefined;
-    const time = typeof at === 'string'
-      ? Date.parse(at)
-      : Number.NaN;
-    return Number.isNaN(time)
-      ? null
-      : new Date(time);
-  };
 }

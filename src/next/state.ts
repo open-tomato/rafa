@@ -20,11 +20,16 @@
  * matches and says.
  *
  *  - {@link NEXT_PRECONDITIONS}`[0]`, `tree-modified`: the working tree
- *    has changes to tracked files. It is read once row 1 has found no
- *    live run and ahead of every other row, since one `git status
- *    --porcelain` asks nothing of the network. Row 1 comes first because
- *    a live run's edits are the loop's and never the person's to commit
- *    or set aside, and the tree line names the checkout it read.
+ *    has changes to tracked files. It is read ahead of every row from
+ *    row 2 on, since one `git status --porcelain` asks nothing of the
+ *    network, and it is read ahead of row 1 too unless a live run works
+ *    in the checkout the tree is read in
+ *    ({@link NextWorld.liveRunHoldsTree}). Such a run's edits are the
+ *    loop's and never the person's to commit or set aside, so row 1
+ *    answers for them and the tree is not read. A loop in a worktree of
+ *    its own edits nothing in that checkout: a change there is the
+ *    person's, the tree line says so and names the checkout it read, and
+ *    row 1 answers only once that tree is clean.
  *  - {@link NEXT_PRECONDITIONS}`[1]`, `pulls-unusable`: the pull
  *    request provider could not be asked. It is read where the table
  *    would read the provider, ahead of rows 5, 6, 7 and 8 and not
@@ -150,8 +155,9 @@
  *
  * `./readings.ts` holds the readings and the order they are asked in:
  * each is made at most once per answer and only when it is asked for,
- * so the working tree is read once, after row 1 and ahead of row 2, the
- * provider is reached from row 5 on and the board from row 10 on. A
+ * so the working tree is read once, ahead of row 2 and on whichever side
+ * of row 1 the live runs put it, the provider is reached from row 5 on
+ * and the board from row 10 on. A
  * reading that failed is carried out as {@link NextState.problems}
  * rather than thrown, and the caller prints those beside the answer.
  */
@@ -583,12 +589,25 @@ const ROADMAP_ROWS: readonly NextRow[] = Object.freeze(ROWS.flatMap((row) => [..
  */
 export const NEXT_ROADMAP_STATES: readonly NextStateId[] = Object.freeze(ROADMAP_ROWS.map((row) => row.id));
 
+/** Row 1 alone: what goes ahead of the working-tree pre-condition for a live run holding that tree. */
+const LOOP_ROW: ReadonlySet<NextStateId> = new Set<NextStateId>(['loop-running']);
+
+/** No row at all: what goes ahead of the working-tree pre-condition otherwise. */
+const NO_ROW: ReadonlySet<NextStateId> = new Set<NextStateId>();
+
 /**
- * The rows read ahead of the working-tree pre-condition: row 1 alone,
- * whose live run owns the edits the tree would otherwise offer back to
- * the person; see `./preconditions.ts`.
+ * The rows read ahead of the working-tree pre-condition: row 1 when a
+ * live run works in the checkout the tree is read in, since that run
+ * owns the edits the tree would otherwise offer back to the person, and
+ * none when no run does. Row 1 is then read after the tree like every
+ * other row, so a loop in a worktree of its own still answers over a
+ * clean tree. See `./preconditions.ts`.
  */
-const AHEAD_OF_TREE: ReadonlySet<NextStateId> = new Set<NextStateId>(['loop-running']);
+function aheadOfTree(world: NextWorld): ReadonlySet<NextStateId> {
+  return world.liveRunHoldsTree()
+    ? LOOP_ROW
+    : NO_ROW;
+}
 
 /**
  * The first answer `rows` give, read in order, the provider pre-condition
@@ -631,11 +650,13 @@ function answer(row: RowAnswer, problems: readonly string[]): NextState {
  * beside it. With {@link NextSources.roadmap} set, the five hop rows are
  * read among them, in {@link NEXT_ROADMAP_STATES}' order.
  *
- * The two pre-conditions are read among the rows: the working tree once
- * row 1 has found no live run and ahead of every other row, the
- * provider ahead of the rows that read it. Either one answers in the
- * table's place, carrying `none` to run, and neither offers a live
- * run's edits back to the person, since row 1 has answered for those.
+ * The two pre-conditions are read among the rows: the working tree
+ * ahead of every row from row 2 on, and ahead of row 1 as well unless a
+ * live run works in the checkout the tree is read in
+ * ({@link aheadOfTree}); the provider ahead of the rows that read it.
+ * Either one answers in the table's place, carrying `none` to run, and
+ * neither offers a live run's edits back to the person, since row 1 has
+ * answered for the tree such a run works in.
  *
  * A row asks only the readings it needs and each of them at most once,
  * so a state an early row settles costs nothing a later one would have
@@ -648,9 +669,10 @@ export async function readNextState(sources: NextSources): Promise<NextState> {
     ? ROWS
     : ROADMAP_ROWS;
 
-  const found = await firstAnswer(world, rows.filter((row) => AHEAD_OF_TREE.has(row.id)))
+  const ahead = aheadOfTree(world);
+  const found = await firstAnswer(world, rows.filter((row) => ahead.has(row.id)))
     ?? readTreeModified(world)
-    ?? await firstAnswer(world, rows.filter((row) => !AHEAD_OF_TREE.has(row.id)));
+    ?? await firstAnswer(world, rows.filter((row) => !ahead.has(row.id)));
   if (found !== null) return answer(found, world.problems());
 
   // Unreachable: row 13 answers for every reading. A table edited to end

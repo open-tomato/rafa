@@ -1218,6 +1218,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../config-sections.js', ['messageOf']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
     ['../../config.js', ['configFilePath']],
+    ['../../utils/agent-shell.js', ['AGENT_SHELL_ENV', 'isAgentShell']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
   ['./commands/ci/status.js', [
@@ -1282,7 +1283,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./item-merge.js', ['afterLoopWait', 'ghFiledAt', 'mergeDryRunLines']],
+    ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/stretch/end.js', [
@@ -1436,7 +1437,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
+    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],
@@ -1451,9 +1452,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../config-load.js', ['loadConfig']],
     ['../config-schema.js', ['SETTINGS']],
     ['../config-sections.js', ['messageOf']],
-    ['../loop/sessions.js', ['isPidAlive', 'readSessions']],
+    ['../loop/sessions.js', ['isPidAlive']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
+    ['../runtime/live-loops.js', ['liveLoopsOf']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],

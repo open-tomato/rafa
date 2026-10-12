@@ -6,6 +6,14 @@
  * JSON fixtures are the shapes `gh pr checks --json name,state,link`
  * actually emitted for this repo, including the plain-text message it
  * writes when a PR has no checks at all.
+ *
+ * The grace cases run on {@link steppedClock}: a counter the sleeps
+ * alone move, so "polled until a row appears" and "polled until the
+ * grace has passed" are exact poll counts, and the two endings on the
+ * first poll (no head time, a head past the grace) are held to NO
+ * sleep at all. Each grace case has a control beside it that differs
+ * in the one input under test, so a wait that ignored the head time
+ * could not pass both.
  */
 
 import type { CheckRow } from './checks.js';
@@ -15,6 +23,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   classifyState,
   failingRows,
+  FIRST_CHECK_GRACE_MS,
   formatRows,
   parseChecks,
   verdictOf,
@@ -36,6 +45,32 @@ function rowsJson(states: Record<string, string>): string {
  */
 function rowsOf(states: Record<string, string>): CheckRow[] {
   return parseChecks(rowsJson(states));
+}
+
+/** The instant the grace cases start at: 2026-10-12T12:00:00Z, in milliseconds. */
+const NOW = Date.UTC(2026, 9, 12, 12);
+
+/** A clock a case advances by sleeping, so no case waits on a real timer. */
+interface SteppedClock {
+  readonly now: () => number;
+  readonly sleep: (ms: number) => Promise<void>;
+  /** Every wait asked for, in order. */
+  readonly sleeps: () => readonly number[];
+}
+
+/** A clock starting at `start` that only the sleeps move. */
+function steppedClock(start: number): SteppedClock {
+  let ms = start;
+  let waits: readonly number[] = [];
+  return {
+    now: () => ms,
+    sleep: (asked: number) => {
+      waits = [...waits, asked];
+      ms += asked;
+      return Promise.resolve();
+    },
+    sleeps: () => [...waits],
+  };
 }
 
 describe('classifyState', () => {
@@ -180,18 +215,21 @@ describe('waitForChecks', () => {
     expect(result.polls).toBe(3);
   });
 
-  it('returns none immediately rather than waiting out the clock', async () => {
-    // A PR with no checks is conflicting or unmatched by any workflow;
-    // neither resolves by waiting, so burning the deadline is wasted.
+  it('returns none on the first poll when it is handed no head time', async () => {
+    // With no head time there is no grace to wait out: this is the wait
+    // the loop's CI gate and `pr triage --resolve` make.
+    const clock = steppedClock(NOW);
     const result = await waitForChecks({
       probe: () => Promise.resolve(parseChecks('no checks reported')),
       timeoutMs: 600_000,
       intervalMs: 1_000,
-      sleep: noSleep,
+      now: clock.now,
+      sleep: clock.sleep,
     });
 
     expect(result.verdict).toBe('none');
     expect(result.polls).toBe(1);
+    expect(clock.sleeps()).toEqual([]);
   });
 
   it('gives up at the deadline instead of polling forever', async () => {
@@ -224,5 +262,168 @@ describe('waitForChecks', () => {
     });
 
     expect(seen).toEqual(['red']);
+  });
+});
+
+describe('waitForChecks on a head whose first check may not have registered', () => {
+  /** The interval every case here polls at. */
+  const INTERVAL = 20_000;
+
+  /** A deadline no case here reaches unless it says so. */
+  const LONG = 20 * 60_000;
+
+  it('declares the grace as two minutes', () => {
+    expect(FIRST_CHECK_GRACE_MS).toBe(120_000);
+  });
+
+  it('polls zero rows on a young head until a row appears', async () => {
+    const clock = steppedClock(NOW);
+    const answers = [[], [], rowsOf({ checks: 'SUCCESS' })];
+    let call = 0;
+    const result = await waitForChecks({
+      probe: () => {
+        const rows = answers[Math.min(call, answers.length - 1)] ?? [];
+        call += 1;
+        return Promise.resolve(rows);
+      },
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - 1_000,
+    });
+
+    expect([result.verdict, result.polls]).toEqual(['green', 3]);
+    expect(clock.sleeps()).toEqual([INTERVAL, INTERVAL]);
+  });
+
+  it('goes on to poll a row that registered pending, as it would with no grace', async () => {
+    const clock = steppedClock(NOW);
+    const answers = [[], rowsOf({ checks: 'IN_PROGRESS' }), rowsOf({ checks: 'FAILURE' })];
+    let call = 0;
+    const result = await waitForChecks({
+      probe: () => {
+        const rows = answers[Math.min(call, answers.length - 1)] ?? [];
+        call += 1;
+        return Promise.resolve(rows);
+      },
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - 1_000,
+    });
+
+    expect([result.verdict, result.polls]).toEqual(['red', 3]);
+  });
+
+  it('ends none on the first poll for zero rows on a head past the grace', async () => {
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - FIRST_CHECK_GRACE_MS,
+    });
+
+    expect([result.verdict, result.polls]).toEqual(['none', 1]);
+    expect(clock.sleeps()).toEqual([]);
+  });
+
+  it('holds a head one millisecond inside the grace, the control on the case above', async () => {
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - FIRST_CHECK_GRACE_MS + 1,
+    });
+
+    // Held on the first poll, and past the grace by the second.
+    expect([result.verdict, result.polls]).toEqual(['none', 2]);
+    expect(clock.sleeps()).toEqual([INTERVAL]);
+  });
+
+  it('polls a young head that never gets a check until the grace has passed, then ends none', async () => {
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - 1_000,
+    });
+
+    // The head is 1s old at the first poll and 121s old at the seventh.
+    expect([result.verdict, result.polls, result.elapsedMs]).toEqual(['none', 7, 6 * INTERVAL]);
+    expect(result.rows).toEqual([]);
+  });
+
+  it('gives up at the deadline when it passes inside the grace', async () => {
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: 60_000,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - 1_000,
+    });
+
+    expect([result.verdict, result.polls]).toEqual(['timeout', 3]);
+    expect(result.rows).toEqual([]);
+  });
+
+  it('never holds a wait past the grace from its own start, whatever date the head carries', async () => {
+    // A committed date is the committer's clock, so it can read ahead of
+    // this one. An hour ahead must not turn two minutes into the deadline.
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW + 60 * 60_000,
+    });
+
+    expect([result.verdict, result.elapsedMs]).toEqual(['none', FIRST_CHECK_GRACE_MS]);
+  });
+
+  it('reads a head time that is no number as no head time', async () => {
+    const clock = steppedClock(NOW);
+    const result = await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: Number.NaN,
+    });
+
+    expect([result.verdict, result.polls]).toEqual(['none', 1]);
+  });
+
+  it('reports a poll the grace holds as pending, and the last one as none', async () => {
+    const clock = steppedClock(NOW);
+    const seen: string[] = [];
+    await waitForChecks({
+      probe: () => Promise.resolve([]),
+      timeoutMs: LONG,
+      intervalMs: INTERVAL,
+      now: clock.now,
+      sleep: clock.sleep,
+      headCommittedAtMs: NOW - FIRST_CHECK_GRACE_MS + INTERVAL + 1,
+      onPoll: (rows, verdict) => {
+        seen.push(`${verdict} ${rows.length}`);
+      },
+    });
+
+    expect(seen).toEqual(['pending 0', 'pending 0', 'none 0']);
   });
 });

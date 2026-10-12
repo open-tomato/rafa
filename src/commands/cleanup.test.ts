@@ -27,6 +27,11 @@
  * - A ticked run record's files are gone after the final yes, and the
  *   same files planted again are still there after a no, so the removal
  *   is proved to follow the answer and the files to have been there.
+ * - A Not-pushed row a ticked, removable worktree holds asks no second
+ *   question and is withheld (#978); over the same reading with that
+ *   worktree left unticked the question IS asked, and an unheld row
+ *   ticked beside the held one is asked too, so the silence is the
+ *   holder's and not a question that stopped being asked.
  * - The listing cases hold the git runner uncalled, the keys never
  *   opened and the prompter never opened, beside the asking cases
  *   where all three are, so "nothing removed" is read against runs that
@@ -150,6 +155,30 @@ const WT_DIRTY: WorktreeRow = {
   ticked: false,
   reason: '1 untracked',
 };
+
+/** A clean worktree with {@link NOT_PUSHED}'s branch checked out: it can be ticked, and starts unticked. */
+const WT_WIP: WorktreeRow = {
+  path: `${WORKTREES}/wt-wip`,
+  branch: 'wip',
+  lastModified: WHEN,
+  branchMerged: false,
+  blockers: [],
+  tickable: true,
+  ticked: false,
+  reason: 'clean',
+};
+
+/** A Not-pushed branch no worktree holds, beside {@link NOT_PUSHED}. */
+const SPARE_NOT_PUSHED: NotPushedRow = {
+  group: 'not-pushed',
+  branch: branch('spare', { upstream: null, ahead: null }),
+  ticked: false,
+  commits: 1,
+  reason: 'no upstream; 1 commit not on any remote',
+};
+
+/** What a ticked, removable worktree holding `wip` is withheld with. */
+const WIP_WITHHELD = `not removed: wip: held by the worktree at ${WT_WIP.path}; only a Merged branch is deleted with its worktree`;
 
 /** The Not-pushed branch {@link WT_DIRTY} has checked out, read as if no worktree held it. */
 const UNHELD_NOT_PUSHED: NotPushedRow = {
@@ -415,6 +444,54 @@ describe('rafa cleanup with a terminal', () => {
     expect(outcome.stdout).toContain('not removed: dirty: checked out in wt-dirty (dirty), which is not removed');
     expect(outcome.stdout).toContain('git branch -D wip');
     expect(outcome.stdout).not.toContain('git branch -D dirty');
+  });
+
+  it('asks nothing about a ticked Not-pushed row a ticked, removable worktree holds, and reports it not removed (#978)', async () => {
+    const read = reading({ worktrees: [WT_CLEAN, WT_WIP] });
+    const keys = [DOWN, DOWN, DOWN, SPACE, DOWN, DOWN, SPACE, ENTER];
+    const outcome = await run([], { read, keys, answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([cleanupQuestion(2, 2, 0)]);
+    expect(gitLines(outcome.recorded)).toEqual([
+      `worktree remove ${WT_CLEAN.path}`,
+      `worktree remove ${WT_WIP.path}`,
+      'branch -d done',
+      'branch -D squashed',
+    ]);
+    expect(outcome.stdout).toContain(WIP_WITHHELD);
+  });
+
+  it('asks about the same row once its worktree is left unticked (control)', async () => {
+    const read = reading({ worktrees: [WT_CLEAN, WT_WIP] });
+    const outcome = await run([], { read, keys: [DOWN, DOWN, DOWN, SPACE, ENTER], answers: ['n', 'y'] });
+    expect(outcome.recorded.asked).toEqual([notPushedQuestion(NOT_PUSHED), cleanupQuestion(2, 1, 0)]);
+    expect(outcome.stdout).not.toContain('not removed:');
+  });
+
+  it('asks nothing about that row under --dry-run either, and prints no -D line for it', async () => {
+    const read = reading({ worktrees: [WT_CLEAN, WT_WIP] });
+    const keys = [DOWN, DOWN, DOWN, SPACE, DOWN, DOWN, SPACE, ENTER];
+    const outcome = await run(['--dry-run'], { read, keys, answers: ['y'] });
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.recorded.asked).toEqual([]);
+    expect(outcome.recorded.git).toEqual([]);
+    expect(outcome.stdout).toContain(WIP_WITHHELD);
+    expect(outcome.stdout).toContain(`git worktree remove ${WT_WIP.path}`);
+    expect(outcome.stdout).not.toContain('git branch -D wip');
+  });
+
+  it('still asks about an unheld Not-pushed row ticked beside it, in a run and under --dry-run', async () => {
+    const read = reading({ notPushed: [NOT_PUSHED, SPARE_NOT_PUSHED], worktrees: [WT_CLEAN, WT_WIP] });
+    const keys = [DOWN, DOWN, DOWN, GROUP, DOWN, DOWN, DOWN, SPACE, ENTER];
+    const real = await run([], { read, keys, answers: ['y', 'y'] });
+    const dry = await run(['--dry-run'], { read, keys, answers: ['y'] });
+    expect(real.recorded.asked).toEqual([notPushedQuestion(SPARE_NOT_PUSHED), cleanupQuestion(3, 2, 0)]);
+    expect(gitLines(real.recorded)).toContain('branch -D spare');
+    expect(gitLines(real.recorded)).not.toContain('branch -D wip');
+    expect(real.stdout).toContain(WIP_WITHHELD);
+    expect(dry.recorded.asked).toEqual([notPushedQuestion(SPARE_NOT_PUSHED)]);
+    expect(dry.stdout).toContain('git branch -D spare');
+    expect(dry.stdout).toContain(WIP_WITHHELD);
   });
 
   it('deletes a ticked Stale row with -D on the final yes alone', async () => {
