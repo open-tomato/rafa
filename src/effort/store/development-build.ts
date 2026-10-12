@@ -61,7 +61,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute } from 'node:path';
 
 import { RAFA_VERSION } from '../../cli/version.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions, runsDir } from '../../loop/sessions.js';
 import { SCOPE_DIR } from '../../project/scope.js';
 import { readRuntimeIdentity } from '../../runtime/identity.js';

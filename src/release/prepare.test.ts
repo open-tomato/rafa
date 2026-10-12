@@ -61,7 +61,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RELEASE_AUTO } from '../config-sections.js';
+import { RELEASE_AUTO } from '../core/config/sections.js';
 import { createGitRunner } from '../pr/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 

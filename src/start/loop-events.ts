@@ -38,7 +38,7 @@ import { join } from 'node:path';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { oneLine, padKind } from '../adapters/output/events.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { readSessionLog } from '../effort/session-log.js';
 import { isSessionId, runsDir } from '../loop/sessions.js';

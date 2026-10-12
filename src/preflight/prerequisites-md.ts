@@ -138,7 +138,7 @@ import type {
 
 import { basename, dirname, join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /**
  * How a PREREQUISITES item is checked: by its probe on every dispatch, by

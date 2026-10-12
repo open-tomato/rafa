@@ -78,7 +78,7 @@ import type { HopRecord } from './hop-record.js';
 import type { BlockedLine } from '../board/blocked-line.js';
 import type { NextNowEpic } from '../board/epic-walk.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 import type { SessionRecord } from '../loop/sessions.js';
 import type { PlanListing } from '../plan/list.js';
 import type { PlansDir } from '../plan/plan-files.js';
@@ -89,7 +89,7 @@ import type { BaseStanding } from '../start/branch-decision.js';
 
 import { scanClaimBranches } from '../board/roadmap.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { isLive } from '../loop/session-readings.js';
 import { listPlans } from '../plan/list.js';
 import { planFileName } from '../plan/plan-files.js';

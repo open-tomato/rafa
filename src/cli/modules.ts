@@ -43,7 +43,7 @@ import type { CommandRegistry } from './registry.js';
 import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { describeValue } from '../config-sections.js';
+import { describeValue } from '../core/config/sections.js';
 
 /** One module's command entry: the name its commands mount under, and the file exporting them. */
 export interface ModuleCommandEntry {

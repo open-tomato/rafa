@@ -19,13 +19,13 @@ import { describe, expect, it } from 'bun:test';
 
 import { globList, TESTS_DEFAULTS, TESTS_SETTINGS } from './config-schema-tests.js';
 import { SETTINGS } from './config-schema.js';
-import { flag } from './config-sections.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
   parseConfigText,
   resolveConfig,
 } from './config.js';
+import { flag } from './core/config/sections.js';
 
 /** The label every file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

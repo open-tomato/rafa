@@ -268,7 +268,7 @@ import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';

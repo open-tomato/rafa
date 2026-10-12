@@ -137,7 +137,7 @@ import type { MergedPullRequest, PullRequests } from '../pr/types.js';
 import { basename } from 'node:path';
 
 import { RELEASE_DEFAULTS } from '../config-schema-release.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/git.js';
 
 import { readPastHead } from './past-head.js';

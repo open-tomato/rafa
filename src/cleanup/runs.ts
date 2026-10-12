@@ -42,7 +42,7 @@ import type { PidProbe, SessionRecord } from '../loop/sessions.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { RECORD_EXTENSION } from '../loop/session-record-parse.js';
 import { errorCode, isPidAlive, parseSessionRecord, readState, runsDir } from '../loop/sessions.js';
 import { EVENTS_EXTENSION } from '../start/loop-events.js';

@@ -76,7 +76,7 @@
  */
 import type { SpecRouteSeams } from './spec-route.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Need, NeedOrigin, NeedsReading, NeedsSeams, StackReading } from '../../plan/needs.js';
 import type { ProjectFound } from '../../project/scope.js';

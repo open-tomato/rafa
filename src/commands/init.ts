@@ -211,8 +211,8 @@ import { commandRetrySeams } from '../board/project/project-runner.js';
 import { CommandExit } from '../cli/command.js';
 import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { loadConfig } from '../config-load.js';
-import { messageOf } from '../config-sections.js';
 import { ConfigError, configFilePath } from '../config.js';
+import { messageOf } from '../core/config/sections.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { readBinPath } from '../project/bin-path.js';
 import {

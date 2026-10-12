@@ -118,7 +118,7 @@ import { homedir } from 'node:os';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';

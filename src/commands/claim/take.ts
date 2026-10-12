@@ -94,8 +94,8 @@ import type { ClaimCommandSeams, ClaimDevice, ClaimDoing, FoundBranch } from './
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimState } from '../../claims/stale.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaimsStaleAfter } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
+import type { ClaimsStaleAfter } from '../../core/config/sections.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createGhSpecIssueReader } from '../../board/issue.js';
@@ -103,7 +103,7 @@ import { idleText } from '../../board/roadmap-claims.js';
 import { holdsClaim } from '../../claims/device.js';
 import { readClaimState } from '../../claims/stale.js';
 import { CommandExit } from '../../cli/command.js';
-import { CLAIMS_STALE_DISABLED, messageOf } from '../../config-sections.js';
+import { CLAIMS_STALE_DISABLED, messageOf } from '../../core/config/sections.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';

@@ -49,7 +49,7 @@ import type { SchemaReport, SchemaReportOptions, SchemaStatus } from '../effort/
 
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { EFFORT_DIR_VARIABLE, effortStoreDir } from '../effort/store/location.js';
 import {
   developmentApplied,

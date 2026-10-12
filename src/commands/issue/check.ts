@@ -72,7 +72,7 @@ import { join, resolve } from 'node:path';
 import { boardId, notesFileName, SPEC_EXTENSION } from '../../board/naming.js';
 import { memoiseVerifier } from '../../board/refs-gate.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../../refs/reading.js';
 import { fingerprintText, RefsBlockError } from '../../refs/stamp.js';
 import { RefVerifyError } from '../../refs/verify.js';

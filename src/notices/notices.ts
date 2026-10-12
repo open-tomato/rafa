@@ -56,12 +56,12 @@
  * the run continues, since the person did answer yes.
  */
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { CLAUDE_SETTING_SOURCES, messageOf } from '../config-sections.js';
+import { CLAUDE_SETTING_SOURCES, messageOf } from '../core/config/sections.js';
 
 /** The notices rafa can owe a person, in the order they are printed. */
 export const NOTICE_IDS = Object.freeze(['alpha', 'danger'] as const);

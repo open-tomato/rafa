@@ -5,8 +5,8 @@
  * project → rafa → user, and that the user tier does not resolve under
  * `project,local`.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
 import type { TierRow, TierSettings } from './resolve.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { InventorySeams } from '../inventory/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

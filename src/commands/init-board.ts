@@ -139,7 +139,7 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { BoardRelationshipMode, PrProvider } from '../config-sections.js';
+import type { BoardRelationshipMode, PrProvider } from '../core/config/sections.js';
 
 import { join } from 'node:path';
 
@@ -151,7 +151,7 @@ import { createNativeRelations } from '../board/relations/native.js';
 import { readBoardRepository } from '../board/repository.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 export const YES_ANSWERS: readonly string[] = ['y', 'yes'];

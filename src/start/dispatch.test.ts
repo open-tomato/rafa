@@ -62,7 +62,7 @@ import type { DispatchGuard, TaskLearning, TaskReportStoreOptions, TaskSessionRu
 import type { TaskHandout } from './handout.js';
 import type { SessionServing } from './serving.js';
 import type { AdapterContext } from '../adapters/registry.js';
-import type { TierPin } from '../config-sections.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning, SyncPayload } from '../ports/index.js';
 import type { ResolvedSkill } from '../task/resolve-skills.js';

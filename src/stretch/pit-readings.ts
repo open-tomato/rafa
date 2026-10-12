@@ -41,7 +41,7 @@ import type { IssueRef, OpenIssue, Tracker } from '../ports/index.js';
 import { readFailedCases } from '../ci/failed-cases.js';
 import { readNewestRun } from '../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** The time an issue was filed, or null when the tracker does not say. */
 export type FiledAtReader = (ref: IssueRef) => Promise<Date | null>;

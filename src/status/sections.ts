@@ -189,7 +189,7 @@ import { horizonOf } from '../board/roadmap-epic-rows.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 import { isLive, readSessionChecklist } from '../loop/session-readings.js';
 import { readSessions } from '../loop/sessions.js';

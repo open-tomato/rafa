@@ -104,7 +104,7 @@ import type { RafaConfig } from '../../config.js';
 import type { PreflightResult, Tracker, TrackerKind } from '../../ports/index.js';
 import type { AdapterContext, AdapterRegistry } from '../registry.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { activeLogger } from '../logger/active.js';
 import { CORE_ADAPTER_REGISTRY } from '../registry.js';
 

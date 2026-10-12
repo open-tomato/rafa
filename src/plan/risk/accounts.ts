@@ -59,7 +59,7 @@
  */
 import type { RiskLevel } from './commands.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { PrProvider } from '../../config-sections.js';
+import type { PrProvider } from '../../core/config/sections.js';
 import type { GitRunner } from '../../pr/git.js';
 
 import { isGitHubRemote, remoteHost, resolvePrProvider } from '../../pr/provider.js';

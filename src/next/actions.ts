@@ -165,7 +165,7 @@
 import type { HopActionWorld } from './hop-action.js';
 import type { NextActionId, NextState } from './state.js';
 import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
 import { CommandExit, commandSpelling } from '../cli/command.js';
 import { parseArgs } from '../cli/core/parseArgs.js';

@@ -78,8 +78,8 @@ import { isAbsolute } from 'node:path';
 import { setActiveLoggerSettings } from './adapters/logger/settings.js';
 import { activeOutput } from './adapters/output/active.js';
 import { loggerSettingsOf } from './config-schema-logger.js';
-import { describeValue, messageOf } from './config-sections.js';
 import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
+import { describeValue, messageOf } from './core/config/sections.js';
 import { setActiveStoreSettings } from './effort/store/settings.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */

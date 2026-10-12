@@ -24,7 +24,8 @@ import type { Reader, ValueAt } from './config-sections.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { moduleSource } from './config-items.js';
+import { moduleSource } from '../../config-items.js';
+
 import {
   busyTimeoutMs,
   CLAIMS_AHEAD,

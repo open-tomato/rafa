@@ -12,7 +12,7 @@
 import type { MergeGuardSettings } from './guard-merge.js';
 import type { GuardRead, GuardReading, GuardVerdict } from './guard.js';
 import type { SettleSettings } from './settle.js';
-import type { VersionCollisionMode } from '../config-readers.js';
+import type { VersionCollisionMode } from '../core/config/sections.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { execFileSync } from 'node:child_process';

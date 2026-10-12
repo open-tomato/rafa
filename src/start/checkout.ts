@@ -49,7 +49,7 @@ import type { GitToplevelProbe } from '../project/roots.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitToplevel } from '../project/roots.js';
 import { mainCheckoutOf } from '../project/worktree-root.js';
 

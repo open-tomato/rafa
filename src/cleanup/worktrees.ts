@@ -95,7 +95,7 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 import { realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readSessions, runsDir } from '../loop/sessions.js';
 import { createGitRunner, gitSaid } from '../pr/git.js';
 import { parseWorktrees } from '../pr/merge.js';

@@ -132,7 +132,7 @@ import { join } from 'node:path';
 
 import { checkReferences } from '../check/references.js';
 import { toolOf } from '../check/shell-lines.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { buildInventory } from '../inventory/index.js';
 import { mcpDeclarationsOf, mcpServerFor, readMcpServers } from '../inventory/mcp.js';
 import { parsePrerequisites, prerequisitesPathForPlan } from '../preflight/prerequisites-md.js';

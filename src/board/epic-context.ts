@@ -82,7 +82,7 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Output } from '../ports/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { readEpicBody } from './epic-body.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from './epics.js';

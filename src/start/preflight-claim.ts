@@ -175,8 +175,8 @@ import type { RefreshConfig } from '../board/project/refresh.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { RafaConfig } from '../config.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
@@ -195,7 +195,7 @@ import {
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CommandExit } from '../cli/command.js';
-import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../config-sections.js';
+import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../core/config/sections.js';
 import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { planStubFromPath } from '../utils/plan-stamp.js';

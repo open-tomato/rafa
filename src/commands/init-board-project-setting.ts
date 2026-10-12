@@ -62,8 +62,8 @@ import type { ConfigFile } from '../config.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
 import { configFilePath, parseConfigText } from '../config.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The setting this module writes, as a row and a refusal name it. */
 export const PROJECT_NUMBER_SETTING = 'board.project.number';

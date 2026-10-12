@@ -46,11 +46,11 @@
  * run (`--retry=<n>`) are read by `start/run-setup.ts`.
  */
 import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { Reader } from './core/config/sections.js';
 
 import { join } from 'node:path';
 
-import { oneOf, refused, text } from './config-sections.js';
+import { oneOf, refused, text } from './core/config/sections.js';
 
 /** The fewest retries `loop.retriesOnContinue` accepts as a number. */
 export const RETRIES_ON_CONTINUE_MIN = 1;

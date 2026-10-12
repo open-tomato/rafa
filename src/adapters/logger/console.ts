@@ -45,12 +45,12 @@
  * site is written.
  */
 import type { LoggerSettings, LoggerTheme } from './settings.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { CliEventLog, LogBindings, LogEntry, Logger, Output } from '../../ports/index.js';
 
 import { basename } from 'node:path';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { activeOutput, activeOutputMode } from '../output/active.js';
 
 import { exchangeLine, filterExchange, scrubUrls } from './api-filter.js';

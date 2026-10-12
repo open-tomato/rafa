@@ -130,7 +130,7 @@ import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../b
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { createGitRunner } from '../pr/git.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 

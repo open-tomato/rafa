@@ -264,7 +264,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 

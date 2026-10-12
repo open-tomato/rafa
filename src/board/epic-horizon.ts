@@ -88,7 +88,7 @@ import type { OpenPullRequestLister, RoadmapPullRequest } from './roadmap.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { HORIZON_LABEL_PREFIX } from './epic-problems.js';
 import { renderHorizonComment } from './epic-trail.js';

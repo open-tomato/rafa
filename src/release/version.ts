@@ -116,7 +116,7 @@ import type { GitRunner } from '../pr/git.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/git.js';
 
 /** The remote the base version is read from, unless a caller names another. */

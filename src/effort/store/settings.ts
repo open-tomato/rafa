@@ -27,7 +27,7 @@ import {
   BUSY_TIMEOUT_MAX_MS,
   BUSY_TIMEOUT_MIN_MS,
   isBusyTimeoutMs,
-} from '../../config-sections.js';
+} from '../../core/config/sections.js';
 
 /** What every effort store open reads. */
 export interface StoreSettings {

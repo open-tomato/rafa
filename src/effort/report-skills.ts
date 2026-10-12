@@ -84,9 +84,9 @@
  * offered or not; M2 only an offered one. `percent` is the unrounded
  * ratio times 100, or null when the denominator is 0.
  */
-import type { SkillResolverName } from '../config-sections.js';
 import type { SkillFact } from './skill-facts.js';
 import type { LessonSignalRow, RecurrenceMatcher, SkillSignalRow, SkillTally } from './skill-signals.js';
+import type { SkillResolverName } from '../core/config/sections.js';
 import type { TierSeams } from '../schema/tiers.js';
 import type { Resolution } from '../tiers/resolve.js';
 import type { PlanCiRow } from './store/plan-ci.js';

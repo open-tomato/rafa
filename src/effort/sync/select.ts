@@ -66,8 +66,8 @@ import type { Sync, SyncPullResult, SyncPushResult } from '../../ports/index.js'
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { hubContextOf } from '../../config-schema-hub.js';
-import { describeValue } from '../../config-sections.js';
 import { SYNC_STRATEGIES } from '../../config.js';
+import { describeValue } from '../../core/config/sections.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'effort sync';

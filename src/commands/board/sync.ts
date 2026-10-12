@@ -88,7 +88,7 @@ import { commandRetrySeams, openProjectRunner } from '../../board/project/projec
 import { rateLimitWarning } from '../../board/project/refresh-warnings.js';
 import { syncProject } from '../../board/project/sync.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 
 /** The usage line a refusal names. */

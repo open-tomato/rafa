@@ -110,7 +110,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { parseTaskDeclaration, readTestScope } from '../utils/declaration.js';
 
 import {

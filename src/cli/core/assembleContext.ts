@@ -53,13 +53,13 @@
 import type { ParseArgsSpec } from './parseArgs.js';
 import type { CliContext, FlagSpec } from './types.js';
 import type { OutputStream } from '../../adapters/output/stream.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { Output } from '../../ports/index.js';
 
 import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
 import { createTextOutput } from '../../adapters/output/text.js';
-import { OUTPUT_MODES } from '../../config-sections.js';
+import { OUTPUT_MODES } from '../../core/config/sections.js';
 
 import { parseArgs } from './parseArgs.js';
 

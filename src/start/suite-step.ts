@@ -256,7 +256,7 @@ import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { runsDir, updateSession } from '../loop/sessions.js';
 import { parsePlan } from '../plan/parse.js';
 import { createGitRunner, gitSaid } from '../pr/index.js';

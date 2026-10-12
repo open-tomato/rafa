@@ -42,7 +42,7 @@
 import type { SessionState } from '../loop/sessions.js';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readSession, updateSession } from '../loop/sessions.js';
 
 /** How long a held loop waits between two reads of its record. */

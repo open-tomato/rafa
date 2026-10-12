@@ -129,7 +129,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { describeValue, messageOf } from '../config-sections.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
 import { HOP_FILE } from '../next/hop-record.js';
 
 import { POSITION_FILE } from './position.js';

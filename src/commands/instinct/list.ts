@@ -79,7 +79,7 @@ import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-recor
 import { toHeldRecords } from '../../adapters/learning/held.js';
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { triggerKey } from '../../learning/index.js';
 import { readScopes } from '../../schema/scope-records.js';
 import { expectNoArgument, resolveProjectConfig } from '../plan/plan-files.js';

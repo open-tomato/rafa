@@ -72,7 +72,7 @@ import type { SuiteFailure } from '../suite/run.js';
 
 import { basename, isAbsolute } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { asHopRecord } from '../next/hop-record.js';
 import { TEST_SCOPES } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';

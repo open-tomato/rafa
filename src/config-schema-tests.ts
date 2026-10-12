@@ -99,11 +99,11 @@
  * this module invented.
  */
 import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { Reader } from './core/config/sections.js';
 
 import { isAbsolute } from 'node:path';
 
-import { flag, listOf, refused, text } from './config-sections.js';
+import { flag, listOf, refused, text } from './core/config/sections.js';
 
 /** The `tests` section's settings, resolved. */
 export interface TestsSettings {

@@ -81,8 +81,8 @@ import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
 import { loadConfig } from '../../config-load.js';
-import { messageOf } from '../../config-sections.js';
 import { ConfigError } from '../../config.js';
+import { messageOf } from '../../core/config/sections.js';
 import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
 import { readPlanChanges } from '../../effort/store/changes.js';
 import { createGitRunner } from '../../pr/index.js';

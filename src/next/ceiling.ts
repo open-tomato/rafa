@@ -115,7 +115,7 @@
  */
 import type { NextActionId } from './state.js';
 import type { RafaContext } from '../cli/command.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
 import { CommandExit } from '../cli/command.js';
 

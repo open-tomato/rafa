@@ -37,12 +37,11 @@
  */
 import type { LoggerSettings, LoggerTheme } from './adapters/logger/settings.js';
 import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { Reader } from './core/config/sections.js';
 import type { LogLevel } from './ports/index.js';
 
 import { DEFAULT_LOGGER_KIND, LOG_LEVELS, LOGGER_THEMES } from './adapters/logger/settings.js';
-import { mapOf } from './config-readers.js';
-import { below, flag, isMapping, oneOf, refused, text } from './config-sections.js';
+import { below, flag, isMapping, mapOf, oneOf, refused, text } from './core/config/sections.js';
 
 /** The `logger` settings. */
 export interface LoggerConfigSettings {

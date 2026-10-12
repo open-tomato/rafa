@@ -59,7 +59,7 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { createGitRunner, gitSaid } from '../pr/git.js';
 
 import { RELEASE_BASE_BRANCH, RELEASE_REMOTE } from './version.js';

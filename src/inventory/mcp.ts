@@ -80,11 +80,11 @@
  * handed it: every path comes from {@link McpSeams}.
  */
 import type { OverrideSeams } from './disabled.js';
-import type { ClaudeSettingSource, Mapping } from '../config-sections.js';
+import type { ClaudeSettingSource, Mapping } from '../core/config/sections.js';
 
 import { join } from 'node:path';
 
-import { describeValue, isMapping } from '../config-sections.js';
+import { describeValue, isMapping } from '../core/config/sections.js';
 
 import { overrideSettingsPath, readSettings } from './disabled.js';
 

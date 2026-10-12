@@ -218,8 +218,8 @@ import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
-import type { RouteTarget } from './config-sections.js';
 import type { RafaConfig } from './config.js';
+import type { RouteTarget } from './core/config/sections.js';
 import type { TierSettings } from './tiers/resolve.js';
 
 import fs from 'fs';

@@ -128,10 +128,10 @@ import type { TriageClass } from './classes.js';
 import type { TriageAssessment } from './classify.js';
 import type { FailedLogEvidence } from './evidence.js';
 import type { FollowUpPullRequest } from './follow-up.js';
-import type { Mapping } from '../../config-sections.js';
+import type { Mapping } from '../../core/config/sections.js';
 import type { PullRequestComment, PullRequests } from '../types.js';
 
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { readRafaBlocks } from '../../plan/blocks.js';
 import { readUnchecked, skipChecksCommand } from '../unchecked.js';
 

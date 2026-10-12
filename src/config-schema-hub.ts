@@ -68,10 +68,10 @@
  * under `service`.
  */
 import type { SettingSpec } from './config-schema.js';
-import type { Reader, SyncStrategy } from './config-sections.js';
 import type { ConfigSource } from './config.js';
+import type { Reader, SyncStrategy } from './core/config/sections.js';
 
-import { describeValue, refused, text } from './config-sections.js';
+import { describeValue, refused, text } from './core/config/sections.js';
 
 /** The shortest `hub.timeout` accepted, in seconds. */
 export const HUB_TIMEOUT_MIN_SECONDS = 1;

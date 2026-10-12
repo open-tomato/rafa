@@ -138,7 +138,7 @@ import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import { join, relative } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { runsDir } from '../loop/sessions.js';
 import { splitFailures } from '../suite/baseline.js';
 import { failingFilesOf } from '../suite/failure-lines.js';

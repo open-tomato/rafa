@@ -86,13 +86,13 @@
  * with each of three strings of `src/start.ts` mutated in turn, and each
  * mutation changed the reading it aimed at.
  */
-import type { TierPin } from '../config-sections.js';
 import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';

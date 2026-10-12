@@ -139,12 +139,12 @@
 import type { SpecIssueReader } from './issue.js';
 import type { BranchClaim, RemoteClaimReader } from './roadmap-claims.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { CommandExit } from '../cli/command.js';
 import { CONFIG_DEFAULTS } from '../config-schema.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { boardId, BRANCH_PREFIX } from './naming.js';
 import {

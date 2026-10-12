@@ -27,9 +27,11 @@
  * loop itself.
  *
  * One caller outside `src/pr/` reaches past this barrel on purpose:
- * `src/config-sections.ts` takes `MERGE_METHODS` and `MergeMethod` from
- * `./types.js` directly, for `pr.mergeMethod`. `./gh.js` imports that
- * module, so the barrel would put the `gh` adapter and its spawner
+ * `src/core/config/config-sections.ts` takes `MERGE_METHODS` and
+ * `MergeMethod` from `./types.js` directly, for `pr.mergeMethod`.
+ * `./gh.js` imports that module through its barrel,
+ * `src/core/config/sections.ts`, so this barrel would put the `gh`
+ * adapter and its spawner
  * behind every config read and make the graph cyclic. Its note records
  * the readings behind that choice; nothing else bypasses this file.
  */

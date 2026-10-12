@@ -176,8 +176,8 @@
  * `learning/identity.ts` imports `node:crypto` alone, and neither of the
  * other two imports is a cycle. `pr/types.ts` imports
  * types alone and `utils/declaration.ts` imports nothing, so this
- * module reaches both without either reaching back. The port is reached at `./pr/types.js`
- * and not through the `./pr/index.js` barrel a caller outside `src/pr/`
+ * module reaches both without either reaching back. The port is reached at `../../pr/types.js`
+ * and not through the `../../pr/index.js` barrel a caller outside `src/pr/`
  * would normally use, because the barrel carries `pr/gh.ts`, which
  * imports THIS module and the `gh` spawner behind it: importing it here
  * would make the graph cyclic and put the CLI adapter behind every
@@ -188,15 +188,15 @@
  * first, and the config and `src/pr/` suites passed. The narrower import
  * is the graph this module wants, not a fix for an observed failure.
  */
-import type { MergeMethod } from './pr/types.js';
-import type { SkillTier } from './schema/tiers.js';
+import type { MergeMethod } from '../../pr/types.js';
+import type { SkillTier } from '../../schema/tiers.js';
 
-import { CONFIDENCE_MAX, CONFIDENCE_MIN } from './learning/identity.js';
-import { MERGE_METHODS } from './pr/types.js';
-import { SKILL_TIERS } from './schema/tiers.js';
-import { parseBudgetUsd } from './utils/declaration.js';
+import { CONFIDENCE_MAX, CONFIDENCE_MIN } from '../../learning/identity.js';
+import { MERGE_METHODS } from '../../pr/types.js';
+import { SKILL_TIERS } from '../../schema/tiers.js';
+import { parseBudgetUsd } from '../../utils/declaration.js';
 
-export type { MergeMethod } from './pr/types.js';
+export type { MergeMethod } from '../../pr/types.js';
 
 /** One key a file carried that names nothing this version reads. */
 export interface ConfigExtra {

@@ -67,7 +67,7 @@ import { resolvePlace } from '../../board/place.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 

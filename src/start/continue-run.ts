@@ -138,8 +138,8 @@ import type { RetryRefusal, RetryTask, RunRetries } from './retry-budget.js';
 import type { NeededDecision, RunSession } from './session.js';
 import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
-import type { OutputMode } from '../config-sections.js';
 import type { ClaudeSettingSource, RafaConfig } from '../config.js';
+import type { OutputMode } from '../core/config/sections.js';
 import type { CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 

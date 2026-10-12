@@ -123,7 +123,7 @@ import type {
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { activeOutput } from '../output/active.js';
 
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';

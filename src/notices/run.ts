@@ -10,7 +10,7 @@
  * (`src/plan.ts`). Each hands in the `loop.settingSources` its own
  * configuration resolved, which the danger notice names.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { homedir } from 'node:os';
 

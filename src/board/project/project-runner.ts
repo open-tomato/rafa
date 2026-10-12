@@ -50,7 +50,7 @@
 import type { RetryNotice } from './retry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaConfig } from '../../config-schema.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { CliEventNamed, Output } from '../../ports/index.js';
 
 import { activeOutput, activeOutputMode } from '../../adapters/output/active.js';

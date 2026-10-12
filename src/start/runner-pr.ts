@@ -82,7 +82,7 @@ import path from 'node:path';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { pullRequestTitle } from '../board/naming.js';
 import { refreshFailedWarning, refreshIssueItems } from '../board/project/issue-board-refresh.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { createGitRunner, ghPullRequestsIn, gitSaid, parseWorkingTree, pushBranch } from '../pr/index.js';
 import { parseFragment } from '../release/fragment.js';
 

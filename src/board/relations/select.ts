@@ -11,11 +11,11 @@
  */
 import type { BoardRelations } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
 import type { RafaConfig } from '../../config.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 
-import { describeValue } from '../../config-sections.js';
+import { describeValue } from '../../core/config/sections.js';
 
 import { createLabelsRelations } from './labels.js';
 import { createNativeRelations } from './native.js';

@@ -85,9 +85,9 @@
  * default's, or whose shape the defaults lack, is configured whatever
  * the set says, since no default could have put it there.
  */
-import type { RouteTarget } from '../config-sections.js';
 import type { ConfigLayers } from '../config.js';
 import type { Resolution, ServedItem, TierCollision } from './resolve.js';
+import type { RouteTarget } from '../core/config/sections.js';
 import type { SkillTier } from '../schema/tiers.js';
 
 import { findTierItem } from './resolve.js';

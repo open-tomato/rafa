@@ -103,7 +103,7 @@ import type { BaseWorkflowReading, UncheckedCase, UncheckedReading } from '../..
 
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readUnchecked } from '../../pr/unchecked.js';
 import { workflowsRunOnPullRequestsInto } from '../../pr/workflow-triggers.js';
 

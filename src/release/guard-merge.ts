@@ -39,7 +39,7 @@
 import type { ReleaseFileSettings } from './enabled.js';
 import type { GuardNotesReader, GuardReading } from './guard.js';
 import type { SettleSettings } from './settle.js';
-import type { VersionCollisionMode } from '../config-readers.js';
+import type { VersionCollisionMode } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { gitSaid } from '../pr/git.js';

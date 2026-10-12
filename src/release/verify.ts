@@ -83,7 +83,7 @@ import type { GitRunner } from '../pr/git.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/index.js';
 
 import { parseFragment } from './fragment.js';

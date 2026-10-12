@@ -160,7 +160,7 @@ import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readEpicCost, renderEpicCost } from '../../effort/epic-cost.js';
 import { selectEffortStore } from '../../effort/store/index.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';

@@ -53,7 +53,7 @@ import type { LineFlags, PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
 import { DEFAULT_PR_SEAMS, expectNoArguments, lineRefusal, onProvider, openPrContext, PR_USAGE } from './pr-context.js';

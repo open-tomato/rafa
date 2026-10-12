@@ -61,7 +61,7 @@ import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readTaskFinishes } from '../effort/store/task-finishes.js';
 import { parsePlan } from '../plan/index.js';
 import { isFile } from '../plan/plan-files.js';

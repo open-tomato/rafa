@@ -36,7 +36,7 @@ import type { PidProbe } from '../loop/sessions.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { isPositiveWhole } from '../loop/session-record-parse.js';
 import { errorCode, isPidAlive } from '../loop/sessions.js';
 

@@ -47,7 +47,7 @@ import type { AgentReading, StretchFolderSeams, StretchLiveness } from '../stret
 
 import { relative } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { defaultSeams, projectName, stretchLiveness, tmuxSessionName } from '../stretch/folder.js';
 
 import { stretchOfBase } from './stretch/item.js';

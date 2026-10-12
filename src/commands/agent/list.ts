@@ -80,7 +80,7 @@
  * that cannot browse. `ctrl-c` inside a browse is exit code 130.
  */
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 import type { ProjectFound } from '../../project/scope.js';

@@ -148,7 +148,8 @@
  *
  * A login that is not shaped like a GitHub login is refused before
  * either answer is consulted, through `isGitHubLogin`
- * (`src/config-sections.ts`), and refused as `lookup-failed`, since no
+ * (`src/core/config/config-sections.ts`), and refused as
+ * `lookup-failed`, since no
  * lookup can be made for it. The shape check is also what keeps the
  * login out of the path's structure: `../../x` or a leading `-` would
  * otherwise reach `gh` as a different path or as a flag. It is checked
@@ -209,7 +210,7 @@
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { CommandExit } from '../cli/command.js';
-import { describeValue, isGitHubLogin, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isGitHubLogin, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The repository placeholders `gh api` expands from the directory it runs in. */
 const REPO_PATH = '{owner}/{repo}';

@@ -126,7 +126,7 @@ import type { SettleSettings } from './settle.js';
 import type { FoldFragment } from './strategy.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { gitSaid } from '../pr/git.js';
 

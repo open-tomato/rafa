@@ -9,7 +9,7 @@
  * bundle is pulled through a registered stub adapter, and the row is read
  * back from the SQLite store with a raw query.
  */
-import type { TierPin } from '../config-sections.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';

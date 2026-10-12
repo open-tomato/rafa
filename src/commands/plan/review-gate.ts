@@ -68,7 +68,7 @@ import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
 import { ClaudePlannerError } from '../../adapters/planner/claude.js';
 import { enforceSpecReview } from '../../board/gate.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 
 import { recordMissingReview, recordSkippedReview } from './plan-record.js';
 

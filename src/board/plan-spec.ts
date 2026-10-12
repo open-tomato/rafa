@@ -262,7 +262,7 @@ import type { RefreshOffer } from './snapshot-settle.js';
 import type { ResolvedSpec, SpecSourceRequest, SpecSourceStop } from './spec-source.js';
 import type { BoardTrust, PermissionReading, Permissions } from './trust.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 import type { Output } from '../ports/index.js';
 import type { GitRunner } from '../pr/git.js';
 

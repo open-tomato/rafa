@@ -125,8 +125,8 @@ import type { CapturingSpawner } from '../utils/claude.js';
 
 import { homedir } from 'node:os';
 
-import { describeValue } from '../config-sections.js';
 import { CONFIG_DEFAULTS, STORE_BACKENDS } from '../config.js';
+import { describeValue } from '../core/config/sections.js';
 import { openNdjsonStore } from '../effort/store/ndjson.js';
 import { openSqliteStore } from '../effort/store/sqlite.js';
 import { createFileSync } from '../effort/sync/file.js';

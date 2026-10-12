@@ -34,7 +34,7 @@ import type {
   Reader,
   Reading,
   ValueAt,
-} from './config-sections.js';
+} from './core/config/sections.js';
 
 import {
   below,
@@ -43,7 +43,7 @@ import {
   refused,
   refusedWith,
   text,
-} from './config-sections.js';
+} from './core/config/sections.js';
 
 /** What an item of one of the two list shapes may carry. */
 interface ItemShape<K extends string> {

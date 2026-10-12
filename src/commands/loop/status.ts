@@ -54,7 +54,7 @@ import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../loop
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../../plan/plan-files.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { blockedTasks } from '../../loop/blocked-tasks.js';
 import {
   estimateEta,

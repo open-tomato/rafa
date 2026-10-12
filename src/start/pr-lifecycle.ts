@@ -120,8 +120,8 @@ import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS } from '../config.js';
+import { messageOf } from '../core/config/sections.js';
 import {
   compareUrl,
   createGitRunner,

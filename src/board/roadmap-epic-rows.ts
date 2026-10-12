@@ -135,7 +135,7 @@ import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } fro
 import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
 import type { GitResult, GitRunner } from '../pr/git.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';

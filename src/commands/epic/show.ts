@@ -150,7 +150,7 @@ import {
   ROADMAP_REFUSAL_EXIT,
 } from '../../board/roadmap.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { plansDirAt } from '../../plan/plan-files.js';
 import { createGitRunner } from '../../pr/git.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';

@@ -54,7 +54,7 @@
  */
 import type { AgentListSeams } from './list.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { ShowView } from '../../inventory/show.js';
 import type { ProjectFound } from '../../project/scope.js';

@@ -30,7 +30,7 @@ import type { SchemaReport, SchemaReportOptions } from '../../effort/store/schem
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { effortStoreDir } from '../../effort/store/location.js';
 import { gateMeaning, readSchemaReport } from '../../effort/store/schema-report.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';

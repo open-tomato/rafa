@@ -68,12 +68,12 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue, BoardIssueLink, BoardListing } from '../board/roadmap-board.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
 import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { EPIC_LABEL_PREFIX } from '../board/epics.js';
 import { readBoardRepository } from '../board/repository.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { plural } from '../plan/plan-files.js';
 
 import { MOVE_FIX } from './init-board.js';

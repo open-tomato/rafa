@@ -22,7 +22,7 @@
 import type { SpecIssue } from './issue.js';
 import type { PlanSpecOptions } from './plan-spec.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { mkdtempSync, rmSync } from 'node:fs';

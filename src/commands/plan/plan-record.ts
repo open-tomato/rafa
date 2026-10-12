@@ -60,7 +60,7 @@ import {
   stampReviewMissing,
   stampReviewSkipped,
 } from '../../board/review-stamp.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 
 /**
  * Records one line in the generated plan's `rafa:plan` block, answering

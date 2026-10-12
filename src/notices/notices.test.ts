@@ -1,6 +1,6 @@
 import type { NoticeSeams } from './notices.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';

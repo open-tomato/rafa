@@ -91,7 +91,7 @@ import type { AlternativeOffer } from '../../board/blocked-line.js';
 import type { PlanSpecOptions, PlanSpecResolution, ReadyOffer } from '../../board/plan-spec.js';
 import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { RefreshOffer } from '../../board/snapshot-settle.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 
 import fs from 'fs';
 import path from 'path';

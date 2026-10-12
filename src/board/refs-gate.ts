@@ -82,7 +82,7 @@ import { readFileSync } from 'node:fs';
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
 import { SETTINGS } from '../config-schema.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js';
 import { RefsBlockError } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';

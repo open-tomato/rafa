@@ -160,7 +160,7 @@ import type { InstinctScope } from '../../schema/tiers.js';
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { actionHash, bless, merge, triggerKey } from '../../learning/index.js';
 import {
   INSTINCT_DOMAINS,

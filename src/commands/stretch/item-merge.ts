@@ -76,7 +76,7 @@ import { readFileSync } from 'node:fs';
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
 import { CommandExit } from '../../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';

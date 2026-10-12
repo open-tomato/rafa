@@ -28,7 +28,7 @@
  * control that a visible item is never a row.
  */
 import type { DeepSettingsSeams, HiddenItem } from './doctor-deep-settings.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

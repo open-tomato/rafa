@@ -38,7 +38,7 @@ import type { PullRequests } from '../pr/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { ghPullRequestsIn } from '../pr/index.js';
 
 import { DECISION_STOP_EXIT, LoopEnd } from './continue-exits.js';

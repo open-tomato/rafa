@@ -3,7 +3,7 @@
  * description fallback, the per-line and whole-index cuts with their
  * order and tail, and what is left out.
  */
-import type { TierPin } from '../config-sections.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventoryState } from '../inventory/record.js';
 import type { SkillTier } from '../schema/tiers.js';
 import type { Resolution, TierSettings } from '../tiers/resolve.js';

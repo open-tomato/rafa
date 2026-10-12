@@ -109,11 +109,11 @@
  * Nothing here throws, writes, or reads `process.env`, `process.cwd()`
  * or the real home: every input comes from {@link SessionEnvSeams}.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
 import { pathDirectories } from '../check/references.js';
-import { describeValue, isMapping } from '../config-sections.js';
+import { describeValue, isMapping } from '../core/config/sections.js';
 import { OVERRIDE_SCOPES, overrideSettingsPath, readSettings } from '../inventory/disabled.js';
 import { sessionSpawnEnv } from '../utils/session-env.js';
 

@@ -87,7 +87,7 @@ import { existsSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions } from '../../loop/sessions.js';
 import { readRuntimeIdentity } from '../../runtime/identity.js';
 

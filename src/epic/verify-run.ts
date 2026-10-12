@@ -121,7 +121,7 @@ import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
 import { readRafaBlocks } from '../plan/blocks.js';
 import { gitSaid } from '../pr/git.js';

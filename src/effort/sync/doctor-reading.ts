@@ -45,7 +45,7 @@ import type { ResolvedConfig } from '../../config.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { describeValue, messageOf } from '../../config-sections.js';
+import { describeValue, messageOf } from '../../core/config/sections.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { SyncModuleMissing, selectSync } from './select.js';

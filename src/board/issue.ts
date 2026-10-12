@@ -212,7 +212,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, resolve } from 'node:path';
 
 import { CommandExit } from '../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { carryRefsBlock, readRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';

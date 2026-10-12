@@ -73,7 +73,7 @@ import type { PrSeams } from './pr-context.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../pr/index.js';
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 

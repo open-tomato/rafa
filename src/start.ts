@@ -370,8 +370,8 @@ import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
 import { CommandExit } from './cli/command.js';
-import { messageOf } from './config-sections.js';
 import { ConfigError } from './config.js';
+import { messageOf } from './core/config/sections.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';

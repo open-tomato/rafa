@@ -106,7 +106,7 @@
  */
 import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
 import type { Key, Terminal } from '../../cli/prompt/terminal.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';

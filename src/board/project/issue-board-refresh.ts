@@ -71,7 +71,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../issue-board.js';
 
 import { activeOutput } from '../../adapters/output/active.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { createGhIssueBoard } from '../issue-board.js';
 
 import { openProjectRunner } from './project-runner.js';

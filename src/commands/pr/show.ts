@@ -90,7 +90,7 @@ import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { formatRows } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';

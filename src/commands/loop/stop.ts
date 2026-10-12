@@ -45,7 +45,7 @@ import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../.
 import type { SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import {
   isLive,
   planLabel,

@@ -12,7 +12,7 @@
  * the path every command's config takes, with the project and user
  * files each naming one half.
  */
-import type { ValueAt } from './config-sections.js';
+import type { ValueAt } from './core/config/sections.js';
 
 import { describe, expect, it } from 'bun:test';
 

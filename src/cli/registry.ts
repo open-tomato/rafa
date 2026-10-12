@@ -61,7 +61,7 @@
  */
 import type { RafaCommand } from './command.js';
 
-import { describeValue } from '../config-sections.js';
+import { describeValue } from '../core/config/sections.js';
 
 import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from './command.js';
 

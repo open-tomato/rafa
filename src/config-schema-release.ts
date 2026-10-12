@@ -131,37 +131,33 @@
  * `"true"`, `yes` and `1` are refused, and it is not a
  * `CommandLineSetting`.
  */
-import type {
-  ReleaseSettleMode,
-  ReleaseStrategy,
-  ReleaseTagMode,
-  VersionCollisionMode,
-} from './config-readers.js';
 import type { SettingSpec } from './config-schema.js';
 import type {
   MergeMethod,
   PrProvider,
   ReleaseEnabled,
-} from './config-sections.js';
+  ReleaseSettleMode,
+  ReleaseStrategy,
+  ReleaseTagMode,
+  VersionCollisionMode,
+} from './core/config/sections.js';
 
 import {
-  fragmentsDirectory,
-  releaseFile,
-  releaseSettleMode,
-  releaseStrategy,
-  releaseTagMode,
-  versionCollisionMode,
-} from './config-readers.js';
-import {
   flag,
+  fragmentsDirectory,
   mergeMethod,
   oneOf,
   PR_PROVIDERS,
   RELEASE_AUTO,
   releaseEnabled,
+  releaseFile,
+  releaseSettleMode,
+  releaseStrategy,
+  releaseTagMode,
   text,
   usdAmount,
-} from './config-sections.js';
+  versionCollisionMode,
+} from './core/config/sections.js';
 
 /** The `pr` section's settings, resolved. */
 export interface PrSettings {

@@ -79,17 +79,17 @@
  * it to the new base first. Every other outcome writes nothing at all,
  * so a reading that is not `folded` is passed through unchanged.
  */
-import type { SettleWorktree } from './settle-worktree.js';
-import type { FoldFragment } from './strategy.js';
-import type { ReleaseStrategy } from '../config-readers.js';
 import type { BranchForecastSettings } from './branch-forecast.js';
 import type { ChangelogInsertPoint } from './changelog.js';
+import type { SettleWorktree } from './settle-worktree.js';
+import type { FoldFragment } from './strategy.js';
+import type { ReleaseStrategy } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { errorCode } from '../loop/sessions.js';
 import { gitSaid } from '../pr/git.js';
 

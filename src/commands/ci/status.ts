@@ -55,7 +55,7 @@ import { readFailedCases } from '../../ci/failed-cases.js';
 import { readNewestRun } from '../../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../../ci/status-reading.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readNonBlankFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { requireProject } from '../plan/plan-files.js';
 

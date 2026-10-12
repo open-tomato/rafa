@@ -53,7 +53,7 @@ import type { PlanTask } from '../../plan/index.js';
 import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import {
   formatDuration,
   isLive,

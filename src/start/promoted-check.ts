@@ -94,7 +94,7 @@ import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 import { isAbsolute, posix, relative } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/index.js';
 
 import { parsePromoted } from './promoted.js';

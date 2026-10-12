@@ -76,7 +76,7 @@
  */
 import type { RoadmapBody } from './roadmap-tick.js';
 
-import { describeValue, messageOf } from '../config-sections.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { splitKeepingBreaks, TICK_ATTEMPTS, tickRoadmapLines } from './roadmap-tick.js';
 import { parseRoadmapBody } from './roadmap.js';

@@ -97,7 +97,7 @@ import type { OverrideReading, OverrideWarning } from './disabled.js';
 import type { AddonModule, PluginSeams, SourceWarning } from './plugins.js';
 import type { InventoryKind, InventoryRecord, InventorySource, InventoryState } from './record.js';
 import type { SourceItem, TreeListing } from './trees.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { Resolution, TierItem, TierRow, TierSettings } from '../tiers/resolve.js';
 
 import { CONFIG_DEFAULTS } from '../config-schema.js';

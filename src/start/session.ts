@@ -127,7 +127,7 @@ import { relative } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {
   beginSession,

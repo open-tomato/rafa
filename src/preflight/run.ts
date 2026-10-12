@@ -95,7 +95,7 @@ import type { PreflightItems } from './prerequisites-md.js';
 import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** How long a probe, or a service request, may take: 30 seconds. */
 export const PROBE_TIMEOUT_MS = 30_000;

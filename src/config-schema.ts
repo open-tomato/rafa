@@ -152,7 +152,7 @@ import type {
   SyncStrategy,
   TierPin,
   TierSwitch,
-} from './config-sections.js';
+} from './core/config/sections.js';
 
 import { join } from 'node:path';
 
@@ -164,12 +164,6 @@ import {
   REQUIRED_ITEM_KEYS,
   requiredPrerequisite,
 } from './config-items.js';
-import {
-  directory,
-  routeTable,
-  tierPins,
-  trackerKind,
-} from './config-readers.js';
 import {
   BOARD_PROJECT_LIMIT_DEFAULTS,
   BOARD_PROJECT_LIMIT_SETTINGS,
@@ -201,6 +195,7 @@ import {
   confidence,
   CONFIG_VERSIONS,
   dayCount,
+  directory,
   flag,
   githubLogin,
   INJECT_MODES,
@@ -212,13 +207,16 @@ import {
   projectNumber,
   projectUrl,
   recurrenceCount,
+  routeTable,
   skillResolverName,
   STORE_BACKENDS,
   subsetOf,
   SYNC_STRATEGIES,
   text,
+  tierPins,
   tierSwitch,
-} from './config-sections.js';
+  trackerKind,
+} from './core/config/sections.js';
 import { DEFAULT_ROUTING } from './tiers/routing.js';
 
 /**

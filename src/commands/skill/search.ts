@@ -74,7 +74,7 @@
  */
 import type { SkillListSeams } from './list.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { InventoryKind, InventoryRecord } from '../../inventory/record.js';
 import type { SearchOutcome } from '../../inventory/search/index.js';

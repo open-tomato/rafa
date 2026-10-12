@@ -89,7 +89,7 @@ import { relative } from 'node:path';
 
 import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import {

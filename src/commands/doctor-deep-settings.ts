@@ -71,7 +71,7 @@
  * from {@link DeepSettingsSeams}.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { OverrideReading } from '../inventory/disabled.js';
 import type { Inventory, InventorySeams } from '../inventory/index.js';
 import type { McpDeclaration, McpReading } from '../inventory/mcp.js';

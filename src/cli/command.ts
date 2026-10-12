@@ -80,7 +80,7 @@ import type { CommandRegistry } from './registry.js';
 import type { CommandSpend } from './spends.js';
 import type { ProjectFound } from '../project/scope.js';
 
-import { describeValue } from '../config-sections.js';
+import { describeValue } from '../core/config/sections.js';
 
 import { spendsProblem } from './spends.js';
 

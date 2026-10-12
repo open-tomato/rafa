@@ -80,7 +80,7 @@ import type { Logger } from '../../ports/index.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { activeOutput } from '../output/active.js';
 
 import { createConsoleLogger } from './console.js';

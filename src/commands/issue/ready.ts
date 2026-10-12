@@ -140,7 +140,7 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
 import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
 
@@ -160,7 +160,7 @@ import {
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/git.js';
 import { answeredYes } from '../../start/branch-decision.js';

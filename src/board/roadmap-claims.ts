@@ -41,7 +41,7 @@
  */
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimState } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { claimBranchIssue, fetchClaimBranches, readClaimBranch } from '../claims/git.js';

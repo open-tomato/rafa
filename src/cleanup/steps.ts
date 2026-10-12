@@ -97,7 +97,7 @@ import type { GitRunner } from '../pr/git.js';
 
 import { rmSync } from 'node:fs';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/git.js';
 import { shellQuote } from '../pr/preflight-items.js';
 

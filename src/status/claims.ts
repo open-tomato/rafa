@@ -49,7 +49,7 @@
 import type { BoardIssue } from '../board/roadmap-board.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { ClaimOwnership, ClaimStateName } from '../claims/stale.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { claimBranchIssue, readClaimBranch } from '../claims/git.js';

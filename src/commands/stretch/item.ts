@@ -84,7 +84,7 @@ import { dirname, join, posix } from 'node:path';
 import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { boardId } from '../../board/naming.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions } from '../../loop/sessions.js';
 import { plansDirAt, stubOfPlanFile } from '../../plan/plan-files.js';
 import { stretchFolder } from '../../stretch/folder.js';

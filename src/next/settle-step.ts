@@ -50,7 +50,7 @@ import type { GitRunner } from '../pr/index.js';
 import type { SettleWaiting } from '../pr/settle-waiting.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { plural } from '../plan/plan-files.js';
 import { settleWaitingOn } from '../pr/settle-waiting.js';
 import { mergeGuardSettings } from '../release/guard-merge.js';

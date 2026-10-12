@@ -76,7 +76,7 @@ import type { SpawnEnv } from '../utils/session-env.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGhPermissions, readAuthorTrust } from '../board/trust.js';
-import { isMapping } from '../config-sections.js';
+import { isMapping } from '../core/config/sections.js';
 import { ghHostOf, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 

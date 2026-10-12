@@ -118,8 +118,8 @@ import type { ConfigRoots } from '../config-load.js';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-import { describeValue, messageOf } from '../config-sections.js';
 import { CONFIG_FILE, configFilePath } from '../config.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 

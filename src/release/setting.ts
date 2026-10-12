@@ -63,12 +63,12 @@
  * temporary directory, and the text that would replace it is answered
  * rather than written.
  */
-import type { ReleaseEnabled } from '../config-sections.js';
+import type { ReleaseEnabled } from '../core/config/sections.js';
 
 import { readFileSync } from 'node:fs';
 
-import { isMapping, messageOf } from '../config-sections.js';
 import { configFilePath, parseConfigText } from '../config.js';
+import { isMapping, messageOf } from '../core/config/sections.js';
 
 /** The setting this module reads and writes, as a message names it. */
 export const RELEASE_ENABLED_SETTING = 'release.enabled';

@@ -36,7 +36,7 @@ import type { RuntimeIdentity } from '../../runtime/identity.js';
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';

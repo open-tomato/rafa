@@ -10,7 +10,7 @@
  * here, and moved with them unchanged. The reader wrapping a list of
  * items, `listOf`, is driven there.
  */
-import type { Reader, ValueAt } from './config-sections.js';
+import type { Reader, ValueAt } from './core/config/sections.js';
 
 import { describe, expect, it } from 'bun:test';
 

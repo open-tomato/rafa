@@ -50,10 +50,10 @@
  * does today, so {@link readClaimState} takes only the two ownerships a
  * claim can have, and the type refuses the third.
  */
-import type { ClaimsStaleAfter } from '../config-sections.js';
 import type { Ownership, PendingHandover } from './record.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
 
-import { claimDurationHours, CLAIMS_STALE_DISABLED } from '../config-sections.js';
+import { claimDurationHours, CLAIMS_STALE_DISABLED } from '../core/config/sections.js';
 
 /** The label a claim's issue carries from `plan create` to `loop start`. */
 export const CLAIMED_LABEL = 'rafa:claimed';

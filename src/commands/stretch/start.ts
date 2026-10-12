@@ -96,9 +96,9 @@ import { dirname, join } from 'node:path';
 
 import { readRemoteHead } from '../../cleanup/branches.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
 import { configFilePath } from '../../config.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readSessions } from '../../loop/sessions.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
 import { createGitRunner, gitSaid } from '../../pr/git.js';

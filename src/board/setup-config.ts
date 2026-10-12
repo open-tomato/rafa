@@ -51,8 +51,8 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { isMapping, messageOf } from '../config-sections.js';
 import { configFilePath, parseConfigText } from '../config.js';
+import { isMapping, messageOf } from '../core/config/sections.js';
 
 /** What the project config says `roadmap.issue` is, or why it could not be read. */
 export interface SettingReading {

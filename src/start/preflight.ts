@@ -321,8 +321,8 @@ import {
   unresolvedSkillLine,
 } from '../agents/roster.js';
 import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
 import { CONFIG_DEFAULTS } from '../config.js';
+import { messageOf } from '../core/config/sections.js';
 import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';

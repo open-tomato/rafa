@@ -49,7 +49,7 @@ import type { InstinctRecord, Learning } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { promotable } from '../../learning/index.js';
 import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';
 

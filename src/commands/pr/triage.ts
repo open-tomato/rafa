@@ -162,7 +162,7 @@ import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSumma
 import type { TriageSelection } from '../../pr/triage/select.js';
 
 import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';

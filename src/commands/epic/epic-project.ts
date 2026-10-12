@@ -80,7 +80,7 @@ import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig } from '../issue/issue-tracker.js';
 
 /** Refreshes `issues`, widened by `widening`; `refreshProjectItems` unless a test plants another. */

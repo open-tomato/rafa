@@ -40,8 +40,8 @@
  * `learning` pulls nothing and warns nothing, which a test driving the
  * dispatch alone names.
  */
-import type { LessonSwitch, SkillResolverName } from '../config-sections.js';
 import type { TaskLearning } from './dispatch.js';
+import type { LessonSwitch, SkillResolverName } from '../core/config/sections.js';
 import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ResolvedSkill, TaskInput } from '../task/resolve-skills.js';

@@ -75,8 +75,8 @@
 import type { ConfigSetting } from './config-schema.js';
 
 import { knownKeysAbove, SECTIONS, SETTING_BY_KEY, SETTING_NAMES } from './config-schema.js';
-import { isMapping, messageOf } from './config-sections.js';
 import { parseConfigText } from './config.js';
+import { isMapping, messageOf } from './core/config/sections.js';
 
 /** The deepest key, in dotted parts, this edit sets. */
 export const CONFIG_SET_MAX_DEPTH = 2;

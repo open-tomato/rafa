@@ -24,7 +24,8 @@
  * file is intended as the public surface, re-exporting everything the
  * other two modules export for a caller to import rather than reaching
  * into a sibling; however, 75
- * modules currently import `config-sections.js` directly. The one
+ * modules currently import `config-sections.ts`'s names directly,
+ * through its barrel `core/config/sections.js`. The one
  * exception is `MergeMethod`, which `config-sections.ts` re-exports
  * from `pr/types.ts` so `config-schema-release.ts` can type a field with
  * it. The pull request port owns that name, a caller reading
@@ -169,7 +170,7 @@ import type {
   ConfigExtra,
   Mapping,
   ValueAt,
-} from './config-sections.js';
+} from './core/config/sections.js';
 
 import { join } from 'node:path';
 
@@ -188,7 +189,7 @@ import {
   describeValue,
   isMapping,
   messageOf,
-} from './config-sections.js';
+} from './core/config/sections.js';
 
 export type {
   CommandLineSetting,
@@ -215,7 +216,7 @@ export type {
   SyncStrategy,
   TierPin,
   TierSwitch,
-} from './config-sections.js';
+} from './core/config/sections.js';
 export {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -227,7 +228,7 @@ export {
   RELEASE_AUTO,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './config-sections.js';
+} from './core/config/sections.js';
 export type {
   ModuleSource,
   ModuleSourceKind,
