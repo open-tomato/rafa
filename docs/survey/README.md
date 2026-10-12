@@ -88,6 +88,14 @@ degree.
   clock). Used to establish the timing baseline for the third criterion of epic #801: test timing is the stable
   reference to measure any test scope growth against when modules move into packages.
 
+### Schema importers
+
+- **`content-schema-importers.md`**: The importers of each non-test file under `src/schema/`, grouped by the future
+  package each would sit in under #905's cut table, with each edge that would point upward marked. Read at commit
+  83e438e, the base of this task, from the tracked tree rather than from `import-graph.json`, which has no entry for
+  `src/schema/scope-records.ts`. Written by hand, with the rows derived from the import graph reader of
+  `scripts/survey/import-graph.ts`.
+
 ## Cost sources
 
 Every script task recorded its work in the effort store. To see the cost and time for each script that made a map or
