@@ -581,6 +581,16 @@ describe('the two outputs', () => {
 
     expect(lines.slice(lines.indexOf('## Edges #118 clears'), lines.indexOf('## Files left to place'))).toContain('None.');
   });
+
+  it('opens no line with an issue number, which markdown lint reads as a heading with no space', () => {
+    const lines = renderCutTableMarkdown(table).split('\n');
+
+    expect(lines.filter((line) => /^#+[^#\s]/.test(line))).toEqual([]);
+    expect(lines).toContain(
+      'Issue #118 makes each package own its config section, so these imports of a section file from '
+      + '`src/core/config/` go with it.',
+    );
+  });
 });
 
 describe('main', () => {

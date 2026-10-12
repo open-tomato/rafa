@@ -59,6 +59,22 @@ repository.
   naming each test file whose index rose: a test file `scripts/survey/core-moves.ts` moves is held under its old path,
   `src/core/` counts as one folder, and the walk stops at a core barrel.
 
+- **`cut-table.{json,md}`**: The ten future packages of epic #801, lowest first, each with the folders and files it
+  holds by rule and its count of upward edges: imports of kind `value` or `type`, between two files neither of which
+  is a test, from a package lower in the order into a higher one. Made by `bun scripts/survey/cut-table.ts` at commit
+  f7a7e25, reading `import-graph.json` above as written for #905 and never a build of its own, so the table and the
+  graph cannot disagree: 1843 files, 1815 of them in the ten packages (675 held by no rule, left to place and counted
+  in `@open-tomato/rafa-cli`) and 28 in the three unassigned folders `src/ci/`, `src/commands/stretch/` and
+  `src/stretch/`. Of 4095 edges between non-test files 285 point upward, 13 of them from `src/core/config/` into a
+  config section file and marked as cleared by #118, and 78 touch an unassigned folder and have no rank. The counts
+  rank options and do not certify a cut: `tsc --build` with project references is that gate (#807). It is not one of
+  the four maps, so `scripts/survey/maps.test.ts` does not check it, and it goes stale when `import-graph.json` is
+  written again without it. JSON: 2-space indent, sorted keys, `graph`, `order`, `packages` (each with `files`,
+  `edges`, `upwardEdges`, `clearedByIssue118`, `remaining`), `leftToPlace`, `clearedByIssue118`, `unassigned`,
+  `totals`. Markdown: the sums, the packages with their counts, what each holds by rule, the upward edges by pair of
+  packages, the 20 files most upward edges end on, the edges #118 clears, the files left to place by folder, the
+  unassigned folders.
+
 ### Cluster contract traces
 
 One markdown file per cluster, showing the cluster's scope, its boundary with the rest of the graph, and the entry points

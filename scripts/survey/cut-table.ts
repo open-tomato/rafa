@@ -842,7 +842,7 @@ export function renderCutTableMarkdown(table: CutTable): string {
     '',
     `## Edges #${SECTIONS_ISSUE} clears`,
     '',
-    `#${SECTIONS_ISSUE} makes each package own its config section, so these imports of a section file from `
+    `Issue #${SECTIONS_ISSUE} makes each package own its config section, so these imports of a section file from `
     + `\`${SECTION_IMPORTER_FOLDER}\` go with it.`,
     '',
     ...(table.clearedByIssue118.length === 0
