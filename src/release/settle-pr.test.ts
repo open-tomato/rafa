@@ -178,6 +178,7 @@ function detail(overrides: Partial<PullRequestDetail> = {}): PullRequestDetail {
     ...summary(),
     body: '',
     headRefOid: '0'.repeat(40),
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

@@ -16,6 +16,24 @@
  *
  * Both are invisible from inside the session that pushed.
  *
+ * ## Zero rows is two readings, and the head's age tells them apart
+ *
+ * GitHub registers a push's runs some seconds after the push, so a poll
+ * in that gap reads zero rows off a pull request whose checks are about
+ * to appear. Zero rows on an OLD head is the settled reading above: no
+ * run is coming. So a caller that knows when the head was committed
+ * hands that time over ({@link WaitOptions.headCommittedAtMs}), and zero
+ * rows on a head younger than {@link FIRST_CHECK_GRACE_MS} is polled
+ * again like a pending reading. A caller that hands over no time gets
+ * `none` on the first poll, as every caller did before the grace
+ * existed: the loop's CI gate and `pr triage --resolve` hand over none.
+ *
+ * The time is the head commit's COMMITTED date, which is not the push
+ * time: a commit made an hour ago and pushed just now reads as old and
+ * gets no grace. A provider answers a committed date and no push time,
+ * and the wrong direction of that error is the cheap one, since it is
+ * the behaviour there was before.
+ *
  * Everything here is pure: the only effect {@link waitForChecks} has is
  * the `probe` handed to it, and its clock and its wait are injected too,
  * so the polling logic is testable without a network or a timer. The
@@ -42,7 +60,8 @@ export interface CheckRow {
 
 /**
  * The verdict over every row: `none` when the PR has no checks at all,
- * which is the shape a conflicting PR produces.
+ * which is the shape a conflicting PR produces, and the shape of a head
+ * pushed seconds ago whose first check has not registered yet.
  */
 export type ChecksVerdict = 'green' | 'red' | 'pending' | 'none';
 
@@ -144,6 +163,17 @@ export function formatRows(rows: readonly CheckRow[]): string {
   return lines.join('\n');
 }
 
+/**
+ * How long after a head commit zero rows still reads as "no check has
+ * registered yet" rather than "no check is coming": two minutes.
+ *
+ * Measured from the head commit's committed date, by the clock
+ * {@link waitForChecks} was handed. It is a ceiling on one wait as well:
+ * a head dated ahead of that clock is held no longer than this from the
+ * wait's own first poll.
+ */
+export const FIRST_CHECK_GRACE_MS = 120_000;
+
 export interface WaitOptions {
   /**
    * The rows of one poll. A caller on the port hands
@@ -157,8 +187,19 @@ export interface WaitOptions {
   now?: () => number;
   /** Injected for tests; defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>;
-  /** Called after every poll, for progress output. */
+  /**
+   * Called after every poll, for progress output. The verdict is the one
+   * the wait acts on, so a poll of zero rows the grace holds is reported
+   * `pending`, which is why it is polled again.
+   */
   onPoll?: (rows: readonly CheckRow[], verdict: ChecksVerdict, elapsedMs: number) => void;
+  /**
+   * When the pull request's head was committed, in the milliseconds
+   * `now` answers in. Handed over, zero rows on a head younger than
+   * {@link FIRST_CHECK_GRACE_MS} is polled again; left out, or a value
+   * that is no finite number, zero rows ends `none` on the first poll.
+   */
+  headCommittedAtMs?: number;
 }
 
 export interface WaitResult {
@@ -176,13 +217,30 @@ function defaultSleep(ms: number): Promise<void> {
 }
 
 /**
+ * Whether zero rows read at `at` are still inside the grace: the head is
+ * younger than {@link FIRST_CHECK_GRACE_MS}, and this wait has not itself
+ * run that long. The second half is what bounds a head dated ahead of
+ * the clock, whose age reads negative for as long as the date is wrong.
+ */
+function insideGrace(headCommittedAtMs: number | undefined, at: number, elapsedMs: number): boolean {
+  if (headCommittedAtMs === undefined || !Number.isFinite(headCommittedAtMs)) return false;
+  return at - headCommittedAtMs < FIRST_CHECK_GRACE_MS && elapsedMs < FIRST_CHECK_GRACE_MS;
+}
+
+/**
  * Polls a PR's checks until they settle, the deadline passes, or the PR
  * reports no checks at all.
  *
- * `none` returns immediately rather than waiting out the deadline: a PR
- * with no checks is either conflicting or has no workflow matching its
- * changed paths, and neither resolves by waiting. The caller distinguishes
- * the two, since only it knows the merge state.
+ * `none` returns rather than waiting out the deadline: a PR with no
+ * checks is conflicting, has no workflow matching its changed paths, or
+ * was pushed so recently that none has registered. Only the last
+ * resolves by waiting, and only for {@link FIRST_CHECK_GRACE_MS}, so
+ * zero rows is polled again while {@link WaitOptions.headCommittedAtMs}
+ * says the head is that young and ends `none` otherwise. The caller
+ * tells the first two apart, since only it knows the merge state.
+ *
+ * A deadline that passes inside the grace ends `timeout`, with no rows,
+ * as it does for any reading that was still being polled.
  */
 export async function waitForChecks(options: WaitOptions): Promise<WaitResult> {
   const now = options.now ?? (() => Date.now());
@@ -194,8 +252,12 @@ export async function waitForChecks(options: WaitOptions): Promise<WaitResult> {
   while (true) {
     const rows = await options.probe();
     polls += 1;
-    const verdict = verdictOf(rows);
-    const elapsedMs = now() - started;
+    const at = now();
+    const elapsedMs = at - started;
+    const read = verdictOf(rows);
+    const verdict = read === 'none' && insideGrace(options.headCommittedAtMs, at, elapsedMs)
+      ? 'pending'
+      : read;
     options.onPoll?.(rows, verdict, elapsedMs);
 
     if (verdict !== 'pending') return { verdict, rows, elapsedMs, polls };

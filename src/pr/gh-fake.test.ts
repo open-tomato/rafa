@@ -214,6 +214,28 @@ describe('gh pr view', () => {
     expect(await withOnePull().run(['pr', 'view', '7']))
       .toEqual(failure('fake gh: models --json alone, and was handed no fields\n'));
   });
+
+  it('writes the head as the one commit a pull request lists, committed when the pull request last moved', async () => {
+    const fake = withOnePull();
+    const read = await json(fake, ['pr', 'view', '7', '--json', 'commits,headRefOid,updatedAt']) as {
+      commits: { oid: string; committedDate: string }[];
+      headRefOid: string;
+      updatedAt: string;
+    };
+
+    expect(read.commits.map((commit) => [commit.oid, commit.committedDate])).toEqual([[read.headRefOid, read.updatedAt]]);
+  });
+
+  it('writes the instant a case planted for the head, and no commit for a head planted with none', async () => {
+    const fake = createFakePrGh();
+    fake.plant({ number: 7, headCommittedAt: '2026-10-12T11:59:59Z' });
+    fake.plant({ number: 8, headCommittedAt: null });
+
+    expect(await json(fake, ['pr', 'view', '7', '--json', 'commits'])).toMatchObject({
+      commits: [{ committedDate: '2026-10-12T11:59:59Z', oid: '0000000000000000000000000000000000000007' }],
+    });
+    expect(await json(fake, ['pr', 'view', '8', '--json', 'commits'])).toEqual({ commits: [] });
+  });
 });
 
 describe('gh pr checks', () => {

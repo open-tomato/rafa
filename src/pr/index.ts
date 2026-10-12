@@ -79,6 +79,7 @@ export type {
 export {
   classifyState,
   failingRows,
+  FIRST_CHECK_GRACE_MS,
   formatRows,
   parseChecks,
   verdictOf,

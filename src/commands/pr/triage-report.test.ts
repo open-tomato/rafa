@@ -50,6 +50,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     updatedAt: '2026-09-18T11:00:00Z',
     body: '',
     headRefOid: HEAD,
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

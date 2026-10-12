@@ -183,6 +183,7 @@ describe('release delivery over a scratch project with no changelog and a bare o
         updatedAt: '2026-09-18T11:00:00Z',
         body: '',
         headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+        headCommittedAt: null,
         mergeable: 'mergeable',
         mergeStateStatus: 'CLEAN',
         labels: [],

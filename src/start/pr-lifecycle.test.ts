@@ -265,6 +265,7 @@ function detail(
     state,
     body: 'Closes #20',
     headRefOid: 'deadbeef',
+    headCommittedAt: null,
     mergeable,
     mergeStateStatus,
     labels: [],

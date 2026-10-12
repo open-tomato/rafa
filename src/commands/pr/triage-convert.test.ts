@@ -165,6 +165,7 @@ function detailAt(head: string): PullRequestDetail {
     updatedAt: NOW,
     body: '',
     headRefOid: head,
+    headCommittedAt: null,
     mergeable: 'conflicting',
     mergeStateStatus: 'DIRTY',
     labels: [],

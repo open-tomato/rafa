@@ -593,6 +593,7 @@ const DETAIL: PullRequestDetail = Object.freeze({
   ...SUMMARY,
   body: 'Closes #63',
   headRefOid: 'abc1234',
+  headCommittedAt: null,
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],

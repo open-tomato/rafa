@@ -237,6 +237,7 @@ describe('wrap-up release fragment over a scratch repository', () => {
         updatedAt: '2026-09-20T12:00:00Z',
         body: BODY_BEFORE,
         headRefOid: 'deadbeef',
+        headCommittedAt: null,
         mergeable: 'mergeable',
         mergeStateStatus: 'CLEAN',
         labels: [],

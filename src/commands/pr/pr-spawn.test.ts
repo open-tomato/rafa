@@ -83,7 +83,7 @@ const BRANCH = 'pr-smoke';
 
 /** The fields `gh pr list` and `gh pr view` are asked for; copied from `src/pr/gh.ts`'s own. */
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
-const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
+const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,commits,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
 const CHECK_FIELDS = 'name,state,link';
 
 /** What the stand-in answers `gh pr list --head` and `gh pr view 7` with. */

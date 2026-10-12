@@ -204,6 +204,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     ...summary(),
     body: 'Closes #63',
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

@@ -21,7 +21,7 @@
  * what a REAL provider answers is `gh-fake.test.ts` and `gh.test.ts`.
  */
 import type { PullRequestsAnswers } from './pull-requests-double.js';
-import type { PullRequests } from './types.js';
+import type { PullRequestDetail, PullRequests } from './types.js';
 
 import { join } from 'node:path';
 
@@ -77,6 +77,31 @@ describe('the pull request double', () => {
     for (const member of members) {
       expect(await send(double.pulls, member)).toBe(member);
     }
+  });
+
+  it('answers the detail a case named as it was handed over, its head time with it', async () => {
+    const planted: PullRequestDetail = {
+      number: 41,
+      title: 'a change',
+      url: 'https://github.com/open-tomato/rafa/pull/41',
+      state: 'open',
+      headRefName: 'feat/a-change',
+      baseRefName: 'main',
+      author: { login: 'octo', isBot: false },
+      isCrossRepository: false,
+      updatedAt: '2026-10-12T12:00:00Z',
+      body: '',
+      headRefOid: '5f2c1d9a7b3e4c6d8f0a1b2c3d4e5f6a7b8c9d0e',
+      headCommittedAt: '2026-10-12T11:59:59Z',
+      mergeable: 'unknown',
+      mergeStateStatus: 'UNKNOWN',
+      labels: [],
+      closes: [],
+    };
+    const double = createPullRequestsDouble({ get: () => Promise.resolve(planted) });
+
+    expect(await double.pulls.get(41)).toBe(planted);
+    expect((await double.pulls.get(41))?.headCommittedAt).toBe('2026-10-12T11:59:59Z');
   });
 
   it('hands a named member the arguments the caller passed', async () => {

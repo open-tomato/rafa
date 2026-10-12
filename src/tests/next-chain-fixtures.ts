@@ -100,6 +100,7 @@ export const PR_DETAIL: PullRequestDetail = Object.freeze({
   ...PR_SUMMARY,
   body: '',
   headRefOid: 'abc1234',
+  headCommittedAt: null,
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],

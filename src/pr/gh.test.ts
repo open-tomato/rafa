@@ -86,7 +86,7 @@ import { createGhPullRequests, ghAuthOk, ghPullRequestsIn } from './gh.js';
 const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,state,title,updatedAt,url';
 
 /** The fields a detail read asks for. */
-const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
+const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,commits,headRefOid,labels,mergeStateStatus,mergeable,closingIssuesReferences`;
 
 /** The branch the planted pull request is from. */
 const BRANCH = 'feat/rafa-20';
@@ -307,6 +307,20 @@ describe('get', () => {
       { number: 20, repository: 'open-tomato/rafa', url: 'https://github.com/open-tomato/rafa/issues/20' },
       { number: 765, repository: 'ptone/scion', url: 'https://github.com/ptone/scion/issues/765' },
     ]);
+  });
+
+  it('answers when the head was committed, as the commit the fake lists for it says', async () => {
+    const { fake, pr } = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, headCommittedAt: '2026-10-12T11:59:59Z' }));
+
+    expect((await pr.get(7))?.headCommittedAt).toBe('2026-10-12T11:59:59Z');
+  });
+
+  it('answers null for a head the commits list does not hold', async () => {
+    const { fake, pr } = withOnePull();
+    fake.update(7, (pull) => ({ ...pull, headCommittedAt: null }));
+
+    expect((await pr.get(7))?.headCommittedAt).toBeNull();
   });
 
   it('answers merged for a merged pull request, whose merge fields read UNKNOWN', async () => {
@@ -739,6 +753,47 @@ describe('what the adapter refuses in a payload', () => {
     }).get(7);
 
     expect(detail).toMatchObject({ mergeable: 'unknown', mergeStateStatus: 'DIRTY', labels: ['type:spec'] });
+  });
+
+  /** A detail payload whose head is `HEAD`, for the head-date readings to change `commits` of. */
+  const HEAD = '321607e656e05ec94e58fd9766a87b3bb68e68b5';
+  const headed = (commits: unknown): PullRequests => writing({
+    ...ROW,
+    body: '',
+    headRefOid: HEAD,
+    labels: [],
+    mergeStateStatus: 'CLEAN',
+    mergeable: 'MERGEABLE',
+    closingIssuesReferences: [],
+    commits,
+  });
+
+  it('reads the committed date of the entry that is the head, not of the last entry', async () => {
+    // The recorded order is oldest first, and a head past the first hundred is not listed at all.
+    const detail = await headed([
+      { oid: '6f844cee13d0b16ebca2fe044bafd287420d410b', committedDate: '2026-08-26T18:06:43Z' },
+      { oid: HEAD, committedDate: '2026-09-24T20:27:04Z' },
+      { oid: 'a609c2b1b9208e13c181b509c027dc382f9f79c7', committedDate: '2026-09-03T10:33:34Z' },
+    ]).get(7);
+
+    expect(detail?.headCommittedAt).toBe('2026-09-24T20:27:04Z');
+  });
+
+  it.each([
+    ['a list that does not hold the head, as a pull request of over 100 commits answers', [
+      { oid: 'a609c2b1b9208e13c181b509c027dc382f9f79c7', committedDate: '2026-09-03T10:33:34Z' },
+    ]],
+    ['an empty list', []],
+    ['no commits field at all', undefined],
+    ['a commits field that is no list', { oid: HEAD, committedDate: '2026-09-24T20:27:04Z' }],
+    ['a head entry with no date', [{ oid: HEAD }]],
+    ['a head entry whose date is no string', [{ oid: HEAD, committedDate: 1758745624 }]],
+    ['a head entry whose date is no time', [{ oid: HEAD, committedDate: 'last Thursday' }]],
+    ['an entry that is no mapping', [null, 'x']],
+  ])('reads %s as no head date, answering the rest of the detail', async (_label, commits) => {
+    const detail = await headed(commits).get(7);
+
+    expect(detail).toMatchObject({ number: 7, headRefOid: HEAD, headCommittedAt: null, mergeable: 'mergeable' });
   });
 
   it('refuses a label that carries no name', async () => {

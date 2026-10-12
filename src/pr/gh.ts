@@ -116,6 +116,14 @@
  *     found to measure whether `gh` follows it. Both members throw on
  *     every failure, an absent pull request included, as the port
  *     declares.
+ *   - **`--json commits` answers the first 100 commits, oldest first, so
+ *     its last entry is not always the head.** Measured on 2026-10-12
+ *     off `gh` 2.102.0: `cli/cli#14515`, whose REST `commits` count is
+ *     1050, answered 100 entries in `committedDate` order, the last one
+ *     `a609c2b` of 2026-09-03, while its `headRefOid` was `321607e`, a
+ *     commit of 2026-09-24 the list did not hold. So `headCommittedAt`
+ *     is the `committedDate` of the entry whose `oid` IS `headRefOid`,
+ *     never the last entry's, and null when no entry is the head.
  *
  * ## What is refused, and what is narrowed
  *
@@ -138,6 +146,14 @@
  *     whole payload would make a PR unreadable over a word GitHub added.
  *     The raw `mergeStateStatus` stays verbatim beside it, so a report
  *     can still name what GitHub said.
+ *
+ * The head's committed date is narrowed the same way and further: a
+ * `commits` field that is no list, that holds no entry for the head, or
+ * whose date is no time, reads null rather than refusing. Null is the
+ * port's own word for "the provider does not say", its one reader gives
+ * a null head no grace, which is what every head got before the field
+ * existed, and `merge`, `show` and triage read the same payload for
+ * fields that are all there.
  *
  * `failedLog` splits the same way. A run whose log has been dropped
  * (`failed to get run log: log not found`) answers the empty string the
@@ -183,7 +199,7 @@ const SUMMARY_FIELDS = 'author,baseRefName,headRefName,isCrossRepository,number,
  * The fields a detail is read from: the summary's, and what only a per-PR
  * read answers. The closing references are read by `./gh-closing-issues.ts`.
  */
-const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,headRefOid,labels,mergeStateStatus,mergeable,${CLOSING_ISSUES_FIELD}`;
+const DETAIL_FIELDS = `${SUMMARY_FIELDS},body,commits,headRefOid,labels,mergeStateStatus,mergeable,${CLOSING_ISSUES_FIELD}`;
 
 /** The fields a check row is read from; `parseChecks` reads exactly these. */
 const CHECK_FIELDS = 'name,state,link';
@@ -350,13 +366,31 @@ function readSummary(value: unknown, command: string, where: string): PullReques
   };
 }
 
+/**
+ * The committed date of the commit `headRefOid` names, out of what
+ * `--json commits` wrote, or null: no list, no entry for the head, or a
+ * date that is no time. Never the last entry's; see the module note.
+ */
+function readHeadCommittedAt(commits: unknown, headRefOid: string): string | null {
+  if (!Array.isArray(commits)) return null;
+  const head = commits.find((commit: unknown) => isMapping(commit) && commit['oid'] === headRefOid) as unknown;
+  const committed = isMapping(head)
+    ? head['committedDate']
+    : null;
+  return typeof committed === 'string' && !Number.isNaN(Date.parse(committed))
+    ? committed
+    : null;
+}
+
 /** One pull request in full, as `gh pr view` writes the detail fields. */
 function readDetail(value: unknown, command: string, where: string): PullRequestDetail {
   const pull = readMapping(value, command, where);
+  const headRefOid = readString(pull['headRefOid'], command, `${where}.headRefOid`);
   return {
     ...readSummary(pull, command, where),
     body: readString(pull['body'], command, `${where}.body`),
-    headRefOid: readString(pull['headRefOid'], command, `${where}.headRefOid`),
+    headRefOid,
+    headCommittedAt: readHeadCommittedAt(pull['commits'], headRefOid),
     mergeable: readMergeability(pull['mergeable'], command, `${where}.mergeable`),
     mergeStateStatus: readString(pull['mergeStateStatus'], command, `${where}.mergeStateStatus`),
     labels: readLabels(pull['labels'], command, `${where}.labels`),
