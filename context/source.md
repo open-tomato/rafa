@@ -247,11 +247,12 @@ a thing to split.
 
 **A new key in `SETTINGS` reaches six files beyond the schema, sections
 and `init` scaffold.** `RafaConfig` literals have to be complete, so the
-layer literal in `src/config.ts` needs it. `src/config-schema.test.ts`
-pins the key set as closed lists (`KEYS`, `TOP`, `SECTIONS`,
-`knownKeysAbove`). Both config suites also check
-that every setting appears exactly once: `src/config.test.ts` (`SETTINGS`,
-`DEFAULTS`, `FULL`, `FULL_VALUES`, its cases and `KNOWN`) and
+layer literal in `src/core/config/config.ts` needs it.
+`src/core/config/config-schema.test.ts` pins the key set as closed
+lists (`KEYS`, `TOP`, `SECTIONS`, `knownKeysAbove`). Both config suites
+also check that every setting appears exactly once:
+`src/core/config/config.test.ts` (`SETTINGS`, `DEFAULTS`, `FULL`,
+`FULL_VALUES`, its cases and `KNOWN`) and
 `src/tests/config-layers.test.ts` (the PROJECT and USER text and values,
 and `SECTION_CASES`). `check-types` never reads the two suites, so only
 `bun run test` shows what is missing. A section appended after the last
