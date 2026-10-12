@@ -132,6 +132,21 @@ describe('the CI reading', () => {
     expect(any.calls()[0]).not.toContain('--workflow');
   });
 
+  it('asks for the branch\'s newest run, with no --commit, whether or not a workflow is named', async () => {
+    const named = caseGh([plantedRun()]);
+    const unnamed = caseGh([plantedRun()]);
+
+    await readPitReadings(seams(named.gh, []), { branch: BRANCH, workflow: WORKFLOW, since: SINCE });
+    await readPitReadings(seams(unnamed.gh, []), { branch: BRANCH, since: SINCE });
+
+    const listCalls = [...named.calls(), ...unnamed.calls()].filter((args) => args[0] === 'run' && args[1] === 'list');
+    expect(listCalls).toHaveLength(2);
+    for (const args of listCalls) {
+      expect(args).toContain('--branch');
+      expect(args).not.toContain('--commit');
+    }
+  });
+
   it('holds a gh failure as not read, and still reads the bugs', async () => {
     const unknownWorkflow = caseGh([plantedRun()]);
 

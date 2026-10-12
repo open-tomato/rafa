@@ -32,13 +32,16 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 
 import { PROMPT_SHAPES } from '../effort/classify.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
+import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 
 import { MECHANICAL_CONFLICT_SENTENCE, mechanicalConflictBullet } from './conflict-sentence.js';
 import { loadPinnedPlan, pinnedPlanValues } from './plans/load.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 /** A triage block with every field null, as an unrecorded assessment reads. */
 const EMPTY_BLOCK = Object.freeze({

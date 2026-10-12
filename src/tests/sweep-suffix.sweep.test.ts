@@ -18,13 +18,21 @@
  * - a walk of the root: a glob scan, `readdirSync` or `readdir` whose
  *   directory is the repository root constant (`REPO_ROOT`, `repoRoot`).
  *
+ * A second check holds every tracked sweep file to the one limit: its source
+ * calls `setDefaultTimeout(SWEEP_TIMEOUT)` or passes `SWEEP_TIMEOUT` as a
+ * case's closing argument, so no sweep runs at the runner's 5 second default.
+ *
  * The detectors read source text, so each answer has a planted-source
  * control below.
  */
 import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setDefaultTimeout, test } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 const SWEEP_SUFFIX = '.sweep.test.ts';
@@ -70,6 +78,28 @@ async function unsuffixedSweeps(listing: readonly string[]): Promise<string[]> {
     if (path === SELF || !lacksSweepSuffix(path)) continue;
     const source = await Bun.file(join(REPO_ROOT, path)).text();
     if (readsRepositoryTree(source)) offenders.push(path);
+  }
+  return offenders.sort();
+}
+
+/** The file-wide limit: `setDefaultTimeout(SWEEP_TIMEOUT)`. */
+const DEFAULT_TIMEOUT_CALL = /\bsetDefaultTimeout\(\s*SWEEP_TIMEOUT\s*,?\s*\)/;
+
+/** The per-case limit: `SWEEP_TIMEOUT` as the closing argument of a call. */
+const CLOSING_ARGUMENT = /,\s*SWEEP_TIMEOUT\s*,?\s*\)/;
+
+/** True when the source sets the sweep limit, by the file-wide call or a case's closing argument. */
+function setsSweepTimeout(source: string): boolean {
+  return DEFAULT_TIMEOUT_CALL.test(source) || CLOSING_ARGUMENT.test(source);
+}
+
+/** Tracked sweep files whose source sets no sweep limit, repo-relative and sorted. */
+async function sweepsWithoutLimit(listing: readonly string[]): Promise<string[]> {
+  const offenders: string[] = [];
+  for (const path of listing) {
+    if (!path.endsWith(SWEEP_SUFFIX)) continue;
+    const source = await Bun.file(join(REPO_ROOT, path)).text();
+    if (!setsSweepTimeout(source)) offenders.push(path);
   }
   return offenders.sort();
 }
@@ -168,5 +198,34 @@ describe('suffix check', () => {
     expect(
       readsRepositoryTree(planted) && lacksSweepSuffix('src/a/planted.test.ts'),
     ).toBe(true);
+  });
+});
+
+describe('sweep limit detector', () => {
+  test('accepts a planted source that calls setDefaultTimeout(SWEEP_TIMEOUT)', () => {
+    expect(setsSweepTimeout('setDefaultTimeout(SWEEP_TIMEOUT);\n')).toBe(true);
+  });
+
+  test('accepts a planted source that passes SWEEP_TIMEOUT as a case\'s closing argument', () => {
+    const planted = 'test(\'walks the tree\', async () => {\n  await walk();\n}, SWEEP_TIMEOUT);\n';
+
+    expect(setsSweepTimeout(planted)).toBe(true);
+  });
+
+  test('flags a planted source that has neither', () => {
+    const planted = 'import { SWEEP_TIMEOUT } from \'./sweep-timeout.js\';\ntest(\'x\', () => {}, 5000);\n';
+
+    expect(setsSweepTimeout(planted)).toBe(false);
+  });
+});
+
+describe('sweep limit', () => {
+  test('every tracked *.sweep.test.ts sets SWEEP_TIMEOUT', async () => {
+    const offenders = await sweepsWithoutLimit(trackedFiles());
+
+    expect(
+      offenders,
+      `call setDefaultTimeout(SWEEP_TIMEOUT) at module level in: ${offenders.join(', ')}`,
+    ).toEqual([]);
   });
 });

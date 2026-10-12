@@ -25,10 +25,14 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from '../tests/sweep-timeout.js';
 
 import { isFixturePath } from './fixture-path.js';
 import { findLeaks } from './scrub.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CONTROLS_DIR = 'src/fixtures/testdata/leak-controls/';

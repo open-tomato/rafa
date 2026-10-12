@@ -1,6 +1,7 @@
 /**
- * The branch run reader: the newest GitHub Actions run on a branch, read
- * through `gh run list --branch <b> [--workflow <w>] --limit 1 --json`.
+ * The branch run reader: the newest GitHub Actions run on a branch, or
+ * of one commit on it, read through `gh run list --branch <b> [--commit
+ * <sha>] [--workflow <w>] --limit 1 --json`.
  *
  * Its own seam, apart from the pull-request port in `src/pr/gh.ts`, so
  * that file (near the 800-line cap) and its fake do not grow. The seam is
@@ -24,6 +25,33 @@
  *     empty string; the reader answers that conclusion as `null`.
  *   - Keys are sorted by code unit and the output ends with a newline.
  *
+ * `--commit` was read off `gh` 2.102.0 on 2026-10-12 against
+ * `open-tomato/rafa`, read-only, with `--repo`, on `stretch/5` while its
+ * two newest runs were of `fb9abe9c` and an older one of `7ade9b90`:
+ *
+ *   - `gh` takes `--commit` beside `--branch`, and both filter, so the
+ *     reader sends the two together. `--branch stretch/5 --limit 1`
+ *     answered the run of `fb9abe9c`; with `--commit 7ade9b90...` added
+ *     it answered the run of `7ade9b90`, the row a later push had moved
+ *     out of first place.
+ *   - A full sha with no run on the branch answers `[]` and exit 0, with
+ *     or without `--workflow`. That is the reader's `null`, as for a
+ *     branch with no run.
+ *   - A sha that is not 40 characters is no error to `gh`: the
+ *     abbreviated `7ade9b9` answered `[]` and exit 0, which reads as "no
+ *     run yet" for a commit that has one. An empty `--commit ""` is no
+ *     filter at all and answered the branch's newest run. The reader
+ *     therefore refuses both before it sends anything.
+ *   - The 40 characters in upper case answered the run, its `headSha` in
+ *     lower case. The reader refuses that spelling all the same: the
+ *     `commit` it answers is lower case, so a caller comparing the two
+ *     would never see them equal.
+ *   - `--workflow` beside `--commit` filters as it does without it.
+ *   - Without `--limit`, every run of the commit on the branch comes
+ *     back, newest first (two for `fb9abe9c`, a `push` and a
+ *     `pull_request` run of `verify`). So `--limit 1` beside `--commit`
+ *     answers the newest run of that commit.
+ *
  * ## Strict
  *
  * A row whose fields are missing or of the wrong type, or whose `status`
@@ -39,6 +67,9 @@ import { describeValue, isMapping, messageOf } from '../config-sections.js';
 /** What this module's errors open with. */
 const PREFIX = 'ci runs';
 
+/** A full commit sha as `gh` writes `headSha`: 40 hex characters, lower case. */
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
 /** The `--json` fields the reader asks for, in the order it sends them. */
 export const RUN_LIST_FIELDS = ['databaseId', 'workflowName', 'status', 'conclusion', 'headSha'] as const;
 
@@ -47,9 +78,18 @@ export const RUN_STATES = ['queued', 'in_progress', 'completed', 'requested', 'w
 
 export type RunState = (typeof RUN_STATES)[number];
 
-/** Which runs to read: those on one branch, and of one workflow when it is named. */
+/**
+ * Which runs to read: those on one branch, of one commit when it is
+ * named, and of one workflow when it is named.
+ */
 export interface RunQuery {
   readonly branch: string;
+  /**
+   * The full sha, 40 hex characters in lower case, of the commit whose
+   * run is read. Left out, the newest run of the branch, which a later
+   * push makes another commit's.
+   */
+  readonly commit?: string;
   /** The workflow's name as `gh run list --workflow` takes it. Left out, any workflow. */
   readonly workflow?: string;
 }
@@ -67,19 +107,28 @@ export interface BranchRun {
   readonly commit: string;
 }
 
-/** The arguments after `gh` that read the newest run for `query`. */
+/**
+ * The arguments after `gh` that read the newest run for `query`. Throws
+ * a `TypeError` on an empty branch or workflow, and on a commit that is
+ * not a 40-character sha.
+ */
 export function runListArgs(query: RunQuery): string[] {
   const branch = textArgument(query.branch, 'branch');
+  const commit = query.commit === undefined
+    ? []
+    : ['--commit', shaArgument(query.commit)];
   const workflow = query.workflow === undefined
     ? []
     : ['--workflow', textArgument(query.workflow, 'workflow')];
-  return ['run', 'list', '--branch', branch, ...workflow, '--limit', '1', '--json', RUN_LIST_FIELDS.join(',')];
+  return ['run', 'list', '--branch', branch, ...commit, ...workflow, '--limit', '1', '--json', RUN_LIST_FIELDS.join(',')];
 }
 
 /**
- * The newest run on `query.branch`, or null when the branch has no run
- * (of that workflow, when one is named). Throws when `gh` fails, naming
- * the command and what it wrote, and when its answer is not a run list.
+ * The newest run on `query.branch`, or of `query.commit` on it when a
+ * commit is named, or null when there is no such run (of that workflow,
+ * when one is named). Throws when `gh` fails, naming the command and what
+ * it wrote, when its answer is not a run list, and before sending
+ * anything when the query is one {@link runListArgs} refuses.
  */
 export async function readNewestRun(gh: GhRunner, query: RunQuery): Promise<BranchRun | null> {
   const args = runListArgs(query);
@@ -106,7 +155,7 @@ function readRun(row: unknown, command: string): BranchRun {
   if (!isRunState(state)) refuse(command, `status ${describeValue(state)}, expected one of: ${RUN_STATES.join(', ')}`);
   const finished = readString(conclusion, 'conclusion', command);
   const commit = readString(headSha, 'headSha', command);
-  if (!/^[0-9a-f]{40}$/.test(commit)) refuse(command, `headSha ${describeValue(commit)}, expected a 40-character sha`);
+  if (!FULL_SHA.test(commit)) refuse(command, `headSha ${describeValue(commit)}, expected a 40-character sha`);
   return {
     id: databaseId,
     workflow,
@@ -132,6 +181,14 @@ function readString(value: unknown, field: string, command: string): string {
 function textArgument(value: string, name: string): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new TypeError(`${PREFIX}: refused a ${name} ${describeValue(value)}, expected a non-empty string`);
+  }
+  return value;
+}
+
+/** A query's commit as a full sha, or a refusal quoting what was given. */
+function shaArgument(value: string): string {
+  if (typeof value !== 'string' || !FULL_SHA.test(value)) {
+    throw new TypeError(`${PREFIX}: refused a commit ${describeValue(value)}, expected a 40-character sha`);
   }
   return value;
 }

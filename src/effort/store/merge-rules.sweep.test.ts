@@ -22,12 +22,16 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
 import { Database } from 'bun:sqlite';
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test';
+
+import { SWEEP_TIMEOUT } from '../../tests/sweep-timeout.js';
 
 import { bringForward } from './bring-forward.js';
 import { MERGE_RULES, SET_ONCE } from './merge-rules.js';
 import { SQLITE_MIGRATIONS } from './migrations.js';
 import { ORIGIN_TABLES } from './origins.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-merge-rules-')));
 afterAll(() => {

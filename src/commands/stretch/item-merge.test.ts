@@ -29,6 +29,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
+import { runListArgs } from '../../ci/runs.js';
 import { beginSession } from '../../loop/sessions.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
@@ -64,6 +65,8 @@ const PR = 901;
 const BRANCH = 'stretch/4';
 const MERGE_SHA = 'c4da2c4c63b2e9d585d3a76ffbda1c49e3ce60d1';
 const OLD_SHA = '0326b9da1b76e75bfdd0ed3b2002897e5bae75e4';
+/** The commit of a push to the branch after the merge, whose run is listed before the merge commit's. */
+const NEWER_SHA = 'fb9abe9c1d2e3f405162738495a6b7c8d9e0f1a2';
 const START = Date.parse('2026-10-07T09:00:00.000Z');
 const BODY = 'Plan for #812.\n\nCloses #812\nFixes #812\ncloses #604\n';
 const THREE_CASES = await Bun.file(new URL('../../ci/testdata/three-cases.log-failed.txt', import.meta.url)).text();
@@ -304,14 +307,48 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).toContain('Filed since 2026-10-07T05:00:00.000Z: 1.');
   });
 
-  it('gives up on a run that never comes after the wait\'s bound, and still writes the ledger line', async () => {
+  it('gives up when no run on the merge commit is found within the wait\'s bound, and still writes the ledger line', async () => {
     const planted = plant({ runs: [[verifyRun({ headSha: OLD_SHA })]] });
 
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(0);
     expect(planted.sleeps).toHaveLength(CI_WAIT_MS / CI_POLL_MS);
-    expect(outcome.stdout).toContain(`warn: no run on ${BRANCH} at c4da2c4 ended within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).toContain(`warn: no run on ${BRANCH} at c4da2c4 was found within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).not.toContain('had not ended within');
+    expect(outcome.stdout).not.toContain('the readings below are of the newest run');
+    expect(readItems(planted.project.root, 4).items).toHaveLength(1);
+  });
+
+  it('ends the wait on a red run of the merge commit while a newer green run of the branch is listed first', async () => {
+    const newer = verifyRun({ databaseId: 37190099999, headSha: NEWER_SHA, conclusion: 'success', createdAt: '2026-10-07T09:40:00Z' });
+    const planted = plant({ runs: [[newer, verifyRun()]] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.sleeps).toEqual([]);
+    expect(planted.ghCalls.filter((args) => args[1] === 'list')).toEqual([
+      runListArgs({ branch: BRANCH, commit: MERGE_SHA }),
+      runListArgs({ branch: BRANCH }),
+    ]);
+    expectInOrder(outcome.stdout, [
+      `waiting for the run on ${BRANCH} at c4da2c4 to end`,
+      `run 37190089292 (verify) on ${BRANCH} at c4da2c4 ended: failure`,
+      `CI: ✅ ${BRANCH}: verify run 37190099999 is success on ${NEWER_SHA.slice(0, 7)}.`,
+    ]);
+    expect(outcome.stdout).not.toContain('warn:');
+  });
+
+  it('says the run it found had not ended when the merge commit\'s run is still going at the wait\'s bound', async () => {
+    const planted = plant({ runs: [[verifyRun({ status: 'in_progress', conclusion: '' })]] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.sleeps).toHaveLength(CI_WAIT_MS / CI_POLL_MS);
+    expect(outcome.stdout).toContain(`warn: run 37190089292 (verify) on ${BRANCH} at c4da2c4 had not ended within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).not.toContain('warn: no run on');
     expect(readItems(planted.project.root, 4).items).toHaveLength(1);
   });
 
@@ -527,7 +564,7 @@ describe('the dry run', () => {
     expect(planted.ghCalls).toEqual([]);
     const lines = mergeDryRunLines(['rafa'], planted.project.root, 4);
     expect(lines[0]).toBe('rafa pr merge <pr> --skip-checks --yes');
-    expect(lines[1]).toStartWith(`gh run list --branch ${BRANCH} --limit 1 --json`);
+    expect(lines[1]).toStartWith(`gh run list --branch ${BRANCH} --commit <merge-commit> --limit 1 --json`);
     expectInOrder(outcome.stdout, ['rafa loop wait --session-id=<session id>', ...lines, 'dry run: would start the loop']);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });

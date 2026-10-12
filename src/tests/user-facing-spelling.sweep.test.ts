@@ -20,11 +20,15 @@
  */
 import { join } from 'node:path';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setDefaultTimeout, test } from 'bun:test';
 import ts from 'typescript';
 
 import { HELP_TAGLINE } from '../cli/help.js';
 import { CORE_REGISTRY } from '../commands/index.js';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 /** The repository root, from this file. */
 const REPO_ROOT = join(import.meta.dir, '..', '..');

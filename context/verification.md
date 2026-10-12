@@ -542,6 +542,36 @@ while failing `existsSync`. Every gate that opens the file by path will
 fail, so stage the deletion and re-run — a gate's refusal to open a staged
 delete is not a fault.
 
+### Per-case time limits
+
+Three kinds of case run under three shared limits. Many spawned and
+integration files still keep a private one beside them (a `SPAWN_TIMEOUT`
+or `CASE_TIMEOUT_MS` constant, or a `{ timeout }` literal):
+
+- a `*.sweep.test.ts` case runs under `SWEEP_TIMEOUT` (150 000 ms), from
+  `src/tests/sweep-timeout.ts`. Each sweep file sets it for its own cases
+  with `setDefaultTimeout(SWEEP_TIMEOUT)` at module level, before its first
+  `describe`. That call reaches no other file of the run, so a sweep's
+  limit does not lift a unit test beside it;
+- a spawned case should pass `RUN_TIMEOUT` (`{ timeout: 60_000 }`, from
+  `src/tests/loop-scratch.ts`) as its middle argument, `it(name,
+  RUN_TIMEOUT, fn)`, which gives the child process a minute. A file with
+  a private limit keeps it until it is next changed;
+- every other case runs under the runner's 5 second default.
+
+The suffix sweep (`src/tests/sweep-suffix.sweep.test.ts`, the case
+"every tracked *.sweep.test.ts sets SWEEP_TIMEOUT") reads each tracked
+sweep file and fails, naming it, when the source neither calls
+`setDefaultTimeout(SWEEP_TIMEOUT)` nor passes `SWEEP_TIMEOUT` as a case's
+closing argument. A sweep added later with no limit is therefore red on
+its first run, not slow on a runner that is already loaded.
+
+No `[test] timeout` goes into `bunfig.toml`. A limit there applies to every
+file of the run, unit tests included, so a hung unit test would wait the
+sweep's 150 seconds, or a raised default would hide it, where the 5 second
+default fails it at once. A slow sweep gets its own limit above, and the
+unit tests keep theirs.
+
 ### Spawned CLI tests
 
 `src/tests/cli-capture.ts` (`plantScratchRepo`, `plantProjectConfig`,

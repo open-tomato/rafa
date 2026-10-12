@@ -92,10 +92,16 @@ loop start to its pit-stop readings. It takes the integration branch from
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
 has a pull request, `item` merges it with `--skip-checks` into the
-integration branch, frees the worktree, waits for `verify` on the new head,
-appends the ledger line and prints the pit-stop readings: the failed cases
-by file and case, the open-bug count, and the bugs filed since the last
-item. It decides nothing; the pit stop does.
+integration branch, frees the worktree, and waits for the run on the merge
+commit. It asks for that run by commit (`--commit`), so a newer push to the
+branch that has a run of its own does not make the wait read that run. The
+wait ends on the merge commit's run, red or green. If no run is found on the
+commit, or the run found has not ended, within 90 minutes, it warns `no run
+on <branch> at <sha> was found within 90 minutes` or `run <id> (<workflow>)
+on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
+ledger line and prints the pit-stop readings: the failed cases by file and
+case, the open-bug count, and the bugs filed since the last item. It decides
+nothing; the pit stop does.
 
 `rafa stretch end [--dry-run]` opens the integration branch into the
 default branch with `report.md` as its body and every merged item's `Closes`
