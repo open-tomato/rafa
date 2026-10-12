@@ -40,12 +40,15 @@
  *
  *   1. Escape, or keys that end, removes nothing; so does Enter with
  *      nothing ticked.
- *   2. Each ticked Not-pushed row gets a second question naming the
- *      commits deleting it loses ({@link notPushedQuestion}); only a
- *      yes keeps it in. A row held by a listed worktree that cannot be
- *      ticked (its `heldBy`, `src/cleanup/groups.ts`) gets no question:
- *      it is never deleted, so it is handed on unasked for step 3 to
- *      withhold (#860).
+ *   2. Each ticked Not-pushed row that would be deleted gets a second
+ *      question naming the commits deleting it loses
+ *      ({@link notPushedQuestion}); only a yes keeps it in. Which rows
+ *      those are is `src/cleanup/steps.ts`'s to say, through
+ *      `deletedNotPushed`: a row a ticked worktree holds (#978), or a
+ *      listed worktree that cannot be ticked holds (its `heldBy`,
+ *      `src/cleanup/groups.ts`, #860), is never deleted, so it gets no
+ *      question and is handed on unasked for step 3 to withhold.
+ *      `--dry-run` asks the same questions as a real run.
  *   3. The ticked rows become `src/cleanup/steps.ts`'s steps. Every
  *      ticked row that is not a step is one warning, `not removed:`
  *      with its reason.
@@ -98,6 +101,7 @@ import type { ProjectFound } from '../project/scope.js';
 import {
   cleanupSteps,
   defaultCleanupSeams,
+  deletedNotPushed,
   dryRunLines,
   readCleanup,
   runCleanupSteps,
@@ -270,14 +274,16 @@ function pullsFor(root: string, config: RafaConfig, seams: CleanupCommandSeams):
 
 /**
  * The Not-pushed rows of `selection` the person answered yes for, one
- * question each, and every row an untickable worktree holds, unasked:
- * `cleanupSteps` withholds that one whatever is answered, so asking
- * about commits it will not lose would be a question with no effect.
+ * question each, asked only of the rows `deletedNotPushed` names, and
+ * every other row unasked: `cleanupSteps` withholds that one whatever
+ * is answered, so asking about commits it will not lose would be a
+ * question with no effect.
  */
 async function confirmNotPushed(selection: CleanupSelection, ask: (question: string) => Promise<boolean>): Promise<CleanupSelection> {
+  const deleted = new Set(deletedNotPushed(selection));
   const kept: NotPushedRow[] = [];
   for (const row of selection.notPushed) {
-    if (row.heldBy !== undefined || await ask(notPushedQuestion(row))) kept.push(row);
+    if (!deleted.has(row) || await ask(notPushedQuestion(row))) kept.push(row);
   }
   return { ...selection, notPushed: kept };
 }
@@ -418,8 +424,10 @@ export function createCleanupCommand(seams: CleanupCommandSeams = DEFAULT_CLEANU
       + ' naming it, and is not deleted even when ticked: it is printed as `not removed:` with that'
       + ' worktree. A Merged branch listed only because its upstream is gone also starts'
       + ' unticked, saying the base does not reach its tip or, when its tip is past a merged pull request\'s'
-      + ' head, `<n> commits past #<pr>\'s head: <subjects>`. A ticked Not-pushed branch no such worktree'
-      + ' holds asks again, naming the commits deleting it loses. Enter'
+      + ' head, `<n> commits past #<pr>\'s head: <subjects>`. A ticked Not-pushed branch asks again, naming'
+      + ' the commits deleting it loses, only when it would be deleted: one a worktree that cannot be ticked'
+      + ' holds, or a ticked worktree holds, is asked nothing and printed as `not removed:` with why, under'
+      + ' `--dry-run` too. Enter'
       + ' then asks `Delete <n> branches, remove <m> worktrees and remove <r> run records? [y/N]`, and a yes'
       + ' runs `git worktree remove` for each worktree and `git branch -d` for each Merged branch, `-D` for a'
       + ' squash-merged one, for one whose commits past its pull request\'s head are release fragments the'

@@ -1437,7 +1437,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
+    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],

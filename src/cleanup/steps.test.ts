@@ -25,6 +25,7 @@ import {
   cleanupCommandLine,
   cleanupSteps,
   deleteBranchStep,
+  deletedNotPushed,
   dryRunLines,
   forcedFlagRefusal,
   needsForcedDelete,
@@ -289,6 +290,44 @@ describe('cleanupSteps', () => {
     }));
     expect(plan.steps).toHaveLength(5);
     expect(plan.steps.map((step) => forcedFlagRefusal(step.argv))).toEqual([null, null, null, null, null]);
+  });
+});
+
+describe('deletedNotPushed', () => {
+  it('leaves out a row a ticked, removable worktree holds, which cleanupSteps withholds (#978)', () => {
+    const picked = selection({ worktrees: [worktreeRow('/w/local', 'local')], notPushed: [notPushedRow('local')] });
+    expect(deletedNotPushed(picked)).toEqual([]);
+    expect(cleanupSteps(picked).withheld.map((entry) => entry.subject)).toEqual(['local']);
+  });
+
+  it('leaves out a row an untickable worktree holds (#860)', () => {
+    const held: NotPushedRow = { ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } };
+    expect(deletedNotPushed(selection({ notPushed: [held] }))).toEqual([]);
+  });
+
+  it('names a row no worktree holds (control)', () => {
+    const row = notPushedRow('local');
+    const picked = selection({ notPushed: [row] });
+    expect(deletedNotPushed(picked)).toEqual([row]);
+    expect(dryRunLines(cleanupSteps(picked))).toEqual(['git branch -D local']);
+  });
+
+  it('names exactly the rows cleanupSteps turns into a delete-branch step, in the order handed over', () => {
+    const free = notPushedRow('free');
+    const other = notPushedRow('other');
+    const picked = selection({
+      worktrees: [worktreeRow('/w/local', 'local'), worktreeRow('/w/dirty', 'stuck', false)],
+      notPushed: [
+        free,
+        notPushedRow('local'),
+        notPushedRow('stuck'),
+        { ...notPushedRow('pinned'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } },
+        other,
+      ],
+    });
+    const deleted = cleanupSteps(picked).steps.filter((step) => step.kind === 'delete-branch').map((step) => step.subject);
+    expect(deletedNotPushed(picked).map((row) => row.branch.name)).toEqual(['free', 'other']);
+    expect(deleted).toEqual(['free', 'other']);
   });
 });
 
