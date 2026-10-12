@@ -4,7 +4,7 @@
  * `--session-id` flag, the session a line picks, the write to a picked
  * session's record, a phase and an ETA as `status` and `list` write
  * them, and the refusals of a line. This is the command half; the
- * library half, `../../loop/session-readings.ts`, holds the readings
+ * library half, `../../core/loop/session-readings.ts`, holds the readings
  * that take none of those (the records under a root, a session's tasks
  * and rough ETA, a session written as a line, the seams and the plain
  * {@link refusal}), and every importer takes them from there: this file
@@ -44,12 +44,12 @@
  */
 import type { RafaContext, RafaFlagSpec } from '../../core/command/index.js';
 import type { SessionChange, SessionPhase, SessionRecord } from '../../core/loop/index.js';
-import type { TaskCounts } from '../../core/plan/index.js';
 import type {
   ResolvedLoopSeams,
   SessionChecklist,
   SessionEta,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
+import type { TaskCounts } from '../../core/plan/index.js';
 import type { PlanTask } from '../../plan/index.js';
 
 import { CommandExit } from '../../core/command/index.js';
@@ -61,7 +61,6 @@ import {
   SessionStateError,
   updateSession,
 } from '../../core/loop/index.js';
-import { plural } from '../../core/plan/index.js';
 import {
   formatDuration,
   isLive,
@@ -69,7 +68,8 @@ import {
   refusal,
   runsLabel,
   sessionLine,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
+import { plural } from '../../core/plan/index.js';
 
 /** The flag naming a session, by the name the context's flags carry it under. */
 export const SESSION_ID_FLAG = 'session-id';

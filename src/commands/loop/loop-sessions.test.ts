@@ -33,7 +33,7 @@ import {
   sessionLine,
   STOP_POLL_MS,
   STOP_WAIT_MS,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
 import {
   DEMO_PLAN,
   DEMO_PLAN_PATH,

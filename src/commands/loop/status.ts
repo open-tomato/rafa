@@ -18,7 +18,7 @@
  * `repair`, and `task` for a record from a rafa older than the field.
  *
  * A session reading `running` or `paused` also gets its rough ETA from the
- * effort store (`loop/session-readings.ts`, "The rough ETA"). A store that
+ * effort store (`core/loop/session-readings.ts`, "The rough ETA"). A store that
  * cannot be read is warned about, and the status is given without one. A
  * session that has ended gets none.
  *
@@ -50,14 +50,12 @@
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../core/loop/readings.js';
 import type { TaskCounts } from '../../core/plan/index.js';
 import type { BlockedTask } from '../../loop/blocked-tasks.js';
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../loop/session-readings.js';
 
 import { messageOf } from '../../core/config/sections.js';
 import { sessionPhase } from '../../core/loop/index.js';
-import { countTasks } from '../../core/plan/index.js';
-import { blockedTasks } from '../../loop/blocked-tasks.js';
 import {
   estimateEta,
   isLive,
@@ -65,7 +63,9 @@ import {
   readSessionFinishes,
   resolveLoopSeams,
   sessionLine,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
+import { countTasks } from '../../core/plan/index.js';
+import { blockedTasks } from '../../loop/blocked-tasks.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

@@ -14,7 +14,7 @@
  * the records are read.
  */
 import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../loop/session-readings.js';
+import type { LoopSessionSeams } from '../../core/loop/readings.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

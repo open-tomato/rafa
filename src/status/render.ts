@@ -80,8 +80,8 @@ import type { Mergeability } from '../pr/index.js';
 import { blockedLineSentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { idleText } from '../board/roadmap-claims.js';
+import { planLabel, sessionLine } from '../core/loop/readings.js';
 import { formatCounts } from '../core/plan/index.js';
-import { planLabel, sessionLine } from '../loop/session-readings.js';
 
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 

@@ -31,13 +31,13 @@
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '../../core/loop/readings.js';
 
 import {
   isLive,
   refusal,
   resolveLoopSeams,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

@@ -12,8 +12,8 @@ import type { Estimate, StatusLoop, StatusWidget } from './dashboard-status.js';
 import type { Dashboard, SkillsPlanSummary, TotalsWidget } from './dashboard.js';
 import type { SkillsMetric } from './report-skills.js';
 
+import { formatDuration } from '../core/loop/readings.js';
 import { formatCounts } from '../core/plan/index.js';
-import { formatDuration } from '../loop/session-readings.js';
 
 import { alignRows } from './report-format.js';
 import { formatLoopsSegment, formatTokens, formatTrendSegment } from './report-trend-format.js';

@@ -53,8 +53,8 @@ import { defaultWorktreeSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { messageOf } from '../core/config/sections.js';
 import { readSessions, SESSION_STATES } from '../core/loop/index.js';
+import { readSessionChecklist } from '../core/loop/readings.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { readSessionChecklist } from '../loop/session-readings.js';
 import { scopeAt } from '../project/scope.js';
 
 import { isIdleWorktree } from './sections.js';

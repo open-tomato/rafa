@@ -14,7 +14,7 @@
  *
  * The command then reads the record every `STOP_POLL_MS` milliseconds
  * until it reads `stopped` or `done`, for at most `STOP_WAIT_MS`, both in
- * `loop/session-readings.ts`. Once it does, it reads the line of the task the
+ * `core/loop/session-readings.ts`. Once it does, it reads the line of the task the
  * record ended at in the plan's tracker, and says what the line holds:
  * `[BLOCKED]` for a task the stop interrupted, `[x]` for one that finished
  * before the signal landed. A record ending with no task was running none.
@@ -42,7 +42,7 @@
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../loop/session-readings.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../core/loop/readings.js';
 import type { PlanTask } from '../../plan/index.js';
 
 import { messageOf } from '../../core/config/sections.js';
@@ -53,7 +53,7 @@ import {
   readSessionChecklist,
   refusal,
   resolveLoopSeams,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

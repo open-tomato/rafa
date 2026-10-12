@@ -11,7 +11,7 @@
  * beside one without, a blank comment beside a written one, and a
  * checklist with no blocked line beside the ones that hold some.
  */
-import type { SessionChecklist } from './session-readings.js';
+import type { SessionChecklist } from '../core/loop/readings.js';
 
 import { describe, expect, it } from 'bun:test';
 

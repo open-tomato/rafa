@@ -25,6 +25,18 @@
  * that reads a record needs this one import, as it needed `sessions.ts`
  * alone before the move.
  *
+ * ## Why the session readings are not here
+ *
+ * `src/core/loop/` has two barrels, both listed under `CORE_BARRELS` in
+ * `scripts/survey/core-moves.ts`. `session-readings.ts`, the second
+ * file that moved here, sits alone behind `readings.ts`. It reaches
+ * `src/effort/store/development-build.ts` by value, through
+ * `src/effort/store/task-finishes.ts`, and that file imports three
+ * runtime names from this barrel. With `session-readings.ts` behind
+ * this barrel the store would import this file, and this file the
+ * store: a cycle of six files. `readings.ts` records the measurement,
+ * and `readings.test.ts` holds that no name is on both barrels.
+ *
  * ## Why the barrel closes no cycle
  *
  * A barrel that groups a file with a file outside `src/core/` that

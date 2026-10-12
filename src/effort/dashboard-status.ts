@@ -18,7 +18,7 @@
  *   everything between tasks as well: gates, commits, reviews, restarts,
  *   and any gap between two runs of the plan.
  * - `bySession`: the estimate `rafa loop status` prints, unchanged
- *   (`loop/session-readings.ts`, "The rough ETA"): from this run's
+ *   (`core/loop/session-readings.ts`, "The rough ETA"): from this run's
  *   start to its last finished task, per task finished in this run.
  *
  * `byProgress` reads the clock, which is why the dashboard, unlike
@@ -26,12 +26,12 @@
  */
 import type { LoopRow } from './report-trend.js';
 import type { PidProbe, SessionRecord, SessionTask } from '../core/loop/index.js';
+import type { SessionEta } from '../core/loop/readings.js';
 import type { TaskCounts } from '../core/plan/index.js';
-import type { SessionEta } from '../loop/session-readings.js';
 
 import { readSessions } from '../core/loop/index.js';
+import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '../core/loop/readings.js';
 import { countTasks } from '../core/plan/index.js';
-import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '../loop/session-readings.js';
 
 /** Milliseconds in one second. */
 const MS_PER_SECOND = 1_000;

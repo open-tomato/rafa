@@ -5,7 +5,7 @@
  *
  * Every record under `.rafa/runs/` reading `running` or `paused`, oldest
  * first (`core/loop/sessions.ts`), with the tasks of its plan counted as
- * `rafa loop status` counts them (`loop/session-readings.ts`), the phase
+ * `rafa loop status` counts them (`core/loop/session-readings.ts`), the phase
  * its run is in beside the tasks done over total, `task` for a record
  * from a rafa older than the field. A record whose pid
  * is gone reads `stopped` and is not listed, nor is one that reads `done`.
@@ -35,20 +35,20 @@
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
+import type { LoopSessionSeams, ResolvedLoopSeams } from '../../core/loop/readings.js';
 import type { TaskCounts } from '../../core/plan/index.js';
-import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
 
 import { isAbsolute, relative } from 'node:path';
 
 import { sessionPhase } from '../../core/loop/index.js';
-import { countTasks } from '../../core/plan/index.js';
 import {
   isLive,
   readRecords,
   readSessionChecklist,
   resolveLoopSeams,
   sessionLine,
-} from '../../loop/session-readings.js';
+} from '../../core/loop/readings.js';
+import { countTasks } from '../../core/plan/index.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

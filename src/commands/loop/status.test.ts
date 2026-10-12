@@ -27,7 +27,7 @@
  * branch reader throwing to show it is never read then.
  */
 import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
-import type { LoopSessionSeams } from '../../loop/session-readings.js';
+import type { LoopSessionSeams } from '../../core/loop/readings.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

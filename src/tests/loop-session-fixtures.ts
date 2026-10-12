@@ -13,7 +13,7 @@
 import type { PlantedProject } from './cli-capture.js';
 import type { SubjectSpec } from '../cli/registry.js';
 import type { SessionRecord } from '../core/loop/index.js';
-import type { LoopSessionSeams } from '../loop/session-readings.js';
+import type { LoopSessionSeams } from '../core/loop/readings.js';
 
 import {
   mkdirSync,

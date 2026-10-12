@@ -208,13 +208,19 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * which imports `blocks.ts` back, and one barrel over both would close
  * a cycle through the tracker. `index.ts` holds `parse.ts` and
  * `plan-files.ts`.
+ *
+ * `loop` has two. `session-readings.ts` sits alone behind
+ * `readings.ts`, because it imports
+ * `src/effort/store/task-finishes.ts`, from which
+ * `src/effort/store/development-build.ts` is reached by value, and
+ * that file imports `index.ts` back. `index.ts` holds `sessions.ts`.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],
   command: ['src/core/command/index.ts'],
   config: ['src/core/config/index.ts', 'src/core/config/load.ts', 'src/core/config/sections.ts'],
   git: ['src/core/git/index.ts'],
-  loop: ['src/core/loop/index.ts'],
+  loop: ['src/core/loop/index.ts', 'src/core/loop/readings.ts'],
   output: ['src/core/output/index.ts'],
   plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
 };

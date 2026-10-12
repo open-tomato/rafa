@@ -392,6 +392,10 @@ describe('subjectBarrels', () => {
       'src/core/plan/block-reader.ts',
       'src/core/plan/index.ts',
     ]);
+    expect(subjectBarrels('src/core/loop/session-readings.ts')).toEqual([
+      'src/core/loop/index.ts',
+      'src/core/loop/readings.ts',
+    ]);
   });
 
   it('answers none for a path directly in src/core/, a folder with no barrel, or a path outside it', () => {

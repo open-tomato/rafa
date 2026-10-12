@@ -44,8 +44,8 @@
 import type { EffortStore, SessionEffortRow } from './store/types.js';
 
 import { boardId } from '../board/naming.js';
+import { formatDuration } from '../core/loop/readings.js';
 import { plural } from '../core/plan/index.js';
-import { formatDuration } from '../loop/session-readings.js';
 
 import { minutesBetween } from './commits.js';
 import { formatCount } from './report-format.js';

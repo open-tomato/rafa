@@ -1,6 +1,6 @@
 /**
  * The session readings any folder may take, the library half of
- * `../commands/loop/loop-sessions.ts`: the session records under a root
+ * `../../commands/loop/loop-sessions.ts`: the session records under a root
  * with the state each reads as, whether a record's run has ended, a
  * session written as a line, a session's tasks and rough ETA, a rough
  * duration as a person reads it, and the seams those reach the system
@@ -22,7 +22,7 @@
  *
  * {@link readSessionChecklist} reads the tasks of the plan a record names,
  * counted by checkbox as `rafa plan list` counts them
- * (`../core/plan/plan-files.ts`): from the plan's tracker once there is one,
+ * (`../plan/plan-files.ts`): from the plan's tracker once there is one,
  * and from the plan before then. They are the whole plan's tasks, those every
  * earlier session got through included. A record whose plan and tracker
  * are both gone has none.
@@ -32,7 +32,7 @@
  * {@link estimateEta}: the time from the session's start to the last task
  * it finished, over the tasks it finished, times the tasks left, open and
  * blocked alike, since the loop retries a blocked task first. The finishes
- * are the effort store's (`../effort/store/task-finishes.ts`), read for the
+ * are the effort store's (`../../effort/store/task-finishes.ts`), read for the
  * record's plan stub from the session's start on. There is no estimate
  * before the session finishes a task. It is rough: the wrap-up and the CI
  * wait are not in it, and the time a run spent paused is, as is the first
@@ -40,7 +40,7 @@
  *
  * ## The refusal
  *
- * {@link refusal} is a `CommandExit` (`../core/command/command.ts`) with
+ * {@link refusal} is a `CommandExit` (`../command/command.ts`) with
  * exit code 1 and a message opening `❌ `, for a problem that is not the
  * line's fault. It sits here because {@link readRecords} throws one for
  * records that cannot be read, to a command and to any other reader
@@ -52,21 +52,22 @@
  * `stop` sends, the wait and how long `stop` waits. Each left out is the
  * system's own ({@link resolveLoopSeams}).
  */
-import type { PidProbe, SessionRecord } from '../core/loop/index.js';
-import type { TaskCounts } from '../core/plan/index.js';
-import type { PlanTask } from '../plan/index.js';
+import type { PidProbe, SessionRecord } from './sessions.js';
+import type { PlanTask } from '../plan/parse.js';
+import type { TaskCounts } from '../plan/plan-files.js';
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { CommandExit } from '../core/command/index.js';
-import { messageOf } from '../core/config/sections.js';
-import { isPidAlive, readSessions, runsDir, SessionRecordError } from '../core/loop/index.js';
-import { isFile } from '../core/plan/index.js';
-import { readTaskFinishes } from '../effort/store/task-finishes.js';
-import { parsePlan } from '../plan/index.js';
-import { trackerPathFor } from '../utils/tracker.js';
+import { readTaskFinishes } from '../../effort/store/task-finishes.js';
+import { trackerPathFor } from '../../utils/tracker.js';
+import { CommandExit } from '../command/command.js';
+import { messageOf } from '../config/config-sections.js';
+import { parsePlan } from '../plan/parse.js';
+import { isFile } from '../plan/plan-files.js';
+
+import { isPidAlive, readSessions, runsDir, SessionRecordError } from './sessions.js';
 
 /** How long `rafa loop stop` waits for the run it signalled to end. */
 export const STOP_WAIT_MS = 30_000;
