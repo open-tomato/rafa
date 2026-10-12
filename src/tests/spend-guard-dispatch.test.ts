@@ -32,35 +32,48 @@
  * ## The three cases
  *
  *   - An undeclared command's `run` calls `spawnClaude`: the dispatch
- *     fails as `command_error`, its stderr line naming the command and
- *     saying to declare `spends`, and the stand-in is never reached.
- *   - The planted `pr triage`, dispatched without `--resolve`: refused
- *     the same way, naming the missing flag, the stand-in unreached.
+ *     ends 0 with a `warn:` line on stdout (text mode's one stream)
+ *     naming the command and saying to declare `spends`, and the
+ *     stand-in runs once. Usage is never a gate.
+ *   - The planted `pr triage`, dispatched without `--resolve`: warned
+ *     the same way, naming the missing flag, the stand-in run once.
  *   - The SAME planted `pr triage`, dispatched WITH `--resolve`: the
- *     control that says the case above was a refusal and not a command
- *     that could never have reached the stand-in at all. It ends 0, and
- *     the stand-in's log holds exactly one line.
+ *     control that says the warning above came from the declaration and
+ *     not from every session. It ends 0 with no warning, and the
+ *     stand-in's log holds exactly one line.
  *
- * "Reached the stand-in" is read off a log file the stand-in itself
- * appends to, never off a resolved promise: a guard checked after the
- * spawn, or a stand-in that ran without being asked to log, would both
- * leave that file empty in the case that should have written to it.
+ * The same undeclared command is also dispatched with `--output=events`,
+ * where stdout and stderr hold no warning since that output drops `warn`,
+ * and with `--output=json`, where one `log` event at level `warn` names
+ * the command; the stand-in runs once in each.
+ *
+ * "Ran the stand-in" is read off a log file the stand-in itself appends
+ * to, never off a resolved promise: a stand-in that ran without being
+ * asked to log would leave that file empty in the case that should have
+ * written to it.
  *
  * ## The overlap case
  *
  * Two undeclared commands that start no session are dispatched at once,
  * the first started ending first, and `spawnClaude` is then called
  * outside any dispatch, as a later test file's stand-in session is. It
- * reaches the stand-in once: a dispatch records its command in an async
- * scope of its own (`cli/running.ts`), so nothing is left for the guard
- * to read once both have ended. This is #927 as it was measured: with
- * the record put back in a `finally`, the second to end put back the
- * first's record, and the guard refused every session a later file
- * started, naming a command that had long ended. Run on 2026-10-10
- * against that dispatcher, this case alone was red, rejecting with
- * `rafa plan idle started a Claude session but declares no spends` and
- * the stand-in's log empty. The third case above is its control that
- * the stand-in can be reached at all.
+ * runs the stand-in once and warns nothing: a dispatch records its
+ * command in an async scope of its own (`cli/running.ts`), so nothing is
+ * left for the guard to read once both have ended. This is #927 as it
+ * was measured: with the record put back in a `finally`, the second to
+ * end put back the first's record, and the guard, which threw at the
+ * time, refused every session a later file started, naming a command
+ * that had long ended. Run on 2026-10-10 against that dispatcher, this
+ * case alone was red, rejecting with `rafa plan idle started a Claude
+ * session but declares no spends` and the stand-in's log empty.
+ *
+ * The session's `warn` lines are read off an output set at module
+ * level, which is the one a caller outside every dispatch writes
+ * through (`adapters/output/active.ts`). Its control was run on
+ * 2026-10-12: with `runAsRunningCommand` also leaving its record at
+ * module level, this case alone of the four was red, its list holding
+ * one line that named `rafa plan waits`, and `cli/running.ts` was
+ * restored sha256-identical.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
@@ -72,9 +85,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { setActiveOutput } from '../adapters/output/active.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import { claudeArgs, spawnClaude } from '../utils/claude.js';
+
+import { sinkOutput } from './output-sinks.js';
 
 /** The setting sources every planted command's session spawns with. */
 const DEFAULT_SOURCES = ['project', 'local'] as const;
@@ -104,7 +120,7 @@ function spender(subject: string, action: string, spend?: CommandSpend, flags: R
     args: [],
     flags,
     examples: [],
-    outputs: ['text'],
+    outputs: ['text', 'json', 'events'],
     needsProject: false,
     ...(spend === undefined
       ? {}
@@ -183,6 +199,7 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
   });
 
   afterEach(() => {
+    setActiveOutput(null);
     if (savedPath === undefined) {
       delete process.env['PATH'];
     } else {
@@ -204,32 +221,55 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
     return { exitCode, stdout: stdout.text(), stderr: stderr.text() };
   }
 
-  it('fails an undeclared command with the named error before any spawn, and reaches the stand-in never', async () => {
+  it('warns about an undeclared command and still runs its session, exiting 0', async () => {
     const outcome = await run(['plan', 'create']);
 
-    expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain('rafa plan create started a Claude session but declares no spends');
-    expect(outcome.stderr).toContain('declare spends on the command');
-    expect(standInCalls()).toBe(0);
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('warn: ⚠️  rafa plan create started a Claude session but declares no spends');
+    expect(outcome.stdout).toContain('declare spends on the command');
+    expect(standInCalls()).toBe(1);
   });
 
-  it('refuses the planted pr triage dispatched without --resolve, its with check having no production path of its own', async () => {
+  it('writes no warning to stdout or stderr in events mode, which drops warn, and still runs its session', async () => {
+    const outcome = await run(['plan', 'create', '--output=events']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).not.toContain('started a Claude session');
+    expect(outcome.stderr).not.toContain('started a Claude session');
+    expect(standInCalls()).toBe(1);
+  });
+
+  it('writes one log event at level warn naming the command in json mode and still runs its session', async () => {
+    const outcome = await run(['plan', 'create', '--output=json']);
+    const events = outcome.stdout.split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as { type: string; level?: string; message?: string });
+    const warnings = events.filter((event) => event.type === 'log' && event.level === 'warn');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.message).toContain('rafa plan create started a Claude session but declares no spends');
+    expect(standInCalls()).toBe(1);
+  });
+
+  it('warns about the planted pr triage dispatched without --resolve, its with check having no production path of its own', async () => {
     const outcome = await run(['pr', 'triage']);
 
-    expect(outcome.exitCode).toBe(1);
-    expect(outcome.stderr).toContain('rafa pr triage started a Claude session without --resolve');
-    expect(standInCalls()).toBe(0);
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).toContain('warn: ⚠️  rafa pr triage started a Claude session without --resolve');
+    expect(standInCalls()).toBe(1);
   });
 
-  it('reaches the stand-in once for the SAME command dispatched with --resolve, the liveness control', async () => {
+  it('warns nothing for the SAME command dispatched with --resolve, the control', async () => {
     const outcome = await run(['pr', 'triage', '--resolve']);
 
     expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).not.toContain('started a Claude session');
     expect(outcome.stderr).toBe('');
     expect(standInCalls()).toBe(1);
   });
 
-  it('refuses no session started outside any dispatch after two undeclared commands overlapped, the first started ending first', async () => {
+  it('warns about no session started outside any dispatch after two undeclared commands overlapped, the first started ending first', async () => {
     const bothRunning = gate();
     const firstEnded = gate();
     const registry = createCommandRegistry({
@@ -254,10 +294,13 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
       }),
       dispatch(['plan', 'waits'], options),
     ]);
+    const warnings: string[] = [];
+    setActiveOutput(sinkOutput({ warn: (message) => warnings.push(message) }));
     const exitCode = await spawnClaude(claudeArgs(DEFAULT_SOURCES), 'a prompt outside any dispatch');
 
     expect(outcomes.map((outcome) => outcome.exitCode)).toEqual([0, 0]);
     expect(exitCode).toBe(0);
+    expect(warnings).toEqual([]);
     expect(standInCalls()).toBe(1);
   });
 });
