@@ -42,6 +42,11 @@
  *     not from every session. It ends 0 with no warning, and the
  *     stand-in's log holds exactly one line.
  *
+ * The same undeclared command is also dispatched with `--output=events`,
+ * where stdout and stderr hold no warning since that output drops `warn`,
+ * and with `--output=json`, where one `log` event at level `warn` names
+ * the command; the stand-in runs once in each.
+ *
  * "Ran the stand-in" is read off a log file the stand-in itself appends
  * to, never off a resolved promise: a stand-in that ran without being
  * asked to log would leave that file empty in the case that should have
@@ -115,7 +120,7 @@ function spender(subject: string, action: string, spend?: CommandSpend, flags: R
     args: [],
     flags,
     examples: [],
-    outputs: ['text'],
+    outputs: ['text', 'json', 'events'],
     needsProject: false,
     ...(spend === undefined
       ? {}
@@ -222,6 +227,28 @@ describe('the spend guard, dispatched over a planted registry with a stand-in cl
     expect(outcome.exitCode).toBe(0);
     expect(outcome.stdout).toContain('warn: ⚠️  rafa plan create started a Claude session but declares no spends');
     expect(outcome.stdout).toContain('declare spends on the command');
+    expect(standInCalls()).toBe(1);
+  });
+
+  it('writes no warning to stdout or stderr in events mode, which drops warn, and still runs its session', async () => {
+    const outcome = await run(['plan', 'create', '--output=events']);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(outcome.stdout).not.toContain('started a Claude session');
+    expect(outcome.stderr).not.toContain('started a Claude session');
+    expect(standInCalls()).toBe(1);
+  });
+
+  it('writes one log event at level warn naming the command in json mode and still runs its session', async () => {
+    const outcome = await run(['plan', 'create', '--output=json']);
+    const events = outcome.stdout.split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as { type: string; level?: string; message?: string });
+    const warnings = events.filter((event) => event.type === 'log' && event.level === 'warn');
+
+    expect(outcome.exitCode).toBe(0);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.message).toContain('rafa plan create started a Claude session but declares no spends');
     expect(standInCalls()).toBe(1);
   });
 
