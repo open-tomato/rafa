@@ -1283,7 +1283,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./item-merge.js', ['afterLoopWait', 'ghFiledAt', 'mergeDryRunLines']],
+    ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/stretch/end.js', [

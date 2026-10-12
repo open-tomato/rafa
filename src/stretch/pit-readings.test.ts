@@ -2,17 +2,19 @@
  * Tests for the pit-stop readings (`pit-readings.ts`): the CI reading
  * over the recorded `run list` fake and a captured failed log, the open
  * bug count and the bugs filed since a cut-off through a stand-in
- * tracker, each reading's failure held apart from the others, and the
- * lines rendered from them.
+ * tracker whose open bugs carry their own `createdAt`, each reading's
+ * failure held apart from the others, and the lines rendered from them.
  *
  * No case spawns `gh`: `run list` is answered by `src/ci/runs-fake.ts`
  * and `run view --log-failed` by a stand-in handing back the capture
  * under `src/ci/testdata/`. Controls: the green case reads the call log
  * beside the red case, so its missing `run view` is read against a run
  * that sends one; the cut-off case lists a bug filed after it beside one
- * filed before it, so the filter is seen to drop as well as keep.
+ * filed before it, so the filter is seen to drop as well as keep; the
+ * null-time case runs the same two bugs dated beside it, so the refusal
+ * is seen to come from the missing time alone.
  */
-import type { FiledAtReader, PitSeams } from './pit-readings.js';
+import type { PitSeams } from './pit-readings.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { FakeRun } from '../ci/runs-fake.js';
 import type { OpenIssue, Tracker } from '../ports/index.js';
@@ -21,7 +23,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../ci/runs-fake.js';
 
-import { NO_FILED_AT, NO_OPEN_ISSUES, readPitReadings, renderPitReadings } from './pit-readings.js';
+import { NO_OPEN_ISSUES, readPitReadings, renderPitReadings } from './pit-readings.js';
 
 const BRANCH = 'stretch/9';
 const WORKFLOW = 'verify';
@@ -62,9 +64,10 @@ function caseGh(runs: readonly FakeRun[], log: GhResult = { ok: true, stdout: TH
   return { gh, calls: () => [...calls] };
 }
 
-function bug(id: string, title: string): OpenIssue {
+/** An open bug filed at `createdAt`, null for one whose tracker names no time. */
+function bug(id: string, title: string, createdAt: string | null): OpenIssue {
   const ref: OpenIssue['ref'] = { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` };
-  return { ref, title, body: '', createdAt: null };
+  return { ref, title, body: '', createdAt };
 }
 
 /** A tracker listing `bugs` as its open bugs, and the types it was asked for. */
@@ -81,31 +84,16 @@ function caseTracker(bugs: readonly OpenIssue[]): { tracker: Pick<Tracker, 'open
   };
 }
 
-/** A filing-time reader over `times`, keyed by issue number. */
-function filedAtOf(times: Readonly<Record<string, string | null>>): FiledAtReader {
-  return (ref) => {
-    const at = times[ref.externalId];
-    return Promise.resolve(at === undefined || at === null
-      ? null
-      : new Date(at));
-  };
-}
+/** Filed before {@link SINCE}. */
+const OLD = bug('801', 'an old bug', '2026-10-06T09:00:00Z');
+const OLDER = bug('790', 'an older bug', '2026-10-01T09:00:00Z');
+/** Filed after {@link SINCE}, the later of the two listed first so the order read is not the order given. */
+const NEW_A = bug('812', 'a bug from this item', '2026-10-07T12:00:00Z');
+const NEW_B = bug('813', 'another bug from this item', '2026-10-07T11:00:00Z');
 
-const OLD = bug('801', 'an old bug');
-const NEW_A = bug('812', 'a bug from this item');
-const NEW_B = bug('813', 'another bug from this item');
-const TIMES = {
-  '801': '2026-10-06T09:00:00Z',
-  '812': '2026-10-07T12:00:00Z',
-  '813': '2026-10-07T11:00:00Z',
-};
-
-/** Seams over `gh` and `bugs`; a null `filedAt` hands over no filing-time reader. */
-function seams(gh: GhRunner, bugs: readonly OpenIssue[], filedAt: FiledAtReader | null = filedAtOf(TIMES)): PitSeams {
-  const { tracker } = caseTracker(bugs);
-  return filedAt === null
-    ? { gh, tracker }
-    : { gh, tracker, filedAt };
+/** Seams over `gh` and `bugs`. */
+function seams(gh: GhRunner, bugs: readonly OpenIssue[]): PitSeams {
+  return { gh, tracker: caseTracker(bugs).tracker };
 }
 
 describe('the CI reading', () => {
@@ -163,7 +151,7 @@ describe('the bug readings', () => {
   it('counts the open bugs through openIssues(\'bug\')', async () => {
     const { tracker, asked } = caseTracker([OLD, NEW_A, NEW_B]);
 
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker, filedAt: filedAtOf(TIMES) }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker }, { branch: BRANCH, since: SINCE });
 
     expect(asked).toEqual(['bug']);
     expect(reading.openBugs).toEqual({ ok: true, value: 3 });
@@ -177,24 +165,46 @@ describe('the bug readings', () => {
     expect(reading.filedSince.value.bugs.map((filed) => filed.id)).toEqual(['813', '812']);
   });
 
-  it('reads the bugs filed since as not read without a filing-time reader, and keeps the count', async () => {
-    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD], null), { branch: BRANCH, since: SINCE });
+  it('reads no bug as filed since when every open bug was filed before the cut-off', async () => {
+    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, OLDER]), { branch: BRANCH, since: SINCE });
 
-    expect(reading.filedSince).toEqual({ ok: false, reason: NO_FILED_AT });
-    expect(reading.openBugs).toEqual({ ok: true, value: 1 });
+    expect(reading.filedSince).toEqual({ ok: true, value: { since: SINCE.toISOString(), bugs: [] } });
+    expect(reading.openBugs).toEqual({ ok: true, value: 2 });
   });
 
-  it('refuses to guess when a bug has no filing time', async () => {
-    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, NEW_A], filedAtOf({ '801': TIMES['801'], '812': null })), {
-      branch: BRANCH,
-      since: SINCE,
-    });
+  it('reads the times off the open bugs, with no gh call for a bug', async () => {
+    const quiet = caseGh([]);
 
+    const reading = await readPitReadings(seams(quiet.gh, [OLD, NEW_A, NEW_B]), { branch: BRANCH, since: SINCE });
+
+    if (!reading.filedSince.ok) throw new Error(reading.filedSince.reason);
+    expect(reading.filedSince.value.bugs.map((filed) => filed.filedAt)).toEqual(['2026-10-07T11:00:00.000Z', '2026-10-07T12:00:00.000Z']);
+    expect(quiet.calls().filter((args) => args[0] === 'issue')).toEqual([]);
+    expect(quiet.calls().some((args) => args[0] === 'run')).toBe(true);
+  });
+
+  it('refuses to guess when a bug has a null time, naming the bug, and keeps the count', async () => {
+    const undated = bug('812', NEW_A.title, null);
+
+    const dated = await readPitReadings(seams(caseGh([]).gh, [OLD, NEW_A]), { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings(seams(caseGh([]).gh, [OLD, undated]), { branch: BRANCH, since: SINCE });
+
+    expect(dated.filedSince.ok).toBe(true);
     expect(reading.filedSince).toEqual({ ok: false, reason: 'no filing time for #812' });
+    expect(reading.openBugs).toEqual({ ok: true, value: 2 });
+  });
+
+  it('names every bug with no time, and reads a time that does not parse as none', async () => {
+    const reading = await readPitReadings(
+      seams(caseGh([]).gh, [bug('801', 'an old bug', null), NEW_A, bug('813', 'another bug', 'soon')]),
+      { branch: BRANCH, since: SINCE },
+    );
+
+    expect(reading.filedSince).toEqual({ ok: false, reason: 'no filing time for #801, #813' });
   });
 
   it('reads both bug readings as not read on a tracker without openIssues, never as zero', async () => {
-    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker: {}, filedAt: filedAtOf(TIMES) }, { branch: BRANCH, since: SINCE });
+    const reading = await readPitReadings({ gh: caseGh([]).gh, tracker: {} }, { branch: BRANCH, since: SINCE });
 
     expect(reading.openBugs).toEqual({ ok: false, reason: NO_OPEN_ISSUES });
     expect(reading.filedSince).toEqual({ ok: false, reason: NO_OPEN_ISSUES });
@@ -230,14 +240,14 @@ describe('the rendered lines', () => {
     const unread = renderPitReadings({
       ci: { ok: false, reason: 'gh offline' },
       openBugs: { ok: false, reason: NO_OPEN_ISSUES },
-      filedSince: { ok: false, reason: NO_FILED_AT },
+      filedSince: { ok: false, reason: 'no filing time for #812' },
     });
 
     expect(quiet).toEqual([`CI: ⚪ No run on ${BRANCH}.`, 'Bugs: 1 open.', `Filed since ${SINCE.toISOString()}: none.`]);
     expect(unread).toEqual([
       'CI: not read: gh offline',
       `Bugs: not read: ${NO_OPEN_ISSUES}`,
-      `Filed since the last item: not read: ${NO_FILED_AT}`,
+      'Filed since the last item: not read: no filing time for #812',
     ]);
   });
 });

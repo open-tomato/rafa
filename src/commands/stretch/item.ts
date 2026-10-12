@@ -96,7 +96,7 @@ import {
   resolveProjectConfig,
 } from '../plan/plan-files.js';
 
-import { afterLoopWait, ghFiledAt, mergeDryRunLines } from './item-merge.js';
+import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -494,7 +494,6 @@ export function defaultStretchItemSeams(): StretchItemSeams {
     isAlive: isPidAlive,
     gh: (root) => createGhRunner({ cwd: root }),
     tracker: (gh) => createGithubTracker({ gh }),
-    filedAt: ghFiledAt,
     sleep: (ms) => Bun.sleep(ms),
     now: () => new Date(),
     rafa: DEFAULT_RAFA_COMMAND,
