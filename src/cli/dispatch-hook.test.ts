@@ -39,6 +39,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
+import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
 import { setActiveOutput } from '../adapters/output/active.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
@@ -405,5 +406,51 @@ describe('a half that fails', () => {
 
     expect(outcome.exitCode).toBe(0);
     expect(stdout).toBe('debug: command hook before: not an error, as a string\ndebug: command hook after: a bare string\n');
+  });
+});
+
+describe('logger settings a half sets, as a hook that loads the project config does', () => {
+  /** The settings a config with `logger.level: error` loads. */
+  const QUIET = { ...DEFAULT_LOGGER_SETTINGS, level: 'error' as const };
+
+  afterEach(() => {
+    setActiveLoggerSettings(null);
+  });
+
+  it('are read by that half and left nowhere once the invocation ends', async () => {
+    const read: string[] = [];
+    const hook: CommandHook = {
+      before: async () => {
+        setActiveLoggerSettings(QUIET);
+        read.push(`before ${activeLoggerSettings().level}`);
+        return null;
+      },
+      after: async () => {
+        setActiveLoggerSettings(QUIET);
+        read.push(`after ${activeLoggerSettings().level}`);
+      },
+    };
+
+    const { outcome } = await run(['loop', 'start'], hook);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(read).toEqual(['before error', 'after error']);
+    expect(activeLoggerSettings()).toEqual(DEFAULT_LOGGER_SETTINGS);
+  });
+
+  it('leave the settings set before the invocation as they were', async () => {
+    const mine = { ...DEFAULT_LOGGER_SETTINGS, callSite: true };
+    setActiveLoggerSettings(mine);
+    const hook: CommandHook = {
+      before: async () => {
+        setActiveLoggerSettings(QUIET);
+        return null;
+      },
+      after: async () => setActiveLoggerSettings(QUIET),
+    };
+
+    await run(['loop', 'start'], hook);
+
+    expect(activeLoggerSettings()).toEqual(mine);
   });
 });

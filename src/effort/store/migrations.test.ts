@@ -427,6 +427,7 @@ const SHIPPED_SHAPES: Readonly<Record<string, readonly string[]>> = {
   'store-meta': ['create-table', 'create-table', 'create-table'],
   'store-meta-generation': ['add-column'],
   'session-worktree': ['add-column'],
+  'store-replaced': ['create-table'],
 };
 
 describe('classifyMigration over the catalogue', () => {

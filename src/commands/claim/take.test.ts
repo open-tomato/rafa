@@ -42,6 +42,9 @@ const ISSUE = 7;
 const BRANCH = 'feat/rafa-7-take';
 const STORE_A = 'store-a';
 const STORE_B = 'store-b';
+
+/** An id store B carried before its file was replaced in place. */
+const STORE_B_REPLACED = 'store-b-replaced';
 const SUBJECTS = [{ name: 'claim', summary: 'claims' }];
 const DAY_MS = 86_400_000;
 
@@ -140,9 +143,9 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
   return { board: createGhIssueBoard({ gh }), calls };
 }
 
-/** A store id reader answering `storeId`. */
-function storeIdOf(storeId: string): () => DeviceStoreId {
-  return () => ({ ok: true, storeId });
+/** A store id reader answering `storeId`, with the ids that store replaced. */
+function storeIdOf(storeId: string, replacedIds: readonly string[] = []): () => DeviceStoreId {
+  return () => ({ ok: true, storeId, replacedIds, mintedAt: '2026-01-01T00:00:00.000Z' });
 }
 
 /** A label reader answering `labels` for any issue. */
@@ -190,7 +193,7 @@ function expectRefused(run: CapturedRun, text: string, world: World, tip: string
 describe('takeOf', () => {
   const weights = {
     issue: ISSUE,
-    storeId: STORE_B,
+    device: { storeId: STORE_B, replacedIds: [] },
     labels: [CLAIMED_LABEL],
     labelWarning: null,
     staleAfter: '3d',
@@ -363,6 +366,26 @@ describe('rafa claim take refuses', () => {
     expect(run.stderr).toContain(`this device (store ${STORE_B}) already holds the claim on #7 on ${BRANCH}; there is nothing to take`);
   });
 
+  it('a stale claim naming an id the store replaced, as already this device\'s, naming the store\'s own id', async () => {
+    const world = plantWorld('replaced');
+    const claimed = claimBranch(world.a, STORE_B_REPLACED);
+    const linked = seamsOfB(world, { readStoreId: storeIdOf(STORE_B, [STORE_B_REPLACED]) });
+
+    const run = await take(world, ['7', '--stale'], linked);
+
+    expectRefused(run, 'the claim on #7 cannot be taken over', world, claimed);
+    expect(run.stderr).toContain(`this device (store ${STORE_B}) already holds the claim on #7 on ${BRANCH}; there is nothing to take`);
+    expect(run.stderr).not.toContain(STORE_B_REPLACED);
+
+    // The control: the same claim under the same clock, read by a store
+    // that replaced no id, is a stranger's stale claim and is taken.
+    const unlinked = await take(world, ['7', '--stale'], seamsOfB(world));
+
+    expect(unlinked.exitCode).toBe(0);
+    expect(tipRecord(world)).toEqual({ kind: 'ownership', record: { action: 'take', issue: ISSUE, store: STORE_B } });
+    expect(unlinked.stdout).toContain(`(store ${STORE_B_REPLACED}'s, idle 4d)`);
+  });
+
   it('a released branch while another branch of the issue holds a fresh claim', async () => {
     const world = plantWorld('two-branches');
     const other = 'feat/rafa-7-other';
@@ -446,7 +469,7 @@ describe('rafa claim take refuses', () => {
     let storeReads = 0;
     const readStoreId = (): DeviceStoreId => {
       storeReads += 1;
-      return { ok: true, storeId: STORE_B };
+      return { ok: true, storeId: STORE_B, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' };
     };
     const lines: readonly (readonly [readonly string[], string])[] = [
       [['seven'], '"seven" is no issue number'],

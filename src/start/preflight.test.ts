@@ -163,6 +163,7 @@ const NO_CLAIM: StartPreflightClaim = {
   readStoreId: () => {
     throw new Error('no store read expected: the plan names no issue');
   },
+  staleAfter: '3d',
 };
 
 /** The id every driven run is generated. */
@@ -1143,7 +1144,7 @@ function recordingBoard(): { readonly board: ReturnType<typeof createGhIssueBoar
 
 /** The claim seams of a device claiming as `store` over `git`, labelling on `board`. */
 function claimSeams(git: GitRunner, store: string, board: StartPreflightClaim['board']): StartPreflightClaim {
-  return { git, board, readStoreId: () => ({ ok: true, storeId: store }) };
+  return { git, board, readStoreId: () => ({ ok: true, storeId: store, replacedIds: [], mintedAt: '2026-01-01T00:00:00.000Z' }), staleAfter: '3d' };
 }
 
 /** The swap `loop start` sends for issue 7. */

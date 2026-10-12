@@ -30,7 +30,7 @@
  *   2. `rafa pr merge <pr> --skip-checks --yes` on this terminal: the
  *      `pr merge` logic, which frees the loop worktree holding the head
  *      branch and cleans up after the merge. `verify` runs on a push to
- *      `stretch/**` and on pull requests into `main` only
+ *      `stretch/**` and on pull requests into `main` or `integration` only
  *      (`.github/workflows/verify.yml`), so the pull request reports no
  *      checks and `--yes` beside `--skip-checks` is let through. Its exit
  *      code, when not 0, is the item's.

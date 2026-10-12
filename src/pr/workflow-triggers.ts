@@ -5,10 +5,11 @@
  * `rafa pr merge --skip-checks --yes` may answer its own question only
  * when nothing on GitHub was ever going to test the pull request. A
  * repository can define workflows and still test no pull request into a
- * base: `verify.yml` runs on `pull_request` into `main` only, so a pull
- * request into `stretch/1` reports no checks by design. This module
- * reads workflow file texts, already fetched by the caller, and answers
- * that question alone: no git, no provider, no terminal.
+ * base: `verify.yml` runs on `pull_request` into `main` and
+ * `integration` only, so a pull request into `stretch/1` reports no
+ * checks by design. This module reads workflow file texts, already
+ * fetched by the caller, and answers that question alone: no git, no
+ * provider, no terminal.
  *
  * ## How a workflow names a base
  *

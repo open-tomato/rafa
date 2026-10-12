@@ -25,6 +25,7 @@
  */
 import type { SqliteMigration } from './migrations.js';
 import type { StoreIdentitySeams, StoreMeta } from './store-meta.js';
+import type { ReplacedStoreId } from './store-replaced.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import {
@@ -51,6 +52,7 @@ import { SQLITE_MIGRATIONS, withSqliteStore } from './sqlite.js';
 import { readStoreGeneration } from './store-generation.js';
 import { readHostId } from './store-identity.js';
 import { readStoreMeta } from './store-meta.js';
+import { readReplacedStoreIds } from './store-replaced.js';
 
 const scope = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-rebuild-identity-')));
 afterAll(() => {
@@ -146,6 +148,16 @@ function metaOf(path: string): StoreMeta | null {
   }
 }
 
+/** The ids the file at `path` holds replaced, read on a connection of its own. */
+function replacedOf(path: string): readonly ReplacedStoreId[] {
+  const db = new Database(path, { readonly: true });
+  try {
+    return readReplacedStoreIds(db);
+  } finally {
+    db.close();
+  }
+}
+
 /** The device and inode of the file at `path`. */
 function factsOf(path: string): { readonly fileDev: bigint; readonly fileIno: bigint } {
   const { dev, ino } = statSync(path, { bigint: true });
@@ -226,6 +238,22 @@ function merge(testCase: Case, expectedAdded: number): string {
 /** A directory-shaped store holding the file at `path`, as `copyEffortStore` copies it from. */
 function storeDirOf(path: string): string {
   return dirname(path);
+}
+
+/**
+ * A minted store holding finding `a1`, moved by a merge's backup
+ * renamed back over it and minted again as `restoredId`: the row that
+ * mint recorded, with `ORIGIN` kept in `store_replaced` as the id it
+ * replaced.
+ */
+function restoredWithReplacedId(testCase: Case, restoredId: string): StoreMeta {
+  mintedWithFinding(testCase);
+  plantOther(testCase, OTHER_ORIGIN, ['b1']);
+  const backupPath = merge(testCase, 1);
+  renameSync(backupPath, testCase.path);
+  const written = writeOpen(testCase.path, seamsOf(restoredId));
+  if (written === null) throw new Error('the restore mint wrote nothing');
+  return written;
 }
 
 describe('a store that is not the one its origin was minted for mints on its next write', () => {
@@ -385,6 +413,76 @@ describe('a store rebuilt beside itself keeps its origin on the first write afte
 
     expect(result.status).toBe('rebuilt');
     expectOriginKept(testCase.path, before);
+  });
+});
+
+/**
+ * Writes once through `withSqliteStore`, minting nothing, and finds the
+ * `store_id` the store held before the rebuild kept and `replacedBefore`
+ * still the ids `store_replaced` holds.
+ */
+function expectReplacedKept(path: string, before: StoreMeta, replacedBefore: readonly ReplacedStoreId[]): void {
+  expectOriginKept(path, before);
+  expect(replacedOf(path)).toEqual(replacedBefore);
+}
+
+describe('a store rebuilt beside itself keeps the ids it carries replaced', () => {
+  it('keeps them through a merge', () => {
+    const testCase = freshCase();
+    const restored = restoredWithReplacedId(testCase, 'store-restored');
+    const replacedBefore = replacedOf(testCase.path);
+    expect(replacedBefore).toEqual([{ storeId: ORIGIN, replacedAt: NOW.toISOString() }]);
+    const secondOther: Case = { ...testCase, otherPath: join(dirname(testCase.otherPath), 'device-c', 'effort.sqlite') };
+    plantOther(secondOther, OTHER_ORIGIN, ['b2', 'b3']);
+
+    merge(secondOther, 2);
+
+    expectReplacedKept(testCase.path, restored, replacedBefore);
+  });
+
+  it('keeps them through a migration', () => {
+    const testCase = freshCase();
+    const restored = restoredWithReplacedId(testCase, 'store-restored');
+    const replacedBefore = replacedOf(testCase.path);
+    expect(replacedBefore).toEqual([{ storeId: ORIGIN, replacedAt: NOW.toISOString() }]);
+
+    const result = migrateStore({
+      path: testCase.path,
+      dryRun: false,
+      stamp: nextStamp(),
+      migrations: [...SQLITE_MIGRATIONS, ADDITIVE_TAIL],
+      now: () => NOW,
+      identity: INSTALLED,
+      isAlive: () => false,
+    });
+
+    expect(result.status).toBe('migrated');
+    expectReplacedKept(testCase.path, restored, replacedBefore);
+  });
+
+  it('keeps them through a schema repair', () => {
+    const testCase = freshCase();
+    const restored = restoredWithReplacedId(testCase, 'store-restored');
+    const replacedBefore = replacedOf(testCase.path);
+    expect(replacedBefore).toEqual([{ storeId: ORIGIN, replacedAt: NOW.toISOString() }]);
+    withRaw(testCase.path, (db) => {
+      db.run('CREATE TABLE future_readings (seq INTEGER PRIMARY KEY, session_id TEXT NOT NULL)');
+      db.run(
+        `INSERT INTO ${MIGRATION_LOG_TABLE} (id, sha256, breaks, applied_at, applied_by)`
+          + ` VALUES ('future-readings', '${'a'.repeat(64)}', '["writers"]', '2026-10-01T09:00:00.000Z', '0.30.0')`,
+      );
+    });
+
+    const result = fixStoreSchema({
+      path: testCase.path,
+      dryRun: false,
+      stamp: nextStamp(),
+      now: () => NOW,
+      identity: INSTALLED,
+    });
+
+    expect(result.status).toBe('rebuilt');
+    expectReplacedKept(testCase.path, restored, replacedBefore);
   });
 });
 

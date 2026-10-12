@@ -67,10 +67,9 @@
  *   `fatal: Needed a single revision`, exit 128.
  *
  * A removal git refuses anyway is reported on {@link VerifyRunRan.removal}
- * and changes no result. When the spawner throws, the spend guard's
- * refusal included, the worktree is removed and the throw goes on to the
- * caller; a removal that failed then is not reported, and the path is
- * the one `rafa cleanup` lists.
+ * and changes no result. When the spawner throws, the worktree is
+ * removed and the throw goes on to the caller; a removal that failed
+ * then is not reported, and the path is the one `rafa cleanup` lists.
  *
  * ## One check, one session
  *

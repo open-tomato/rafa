@@ -124,7 +124,7 @@ describe('session-worktree over a store an older runtime left', () => {
 
     const read = openSqliteStore(root).read('sessions');
 
-    expect(loggedIds(path).at(-1)).toBe('session-worktree');
+    expect(loggedIds(path)).toContain('session-worktree');
     expect(sessionColumns(path, ['session_id', 'row_json', 'worktree'])).toEqual([
       { session_id: '01d-5e55', row_json: OLD_ROW_JSON, worktree: null },
     ]);

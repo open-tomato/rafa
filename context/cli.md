@@ -16,7 +16,7 @@ module's note is the long form.
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
-| `src/cli/dispatch.ts` | one invocation: the context, the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
+| `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger and the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
 | `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
@@ -1499,7 +1499,7 @@ New; it replaces no earlier text. What a row or an action added to
   ranks one. `--all` searches skills as well, agents first, one session
   per kind. `--no-model` runs the ranking alone, prints it and stops: no
   session starts and no effort row is written. The command's `spends`
-  declaration is `unless --no-model`, so the spend guard refuses a
+  declaration is `unless --no-model`, so the spend guard warns about a
   session a run carrying that flag would start. Text mode prints, per
   kind, a heading, then each kept match with its quote and its `path:line`
   and the dropped line, or "not answerable from these files", or the
@@ -1642,7 +1642,7 @@ New; it replaces no earlier text. What a row or an action added to
   `--no-model` runs the ranking alone, prints it and stops: no session
   starts, no scratch copy is made and no effort row is written. The
   command's `spends` declaration is `unless --no-model`, so the spend
-  guard refuses a session a run carrying that flag would start. Text mode
+  guard warns about a session a run carrying that flag would start. Text mode
   prints, per kind, a heading naming the kind, the question and the
   project, then the kept matches with each quote and its `path:line` and
   the dropped line, or "not answerable from these files", or the numbered
@@ -1793,7 +1793,15 @@ New; it replaces no earlier text. What a row or an action added to
   the query its flags make and reads each ref it answers with `get`, and
   `github`'s `find` refuses every `--state`. `show` reads one issue;
   `create` files a draft with default type `code` (changed by `--type`),
-  module `unassigned` and no priority unless a flag names one. Its body
+  module `unassigned` and no priority unless a flag names one. A
+  `--type=bug` line is filed as a bug record (`issue/create-bug.ts`,
+  `context/bug-record.md`): its fields come from the bug flags and the
+  body's sections, its title is rendered through `issues.titles.bug`, and
+  a record missing a field is refused before the chain is resolved, so
+  `--title` is required for every type but `bug`. `--dry-run` prints the
+  draft of any type and resolves no tracker. `list --type=bug` prints
+  the columns id, state, module, action and summary, read back from each
+  title. Its body
   is `--body` or the bytes of the file `--body-file` names (standard input
   for `-`, a seam of the factory); the two are refused together and an
   unreadable path refused before the chain is resolved. When `--type=spec`,
@@ -2705,24 +2713,68 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
-  (`src/adapters/output/active.ts`), set in the invocation's output mode,
-  which `activeOutputMode()` answers. The output and the mode active
-  before are put back afterwards, when the command throws too.
-- **A command runs with a logger of its own** (`setCommandLogger`): the
+  (`src/adapters/output/active.ts`), in the invocation's output mode,
+  which `activeOutputMode()` answers. Both are held in an async scope of
+  the invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`),
+  beside the running command (`runAsRunningCommand`,
+  `src/cli/running.ts`): they are read inside the command's `run` and
+  everything it awaits, and nothing is left once it ends, when the
+  command throws too. The dispatcher sets no module-level value, so two
+  invocations dispatched in one process and awaited with `Promise.all`
+  each read their own whichever ends first, and one dispatched from
+  inside a command reads the inner ones inside and the outer ones after
+  (#927; `src/cli/dispatch-scope.test.ts`).
+- **The module-level output and record are a test's to set**
+  (`setActiveOutput`, `setRunningCommand`). A reader outside every
+  invocation answers them, the default output and no record until one is
+  set. One set ahead of an invocation is hidden while the command runs
+  and read again after it. One set inside a command's `run` writes the
+  module-level value and changes nothing the command reads.
+- **A callback the runtime calls from outside the scope reads the
+  module-level values.** Measured under bun 1.3.14: a `process.on`
+  signal listener registered inside a scope, an abort listener it fires
+  and an abort listener an `AbortSignal.timeout` fires read no scope,
+  while a timer, a child process's `data` listener, a `readline` `line`
+  listener and the code after an await such a handler settles read the
+  invocation's. No such callback under `src/` reads the active output,
+  the running command, the active logger or the logger settings, and
+  none writes through a command's output: the four
+  `process.on('SIGINT')` listeners
+  (`src/start.ts`, `src/start/runtime.ts`, `src/commands/stretch/start.ts`,
+  `src/cli/prompt/terminal.ts`) flag the interrupt, signal the sessions,
+  do nothing or restore the terminal, and `loop start` writes its lines
+  after the await returns; `src/` registers no abort listener. One that
+  has to read any of them wraps the listener with `AsyncResource.bind`
+  where it registers it.
+- **A command runs with a logger of its own** (`commandLogger`): the
   registry's `logger/console`, made with the invocation's verbosity and
   with colour on only in text mode, by `FORCE_COLOR`, `NO_COLOR` and
   whether stdout is a terminal. It is the active logger while the command
-  runs, with a resolver for any other `logger.kind`. The logger settings
-  start from the defaults for every invocation, are set when the command
-  loads its config, and are put back afterwards with the logger that was
-  active. `context/logging.md` is the page for the port.
+  runs, with a resolver for any other `logger.kind`, and the logger
+  settings start from the defaults for every invocation. Both are held in
+  async scopes of the invocation's own (`runWithActiveLogger`,
+  `runWithLoggerSettings`), as the output and the running command are:
+  two invocations that overlap each read their own, a nested one starts
+  from the defaults, and nothing is left once the command ends
+  (`src/cli/dispatch-logger-scope.test.ts`). `context/logging.md` is the
+  page for the port.
+- **A set of the logger or its settings made inside a command reaches
+  that command**, unlike a set of the output or the record:
+  `setActiveLogger` and `setActiveLoggerSettings` act on the innermost
+  scope when called inside one, and on the module-level value otherwise.
+  The settings need it, since a command loads its config inside its
+  `run` (`loadConfig`) and its own logger must then read them; the logger
+  follows the same rule so one covers both. Nothing set inside a command
+  is left once it ends.
 - **The context's output gates `warn`, `error` and `debug`** on that
   logger: a line passes only when `activeLogger().enabled(<level>)`, so
   `logger.level: error` quiets every warning a command writes through its
   output, in text and json mode alike. `info`, `emit` and `result` are
   never gated: they are the command's own answer. The dispatcher's own
   lines, such as a thrown error's stack at `debug`, go to the base output
-  and are not gated.
+  and are not gated. The gate reads the logger when the line is written,
+  so a line written from a callback outside the scope is gated by the
+  module-level logger.
 - **An alias but a lasting one, or a command declaring `deprecated`,
   writes one line to stderr** before it runs, in either mode:
   `rafa: "rafa start" is deprecated; use "rafa loop start"`. A help
@@ -2772,11 +2824,12 @@ session does:
 
 A command without a `spends` declaration declares nothing.
 
-The spend guard in `src/utils/claude.ts` refuses to start a session for a
-running command when its `spends` declaration does not cover the run. The
-running command is the one the dispatcher recorded with its parsed flags
-(`src/cli/running.ts`), checked before `Bun.spawn` so a refused run starts
-no process:
+The spend guard in `src/utils/claude.ts` warns when the running command's
+`spends` declaration does not cover the session it starts, and starts the
+session anyway: usage is at most a warning, never a gate. The running
+command is the one the dispatcher recorded with its parsed flags
+(`src/cli/running.ts`), in the async scope of the invocation the session
+is started from, checked once per session before `Bun.spawn`:
 
 - A command declaring `always` or `through` covers every run.
 - A command declaring `with <flag>` covers only a run carrying that `flag`,
@@ -2789,11 +2842,19 @@ no process:
 - A run with no recorded command, as for a caller that never went through
   the dispatcher, is not checked.
 
-A refusal throws `UndeclaredSpendError` (`src/utils/claude.ts`) with a
-message naming the command as typed after `rafa` and saying to declare
-`spends` on it, with the flag missing for a `with` form and present for an
-`unless` one. Thrown from a command's `run`, it ends the invocation as
-`command_error` with exit 1 (`src/cli/dispatch.ts`).
+The warning is one `warn` line, `⚠️  ` and then a sentence naming the
+command as typed after `rafa`, the session it started, and the fault: no
+`spends` at all, a `with` flag missing, or an `unless` flag present. It
+ends by saying to declare `spends` on the command to cover this run. It
+changes no exit code. In text mode it is a `warn:` line on stdout, the
+text output's one stream; in json mode a `log` event at level `warn`; in
+events mode nothing, since that output drops `warn`, so the watch line
+shows no warning. Refusing the session was rejected: a missing declaration
+is a gap in the command, and stopping a run for it cost three loop restarts
+in #863. A config key turning the refusal back on was rejected too, since
+usage is never a gate. Until 2026-10-07 the guard threw instead, and a
+command an earlier test file left recorded refused every later session in
+the same process (#863).
 
 ### Help
 

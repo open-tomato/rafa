@@ -106,8 +106,15 @@ export interface IssueSeams {
   readonly registry?: AdapterRegistry;
   /** What the `github` adapter runs `gh` through. A runner spawning `gh` in the project root when left out. */
   readonly gh?: GhRunner;
-  /** What `issue list --roadmap`'s branch scan runs `git` through. A runner spawning `git` in the project root when left out. */
+  /**
+   * What `issue list --roadmap`'s branch scan runs `git` through, a runner
+   * spawning `git` in the project root when left out; and what `issue
+   * create --type=bug` reads the checkout and its commit through, a runner
+   * spawning `git` in {@link cwd} when left out.
+   */
   readonly git?: GitRunner;
+  /** The directory `issue create --type=bug` runs from, whose checkout a bug's versions are read in. `process.cwd()` when left out. */
+  readonly cwd?: () => string;
   /** What reads the file names in the plan dir `issue list --roadmap` resolved. `createPlanDirNames` when left out. */
   readonly planNames?: (dir: string) => PlanNames;
   /** What makes the verifier `issue list --roadmap`'s `refs` column reads with. `rafa doctor`'s own when left out. */

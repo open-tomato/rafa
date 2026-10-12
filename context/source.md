@@ -75,6 +75,28 @@ spells out, and the shapes the lint config forces.
   errors (measured on ESLint 9.39.5). Two globs make several projects,
   so the resolver also sets `noWarnOnMultipleProjects`, or every run
   prints `Multiple projects found` to stderr.
+- **A content schema is imported through its owner's `schemas` export.**
+  A content schema is a frontmatter or record schema describing a file
+  rafa reads (a skill, an agent, an instinct), not config and not a step.
+  Across a package line it comes through the owning package's `schemas`
+  export, a fifth export beside the four the package contract lists
+  (commands, steps with guards, config section, flows through
+  `run(ctx, options)`), never through a deep path. Core's schemas are
+  exported from `@open-tomato/rafa/ports` as `schemas`, so the closed list
+  of two core subpaths stays at two. No schema has moved yet: this is the
+  placement the cut takes.
+- **Each schema under `src/schema/` lands in one package**, the one
+  `docs/survey/content-schema-importers.md` names for it:
+  - `tiers.ts`, `project-id.ts`: `@open-tomato/rafa` (core)
+  - `frontmatter.ts`: `rafa-effort`
+  - `instinct.ts`, `skill.ts`, `stack.ts`, `provenance.ts`,
+    `failure-strings.ts`, `scope-records.ts`: `rafa-inventory`
+  - `agent.ts`: `@open-tomato/rafa-cli`
+- **One upward edge survives the placement.** `src/effort/report-skills.ts`
+  (rafa-effort) reads `readScopes` from `src/schema/scope-records.ts`,
+  which lands in rafa-inventory. No placement clears it, because
+  `scope-records.ts` imports inventory's `instinct.ts` and
+  `check/layout.ts`. The survey page records it under its upward edges.
 
 ### References
 
@@ -172,10 +194,11 @@ is the gate for those.
 **Files are mapped to clusters via `docs/survey/cluster-map.json`,**
 the file-to-cluster assignment from the eight-cluster import graph survey
 run. A file with no mapping takes the cluster most of its folder's mapped
-files hold. If a file's folder holds no mapped file, the sweep fails,
-naming the file and that you must extend the map with a new survey run.
-The sweep prints the file coverage line and a count of files placed by
-folder majority.
+files hold. If a file's folder holds no mapped file, the file stays
+unplaced and the sweep does not fail on it: a cycle through it is still
+found, and the file counts toward no cluster. The sweep prints the file
+coverage line, a count of files placed by folder majority, and a count
+of the unplaced ones; a new survey run that extends the map places them.
 
 **The map traces the 68-file cycle that crossed package lines before
 rafa-903.** That cycle spanned five clusters (c1: board, pr, triage; c6:

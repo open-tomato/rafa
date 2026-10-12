@@ -17,8 +17,11 @@
  * deprecation cases read stderr whole, so a line written twice fails,
  * beside the canonical spelling and the help request writing none.
  *
- * The active output is module state, and bun runs every test file in one
- * process, so each case puts the default back after it.
+ * The module-level active output is module state, and bun runs every
+ * test file in one process, so each case puts the default back after it.
+ * The dispatcher itself sets none: it runs a command in an async scope
+ * (`dispatch.ts`, "The scope a command runs in"), and the cases of
+ * invocations that overlap are `dispatch-scope.test.ts`'s.
  *
  * No case sets `process.exitCode` in this process. Measured on bun 1.3.14
  * on 2026-09-14: `process.exitCode = 1` followed by `= undefined` leaves
@@ -81,6 +84,13 @@
  * back two, null put back in place of the previous record two, the
  * record set without its flags one, and a record set ahead of the help
  * renderer the help case alone.
+ *
+ * Since #927 the dispatcher puts nothing back, having set nothing at
+ * module level: the command reads its record and its output from its
+ * invocation's scope. The cases above still set an output, a mode or a
+ * record of their own ahead of the invocation, and now read it as left
+ * in place afterwards, hidden only while the command runs. The mutations
+ * of the scoped code are counted in `dispatch-scope.test.ts`.
  */
 import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
@@ -863,7 +873,7 @@ describe('what a command runs with', () => {
 });
 
 describe('the active output and the exit code', () => {
-  it('sets the context output as the active output while the command runs, and puts the previous one back', async () => {
+  it('runs the command with its context output as the active output, and leaves the one set before in place', async () => {
     const sentinel = createJsonOutput({ stream: memoryStream().stream });
     setActiveOutput(sentinel);
 
@@ -874,7 +884,7 @@ describe('the active output and the exit code', () => {
     expect(activeOutput()).toBe(sentinel);
   });
 
-  it('puts the previous output back when the command throws', async () => {
+  it('leaves the output set before in place when the command throws', async () => {
     const before = activeOutput();
 
     await run(['loop', 'crash']);
@@ -882,7 +892,7 @@ describe('the active output and the exit code', () => {
     expect(activeOutput()).toBe(before);
   });
 
-  it('sets the invocation output mode beside the active output while the command runs, and puts the previous mode back', async () => {
+  it('runs the command in the invocation output mode beside its output, and leaves the mode set before in place', async () => {
     const during: string[] = [];
     const after: string[] = [];
     const registry = createCommandRegistry({
@@ -949,7 +959,7 @@ describe('the active output and the exit code', () => {
 });
 
 describe('the running command', () => {
-  /** A record set ahead of the invocation, so putting it back is told apart from clearing it. */
+  /** A record set ahead of the invocation, so leaving it in place is told apart from clearing it. */
   const OUTER = command('outer', 'probe');
 
   /** A registry whose commands read the running record while they run. */
@@ -973,7 +983,7 @@ describe('the running command', () => {
     });
   }
 
-  it('records a command that returns with its parsed flags while it runs, and puts the previous record back', async () => {
+  it('records a command that returns with its parsed flags while it runs, and leaves the record set before in place', async () => {
     const during: (RunningCommand | null)[] = [];
     const registry = probeRegistry(during);
     setRunningCommand(OUTER, {});
@@ -987,7 +997,7 @@ describe('the running command', () => {
     expect(runningCommand()?.command).toBe(OUTER);
   });
 
-  it('records a command that throws while it runs, and puts the previous record back once it ends as command_error', async () => {
+  it('records a command that throws while it runs, and leaves the record set before in place once it ends as command_error', async () => {
     const during: (RunningCommand | null)[] = [];
     const registry = probeRegistry(during);
     setRunningCommand(OUTER, {});

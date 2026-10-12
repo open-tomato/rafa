@@ -413,6 +413,7 @@ const NO_CLAIM = {
   readStoreId: () => {
     throw new Error('no store read expected: the plan names no issue');
   },
+  staleAfter: '3d' as const,
 };
 
 /** Enough PATH for the probe's `sleep` to resolve; nothing carried over from this process. */
