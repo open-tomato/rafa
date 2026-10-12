@@ -14,8 +14,8 @@ skill, an agent or an instinct. The decision stage of the plan comes after this 
 - **Tests.** A file `classifyFile` of `scripts/survey/files.ts` calls `test` is not listed, and test importers are not
   counted. No `test-support` file imports the folder. A grep of every other tracked file for a schema folder path
   finds no code importer outside `src/`: only data files and context pages name the folder.
-- **Not from the JSON.** `docs/survey/import-graph.json` has no entry for `src/schema/scope-records.ts` or its test,
-  so its rows were read from the tree. `docs/survey/cluster-map.json` has no cluster for `scope-records.ts` either.
+- **Not from the JSON.** `docs/survey/import-graph.json` had no entry at 83e438e for `src/schema/scope-records.ts` or
+  its test, so its rows were read from the tree. `docs/survey/cluster-map.json` has no cluster for `scope-records.ts` either.
 - **External packages.** Imports of node builtins and npm packages are not edges, so they are not listed. Every
   in-repo import that leaves the folder is listed.
 - **Packages.** A file goes to the future package its folder is named for in #905's cut table (its item 4). The core
