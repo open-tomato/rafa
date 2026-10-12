@@ -2,8 +2,13 @@
  * The survey's test index: per test file, the epic's index, and per
  * source file, the test files that reach it. Run from the repository root,
  * `bun scripts/survey/test-index.ts` writes `docs/survey/test-index.json`
- * and `docs/survey/test-index.md`. The JSON is the baseline epic #801
- * holds the package cut to: no test file's index may rise above it.
+ * and `docs/survey/test-index.md`, the survey's record. Run with
+ * `--baseline`, it writes `docs/survey/test-index.baseline.json` instead
+ * and leaves the other two as they are: the baseline epic #801 holds the
+ * package cut to, no test file's index may rise above it. The baseline
+ * names the commit it read, and the mode refuses to run when a tracked
+ * file in scope differs from that commit, since the script reads the
+ * working tree and the commit would then name other text.
  *
  * The index of a test file is the number of folders its transitive imports
  * reach, doubled when it spawns a process:
@@ -48,7 +53,7 @@ import { join, posix } from 'node:path';
 
 import ts from 'typescript';
 
-import { classifyFile, coverageLine, listTrackedFiles } from './files';
+import { classifyFile, coverageLine, isInScope, listTrackedFiles } from './files';
 import {
   OUTPUT_DIR,
   buildImportGraph,
@@ -112,6 +117,15 @@ export interface TestIndex {
   /** The files whose imports were read, for the coverage line. */
   readonly read: readonly string[];
 }
+
+/** What the script writes: the survey's two files, or the baseline. */
+export type TestIndexMode = 'baseline' | 'survey';
+
+/** The flag that picks the baseline mode. */
+export const BASELINE_FLAG = '--baseline';
+
+/** The baseline's path, relative to the repository root. */
+export const BASELINE_PATH = `${OUTPUT_DIR}/test-index.baseline.json`;
 
 /** How many test files the summary lists by index. */
 export const TOP_INDEXES = 20;
@@ -473,14 +487,95 @@ export function renderTestIndexMarkdown(index: TestIndex, tracked: readonly stri
 }
 
 /**
- * Reads the repository at `root` and writes both outputs under
- * `docs/survey/`. The import graph is built here again rather than read
- * from `docs/survey/import-graph.json`, so the scripts run in any order.
+ * The index as `docs/survey/test-index.baseline.json` holds it: the commit
+ * read, each test keyed by its path with its index and what the index was
+ * counted from, and the unindexed tests. The per-source lists and the
+ * support files are left out: the baseline is compared by test file, and
+ * neither counts toward an index.
+ *
+ * @param index - The computed index.
+ * @param commit - The commit whose tree the index was read from.
+ * @returns The JSON text.
+ */
+export function renderTestIndexBaselineJson(index: TestIndex, commit: string): string {
+  return stableJson({
+    commit,
+    tests: Object.fromEntries(index.tests.map((entry) => [
+      entry.test,
+      { folders: entry.folders, index: entry.index, spawns: entry.spawns, spawnsVia: entry.spawnsVia },
+    ])),
+    unindexed: index.unindexed,
+  });
+}
+
+/**
+ * The mode a command line asks for.
+ *
+ * @param args - The arguments after the script's path.
+ * @returns `baseline` when the one argument is `--baseline`, `survey` when there is none.
+ * @throws When any other argument is passed, or more than one.
+ */
+export function parseMode(args: readonly string[]): TestIndexMode {
+  if (args.length === 0) {
+    return 'survey';
+  }
+  if (args.length === 1 && args[0] === BASELINE_FLAG) {
+    return 'baseline';
+  }
+  throw new Error(`unknown arguments: ${args.join(' ')}. Usage: bun scripts/survey/test-index.ts [${BASELINE_FLAG}]`);
+}
+
+/**
+ * Runs git in `root` and returns what it printed.
  *
  * @param root - The repository root.
- * @returns The paths written, relative to `root`.
+ * @param args - The git arguments.
+ * @returns Standard output.
+ * @throws When git cannot run or exits non-zero.
  */
-export async function main(root: string): Promise<string[]> {
+function gitOutput(root: string, args: readonly string[]): string {
+  const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe', stdout: 'pipe' });
+  if (result.exitCode !== 0) {
+    throw new Error(`git ${args.join(' ')} failed in ${root} (exit ${result.exitCode}): ${result.stderr.toString().trim()}`);
+  }
+  return result.stdout.toString();
+}
+
+/**
+ * The commit the working tree's files in scope are the text of: `HEAD`,
+ * once no tracked file in scope differs from it, staged or not.
+ *
+ * @param root - The repository root.
+ * @returns The full hash of `HEAD`.
+ * @throws When there is no commit, or a tracked file in scope differs from it.
+ */
+export function readCommit(root: string): string {
+  const commit = gitOutput(root, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
+  const changed = gitOutput(root, ['diff', '--name-only', '-z', 'HEAD', '--', 'src', 'packages'])
+    .split('\0')
+    .filter(isInScope)
+    .sort();
+  if (changed.length > 0) {
+    throw new Error(`cannot name the commit read: ${changed.length} tracked file(s) in scope differ from ${commit}: ${changed.join(', ')}`);
+  }
+  return commit;
+}
+
+/**
+ * Reads the repository at `root` and writes the survey's two outputs under
+ * `docs/survey/`, or the baseline alone in `baseline` mode. The import
+ * graph is built here again rather than read from
+ * `docs/survey/import-graph.json`, so the scripts run in any order.
+ *
+ * @param root - The repository root.
+ * @param mode - What to write; the survey's two files unless `baseline`.
+ * @returns The paths written, relative to `root`.
+ * @throws In `baseline` mode, when `readCommit` cannot name the commit read.
+ */
+export async function main(root: string, mode: TestIndexMode = 'survey'): Promise<string[]> {
+  const commit = mode === 'baseline'
+    ? readCommit(root)
+    : undefined;
   const tracked = listTrackedFiles(root);
   const sources = new Map<string, string>();
   for (const path of tracked.all) {
@@ -490,6 +585,10 @@ export async function main(root: string): Promise<string[]> {
   const graph = buildImportGraph({ files: tracked.all, metafile, resolve: bunResolver(root), root, sources });
   const index = computeTestIndex({ graph, sources });
   mkdirSync(join(root, OUTPUT_DIR), { recursive: true });
+  if (commit !== undefined) {
+    writeFileSync(join(root, BASELINE_PATH), renderTestIndexBaselineJson(index, commit));
+    return [BASELINE_PATH];
+  }
   const jsonPath = `${OUTPUT_DIR}/test-index.json`;
   const markdownPath = `${OUTPUT_DIR}/test-index.md`;
   writeFileSync(join(root, jsonPath), renderTestIndexJson(index));
@@ -499,7 +598,7 @@ export async function main(root: string): Promise<string[]> {
 
 if (import.meta.main) {
   try {
-    for (const path of await main(process.cwd())) {
+    for (const path of await main(process.cwd(), parseMode(process.argv.slice(2)))) {
       console.log(`wrote ${path}`);
     }
   } catch (err) {

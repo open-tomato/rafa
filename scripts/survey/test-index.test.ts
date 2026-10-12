@@ -1,16 +1,20 @@
 import type { ImportEdge, ImportGraph } from './import-graph';
 import type { TestIndex, TestIndexEntry } from './test-index';
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import {
+  BASELINE_PATH,
   computeTestIndex,
   indexFolder,
   main,
+  parseMode,
+  readCommit,
+  renderTestIndexBaselineJson,
   renderTestIndexJson,
   renderTestIndexMarkdown,
   spawnApis,
@@ -182,12 +186,44 @@ describe('the outputs', () => {
   });
 });
 
-/** Runs git in a scratch repository and fails the test on a non-zero exit. */
-function git(root: string, args: readonly string[]): void {
+describe('the baseline', () => {
+  const index = plantedIndex();
+
+  it('names the commit read beside each test\'s index and what it was counted from', () => {
+    const parsed = JSON.parse(renderTestIndexBaselineJson(index, 'abc123')) as {
+      commit: string;
+      tests: Record<string, unknown>;
+      unindexed: string[];
+    };
+    expect(Object.keys(parsed)).toEqual(['commit', 'tests', 'unindexed']);
+    expect(parsed.commit).toBe('abc123');
+    expect(parsed.tests[SPAWNING]).toEqual({ folders: ['src/far', 'src/near'], index: 4, spawns: true, spawnsVia: [SPAWNING] });
+    expect(parsed.tests[THROUGH_SUPPORT]).toEqual({ folders: ['src/near'], index: 1, spawns: false, spawnsVia: [] });
+    expect(Object.keys(parsed.tests)).toEqual(index.tests.map((entry) => entry.test));
+    expect(parsed.unindexed).toEqual([UNREAD]);
+  });
+
+  it('differs by the commit alone when the index is the same', () => {
+    const first = renderTestIndexBaselineJson(index, 'abc123');
+    expect(renderTestIndexBaselineJson(plantedIndex(), 'abc123')).toBe(first);
+    expect(renderTestIndexBaselineJson(index, 'def456')).toBe(first.replace('abc123', 'def456'));
+  });
+
+  it('is picked by --baseline alone, and any other argument is refused', () => {
+    expect(parseMode([])).toBe('survey');
+    expect(parseMode(['--baseline'])).toBe('baseline');
+    expect(() => parseMode(['--base'])).toThrow('unknown arguments: --base.');
+    expect(() => parseMode(['--baseline', '--baseline'])).toThrow('unknown arguments');
+  });
+});
+
+/** Runs git in a scratch repository, fails the test on a non-zero exit, and returns what it printed. */
+function git(root: string, args: readonly string[]): string {
   const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe', stdout: 'pipe' });
   if (result.exitCode !== 0) {
     throw new Error(`git ${args.join(' ')} exited ${result.exitCode}: ${result.stderr.toString()}`);
   }
+  return result.stdout.toString();
 }
 
 function plant(root: string, path: string, text: string): void {
@@ -241,5 +277,69 @@ describe('a real bun build over a scratch repository', () => {
     await main(root);
     expect(readFileSync(join(root, 'docs/survey/test-index.json'), 'utf8')).toBe(json);
     expect(readFileSync(join(root, 'docs/survey/test-index.md'), 'utf8')).toBe(markdown);
+  });
+});
+
+describe('the baseline mode over a scratch repository', () => {
+  let root = '';
+  let head = '';
+  const files: Record<string, string> = {
+    'src/a/one.test.ts': 'import { expect, it } from \'bun:test\';\nimport { x } from \'../deep/x.js\';\n'
+      + 'it(\'x\', () => expect(x).toBe(1));\n',
+    'src/deep/x.ts': 'export const x = 1;\n',
+    'src/far/y.ts': 'export const y = 2;\n',
+  };
+  const identity = ['-c', 'user.name=survey', '-c', 'user.email=survey@example.invalid', '-c', 'commit.gpgsign=false'];
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'survey-test-index-baseline-'));
+    git(root, ['init', '--quiet']);
+    for (const [path, text] of Object.entries(files)) {
+      plant(root, path, text);
+    }
+    plant(root, 'README.md', 'A file out of scope.\n');
+    git(root, ['add', '-A']);
+  });
+
+  afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  it('refuses a repository with no commit to name', async () => {
+    await expect(main(root, 'baseline')).rejects.toThrow('git rev-parse --verify HEAD^{commit} failed');
+    expect(existsSync(join(root, BASELINE_PATH))).toBe(false);
+  });
+
+  it('writes the baseline alone, naming HEAD, byte-identical twice', async () => {
+    git(root, [...identity, 'commit', '--quiet', '-m', 'plant']);
+    head = git(root, ['rev-parse', 'HEAD']).trim();
+    expect(head).toMatch(/^[0-9a-f]{40}$/);
+    expect(await main(root, 'baseline')).toEqual(['docs/survey/test-index.baseline.json']);
+    const json = readFileSync(join(root, BASELINE_PATH), 'utf8');
+    expect(JSON.parse(json)).toEqual({
+      commit: head,
+      tests: { 'src/a/one.test.ts': { folders: ['src/deep'], index: 1, spawns: false, spawnsVia: [] } },
+      unindexed: [],
+    });
+    // The survey's two files are another mode's: this one leaves them unwritten.
+    expect(existsSync(join(root, 'docs/survey/test-index.json'))).toBe(false);
+    expect(existsSync(join(root, 'docs/survey/test-index.md'))).toBe(false);
+    await main(root, 'baseline');
+    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(json);
+  });
+
+  it('reads past a change out of scope, an untracked file and its own output', () => {
+    plant(root, 'README.md', 'Changed, and still out of scope.\n');
+    plant(root, 'src/a/untracked.test.ts', 'import { y } from \'../far/y.js\';\n');
+    expect(readCommit(root)).toBe(head);
+  });
+
+  it('refuses when a tracked file in scope differs from HEAD, unstaged or staged, and leaves the baseline as it was', async () => {
+    const before = readFileSync(join(root, BASELINE_PATH), 'utf8');
+    plant(root, 'src/a/one.test.ts', 'import { y } from \'../far/y.js\';\n');
+    await expect(main(root, 'baseline')).rejects.toThrow(`1 tracked file(s) in scope differ from ${head}: src/a/one.test.ts`);
+    git(root, ['add', '--', 'src/a/one.test.ts', 'src/a/untracked.test.ts']);
+    expect(() => readCommit(root)).toThrow(`2 tracked file(s) in scope differ from ${head}: src/a/one.test.ts, src/a/untracked.test.ts`);
+    expect(readFileSync(join(root, BASELINE_PATH), 'utf8')).toBe(before);
   });
 });
