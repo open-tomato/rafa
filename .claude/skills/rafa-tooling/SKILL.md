@@ -123,10 +123,10 @@ that a running loop may be using, so run `rafa loop list` and
 
 `rafa pr merge` refuses in three cases a suggestion can check first:
 
-- **Pull request into `main`.** A pull request into the base branch reports
-  the `verify` check. Merge by handing over `rafa pr wait <n>`, waiting for
-  the checks to pass or fail, then `rafa pr merge <n>`. Never use
-  `--skip-checks` on a PR into `main`.
+- **Pull request into `main` or `integration`.** A pull request into
+  either reports the `verify` check. Merge by handing over
+  `rafa pr wait <n>`, waiting for the checks to pass or fail, then
+  `rafa pr merge <n>`. Never use `--skip-checks` on either.
 - **Pull request into `stretch/**`.** A pull request into a `stretch/` branch
   reports no check. Merge by handing over `rafa pr merge <n>
   --skip-checks`.

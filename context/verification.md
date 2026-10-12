@@ -130,13 +130,14 @@ on that repair's line and halts.
 
 **One hosted workflow repeats the gates outside a loop.**
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
-and three gates. **Triggers:** pull requests into `main` and pushes to
-`stretch/**`. **Gates** (each step runs unless the job was cancelled):
-`bun test`, `bunx eslint .`, and `bunx tsc --noEmit`. **Two cases for
-`gh pr checks <n>`:** A pull request into `main` reports the `verify`
-check (merge with `rafa pr wait <n>` then `rafa pr merge <n>`); a pull
-request into `stretch/**` reports no check (merge with `rafa pr merge <n>
---skip-checks`). One more gate runs at `git commit`: `.githooks/pre-commit`
+and three gates. **Triggers:** pull requests into `main` or `integration`,
+and pushes to `stretch/**`. **Gates** (each step runs unless the job was
+cancelled): `bun test`, `bunx eslint .`, and `bunx tsc --noEmit`. **Two
+cases for `gh pr checks <n>`:** A pull request into `main` or
+`integration` reports the `verify` check (merge with `rafa pr wait <n>`
+then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
+check (merge with `rafa pr merge <n> --skip-checks`). One more gate runs
+at `git commit`: `.githooks/pre-commit`
 runs `scripts/control-byte-gate/control-byte-gate.ts` with `--staged`,
 refusing a commit whose staged blobs carry a raw control byte or an
 invisible codepoint. The hook is live only where `git config core.hooksPath

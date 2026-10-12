@@ -58,9 +58,10 @@
  * ## The workflow files on the base
  *
  * A count of one or more does not say that anything tests THIS pull
- * request: `verify.yml` runs on `pull_request` into `main` and on `push`
- * to `stretch/**`, so a pull request into `stretch/1` reports no checks
- * by design. So where the count reads one or more, and only there,
+ * request: `verify.yml` runs on `pull_request` into `main` or
+ * `integration` and on `push` to `stretch/**`, so a pull request into
+ * `stretch/1` reports no checks by design. So where the count reads one
+ * or more, and only there,
  * {@link readBaseWorkflows} runs `git fetch origin <base>`, lists
  * `.github/workflows/` on `origin/<base>` with
  * `git ls-tree --full-tree -z` (the top of the tree, whichever directory

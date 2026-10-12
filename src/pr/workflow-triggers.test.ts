@@ -28,9 +28,14 @@ function workflowWith(onBlock: string): string {
 }
 
 describe('the repository\'s own verify.yml', () => {
-  test('holds the pull_request into main and push to stretch/** triggers these cases read', () => {
+  test('holds the pull_request into main and integration, and push to stretch/** triggers these cases read', () => {
     const on = (Bun.YAML.parse(VERIFY_YML) as { on: unknown }).on;
-    expect(on).toEqual({ pull_request: { branches: ['main'] }, push: { branches: ['stretch/**'] } });
+    expect(on).toEqual({ pull_request: { branches: ['main', 'integration'] }, push: { branches: ['stretch/**'] } });
+  });
+
+  test('names integration, the trunk', () => {
+    expect(workflowNamesBase(VERIFY_YML, 'integration')).toBe(true);
+    expect(workflowsRunOnPullRequestsInto([VERIFY_YML], 'integration')).toBe(true);
   });
 
   test('names main', () => {
