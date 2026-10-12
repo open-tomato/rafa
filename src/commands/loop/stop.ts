@@ -40,7 +40,7 @@
  * refuses for any reason but the pid being gone. A record that cannot be
  * read after the signal is refused too, the signal having been sent.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../loop/session-readings.js';
 import type { SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';

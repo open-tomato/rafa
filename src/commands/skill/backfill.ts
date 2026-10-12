@@ -68,7 +68,7 @@ import type { BackupResult } from '../../backfill/backup.js';
 import type { DerivationAction, DerivationKind, DerivationOptions, DerivationPlan } from '../../backfill/derive.js';
 import type { ProposalFile } from '../../backfill/proposal-file.js';
 import type { ProposalAction, ProposalActionKind } from '../../backfill/propose.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { DemotionScope } from '../../demote/select.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctScope } from '../../schema/instinct.js';
@@ -87,7 +87,7 @@ import {
   runProposalPass,
 } from '../../backfill/propose.js';
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { resolveDemotionScope } from '../../demote/select.js';
 

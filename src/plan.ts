@@ -65,7 +65,8 @@
  * The command writes every line the operator reads through the active
  * output (`adapters/output/active.ts`), at `info`, each message as
  * `console.log` printed it in phase 0. It refuses by throwing
- * `CommandExit` (`cli/command.ts`) and never by `process.exit`, so the
+ * `CommandExit` (`core/command/command.ts`) and never by
+ * `process.exit`, so the
  * dispatcher writes the terminal event. A rejection throws the exit code
  * a `claude` planner's rejection carries, or 1 for any other, with the
  * rejection's message. An unusable config, a line naming no spec source
@@ -234,13 +235,13 @@ import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
-import { CommandExit } from './cli/command.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
+import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { loadConfig } from './core/config/load.js';
 import { requireNoticesAnswered } from './notices/run.js';

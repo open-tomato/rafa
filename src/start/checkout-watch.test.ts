@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { commitTaskWork } from '../utils/commit.js';
 import { findNextTask } from '../utils/tracker.js';

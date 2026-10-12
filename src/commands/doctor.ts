@@ -207,10 +207,10 @@
  *
  * ## What it prints
  *
- * In text mode, `rafa <version>` (`src/cli/version.ts`) first, printed
- * before anything is checked so a person reads which build answered
- * whatever the preflight then does; then {@link renderDoctor}'s lines
- * (`./doctor-render.ts`): a head naming the plan, or where none was
+ * In text mode, `rafa <version>` (`src/core/command/version.ts`) first,
+ * printed before anything is checked so a person reads which build
+ * answered whatever the preflight then does; then {@link renderDoctor}'s
+ * lines (`./doctor-render.ts`): a head naming the plan, or where none was
  * found, and the PREREQUISITES file merged in; one line per check; the
  * line naming the start-only items a resume passed over; the steps that
  * file names and nothing checks; and the verdict with any
@@ -256,7 +256,7 @@ import type { DoctorProjectReading } from './doctor-project.js';
 import type { DoctorRefsReading, DoctorRefsSeams } from './doctor-refs.js';
 import type { DoctorReleaseReading, DoctorReleaseSeams } from './doctor-release.js';
 import type { DoctorTiersReading, DoctorTiersRunSeams } from './doctor-tiers.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { PrerequisiteItem, RafaConfig, ResolvedConfig } from '../core/config/index.js';
 import type { PrProvider } from '../core/config/sections.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
@@ -272,8 +272,7 @@ import type { ProjectFound } from '../project/scope.js';
 import { basename, resolve } from 'node:path';
 
 import { commandRetrySeams } from '../board/project/project-runner.js';
-import { CommandExit } from '../cli/command.js';
-import { versionLine } from '../cli/version.js';
+import { CommandExit , versionLine } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { messageOf } from '../core/config/sections.js';

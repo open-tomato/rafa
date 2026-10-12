@@ -58,7 +58,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { resolveConfig } from '../core/config/index.js';
 import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';

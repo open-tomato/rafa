@@ -19,7 +19,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import { describe, expect, test } from 'bun:test';
 
 import { CLAIMED_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { BOARD_REFUSAL_EXIT } from './exit-codes.js';
 import { appendedBody, renderUpdateBlock, replacedBody } from './issue-edit-body.js';

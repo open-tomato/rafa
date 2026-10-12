@@ -13,7 +13,7 @@
  * a null, never a failure, and none changes the exit code.
  */
 import type { PreviousCopiesReading } from './doctor-previous.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';

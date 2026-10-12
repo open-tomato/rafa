@@ -177,7 +177,7 @@ import type { ConfigRoots } from '../core/config/load.js';
 import { homedir } from 'node:os';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { resolveSessionTiers } from '../start/serving.js';

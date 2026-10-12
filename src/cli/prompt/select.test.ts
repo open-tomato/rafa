@@ -7,7 +7,7 @@ import type { Key, Terminal } from './terminal.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { matchChoices, NO_MATCHES_TEXT, renderSelect, select } from './select.js';
 import { INTERRUPT_EXIT_CODE, NO_TERMINAL_TEXT } from './terminal.js';

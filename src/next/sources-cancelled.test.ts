@@ -18,7 +18,7 @@
  *    the recorded calls hold no listing, so the notice costs no read.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

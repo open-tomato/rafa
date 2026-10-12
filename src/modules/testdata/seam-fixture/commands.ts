@@ -4,7 +4,7 @@
  * under `module/seam-fixture` once `allowList:` names it, its one action
  * reached as `rafa module exec seam-fixture ping`.
  */
-import type { RafaCommand } from '../../../cli/command.js';
+import type { RafaCommand } from '../../../core/command/index.js';
 
 const pingCommand: RafaCommand = {
   name: 'seam ping',

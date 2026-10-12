@@ -34,7 +34,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { REVIEWED_STATUS } from '../../demote/report.js';
 import { dispatchInProject, plantProjectConfig } from '../../tests/cli-capture.js';
 

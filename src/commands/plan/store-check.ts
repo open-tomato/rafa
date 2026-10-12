@@ -44,7 +44,7 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
 import { activeOutput } from '../../adapters/output/active.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { isFile, plural, rejectedPath } from '../../plan/plan-files.js';
 import { findStoreRuleProblems, storeRuleLine } from '../../plan/store-rules.js';

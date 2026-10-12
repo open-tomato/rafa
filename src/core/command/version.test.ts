@@ -1,6 +1,6 @@
 /**
  * Tests for the version the running build answers with
- * (`src/cli/version.ts`).
+ * (`src/core/command/version.ts`).
  *
  * The version is held to `package.json`'s, read here through the same
  * named import the module uses, and the line to `rafa <version>` spelled
@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { version } from '../../package.json';
+import { version } from '../../../package.json';
 
 import { RAFA_VERSION, versionLine } from './version.js';
 

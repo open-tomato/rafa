@@ -82,7 +82,7 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { DeviceStoreId, DeviceStoreIds } from '../../claims/device.js';
 import type { ClaimBranchReading } from '../../claims/git.js';
 import type { ClaimRecord } from '../../claims/record.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { GitRunner } from '../../pr/index.js';
 
@@ -95,7 +95,7 @@ import {
   readClaimBranch,
 } from '../../claims/git.js';
 import { unlabelReleased } from '../../claims/labels.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { gitSaid } from '../../pr/index.js';
 import { BRANCH_PREFIX, REMOTE } from '../../start/branch-decision.js';

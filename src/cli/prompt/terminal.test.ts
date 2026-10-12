@@ -10,7 +10,7 @@ import { PassThrough } from 'node:stream';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import {
   decodeKeys,

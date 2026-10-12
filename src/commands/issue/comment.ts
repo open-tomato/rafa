@@ -27,7 +27,7 @@
  * holds.
  */
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { IssueRef } from '../../ports/index.js';
 
 import { expectOneArgument } from '../plan/plan-files.js';

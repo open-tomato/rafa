@@ -32,7 +32,7 @@
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';

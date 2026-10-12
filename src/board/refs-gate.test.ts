@@ -30,7 +30,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { SETTINGS } from '../core/config/index.js';
 import { ABSENT, blobFingerprint, issueFingerprint, NEW, PRESENT, readRefsBlock, UNREADABLE, writeRefsBlock } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';

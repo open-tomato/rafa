@@ -62,14 +62,13 @@
  * the case that reads no command ran.
  */
 import type { NextState } from './state.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
 import issueUnblock from '../commands/issue/unblock.js';
@@ -79,6 +78,7 @@ import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
 import releaseSettle from '../commands/release/settle.js';
+import { CommandExit } from '../core/command/index.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

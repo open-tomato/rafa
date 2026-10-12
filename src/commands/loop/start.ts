@@ -54,7 +54,7 @@
  * words `start` is handed, so the command refuses it before it runs
  * `start` rather than let the run go on in this runtime.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';

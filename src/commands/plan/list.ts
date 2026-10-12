@@ -48,7 +48,7 @@
  * The command declares no argument and the one flag `open`, and refuses
  * a line handing it an argument with exit code 1.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { PlanList, PlanListing } from '../../plan/list.js';
 
 import { listPlans } from '../../plan/list.js';

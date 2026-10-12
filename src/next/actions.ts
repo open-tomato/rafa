@@ -164,11 +164,11 @@
  */
 import type { HopActionWorld } from './hop-action.js';
 import type { NextActionId, NextState } from './state.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { BoardRelationshipMode } from '../core/config/sections.js';
 
-import { CommandExit, commandSpelling } from '../cli/command.js';
 import { parseArgs } from '../cli/core/parseArgs.js';
+import { CommandExit, commandSpelling } from '../core/command/index.js';
 
 import { HINT_FLAG } from './hint.js';
 import { runHome, runHop } from './hop-action.js';

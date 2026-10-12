@@ -32,7 +32,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { expectExit, plantScratchRepo, plantStandInClaude, runRafa } from '../tests/cli-capture.js';
 

@@ -59,11 +59,10 @@
  * for its reason: bun runs every test file in one process. The lists a
  * registry answers are frozen copies of what it was handed.
  */
-import type { RafaCommand } from './command.js';
+import type { RafaCommand } from '../core/command/index.js';
 
+import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from '../core/command/index.js';
 import { describeValue } from '../core/config/sections.js';
-
-import { commandProblem, commandSpelling, isRoutingWord, isTopLevel } from './command.js';
 
 /** What every refusal opens with. */
 const REFUSAL = 'command registry';

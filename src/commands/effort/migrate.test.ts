@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { RAFA_VERSION } from '../../cli/version.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
 import { bringForward } from '../../effort/store/bring-forward.js';
 import { LEGACY_GATE_CLOSED, LEGACY_GATE_OPEN } from '../../effort/store/migrations.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS } from '../../effort/store/sqlite.js';

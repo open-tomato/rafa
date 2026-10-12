@@ -30,7 +30,7 @@
  * failed), each changing no byte of either file. Exit code 0 otherwise.
  * In json mode the `MergeResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { MergeOptions, MergeResult, TableMerge } from '../../effort/store/merge-store.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { ProjectIdentity } from '../../effort/store/store-identity.js';
@@ -39,7 +39,7 @@ import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';

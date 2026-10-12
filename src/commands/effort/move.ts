@@ -19,10 +19,10 @@
  * over a store it does not own. Exit code 0 otherwise. In json mode the
  * `MoveResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { KindMove, MoveResult } from '../../effort/store/move.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { SchemaRefusedError } from '../../effort/store/bring-forward.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';

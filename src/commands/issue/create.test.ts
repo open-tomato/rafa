@@ -66,7 +66,7 @@ import { createGhProjectPort } from '../../board/project/gh.js';
 import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, fakeProjectId } from '../../board/project/project-fake.js';
 import { notFoundWarning } from '../../board/project/refresh-warnings.js';
 import { flakyGh, recordRetries, TIMED_OUT_STDERR } from '../../board/project/retry-fake.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import {
   dispatchInProject,
   eventsOf,

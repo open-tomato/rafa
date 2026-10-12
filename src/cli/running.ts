@@ -63,8 +63,8 @@
  * module state: a case that sets a record restores the one it replaced
  * after it.
  */
-import type { RafaCommand } from './command.js';
 import type { CliContext } from './core/types.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 

@@ -35,7 +35,7 @@
  * suite never told git about directly, and the sha the new branch ends
  * on is read back off the real ref rather than asserted from a script.
  */
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { BranchOutcome, BranchRequest, BranchSeams } from '../start/branch.js';
 
@@ -46,7 +46,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { createGitRunner } from '../pr/index.js';
 import { offerRunBranch } from '../start/branch.js';
 

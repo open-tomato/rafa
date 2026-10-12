@@ -45,12 +45,12 @@
  * no line, and its `pr merge` is what it was before the guard.
  */
 import type { PrContext } from './pr-context.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 import type { GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { GuardReaction } from '../../release/guard-merge.js';
 import type { GuardAnswer, GuardReading } from '../../release/guard.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { resolveReleaseEnabled } from '../../release/enabled.js';
 import { guardReaction, readMergeGuard } from '../../release/guard-merge.js';
 import { guardLines, localPlanNotes } from '../../release/guard.js';

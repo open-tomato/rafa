@@ -78,7 +78,7 @@
  * @module commands/loop/wait
  */
 import type { PickedSession } from './loop-sessions.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { AwakeClock, AwakeMark, AwakeReading } from '../../loop/awake-clock.js';
 import type { EventLine } from '../../loop/events-file.js';
 import type { LoopSessionSeams } from '../../loop/session-readings.js';
@@ -88,7 +88,7 @@ import type { WaitReason, WaitReasonRow, WaitUntil } from '../../loop/wait-reaso
 import { relative } from 'node:path';
 
 import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';

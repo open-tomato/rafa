@@ -40,11 +40,11 @@
  *
  * ## The refusal
  *
- * {@link refusal} is a `CommandExit` (`../cli/command.ts`) with exit code
- * 1 and a message opening `❌ `, for a problem that is not the line's
- * fault. It sits here because {@link readRecords} throws one for records
- * that cannot be read, to a command and to any other reader alike; the
- * command half builds its own refusals on it.
+ * {@link refusal} is a `CommandExit` (`../core/command/command.ts`) with
+ * exit code 1 and a message opening `❌ `, for a problem that is not the
+ * line's fault. It sits here because {@link readRecords} throws one for
+ * records that cannot be read, to a command and to any other reader
+ * alike; the command half builds its own refusals on it.
  *
  * ## Seams
  *
@@ -60,7 +60,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { readTaskFinishes } from '../effort/store/task-finishes.js';
 import { parsePlan } from '../plan/index.js';

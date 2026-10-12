@@ -4,7 +4,7 @@
  *
  * The CLI surface spec declares `RafaCommand` as a superset of `cli-core`'s
  * `CliCommand`, so a `cli-core` command still loads. The superset is spelled
- * here over the copy in `./core/types.ts`.
+ * here over the copy in `src/cli/core/types.ts`.
  *
  * ## Routing keys
  *
@@ -60,9 +60,9 @@
  * The registry refuses a core command it answers for, and the module
  * loader skips the file of a module command it answers for.
  *
- * `spends` is checked last, by `spendsProblem` (`./spends.ts`), whose
- * sentence names the field inside it: `spends.flag is "resolve", expected
- * a flag as typed, starting with --`. A module entry declaring a
+ * `spends` is checked last, by `spendsProblem` (`src/cli/spends.ts`),
+ * whose sentence names the field inside it: `spends.flag is "resolve",
+ * expected a flag as typed, starting with --`. A module entry declaring a
  * malformed `spends` is therefore skipped like any other bad shape.
  *
  * ## Deprecated flags
@@ -70,19 +70,18 @@
  * A flag a command declares is a {@link RafaFlagSpec}: a `FlagSpec` that
  * may carry `deprecated`, naming the spelling to type instead. The
  * dispatcher reads such a flag, typed bare, as that spelling and writes
- * one deprecation line (`dispatch.ts`), so `rafa effort report --json`
- * runs as `rafa effort report --output=json`. The field is declared here
- * rather than on `FlagSpec`, so the copy of `cli-core` in `./core/` keeps
- * the source's shape.
+ * one deprecation line (`src/cli/dispatch.ts`), so
+ * `rafa effort report --json` runs as `rafa effort report --output=json`.
+ * The field is declared here rather than on `FlagSpec`, so the copy of
+ * `cli-core` in `src/cli/core/` keeps the source's shape.
  */
-import type { CliCommand, CliContext, FlagSpec } from './core/types.js';
-import type { CommandRegistry } from './registry.js';
-import type { CommandSpend } from './spends.js';
-import type { ProjectFound } from '../project/scope.js';
+import type { CliCommand, CliContext, FlagSpec } from '../../cli/core/types.js';
+import type { CommandRegistry } from '../../cli/registry.js';
+import type { CommandSpend } from '../../cli/spends.js';
+import type { ProjectFound } from '../../project/scope.js';
 
-import { describeValue } from '../core/config/sections.js';
-
-import { spendsProblem } from './spends.js';
+import { spendsProblem } from '../../cli/spends.js';
+import { describeValue } from '../config/config-sections.js';
 
 /** What an action can render: text a person reads, NDJSON events, one line per loop event, or the TUI. */
 export const COMMAND_OUTPUTS = ['text', 'json', 'events', 'tui'] as const;
@@ -177,7 +176,8 @@ export interface RafaCommand extends Omit<CliCommand, 'run'> {
   readonly needsProject?: boolean;
   /**
    * Whether running the command can start a Claude Code session, and
-   * under what condition; absent, it spends nothing. See `./spends.ts`.
+   * under what condition; absent, it spends nothing. See
+   * `src/cli/spends.ts`.
    */
   readonly spends?: CommandSpend;
   /** Runs the command. Throws {@link CommandExit} to refuse. */

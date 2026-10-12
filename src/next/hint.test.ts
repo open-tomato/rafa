@@ -50,12 +50,12 @@
  */
 import type { NextHintSeams } from './hint.js';
 import type { NextState } from './state.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { actionInvocation } from './actions.js';

@@ -142,7 +142,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimsStaleAfter } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 

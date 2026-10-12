@@ -42,14 +42,14 @@
  * shown and never refused: `rafa plan validate` is the check that exits
  * nonzero on one.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { PlanIssue, PlanStage, PlanTask } from '../../plan/index.js';
 import type { PlansDir, TaskCounts } from '../../plan/plan-files.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { parsePlan } from '../../plan/index.js';
 import {
   checkbox,

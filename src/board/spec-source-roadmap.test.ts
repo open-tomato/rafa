@@ -144,7 +144,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
 import { positionAt, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';

@@ -48,7 +48,7 @@
  *
  * Exit code 1: the refusals `loop-sessions.ts` names.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { BlockedTask } from '../../loop/blocked-tasks.js';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';

@@ -37,12 +37,12 @@
  * With `--output=json` the {@link ConfigSetResult} is the data of the
  * terminal result event.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { CommandExit } from '../../cli/command.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
+import { CommandExit } from '../../core/command/index.js';
 import { configFilePath } from '../../core/config/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { expectOneArgument, requireProject } from '../plan/plan-files.js';

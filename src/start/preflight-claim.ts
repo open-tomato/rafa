@@ -194,7 +194,7 @@ import {
 } from '../claims/git.js';
 import { labelInDevelopment } from '../claims/labels.js';
 import { parseClaimMessage } from '../claims/record.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { claimDurationHours, CLAIMS_STALE_DISABLED, messageOf } from '../core/config/sections.js';
 import { createGitRunner } from '../pr/git.js';
 import { resolvePrProvider } from '../pr/provider.js';

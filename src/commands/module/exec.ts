@@ -22,10 +22,10 @@
  * outside a project, where no module is mounted. A mounted action
  * declares its own.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
-import { CommandExit } from '../../cli/command.js';
 import { mountKey } from '../../cli/registry.js';
+import { CommandExit } from '../../core/command/index.js';
 
 /** The usage line a refusal names. */
 const USAGE = 'rafa module exec <module> <action> [args] [flags]';

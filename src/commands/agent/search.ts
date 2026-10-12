@@ -12,7 +12,7 @@
  * first, one session per kind. See `src/commands/skill/search.ts` for
  * the steps, the output, the exit code and json mode.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { SearchSeams } from '../skill/search.js';
 
 import { createSearchCommand, DEFAULT_SEARCH_SEAMS } from '../skill/search.js';

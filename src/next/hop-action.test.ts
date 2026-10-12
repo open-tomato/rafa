@@ -43,7 +43,7 @@ import type { HopActionWorld } from './hop-action.js';
 import type { HopRecord } from './hop-record.js';
 import type { HopHome, HopOpening, HopOut } from './hop-rows.js';
 import type { NextState } from './state.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { Place, Position } from '../project/position.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -52,8 +52,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { CommandExit } from '../core/command/index.js';
 import { hop, positionFilePath, readPositionFile, writePositionFile } from '../project/position.js';
 import { resolveScope } from '../project/scope.js';
 import { sinkOutput } from '../tests/output-sinks.js';

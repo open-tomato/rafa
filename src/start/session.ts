@@ -82,8 +82,8 @@
  *
  * ## The refusals
  *
- * The open throws `CommandExit` (`cli/command.ts`) with exit code 1 and
- * the whole refusal as its message, each ending with
+ * The open throws `CommandExit` (`core/command/command.ts`) with exit
+ * code 1 and the whole refusal as its message, each ending with
  * `Nothing was checked and nothing was dispatched.`:
  *
  *   - **A record of the plan refuses the run** ({@link sessionRefusal}):
@@ -126,7 +126,7 @@ import { randomUUID } from 'node:crypto';
 import { relative } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {

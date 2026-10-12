@@ -37,8 +37,8 @@
  * command entries of the modules `src/modules/load.ts` loaded: those
  * `allowList:` names from a `path` source whose manifest checked out.
  */
-import type { RafaCommand } from './command.js';
 import type { CommandRegistry } from './registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';

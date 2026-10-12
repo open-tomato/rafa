@@ -37,7 +37,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { positionAt, positionFilePath, writePositionFile } from '../project/position.js';
 import { completeSpecBody } from '../tests/spec-bodies.js';
 

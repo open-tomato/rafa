@@ -68,7 +68,7 @@
  * `loadConfig` refuses. Both exit 1.
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { PlanChange } from '../../effort/store/changes.js';
 import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { GitRunner } from '../../pr/index.js';
@@ -79,7 +79,7 @@ import type { TagReading, UntaggedReading } from '../../release/status-readings.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { messageOf } from '../../core/config/sections.js';

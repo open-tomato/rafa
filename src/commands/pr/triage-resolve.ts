@@ -174,7 +174,7 @@ import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 import type { SettleSettings } from '../../release/settle.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';

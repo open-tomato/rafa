@@ -96,7 +96,7 @@ import type { CommitAttempt } from '../utils/commit.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { CHECKOUT_MOVED, guardCheckout, haltHeadline, readCheckout } from './checkout-guard.js';

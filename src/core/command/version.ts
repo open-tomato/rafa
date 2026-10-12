@@ -13,7 +13,7 @@
  * reads `--version` into, and `rafa doctor`, whose first line it is. They
  * share this module so the two can never drift apart.
  */
-import { version } from '../../package.json';
+import { version } from '../../../package.json';
 
 /** The `version` of `package.json`, inlined into the build that reads it. */
 export const RAFA_VERSION: string = version;

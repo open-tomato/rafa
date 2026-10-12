@@ -36,7 +36,7 @@
  */
 import type { Key, NoTerminalOptions, Terminal } from './terminal.js';
 
-import { CommandExit } from '../command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { INTERRUPT_EXIT_CODE, processTerminal, rawSession, stdinKeys } from './terminal.js';
 

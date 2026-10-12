@@ -115,7 +115,7 @@
  * that rejects is refused as any other tracker call.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { IssueDraft, IssueRef, IssueType, Tracker } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';

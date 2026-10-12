@@ -167,7 +167,7 @@ import type { Output } from '../ports/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { nextUndoneLine } from '../claims/ahead.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import {
   CLAIM_AHEAD_FLAG,

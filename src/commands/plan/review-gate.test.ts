@@ -47,7 +47,7 @@ import { ClaudePlannerError } from '../../adapters/planner/claude.js';
 import { SPEC_NOT_READY_EXIT } from '../../board/gate.js';
 import { REVIEW_MISSING_LINE, REVIEW_SKIPPED_LINE } from '../../board/review-stamp.js';
 import { parseSpecReview } from '../../board/spec-review.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { generateOrExit, rejectedReview, settleReview } from './review-gate.js';

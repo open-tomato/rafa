@@ -12,12 +12,12 @@
  * Exit code 1 for an argument, for a flag value the parser refuses, and
  * for a config the loop cannot run on, one line per problem.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { Dashboard } from '../../effort/dashboard.js';
 
 import { homedir } from 'node:os';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { formatDashboard } from '../../effort/dashboard-format.js';
 import { readDashboard } from '../../effort/dashboard.js';

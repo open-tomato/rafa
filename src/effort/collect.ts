@@ -183,7 +183,7 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 

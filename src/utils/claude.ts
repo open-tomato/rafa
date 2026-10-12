@@ -184,8 +184,8 @@ import type { RunningCommand } from '../cli/running.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { commandSpelling } from '../cli/command.js';
 import { runningCommand } from '../cli/running.js';
+import { commandSpelling } from '../core/command/index.js';
 
 import { sessionSpawnEnv } from './session-env.js';
 

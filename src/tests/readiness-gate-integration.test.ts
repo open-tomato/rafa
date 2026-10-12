@@ -71,7 +71,7 @@ import {
   stampReviewSkipped,
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { rejectedPath } from '../plan/plan-files.js';
 
 import { sinkOutput } from './output-sinks.js';

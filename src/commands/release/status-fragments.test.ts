@@ -22,7 +22,7 @@
  *     until the caller fetches, which is what "as last fetched" says.
  */
 import type { WaitingSettings } from './status-fragments.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { Fragment } from '../../release/fragment.js';
 
 import { execFileSync } from 'node:child_process';

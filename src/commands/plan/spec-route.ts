@@ -98,7 +98,7 @@ import path from 'path';
 
 import { resolvePlanSpec } from '../../board/plan-spec.js';
 import { noSourceMessage, readSpecSourceFlags, SOURCE_REFUSAL_EXIT } from '../../board/spec-source.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { createPlanBlockedOffer } from './blocked-offer.js';
 import { createPlanReadyOffer } from './ready-offer.js';

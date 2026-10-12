@@ -37,7 +37,7 @@
 import type { ResolvedConfig } from '../core/config/index.js';
 import type { DoctorEffortSyncReading, DoctorEffortSyncSeams } from '../effort/sync/doctor-reading.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { readDoctorEffortSync } from '../effort/sync/doctor-reading.js';
 
 /** What the sync-strategy check reads, and the seams it loads modules through. */

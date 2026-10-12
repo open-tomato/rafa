@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { WAIT_NO_SESSION_EXIT, WAIT_REASONS, WAIT_TIMEOUT_EXIT } from '../loop/wait-reasons.js';
 
 import {

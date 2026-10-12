@@ -51,18 +51,18 @@
  * bun ran earlier in the process leaves nothing a case could read as
  * left behind, and after each, for the two cases that set them.
  */
-import type { RafaCommand, RafaContext, RafaFlagSpec } from './command.js';
 import type { DispatchOutcome } from './dispatch.js';
 import type { CommandRegistry } from './registry.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
+import { CommandExit } from '../core/command/index.js';
 
-import { CommandExit } from './command.js';
 import { dispatch } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';

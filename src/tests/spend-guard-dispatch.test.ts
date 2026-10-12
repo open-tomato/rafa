@@ -76,8 +76,8 @@
  * restored sha256-identical.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
 import type { CommandSpend } from '../cli/spends.js';
+import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

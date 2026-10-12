@@ -32,12 +32,12 @@
  * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
  * too; this file re-exports none of it.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { FixSchemaResult } from '../../effort/store/fix-schema.js';
 import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { fixStoreSchema, SchemaFixRefusal } from '../../effort/store/fix-schema.js';
 import { sqliteStorePath } from '../../effort/store/sqlite.js';

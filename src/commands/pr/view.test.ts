@@ -19,7 +19,7 @@
  * have made no provider.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { PullRequestsDouble } from '../../pr/pull-requests-double.js';

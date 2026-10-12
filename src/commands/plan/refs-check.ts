@@ -86,7 +86,8 @@
  *
  * A caller builds it with {@link registryRoster} from the registry its
  * line was routed through, `RafaContext.registry`
- * (`src/cli/command.ts`): `./create.ts`, which hands it to
+
+ * (`src/core/command/command.ts`): `./create.ts`, which hands it to
  * `src/plan.ts` and so to check 4, `../issue/check.ts`, and the three
  * commands that read `../doctor-refs.ts`'s row, `../doctor.ts`,
  * `../epic/show.ts` and `../issue/list.ts`. It is `describeRegistry`

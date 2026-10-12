@@ -62,7 +62,7 @@ import type { Output } from '../ports/index.js';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 
 import {

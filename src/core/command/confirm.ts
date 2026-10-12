@@ -1,6 +1,6 @@
 /**
- * The line prompter: the one prompt in `src/cli/prompt/` that reads whole
- * lines rather than keys, so it needs no raw mode and works on a pipe as
+ * The line prompter: the one prompt that reads whole lines, not keys as
+ * `src/cli/prompt/`'s do, so it needs no raw mode and works on a pipe as
  * well as on a terminal. Every yes-or-no question rafa asks, and the root
  * `rafa init` reads, goes through a {@link Prompter}; the commands take
  * one from {@link createLinePrompter} over `process.stdin` and

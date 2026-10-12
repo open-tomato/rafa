@@ -43,7 +43,7 @@
  * as `doctor`'s other warnings do, so json mode reads each as a `log`
  * event. {@link effortSchemaRefusal} is the text `doctor` exits 1 with.
  */
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { StoreEnvironment } from '../effort/store/location.js';
 import type { SchemaReport, SchemaReportOptions, SchemaStatus } from '../effort/store/schema-report.js';
 

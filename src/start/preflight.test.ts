@@ -118,7 +118,7 @@ import { PORT_VERSIONS } from '../adapters/registry.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';

@@ -42,7 +42,7 @@
  * {@link NoSessionRefusal}, still exit code 1, so `loop wait` can end
  * them with its own code for no session without reading their words.
  */
-import type { RafaContext, RafaFlagSpec } from '../../cli/command.js';
+import type { RafaContext, RafaFlagSpec } from '../../core/command/index.js';
 import type {
   ResolvedLoopSeams,
   SessionChecklist,
@@ -52,7 +52,7 @@ import type { SessionChange, SessionPhase, SessionRecord } from '../../loop/sess
 import type { PlanTask } from '../../plan/index.js';
 import type { TaskCounts } from '../../plan/plan-files.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import {
   formatDuration,

@@ -29,7 +29,7 @@ import type { TaskCounts } from './plan-files.js';
 
 import { readFileSync } from 'node:fs';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { countTasks, isFile } from './plan-files.js';
 

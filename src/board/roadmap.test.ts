@@ -94,7 +94,7 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 import { describe, expect, it } from 'bun:test';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CLAIMS_STALE_DISABLED } from '../core/config/sections.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 

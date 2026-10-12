@@ -204,7 +204,7 @@ import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../core/command/index.js';
 import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { Issue, IssueQuery, IssueType, TrackerKind } from '../../ports/index.js';
 
@@ -219,7 +219,7 @@ import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { parseTitle } from '../../bugs/title.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { plansDirAt } from '../../plan/plan-files.js';
 import { createGitRunner } from '../../pr/git.js';

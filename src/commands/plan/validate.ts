@@ -109,7 +109,7 @@
  * are refused with exit code 1 before anything is parsed.
  */
 import type { MissingAgent, SkillCollision, UnresolvedSkill } from '../../agents/roster.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { StoreRuleProblem } from '../../plan/store-rules.js';
 import type { PlanValidation } from '../../plan/validate.js';
@@ -127,7 +127,7 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../../agents/roster.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { formatCounts, issueLine, plural } from '../../plan/plan-files.js';

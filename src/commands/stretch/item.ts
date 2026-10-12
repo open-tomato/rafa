@@ -74,7 +74,7 @@
  * `rafa`, a planning session or a loop.
  */
 import type { ItemMergeSeams } from './item-merge.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { PlansDir } from '../../plan/plan-files.js';
 
@@ -83,7 +83,7 @@ import { dirname, join, posix } from 'node:path';
 
 import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { boardId } from '../../board/naming.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { isPidAlive, readSessions } from '../../loop/sessions.js';
 import { plansDirAt, stubOfPlanFile } from '../../plan/plan-files.js';

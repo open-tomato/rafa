@@ -88,7 +88,7 @@ import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { cleanUpSteps, commandLine, gitSaid, remainingFrom } from '../../pr/index.js';
 import { settleWaitingOn } from '../../pr/settle-waiting.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';

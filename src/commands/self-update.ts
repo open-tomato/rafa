@@ -88,13 +88,13 @@
  * Whether a record's pid is alive is its `isAlive`, `isPidAlive` when left
  * out, so a case plants a live loop without a process of its own.
  */
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { PidProbe, SessionRecord } from '../loop/sessions.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { BuildLines } from '../runtime/install.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { SETTINGS } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { messageOf } from '../core/config/sections.js';

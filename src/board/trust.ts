@@ -209,7 +209,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { describeValue, isGitHubLogin, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The repository placeholders `gh api` expands from the directory it runs in. */

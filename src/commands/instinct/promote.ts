@@ -44,11 +44,11 @@
  * data of the terminal result event.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { InstinctRecord, Learning } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { promotable } from '../../learning/index.js';
 import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/plan-files.js';

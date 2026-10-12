@@ -42,7 +42,7 @@
  * the plan as its value, and the line is refused with exit code 1 rather
  * than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { AccountSeams } from '../../plan/risk/accounts.js';
 import type { RiskFinding, RiskReport } from '../../plan/risk.js';
@@ -52,7 +52,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { isFile, plural } from '../../plan/plan-files.js';
 import { assessPlanRisk, renderRiskText } from '../../plan/risk.js';
 import { createGitRunner } from '../../pr/git.js';

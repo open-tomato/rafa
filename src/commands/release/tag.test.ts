@@ -45,7 +45,7 @@ import type {
   TagReady,
   TagRefused,
 } from './tag.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';
 import type { ReleaseTag } from '../../release/status-readings.js';

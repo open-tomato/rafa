@@ -75,7 +75,7 @@
  * rather than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
 import type { SpecRouteSeams } from './spec-route.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Need, NeedOrigin, NeedsReading, NeedsSeams, StackReading } from '../../plan/needs.js';
@@ -84,7 +84,7 @@ import type { ProjectFound } from '../../project/scope.js';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';

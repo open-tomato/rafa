@@ -31,7 +31,7 @@ import type { StoreEnvironment } from '../effort/store/location.js';
 import type { PlanIssue } from '../plan/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { EFFORT_DIR_VARIABLE } from '../effort/store/location.js';
 import { parsePlan } from '../plan/index.js';

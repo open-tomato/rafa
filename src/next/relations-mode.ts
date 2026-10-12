@@ -36,7 +36,7 @@
 import type { NextSourceSeams } from './sources.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicRelations } from '../board/epics.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { RafaConfig } from '../core/config/index.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';

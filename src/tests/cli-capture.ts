@@ -33,8 +33,8 @@
  * command that makes a project, asks for none.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 import type { CliEvent, CliEventNamed } from '../ports/index.js';
 
 import { execFileSync } from 'node:child_process';

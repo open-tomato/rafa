@@ -57,13 +57,11 @@
  */
 import type { NextEndingSeams } from './ending.js';
 import type { NextState } from './state.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
 import type { Output } from '../ports/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { createCommandRegistry } from '../cli/registry.js';
 import issueReady from '../commands/issue/ready.js';
 import loopStart from '../commands/loop/start.js';
@@ -71,6 +69,7 @@ import planCreate from '../commands/plan/create.js';
 import prMerge from '../commands/pr/merge.js';
 import prTriage from '../commands/pr/triage.js';
 import prWait from '../commands/pr/wait.js';
+import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { DEFAULT_ENDING_SEAMS, endingWith, endWithNextStep, HINT_FLAG_SPEC } from './ending.js';

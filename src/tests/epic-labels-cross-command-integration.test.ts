@@ -29,8 +29,8 @@
  *    epic table is shown, warns about both faults, in the same words.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { DoctorSeams } from '../commands/doctor.js';
+import type { Prompter } from '../core/command/index.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

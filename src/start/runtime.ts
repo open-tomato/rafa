@@ -24,8 +24,8 @@
  *
  * ## The refusals
  *
- * Each throws `CommandExit` (`cli/command.ts`) with exit code 1 and the
- * whole refusal as its message, ending with
+ * Each throws `CommandExit` (`core/command/command.ts`) with exit code 1
+ * and the whole refusal as its message, ending with
  * `Nothing was checked and nothing was dispatched.`:
  *
  *   - `--runtime` with no value, bare or empty.
@@ -85,7 +85,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 
 import { argValue } from './run-config.js';

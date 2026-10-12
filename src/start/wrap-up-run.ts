@@ -117,7 +117,7 @@ import type { PullRequestSummary } from '../pr/index.js';
 import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { parsePlan } from '../plan/index.js';
 import { createGitRunner, ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';

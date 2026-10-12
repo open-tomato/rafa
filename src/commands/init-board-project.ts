@@ -130,7 +130,7 @@ import type { ProgressFeed } from '../board/project/progress.js';
 import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { RafaConfig } from '../core/config/index.js';
 
 import { readIssueFacts } from '../board/project/facts.js';

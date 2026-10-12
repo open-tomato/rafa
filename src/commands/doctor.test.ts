@@ -161,7 +161,7 @@ import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { versionLine } from '../cli/version.js';
+import { versionLine } from '../core/command/index.js';
 import { configFilePath } from '../core/config/index.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';

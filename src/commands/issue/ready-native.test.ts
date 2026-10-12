@@ -24,7 +24,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_LABEL } from '../../board/issue.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 

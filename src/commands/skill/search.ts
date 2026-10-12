@@ -73,7 +73,7 @@
  * alone under `--no-model`, as status `ranked`.
  */
 import type { SkillListSeams } from './list.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { InventoryKind, InventoryRecord } from '../../inventory/record.js';
@@ -82,7 +82,7 @@ import type { RankedCandidate } from '../../inventory/search/rank.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { CapturingSpawner } from '../../utils/claude.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { loadConfig } from '../../core/config/load.js';
 import { selectEffortStore } from '../../effort/store/index.js';
 import { droppedLine, rankSearch, runSearch } from '../../inventory/search/index.js';

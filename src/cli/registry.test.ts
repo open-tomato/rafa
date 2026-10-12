@@ -21,8 +21,8 @@
  * `mount` did that, and the case for commands that are not a list caught
  * it: it received the engine's spread error in place of the refusal.
  */
-import type { RafaCommand } from './command.js';
 import type { CommandRegistryInput, SubjectSpec } from './registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

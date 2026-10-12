@@ -73,7 +73,8 @@
  * prints what the command prints. Each writes through the active output
  * (`src/adapters/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
- * `process.exit`: a refusal throws `CommandExit` (`src/cli/command.ts`)
+ * `process.exit`: a refusal throws `CommandExit`
+ * (`src/core/command/command.ts`)
  * with the refusal as its message, which the command leaves to its caller
  * to print. `planCommand` also throws it with the exit code a `claude`
  * planner's rejection carries, and `startCommand` with exit code 0 once

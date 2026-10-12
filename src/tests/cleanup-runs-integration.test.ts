@@ -11,8 +11,8 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
+import type { Prompter } from '../core/command/index.js';
 import type { SessionRecord } from '../loop/sessions.js';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

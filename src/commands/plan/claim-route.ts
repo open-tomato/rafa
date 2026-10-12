@@ -80,7 +80,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../pr/git.js';
 import { resolvePrProvider } from '../../pr/provider.js';

@@ -70,7 +70,7 @@
  */
 import type { BaseReader, PrListForecast } from './list-forecast.js';
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksVerdict, GitRunner, Mergeability, PullRequests, PullRequestSummary } from '../../pr/index.js';
 
 import { messageOf } from '../../core/config/sections.js';

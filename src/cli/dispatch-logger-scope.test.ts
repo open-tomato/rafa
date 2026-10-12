@@ -58,7 +58,7 @@
  * case, so a file bun ran earlier in the process leaves nothing a case
  * could read as left behind.
  */
-import type { RafaCommand, RafaContext } from './command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { Logger } from '../ports/index.js';
 import type { CapturedRun, PlantedProject } from '../tests/cli-capture.js';
 
@@ -71,11 +71,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
+import { CommandExit } from '../core/command/index.js';
 import { loadConfig } from '../core/config/load.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
-
-import { CommandExit } from './command.js';
 
 const tempBase = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-dispatch-logger-scope-')));
 

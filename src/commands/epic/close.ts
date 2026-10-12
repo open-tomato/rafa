@@ -134,7 +134,7 @@ import type { EpicBody } from '../../board/epic-body.js';
 import type { UncheckedCriterion } from '../../board/epic-trail.js';
 import type { EpicRelations } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { EpicCost } from '../../effort/epic-cost.js';
 import type { FindingsWriterSeams } from '../../effort/store/findings.js';
@@ -159,7 +159,7 @@ import { EPIC_LABEL_PREFIX, epicSlugsOf, groupByEpicLabel } from '../../board/ep
 import { createGhIssueBoard } from '../../board/issue-board.js';
 import { LABELS_READS } from '../../board/relations/labels.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { readEpicCost, renderEpicCost } from '../../effort/epic-cost.js';
 import { selectEffortStore } from '../../effort/store/index.js';

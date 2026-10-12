@@ -1,6 +1,6 @@
 /**
  * Tests for `RafaCommand`, `RafaContext`, `CommandExit` and the shape
- * check (`src/cli/command.ts`).
+ * check (`src/core/command/command.ts`).
  *
  * The type claims are compiled as probes through the TypeScript compiler
  * API under the root tsconfig, as `src/cli/core/types.test.ts` does and
@@ -248,15 +248,15 @@ describe('the shape check', () => {
 });
 
 /** The `src/` directory the probes import from. */
-const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
+const SRC_DIR = fileURLToPath(new URL('../../', import.meta.url));
 
 /** The repository root, whose tsconfig the probes compile under. */
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** A probe's source: the command module as `C` and the core contracts as `T`, then the lines given. */
 function probeSource(...lines: string[]): string {
   return [
-    `import type * as C from ${JSON.stringify(join(SRC_DIR, 'cli', 'command.js'))};`,
+    `import type * as C from ${JSON.stringify(join(SRC_DIR, 'core', 'command', 'command.js'))};`,
     `import type * as T from ${JSON.stringify(join(SRC_DIR, 'cli', 'core', 'types.js'))};`,
     `import type { ParseArgsSpec } from ${JSON.stringify(join(SRC_DIR, 'cli', 'core', 'parseArgs.js'))};`,
     'export const base = {',

@@ -138,8 +138,7 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner } from '../../pr/git.js';
@@ -158,8 +157,7 @@ import {
   SPEC_READY_LABEL,
 } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/git.js';

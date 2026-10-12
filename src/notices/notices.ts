@@ -55,7 +55,7 @@
  * damaged file errs toward telling. A write that fails is reported and
  * the run continues, since the person did answer yes.
  */
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

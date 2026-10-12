@@ -73,7 +73,7 @@
  * is the project config under the root it is handed, which every case
  * in `./init-release.test.ts` points at its own temporary directory.
  */
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { ReleaseEnabled } from '../core/config/sections.js';
 import type { ReleaseFileSettings } from '../release/enabled.js';
 

@@ -24,8 +24,7 @@
  * as well as what it printed and posted.
  */
 import type { MergeSeams } from './merge.js';
-import type { RafaCommand } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { RafaCommand , Prompter } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,

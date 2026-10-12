@@ -42,7 +42,7 @@
  * `StretchFolderSeams`; left out, the system's own, so
  * `src/commands/doctor.ts` wires the row with its one call.
  */
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { AgentReading, StretchFolderSeams, StretchLiveness } from '../stretch/folder.js';
 
 import { relative } from 'node:path';

@@ -107,7 +107,8 @@
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
  *  12. **Halts, or answers.** A failed required item, or rows that could
- *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
+ *      not be stored, throws `CommandExit` (`core/command/command.ts`)
+ *      with exit
  *      code 1. Otherwise, on a first dispatch of a run holding its claim,
  *      the issue's `rafa:claimed` is swapped for `rafa:in-development`,
  *      best-effort, and the run's id, the report, the reminders and the
@@ -321,7 +322,7 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { effortStoreDir } from '../effort/store/location.js';

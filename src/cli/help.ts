@@ -106,12 +106,13 @@
  * change to a core command's declaration, or to a default it reads from
  * a constant, goes red until they are regenerated and the diff read.
  */
-import type { CommandExample, RafaCommand } from './command.js';
 import type { ArgSpec, FlagSpec } from './core/types.js';
 import type { CommandRegistry, SubjectSpec } from './registry.js';
 import type { HelpRequest } from './route.js';
+import type { CommandExample, RafaCommand } from '../core/command/index.js';
 
-import { isTopLevel } from './command.js';
+import { isTopLevel } from '../core/command/index.js';
+
 import { mountKey } from './registry.js';
 import { SPENDS_GLYPH, spendsCondition, spendsMark } from './spends.js';
 

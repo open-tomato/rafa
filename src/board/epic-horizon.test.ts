@@ -32,7 +32,7 @@ import type { GitResult, GitRunner } from '../pr/git.js';
 import { describe, expect, test } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import {
   applyHorizonChange,

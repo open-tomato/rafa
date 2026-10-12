@@ -24,7 +24,7 @@
  * case; a `console.log` in `expectExit` on a match reddened its quiet
  * case alone, and a stderr write in `expectEvent` on a match its own.
  */
-import type { RafaCommand } from '../cli/command.js';
+import type { RafaCommand } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';

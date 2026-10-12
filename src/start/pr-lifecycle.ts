@@ -119,7 +119,7 @@ import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { messageOf } from '../core/config/sections.js';
 import {

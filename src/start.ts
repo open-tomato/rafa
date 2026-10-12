@@ -280,8 +280,9 @@
  * `error`, each message as it was. Under the dispatcher that is the
  * invocation's output, so json mode reads each as a `log` event.
  *
- * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
- * never by `process.exit`, so the dispatcher writes the terminal event.
+ * The run is refused by throwing `CommandExit`
+ * (`core/command/command.ts`) and never by `process.exit`, so the
+ * dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
  * read (`start/run-config.ts`), `--as-worktree` beside
  * `--create-branch`, refused right after it (`start/run-setup.ts`), a
@@ -369,7 +370,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { activeOutput } from './adapters/output/active.js';
-import { CommandExit } from './cli/command.js';
+import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { messageOf } from './core/config/sections.js';
 import { createHubContact } from './effort/sync/contact.js';

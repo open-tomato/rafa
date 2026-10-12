@@ -72,7 +72,7 @@ import { readDeviceStoreId } from '../claims/device.js';
 import { makeOwnershipCommit, readLocalClaimBranch } from '../claims/git.js';
 import { parseClaimMessage } from '../claims/record.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { createGitRunner } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';

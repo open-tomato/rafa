@@ -138,7 +138,7 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { BoardRelationshipMode, PrProvider } from '../core/config/sections.js';
 
 import { join } from 'node:path';

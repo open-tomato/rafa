@@ -39,8 +39,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { MembershipChange, OpenWork } from '../../board/epic-trail.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { BoardRelations, ParentChange } from '../../board/relations/port.js';
-import type { RafaCommand } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { RafaCommand , Prompter } from '../../core/command/index.js';
 import type { GitResult, GitRunner } from '../../pr/git.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 

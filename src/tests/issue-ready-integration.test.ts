@@ -33,8 +33,8 @@
  * repository everywhere.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { SpecRouteSeams } from '../commands/plan/spec-route.js';
+import type { Prompter } from '../core/command/index.js';
 import type { GitRunner } from '../pr/git.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -49,10 +49,10 @@ import { SPEC_LABEL } from '../board/issue.js';
 import { specPath } from '../board/naming.js';
 import { resolvePlanSpec } from '../board/plan-spec.js';
 import { SPEC_READY_LABEL, specReadyRefusalMessage } from '../board/readiness.js';
-import { CommandExit } from '../cli/command.js';
 import { createIssueReadyCommand, readyQuestion } from '../commands/issue/ready.js';
 import { createPlanReadyOffer } from '../commands/plan/ready-offer.js';
 import { resolveCreateSpec } from '../commands/plan/spec-route.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { dispatchInProject, plantProject } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';

@@ -255,8 +255,7 @@
  * whose `pr.provider` is not `gh`, and whatever an action threw for an
  * action that failed, or the native-mode repository read threw.
  */
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
@@ -266,8 +265,7 @@ import type { DryEpic, NextSources } from '../next/readings.js';
 import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 
-import { CommandExit } from '../cli/command.js';
-import { createLinePrompter } from '../cli/prompt/confirm.js';
+import { CommandExit , createLinePrompter } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { actionInvocation, runAction } from '../next/actions.js';

@@ -87,7 +87,7 @@ import type { PlanNames } from './roadmap-rows.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from './roadmap.js';
 import type { GitRunner } from '../pr/git.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 
 import { HORIZON_LABEL_PREFIX } from './epic-problems.js';

@@ -33,7 +33,7 @@
  * Exit code 1 for an argument, and for records that cannot be read. The
  * command declares no flag.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { TaskCounts } from '../../plan/plan-files.js';

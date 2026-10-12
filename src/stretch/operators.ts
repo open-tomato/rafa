@@ -43,7 +43,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RAFA_VERSION } from '../cli/version.js';
+import { RAFA_VERSION } from '../core/command/index.js';
 import { errorCode } from '../loop/sessions.js';
 import { readManifestVersion } from '../release/version.js';
 import { realEntry } from '../schema/tiers.js';

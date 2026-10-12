@@ -10,7 +10,7 @@
  * the same line with a module and an action after it, which runs.
  */
 import type { OutputStream } from '../../adapters/output/stream.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

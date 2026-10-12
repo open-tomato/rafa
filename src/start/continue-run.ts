@@ -146,7 +146,7 @@ import type { TaskInfo } from '../utils/tracker.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { heldOnNothingLeftBehind } from './commit.js';
