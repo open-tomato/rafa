@@ -139,6 +139,8 @@ function plant(realGit: string): ScratchRepo {
   const base = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: scratch.repo, encoding: 'utf8' }).trim();
   git(scratch, scratch.repo, 'remote', 'add', 'origin', originPath);
   git(scratch, scratch.repo, 'push', '-q', '-u', 'origin', base);
+  // The run reads its base from origin/HEAD, which a bare clone-less remote add leaves unset.
+  git(scratch, scratch.repo, 'remote', 'set-head', 'origin', base);
 
   mkdirSync(join(scratch.repo, '.plans'));
   writeFileSync(join(scratch.repo, PLAN_REL), `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`, 'utf8');

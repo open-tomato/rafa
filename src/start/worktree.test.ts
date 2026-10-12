@@ -26,9 +26,18 @@
  * refusal names is the one git itself lists. The stubbed fixtures are
  * what git 2.50.1 (Apple Git-155) wrote under `LC_ALL=C` on 2026-09-29.
  *
+ * The upstream step of route `switch-remote` (`./worktree-upstream.ts`)
+ * is stubbed in the same table, and its pause is a stub that writes
+ * `sleep <ms>` into the same record, so a case reads the tries and the
+ * pauses in the order they happened and waits for nothing. The removal
+ * of the added worktree has NO reply in `CLEAN`: a run that removed a
+ * worktree no case planned for throws. The lock refusal is what git
+ * 2.53.0 wrote under Linux with `LC_ALL=C` on 2026-10-12, copied whole.
+ *
  * The active output is module state and bun runs every test file in one
  * process, so each case sets a sink and the last one sets it back.
  */
+import type { Sleep } from './worktree-upstream.js';
 import type { WorktreeOutcome, WorktreeRequest } from './worktree.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 
@@ -45,6 +54,7 @@ import { CONFIG_DEFAULTS } from '../config.js';
 import { parseWorktrees } from '../pr/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
+import { UPSTREAM_PAUSE_MS, UPSTREAM_TRIES } from './worktree-upstream.js';
 import {
   addRunWorktree,
   behindLine,
@@ -97,8 +107,17 @@ const CREATE_ADD = `worktree add --no-track -b ${BRANCH} ${PATH} origin/${BASE}`
 /** The add the switch-local route runs. */
 const LOCAL_ADD = `worktree add ${PATH} ${BRANCH}`;
 
-/** The add the switch-remote route runs. */
-const REMOTE_ADD = `worktree add --track -b ${BRANCH} ${PATH} origin/${BRANCH}`;
+/** The add the switch-remote route runs: a new branch cut from the remote one, its upstream left to the next step. */
+const REMOTE_ADD = `worktree add --no-track -b ${BRANCH} ${PATH} origin/${BRANCH}`;
+
+/** The upstream line the switch-remote route runs after its add; see `./worktree-upstream.ts`. */
+const SET_UPSTREAM = `branch --set-upstream-to=origin/${BRANCH} ${BRANCH}`;
+
+/** The removal of the worktree the add made, run when the upstream step gives up. */
+const REMOVE = `worktree remove --force ${PATH}`;
+
+/** What the record holds for one pause of the upstream step. */
+const PAUSE = `sleep ${UPSTREAM_PAUSE_MS}`;
 
 /** The listing command a failed add reads. */
 const LIST = 'worktree list --porcelain';
@@ -196,6 +215,24 @@ const PATH_DETACHED = MAIN_ONLY + block(PATH, null, '333333333333333333333333333
 const HELD_SAID = `Preparing worktree (checking out '${BRANCH}')\n`
   + `fatal: '${BRANCH}' is already used by worktree at '${ELSEWHERE}'\n`;
 
+/** What git wrote when `.git/config.lock` was held as the upstream line ran in the main checkout. */
+const LOCKED_SAID = [
+  'error: could not lock config file .git/config: File exists',
+  'error: unable to write upstream branch configuration',
+  'hint:',
+  'hint: After fixing the error cause you may try to fix up',
+  'hint: the remote tracking information by invoking:',
+  `hint:   git branch --set-upstream-to=origin/refs/heads/${BRANCH}`,
+  '',
+].join('\n');
+
+/** The record of `count` tries of the upstream line, a pause between every two. */
+function tries(count: number): readonly string[] {
+  return Array.from({ length: count }, (_, index) => (index === 0
+    ? [SET_UPSTREAM]
+    : [PAUSE, SET_UPSTREAM])).flat();
+}
+
 /** What a stubbed git answers, keyed by the argv after `git`, joined by spaces; see the file note for a list. */
 type GitReplies = Readonly<Record<string, GitResult | readonly GitResult[]>>;
 
@@ -207,6 +244,7 @@ const CLEAN: GitReplies = {
   [CREATE_ADD]: ok(),
   [LOCAL_ADD]: ok(),
   [REMOTE_ADD]: ok(),
+  [SET_UPSTREAM]: ok(),
   [LIST]: ok(MAIN_ONLY),
   [READ_BASE]: ok(`${BASE_TIP}\n`),
   [READ_BRANCH]: ok(`${BRANCH_TIP}\n`),
@@ -215,12 +253,15 @@ const CLEAN: GitReplies = {
   [ABORT]: failed('fatal: There is no merge to abort (MERGE_HEAD missing).'),
 };
 
-/** A stubbed git, the roots it was made for and the commands it was given. */
+/** A stubbed git and pause, the roots git was made for, and the commands and pauses in the order they came. */
 interface World {
   readonly git: (root: string) => GitRunner;
+  /** The pause of the upstream step: waits for nothing and writes `sleep <ms>` into {@link ran}. */
+  readonly sleep: Sleep;
   readonly roots: readonly string[];
+  /** Every command, and every pause as `sleep <ms>`. */
   readonly ran: readonly string[];
-  /** Every command of {@link ran}, prefixed with the root it ran in and a colon. */
+  /** Every command of {@link ran}, prefixed with the root it ran in and a colon; a pause is in no root and is left out. */
   readonly ranIn: readonly string[];
 }
 
@@ -234,6 +275,9 @@ function world(over: GitReplies = {}): World {
     ran,
     ranIn,
     roots,
+    sleep: (ms) => {
+      ran.push(`sleep ${ms}`);
+    },
     git: (root) => {
       roots.push(root);
       return (args) => {
@@ -315,7 +359,26 @@ describe('worktreeSteps', () => {
 
   it('fetches nothing for a branch that already exists, local or remote', () => {
     expect(worktreeSteps('switch-local', plan, PATH).map((step) => step.argv.join(' '))).toEqual([`git ${LOCAL_ADD}`]);
-    expect(worktreeSteps('switch-remote', plan, PATH).map((step) => step.argv.join(' '))).toEqual([`git ${REMOTE_ADD}`]);
+    expect(worktreeSteps('switch-remote', plan, PATH).map((step) => step.argv.join(' ')))
+      .toEqual([`git ${REMOTE_ADD}`, `git ${SET_UPSTREAM}`]);
+  });
+
+  it('adds a branch only the remote has with --no-track, its upstream a step of its own after the add', () => {
+    const steps = worktreeSteps('switch-remote', plan, PATH);
+
+    expect(steps.map((step) => step.id)).toEqual(['add', 'set-upstream']);
+    expect(steps.map((step) => step.label)).toEqual([
+      `add the worktree for ${BRANCH} at ${PATH}`,
+      `set the upstream of ${BRANCH} to origin/${BRANCH}`,
+    ]);
+    expect(steps[0]?.argv).toContain('--no-track');
+    expect(steps.flatMap((step) => step.argv)).not.toContain('--track');
+  });
+
+  it('sets no upstream on the two routes whose add writes none', () => {
+    const ids = (['create', 'switch-local'] as const).map((route) => worktreeSteps(route, plan, PATH).map((step) => step.id));
+
+    expect(ids).toEqual([['fetch', 'add'], ['add']]);
   });
 });
 
@@ -498,12 +561,20 @@ describe('addRunWorktree over a stubbed git', () => {
     expect(git.ran.filter((command) => command.startsWith('fetch'))).toEqual([FETCH]);
   });
 
-  it('tracks a branch only the remote has, without fetching it, then catches it up', () => {
+  it('adds a branch only the remote has untracked, sets its upstream in the project root, then catches it up', () => {
     const git = world({ [REMOTE_READ]: ok() });
-    const outcome = addRunWorktree(request(), { git: git.git });
+    const outcome = addRunWorktree(request(), { git: git.git, sleep: git.sleep });
 
     expect(outcome.route).toBe('switch-remote');
-    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, REMOTE_ADD, ...CURRENT_READS]);
+    expect(outcome.steps.map((step) => step.id)).toEqual(['add', 'set-upstream']);
+    expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, REMOTE_ADD, SET_UPSTREAM, ...CURRENT_READS]);
+    expect(git.ranIn).toContain(`${ROOT}: ${SET_UPSTREAM}`);
+    expect(lines).toEqual([
+      `\n🌿 Adding a worktree for the existing ${BRANCH}.`,
+      `   add the worktree for ${BRANCH} at ${PATH}: done`,
+      `   set the upstream of ${BRANCH} to origin/${BRANCH}: done`,
+      `   The run is on ${BRANCH} in ${PATH}.`,
+    ]);
   });
 
   it('trims the stub, as the branch offer does', () => {
@@ -561,6 +632,91 @@ describe('addRunWorktree over a stubbed git', () => {
     expect(refusal.message).toContain(`❌ Could not fetch origin ${BASE}.`);
     expect(refusal.message).toContain(`Refusing to cut ${BRANCH} from a stale origin/${BASE}.`);
     expect(git.ran).toEqual([LIST, LOCAL_READ, REMOTE_READ, 'fetch origin main']);
+  });
+});
+
+describe('addRunWorktree setting the upstream of a branch only the remote has', () => {
+  /** A branch only the remote has, the upstream line answering `upstream`, `over` laid over the world. */
+  const remoteOnly = (upstream: GitResult | readonly GitResult[], over: GitReplies = {}): World => world({
+    [REMOTE_READ]: ok(),
+    [SET_UPSTREAM]: upstream,
+    ...over,
+  });
+
+  /** Every command a switch-remote run gives git before its upstream step. */
+  const UP_TO_ADD = [LIST, LOCAL_READ, REMOTE_READ, REMOTE_ADD];
+
+  it('ends after one try on a failure that is no lock refusal, quoting git and removing nothing', () => {
+    const said = `fatal: the requested upstream branch 'origin/${BRANCH}' does not exist`;
+    const git = remoteOnly(failed(said));
+    const refusal = refusalOf(() => addRunWorktree(request(), { git: git.git, sleep: git.sleep }));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message.split('\n')).toEqual([
+      '',
+      `❌ Could not set the upstream of ${BRANCH}.`,
+      `   ${said}`,
+      '   The command that failed:',
+      `     git ${SET_UPSTREAM}`,
+      `   The worktree added at ${PATH} was left in place, holding ${BRANCH}.`,
+      '   The main checkout\'s branch and working tree were not touched.',
+    ]);
+    expect(git.ran).toEqual([...UP_TO_ADD, SET_UPSTREAM]);
+    expect(lines.some((line) => line.includes('The run is on'))).toBe(false);
+  });
+
+  it('gives up on a lock held past the last try, removing the added worktree before it refuses', () => {
+    const git = remoteOnly(failed(LOCKED_SAID), { [REMOVE]: ok() });
+    const refusal = refusalOf(() => addRunWorktree(request(), { git: git.git, sleep: git.sleep }));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message.split('\n')).toEqual([
+      '',
+      `❌ Could not set the upstream of ${BRANCH}: git's config file was still locked after ${UPSTREAM_TRIES} tries.`,
+      '   error: could not lock config file .git/config: File exists',
+      '   error: unable to write upstream branch configuration',
+      '   Once that lock is gone, set the upstream with:',
+      `     git ${SET_UPSTREAM}`,
+      `   The worktree added at ${PATH} was removed and ${BRANCH} was kept: run again once its upstream is set.`,
+      '   The main checkout\'s branch and working tree were not touched.',
+    ]);
+    expect(git.ran).toEqual([...UP_TO_ADD, ...tries(UPSTREAM_TRIES), REMOVE]);
+    expect(git.ran.filter((command) => command === PAUSE)).toHaveLength(UPSTREAM_TRIES - 1);
+    expect(git.ranIn.at(-1)).toBe(`${ROOT}: ${REMOVE}`);
+    expect(lines.some((line) => line.includes('The run is on'))).toBe(false);
+  });
+
+  it('goes on once the lock is released after two pauses, removing nothing and catching the branch up', () => {
+    const git = remoteOnly([failed(LOCKED_SAID), failed(LOCKED_SAID), ok()]);
+    const outcome = addRunWorktree(request(), { git: git.git, sleep: git.sleep });
+
+    expect(outcome.route).toBe('switch-remote');
+    expect(git.ran).toEqual([...UP_TO_ADD, ...tries(3), ...CURRENT_READS]);
+    expect(git.ran).not.toContain(REMOVE);
+    expect(lines).toContain(`   set the upstream of ${BRANCH} to origin/${BRANCH}: done`);
+    expect(lines.at(-1)).toBe(`   The run is on ${BRANCH} in ${PATH}.`);
+  });
+
+  it('says so when the added worktree could not be removed, quoting git beneath it', () => {
+    const said = `fatal: '${PATH}' is not a working tree`;
+    const git = remoteOnly(failed(LOCKED_SAID), { [REMOVE]: failed(said) });
+    const refusal = refusalOf(() => addRunWorktree(request(), { git: git.git, sleep: git.sleep }));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message.split('\n').slice(-3)).toEqual([
+      `   The worktree added at ${PATH} could not be removed and still holds ${BRANCH}:`,
+      `   ${said}`,
+      '   The main checkout\'s branch and working tree were not touched.',
+    ]);
+    expect(refusal.message).not.toContain('was removed');
+  });
+
+  it('never reaches the upstream step when the add itself fails', () => {
+    const git = remoteOnly(ok(), { [REMOTE_ADD]: failed(`fatal: '${PATH}' already exists`) });
+    const refusal = refusalOf(() => addRunWorktree(request(), { git: git.git, sleep: git.sleep }));
+
+    expect(refusal.message).toContain(`❌ Could not add the worktree for ${BRANCH} at ${PATH}.`);
+    expect(git.ran).toEqual([...UP_TO_ADD, LIST]);
   });
 });
 
@@ -760,6 +916,25 @@ describe('addRunWorktree against a real repository', () => {
     expect(run(project, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('main');
     expect(run(project, ['status', '--porcelain', '--untracked-files=no'])).toBe('');
     expect(() => run(project, ['config', '--get', 'branch.feat/real.merge'])).toThrow();
+  });
+
+  it('adds a branch only the remote has and sets its upstream to that branch, never to the base', () => {
+    run(project, ['push', '-q', 'origin', 'main:feat/remote']);
+    // The control: the branch is the remote's alone, so the route is the one under test.
+    expect(() => run(project, ['rev-parse', '--verify', '--quiet', 'refs/heads/feat/remote'])).toThrow();
+
+    const outcome = addRunWorktree(request({ projectRoot: project, planStub: 'remote' }));
+    const path = join(project, '.rafa', 'worktrees', 'remote');
+
+    expect(outcome.route).toBe('switch-remote');
+    expect(outcome.steps.map((step) => step.argv.join(' '))).toEqual([
+      `git worktree add --no-track -b feat/remote ${path} origin/feat/remote`,
+      'git branch --set-upstream-to=origin/feat/remote feat/remote',
+    ]);
+    expect(run(path, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('feat/remote');
+    expect(run(project, ['config', '--get', 'branch.feat/remote.merge'])).toBe('refs/heads/feat/remote');
+    expect(run(project, ['config', '--get', 'branch.feat/remote.remote'])).toBe('origin');
+    expect(run(project, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('main');
   });
 
   it('names the path git lists when the branch is checked out elsewhere, and the path the run wanted', () => {
