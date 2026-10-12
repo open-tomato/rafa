@@ -287,6 +287,38 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).not.toContain('#869');
   });
 
+  it('lists the bugs filed since the ledger\'s last line oldest first, from the listing alone, with no issue view per bug', async () => {
+    const planted = plant({
+      bugs: [
+        bug('874', 'filed last', '2026-10-07T09:08:00Z'),
+        bug('869', 'filed before the last item', '2026-10-07T07:00:00Z'),
+        bug('873', 'filed first', '2026-10-07T08:30:00Z'),
+      ],
+    });
+    appendItem(planted.project.root, 4, {
+      issue: '604',
+      plan: 'rafa-604-config-set',
+      pullRequest: 880,
+      mergeCommit: OLD_SHA,
+      closes: ['Closes #604'],
+      at: '2026-10-07T08:00:00.000Z',
+    });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expectInOrder(outcome.stdout, [
+      'Bugs: 3 open.',
+      'Filed since 2026-10-07T08:00:00.000Z: 2.',
+      '   #873 filed first',
+      '   #874 filed last',
+    ]);
+    expect(outcome.stdout).not.toContain('Filed since the last item: not read');
+    expect(outcome.stdout).not.toContain('#869');
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue' && args[1] === 'view')).toEqual([]);
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue')).toEqual([]);
+  });
+
   it('counts new bugs from stretch.json\'s start when the ledger is empty', async () => {
     const planted = plant({ bugs: [bug('872', 'during the stretch', '2026-10-07T06:00:00Z')] });
     mkdirSync(join(planted.project.root, '.rafa', 'stretch', '4'), { recursive: true });
