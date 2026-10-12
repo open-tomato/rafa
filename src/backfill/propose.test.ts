@@ -37,14 +37,14 @@
  *
  * That the real spawner is reached at all. {@link runProposalBatch}
  * hands its spawner to `runClaudeCaptured`, whose own tests
- * (`../utils/claude.test.ts`) measure the argument list and the prompt
+ * (`../core/loop/claude.test.ts`) measure the argument list and the prompt
  * on stdin; the assertion here is that the pass builds the arguments
  * `claudeArgs` builds for the same setting sources, and that the prompt
  * names every file of the batch.
  */
 import type { ProposalFile, ProposalRow } from './proposal-file.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
+import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

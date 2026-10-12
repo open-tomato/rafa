@@ -31,7 +31,7 @@
  * is stored `done` beside `blocked` — which is exactly the row the third
  * case below reads back.
  */
-import type { CapturedSession } from '../utils/claude.js';
+import type { CapturedSession } from '../core/loop/index.js';
 
 import { execFileSync } from 'node:child_process';
 import {

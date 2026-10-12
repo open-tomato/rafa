@@ -3,7 +3,7 @@
  * prompt `./decision-prompt.ts` builds on stdin, read-only tools, and
  * its captured output handed back for `./decision-parse.ts` to read.
  *
- * It goes through the capturing door (`utils/claude.ts`), as the task
+ * It goes through the capturing door (`core/loop/claude.ts`), as the task
  * and wrap-up sessions do, under the run's `loop.settingSources`, in the
  * run's checkout, with the argument list {@link decisionFlags} builds:
  * `--session-id` with an id the loop picks, then `--tools` naming
@@ -24,11 +24,11 @@
  * door's tee, and the caller (`./continue-run.ts`) says what was decided.
  */
 import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
+import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
 
 import { randomUUID } from 'node:crypto';
 
-import { runClaudeCaptured } from '../utils/claude.js';
+import { runClaudeCaptured } from '../core/loop/index.js';
 
 import { SESSION_ID_FLAG } from './dispatch.js';
 import { withStamp } from './stamp.js';

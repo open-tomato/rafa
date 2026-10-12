@@ -20,9 +20,9 @@
  * ## Why one file has a barrel of its own
  *
  * `src/core/loop/` has two barrels, both listed under `CORE_BARRELS` in
- * `scripts/survey/core-moves.ts`. `index.ts` holds `sessions.ts`. This
- * one holds `session-readings.ts` alone, because `index.ts` cannot take
- * it.
+ * `scripts/survey/core-moves.ts`. `index.ts` holds `sessions.ts` and
+ * `claude.ts`. This one holds `session-readings.ts` alone, because
+ * `index.ts` cannot take it.
  *
  * A barrel that groups a file with a file outside `src/core/` that
  * imports the barrel back by value is a runtime cycle.

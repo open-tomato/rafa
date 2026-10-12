@@ -30,7 +30,7 @@
  * as written is named to the operator once, at start. `start/run-config.ts`
  * does both. The same resolution names the setting sources every session the
  * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
- * `project,local` unless a config names others (`utils/claude.ts`).
+ * `project,local` unless a config names others (`core/loop/claude.ts`).
  *
  * A `--runtime=<path|version>` naming an installed rafa other than the one
  * running sends the whole run there, before anything else is read
@@ -350,7 +350,7 @@
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
- * moment (`utils/claude.ts`), so the task ends then rather than when its
+ * moment (`core/loop/claude.ts`), so the task ends then rather than when its
  * session would have, and the task is marked `[BLOCKED]`. A SIGINT during
  * a suite step, whether it ended `bun test` or reached the loop alone, is
  * a stop and not a red step (`start/suite-step.ts`): the step is recorded
@@ -372,6 +372,7 @@ import { fileURLToPath } from 'url';
 import { CommandExit } from './core/command/index.js';
 import { ConfigError } from './core/config/index.js';
 import { messageOf } from './core/config/sections.js';
+import { interruptClaudeSessions } from './core/loop/index.js';
 import { activeOutput } from './core/output/index.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
@@ -432,7 +433,6 @@ import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
-import { interruptClaudeSessions } from './utils/claude.js';
 import { parseTaskDeclaration } from './utils/declaration.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';

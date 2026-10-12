@@ -32,8 +32,8 @@
  */
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { AdapterContext, AnyAdapter } from '../core/adapters/index.js';
+import type { ClaudeSpawner } from '../core/loop/index.js';
 import type { Tracker } from '../ports/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
 
 import {
   existsSync,

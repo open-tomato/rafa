@@ -13,7 +13,7 @@
  * and reports done, and the next step over the same selection is red
  * again. Issue 926 measured it: `src/utils/claude.test.ts` read 21 cases
  * red in the runner's task and stage steps only, each stopped by the
- * spend guard of `src/utils/claude.ts` over a record another file had
+ * spend guard of `src/core/loop/claude.ts` over a record another file had
  * left, and one run of 2026-10-10 inserted five repair tasks for it,
  * about 32 minutes of sessions that changed no file. The guard threw
  * at the time of that measurement; it has since been changed to warn

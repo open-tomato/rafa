@@ -53,7 +53,7 @@
  *     approved it: no `enabledMcpjsonServers`, no
  *     `enableAllProjectMcpServers`, no trust. It started all the same,
  *     where `claude mcp get` read it `Pending approval`. The loop always
- *     runs `-p` (`CLAUDE_BASE_ARGS` in `utils/claude.ts`), so approval
+ *     runs `-p` (`CLAUDE_BASE_ARGS` in `core/loop/claude.ts`), so approval
  *     is not read here at all. An interactive session approves by
  *     `enabledMcpjsonServers` and `enableAllProjectMcpServers`, the local and
  *     project files counting only in a trusted workspace. That is

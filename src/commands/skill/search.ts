@@ -34,7 +34,7 @@
  * `--no-model` runs step one alone, the keyword ranking, prints it and
  * stops: no session starts, no scratch copy is made and no effort row is
  * written. The command's `spends` declaration is `unless --no-model`, so
- * the spend guard in `src/utils/claude.ts` warns about a session that a
+ * the spend guard in `src/core/loop/claude.ts` warns about a session that a
  * run carrying `--no-model` would start.
  *
  * ## What each kind prints
@@ -75,12 +75,12 @@
 import type { SkillListSeams } from './list.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ClaudeSettingSource } from '../../core/config/sections.js';
+import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { InventoryKind, InventoryRecord } from '../../inventory/record.js';
 import type { SearchOutcome } from '../../inventory/search/index.js';
 import type { RankedCandidate } from '../../inventory/search/rank.js';
 import type { ProjectFound } from '../../project/scope.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
 
 import { CommandExit } from '../../core/command/index.js';
 import { loadConfig } from '../../core/config/load.js';

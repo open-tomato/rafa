@@ -137,6 +137,7 @@ import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { GitRunner } from '../../core/git/index.js';
+import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { EpicCost } from '../../effort/epic-cost.js';
 import type { FindingsWriterSeams } from '../../effort/store/findings.js';
 import type { EffortStore } from '../../effort/store/types.js';
@@ -145,7 +146,6 @@ import type { CheckAnswered, CheckUnanswered, VerifyRunRan } from '../../epic/ve
 import type { IssueRef, Tracker } from '../../ports/index.js';
 import type { TaskReport } from '../../report/parse.js';
 import type { BugTriage, NamedSecret } from '../../triage/triage.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
 
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -162,6 +162,7 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
+import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
 import { readEpicCost, renderEpicCost } from '../../effort/epic-cost.js';
 import { selectEffortStore } from '../../effort/store/index.js';
 import { buildVerifyPrompt, criteriaToAsk, parseVerifyPlan, readVerifyPrompt, splitCriteria } from '../../epic/verify-plan.js';
@@ -169,7 +170,6 @@ import { runVerification } from '../../epic/verify-run.js';
 import { SESSION_ID_FLAG } from '../../start/dispatch.js';
 import { unresolvedTracker } from '../../start/triage.js';
 import { namedSecrets, triageReport } from '../../triage/triage.js';
-import { claudeArgs, spawnClaudeCaptured } from '../../utils/claude.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { readSwitch } from '../plan/plan-files.js';
 

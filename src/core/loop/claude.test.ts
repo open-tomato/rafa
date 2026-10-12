@@ -164,10 +164,10 @@ import type {
   CapturingSpawner,
   ClaudeSpawner,
 } from './claude.js';
-import type { AgentEffortLookup } from './declaration.js';
-import type { CommandSpend } from '../cli/spends.js';
-import type { RafaCommand } from '../core/command/index.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { CommandSpend } from '../../cli/spends.js';
+import type { AgentEffortLookup } from '../../utils/declaration.js';
+import type { RafaCommand } from '../command/command.js';
+import type { ClaudeSettingSource } from '../config/config-sections.js';
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -175,9 +175,11 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { restoreRunningCommand, setRunningCommand } from '../cli/running.js';
-import { setActiveOutput } from '../core/output/index.js';
-import { sinkOutput } from '../tests/output-sinks.js';
+import { restoreRunningCommand, setRunningCommand } from '../../cli/running.js';
+import { sinkOutput } from '../../tests/output-sinks.js';
+import { parseTaskDeclaration, resolveDeclarationFlags } from '../../utils/declaration.js';
+import { sessionSpawnEnv } from '../../utils/session-env.js';
+import { setActiveOutput } from '../output/active.js';
 
 import {
   CLAUDE_BASE_ARGS,
@@ -190,8 +192,6 @@ import {
   spawnClaude,
   spawnClaudeCaptured,
 } from './claude.js';
-import { parseTaskDeclaration, resolveDeclarationFlags } from './declaration.js';
-import { sessionSpawnEnv } from './session-env.js';
 
 /** No agent definition here declares an effort of its own. */
 const NO_OWN_EFFORT: AgentEffortLookup = () => false;

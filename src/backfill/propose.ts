@@ -16,7 +16,7 @@
  *
  * {@link runProposalPass} selects the files that need something,
  * batches them twenty at a time, runs one `claude -p` session per batch
- * through the capturing door of `../utils/claude.ts`, and writes each
+ * through the capturing door of `../core/loop/claude.ts`, and writes each
  * batch to `<scope>/.rafa/backfill/proposals-<nn>.yaml` marked
  * `status: draft`. A reviewer then edits those files — correcting what
  * a session said, answering what it did not, and marking each file
@@ -107,16 +107,16 @@
 import type { ProposalAnswer, ProposalCandidate } from './proposal-batch.js';
 import type { ProposalFile, ProposalNeed, ProposalRow } from './proposal-file.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
-import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
+import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { checkFile } from '../check/run.js';
+import { runClaudeCaptured } from '../core/loop/index.js';
 import { sourceHash } from '../demote/report.js';
 import { mergeFrontmatter, readFrontmatterDocument, writeFrontmatter } from '../schema/frontmatter.js';
 import { countCharacters, DESCRIPTION_LIMIT, SKILL_SIGNALS } from '../schema/skill.js';
-import { runClaudeCaptured } from '../utils/claude.js';
 
 import { addedFailures, failureLines } from './derive.js';
 import { batchCandidates, parseSessionAnswer, renderProposalPrompt, selectProposals } from './proposal-batch.js';

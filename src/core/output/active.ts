@@ -65,7 +65,7 @@
  *
  * An Output carries no mode of its own, and two writers need one, so the
  * mode is held beside the output, in the scope and at module level
- * alike. `utils/claude.ts` echoes a session's stdout as the bytes it
+ * alike. `core/loop/claude.ts` echoes a session's stdout as the bytes it
  * wrote in `text` mode and as one `log` event per line in `json` mode.
  * `start/dispatch.ts` emits a `step` event per task in `json` mode
  * alone, where the `text` adapter would render it as a `step: ` line

@@ -125,7 +125,7 @@
  * and the inherited stderr are the same in both modes.
  *
  * The environment is `sessionSpawnEnv(process.env)` at both doors
- * (`session-env.ts`), the one function a reading of the session's
+ * (`utils/session-env.ts`), the one function a reading of the session's
  * environment calls too, so neither door spells an entry of its own.
  * That puts the running entry's `bundled/bin` at the front of every
  * session's `PATH`.
@@ -180,14 +180,13 @@
  * stream (`src/adapters/output/text.ts`); in json mode a `log` event at
  * level `warn`; in events mode nothing, since that output drops `warn`.
  */
-import type { RunningCommand } from '../cli/running.js';
-import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { RunningCommand } from '../../cli/running.js';
+import type { ClaudeSettingSource } from '../config/config-sections.js';
 
-import { runningCommand } from '../cli/running.js';
-import { commandSpelling } from '../core/command/index.js';
-import { activeOutput, activeOutputMode } from '../core/output/index.js';
-
-import { sessionSpawnEnv } from './session-env.js';
+import { runningCommand } from '../../cli/running.js';
+import { sessionSpawnEnv } from '../../utils/session-env.js';
+import { commandSpelling } from '../command/command.js';
+import { activeOutput, activeOutputMode } from '../output/active.js';
 
 /**
  * The executable every session is spawned as.

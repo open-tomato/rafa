@@ -140,7 +140,7 @@ import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
 import type { RafaConfig } from '../core/config/index.js';
 import type { ClaudeSettingSource, OutputMode } from '../core/config/sections.js';
-import type { CapturingSpawner } from '../utils/claude.js';
+import type { CapturingSpawner } from '../core/loop/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { existsSync, readFileSync } from 'node:fs';

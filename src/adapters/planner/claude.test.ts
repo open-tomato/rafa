@@ -122,7 +122,7 @@
  */
 import type { ClaudePlannerOptions } from './claude.js';
 import type { SpecReviewReading } from '../../board/spec-review.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
+import type { CapturingSpawner } from '../../core/loop/index.js';
 
 import {
   existsSync,

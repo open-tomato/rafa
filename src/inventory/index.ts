@@ -67,7 +67,7 @@
  * | `user` | `settingSources` includes `user` |
  * | `plugin:<name>` | `settingSources` includes `user`, where Claude Code records its plugins |
  * | `rafa` | it is being served: the winner of its name, and `serveVerdict` admits it |
- * | `addon:<name>` | never: `claudeArgs` (`utils/claude.ts`) hands a session no directory of theirs |
+ * | `addon:<name>` | never: `claudeArgs` (`core/loop/claude.ts`) hands a session no directory of theirs |
  *
  * and false, whatever its source, for a row that is not `enabled`.
  * `serveVerdict` is the check `serveResolution` makes before it copies

@@ -120,9 +120,9 @@ import type {
   Sync,
   Tracker,
 } from '../../ports/index.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
 import type { ClaudeSettingSource, StoreBackend } from '../config/config-sections.js';
 import type { HubContext } from '../config/config.js';
+import type { CapturingSpawner } from '../loop/claude.js';
 
 import { homedir } from 'node:os';
 

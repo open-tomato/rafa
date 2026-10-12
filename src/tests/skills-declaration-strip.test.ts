@@ -40,7 +40,7 @@
  * rather than for one line of it.
  */
 import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
+import type { ClaudeSpawner } from '../core/loop/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -56,12 +56,12 @@ import {
   it,
 } from 'bun:test';
 
+import { runClaude } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { parsePlan } from '../core/plan/index.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { setActivePlanStub } from '../start/stamp.js';
-import { runClaude } from '../utils/claude.js';
 
 import { sinkOutput } from './output-sinks.js';
 

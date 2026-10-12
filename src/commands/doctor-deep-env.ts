@@ -14,7 +14,7 @@
  *
  *   1. **The spawn.** `sessionSpawnEnv(env)` (`src/utils/session-env.ts`),
  *      where `env` is the invocation's `RafaContext.env`: the function
- *      both spawn doors in `src/utils/claude.ts` call, called here
+ *      both spawn doors in `src/core/loop/claude.ts` call, called here
  *      rather than spelled again, so the reading cannot drift from what
  *      a spawn hands `Bun.spawn`.
  *   2. **The settings files.** Claude Code then assigns the `env`

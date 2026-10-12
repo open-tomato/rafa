@@ -26,7 +26,7 @@
  *     measured.
  *
  * Only stdout is read: the loop captures a task session's stdout and
- * leaves its stderr to the operator (`utils/claude.ts`), and the
+ * leaves its stderr to the operator (`core/loop/claude.ts`), and the
  * measurement found the line on stdout.
  *
  * ## What becomes of the task

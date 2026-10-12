@@ -3,7 +3,7 @@
  * registry, through the REAL dispatcher (`cli/dispatch.ts`), which
  * records the running command in `cli/running.ts`, whose record a
  * planted command's `run` reads by calling the REAL `spawnClaude`
- * (`utils/claude.ts`) against a stand-in `claude` on PATH.
+ * (`core/loop/claude.ts`) against a stand-in `claude` on PATH.
  *
  * `claude.test.ts` drives the guard directly: it calls `setRunningCommand`
  * itself and then a door, so it proves the guard reads the record
@@ -87,8 +87,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { claudeArgs, spawnClaude } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
-import { claudeArgs, spawnClaude } from '../utils/claude.js';
 
 import { sinkOutput } from './output-sinks.js';
 

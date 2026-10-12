@@ -62,7 +62,7 @@
  * values and put the previous ones back in a `finally`, a stack: two
  * that overlapped and ended in the order they started left the first's
  * output and record for the rest of the process, and the spend guard
- * (`src/utils/claude.ts`) then refused every session a later test file
+ * (`src/core/loop/claude.ts`) then refused every session a later test file
  * started, naming a command that had ended. The logger and its settings
  * were the same stack: each of the two read the other's while both ran,
  * and the last to end left a logger and settings of a command that had

@@ -8,7 +8,7 @@
  *  - `alpha`: the package is alpha software. It says so once, with the
  *    place feedback goes, so an unfinished edge reads as expected.
  *  - `danger`: every session rafa spawns runs with
- *    `--dangerously-skip-permissions` (`src/utils/claude.ts`), which is
+ *    `--dangerously-skip-permissions` (`src/core/loop/claude.ts`), which is
  *    what lets a run go unattended and is also what lets a task edit,
  *    delete and run anything the user's account can. A run also pushes
  *    branches, opens pull requests and may file issues under that

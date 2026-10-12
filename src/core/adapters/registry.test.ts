@@ -126,7 +126,7 @@ import type { AdapterContext, AnyAdapter } from './registry.js';
 import type { DescribedInstinctRecord } from '../../adapters/learning/local.js';
 import type { SessionEffortRow } from '../../effort/store/types.js';
 import type { InstinctRecord, Sync, Tracker } from '../../ports/index.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
+import type { CapturingSpawner } from '../loop/claude.js';
 
 import {
   existsSync,

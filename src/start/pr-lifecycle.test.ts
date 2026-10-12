@@ -113,13 +113,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
 import { CommandExit } from '../core/command/index.js';
+import { runClaude } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { runClaude } from '../utils/claude.js';
 import { getCurrentBranch } from '../utils/git.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
 

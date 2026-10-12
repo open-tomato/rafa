@@ -3,7 +3,7 @@
  * into.
  *
  * A reader deep below a command's `run` — the spend guard in
- * `src/utils/claude.ts` — asks {@link runningCommand} which command it
+ * `src/core/loop/claude.ts` — asks {@link runningCommand} which command it
  * runs under, without a context threaded down to it. The record is held
  * in two places, and the reader answers the first that has one.
  *
@@ -33,7 +33,7 @@
  * {@link setRunningCommand} answered, so a caller that sets one restores
  * it in a `finally`. Outside every scope the reader answers this value,
  * or null. No module but a test sets it: a case stands in for a dispatch
- * with it, as `src/utils/claude.test.ts` does ahead of a door.
+ * with it, as `src/core/loop/claude.test.ts` does ahead of a door.
  *
  * ## A set made inside a scope
  *

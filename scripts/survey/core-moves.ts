@@ -213,7 +213,9 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * `readings.ts`, because it imports
  * `src/effort/store/task-finishes.ts`, from which
  * `src/effort/store/development-build.ts` is reached by value, and
- * that file imports `index.ts` back. `index.ts` holds `sessions.ts`.
+ * that file imports `index.ts` back. `index.ts` holds `sessions.ts`
+ * and `claude.ts`, which share it because neither reaches a file that
+ * imports it back.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],

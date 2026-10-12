@@ -7,7 +7,7 @@
  * It picks a session reading `running` or `paused` (`loop-sessions.ts`)
  * and sends SIGINT to the pid its record names. This command marks
  * nothing: the loop answers the signal (`src/start.ts`). It passes it on
- * to the Claude session it is running (`utils/claude.ts`), marks that
+ * to the Claude session it is running (`core/loop/claude.ts`), marks that
  * task `[BLOCKED]`, stores its report and ends, writing `stopped` to the
  * record. A run held by a pause ends within one read of its record
  * (`start/pause.ts`), with no task marked.
