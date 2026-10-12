@@ -84,6 +84,43 @@ describe('runListArgs', () => {
   ])('refuses an empty value: %p', (query, named) => {
     expect(() => runListArgs(query)).toThrow(`ci runs: refused a ${named}, expected a non-empty string`);
   });
+
+  it('names the commit after the branch, keeping --limit 1', () => {
+    expect(runListArgs({ branch: 'stretch/5', commit: SHA_BEHIND })).toEqual([
+      'run', 'list', '--branch', 'stretch/5', '--commit', SHA_BEHIND, '--limit', '1', '--json', RUN_LIST_FIELDS.join(','),
+    ]);
+  });
+
+  it('keeps the workflow after the commit when both are named', () => {
+    expect(runListArgs({ branch: 'stretch/5', commit: SHA_BEHIND, workflow: 'verify' })).toEqual([
+      'run', 'list', '--branch', 'stretch/5', '--commit', SHA_BEHIND, '--workflow', 'verify', '--limit', '1', '--json', RUN_LIST_FIELDS.join(','),
+    ]);
+  });
+
+  it('builds for a query with no commit what it built before the commit was added', () => {
+    expect(runListArgs({ branch: 'stretch/5' }).includes('--commit')).toBe(false);
+    expect(runListArgs({ branch: 'stretch/5', workflow: 'verify' }).includes('--commit')).toBe(false);
+  });
+
+  it.each([
+    ['an empty value', ''],
+    ['an abbreviated sha', '7ade9b9'],
+    ['39 characters', SHA_BEHIND.slice(1)],
+    ['41 characters', `${SHA_BEHIND}0`],
+    ['40 characters that are not hex', 'g'.repeat(40)],
+    ['the sha in upper case', SHA_BEHIND.toUpperCase()],
+    ['a sha with a space after it', `${SHA_BEHIND} `],
+    ['a placeholder', '<merge-commit>'],
+  ])('refuses a commit that is not a 40-character sha: %s', (_name, commit) => {
+    expect(() => runListArgs({ branch: 'stretch/5', commit })).toThrow(
+      `ci runs: refused a commit ${JSON.stringify(commit)}, expected a 40-character sha`,
+    );
+  });
+
+  it('refuses the branch before the commit, and takes the same query once the commit is whole (the control)', () => {
+    expect(() => runListArgs({ branch: '', commit: '7ade9b9' })).toThrow('ci runs: refused a branch ""');
+    expect(() => runListArgs({ branch: 'stretch/5', commit: SHA_BEHIND })).not.toThrow();
+  });
 });
 
 describe('readNewestRun over recorded output', () => {
@@ -196,6 +233,66 @@ describe('readNewestRun through the recorded fake', () => {
     const fake = createFakeRunsGh(RUNS);
     await readNewestRun(fake.gh, { branch: 'main' });
     expect(fake.calls()).toEqual([runListArgs({ branch: 'main' })]);
+  });
+});
+
+describe('readNewestRun by commit, where a newer run on the branch is listed first', () => {
+  /** `stretch/5` of `open-tomato/rafa` as the recording read it: two runs of `fb9abe9c` above one of `7ade9b90`. */
+  const RUNS: readonly FakeRun[] = [
+    run({ databaseId: 38253956537, headBranch: 'stretch/5', headSha: SHA_BEHIND, createdAt: '2026-10-12T13:11:28Z' }),
+    run({ databaseId: 38253997303, headBranch: 'stretch/101', headSha: SHA_BEHIND, createdAt: '2026-10-12T13:11:50Z' }),
+    run({ databaseId: 38267238905, headBranch: 'stretch/5', headSha: SHA_AHEAD, createdAt: '2026-10-12T15:01:56Z' }),
+    run({ databaseId: 38269528759, headBranch: 'stretch/5', headSha: SHA_AHEAD, createdAt: '2026-10-12T15:20:36Z' }),
+    run({ databaseId: 902, workflowName: 'lint', headBranch: 'stretch/5', headSha: SHA_BEHIND, createdAt: '2026-10-12T13:30:00Z', conclusion: 'failure' }),
+  ];
+
+  it('reads the named commit\'s run of a workflow, not the branch\'s newest', async () => {
+    const fake = createFakeRunsGh(RUNS);
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/5', commit: SHA_BEHIND, workflow: 'verify' })).toEqual({
+      id: 38253956537, workflow: 'verify', state: 'completed', conclusion: 'success', commit: SHA_BEHIND,
+    });
+    expect(fake.calls()).toEqual([[
+      'run', 'list', '--branch', 'stretch/5', '--commit', SHA_BEHIND, '--workflow', 'verify', '--limit', '1', '--json', RUN_LIST_FIELDS.join(','),
+    ]]);
+  });
+
+  it('reads the branch\'s newest run, of the other commit, for the same query with no commit (the control)', async () => {
+    const fake = createFakeRunsGh(RUNS);
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/5', workflow: 'verify' })).toMatchObject({
+      id: 38269528759,
+      commit: SHA_AHEAD,
+    });
+  });
+
+  it('reads the newest run of the commit, of any workflow, when none is named', async () => {
+    const fake = createFakeRunsGh(RUNS);
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/5', commit: SHA_BEHIND })).toMatchObject({
+      id: 902,
+      workflow: 'lint',
+      conclusion: 'failure',
+      commit: SHA_BEHIND,
+    });
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/5', commit: SHA_AHEAD })).toMatchObject({ id: 38269528759 });
+  });
+
+  it('answers null for a commit with no run on the branch, although the branch has runs', async () => {
+    const fake = createFakeRunsGh(RUNS);
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/5', commit: SHA_NO_RUN })).toBeNull();
+    expect(await readNewestRun(fake.gh, { branch: 'stretch/4', commit: SHA_BEHIND })).toBeNull();
+  });
+
+  it('reads the bytes gh wrote for the command it sends', async () => {
+    const { gh, calls } = answering(ok(RECORDED_BY_COMMIT));
+    expect(await readNewestRun(gh, { branch: 'stretch/5', commit: SHA_BEHIND })).toMatchObject({ id: 38253956537, commit: SHA_BEHIND });
+    expect(calls).toEqual([runListArgs({ branch: 'stretch/5', commit: SHA_BEHIND })]);
+  });
+
+  it('sends nothing for a commit that is not a 40-character sha', async () => {
+    const fake = createFakeRunsGh(RUNS);
+    await expect(readNewestRun(fake.gh, { branch: 'stretch/5', commit: '7ade9b9' })).rejects.toThrow(
+      'ci runs: refused a commit "7ade9b9", expected a 40-character sha',
+    );
+    expect(fake.calls()).toEqual([]);
   });
 });
 
