@@ -429,25 +429,65 @@ New; it replaces no earlier text. What a row or an action added to
   `hop` key holding anything but a hop record, and every later write keeps
   it.
 - **`loop start --as-worktree` creates a new git worktree for the loop to run
-  in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`):
-  the worktree is created under `.rafa/worktrees/` by default, or in the
-  directory `loop.worktreeDir` names when configured. Started again, the run
-  reuses the worktree at `<loop.worktreeDir>/<stub>` when it holds
-  `feat/<stub>`, with one line saying so, and refuses that path holding
-  another branch or `feat/<stub>` held at another path, naming both
-  (`start/worktree.ts`). The project root and
-  checkout stay separate: the root owns `.rafa/`, the config and the store,
-  while the checkout (the worktree) is where the loop creates the branch and
-  runs; you stay on `main` in the original checkout and can work there while
-  the loop runs beside you. The worktree carries its own checked-out branch
-  (the feature branch the loop creates), and `loop list` names it in the
-  `worktree` column, one per run. Worktrees on merged branches are left idle
-  for `rafa cleanup` to find and remove. The loop guard compares the checkout's
-  branch and HEAD against what the run was given when it started, and halts
-  with the work kept if either changes externally; the guard fires on every
-  loop, with or without `--as-worktree`, and never interferes with the loop's
-  own commits. Without `--as-worktree` the checkout is the project root itself,
-  and you run the loop where you already are.
+  in, alongside the main checkout** (`start/run-config.ts`, `start/session.ts`,
+  `start/run-checkout.ts`): the worktree is created under `.rafa/worktrees/` by
+  default, or in the directory `loop.worktreeDir` names when configured. Its
+  base is read by `resolveBaseBranch` in the project root: `pr.base` when set,
+  else the branch `origin/HEAD` names, else `main`, the same reading the
+  wrap-up makes for the pull request. A new branch is cut from the fetched
+  `origin/<base>`, never from the local base, and the branch checked out where
+  the run was started is not the base. Started again, the run reuses the
+  worktree at `<loop.worktreeDir>/<stub>` when it holds `feat/<stub>`, with one
+  line saying so, and refuses that path holding another branch or
+  `feat/<stub>` held at another path, naming both (`start/worktree.ts`). The
+  project root and checkout stay separate: the root owns `.rafa/`, the config
+  and the store, while the checkout (the worktree) is where the loop creates
+  the branch and runs; you stay on `main` in the original checkout and can work
+  there while the loop runs beside you. The worktree carries its own
+  checked-out branch (the feature branch the loop creates), and `loop list`
+  names it in the `worktree` column, one per run. Worktrees on merged branches
+  are left idle for `rafa cleanup` to find and remove. The loop guard compares
+  the checkout's branch and HEAD against what the run was given when it
+  started, and halts with the work kept if either changes externally; the guard
+  fires on every loop, with or without `--as-worktree`, and never interferes
+  with the loop's own commits. Without `--as-worktree` the checkout is the
+  project root itself, and you run the loop where you already are.
+- **`start/worktree.ts` adds the worktree on the branch's route**: `create`
+  fetches `origin/<base>` (a failed fetch refuses the run, so a stale base is
+  never cut from) and adds `feat/<stub>` on a new branch with `--no-track`;
+  `switch-local` adds the local `feat/<stub>` as it is; `switch-remote` adds a
+  new local branch cut from `origin/feat/<stub>` with `--no-track`, and sets its
+  upstream in a step after the add (`start/worktree-upstream.ts`). The route is
+  the one `--create-branch` reaches through `readBranchOffer`. This module takes
+  the base the run hands in and never reads one itself. A branch that already
+  exists is caught up with `origin/<base>` before the first task when it holds
+  only claim commits; one behind with other work on it is reported and left as
+  it stands.
+- **`start/run-checkout.ts` settles the checkout and reads the base**: without
+  `--as-worktree` the checkout is the working tree the run was started in, and
+  its branch is the one it stands on, read by `readCheckedOutBranch`, which is
+  null on a detached HEAD and never reads `HEAD` as a branch. A worktree made
+  with `git worktree add --detach` is such a checkout: there the offer of
+  `feat/<stub>` is cut from the base as fetched, and without `--create-branch`
+  (or a yes to the question a terminal asks) the run is refused, naming the
+  flag. Under `--as-worktree` the base is `resolveBaseBranch` over git in the
+  project root, and no branch of the started checkout sets it. That checkout's
+  branch is read for one line only: when it is not the base, the run prints
+  "The worktree's base is `<base>`, read from `pr.base`, or from `origin/HEAD`
+  (the default when it names none), not `<branch>`, which the run was started
+  on", with "a detached HEAD" in place of the branch. A detached HEAD is not
+  refused on this route.
+- **`start/worktree-upstream.ts` sets the upstream as a step of its own**:
+  `git branch --set-upstream-to=origin/<branch> <branch>`, run in the project
+  root after a `switch-remote` add. The add writes nothing to the `.git/config`
+  every worktree shares, and this line does, so two runs started at once in one
+  clone (issue #960) no longer lose one. The line is tried up to
+  `UPSTREAM_TRIES` (5) times, with `UPSTREAM_PAUSE_MS` (200 ms) between tries,
+  and only while git reports the config file locked. A run that gives up
+  removes the worktree it added with `git worktree remove --force`, keeps the
+  local branch, and names the branch and that line; any other failure ends
+  after one try and leaves the worktree in place. No rafa lock file stands in
+  front of the step, since git already locks the file.
 - **`loop.wrapUp.retries` and the wrap-up pull request retry loop**
   (`start/wrap-up.ts`, `start/pr-lifecycle.ts`): After the wrap-up session
   ends, the runner reads the branch's open pull request. With none, it runs
