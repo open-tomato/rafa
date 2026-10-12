@@ -29,7 +29,7 @@
  * them. `select.ts` reading `CORE_ADAPTER_REGISTRY` at its top level
  * failed all five test files under those paths at load, no case passing.
  */
-import type { AdapterContext, AnyAdapter } from '../../adapters/registry.js';
+import type { AdapterContext, Adapter } from '../../adapters/registry.js';
 import type { RafaConfig } from '../../core/config/index.js';
 import type { Sync } from '../../ports/index.js';
 
@@ -76,7 +76,7 @@ const FIXTURE_GIT: Sync = {
 };
 
 /** A `sync` adapter of `kind` answering {@link FIXTURE_GIT}. */
-function fixtureAdapter(kind: string): AnyAdapter {
+function fixtureAdapter(kind: string): Adapter<'sync'> {
   return { port: 'sync', kind, portVersion: PORT_VERSIONS.sync, create: () => FIXTURE_GIT };
 }
 
