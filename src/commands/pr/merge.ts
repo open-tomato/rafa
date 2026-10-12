@@ -206,7 +206,7 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { RoadmapTickResult } from '../../board/roadmap-tick.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
 import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
-import type { PidProbe } from '../../loop/sessions.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, MergeMethod, PullRequestDetail } from '../../pr/index.js';
 

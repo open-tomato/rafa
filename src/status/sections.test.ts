@@ -28,7 +28,7 @@ import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
 import type { GitResult, GitRunner } from '../core/git/index.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { NextBoard, NextRoadmapReading } from '../next/readings.js';
 import type { PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/types.js';
 import type { Position } from '../project/position.js';
@@ -45,7 +45,7 @@ import { readBlockedBy } from '../board/blocked.js';
 import { defaultCleanupSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
 import { readDoctorCleanup } from '../commands/doctor-cleanup.js';
-import { runsDir } from '../loop/sessions.js';
+import { runsDir } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { positionFilePath, writePositionFile } from '../project/position.js';
 import {

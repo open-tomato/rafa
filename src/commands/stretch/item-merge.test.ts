@@ -29,7 +29,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
-import { beginSession } from '../../loop/sessions.js';
+import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

@@ -91,7 +91,7 @@ import { join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../core/git/index.js';
-import { errorCode } from '../loop/sessions.js';
+import { errorCode } from '../core/loop/index.js';
 
 import { insertChangelogEntry } from './changelog.js';
 import { readFragmentTree } from './fragment-tree.js';

@@ -31,10 +31,10 @@
  * In json mode the `MergeResult` is the data of the terminal result.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { MergeOptions, MergeResult, TableMerge } from '../../effort/store/merge-store.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { ProjectIdentity } from '../../effort/store/store-identity.js';
-import type { PidProbe } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { join, resolve } from 'node:path';

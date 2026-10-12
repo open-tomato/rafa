@@ -10,7 +10,7 @@
  */
 import type { SuiteStepContext, SuiteStepSeams } from './suite-step.js';
 import type { GhResult } from '../adapters/tracker/github.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';

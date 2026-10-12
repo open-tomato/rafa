@@ -63,8 +63,8 @@
  *     `refuseUnownedDevelopmentWrite`'s, the one every open asks.
  *   - While a loop record under the store's project root reads `running`
  *     or `paused` with its pid alive (`readSessions`,
- *     `src/loop/sessions.ts`): renaming the store under a loop loses what
- *     it writes. The spec's text names the first breaking migration:
+ *     `src/core/loop/sessions.ts`): renaming the store under a loop loses
+ *     what it writes. The spec's text names the first breaking migration:
  *     `REFUSED — migration <id> breaks older runtimes, and loop <sessionId>
  *     (pid <pid>, plan <stub>) is running on this store. Nothing was
  *     migrated. Finish or stop that loop, then run it again.` With only
@@ -81,14 +81,14 @@ import type { DevelopmentProbe } from './development-build.js';
 import type { SqliteMigration } from './migrations.js';
 import type { TableRows } from './rebuild-aside.js';
 import type { LoggedMigration } from './schema-plan.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 
 import { existsSync } from 'node:fs';
 
 import { Database } from 'bun:sqlite';
 
 import { messageOf } from '../../core/config/sections.js';
-import { isPidAlive, readSessions } from '../../loop/sessions.js';
+import { isPidAlive, readSessions } from '../../core/loop/index.js';
 import { readRuntimeIdentity } from '../../runtime/identity.js';
 
 import { bringForward, writeNames } from './bring-forward.js';

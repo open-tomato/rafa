@@ -19,7 +19,7 @@ import type {
   TaskStepInput,
 } from './suite-step.js';
 import type { SuiteStepCalls } from './suite-steps-run.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';

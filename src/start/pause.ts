@@ -39,11 +39,11 @@
  *
  * Every line goes through the active output (`core/output/active.ts`).
  */
-import type { SessionState } from '../loop/sessions.js';
+import type { SessionState } from '../core/loop/index.js';
 
 import { messageOf } from '../core/config/sections.js';
+import { readSession, updateSession } from '../core/loop/index.js';
 import { activeOutput } from '../core/output/index.js';
-import { readSession, updateSession } from '../loop/sessions.js';
 
 /** How long a held loop waits between two reads of its record. */
 export const PAUSE_POLL_MS = 1_000;

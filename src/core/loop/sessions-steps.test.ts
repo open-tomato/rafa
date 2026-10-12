@@ -1,7 +1,7 @@
 /**
  * Tests for the additive `steps` field of a session record
- * (`loop/sessions.ts`): left out of a new record and of one written before
- * the field, read as none by `sessionSteps`, appended through
+ * (`core/loop/sessions.ts`): left out of a new record and of one written
+ * before the field, read as none by `sessionSteps`, appended through
  * `updateSession`'s `appendStep`, kept by every later write, and refused
  * on read or append when a step is outside its shape.
  *
@@ -243,7 +243,7 @@ describe('updateSession and appendStep', () => {
 describe('parseSessionRecord and the steps field', () => {
   it.each([
     ['a named scope', { scope: 'module' }],
-    ['a list of paths', { scope: ['src/suite', 'src/loop/sessions.test.ts'] }],
+    ['a list of paths', { scope: ['src/suite', 'src/core/loop/sessions.test.ts'] }],
     ['an empty list of paths', { scope: [] }],
     ['a negative exit code', { exitCode: -1 }],
     ['a new failure the failures hold', { failures: [KNOWN, FRESH], newFailures: [FRESH] }],

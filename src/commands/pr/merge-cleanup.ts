@@ -81,7 +81,7 @@
  * the home and the pid probe the other follow-up reads.
  */
 import type { FollowUp } from './merge-followups.js';
-import type { PidProbe } from '../../loop/sessions.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { GitRunner, MergeStepId, PullRequestDetail } from '../../pr/index.js';
 import type { SettleWaitingPlace } from '../../pr/settle-waiting.js';
 

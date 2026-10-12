@@ -22,6 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { isPidAlive } from '../../core/loop/index.js';
 import {
   estimateEta,
   formatDuration,
@@ -33,7 +34,6 @@ import {
   STOP_POLL_MS,
   STOP_WAIT_MS,
 } from '../../loop/session-readings.js';
-import { isPidAlive } from '../../loop/sessions.js';
 import {
   DEMO_PLAN,
   DEMO_PLAN_PATH,

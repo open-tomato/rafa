@@ -52,7 +52,7 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { parseSessionRecord, runsDir } from '../loop/sessions.js';
+import { parseSessionRecord, runsDir } from '../core/loop/index.js';
 import { hopFilePath, readHopRecord } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';

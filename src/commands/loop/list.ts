@@ -4,7 +4,7 @@
  * ## What is listed
  *
  * Every record under `.rafa/runs/` reading `running` or `paused`, oldest
- * first (`loop/sessions.ts`), with the tasks of its plan counted as
+ * first (`core/loop/sessions.ts`), with the tasks of its plan counted as
  * `rafa loop status` counts them (`loop/session-readings.ts`), the phase
  * its run is in beside the tasks done over total, `task` for a record
  * from a rafa older than the field. A record whose pid
@@ -22,7 +22,7 @@
  * row per session, or `No running sessions.` alone.
  *
  * A row's last column is where the session runs: `in worktree <path>`
- * for a record carrying a `worktree` (`loop/sessions.ts`), the path
+ * for a record carrying a `worktree` (`core/loop/sessions.ts`), the path
  * relative to the project root when the worktree sits under it, as the
  * default `loop.worktreeDir` of `.rafa/worktrees` does, and absolute
  * otherwise; `in the main checkout` for a record carrying none. In json
@@ -34,12 +34,13 @@
  * command declares no flag.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
 import type { TaskCounts } from '../../core/plan/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
-import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
 
 import { isAbsolute, relative } from 'node:path';
 
+import { sessionPhase } from '../../core/loop/index.js';
 import { countTasks } from '../../core/plan/index.js';
 import {
   isLive,
@@ -48,7 +49,6 @@ import {
   resolveLoopSeams,
   sessionLine,
 } from '../../loop/session-readings.js';
-import { sessionPhase } from '../../loop/sessions.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

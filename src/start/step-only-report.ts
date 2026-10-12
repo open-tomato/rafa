@@ -17,7 +17,7 @@
  *
  * ## The list
  *
- * {@link runStepOnlyOf} reads the recorded steps (`loop/sessions.ts`)
+ * {@link runStepOnlyOf} reads the recorded steps (`core/loop/sessions.ts`)
  * in order and answers one {@link RunStepOnly} per file, in the order
  * first met. A file several steps read so is listed once: it keeps the
  * tests, the first error line, the place and the files before it of the
@@ -57,10 +57,10 @@
  * every retry session ended without one, carries the release fragment's
  * notes and not this list; the run's end still prints it.
  */
-import type { SessionStep, SessionStepKind, SessionStepOnly } from '../loop/sessions.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly } from '../core/loop/index.js';
 
+import { readSession, sessionSteps } from '../core/loop/index.js';
 import { activeOutput } from '../core/output/index.js';
-import { readSession, sessionSteps } from '../loop/sessions.js';
 
 /** The heading the list goes under, in the prompt and in the pull request body. */
 export const STEP_ONLY_HEADING = 'Test files red only in a suite step';

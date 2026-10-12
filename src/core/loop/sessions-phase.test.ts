@@ -1,5 +1,5 @@
 /**
- * Tests for the `phase` field of a session record (`loop/sessions.ts`):
+ * Tests for the `phase` field of a session record (`core/loop/sessions.ts`):
  * a new record opens without one and reads as `task`, `updateSession`
  * writes a change's phase as its own `"phase": "<value>"` key after `task`,
  * keeps it through changes that name none, and a record a rafa older than

@@ -28,9 +28,9 @@
  * the terminal result.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { MigrateResult } from '../../effort/store/migrate.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
-import type { PidProbe } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { join } from 'node:path';

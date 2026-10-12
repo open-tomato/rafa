@@ -30,7 +30,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../loop/sessions.js';
+import { beginSession } from '../../core/loop/index.js';
 
 import { bringForward } from './bring-forward.js';
 import { DevelopmentBuildRefusedError } from './development-build.js';

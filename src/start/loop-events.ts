@@ -20,7 +20,7 @@
  * text included. The append is best-effort: a failed write warns once on
  * stderr, naming the path and the error, and never throws into the loop.
  * {@link unbindEventsFile} ends it. The session's record, `<id>.json`
- * (`loop/sessions.ts`), stays the only `.json` file a run writes.
+ * (`core/loop/sessions.ts`), stays the only `.json` file a run writes.
  *
  * An `error` event says the run ended on an uncaught error; its line is
  * the first non-blank line of the error's message.
@@ -38,10 +38,10 @@ import { join } from 'node:path';
 
 import { oneLine, padKind } from '../adapters/output/events.js';
 import { messageOf } from '../core/config/sections.js';
+import { isSessionId, runsDir } from '../core/loop/index.js';
 import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { readSessionLog } from '../effort/session-log.js';
-import { isSessionId, runsDir } from '../loop/sessions.js';
 import { parsePlan } from '../plan/index.js';
 
 /** Where a task sits among its tracker's tasks, counted from 1. */

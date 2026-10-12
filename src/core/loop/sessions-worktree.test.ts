@@ -1,6 +1,6 @@
 /**
  * Tests for the optional `worktree` field of a session record
- * (`loop/sessions.ts`): written by `beginSession` only when the draft
+ * (`core/loop/sessions.ts`): written by `beginSession` only when the draft
  * carries one, last and after `hop`, kept by `updateSession`, read back by
  * `parseSessionRecord`, and refused on read when its value is no absolute
  * path.

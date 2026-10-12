@@ -25,13 +25,13 @@
  * `rafa effort report`, is not a pure projection of the store.
  */
 import type { LoopRow } from './report-trend.js';
+import type { PidProbe, SessionRecord, SessionTask } from '../core/loop/index.js';
 import type { TaskCounts } from '../core/plan/index.js';
 import type { SessionEta } from '../loop/session-readings.js';
-import type { PidProbe, SessionRecord, SessionTask } from '../loop/sessions.js';
 
+import { readSessions } from '../core/loop/index.js';
 import { countTasks } from '../core/plan/index.js';
 import { estimateEta, isLive, readSessionChecklist, readSessionFinishes } from '../loop/session-readings.js';
-import { readSessions } from '../loop/sessions.js';
 
 /** Milliseconds in one second. */
 const MS_PER_SECOND = 1_000;

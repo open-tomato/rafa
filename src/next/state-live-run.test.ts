@@ -44,7 +44,7 @@
  *    the whole line.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { SessionRecord, SessionState } from '../loop/sessions.js';
+import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { GitResult } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

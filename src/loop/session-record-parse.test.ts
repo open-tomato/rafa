@@ -15,9 +15,11 @@
  * `sessions-steps.test.ts` and `sessions-phase.test.ts`, beside the
  * writes of each field.
  */
-import type { SessionRecord, SessionStep } from './sessions.js';
+import type { SessionRecord, SessionStep } from '../core/loop/index.js';
 
 import { describe, expect, it } from 'bun:test';
+
+import * as sessions from '../core/loop/index.js';
 
 import {
   isSessionId,
@@ -30,7 +32,6 @@ import {
   sessionPhase,
   sessionSteps,
 } from './session-record-parse.js';
-import * as sessions from './sessions.js';
 
 /** The id of the record every case reads. */
 const ID = 'session-0001';

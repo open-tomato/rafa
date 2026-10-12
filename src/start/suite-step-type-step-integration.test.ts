@@ -30,7 +30,7 @@
  *      the step still runs, and reads a new error as red.
  */
 import type { SuiteStepContext } from './suite-step.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

@@ -14,8 +14,9 @@
  * it names none.
  *
  * The write moves only a record storing `running`, so a run that writes its
- * end between the read and the write keeps that end (`loop/sessions.ts`).
- * A session already paused is left as it is, and the command exits 0.
+ * end between the read and the write keeps that end
+ * (`core/loop/sessions.ts`). A session already paused is left as it is, and
+ * the command exits 0.
  *
  * ## What it writes
  *
@@ -29,8 +30,8 @@
  * reads `stopped` or `done`.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
-import type { SessionRecord } from '../../loop/sessions.js';
 
 import {
   isLive,

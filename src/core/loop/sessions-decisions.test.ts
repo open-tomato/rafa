@@ -1,6 +1,6 @@
 /**
  * Tests for the optional `decisions` field of a session record
- * (`loop/sessions.ts`): the pass-over list a `--continue` run saves,
+ * (`core/loop/sessions.ts`): the pass-over list a `--continue` run saves,
  * written by `updateSession` when a change hands one, last and after
  * `steps`, kept by every other change, dropped when the list handed is
  * empty, read back by `parseSessionRecord`, and refused on read when an

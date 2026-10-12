@@ -20,7 +20,7 @@
  */
 import type { AloneSaid } from './suite-blocker.js';
 import type { SuiteStepContext } from './suite-step.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';

@@ -32,7 +32,7 @@ import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
-import { beginSession } from '../../loop/sessions.js';
+import { beginSession } from '../../core/loop/index.js';
 import { copyDevice, freshDevice } from '../../tests/merged-stores.js';
 import { EffortCopyRefusal } from '../store/copy.js';
 import { writeDispatch } from '../store/dispatches.js';

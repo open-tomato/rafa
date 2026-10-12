@@ -10,8 +10,9 @@
  * next task. A run whose pause has not taken effect, its task still
  * running, carries on past that task as if it had never been paused.
  *
- * The write moves only a record storing `paused` (`loop/sessions.ts`). A
- * session already running is left as it is, and the command exits 0.
+ * The write moves only a record storing `paused`
+ * (`core/loop/sessions.ts`). A session already running is left as it is,
+ * and the command exits 0.
  *
  * A session reading `stopped` or `done` has no run left to resume: its
  * process has ended, and until phase 6 no command starts one in the
@@ -30,8 +31,8 @@
  * reads `stopped` or `done`.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
-import type { SessionRecord } from '../../loop/sessions.js';
 
 import {
   isLive,

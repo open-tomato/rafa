@@ -206,10 +206,10 @@ import type {
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from './session-record-parse.js';
-import type { HopRecord } from '../next/hop-record.js';
-import type { SuiteFailure } from '../suite/run.js';
-import type { TestScope } from '../utils/declaration.js';
+} from '../../loop/session-record-parse.js';
+import type { HopRecord } from '../../next/hop-record.js';
+import type { SuiteFailure } from '../../suite/run.js';
+import type { TestScope } from '../../utils/declaration.js';
 
 import {
   linkSync,
@@ -222,9 +222,6 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../core/config/sections.js';
-import { scopeAt } from '../project/scope.js';
-
 import {
   freezeRecord,
   isPositiveWhole,
@@ -236,14 +233,16 @@ import {
   sessionDecisions,
   sessionSteps,
   stepProblems,
-} from './session-record-parse.js';
+} from '../../loop/session-record-parse.js';
+import { scopeAt } from '../../project/scope.js';
+import { messageOf } from '../config/config-sections.js';
 
 export type {
   SessionPhase,
   SessionState,
   SessionStepKind,
   SessionStepReason,
-} from './session-record-parse.js';
+} from '../../loop/session-record-parse.js';
 export {
   isSessionId,
   parseSessionRecord,
@@ -256,7 +255,7 @@ export {
   sessionDecisions,
   sessionPhase,
   sessionSteps,
-} from './session-record-parse.js';
+} from '../../loop/session-record-parse.js';
 
 /** The directory the records are kept in, under a project's `.rafa/`. */
 export const RUNS_DIR = 'runs';

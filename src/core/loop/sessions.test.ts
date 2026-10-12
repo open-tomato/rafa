@@ -1,5 +1,5 @@
 /**
- * Tests for the session records of `loop start` (`loop/sessions.ts`).
+ * Tests for the session records of `loop start` (`core/loop/sessions.ts`).
  *
  * Every record is read from and written under this file's own temporary
  * directory, one fresh project root per case that writes, and every

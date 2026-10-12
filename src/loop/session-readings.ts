@@ -52,7 +52,7 @@
  * `stop` sends, the wait and how long `stop` waits. Each left out is the
  * system's own ({@link resolveLoopSeams}).
  */
-import type { PidProbe, SessionRecord } from './sessions.js';
+import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 import type { TaskCounts } from '../core/plan/index.js';
 import type { PlanTask } from '../plan/index.js';
 
@@ -62,12 +62,11 @@ import { join, relative } from 'node:path';
 
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { isPidAlive, readSessions, runsDir, SessionRecordError } from '../core/loop/index.js';
 import { isFile } from '../core/plan/index.js';
 import { readTaskFinishes } from '../effort/store/task-finishes.js';
 import { parsePlan } from '../plan/index.js';
 import { trackerPathFor } from '../utils/tracker.js';
-
-import { isPidAlive, readSessions, runsDir, SessionRecordError } from './sessions.js';
 
 /** How long `rafa loop stop` waits for the run it signalled to end. */
 export const STOP_WAIT_MS = 30_000;

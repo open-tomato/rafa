@@ -26,7 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { defaultWorktreeSeams } from '../cleanup/index.js';
 import { createScratchRepository, SCRATCH_NOW } from '../cleanup/scratch-repository.js';
-import { runsDir } from '../loop/sessions.js';
+import { runsDir } from '../core/loop/index.js';
 import { plantDemoProject, plantSession, sessionRecord } from '../tests/loop-session-fixtures.js';
 
 import {

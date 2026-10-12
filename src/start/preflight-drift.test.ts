@@ -18,8 +18,8 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
 import { typeOfLabels } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
+import { runsDir } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
-import { runsDir } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { countRunRecords, createStartPreflightDrift, isDriftRun, reportStartDrift } from './preflight-drift.js';

@@ -255,7 +255,7 @@ import type { BoardListing } from '../board/roadmap-board.js';
 import type { RafaContext } from '../core/command/index.js';
 import type { RafaConfig } from '../core/config/index.js';
 import type { ConfigRoots } from '../core/config/load.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { GitRunner, PullRequests } from '../pr/index.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';

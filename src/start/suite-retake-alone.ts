@@ -97,8 +97,8 @@
  * of the step's new failures ({@link withoutStepOnly}), so a step whose
  * every new failure was red only in the step is green: no blocker, no
  * repair task, no halt. The recorded step keeps them in `failures` and lists
- * each such file under `stepOnly` (`loop/sessions.ts`) with the names of
- * its tests, the error lines of the first, its place in the order its
+ * each such file under `stepOnly` (`core/loop/sessions.ts`) with the names
+ * of its tests, the error lines of the first, its place in the order its
  * process ran the files, and the {@link STEP_ONLY_BEFORE} files run just
  * before it, which is where the state it met came from. One warning per
  * file says the same ({@link announceStepOnly}), with the step's output
@@ -131,15 +131,15 @@
  */
 import type { StepVerdict } from './suite-blocker.js';
 import type { Settling, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
-import type { SessionStepKind, SessionStepOnly } from '../loop/sessions.js';
+import type { SessionStepKind, SessionStepOnly } from '../core/loop/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 
 import { join, relative } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
+import { runsDir } from '../core/loop/index.js';
 import { activeOutput } from '../core/output/index.js';
-import { runsDir } from '../loop/sessions.js';
 import { splitFailures } from '../suite/baseline.js';
 import { failingFilesOf } from '../suite/failure-lines.js';
 import { outputFileFor } from '../suite/run.js';

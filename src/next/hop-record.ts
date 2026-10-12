@@ -130,7 +130,7 @@ function issuesMatchKind(kind: HopKind, blocked: number | null, target: number |
 /**
  * `value` as a hop record, or null when it is not one: the check
  * {@link readHopRecord} makes on the parsed file, which the session record
- * makes on its `hop` field (`src/loop/sessions.ts`).
+ * makes on its `hop` field (`src/core/loop/sessions.ts`).
  */
 export function asHopRecord(value: unknown): HopRecord | null {
   if (!isRecord(value)) return null;

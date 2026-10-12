@@ -11,9 +11,9 @@
  * re-exports none of them.
  *
  * From the CLI surface spec, "Sessions": every `loop start` writes its
- * record to `.rafa/runs/<session-id>.json` (`loop/sessions.ts`), and these
- * commands reach a run through that record alone. Single-thread is the
- * only mode until phase 6, so a plan runs in one session at a time.
+ * record to `.rafa/runs/<session-id>.json` (`core/loop/sessions.ts`), and
+ * these commands reach a run through that record alone. Single-thread is
+ * the only mode until phase 6, so a plan runs in one session at a time.
  *
  * ## The session a line picks
  *
@@ -43,17 +43,24 @@
  * them with its own code for no session without reading their words.
  */
 import type { RafaContext, RafaFlagSpec } from '../../core/command/index.js';
+import type { SessionChange, SessionPhase, SessionRecord } from '../../core/loop/index.js';
 import type { TaskCounts } from '../../core/plan/index.js';
 import type {
   ResolvedLoopSeams,
   SessionChecklist,
   SessionEta,
 } from '../../loop/session-readings.js';
-import type { SessionChange, SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
 
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import {
+  isSessionId,
+  SessionRecordError,
+  sessionPhase,
+  SessionStateError,
+  updateSession,
+} from '../../core/loop/index.js';
 import { plural } from '../../core/plan/index.js';
 import {
   formatDuration,
@@ -63,13 +70,6 @@ import {
   runsLabel,
   sessionLine,
 } from '../../loop/session-readings.js';
-import {
-  isSessionId,
-  SessionRecordError,
-  sessionPhase,
-  SessionStateError,
-  updateSession,
-} from '../../loop/sessions.js';
 
 /** The flag naming a session, by the name the context's flags carry it under. */
 export const SESSION_ID_FLAG = 'session-id';

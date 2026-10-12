@@ -1,6 +1,6 @@
 /**
  * Tests for the optional `hop` field of a session record
- * (`loop/sessions.ts`): written by `beginSession` only when the draft
+ * (`core/loop/sessions.ts`): written by `beginSession` only when the draft
  * carries one, kept by `updateSession`, read back by `parseSessionRecord`,
  * and refused on read when its value is not a hop record.
  *
@@ -10,7 +10,7 @@
  * field is read, the same record with a value that is not one is refused.
  */
 import type { SessionDraft, SessionRecord } from './sessions.js';
-import type { HopRecord } from '../next/hop-record.js';
+import type { HopRecord } from '../../next/hop-record.js';
 
 import {
   mkdirSync,

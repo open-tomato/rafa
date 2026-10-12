@@ -18,10 +18,10 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { sessionFilePath } from '../core/loop/index.js';
 import { emitLoopEvent, bindEventsFile, unbindEventsFile } from '../start/loop-events.js';
 
 import { eventsFileOf, parseEventLine, readEventsFrom } from './events-file.js';
-import { sessionFilePath } from './sessions.js';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rafa-loop-events-file-'));
 let caseCount = 0;

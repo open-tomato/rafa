@@ -11,7 +11,7 @@
  * undefined as a key left out.
  */
 import type { RunSessionOptions } from './session.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { Place } from '../project/position.js';
 
@@ -21,8 +21,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readSession } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
-import { readSession } from '../loop/sessions.js';
 import { hopFilePath, writeHopRecord } from '../next/hop-record.js';
 import { hop, positionAt, rehome, writePositionFile } from '../project/position.js';
 import { sinkOutput } from '../tests/output-sinks.js';

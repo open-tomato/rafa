@@ -91,7 +91,7 @@
  * checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
  * stub and path, the branch, this process's pid, the start time, the state
- * `running` and no task (`loop/sessions.ts`), and under `--roadmap` the
+ * `running` and no task (`core/loop/sessions.ts`), and under `--roadmap` the
  * `rafa next --roadmap` hop that is away, when one is. A record of the plan refuses
  * the run when it names another branch, whatever its state, or names this
  * branch and still reads `running` or `paused`; a record whose pid is gone

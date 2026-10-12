@@ -41,11 +41,12 @@
  * read after the signal is refused too, the signal having been sent.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../loop/session-readings.js';
-import type { SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
 
 import { messageOf } from '../../core/config/sections.js';
+import { errorCode, readSession, SessionRecordError } from '../../core/loop/index.js';
 import {
   isLive,
   planLabel,
@@ -53,7 +54,6 @@ import {
   refusal,
   resolveLoopSeams,
 } from '../../loop/session-readings.js';
-import { errorCode, readSession, SessionRecordError } from '../../loop/sessions.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

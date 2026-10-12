@@ -19,7 +19,7 @@
  * repositories under a stand-in `claude`.
  */
 import type { RunSessionOptions } from './session.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import {
   mkdirSync,
@@ -35,8 +35,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CommandExit } from '../core/command/index.js';
+import { readSessions, runsDir, sessionFilePath } from '../core/loop/index.js';
 import { setActiveOutput } from '../core/output/index.js';
-import { readSessions, runsDir, sessionFilePath } from '../loop/sessions.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 

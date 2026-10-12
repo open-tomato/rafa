@@ -15,7 +15,7 @@
  * default probe, whose record names this test process's own pid.
  */
 import type { SelfUpdateResult, SelfUpdateSeams } from './self-update.js';
-import type { SessionRecord, SessionState } from '../loop/sessions.js';
+import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

@@ -77,7 +77,7 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

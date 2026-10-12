@@ -15,7 +15,7 @@
  */
 
 import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
-import type { SessionStep, SessionStepReason } from '../loop/sessions.js';
+import type { SessionStep, SessionStepReason } from '../core/loop/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 
 import { readFileSync } from 'node:fs';

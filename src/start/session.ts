@@ -1,7 +1,7 @@
 /**
  * The session record of one `loop start` run: the refusal of a second run
  * of its plan, the record written, and each change the run makes to it,
- * over `loop/sessions.ts`.
+ * over `core/loop/sessions.ts`.
  *
  * `start()` opens the session through {@link openRunSession} right after
  * the branch guard lets the run through, before anything else is printed
@@ -44,13 +44,13 @@
  * record names one) saved, so the next `--continue` run starts from it.
  *
  * The open writes no phase, so a record no change has reached yet reads
- * as `task` (`sessionPhase`, `loop/sessions.ts`). A run started with
+ * as `task` (`sessionPhase`, `core/loop/sessions.ts`). A run started with
  * `--no-ci-wait` runs no gate, and its record ends in `wrap-up`. The end
  * leaves the phase as the last change wrote it.
  *
  * Each change after the open reads the stored record again and changes
  * only its own fields, so a `paused` another process wrote is kept by the
- * loop writing its next task (`loop/sessions.ts`).
+ * loop writing its next task (`core/loop/sessions.ts`).
  *
  * ## Under `--roadmap`: the away hop
  *
@@ -68,7 +68,7 @@
  * worked for and decides nothing the run does.
  *
  * Without the option neither file is read, and the record carries no
- * `hop` key at all (`loop/sessions.ts`).
+ * `hop` key at all (`core/loop/sessions.ts`).
  *
  * ## In a worktree: its path
  *
@@ -78,7 +78,7 @@
  * loop started in a linked worktree with no `.rafa/` of its own, the
  * record carries it as `worktree`, and `rafa loop list` prints it. A run
  * whose checkout is the project root, or that hands none, carries no
- * `worktree` key at all (`loop/sessions.ts`).
+ * `worktree` key at all (`core/loop/sessions.ts`).
  *
  * ## The refusals
  *
@@ -118,7 +118,7 @@ import type {
   SessionDraft,
   SessionReadSeams,
   SessionRecord,
-} from '../loop/sessions.js';
+} from '../core/loop/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -127,8 +127,6 @@ import { relative } from 'node:path';
 
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
-import { activeOutput } from '../core/output/index.js';
-import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import {
   beginSession,
   errorCode,
@@ -140,7 +138,9 @@ import {
   sessionFilePath,
   SessionRecordError,
   updateSession,
-} from '../loop/sessions.js';
+} from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
+import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
 import { readHopRecord, staleAgainst } from '../next/hop-record.js';
 import { readPositionFile } from '../project/position.js';
 import { stripTaskDeclaration } from '../utils/declaration.js';
