@@ -26,7 +26,7 @@ It sits beside `Output`, and the two never share a job.
 - `enabled(level, module)` says whether an entry would be written.
 
 `logger` is the seventh port type of the adapter registry
-(`src/adapters/registry.ts`), at version 1, and core registers
+(`src/core/adapters/registry.ts`), at version 1, and core registers
 `logger/console`.
 
 ### Which entries are written
