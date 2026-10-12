@@ -1,0 +1,94 @@
+import type { CapturedRun } from './cli-capture.js';
+
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, test } from 'bun:test';
+
+import { expectExit } from './cli-capture.js';
+
+/**
+ * A barrel that closes a runtime cycle fails with a `ReferenceError` in one
+ * import order only, so a green `tsc` proves nothing. Each case here loads
+ * one file first in a fresh `bun` process, then reads a setting.
+ */
+
+const SRC = fileURLToPath(new URL('..', import.meta.url));
+const CONFIG_BARREL_DIR = join(SRC, 'core', 'config');
+
+const CONFIG_BARRELS: string[] = ['index.ts', 'sections.ts', 'load.ts'];
+
+/** Section files hold their `*_SETTINGS` records; a test file is no section. */
+const SECTION_FILES = readdirSync(SRC)
+  .filter((name) => /^config-schema-.+\.ts$/.test(name) && !name.endsWith('.test.ts'))
+  .sort();
+
+/** The child's program: load `first`, then read from the config barrel. */
+const CHILD = `
+const [first, barrel] = process.argv.slice(1);
+const loaded = await import(first);
+const config = await import(barrel);
+const records = Object.entries(loaded)
+  .filter(([name]) => name.endsWith('_SETTINGS'))
+  .map(([, record]) => record);
+const read = [];
+for (const record of records) {
+  const key = Object.keys(record)[0];
+  if (key === undefined) throw new Error('an empty settings record in ' + first);
+  if (config.SETTINGS[key] !== record[key]) throw new Error('SETTINGS does not hold ' + key + ' from ' + first);
+  read.push(key);
+}
+console.log(JSON.stringify({ names: Object.keys(loaded).length, read, settings: Object.keys(config.SETTINGS).length }));
+`;
+
+async function loadFirst(first: string): Promise<CapturedRun> {
+  const child = Bun.spawn(
+    ['bun', '-e', CHILD, first, join(CONFIG_BARREL_DIR, 'index.ts')],
+    { cwd: SRC, stdout: 'pipe', stderr: 'pipe' },
+  );
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { exitCode, stdout, stderr };
+}
+
+interface Reading {
+  readonly names: number;
+  readonly read: readonly string[];
+  readonly settings: number;
+}
+
+function reading(run: CapturedRun): Reading {
+  return JSON.parse(run.stdout.trim()) as Reading;
+}
+
+describe('each config barrel loaded first in a fresh process', () => {
+  test.each(CONFIG_BARRELS)('%s loads, exits 0 and SETTINGS is readable', async (barrel) => {
+    const run = await loadFirst(join(CONFIG_BARREL_DIR, barrel));
+    expectExit(run, 0);
+    const result = reading(run);
+    expect(result.names).toBeGreaterThan(0);
+    expect(result.settings).toBeGreaterThan(0);
+  });
+});
+
+describe('each config-schema section file loaded first in a fresh process', () => {
+  test('the tree holds section files to load', () => {
+    expect(SECTION_FILES.length).toBeGreaterThanOrEqual(11);
+  });
+
+  test.each(SECTION_FILES)('%s loads, exits 0 and its first setting is read from SETTINGS', async (file) => {
+    const run = await loadFirst(join(SRC, file));
+    expectExit(run, 0);
+    const result = reading(run);
+    if (file === 'config-schema-readings.ts') {
+      // The readings file is a note: it exports nothing to read.
+      expect(result.read).toEqual([]);
+      return;
+    }
+    expect(result.read.length).toBeGreaterThan(0);
+  });
+});
