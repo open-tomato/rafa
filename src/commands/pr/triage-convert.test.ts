@@ -196,7 +196,7 @@ function readingOf(w: World, detail: PullRequestDetail, as?: TriageClass): Triag
     : { ...classified, triageClass: as, simple: false };
   return {
     detail,
-    rerun: readTriageRerun({ comment: null, head: detail.headRefOid, rows: [] }),
+    rerun: readTriageRerun({ comment: null, head: detail.headRefOid, pr: detail, rows: [] }),
     ignored: [],
     assessment,
     logs: null,

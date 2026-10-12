@@ -367,6 +367,11 @@ Run again:
   when none is pending and the PR is still not green, assess again and EDIT
   the same comment (one triage comment per PR, history in its edits); when
   green, say green.
+- A conflicting head is never green, whatever its checks say: with every
+  check passed and `mergeable: conflicting` (or `mergeStateStatus: DIRTY`
+  while `mergeable` is `unknown`) it is assessed and classed `conflict-*`.
+  `unknown` with any other merge state and green checks still says green.
+  The two rules above come first and are unchanged.
 - `--no-comment` reads an existing comment and writes none.
 
 Which PR, with no `<n>` and no PR on the current branch: list red PRs. One:
@@ -429,7 +434,10 @@ rejected.
 - Then the existing CI wait. A fresh assessment of class `green` OR
   `no-checks` counts as resolved (`endOfAttempt`,
   `src/commands/pr/triage-resolve.ts`), because a resolved conflict in a
-  repository that schedules no checks reads `no-checks`. Guard against an unfixable PR: `attempts` in
+  repository that schedules no checks reads `no-checks`. Nothing counts as
+  resolved while the PR still conflicts (`stillConflicts`), green checks
+  included: they are what a green, conflicting PR brings into its run.
+  Guard against an unfixable PR: `attempts` in
   the triage block, raised before each run; at `--max-attempts` (default 2),
   or when a run ends with the same class and the same failing step as before,
   stop, update the comment, remove the worktree, print the follow-up prompt,

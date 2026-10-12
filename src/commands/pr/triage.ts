@@ -26,10 +26,19 @@
  * assessment carries), and at most one comment write. The conflict is
  * read locally, with no network and no fetch (`./triage-read.ts`).
  *
- * The re-run reading comes BEFORE the logs and the conflict: three of
- * its four readings assess nothing, and there is no reason to pull a
+ * The re-run reading comes BEFORE the logs and the conflict FILES: three
+ * of its four readings assess nothing, and there is no reason to pull a
  * 5000-line log for a pull request whose head has not moved since it was
  * last assessed.
+ *
+ * What it does not come before is whether the head conflicts at all.
+ * `get` has already answered `mergeable` and `mergeStateStatus` by then,
+ * at no further cost, and the reading is handed both: green rows on a
+ * head that does not merge are rows from before the base moved, so that
+ * pull request is assessed, and `classifyTriage` — which ranks the
+ * conflict first — names its `conflict-*` class from the file list read
+ * next. Handed the rows alone, the reading answered "nothing to triage"
+ * for it and the classifier was never reached (#889).
  *
  * ## Which pull request, with no `<n>`
  *
@@ -42,11 +51,12 @@
  * answers `no checks reported` for every pull request forever — this one
  * does, `context/verification.md` — so counting `none` as a candidate
  * would make a bare `rafa pr triage` select every open pull request in
- * such a repository. The cost is that a conflicting pull request GitHub
- * scheduled no run for is not picked up by the bare form; it is reached
- * by `rafa pr triage <n>`, and by standing on its branch, which is rule
- * 1 of the selection and outranks the candidates whatever colour they
- * are.
+ * such a repository. The cost is that a conflicting pull request whose
+ * checks are not red — GitHub scheduled no run for it, or the rows it
+ * still carries all passed — is not picked up by the bare form; it is
+ * reached by `rafa pr triage <n>`, and by standing on its branch, which
+ * is rule 1 of the selection and outranks the candidates whatever colour
+ * they are.
  *
  * A detached HEAD, and a branch git cannot read, are WARNINGS here and
  * not refusals, where `pr show` and `pr merge` refuse on both: they act
@@ -436,7 +446,11 @@ async function commentOn(
   }
 }
 
-/** Assesses one pull request: the four reads, the classification, and the comment. */
+/**
+ * Assesses one pull request: the four reads, the classification, and the
+ * comment. The re-run reading is handed the detail for its mergeability,
+ * so a conflicting head is assessed whatever its rows say.
+ */
 async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const { git, maxAttempts, number, pr } = options;
   const detail = await detailOf(pr, number);
@@ -454,6 +468,7 @@ async function assessOne(options: AssessOptions): Promise<TriageReading> {
   const rerun = readTriageRerun({
     comment: existing,
     head: detail.headRefOid,
+    pr: detail,
     rows: checks.rows,
     noComment: !options.wantsComment,
   });

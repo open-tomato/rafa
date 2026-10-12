@@ -128,6 +128,7 @@ function reading(seed: ReadingSeed = {}): TriageReading {
   const rerun = readTriageRerun({
     comment: seed.comment ?? null,
     head: pull.headRefOid,
+    pr: pull,
     rows,
     noComment: seed.noComment === true,
   });

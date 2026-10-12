@@ -272,6 +272,14 @@ export type ClassifiedPullRequest = Pick<
   'author' | 'mergeable' | 'mergeStateStatus' | 'number' | 'title'
 >;
 
+/**
+ * The two fields of a pull request the conflict question is asked of,
+ * apart from the rest so that a reader holding no title and no author —
+ * the re-run reading (`./rerun.ts`), which asks before anything else is
+ * read — passes the same two to {@link readsAsConflicting}.
+ */
+export type MergeReading = Pick<PullRequestDetail, 'mergeable' | 'mergeStateStatus'>;
+
 /** The six captured readings {@link classifyTriage} decides on. */
 export interface ClassifyTriageInput {
   /** The pull request as `gh pr view --json …` answered it. */
@@ -419,7 +427,7 @@ export function classifyFailedStep(step: string | undefined): TriageClass {
  * `unknown`. See the module note.
  */
 export function readsAsConflicting(
-  pr: ClassifiedPullRequest,
+  pr: MergeReading,
   conflictFiles: readonly string[],
 ): boolean {
   if (pr.mergeable === 'conflicting') return true;
