@@ -304,14 +304,22 @@ export interface IssueQuery {
 }
 
 /**
- * One open issue as `openIssues` answers it: where it lives, and the
- * title and body it holds, so a caller comparing issue text reads every
- * open issue in one call rather than a `get` for each.
+ * One open issue as `openIssues` answers it: where it lives, the title
+ * and body it holds, and when it was created, so a caller comparing
+ * issue text, or asking which issues were filed after a time, reads
+ * every open issue in one call rather than a `get` for each.
  */
 export interface OpenIssue {
   ref: IssueRef;
   title: string;
   body: string;
+  /**
+   * When the issue was created, as an ISO 8601 date and time with its
+   * offset, or null when the tracker does not say: it holds no creation
+   * time for the issue, or one that does not read as a time. {@link Issue}
+   * carries no such time.
+   */
+  createdAt: string | null;
 }
 
 /**
@@ -401,12 +409,12 @@ export interface Tracker {
   comment: (ref: IssueRef, body: string) => Promise<void>;
   transition: (ref: IssueRef, state: IssueState) => Promise<TransitionResult>;
   /**
-   * The open issues of `type`, each with its title and body, in the
-   * order the adapter lists them. Open is every state the tracker does
-   * not hold closed: `done`, `released` and `cancelled` are closed, the
-   * rest open. rafa's own member, absent from the source, and optional:
-   * a tracker without it reads no open issues, and a caller that needs
-   * them goes without.
+   * The open issues of `type`, each with its title, its body and the
+   * time it was created, in the order the adapter lists them. Open is
+   * every state the tracker does not hold closed: `done`, `released`
+   * and `cancelled` are closed, the rest open. rafa's own member, absent
+   * from the source, and optional: a tracker without it reads no open
+   * issues, and a caller that needs them goes without.
    */
   openIssues?: (type: IssueType) => Promise<OpenIssue[]>;
   /**

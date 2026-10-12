@@ -63,7 +63,8 @@ function caseGh(runs: readonly FakeRun[], log: GhResult = { ok: true, stdout: TH
 }
 
 function bug(id: string, title: string): OpenIssue {
-  return { ref: { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` }, title, body: '' };
+  const ref: OpenIssue['ref'] = { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` };
+  return { ref, title, body: '', createdAt: null };
 }
 
 /** A tracker listing `bugs` as its open bugs, and the types it was asked for. */

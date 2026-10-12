@@ -40,12 +40,16 @@
  *     absent rather than for being malformed. `unknownExternalId`
  *     overrides it.
  *   - `openIssues`: rafa's own optional reading, which the source
- *     lacks, with three cases of its own. The open issues of a type are
+ *     lacks, with four cases of its own. The open issues of a type are
  *     answered with their titles and bodies, an issue moved to `done` or
- *     to `cancelled` is left out, and a type with no open issue answers
- *     none. Order is the adapter's, so ids are compared sorted. An
- *     adapter run with `readsOpenIssues: false` is held to leaving the
- *     reading out instead, by one case in place of the three.
+ *     to `cancelled` is left out, a type with no open issue answers
+ *     none, and every open issue answers a `createdAt` that parses as a
+ *     time. The port lets a tracker answer a null `createdAt` for an
+ *     issue it holds no time for; the contract holds every adapter here
+ *     to answering one for an issue it created itself. Order is the
+ *     adapter's, so ids are compared sorted. An adapter run with
+ *     `readsOpenIssues: false` is held to leaving the reading out
+ *     instead, by one case in place of the four.
  *   - `editable` and `edit`: rafa's own optional pair, which the source
  *     lacks, with five cases of their own. `editable` answers a created
  *     issue's title, body and open state, with labels and an author
@@ -154,6 +158,11 @@ async function openIssueRows(tracker: Tracker, type: IssueType): Promise<OpenIss
   return sortedRows(open.map((issue): OpenIssueRow => [issue.ref.externalId, issue.title, issue.body]));
 }
 
+/** True when `value` is a string `Date.parse` reads as a time, which a null or absent `createdAt` is not. */
+function parsesAsTime(value: unknown): boolean {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
 /** The cases of the optional `openIssues` reading, or the one case holding it left out. */
 function openIssuesCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
   const { create } = options;
@@ -213,6 +222,21 @@ function openIssuesCases(options: TrackerContractOptions): readonly TrackerContr
         await tracker.create(draftFixture());
 
         expect(await openIssuesOf(tracker)('chore')).toEqual([]);
+      },
+    },
+    {
+      name: 'openIssues answers each open issue with a createdAt that parses as a time',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        await tracker.create(draftFixture({ opt: 0, title: 'Replay window' }));
+        await tracker.create(draftFixture({ opt: 0, title: 'Signing keys' }));
+
+        const open = await openIssuesOf(tracker)('bug');
+
+        // The control: with no open issue answered, the check below would hold nothing.
+        expect(open.length).toBeGreaterThan(0);
+        expect(open.filter((issue) => !parsesAsTime(issue.createdAt)).map((issue) => issue.title)).toEqual([]);
       },
     },
   ];

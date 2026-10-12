@@ -87,7 +87,8 @@ function verifyRun(fields: Partial<FakeRun> = {}): FakeRun {
 }
 
 function bug(id: string, title: string): OpenIssue {
-  return { ref: { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` }, title, body: '' };
+  const ref: OpenIssue['ref'] = { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` };
+  return { ref, title, body: '', createdAt: null };
 }
 
 /** What a case changes about the fakes. */

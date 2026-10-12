@@ -38,6 +38,14 @@
  * green: the closed case moves its issues to `done` and `cancelled`
  * whatever the narrowing, and rejects for a tracker that never moves.
  *
+ * The fourth `openIssues` case, the `createdAt` one, arrived on
+ * 2026-10-12, held by five breaks of its own below: a null time, no
+ * time, a time that is no time, a tracker dating its first issue alone,
+ * which is what holds the case to every issue rather than to one, and a
+ * tracker answering no open issue, which is what holds it to having read
+ * an issue at all. It creates its two issues with `opt: 0` and compares
+ * no count, so the break keying issues by opt leaves it green.
+ *
  * The five `editable` and `edit` cases arrived on 2026-10-06, each held
  * by the breaks below. The in-memory tracker is run with
  * `editsIssues: true`, and three earlier breaks redden one of them as
@@ -76,6 +84,7 @@ const CASES = {
   openOfType: 'openIssues answers each open issue of the type with its title and body',
   openClosed: 'openIssues leaves out an issue moved to done or to cancelled',
   openNone: 'openIssues answers nothing for a type with no open issue',
+  openCreatedAt: 'openIssues answers each open issue with a createdAt that parses as a time',
   editable: 'editable answers the title, body and open state of a created issue',
   editableClosed: 'editable answers an issue moved to done or to cancelled as closed',
   editBody: 'edit writes a body read back byte for byte, leaving the title and every other issue',
@@ -83,7 +92,7 @@ const CASES = {
   editUnknown: 'editable and edit reject for an unknown ref',
 } as const;
 
-/** The case an adapter run with `readsOpenIssues: false` gets in place of the three `openIssues` cases. */
+/** The case an adapter run with `readsOpenIssues: false` gets in place of the four `openIssues` cases. */
 const LEFT_OUT_CASE = 'leaves out the openIssues reading it is run without';
 
 /** The case an adapter run without `editsIssues` gets in place of the five `editable` and `edit` cases. */
@@ -110,6 +119,8 @@ interface Faults {
   readonly closedAsOpen?: boolean;
   /** `openIssues` answers open issues of every type. */
   readonly anyType?: boolean;
+  /** `openIssues` answers the first issue created with its time, and every later one with none. */
+  readonly datesFirstOnly?: boolean;
   /** `edit` writes its change onto every issue held, not the one its ref names. */
   readonly editsEveryIssue?: boolean;
   /** `edit` given a body alone clears the title. */
@@ -124,6 +135,8 @@ interface HeldIssue {
   readonly draft: IssueDraft;
   readonly state: IssueState;
   readonly comments: readonly string[];
+  /** When `create` made it, or null for one the tracker holds no time for. */
+  readonly createdAt: string | null;
 }
 
 /** An in-memory tracker, and a reader of the comments it holds. */
@@ -157,7 +170,10 @@ function memoryTracker(faults: Faults = {}): {
       const externalId = faults.idFromOpt === true
         ? String(draft.opt)
         : String(issued);
-      issues.set(externalId, { draft, state: 'todo', comments: [] });
+      const createdAt = faults.datesFirstOnly === true && issued > 1
+        ? null
+        : new Date().toISOString();
+      issues.set(externalId, { draft, state: 'todo', comments: [], createdAt });
       return { opt: draft.opt, kind: 'memory', externalId, url: null };
     },
     get: async (ref) => {
@@ -190,6 +206,7 @@ function memoryTracker(faults: Faults = {}): {
         ref: { opt: issue.draft.opt, kind: 'memory', externalId, url: null },
         title: issue.draft.title,
         body: issue.draft.body,
+        createdAt: issue.createdAt,
       })),
     editable: async (ref) => {
       const issue = held(ref);
@@ -305,6 +322,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
       CASES.openOfType,
       CASES.openClosed,
       CASES.openNone,
+      CASES.openCreatedAt,
       CASES.editable,
       CASES.editableClosed,
       CASES.editBody,
@@ -365,7 +383,7 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
   [
     'has no openIssues reading',
     contractOptions({}, () => ({ openIssues: undefined })),
-    [CASES.openOfType, CASES.openClosed, CASES.openNone],
+    [CASES.openOfType, CASES.openClosed, CASES.openNone, CASES.openCreatedAt],
   ],
   ['answers closed issues from openIssues', contractOptions({ closedAsOpen: true }), [CASES.openClosed]],
   ['ignores the type in openIssues', contractOptions({ anyType: true }), [CASES.openOfType, CASES.openNone]],
@@ -383,6 +401,34 @@ const BREAKS: readonly (readonly [string, TrackerContractOptions, readonly strin
         .map((issue) => ({ ...issue, ref: { ...issue.ref, kind: 'github' } })),
     })),
     [CASES.openOfType],
+  ],
+  [
+    'answers open issues with a null createdAt',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? []).map((issue) => ({ ...issue, createdAt: null })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  [
+    'answers open issues with no createdAt',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? [])
+        .map((issue) => ({ ...issue, createdAt: undefined as unknown as string })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  [
+    'answers open issues with a createdAt that is no time',
+    contractOptions({}, (base) => ({
+      openIssues: async (type) => ((await base.openIssues?.(type)) ?? []).map((issue) => ({ ...issue, createdAt: 'yesterday' })),
+    })),
+    [CASES.openCreatedAt],
+  ],
+  ['dates the first open issue alone', contractOptions({ datesFirstOnly: true }), [CASES.openCreatedAt]],
+  [
+    'answers no open issue at all',
+    contractOptions({}, () => ({ openIssues: async () => [] })),
+    [CASES.openOfType, CASES.openClosed, CASES.openCreatedAt],
   ],
   ['has no editable and edit pair', contractOptions({}, () => ({ editable: undefined, edit: undefined })), EDIT_CASES],
   ['has editable without edit', contractOptions({}, () => ({ edit: undefined })), EDIT_CASES],
@@ -482,7 +528,7 @@ describe('the Tracker contract cases', () => {
     expect(await rejectedCases({ ...answers999, unknownExternalId: 'missing' })).toEqual([]);
   });
 
-  it('swaps the three openIssues cases for one holding the reading left out, when run without it', () => {
+  it('swaps the four openIssues cases for one holding the reading left out, when run without it', () => {
     const without = { ...contractOptions(), readsOpenIssues: false };
 
     expect(trackerContractCases(without).map((contractCase) => contractCase.name)).toEqual([

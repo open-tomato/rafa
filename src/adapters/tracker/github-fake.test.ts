@@ -127,6 +127,45 @@ describe('the recorded gh fake', () => {
       .toEqual(failure('fake gh: does not model --json field "issueType"\n'));
   });
 
+  it('stamps each created issue from its clock, and writes the time as recorded in a view and in a listing', async () => {
+    const times = ['2026-10-08T19:15:57Z', '2026-10-12T05:50:18Z'];
+    const fake = createFakeGh({ now: () => times.shift() ?? '' });
+    await fake.run(issueCreate('Older', 'bug'));
+    await fake.run(issueCreate('Newer', 'bug'));
+
+    expect(await fake.run(['issue', 'view', '1', '--json', 'number,createdAt']))
+      .toEqual({ ok: true, stdout: '{"createdAt":"2026-10-08T19:15:57Z","number":1}\n', stderr: '' });
+    expect((await fake.run(['issue', 'list', '--json', 'number,createdAt'])).stdout)
+      .toBe('[{"createdAt":"2026-10-12T05:50:18Z","number":2},{"createdAt":"2026-10-08T19:15:57Z","number":1}]\n');
+    expect((await fake.run(['issue', 'view', '1', '--json', 'number'])).stdout).toBe('{"number":1}\n');
+  });
+
+  it('keeps the time through a comment, an edit and a close, and takes another through update alone', async () => {
+    const fake = createFakeGh({ now: () => '2026-10-08T19:15:57Z' });
+    await fake.run(issueCreate('t', 'bug'));
+
+    await fake.run(['issue', 'comment', '1', '--body', 'noted']);
+    await fake.run(['issue', 'edit', '1', '--title', 'Edited']);
+    await fake.run(closeIssue('1', 'completed'));
+
+    expect(fake.issue('1')).toMatchObject({ title: 'Edited', state: 'CLOSED', createdAt: '2026-10-08T19:15:57Z' });
+    fake.update('1', (issue) => ({ ...issue, createdAt: 'not a time' }));
+    expect((await fake.run(['issue', 'view', '1', '--json', 'createdAt'])).stdout).toBe('{"createdAt":"not a time"}\n');
+  });
+
+  it('stamps from the system clock, to the second in UTC as gh writes a time, when handed no clock', async () => {
+    const before = Date.now();
+    const fake = createFakeGh();
+
+    await fake.run(issueCreate('t', 'bug'));
+
+    const createdAt = fake.issue('1')?.createdAt ?? '';
+    expect(createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // To the second: the stamp may read up to a second before the clock did.
+    expect(Date.parse(createdAt)).toBeGreaterThan(before - 1000);
+    expect(Date.parse(createdAt)).toBeLessThanOrEqual(Date.now());
+  });
+
   it('lists newest first and open alone by default, narrowed by state, labels, search text and limit', async () => {
     const fake = createFakeGh();
     await fake.run(issueCreate('Replay window', 'bug'));
