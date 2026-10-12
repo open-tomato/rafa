@@ -1,8 +1,8 @@
 /**
  * What `rafa loop start` does about the branch when it is started on the
- * base: which question it asks, which refusal follows an answer, and
- * which git steps a yes turns into — all of it as data, none of it
- * spawning anything.
+ * base, or with no branch checked out at all: which question it asks,
+ * which refusal follows an answer, and which git steps a yes turns into
+ * — all of it as data, none of it spawning anything.
  *
  * The split is the `pr` subject's (`src/pr/merge.ts` beside
  * `src/commands/pr/merge.ts`): everything here is the part that can be
@@ -28,10 +28,11 @@
  * {@link readBranchOffer} answers `stand-aside` three ways, and each of
  * them leaves the branch guard in `src/start/run-setup.ts` to have the last word:
  *
- *  - `--any-branch`: an operator who asked to run on `main` is not then
- *    asked whether to leave it. It outranks `--create-branch` too, since
- *    it is the escape hatch and the other is an answer to a question
- *    that is no longer asked.
+ *  - `--any-branch`, on the base: an operator who asked to run on `main`
+ *    is not then asked whether to leave it. It outranks `--create-branch`
+ *    too, since it is the escape hatch and the other is an answer to a
+ *    question that is no longer asked. With no branch checked out it
+ *    stands nothing aside; see below.
  *  - No plan stub: the branch name would be `feat/` and nothing else.
  *  - No terminal and no `--create-branch`: nobody can answer, so the
  *    guard refuses as it did before, naming the flag. The refusal is the
@@ -87,19 +88,64 @@
  *    taken exited 128 with `fatal: a branch named 'feat/x' already
  *    exists` — which is the route split above, held up by git.
  *
- * ## A detached HEAD is no base
+ * ## No branch is treated like the default branch
  *
- * `git rev-parse --abbrev-ref HEAD` answers the literal `HEAD` when no
- * branch is checked out (measured on git 2.53.0 under Linux, 2026-10-01,
- * in a repository after `git switch --detach`: stdout `HEAD`, exit 0) —
- * the same constant `src/next/readings.ts` and
- * `src/commands/pr/pr-context.ts` read. Taken as a branch name it would
- * be offered nothing, guarded as a branch of its own, and recorded as
- * the run's branch, so a run on the checkout's own HEAD is refused
- * there instead ({@link isDetachedHead}, {@link detachedHeadRefusal}),
- * whatever flags the line carries. The refusal names the two ways on:
- * `git switch <base>` back onto a branch, or `--as-worktree`, which
- * leaves this checkout where it is.
+ * A run started with no branch checked out, a detached HEAD, stands on
+ * `no-branch` ({@link RunStanding}) and is offered `feat/<stub>` as a
+ * run on the base is: the same questions, the same three routes, the
+ * same working-tree refusal read after the answer. Its `base` is the one
+ * its caller read for the run, since nothing is checked out to be it.
+ * Three things differ from the `on-base` standing, and nothing else:
+ *
+ *  - `create` is two steps, not four: the fetch of `origin <base>`, then
+ *    `git switch --no-track -c feat/<stub> origin/<base>`. There is no
+ *    local base to read the standing of or to fast-forward, so both of
+ *    those steps are left out and the branch is cut from the fetched ref
+ *    itself. A failed fetch still refuses first, so the branch is never
+ *    cut from a stale `origin/<base>`. The two switch routes are the one
+ *    step they are on the base.
+ *  - `--any-branch` does not stand the offer aside
+ *    ({@link anyBranchStandsAside}). The flag waives WHICH branch the
+ *    run is on, not that it is on one, so with it the run is offered
+ *    exactly what it is offered without it.
+ *  - A refusal names `a detached HEAD` where it would name the base
+ *    ({@link standsOn}): `Refusing to leave a detached HEAD for
+ *    feat/<stub>`, and `The run is still on a detached HEAD.`
+ *
+ * No plan stub, and no terminal without `--create-branch`, stand aside
+ * here as they do on the base. What a caller makes of a `stand-aside` or
+ * a declined offer on this standing is the caller's.
+ *
+ * Measured on git 2.53.0 under Linux with `LC_ALL=C` set (2026-10-12),
+ * in a clone of a bare remote after `git switch --detach`, the remote
+ * then one commit ahead:
+ *
+ *  - `git fetch origin main` exited 0 and moved `origin/main` to the
+ *    remote's commit, HEAD staying where it was.
+ *  - `git switch --no-track -c feat/x origin/main` exited 0 with
+ *    `Switched to a new branch 'feat/x'`, HEAD at the fetched commit.
+ *    `git rev-parse --abbrev-ref feat/x@{upstream}` then exited 128 with
+ *    `fatal: no upstream configured for branch 'feat/x'`. The control,
+ *    the same command without `--no-track`, wrote `branch 'feat/tracked'
+ *    set up to track 'origin/main'.` and answered `origin/main` as its
+ *    upstream: a start point that is a remote-tracking ref is tracked
+ *    unless the flag says otherwise.
+ *  - The same command exited 128 with `fatal: a branch named 'feat/x'
+ *    already exists` on a name already taken, and with `fatal: invalid
+ *    reference: origin/nosuch` on a start point git has not got.
+ *  - `git switch feat/x` and `git switch --track origin/feat/remote-only`
+ *    both exited 0 from the detached HEAD, the second setting the
+ *    upstream as it does from a branch.
+ *  - `git status --porcelain` wrote ` M a.txt` and `?? untracked.txt`,
+ *    as it does on a branch.
+ *
+ * No run reaches this standing yet. `git rev-parse --abbrev-ref HEAD`
+ * answers the literal `HEAD` when no branch is checked out (measured on
+ * git 2.53.0 under Linux, 2026-10-01, in a repository after `git switch
+ * --detach`: stdout `HEAD`, exit 0), and `src/start/run-setup.ts` still
+ * reads its branch that way and refuses the word before any offer is
+ * made ({@link isDetachedHead}, {@link detachedHeadRefusal}), whatever
+ * flags the line carries.
  *
  * ## Being ahead is not being diverged
  *
@@ -163,6 +209,24 @@ export function detachedHeadRefusal(worktreeFlag: string): string {
   ].join('\n');
 }
 
+/**
+ * Where a run stands when the offer is made: on its base, the branch the
+ * caller found checked out, or on no branch at all, a detached HEAD.
+ * See the module note for what the second changes.
+ */
+export type RunStanding = 'on-base' | 'no-branch';
+
+/** The standing of a situation or a plan that names none. */
+const DEFAULT_STANDING: RunStanding = 'on-base';
+
+/** What a line calls where a run with no branch checked out stands. */
+export const NO_BRANCH = 'a detached HEAD';
+
+/** True when nothing is checked out for the run to be on. */
+function hasNoBranch(standing: RunStanding | undefined): boolean {
+  return (standing ?? DEFAULT_STANDING) === 'no-branch';
+}
+
 /** The branch a plan with this stub runs on. */
 export function branchNameFor(planStub: string): string {
   return `${BRANCH_PREFIX}${planStub}`;
@@ -185,8 +249,23 @@ export type BranchRoute = 'create' | 'switch-local' | 'switch-remote';
 export interface BranchPlan {
   /** The plan's branch, `feat/<stub>`. */
   readonly branch: string;
-  /** The base the run is on, which the branch is cut from. */
+  /**
+   * The base the branch is cut from: the branch the run is on, or on the
+   * `no-branch` standing the base its caller read for it.
+   */
   readonly base: string;
+  /** Where the run stands; `on-base` when left out. */
+  readonly standing?: RunStanding;
+}
+
+/**
+ * What the run is on, as a line names it: its base, or
+ * {@link NO_BRANCH} when no branch is checked out.
+ */
+export function standsOn(plan: BranchPlan): string {
+  return hasNoBranch(plan.standing)
+    ? NO_BRANCH
+    : plan.base;
 }
 
 /** Why no branch is offered at all; see the module note. */
@@ -196,9 +275,17 @@ export type StandAsideReason = 'any-branch' | 'no-plan-stub' | 'no-terminal';
 export interface BranchSituation {
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;
-  /** The base branch the run is on, which the caller found checked out. */
+  /**
+   * The base branch the run is on, which the caller found checked out,
+   * or on the `no-branch` standing the base the caller read for the run.
+   */
   readonly base: string;
-  /** True when `--any-branch` was passed, which outranks everything here. */
+  /** Where the run stands; `on-base` when left out. */
+  readonly standing?: RunStanding;
+  /**
+   * True when `--any-branch` was passed, which outranks everything here
+   * on the base and nothing with no branch ({@link anyBranchStandsAside}).
+   */
   readonly anyBranch: boolean;
   /** True when `--create-branch` was passed, which answers the question yes. */
   readonly createBranch: boolean;
@@ -255,13 +342,24 @@ export function questionFor(route: BranchRoute, plan: BranchPlan): string {
 }
 
 /**
+ * True when `--any-branch` stands the offer aside: on the base alone.
+ * With no branch checked out the flag waives nothing, since it is about
+ * which branch the run is on and there is none; see the module note.
+ */
+export function anyBranchStandsAside(
+  situation: Pick<BranchSituation, 'anyBranch' | 'standing'>,
+): boolean {
+  return situation.anyBranch && !hasNoBranch(situation.standing);
+}
+
+/**
  * What to do about the branch: ask a question, take the branch without
  * asking because `--create-branch` said so, or stand aside and leave the
  * guard in `src/start/run-setup.ts` to have the last word. See the module note for
  * the order these are read in.
  */
 export function readBranchOffer(situation: BranchSituation): BranchOffer {
-  if (situation.anyBranch) return standAside('any-branch');
+  if (anyBranchStandsAside(situation)) return standAside('any-branch');
 
   const stub = situation.planStub?.trim() ?? '';
   if (stub === '') return standAside('no-plan-stub');
@@ -275,7 +373,7 @@ export function readBranchOffer(situation: BranchSituation): BranchOffer {
     kind: 'ask',
     branch,
     route,
-    question: questionFor(route, { branch, base: situation.base }),
+    question: questionFor(route, { branch, base: situation.base, standing: situation.standing }),
   });
 }
 
@@ -325,7 +423,7 @@ export function treeRefusal(tree: WorkingTreeStatus, plan: BranchPlan): string |
   if (changes.length === 0) return null;
 
   return [
-    `❌ Refusing to leave ${plan.base} for ${plan.branch}: `
+    `❌ Refusing to leave ${standsOn(plan)} for ${plan.branch}: `
       + `the working tree has ${plural(changes.length, 'change', 'changes')} to tracked files.`,
     ...listChanges(changes),
     `${INDENT}Commit or stash them, then run again. Untracked files are left alone.`,
@@ -350,37 +448,18 @@ export interface BranchStep {
   readonly argv: readonly string[];
 }
 
+/** The step that brings `origin/<base>` up to the remote, the first of either way of creating. */
+function fetchStep(base: string): BranchStep {
+  return { id: 'fetch', label: `fetch ${REMOTE} ${base}`, argv: ['git', 'fetch', REMOTE, base] };
+}
+
 /**
- * The steps a route runs, in order, frozen.
- *
- * `create` fetches the base, reads how the local base stands against it,
- * fast-forwards it and cuts the branch from it — the spec's order, and
- * the reason a stale or diverged base can never reach the `create` step.
- * The two switch routes run one step and fetch nothing, since a branch
- * that already exists is never fetched over.
+ * Creating from the base the run is on: the local base is read against
+ * what was fetched, fast-forwarded, and branched from where it stands.
  */
-export function branchSteps(route: BranchRoute, plan: BranchPlan): readonly BranchStep[] {
-  const { base, branch } = plan;
-  if (route === 'switch-local') {
-    return Object.freeze([
-      { id: 'switch', label: `switch to ${branch}`, argv: ['git', 'switch', branch] },
-    ] as const);
-  }
-  if (route === 'switch-remote') {
-    return Object.freeze([
-      {
-        id: 'track',
-        label: `check out ${branch} tracking ${REMOTE}/${branch}`,
-        argv: ['git', 'switch', '--track', `${REMOTE}/${branch}`],
-      },
-    ] as const);
-  }
-  return Object.freeze([
-    {
-      id: 'fetch',
-      label: `fetch ${REMOTE} ${base}`,
-      argv: ['git', 'fetch', REMOTE, base],
-    },
+function createOnBase({ base, branch }: BranchPlan): readonly BranchStep[] {
+  return [
+    fetchStep(base),
     {
       id: 'read-standing',
       label: `read how ${base} stands against ${REMOTE}/${base}`,
@@ -396,7 +475,56 @@ export function branchSteps(route: BranchRoute, plan: BranchPlan): readonly Bran
       label: `create ${branch} from ${base}`,
       argv: ['git', 'switch', '-c', branch],
     },
-  ] as const);
+  ];
+}
+
+/**
+ * Creating with no branch checked out: the branch is cut from the
+ * fetched `origin/<base>` itself, `--no-track` keeping it without an
+ * upstream. See the module note for what git said.
+ */
+function createOnNoBranch({ base, branch }: BranchPlan): readonly BranchStep[] {
+  return [
+    fetchStep(base),
+    {
+      id: 'create',
+      label: `create ${branch} from ${REMOTE}/${base}`,
+      argv: ['git', 'switch', '--no-track', '-c', branch, `${REMOTE}/${base}`],
+    },
+  ];
+}
+
+/**
+ * The steps a route runs, in order, frozen.
+ *
+ * On the base, `create` fetches the base, reads how the local base
+ * stands against it, fast-forwards it and cuts the branch from it — the
+ * spec's order, and the reason a stale or diverged base can never reach
+ * the `create` step. With no branch checked out it fetches the base and
+ * cuts the branch from `origin/<base>`, there being no local base to
+ * read or to move. The two switch routes run one step on either standing
+ * and fetch nothing, since a branch that already exists is never fetched
+ * over.
+ */
+export function branchSteps(route: BranchRoute, plan: BranchPlan): readonly BranchStep[] {
+  const { branch } = plan;
+  if (route === 'switch-local') {
+    return Object.freeze([
+      { id: 'switch', label: `switch to ${branch}`, argv: ['git', 'switch', branch] },
+    ] as const);
+  }
+  if (route === 'switch-remote') {
+    return Object.freeze([
+      {
+        id: 'track',
+        label: `check out ${branch} tracking ${REMOTE}/${branch}`,
+        argv: ['git', 'switch', '--track', `${REMOTE}/${branch}`],
+      },
+    ] as const);
+  }
+  return Object.freeze(hasNoBranch(plan.standing)
+    ? createOnNoBranch(plan)
+    : createOnBase(plan));
 }
 
 /** How the local base stands against its remote-tracking branch, in commits. */
@@ -456,7 +584,7 @@ function quotedLines(said: string): readonly string[] {
 
 /** The line every refusal here ends with: the run has not moved. */
 function stillOn(plan: BranchPlan): string {
-  return `${INDENT}The run is still on ${plan.base}.`;
+  return `${INDENT}The run is still on ${standsOn(plan)}.`;
 }
 
 /**

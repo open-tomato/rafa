@@ -2,7 +2,8 @@
  * The half of the branch offer that touches a repository: it takes the
  * readings `./branch-decision.ts` decides from off a `GitRunner`, asks
  * the question through a `Prompter`, and runs the fetch, the
- * fast-forward and the checkout the decision names.
+ * fast-forward and the checkout the decision names — or, for a run with
+ * no branch checked out, the fetch and the checkout alone.
  *
  * Nothing here decides anything. Which question is asked, which refusal
  * an answer or a git outcome leads to and which steps a route runs are
@@ -26,10 +27,14 @@
  *
  * ## The order, and what each part of it costs
  *
- * `--any-branch` and a plan with no stub are answered before git is
- * reached: both stand aside whatever the repository holds, and running
- * two `git show-ref` calls to reach the same answer would be two
- * processes spent on nothing. Everything after them is, in order:
+ * `--any-branch` on the base and a plan with no stub are answered before
+ * git is reached: both stand aside whatever the repository holds, and
+ * running two `git show-ref` calls to reach the same answer would be two
+ * processes spent on nothing. With no branch checked out
+ * (`standing: 'no-branch'`) `--any-branch` stands nothing aside, which
+ * is the decision's rule ({@link anyBranchStandsAside}), so the refs are
+ * read there with the flag as without it. Everything after them is, in
+ * order:
  *
  *  1. `git show-ref --verify --quiet refs/heads/feat/<stub>` and the
  *     same for `refs/remotes/origin/feat/<stub>`. Both are local reads;
@@ -43,14 +48,16 @@
  * ## Every refusal leaves the run where it found it
  *
  * The refusals from `./branch-decision.ts` all end `The run is still on
- * <base>.`, and that holds for this runner because the checkout is the
- * LAST step of every route: a failed fetch, a base that could not
- * fast-forward and a base that has diverged all stop before anything is
- * checked out. A fast-forward that ran before a later step failed did
- * move the base forward, which is the base's own business and not the
- * run's branch. Each refusal is thrown as a `CommandExit` with exit code
- * 1, the shape the branch guard in `src/start/run-setup.ts` already
- * refuses with.
+ * <base>.`, or `on a detached HEAD.` for a run with no branch checked
+ * out ({@link standsOn}), and that holds for this runner because the
+ * checkout is the LAST step of every route: a failed fetch, a base that
+ * could not fast-forward and a base that has diverged all stop before
+ * anything is checked out. A fast-forward that ran before a later step
+ * failed did move the base forward, which is the base's own business and
+ * not the run's branch; with no branch checked out there is no such
+ * step, and a fetch that ran moved `origin/<base>` alone. Each refusal
+ * is thrown as a `CommandExit` with exit code 1, the shape the branch
+ * guard in `src/start/run-setup.ts` already refuses with.
  *
  * ## What `git show-ref` answered
  *
@@ -66,7 +73,14 @@
  * that could be wrong is the one that creates nothing until git has
  * spoken again.
  */
-import type { BranchOffer, BranchPlan, BranchRoute, BranchStep, StandAsideReason } from './branch-decision.js';
+import type {
+  BranchOffer,
+  BranchPlan,
+  BranchRoute,
+  BranchStep,
+  RunStanding,
+  StandAsideReason,
+} from './branch-decision.js';
 import type { Prompter } from '../cli/prompt/confirm.js';
 import type { GitRunner, WorkingTreeStatus } from '../pr/index.js';
 
@@ -77,6 +91,7 @@ import { createGitRunner, gitSaid, parseWorkingTree } from '../pr/index.js';
 
 import {
   answeredYes,
+  anyBranchStandsAside,
   branchNameFor,
   branchSteps,
   localRef,
@@ -84,6 +99,7 @@ import {
   readStepOutcome,
   REMOTE,
   remoteTrackingRef,
+  standsOn,
   treeRefusal,
 } from './branch-decision.js';
 
@@ -96,9 +112,21 @@ export interface BranchRequest {
   readonly repoRoot: string;
   /** The plan's stub, or null when the plan path gave none. */
   readonly planStub: string | null;
-  /** The base branch the run was started on, which the offer would leave. */
+  /**
+   * The base branch the run was started on, which the offer would leave,
+   * or under `standing: 'no-branch'` the base the caller read for the
+   * run, which `feat/<stub>` is cut from on `origin`.
+   */
   readonly base: string;
-  /** True when `--any-branch` was passed, which outranks the whole offer. */
+  /**
+   * Where the run was started: on its base, or with no branch checked
+   * out at all. `on-base` when left out.
+   */
+  readonly standing?: RunStanding;
+  /**
+   * True when `--any-branch` was passed, which outranks the whole offer
+   * on the base and none of it with no branch checked out.
+   */
   readonly anyBranch: boolean;
   /** True when `--create-branch` was passed, which answers the question yes. */
   readonly createBranch: boolean;
@@ -155,12 +183,13 @@ function terminalReading(seams: BranchSeams): () => boolean {
  */
 function readOffer(request: BranchRequest, git: GitRunner, seams: BranchSeams): BranchOffer {
   const stub = request.planStub?.trim() ?? '';
-  const branch = request.anyBranch || stub === ''
+  const branch = anyBranchStandsAside(request) || stub === ''
     ? null
     : branchNameFor(stub);
   return readBranchOffer({
     planStub: request.planStub,
     base: request.base,
+    standing: request.standing,
     anyBranch: request.anyBranch,
     createBranch: request.createBranch,
     canAsk: terminalReading(seams)(),
@@ -185,9 +214,9 @@ function readWorkingTree(git: GitRunner, plan: BranchPlan): WorkingTreeStatus {
   const result = git(['status', '--porcelain']);
   if (result.ok) return parseWorkingTree(result.stdout);
   throw new CommandExit(1, [
-    `❌ Could not read the working tree before leaving ${plan.base} for ${plan.branch}.`,
+    `❌ Could not read the working tree before leaving ${standsOn(plan)} for ${plan.branch}.`,
     `${INDENT}${gitSaid(result)}`,
-    `${INDENT}The run is still on ${plan.base}.`,
+    `${INDENT}The run is still on ${standsOn(plan)}.`,
   ].join('\n'));
 }
 
@@ -220,10 +249,10 @@ function runRoute(route: BranchRoute, plan: BranchPlan, git: GitRunner): BranchO
 }
 
 /**
- * Offers `feat/<stub>` to a run started on its base, and takes it when
- * the offer is accepted: it asks the question, or takes the branch
- * without asking under `--create-branch`, and runs the steps of the
- * route the branch's own existence chooses.
+ * Offers `feat/<stub>` to a run started on its base, or with no branch
+ * checked out, and takes it when the offer is accepted: it asks the
+ * question, or takes the branch without asking under `--create-branch`,
+ * and runs the steps of the route the branch's own existence chooses.
  *
  * Answers where the run was left. `stood-aside` means nothing was
  * offered and the caller's branch guard has the last word, `declined`
@@ -240,9 +269,9 @@ export async function offerRunBranch(
   const offer = readOffer(request, git, seams);
   if (offer.kind === 'stand-aside') return Object.freeze({ kind: 'stood-aside', why: offer.why });
 
-  const plan: BranchPlan = { branch: offer.branch, base: request.base };
+  const plan: BranchPlan = { branch: offer.branch, base: request.base, standing: request.standing };
   if (offer.kind === 'ask' && !await confirmed(offer.question, seams)) {
-    activeOutput().info(`Staying on ${plan.base}.`);
+    activeOutput().info(`Staying on ${standsOn(plan)}.`);
     return Object.freeze({ kind: 'declined', branch: offer.branch, route: offer.route });
   }
   return runRoute(offer.route, plan, git);
