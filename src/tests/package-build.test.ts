@@ -337,7 +337,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { EPIC_GUARD_FILE, readEpicGuard } from '../board/epic-guard.js';
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 import * as storeSource from '../effort/store/index.js';
 import { readVerifyPrompt, VERIFY_PROMPT_FILE } from '../epic/verify-plan.js';
 import * as rootSource from '../index.js';

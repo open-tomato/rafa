@@ -11,8 +11,8 @@
  * dry run could never have folded. `src/commands/pr/merge-cleanup.test.ts`
  * drives the same function through the follow-ups it decides.
  */
-import type { GitRunner } from './git.js';
 import type { SettleWaitingPlace } from './settle-waiting.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Fragment } from '../release/fragment.js';
 import type { MergeGuardSettings } from '../release/guard-merge.js';
 
@@ -23,9 +23,9 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '../core/git/index.js';
 import { serializeFragment } from '../release/fragment.js';
 
-import { createGitRunner } from './git.js';
 import { SETTLE_REMOTE, settleWaitingOn } from './settle-waiting.js';
 
 const RELEASE: MergeGuardSettings = {

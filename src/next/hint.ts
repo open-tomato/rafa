@@ -101,7 +101,7 @@
 import type { NextInvocation } from './actions.js';
 import type { NextSourceSeams } from './sources.js';
 import type { NextState } from './state.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { Output } from '../ports/index.js';
 
 import { actionInvocation } from './actions.js';

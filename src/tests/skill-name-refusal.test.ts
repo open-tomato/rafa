@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 import {
   buildPlanPrompt,
   readPlanFormat,

@@ -75,7 +75,7 @@
  * passes `--effort` and the CLI is left to refuse the name.
  */
 import type { AgentEffortLookup } from './declaration.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -54,7 +54,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { PORT_VERSIONS } from '../adapters/registry.js';
+import { PORT_VERSIONS } from '../core/adapters/index.js';
 
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from './manifest.js';
 

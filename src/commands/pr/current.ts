@@ -71,10 +71,10 @@
  * request. A checks call that failed is NOT one of them; see above.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksVerdict, PullRequests, PullRequestState } from '../../pr/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 
 import { DEFAULT_PR_SEAMS, expectNoArguments, openPrContext, pickPullRequest, PR_USAGE } from './pr-context.js';
 

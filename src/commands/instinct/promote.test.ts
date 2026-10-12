@@ -19,7 +19,7 @@
  * project and the home, path and bytes, before and after a run that
  * listed a lesson.
  */
-import type { AnyAdapter } from '../../adapters/registry.js';
+import type { AnyAdapter } from '../../core/adapters/index.js';
 import type { BlessedBundle, InstinctRecord, Learning, MergeResult } from '../../ports/index.js';
 
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { actionHash } from '../../learning/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';

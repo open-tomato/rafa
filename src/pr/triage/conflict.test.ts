@@ -2,10 +2,11 @@
  * Tests for the conflicting file list (`src/pr/triage/conflict.ts`).
  *
  * These cases spawn the REAL git, in repositories of their own under
- * this file's temporary directory, for the same reason `src/pr/git.ts`
- * has its tests do it: the module exists to read what `git merge-tree`
- * says, and a fake git would measure the fake. No case touches the
- * repository this file lives in, no case reaches a network, and
+ * this file's temporary directory, for the same reason
+ * `src/core/git/git.ts` has its tests do it: the module exists to read
+ * what `git merge-tree` says, and a fake git would measure the fake. No
+ * case touches the repository this file lives in, no case reaches a
+ * network, and
  * `plants every repository under its own temporary directory` asserts
  * both.
  *
@@ -34,7 +35,7 @@
  *  - the trailing newline left on a message: 2 fail, the branch-name
  *    case and the well-formed captured record.
  */
-import type { GitResult } from '../git.js';
+import type { GitResult } from '../../core/git/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,7 +43,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../git.js';
+import { createGitRunner } from '../../core/git/index.js';
 
 import { hasConflictMessage, mergeTreeArgs, parseMergeTree, readConflict } from './conflict.js';
 

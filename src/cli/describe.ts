@@ -63,12 +63,13 @@
  * action. A hidden `exec` action takes the actions typed through it out
  * with it.
  */
-import type { CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from './command.js';
 import type { ArgSpec, FlagSpec } from './core/types.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandSpend } from './spends.js';
+import type { CommandDeprecation, CommandExample, CommandOutput, RafaCommand } from '../core/command/index.js';
 
-import { isTopLevel } from './command.js';
+import { isTopLevel } from '../core/command/index.js';
+
 import { mountKey } from './registry.js';
 
 /** The schema of the document {@link describeRegistry} builds. */

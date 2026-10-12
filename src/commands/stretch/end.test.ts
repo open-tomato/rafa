@@ -14,7 +14,7 @@
  * `main`.
  */
 import type { StretchEndSeams } from './end.js';
-import type { GitResult } from '../../pr/git.js';
+import type { GitResult } from '../../core/git/index.js';
 import type { PullRequestsAnswers } from '../../pr/pull-requests-double.js';
 import type { MergedPullRequest, PullRequestDraft, PullRequestSummary } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { configFilePath } from '../../config.js';
+import { configFilePath } from '../../core/config/index.js';
 import { createPullRequestsDouble } from '../../pr/pull-requests-double.js';
 import { appendItem, itemsPath } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';

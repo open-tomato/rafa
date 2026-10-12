@@ -20,8 +20,8 @@
  * the Roadmap's #13 and #11, is the control.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaCommand } from '../cli/command.js';
-import type { GitRunner } from '../pr/git.js';
+import type { RafaCommand } from '../core/command/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Place } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 

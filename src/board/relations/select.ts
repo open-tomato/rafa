@@ -3,7 +3,7 @@
  * shaped like `selectEffortStore` (`../../effort/store/index.ts`): a
  * module-local table keyed by mode, and a `TypeError` naming the modes
  * when the configured value is none of them, never a silent fall back to
- * `labels`. It registers no port type in `../../adapters/registry.ts`;
+ * `labels`. It registers no port type in `src/core/adapters/registry.ts`;
  * the table below is the only place a mode meets its adapter.
  *
  * Selecting makes the adapter and sends nothing: every `gh` call waits
@@ -11,11 +11,11 @@
  */
 import type { BoardRelations } from './port.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 
-import { describeValue } from '../../config-sections.js';
+import { describeValue } from '../../core/config/sections.js';
 
 import { createLabelsRelations } from './labels.js';
 import { createNativeRelations } from './native.js';

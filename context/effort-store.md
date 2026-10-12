@@ -261,8 +261,8 @@ any live loop, including its own if one somehow persists.
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
 which means no sync: a device keeps its own store. The user scope's
 `~/.rafa/config.yaml` already layers under the project's for every
-setting (`src/config.ts`), so the user default needs no reader of its
-own. The user and project scopes share every config key in `config.ts`,
+setting (`src/core/config/config.ts`), so the user default needs no reader of
+its own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
 when either is read. A deployment of the `service` strategy requires
 `hub.url` (the hub's address), and may name `hub.tokenSecret` (the
@@ -273,7 +273,7 @@ to `30s`, as `3s`). `selectSync` hands the three to the adapter as
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core registers two adapters in `CORE_ADAPTER_REGISTRY`
-(`src/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
+(`src/core/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
 (copy exchange).** The `git`, `service` and `p2p` adapters come from
 modules loaded under `src/modules/load.ts`; core ships no code for them.
 When `rafa doctor`, the loop preflight and `describe` read the config,

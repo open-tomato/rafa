@@ -33,8 +33,8 @@
  * refuse, and each such fragment gets a sentence under the block. The
  * fragments that do parse are still listed.
  */
-import type { RafaConfig } from '../../config.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { SettleForecast } from '../../release/forecast.js';
 import type { FoldFragment } from '../../release/strategy.js';

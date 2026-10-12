@@ -25,7 +25,7 @@
  * commit and holds it from then on — so `splitFailures` (`./suite/
  * baseline.ts`) puts it in `known` at every later step and never in
  * `fresh`. One assertion reads the run record's `steps`
- * (`../loop/sessions.ts`) for the five entries this two-stage, one-task
+ * (`../core/loop/sessions.ts`) for the five entries this two-stage, one-task
  * plan takes — baseline, the first task, the first stage (after the
  * first task, its stage's only one), the second task, and the
  * pre-wrap-up step standing in for the second (and last) stage's own —
@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../loop/sessions.js';
+import { readSessions } from '../core/loop/index.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

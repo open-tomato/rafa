@@ -100,13 +100,13 @@
  * (`writeTrackerBlocker` in `utils/tracker.ts`), so no text a session wrote
  * opens a line `findNextTask` could answer as a task.
  *
- * Every line goes through the active output (`adapters/output/active.ts`):
+ * Every line goes through the active output (`core/output/active.ts`):
  * what was written, filed or commented on through `info`, and everything
  * that was not through `warn`.
  */
-import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
-import type { RafaConfig } from '../config.js';
 import type { TaskDispatch } from './dispatch.js';
+import type { ResolveTrackerOptions, TrackerResolution } from '../adapters/tracker/resolve.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { FindingOutcome, FindingsWriterSeams } from '../effort/store/findings.js';
 import type { IssueRef, Tracker, TrackerKind } from '../ports/index.js';
 import type { ReportBug, TaskReport } from '../report/parse.js';
@@ -116,9 +116,9 @@ import type { BugTriage, SecretEnvironment, TriageResult } from '../triage/triag
 
 import { homedir } from 'node:os';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { parseReport } from '../report/parse.js';
 import { baselinePathFor, readBaseline } from '../suite/baseline.js';
 import { artifactOf, hasText } from '../triage/bug-key.js';

@@ -38,7 +38,7 @@
  * (`../config-schema-tests.ts`), sitting under neither `Owns:` folder.
  *
  * The one assertion that matters reads the `stage` step back off the run
- * record's `steps` (`../loop/sessions.ts`): its `scope`, the raw path
+ * record's `steps` (`../core/loop/sessions.ts`): its `scope`, the raw path
  * list `stageStepScope` answered, is exactly `alpha/mod.test.ts` and
  * `shared/flow-integration.test.ts`, sorted, and its `command` (the argv
  * `bun test` was actually spawned with) names both and never
@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../loop/sessions.js';
+import { readSessions } from '../core/loop/index.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

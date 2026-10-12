@@ -11,7 +11,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { appendedBody, renderUpdateBlock } from './issue-edit-body.js';
 import {

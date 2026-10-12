@@ -71,7 +71,7 @@
  * from {@link DeepSettingsSeams}.
  */
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { OverrideReading } from '../inventory/disabled.js';
 import type { Inventory, InventorySeams } from '../inventory/index.js';
 import type { McpDeclaration, McpReading } from '../inventory/mcp.js';
@@ -80,7 +80,7 @@ import type { Resolution } from '../tiers/resolve.js';
 
 import { join } from 'node:path';
 
-import { CONFIG_FILE } from '../config.js';
+import { CONFIG_FILE } from '../core/config/index.js';
 import { OVERRIDE_DISABLED, OVERRIDES_KEY, overrideFor, overrideSettingsPath, readSkillOverrides } from '../inventory/disabled.js';
 import { buildInventory } from '../inventory/index.js';
 import { CLAUDE_JSON_FILE, DISABLE_KEY, MCP_SCOPES, mcpServerFor, PROJECTS_KEY, readMcpServers, REJECT_KEY } from '../inventory/mcp.js';

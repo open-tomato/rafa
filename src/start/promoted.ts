@@ -20,7 +20,7 @@
  *
  * ## Which block
  *
- * Blocks are found by `readRafaBlocks` (`plan/blocks.ts`), so a
+ * Blocks are found by `readRafaBlocks` (`core/plan/blocks.ts`), so a
  * `rafa:promoted` fence shown inside a longer fence is an illustration
  * and not an answer. The LAST block counts, as the last
  * `rafa:spec-review` block does in `board/spec-review.ts`: a session
@@ -61,7 +61,7 @@
  *
  * Nothing here throws, opens a file or changes a value passed in.
  */
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 /** The kind of the block the wrap-up session answers in. */
 export const PROMOTED_BLOCK_KIND = 'promoted';

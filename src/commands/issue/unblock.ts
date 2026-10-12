@@ -68,15 +68,13 @@
 import type { NativeUnblockRefreshOptions } from './unblock-native.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { UnblockAsk, UnblockReport } from '../../board/unblock.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { isUnblockFailure, runUnblock } from '../../board/unblock.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
 import { nativeUnblockReport, NATIVE_UNBLOCK_LINE, refreshNativeUnblock, unblockRelationshipsMode } from './unblock-native.js';

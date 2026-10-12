@@ -75,8 +75,8 @@
  * rather than read as the default plan (`readSwitch`, `plan-files.ts`).
  */
 import type { SpecRouteSeams } from './spec-route.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Need, NeedOrigin, NeedsReading, NeedsSeams, StackReading } from '../../plan/needs.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -84,12 +84,12 @@ import type { ProjectFound } from '../../project/scope.js';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { isFile, plural } from '../../core/plan/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
-import { isFile, plural } from '../../plan/plan-files.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 import { isSourceShape } from '../skill/list.js';
 

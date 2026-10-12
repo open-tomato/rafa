@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 
 import { expectExit, plantScratchRepo, runRafa } from './cli-capture.js';

@@ -14,7 +14,7 @@
  *
  *   1. **The spawn.** `sessionSpawnEnv(env)` (`src/utils/session-env.ts`),
  *      where `env` is the invocation's `RafaContext.env`: the function
- *      both spawn doors in `src/utils/claude.ts` call, called here
+ *      both spawn doors in `src/core/loop/claude.ts` call, called here
  *      rather than spelled again, so the reading cannot drift from what
  *      a spawn hands `Bun.spawn`.
  *   2. **The settings files.** Claude Code then assigns the `env`
@@ -109,11 +109,11 @@
  * Nothing here throws, writes, or reads `process.env`, `process.cwd()`
  * or the real home: every input comes from {@link SessionEnvSeams}.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
 import { pathDirectories } from '../check/references.js';
-import { describeValue, isMapping } from '../config-sections.js';
+import { describeValue, isMapping } from '../core/config/sections.js';
 import { OVERRIDE_SCOPES, overrideSettingsPath, readSettings } from '../inventory/disabled.js';
 import { sessionSpawnEnv } from '../utils/session-env.js';
 

@@ -10,7 +10,7 @@
  * project's entry beside this project's, and so on.
  */
 import type { McpSeams } from './mcp.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

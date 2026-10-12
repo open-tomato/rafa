@@ -30,8 +30,8 @@ import type { EpicMoveSeams } from './move.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { MembershipChange, OpenWork } from '../../board/epic-trail.js';
 import type { IssueBoard } from '../../board/issue-board.js';
-import type { RafaCommand } from '../../cli/command.js';
-import type { GitResult, GitRunner } from '../../pr/git.js';
+import type { RafaCommand } from '../../core/command/index.js';
+import type { GitResult, GitRunner } from '../../core/git/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

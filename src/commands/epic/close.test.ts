@@ -32,14 +32,14 @@
  */
 import type { EpicCloseSeams } from './close.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
+import type { GitResult, GitRunner } from '../../core/git/index.js';
+import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { EpicCriterion } from '../../epic/verify-plan.js';
 import type { CheckAnswered } from '../../epic/verify-run.js';
 import type { Tracker } from '../../ports/index.js';
-import type { GitResult, GitRunner } from '../../pr/git.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
-import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

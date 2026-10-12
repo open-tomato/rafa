@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import { worktreeDirAt } from './worktree-dir.js';
 

@@ -47,7 +47,7 @@
  *     when no directory holds one, with {@link ScopeError},
  *     {@link scopeAt}, {@link initHint} and the filesystem seam the walk
  *     reads.
- *   - The whole adapter registry, `adapters/registry.ts`:
+ *   - The whole adapter registry, `core/adapters/registry.ts`:
  *     {@link createAdapterRegistry}, {@link CORE_ADAPTER_REGISTRY}, which
  *     holds core's own adapters keyed by port type and kind, and
  *     {@link PORT_VERSIONS}, the version core serves of each port.
@@ -71,9 +71,10 @@
  * project it acts on, which behind the terminal is the nearest directory
  * at or above the working directory holding `.rafa/config.yaml`, and
  * prints what the command prints. Each writes through the active output
- * (`src/adapters/output/active.ts`), the `text` adapter on
+ * (`src/core/output/active.ts`), the `text` adapter on
  * `process.stdout` until something sets another. None calls
- * `process.exit`: a refusal throws `CommandExit` (`src/cli/command.ts`)
+ * `process.exit`: a refusal throws `CommandExit`
+ * (`src/core/command/command.ts`)
  * with the refusal as its message, which the command leaves to its caller
  * to print. `planCommand` also throws it with the exit code a `claude`
  * planner's rejection carries, and `startCommand` with exit code 0 once
@@ -119,34 +120,36 @@ export type {
   AdapterRegistry,
   AnyAdapter,
   PortImplementations,
-} from './adapters/registry.js';
-export type { ConfigRoots } from './config-load.js';
+} from './core/adapters/index.js';
+export type { ConfigRoots } from './core/config/load.js';
 export type {
-  BoardRelationshipMode,
-  ClaudeSettingSource,
   CommandLineSetting,
-  ConfigExtra,
   ConfigFile,
   ConfigLayer,
   ConfigLayers,
   ConfigOverrides,
   ConfigSetting,
   ConfigSource,
-  ConfigVersion,
-  InjectMode,
   ModuleSource,
   ModuleSourceKind,
   OptionalPrerequisiteItem,
-  OutputMode,
   PrerequisiteItem,
   PrerequisiteKind,
-  PrProvider,
   RafaConfig,
-  ReleaseEnabled,
   ResolvedConfig,
+} from './core/config/index.js';
+export type {
+  BoardRelationshipMode,
+  ClaudeSettingSource,
+  ConfigExtra,
+  ConfigVersion,
+  InjectMode,
+  OutputMode,
+  PrProvider,
+  ReleaseEnabled,
   StoreBackend,
   SyncStrategy,
-} from './config.js';
+} from './core/config/sections.js';
 export type {
   AppendResult,
   CommitEffortRow,
@@ -248,28 +251,30 @@ export type {
   ScopeSeams,
 } from './project/scope.js';
 
-export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
-export { loadConfig, readConfigFile } from './config-load.js';
+export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
+export { loadConfig, readConfigFile } from './core/config/load.js';
+export {
+  CONFIG_DEFAULTS,
+  CONFIG_FILE,
+  ConfigError,
+  configFilePath,
+  MODULE_SOURCE_KINDS,
+  parseConfigText,
+  PREREQUISITE_KINDS,
+  resolveConfig,
+} from './core/config/index.js';
 export {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
-  CONFIG_DEFAULTS,
-  CONFIG_FILE,
   CONFIG_VERSIONS,
-  ConfigError,
-  configFilePath,
   INJECT_MODES,
-  MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
-  parseConfigText,
   PR_PROVIDERS,
-  PREREQUISITE_KINDS,
   RELEASE_AUTO,
-  resolveConfig,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './config.js';
+} from './core/config/sections.js';
 export { default as effortCollectCommand } from './effort/collect.js';
 export { default as effortReportCommand } from './effort/report.js';
 export {

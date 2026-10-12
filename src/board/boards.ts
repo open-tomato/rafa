@@ -66,7 +66,7 @@
 import type { BoardIssue } from './roadmap-board.js';
 import type { RoadmapSearch } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
 import { BOARD_LISTING_LIMIT, boardListFields, parseBoardListing } from './roadmap-board.js';
 import { isRoadmapTitle, resolveRoadmapIssue, ROADMAP_TITLE } from './roadmap.js';

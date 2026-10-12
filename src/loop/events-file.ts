@@ -39,13 +39,12 @@
  *
  * @module loop/events-file
  */
-import type { SessionRecord } from './sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
 
+import { errorCode } from '../core/loop/index.js';
 import { eventsFilePath } from '../start/loop-events.js';
-
-import { errorCode } from './sessions.js';
 
 /** The newline byte every line of the events file ends with. */
 const NEWLINE = 0x0a;

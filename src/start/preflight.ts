@@ -107,7 +107,8 @@
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
  *  12. **Halts, or answers.** A failed required item, or rows that could
- *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
+ *      not be stored, throws `CommandExit` (`core/command/command.ts`)
+ *      with exit
  *      code 1. Otherwise, on a first dispatch of a run holding its claim,
  *      the issue's `rafa:claimed` is swapped for `rafa:in-development`,
  *      best-effort, and the run's id, the report, the reminders and the
@@ -289,12 +290,13 @@
  *       checked: it is probed on a first dispatch alone, and
  *       PLAN_TRACKER-demo.md already holds a ticked task
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
-import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
+import type { PrerequisiteItem, RafaConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
@@ -310,7 +312,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import {
   collidingPlanSkills,
   missingAgentLine,
@@ -320,9 +321,10 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';

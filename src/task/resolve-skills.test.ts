@@ -3,15 +3,15 @@
  * by rank against the task text and stage context, `none`, what none of
  * them may offer, and the exported floor and limit.
  */
-import type { TierPin } from '../config-sections.js';
 import type { TaskInput } from './resolve-skills.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InventoryState } from '../inventory/record.js';
 import type { SkillTier } from '../schema/tiers.js';
 import type { Resolution, TierSettings } from '../tiers/resolve.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { SKILL_RESOLVERS } from '../config-sections.js';
+import { SKILL_RESOLVERS } from '../core/config/sections.js';
 import { resolveTiers } from '../tiers/resolve.js';
 
 import {

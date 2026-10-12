@@ -62,7 +62,7 @@ import type { LeakFinding } from './leak.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import {
   findLeaks,

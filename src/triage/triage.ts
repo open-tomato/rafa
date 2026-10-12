@@ -249,7 +249,7 @@ import type { BugValues } from './issue-text.js';
 import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type {
   FindingOutcome,
   FindingsDispatch,
@@ -264,7 +264,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 

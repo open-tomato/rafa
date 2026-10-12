@@ -86,7 +86,8 @@
  *
  * A caller builds it with {@link registryRoster} from the registry its
  * line was routed through, `RafaContext.registry`
- * (`src/cli/command.ts`): `./create.ts`, which hands it to
+
+ * (`src/core/command/command.ts`): `./create.ts`, which hands it to
  * `src/plan.ts` and so to check 4, `../issue/check.ts`, and the three
  * commands that read `../doctor-refs.ts`'s row, `../doctor.ts`,
  * `../epic/show.ts` and `../issue/list.ts`. It is `describeRegistry`
@@ -148,13 +149,13 @@ import { readFileSync } from 'node:fs';
 import path from 'path';
 
 import { version } from '../../../package.json';
-import { activeOutput } from '../../adapters/output/active.js';
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { announceAcceptStaleRefs, enforceRefsGate, readAcceptRefsFlag, refsAcceptance } from '../../board/refs-gate.js';
 import { readSpecSourceFlags } from '../../board/spec-source.js';
 import { DESCRIBE_SCHEMA_VERSION, describeRegistry } from '../../cli/describe.js';
-import { messageOf } from '../../config-sections.js';
-import { createGitRunner, gitSaid } from '../../pr/git.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../../core/git/index.js';
+import { activeOutput } from '../../core/output/index.js';
 import { createRefVerifier, ghIssueReader, tsSymbolsOutliner } from '../../refs/verify.js';
 
 /** The `name` in `package.json` of a project root that is rafa itself. */

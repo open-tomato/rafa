@@ -40,12 +40,12 @@
  * ({@link EFFORT_SYNC_ROW}) opening it, so a caller that names the row
  * itself never says it twice.
  */
-import type { AdapterRegistry } from '../../adapters/registry.js';
-import type { ResolvedConfig } from '../../config.js';
+import type { AdapterRegistry } from '../../core/adapters/index.js';
+import type { ResolvedConfig } from '../../core/config/index.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { describeValue, messageOf } from '../../config-sections.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
+import { describeValue, messageOf } from '../../core/config/sections.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { SyncModuleMissing, selectSync } from './select.js';

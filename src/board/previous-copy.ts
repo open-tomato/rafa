@@ -58,7 +58,7 @@
 import { linkSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** What every failure this module raises opens with. */
 const PREFIX = 'board previous copy';

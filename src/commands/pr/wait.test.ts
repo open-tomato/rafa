@@ -44,7 +44,7 @@
  * line is used instead of the branch" is measured too.
  */
 import type { PrWaitReading, PrWaitSeams } from './wait.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { CheckRow, ChecksReading, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';

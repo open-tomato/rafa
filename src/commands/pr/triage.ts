@@ -156,13 +156,13 @@ import type { TriageReading } from './triage-report.js';
 import type { ResolveResult } from './triage-resolve.js';
 import type { IgnoredTriageComment, TriageTrust, TrustedTriageComment } from './triage-trust.js';
 import type { Permissions } from '../../board/trust.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { GitRunner, PullRequestComment, PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { TriageSelection } from '../../pr/triage/select.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { recordPlanCi } from '../../effort/store/plan-ci.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { createGitRunner } from '../../pr/index.js';

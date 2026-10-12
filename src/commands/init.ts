@@ -191,9 +191,8 @@ import type { BoardStepResult, EpicGuardStepResult, RelationsMoveStepResult } fr
 import type { ReleaseStepResult } from './init-release.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { VendorableAgent } from '../agents/vendorable.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
-import type { RafaConfig, ResolvedConfig } from '../config.js';
+import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
+import type { RafaConfig, ResolvedConfig } from '../core/config/index.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { TrackingApplied, TrackingFlags } from '../project/gitignore.js';
 import type { ChosenRoot, RootReading, RootSource } from '../project/root-choice.js';
@@ -208,11 +207,10 @@ import { createGhRunner } from '../adapters/tracker/github.js';
 import { vendorableAgents, vendorableAgentWarnings } from '../agents/vendorable.js';
 import { commandProgressFeed } from '../board/project/progress.js';
 import { commandRetrySeams } from '../board/project/project-runner.js';
-import { CommandExit } from '../cli/command.js';
-import { createLinePrompter } from '../cli/prompt/confirm.js';
-import { loadConfig } from '../config-load.js';
-import { messageOf } from '../config-sections.js';
-import { ConfigError, configFilePath } from '../config.js';
+import { CommandExit , createLinePrompter } from '../core/command/index.js';
+import { ConfigError, configFilePath } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
+import { messageOf } from '../core/config/sections.js';
 import { resolvePrProvider } from '../pr/provider.js';
 import { readBinPath } from '../project/bin-path.js';
 import {

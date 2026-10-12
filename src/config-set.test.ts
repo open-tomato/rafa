@@ -20,7 +20,7 @@ import type { ConfigSetRefusalReason } from './config-set.js';
 import { describe, expect, it } from 'bun:test';
 
 import { ConfigSetRefusal, withConfigSetting } from './config-set.js';
-import { parseConfigText } from './config.js';
+import { parseConfigText } from './core/config/index.js';
 import { projectConfigText } from './project/scaffold.js';
 
 /** The path refusals are labelled with. */

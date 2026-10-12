@@ -78,7 +78,7 @@ import { selectBoardRelations } from '../../board/relations/select.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 
 /** What {@link refreshProjectAfterMerge} is made with. */
 export interface MergeProjectOptions {

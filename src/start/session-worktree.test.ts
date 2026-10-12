@@ -17,7 +17,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSession } from '../loop/sessions.js';
+import { readSession } from '../core/loop/index.js';
 
 import { openRunSession } from './session.js';
 

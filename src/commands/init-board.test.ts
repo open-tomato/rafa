@@ -40,7 +40,7 @@
  *    alone sets it up: the decline case here and `init.test.ts`'s.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +51,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { EPIC_GUARD_PATH, readEpicGuard } from '../board/epic-guard.js';
 import { BOARD_LABELS, ROADMAP_LABEL, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import {

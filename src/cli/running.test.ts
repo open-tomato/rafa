@@ -25,7 +25,7 @@
  * the module-level record, and the same listener wrapped with
  * `AsyncResource.bind` where it is registered reads the scope's.
  */
-import type { RafaCommand } from './command.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { AsyncResource } from 'node:async_hooks';
 import { EventEmitter } from 'node:events';

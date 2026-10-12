@@ -104,7 +104,7 @@
 /**
  * Keys this module answers to, in the order flags are emitted. `budget`
  * sits ahead of `tools` because `--tools` is variadic and has to end the
- * argument list (`utils/claude.ts`). `skills` and `tests` come last
+ * argument list (`core/loop/claude.ts`). `skills` and `tests` come last
  * because they emit no flag at all: each is recognised so that its value
  * is PARSED and lands on the record, and a value the parser cannot use
  * lands in {@link TaskDeclaration.issues} rather than passing silently.

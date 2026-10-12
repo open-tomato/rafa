@@ -7,8 +7,8 @@
  * the reading rather than assumed to.
  */
 import type { CleanupSeams, CleanupSettings } from './index.js';
-import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';
@@ -18,7 +18,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runsDir, sessionFilePath } from '../loop/sessions.js';
+import { runsDir, sessionFilePath } from '../core/loop/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { EVENTS_EXTENSION, eventsFilePath } from '../start/loop-events.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';

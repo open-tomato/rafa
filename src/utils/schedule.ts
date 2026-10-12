@@ -4,9 +4,9 @@
  * be queued for off-hours without cron.
  *
  * The line announcing the deferral goes through the active output's `info`
- * (`adapters/output/active.ts`), so json mode reads it as a `log` event.
+ * (`core/output/active.ts`), so json mode reads it as a `log` event.
  */
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 
 /** Parses `HH:MM` (24h) into a delay in milliseconds from `now`. */
 export function msUntil(startAt: string, now: Date = new Date()): number {

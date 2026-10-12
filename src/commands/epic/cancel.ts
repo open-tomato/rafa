@@ -120,9 +120,8 @@ import type { BoardRelations } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { RoadmapBody } from '../../board/roadmap-tick.js';
 import type { OpenPullRequestLister } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { SPEC_BLOCKED_LABEL } from '../../board/blocked.js';
@@ -141,10 +140,9 @@ import { createLabelsRelations, LABELS_READS } from '../../board/relations/label
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { keptLinksLine, readUnblockStill } from './cancel-unblock.js';

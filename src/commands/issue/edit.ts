@@ -29,9 +29,9 @@
  * person in either output mode.
  */
 import type { EditSeams } from './edit-run.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { editIssue, renderEditReport } from './edit-run.js';
 

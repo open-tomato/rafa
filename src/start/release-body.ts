@@ -60,8 +60,8 @@
  */
 import type { PrProviderReading, PullRequests } from '../pr/index.js';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 import { bodyWithRelease } from '../release/branch-forecast.js';
 

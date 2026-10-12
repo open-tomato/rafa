@@ -65,7 +65,7 @@
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { Need, NeedsReading, NeedsSeams, NeedsWarning, StackReading } from '../plan/needs.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { isBundledProgram, isUnmet, readPlanNeeds, readStackNeeds, STACK_TOOLS } from '../plan/needs.js';
 
 import { originsPhrase } from './plan/needs.js';

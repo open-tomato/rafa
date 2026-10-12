@@ -1,6 +1,6 @@
 /**
  * An Output a test reads, level by level, for a module that writes
- * through the active output (`src/adapters/output/active.ts`).
+ * through the active output (`src/core/output/active.ts`).
  *
  * A case sets one with `setActiveOutput`, drives the module, and sets
  * `null` after it. The active output is module state and bun runs every

@@ -44,7 +44,7 @@ import type { SpecReviewGap } from './spec-review.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 
 import {
   ASSUMPTIONS_HEADING,

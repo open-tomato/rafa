@@ -13,7 +13,7 @@
  */
 import type { RecordedIdentity, StoreIdentityFacts } from './store-identity.js';
 import type { StoreIdentitySeams } from './store-meta.js';
-import type { GitResult, GitRunner } from '../../pr/git.js';
+import type { GitResult, GitRunner } from '../../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import {

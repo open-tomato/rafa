@@ -3,7 +3,7 @@
  * with a scripted pid probe, so no case reads this checkout's
  * `.rafa/runs/` or a real process.
  */
-import type { PidProbe, SessionRecord } from '../loop/sessions.js';
+import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { runsDir, sessionFilePath } from '../loop/sessions.js';
+import { runsDir, sessionFilePath } from '../core/loop/index.js';
 import { eventsFilePath } from '../start/loop-events.js';
 
 import { readRunRecords } from './runs.js';

@@ -65,10 +65,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { CLAUDE_BASE_ARGS, CLAUDE_BIN } from '../core/loop/index.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 import { parseReport } from '../report/parse.js';
 import { buildTaskPrompt } from '../start/dispatch.js';
-import { CLAUDE_BASE_ARGS, CLAUDE_BIN } from '../utils/claude.js';
 
 /** `src/PROMPT.md`, the file `buildTaskPrompt` places in every task prompt. */
 const PROMPT_FILE = readFileSync(fileURLToPath(new URL('../PROMPT.md', import.meta.url)), 'utf8');

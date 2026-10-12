@@ -32,7 +32,7 @@
  * refusal, because `parseArgs` hands the flag the directory as its
  * value, exactly as it does for `rafa skill check --fix`.
  */
-import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
+import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -41,7 +41,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { DRAFT_FILE, REVIEWED_FILE } from '../../backfill/proposal-file.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { readFrontmatterDocument } from '../../schema/frontmatter.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 

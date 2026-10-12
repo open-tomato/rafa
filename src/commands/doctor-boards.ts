@@ -79,7 +79,7 @@ import { openBoards } from '../board/epic-board.js';
 import { createOwnerResolver } from '../board/owner-resolve.js';
 import { resolvePlace } from '../board/place.js';
 import { createGhRoadmapSearch } from '../board/roadmap.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readPositionFile } from '../project/position.js';
 
 /** The heading the board lines sit under, as `Epic labels:` heads its own. */

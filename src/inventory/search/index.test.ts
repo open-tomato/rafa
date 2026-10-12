@@ -15,8 +15,8 @@
  * search, and the log whose prompt the classifier reads as `other` is
  * shown to read as `other` before the runner stores it as `search`.
  */
+import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore, SessionEffortRow } from '../../effort/store/types.js';
-import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
 import type { InventoryRecord } from '../record.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';

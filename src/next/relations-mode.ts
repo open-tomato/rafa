@@ -36,14 +36,14 @@
 import type { NextSourceSeams } from './sources.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { EpicRelations } from '../board/epics.js';
-import type { RafaContext } from '../cli/command.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaContext } from '../core/command/index.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { selectBoardRelations } from '../board/relations/select.js';
 import { readBoardRepository } from '../board/repository.js';
-import { loadConfig } from '../config-load.js';
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 import { resolvePrProvider } from '../pr/index.js';
 
 /** The settings the mode is read from, or null where `openNextSources` refuses the config. */

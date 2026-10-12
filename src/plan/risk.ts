@@ -51,19 +51,19 @@
  * runners; the environment is the object it is handed. A test plants
  * every one of them.
  */
-import type { PlanTask } from './parse.js';
-import type { ClaudeSettingSource } from '../config.js';
 import type { AccountSeams, AccountSettings } from './risk/accounts.js';
 import type { CommandFinding, PathSeams, RiskLevel } from './risk/commands.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { PlanTask } from '../core/plan/index.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import { parsePlan } from '../core/plan/index.js';
 import { resolveSkillTiers } from '../schema/tiers.js';
 import { findAgentDefinition } from '../utils/agent-definition.js';
 
-import { parsePlan } from './parse.js';
 import { readAccounts } from './risk/accounts.js';
 import { readBodyCommands, readTaskLineCommands } from './risk/commands.js';
 import { scanSecretNames } from './risk/secrets.js';

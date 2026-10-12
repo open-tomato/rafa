@@ -38,8 +38,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BOARD_REFUSAL_EXIT } from '../board/exit-codes.js';
-import { CommandExit } from '../cli/command.js';
 import { checkCreateRefs, RAFA_PACKAGE_NAME } from '../commands/plan/refs-check.js';
+import { CommandExit } from '../core/command/index.js';
 import { readRefsBlock } from '../refs/stamp.js';
 
 import { sinkOutput } from './output-sinks.js';

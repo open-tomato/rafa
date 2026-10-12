@@ -157,7 +157,7 @@ import type {
   TransitionResult,
 } from '../../ports/index.js';
 
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 
 import { createGithubEditMembers } from './github-edit.js';
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';

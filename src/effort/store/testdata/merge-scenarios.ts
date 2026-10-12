@@ -71,7 +71,7 @@ import { dirname, join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-import { beginSession } from '../../../loop/sessions.js';
+import { beginSession } from '../../../core/loop/index.js';
 import { minutesBetween } from '../../commits.js';
 import { bringForward } from '../bring-forward.js';
 import { vacuumInto } from '../copy.js';

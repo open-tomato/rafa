@@ -47,7 +47,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'bun:test';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 import { parseReport } from '../report/parse.js';
 import { buildTaskPrompt } from '../start/dispatch.js';
 

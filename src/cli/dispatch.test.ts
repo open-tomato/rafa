@@ -92,12 +92,12 @@
  * in place afterwards, hidden only while the command runs. The mutations
  * of the scoped code are counted in `dispatch-scope.test.ts`.
  */
-import type { RafaCommand, RafaContext } from './command.js';
 import type { DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { RunningCommand } from './running.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { CliEvent, Output } from '../ports/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -108,17 +108,16 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { version } from '../../package.json';
-import { activeOutput, activeOutputMode, setActiveOutput } from '../adapters/output/active.js';
 import { createJsonOutput } from '../adapters/output/json.js';
+import { CommandExit , versionLine } from '../core/command/index.js';
+import { activeOutput, activeOutputMode, setActiveOutput } from '../core/output/index.js';
 import { initHint } from '../project/scope.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
-import { CommandExit } from './command.js';
 import { deprecationLine, dispatch, renderUsage } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 import { restoreRunningCommand, runningCommand, setRunningCommand } from './running.js';
-import { versionLine } from './version.js';
 
 /** The directory the dispatcher sits in, which the child probe imports from. */
 const CLI_DIR = fileURLToPath(new URL('./', import.meta.url));

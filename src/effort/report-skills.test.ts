@@ -12,8 +12,8 @@
  * once the difference is put in.
  */
 import type { SkillFact, SkillFactEntry } from './skill-facts.js';
-import type { TierPin } from '../config-sections.js';
 import type { PlanCiRow } from './store/plan-ci.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
 import type { Resolution, TierRow, TierSettings } from '../tiers/resolve.js';
 

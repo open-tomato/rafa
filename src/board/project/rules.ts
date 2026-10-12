@@ -104,7 +104,7 @@
  * modules learning a relationship. Stage reads the label only to pick a
  * column, so it takes the tracker's spelling of the same name.
  */
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { Epic } from '../epics.js';
 import type { Blocker, BlockersReading } from '../relations/port.js';
 import type { BoardIssue } from '../roadmap-board.js';

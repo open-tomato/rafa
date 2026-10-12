@@ -79,8 +79,8 @@
  * naming nothing it can take, a config that cannot be used, and a `-i`
  * that cannot browse. `ctrl-c` inside a browse is exit code 130.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { InventoryRecord } from '../../inventory/record.js';
 import type { ProjectFound } from '../../project/scope.js';
@@ -88,9 +88,9 @@ import type { SkillListFilters, SkillListSeams, SkillTreeListing, StateFilter } 
 
 import { VENDOR_COMMAND } from '../../agents/roster.js';
 import { pathDirectories } from '../../check/references.js';
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { buildInventory } from '../../inventory/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { SKILL_TIERS } from '../../schema/tiers.js';

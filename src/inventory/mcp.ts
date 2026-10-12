@@ -53,7 +53,7 @@
  *     approved it: no `enabledMcpjsonServers`, no
  *     `enableAllProjectMcpServers`, no trust. It started all the same,
  *     where `claude mcp get` read it `Pending approval`. The loop always
- *     runs `-p` (`CLAUDE_BASE_ARGS` in `utils/claude.ts`), so approval
+ *     runs `-p` (`CLAUDE_BASE_ARGS` in `core/loop/claude.ts`), so approval
  *     is not read here at all. An interactive session approves by
  *     `enabledMcpjsonServers` and `enableAllProjectMcpServers`, the local and
  *     project files counting only in a trusted workspace. That is
@@ -80,11 +80,11 @@
  * handed it: every path comes from {@link McpSeams}.
  */
 import type { OverrideSeams } from './disabled.js';
-import type { ClaudeSettingSource, Mapping } from '../config-sections.js';
+import type { ClaudeSettingSource, Mapping } from '../core/config/sections.js';
 
 import { join } from 'node:path';
 
-import { describeValue, isMapping } from '../config-sections.js';
+import { describeValue, isMapping } from '../core/config/sections.js';
 
 import { overrideSettingsPath, readSettings } from './disabled.js';
 

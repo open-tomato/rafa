@@ -59,14 +59,14 @@
  * The project's resolved `store` is handed in, never read here, for the
  * reason `mergeStore` gives: resolution has one owner, the config. Core
  * registers the strategy as `sync/file` in `CORE_ADAPTER_REGISTRY`
- * (`src/adapters/registry.ts`), whose `create` reads it off the
+ * (`src/core/adapters/registry.ts`), whose `create` reads it off the
  * context's `store` and refuses a context naming none: defaulting it to
  * `sqlite` would carry an NDJSON project's store without its sessions.
  *
  * Push and pull are async only to fill the port: each runs to its end
  * before it answers, and a throw is answered as a rejection.
  */
-import type { StoreBackend } from '../../config.js';
+import type { StoreBackend } from '../../core/config/sections.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushRequest, SyncPushResult } from '../../ports/index.js';
 import type { DevelopmentProbe } from '../store/development-build.js';
 import type { MergeOptions } from '../store/merge-store.js';
@@ -74,7 +74,7 @@ import type { MergeOptions } from '../store/merge-store.js';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { describeValue } from '../../config-sections.js';
+import { describeValue } from '../../core/config/sections.js';
 import { fileStamp } from '../file-stamp.js';
 import { copyEffortStore } from '../store/copy.js';
 import { effortStoreDir } from '../store/location.js';

@@ -4,7 +4,7 @@
  * (including an inherited property name) is refused with the modes named.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

@@ -24,7 +24,7 @@ export default [
     // shipped as `@open-tomato/rafa/learning`, so it imports nothing from
     // the rest of `src/` and touches no filesystem. `node:crypto` (for
     // sha256) and packages such as `bun:test` stay allowed. The zone is
-    // resolved, not matched by specifier, so `../config.js` from
+    // resolved, not matched by specifier, so `../core/config/index.js` from
     // `src/learning/` is refused while `../x.js` from a subdirectory of it
     // is not. `src/tests/learning-boundary.test.ts` lints a file planted
     // under `src/learning/` against this block.

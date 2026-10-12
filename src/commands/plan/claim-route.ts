@@ -72,17 +72,17 @@ import type { RefreshConfig } from '../../board/project/refresh.js';
 import type { ResolvedSpec } from '../../board/spec-source.js';
 import type { AheadRequest } from '../../claims/ahead.js';
 import type { PlanClaim, PlanClaimContext, PlanClaimRequest } from '../../claims/plan-claim.js';
-import type { ClaimsAhead } from '../../config-sections.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { ClaimsAhead } from '../../core/config/sections.js';
 import type { Output } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { createRefreshingGhIssueBoard } from '../../board/project/issue-board-refresh.js';
 import { aheadClaimedLine, aheadEnabled, aheadNotClaimedWarning } from '../../claims/ahead.js';
 import { readDeviceStoreId } from '../../claims/device.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 
 /** The exit code a refused `--issue` or `--spec` run ends with: another store holds the issue. */

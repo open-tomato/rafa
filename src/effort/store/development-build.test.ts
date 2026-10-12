@@ -14,7 +14,7 @@
  * appended to `SQLITE_MIGRATIONS`.
  */
 import type { SqliteMigration } from './migrations.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import {
@@ -32,7 +32,7 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { runsDir, sessionFilePath } from '../../loop/sessions.js';
+import { runsDir, sessionFilePath } from '../../core/loop/index.js';
 
 import { bringForward, MIGRATION_LOG_TABLE } from './bring-forward.js';
 import {

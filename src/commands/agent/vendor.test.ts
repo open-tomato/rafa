@@ -46,7 +46,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { resolveAgentRoster } from '../../agents/roster.js';
-import { CONFIG_DEFAULTS } from '../../config.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import {

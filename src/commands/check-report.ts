@@ -70,13 +70,13 @@
  */
 import type { CheckKind } from '../check/layout.js';
 import type { CheckIssue, CheckOptions, CheckReport, DirectoryReport } from '../check/run.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 
 import { resolve } from 'node:path';
 
 import { pathDirectories } from '../check/references.js';
 import { checkDirectory } from '../check/run.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 /** Answers the directory a relative path on the line is resolved against. */
 export type Cwd = () => string;

@@ -79,10 +79,10 @@ import type { RefVerifier } from '../refs/verify.js';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { SETTINGS } from '../config-schema.js';
-import { messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { SETTINGS } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { readCopyRefs, readRefsText, restampCopyRefs } from '../refs/reading.js';
 import { RefsBlockError } from '../refs/stamp.js';
 import { RefVerifyError } from '../refs/verify.js';

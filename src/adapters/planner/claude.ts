@@ -24,7 +24,7 @@
  *     `rafa effort collect`.
  *   - `settingSources`: what the session loads settings from, the run's
  *     resolved `loop.settingSources`. There is no default, for the reason
- *     `src/utils/claude.ts` gives.
+ *     `src/core/loop/claude.ts` gives.
  *   - `buildPrompt`: the session's prompt for one spec and stub, with
  *     the plans directory it is to name the files in, which is `planDir`
  *     resolved absolute against the root. See "Paths" below.
@@ -145,16 +145,16 @@
  * `rafa loop start --plan=` takes them against the root.
  */
 import type { SpecReviewReading } from '../../board/spec-review.js';
-import type { ClaudeSettingSource } from '../../config.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
+import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { GeneratedPlan, Planner, PlanRequest } from '../../ports/index.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
 import { parseSpecReview } from '../../board/spec-review.js';
-import { claudeArgs, spawnClaudeCaptured } from '../../utils/claude.js';
+import { claudeArgs, spawnClaudeCaptured } from '../../core/loop/index.js';
 
 /** The exit code of a rejection no session exit code stands behind. */
 const FAILURE_EXIT_CODE = 1;

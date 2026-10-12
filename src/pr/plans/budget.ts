@@ -27,7 +27,7 @@
  * deliberate: the four pinned plans carry no such block, the values
  * substituted into them are checked by `./load.ts` before they arrive,
  * and a fence-aware reader here would be a second, weaker copy of
- * `src/plan/blocks.ts` for a file this package ships and controls.
+ * `src/core/plan/blocks.ts` for a file this package ships and controls.
  *
  * ## A declaration already there is joined, never replaced
  *

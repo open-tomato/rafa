@@ -11,7 +11,7 @@
  * plants a session record naming its pid, as `loop start` would. It
  * dispatches `rafa self-update` with a build seam of its own (so no real
  * `bun run build` runs) but no `isAlive` seam, so the command's default,
- * the real `isPidAlive` (`loop/sessions.ts`), reads the child's pid
+ * the real `isPidAlive` (`core/loop/sessions.ts`), reads the child's pid
  * through the OS. The run exits 1, naming the loop's branch, pid and
  * session, and builds nothing. The child is then killed and awaited, so
  * its pid is gone by the time a second, otherwise identical run is
@@ -19,7 +19,7 @@
  * `~/.rafa/bin/rafa`, the record itself untouched.
  */
 import type { PlantedProject } from './cli-capture.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

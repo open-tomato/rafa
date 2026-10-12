@@ -11,7 +11,7 @@
  * that could not tell the two apart would fail there.
  */
 import type { StepRun, StretchStartSeams } from './start.js';
-import type { GitResult } from '../../pr/git.js';
+import type { GitResult } from '../../core/git/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { nodeStretchFs } from '../../stretch/folder.js';
 import { nodeOperatorsFs } from '../../stretch/operators.js';
 import { nodePromptFs } from '../../stretch/prompt.js';

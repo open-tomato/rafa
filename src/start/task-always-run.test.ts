@@ -9,7 +9,7 @@ import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { FOLDED_COMMAND_JOINER, foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';

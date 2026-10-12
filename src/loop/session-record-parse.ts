@@ -1,5 +1,5 @@
 /**
- * The reading of a session record (`loop/sessions.ts`): the sets its
+ * The reading of a session record (`core/loop/sessions.ts`): the sets its
  * fields are checked against, the field readers that name each problem,
  * the frozen record built from fields already checked, and
  * {@link parseSessionRecord}. `sessions.ts` re-exports everything a
@@ -9,8 +9,9 @@
  * of `sessions.ts`, "The record" and "Steps".
  *
  * The two modules import each other's types alone: this one takes the
- * record's interfaces from `sessions.ts` with `import type`, which leaves
- * no import at run time, and `sessions.ts` takes its values from here.
+ * record's interfaces from `sessions.ts`, through the barrel of
+ * `src/core/loop/`, with `import type`, which leaves no import at run
+ * time, and `sessions.ts` takes its values from here.
  * The sets, the error and the id check live here so this module imports
  * no value from `sessions.ts` and the pair forms no cycle when loaded.
  *
@@ -66,13 +67,13 @@ import type {
   SessionStep,
   SessionStepOnly,
   SessionTaskRef,
-} from './sessions.js';
+} from '../core/loop/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 
 import { basename, isAbsolute } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { asHopRecord } from '../next/hop-record.js';
 import { TEST_SCOPES } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';

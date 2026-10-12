@@ -94,7 +94,7 @@
  *
  * {@link parseVerifyPlan} takes the session's output and the criteria it
  * was built from, never throws, and reads the LAST `rafa:verify` block by
- * `readRafaBlocks` (`../plan/blocks.ts`), under the rule
+ * `readRafaBlocks` (`../core/plan/blocks.ts`), under the rule
  * `../inventory/search/block.ts` reads its own by: an earlier block is a
  * draft or the format quoted back, and when the last one cannot be read
  * no earlier one is read in its place.
@@ -133,14 +133,14 @@
  * and `criterion: "1"` reads as a string, which is refused rather than
  * turned into a number.
  */
-import type { RafaBlock } from '../plan/blocks.js';
+import type { RafaBlock } from '../core/plan/block-reader.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CRITERIA_PLACEHOLDERS, PLACEHOLDER_REASON } from '../board/epic-template.js';
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 /** This module's own directory, where the template lookup starts. */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));

@@ -38,7 +38,7 @@
  * same line and whose data holds the retry's place, reason, subject,
  * issue and wait. An opener with a command context at hand reports to
  * that command's output; one without reports to the active output
- * (`src/adapters/output/active.ts`), read at each retry, as the
+ * (`src/core/output/active.ts`), read at each retry, as the
  * refreshing issue board's warnings are.
  *
  * ## The wait
@@ -49,11 +49,11 @@
  */
 import type { RetryNotice } from './retry.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaConfig } from '../../config-schema.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { CliEventNamed, Output } from '../../ports/index.js';
 
-import { activeOutput, activeOutputMode } from '../../adapters/output/active.js';
+import { activeOutput, activeOutputMode } from '../../core/output/index.js';
 
 import { retryingGhRunner } from './retry.js';
 

@@ -22,8 +22,8 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { createGitRunner } from '../core/git/index.js';
 import { writeChanges } from '../effort/store/changes.js';
-import { createGitRunner } from '../pr/git.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';

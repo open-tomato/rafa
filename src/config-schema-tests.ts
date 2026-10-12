@@ -98,12 +98,12 @@
  * (`config-schema-readings.ts`): a global flag nobody typed would be one
  * this module invented.
  */
-import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
 import { isAbsolute } from 'node:path';
 
-import { flag, listOf, refused, text } from './config-sections.js';
+import { flag, listOf, refused, text } from './core/config/sections.js';
 
 /** The `tests` section's settings, resolved. */
 export interface TestsSettings {
