@@ -238,8 +238,10 @@ stopping at the first row whose reading answers something (a found state or a
 problem). The base rows are:
 
 1. Branch sync (`git fetch --all || git ls-remote`)
-2. Loop running (`rafa loop status`)
-3. Working tree uncommitted edits
+2. Loop running (`rafa loop status`), ahead of the working tree only while
+   a live run works in the checkout the tree is read in
+3. Working tree uncommitted edits, ahead of a loop running in a worktree
+   of its own, whose row answers once this tree is clean
 4. Plan unstarted or paused
 5. Pull request merge checks
 6. Pull request open (ready to merge)
