@@ -166,20 +166,20 @@
 import type { SessionKind } from './classify.js';
 import type { SessionEffortRow } from './collect.js';
 import type { BudgetedSession } from './report-budgets.js';
-import type { SessionUsageTotals } from './session-log.js';
-import type { ConfigRoots } from '../config-load.js';
 import type { SkillsReport } from './report-skills.js';
+import type { SessionUsageTotals } from './session-log.js';
 import type { SessionBudget } from './store/dispatches.js';
 import type { PreflightHalt } from './store/preflight.js';
 import type { TaskReportTally } from './store/reports.js';
 import type { EffortStore } from './store/types.js';
+import type { ConfigRoots } from '../core/config/load.js';
 
 import { homedir } from 'node:os';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 import { resolveSessionTiers } from '../start/serving.js';
 
 import { PROMPT_SHAPES } from './classify.js';

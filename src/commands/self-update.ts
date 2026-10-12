@@ -95,8 +95,8 @@ import type { ProjectFound } from '../project/scope.js';
 import type { BuildLines } from '../runtime/install.js';
 
 import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
 import { SETTINGS } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 import { messageOf } from '../core/config/sections.js';
 import { isPidAlive, readSessions } from '../loop/sessions.js';
 import { readBinPath } from '../project/bin-path.js';

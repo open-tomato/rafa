@@ -184,8 +184,8 @@ import { resolve } from 'node:path';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
 import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 
 import { attributeSession, planStubsFromFileNames } from './attribution.js';
 import { findFirstEnqueue } from './classify.js';

@@ -48,7 +48,7 @@ import type { CommandRoute } from '../cli/route.js';
 import type { RafaConfig } from '../core/config/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 
 import { noticeLine } from './notice.js';
 import { readSeenFile, takeSeenSnapshot, writeSeenFile } from './seen.js';

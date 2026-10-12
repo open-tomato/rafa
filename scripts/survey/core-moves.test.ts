@@ -108,11 +108,12 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists eight barrels, two of them for config', () => {
+  it('lists nine barrels, three of them for config', () => {
     expect(barrelPaths()).toEqual([
       'src/core/adapters/index.ts',
       'src/core/command/index.ts',
       'src/core/config/index.ts',
+      'src/core/config/load.ts',
       'src/core/config/sections.ts',
       'src/core/git/index.ts',
       'src/core/loop/index.ts',

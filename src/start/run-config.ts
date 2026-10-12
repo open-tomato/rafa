@@ -25,14 +25,14 @@
  * Every line either writes goes through the active output
  * (`adapters/output/active.ts`), at warn level.
  */
-import type { ConfigRoots } from '../config-load.js';
 import type { ConfigSource, ResolvedConfig } from '../core/config/index.js';
+import type { ConfigRoots } from '../core/config/load.js';
 import type { StoreEnvironment } from '../effort/store/location.js';
 import type { PlanIssue } from '../plan/index.js';
 
 import { activeOutput } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 import { EFFORT_DIR_VARIABLE } from '../effort/store/location.js';
 import { parsePlan } from '../plan/index.js';
 

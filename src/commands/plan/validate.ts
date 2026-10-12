@@ -128,8 +128,8 @@ import {
   unresolvedSkillLine,
 } from '../../agents/roster.js';
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { formatCounts, issueLine, plural } from '../../plan/plan-files.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';

@@ -241,8 +241,8 @@ import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
-import { loadConfig } from './config-load.js';
 import { ConfigError } from './core/config/index.js';
+import { loadConfig } from './core/config/load.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';

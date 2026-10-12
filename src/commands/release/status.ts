@@ -80,8 +80,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { messageOf } from '../../core/config/sections.js';
 import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
 import { readPlanChanges } from '../../effort/store/changes.js';

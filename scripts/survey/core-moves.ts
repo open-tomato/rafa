@@ -195,16 +195,18 @@ export const CORE_MOVES: readonly CoreMove[] = [
 ];
 
 /**
- * The barrel files of each subject, sorted. `config` has two: the leaf
- * pair `config-sections.ts` and `config-readers.ts` sits behind
+ * The barrel files of each subject, sorted. `config` has three. The
+ * leaf pair `config-sections.ts` and `config-readers.ts` sits behind
  * `sections.ts`, because `config-schema.ts` imports section files that
  * import that pair back, and one barrel over all of them would close a
- * cycle through every section file.
+ * cycle through every section file. `config-load.ts` sits alone behind
+ * `load.ts`, because it imports `src/effort/store/settings.ts`, which
+ * imports `index.ts` and `sections.ts` back.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],
   command: ['src/core/command/index.ts'],
-  config: ['src/core/config/index.ts', 'src/core/config/sections.ts'],
+  config: ['src/core/config/index.ts', 'src/core/config/load.ts', 'src/core/config/sections.ts'],
   git: ['src/core/git/index.ts'],
   loop: ['src/core/loop/index.ts'],
   output: ['src/core/output/index.ts'],

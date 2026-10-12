@@ -52,8 +52,8 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../../config-load.js';
 import { PREREQUISITE_KINDS } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { runPreflight } from '../../preflight/run.js';
 
 import { LEGACY_GATE_OPEN } from './migrations.js';

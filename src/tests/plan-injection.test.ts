@@ -30,7 +30,7 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { ConfigRoots } from '../config-load.js';
+import type { ConfigRoots } from '../core/config/load.js';
 import type { InjectMode } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';

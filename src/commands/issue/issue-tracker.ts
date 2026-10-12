@@ -96,8 +96,8 @@ import type { DoctorRefsSeams } from '../doctor-refs.js';
 
 import { resolveTracker } from '../../adapters/tracker/resolve.js';
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { messageOf } from '../../core/config/sections.js';
 
 /** How the chain is resolved; see the module note. Each left out is the chain's own. */

@@ -82,14 +82,14 @@
  * would throw it.
  */
 import type { AdapterRegistry } from '../../adapters/registry.js';
-import type { ConfigRoots } from '../../config-load.js';
 import type { ResolvedConfig } from '../../core/config/index.js';
+import type { ConfigRoots } from '../../core/config/load.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
 import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { describeValue, messageOf } from '../../core/config/sections.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 

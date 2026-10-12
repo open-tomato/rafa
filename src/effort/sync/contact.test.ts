@@ -32,8 +32,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../../adapters/registry.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError, parseConfigText, resolveConfig } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 
 import {
   createHubContact,

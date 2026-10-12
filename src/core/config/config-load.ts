@@ -4,9 +4,9 @@
  * `config.ts`, which parses each file and ranks the layers.
  *
  * The file is `config-load.ts` and not `config/load.ts` for the reason
- * `config-sections.ts` gives: a `src/config/` directory beside
- * `config.ts` would set the trap `context/source.md` records for
- * `./plan`.
+ * `config-sections.ts` gives: while both sat in `src/`, a `src/config/`
+ * directory beside `config.ts` would have set the trap
+ * `context/source.md` records for `./plan`.
  *
  * ## Two scopes
  *
@@ -70,17 +70,18 @@
  * is absorbed — the rule `effort/store.ts` applies to its own files —
  * and anything at the path that cannot be read is refused.
  */
-import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './core/config/index.js';
+import type { ConfigFile, ConfigOverrides, ResolvedConfig } from './config.js';
 
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
-import { setActiveLoggerSettings } from './adapters/logger/settings.js';
-import { activeOutput } from './adapters/output/active.js';
-import { loggerSettingsOf } from './config-schema-logger.js';
-import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './core/config/index.js';
-import { describeValue, messageOf } from './core/config/sections.js';
-import { setActiveStoreSettings } from './effort/store/settings.js';
+import { setActiveLoggerSettings } from '../../adapters/logger/settings.js';
+import { activeOutput } from '../../adapters/output/active.js';
+import { loggerSettingsOf } from '../../config-schema-logger.js';
+import { setActiveStoreSettings } from '../../effort/store/settings.js';
+
+import { describeValue, messageOf } from './config-sections.js';
+import { ConfigError, configFilePath, parseConfigText, resolveConfig } from './config.js';
 
 /** The two directories {@link loadConfig} reads a config file under. */
 export interface ConfigRoots {

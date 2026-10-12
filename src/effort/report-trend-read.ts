@@ -21,8 +21,8 @@ import { homedir } from 'node:os';
 
 import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { CommandExit } from '../cli/command.js';
-import { loadConfig } from '../config-load.js';
 import { ConfigError } from '../core/config/index.js';
+import { loadConfig } from '../core/config/load.js';
 
 import { formatTrendReport } from './report-trend-format.js';
 import { summariseTrend } from './report-trend.js';

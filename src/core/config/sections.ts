@@ -9,7 +9,7 @@
  *
  * ## Why the pair has a barrel of its own
  *
- * `src/core/config/` has two barrels, both listed under `CORE_BARRELS`
+ * `src/core/config/` has three barrels, all listed under `CORE_BARRELS`
  * in `scripts/survey/core-moves.ts`. This one holds the leaf pair: the
  * two files import each other one way (`config-readers.ts` reads
  * `config-sections.ts`), `node:path`, and four modules that import none

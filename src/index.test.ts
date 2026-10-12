@@ -27,6 +27,9 @@
  * root or to that list. The ten runtime names `config.ts` re-exports
  * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
  * other barrel, `sections.ts`, and are held by the spelled list alone.
+ * The second config module, `config-load.ts`, is read through a barrel
+ * of its own, `src/core/config/load.ts`, which holds that module's
+ * names and no other, so nothing is left out of its containment case.
  *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
  * dispatcher, the help renderer, the core registry, the module loader
@@ -124,8 +127,6 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
 import * as registryModule from './adapters/registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
-import { loadConfig, readConfigFile } from './config-load.js';
-import * as configLoadModule from './config-load.js';
 import {
   CONFIG_DEFAULTS,
   CONFIG_FILE,
@@ -137,6 +138,8 @@ import {
   resolveConfig,
 } from './core/config/index.js';
 import * as configBarrel from './core/config/index.js';
+import { loadConfig, readConfigFile } from './core/config/load.js';
+import * as configLoadModule from './core/config/load.js';
 import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
@@ -462,8 +465,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'unresolvedSkillLine',
     ]],
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../plan/plan-files.js', ['formatCounts', 'issueLine', 'plural']],
     ['../../plan/store-rules.js', ['storeRuleLine']],
     ['../../plan/validate.js', ['validatePlan']],
@@ -482,8 +485,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/plan/needs.js', [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../plan/needs.js', ['isUnmet', 'readPlanNeeds', 'readSpecNeeds']],
     ['../../plan/plan-files.js', ['isFile', 'plural']],
@@ -856,8 +859,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/module/list.js', [
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
@@ -872,8 +875,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../agents/roster.js', ['VENDOR_COMMAND']],
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../schema/tiers.js', ['SKILL_TIERS']],
@@ -907,8 +910,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/terminal.js', ['processTerminal', 'refuseWithoutTerminal']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../inventory/browse.js', ['browse']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
@@ -923,7 +926,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/skill/search.js', [
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../effort/store/index.js', ['selectEffortStore']],
     ['../../inventory/search/index.js', ['droppedLine', 'rankSearch', 'runSearch']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
@@ -946,7 +949,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../backfill/propose.js', ['applyProposals', 'PROPOSAL_ACTION_KINDS', 'runProposalPass']],
     ['../../check/references.js', ['pathDirectories']],
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../demote/select.js', ['resolveDemotionScope']],
   ]],
   ['./commands/instinct/check.js', [
@@ -986,8 +989,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/release/status.js', [
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/attribution.js', ['planStubsFromFileNames', 'resolvePlanStub']],
     ['../../effort/store/changes.js', ['readPlanChanges']],
@@ -1015,8 +1018,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/release/tag.js', [
     ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
     ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
     ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
     ['../../release/status-readings.js', ['changelogVersions', 'readTags']],
@@ -1218,7 +1221,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/confirm.js', ['createLinePrompter']],
     ['../../cli/version.js', ['RAFA_VERSION']],
-    ['../../config-load.js', ['loadConfig']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/provider.js', ['resolvePrProvider']],
     ['../../project/lock.js', ['LOCK_FILE', 'readProjectLock']],
@@ -1416,8 +1419,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../config-load.js', ['loadConfig']],
     ['../core/config/index.js', ['ConfigError', 'configFilePath']],
+    ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../project/bin-path.js', ['readBinPath']],
@@ -1444,8 +1447,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/project/project-runner.js', ['commandRetrySeams']],
     ['../cli/command.js', ['CommandExit']],
     ['../cli/version.js', ['versionLine']],
-    ['../config-load.js', ['loadConfig']],
     ['../core/config/index.js', ['ConfigError']],
+    ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
     ['../effort/sync/doctor-reading.js', ['readDoctorEffortSync']],
     ['../plan/plan-files.js', ['isFile']],
@@ -1485,8 +1488,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/self-update.js', [
     ['../cli/command.js', ['CommandExit']],
-    ['../config-load.js', ['loadConfig']],
     ['../core/config/index.js', ['SETTINGS']],
+    ['../core/config/load.js', ['loadConfig']],
     ['../core/config/sections.js', ['messageOf']],
     ['../loop/sessions.js', ['isPidAlive', 'readSessions']],
     ['../project/bin-path.js', ['readBinPath']],

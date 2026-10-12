@@ -120,7 +120,7 @@ export type {
   AnyAdapter,
   PortImplementations,
 } from './adapters/registry.js';
-export type { ConfigRoots } from './config-load.js';
+export type { ConfigRoots } from './core/config/load.js';
 export type {
   CommandLineSetting,
   ConfigFile,
@@ -251,7 +251,7 @@ export type {
 } from './project/scope.js';
 
 export { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
-export { loadConfig, readConfigFile } from './config-load.js';
+export { loadConfig, readConfigFile } from './core/config/load.js';
 export {
   CONFIG_DEFAULTS,
   CONFIG_FILE,

@@ -363,7 +363,8 @@ describe('importLine and deepImportLine', () => {
 
   it('names the barrels of the subject a deep import reaches into', () => {
     expect(deepImportLine(LOAD_EDGE)).toBe(
-      'src/board/place.ts -> src/core/config/config-load.ts (import src/core/config/index.ts or src/core/config/sections.ts)',
+      'src/board/place.ts -> src/core/config/config-load.ts '
+      + '(import src/core/config/index.ts or src/core/config/load.ts or src/core/config/sections.ts)',
     );
     expect(deepImportLine({ from: 'src/a.ts', to: 'src/core/git/hooks/run.ts' })).toBe(
       'src/a.ts -> src/core/git/hooks/run.ts (import src/core/git/index.ts)',
@@ -382,7 +383,11 @@ describe('importLine and deepImportLine', () => {
 
 describe('subjectBarrels', () => {
   it('answers the barrels in the subject folder of a path under src/core/, sorted', () => {
-    expect(subjectBarrels('src/core/config/config-load.ts')).toEqual(['src/core/config/index.ts', 'src/core/config/sections.ts']);
+    expect(subjectBarrels('src/core/config/config-load.ts')).toEqual([
+      'src/core/config/index.ts',
+      'src/core/config/load.ts',
+      'src/core/config/sections.ts',
+    ]);
     expect(subjectBarrels('src/core/plan/deep/er/file.ts')).toEqual(['src/core/plan/index.ts']);
   });
 

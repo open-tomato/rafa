@@ -47,7 +47,7 @@
  * planted at the LITERAL `.rafa/config.yaml`.
  */
 import type { ConfigRoots } from './config-load.js';
-import type { ConfigSetting, ConfigSource } from './core/config/index.js';
+import type { ConfigSetting, ConfigSource } from './config.js';
 
 import {
   chmodSync,
@@ -64,11 +64,12 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { setActiveOutput } from './adapters/output/active.js';
+import { setActiveOutput } from '../../adapters/output/active.js';
+import { activeStoreSettings, setActiveStoreSettings } from '../../effort/store/settings.js';
+import { sinkOutput } from '../../tests/output-sinks.js';
+
 import { loadConfig, readConfigFile } from './config-load.js';
-import { CONFIG_DEFAULTS, ConfigError } from './core/config/index.js';
-import { activeStoreSettings, setActiveStoreSettings } from './effort/store/settings.js';
-import { sinkOutput } from './tests/output-sinks.js';
+import { CONFIG_DEFAULTS, ConfigError } from './config.js';
 
 /** Chmod cannot deny a read to root; see the unreadable-file case. */
 const isRoot = process.getuid?.() === 0;

@@ -83,7 +83,7 @@ import type { ProjectFound } from '../../project/scope.js';
 import type { CapturingSpawner } from '../../utils/claude.js';
 
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
+import { loadConfig } from '../../core/config/load.js';
 import { selectEffortStore } from '../../effort/store/index.js';
 import { droppedLine, rankSearch, runSearch } from '../../inventory/search/index.js';
 import { expectOneArgument, readSwitch } from '../plan/plan-files.js';

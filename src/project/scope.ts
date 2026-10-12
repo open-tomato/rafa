@@ -113,7 +113,7 @@
  * from. A home that does not resolve is not refused: nothing can sit
  * under it, so it is no directory the walk climbs.
  */
-import type { ConfigRoots } from '../config-load.js';
+import type { ConfigRoots } from '../core/config/load.js';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';

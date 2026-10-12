@@ -187,7 +187,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { epicContextArgs } from './board/epic-context.js';
 import { specPath } from './board/naming.js';
 import { acceptStaleRefsPassLine } from './board/refs-gate.js';
-import { loadConfig } from './config-load.js';
+import { loadConfig } from './core/config/load.js';
 import { NOTICE_IDS, writeDismissed } from './notices/notices.js';
 import {
   buildPlanPrompt,

@@ -4,10 +4,11 @@
  *
  * The dispatcher builds a command's logger before the project is found,
  * and a command loads its config later. So the settings cannot be handed
- * to the logger when it is made: `loadConfig` (`src/config-load.ts`)
- * sets them here once a config is read, as it sets the effort store's,
- * and a logger reads them at each entry. Until then the default applies,
- * with the invocation's verbosity beside it.
+ * to the logger when it is made: `loadConfig`
+ * (`src/core/config/config-load.ts`) sets them here once a config is
+ * read, as it sets the effort store's, and a logger reads them at each
+ * entry. Until then the default applies, with the invocation's
+ * verbosity beside it.
  *
  * This module imports types and `node:async_hooks` alone, so
  * `config-load.ts` can import it without pulling an adapter in.

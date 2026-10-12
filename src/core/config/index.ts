@@ -9,12 +9,13 @@
  * file inside `src/core/` imports the three directly and never this
  * file.
  *
- * ## The two barrels hold no name in common
+ * ## The barrels hold no name in common
  *
- * `src/core/config/` has two barrels, both listed under `CORE_BARRELS`
+ * `src/core/config/` has three barrels, all listed under `CORE_BARRELS`
  * in `scripts/survey/core-moves.ts`. `sections.ts` holds the leaf pair,
  * `config-sections.ts` and `config-readers.ts`, and argues why the pair
- * has a barrel of its own. This one holds the three files that read a
+ * has a barrel of its own. `load.ts` holds `config-load.ts` alone, and
+ * argues the same for it. This one holds the three files that read a
  * key or rank a layer.
  *
  * `config.ts` re-exports twenty-seven names of `config-sections.ts`

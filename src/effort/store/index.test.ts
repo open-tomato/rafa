@@ -73,8 +73,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TRUSTED_PERMISSIONS } from '../../board/trust.js';
-import { loadConfig } from '../../config-load.js';
 import { resolveConfig } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { STORE_BACKENDS } from '../../core/config/sections.js';
 import * as wire from '../sync/wire.js';
 

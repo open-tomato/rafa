@@ -51,7 +51,7 @@ import { createGhRunner } from '../../adapters/tracker/github.js';
 import { CommandExit } from '../../cli/command.js';
 import { createLinePrompter } from '../../cli/prompt/confirm.js';
 import { RAFA_VERSION } from '../../cli/version.js';
-import { loadConfig } from '../../config-load.js';
+import { loadConfig } from '../../core/config/load.js';
 import { messageOf } from '../../core/config/sections.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 import { LOCK_FILE, readProjectLock } from '../../project/lock.js';

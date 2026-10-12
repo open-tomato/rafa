@@ -88,7 +88,7 @@ import {
 } from '../../backfill/propose.js';
 import { pathDirectories } from '../../check/references.js';
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
+import { loadConfig } from '../../core/config/load.js';
 import { resolveDemotionScope } from '../../demote/select.js';
 
 /** The two things neither the context nor the registry carries. */

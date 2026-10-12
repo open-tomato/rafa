@@ -34,8 +34,8 @@ import type { ModuleSource } from '../../core/config/index.js';
 import type { ConfiguredModule, ModuleLoadSeams } from '../../modules/load.js';
 
 import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
 import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 

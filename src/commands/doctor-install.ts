@@ -19,7 +19,7 @@ import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
 
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 import { messageOf } from '../core/config/sections.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { readBinPath } from '../project/bin-path.js';

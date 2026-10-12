@@ -17,8 +17,9 @@
  *
  *   - **The settings.** One project is planted, whose config sets
  *     `logger.level: error`. A command that loads it inside its `run`
- *     (`loadConfig`, `src/config-load.ts`) reads `error` from then on; a
- *     command that loads nothing stays at the default, `warn`.
+ *     (`loadConfig`, `src/core/config/config-load.ts`) reads `error`
+ *     from then on; a command that loads nothing stays at the default,
+ *     `warn`.
  *   - **The logger.** The dispatcher makes each from the invocation's
  *     verbosity, so one run with `-v -v` has `debug` on and one run
  *     without has it off, whatever the settings say.
@@ -70,7 +71,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { activeLogger, setActiveLogger } from '../adapters/logger/active.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { loadConfig } from '../config-load.js';
+import { loadConfig } from '../core/config/load.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, plantProject } from '../tests/cli-capture.js';
 
