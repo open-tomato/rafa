@@ -33,7 +33,7 @@ import {
   plural,
   rejectedPath,
   stubOfPlanFile,
-} from '../../plan/plan-files.js';
+} from '../../core/plan/index.js';
 import { scopeAt } from '../../project/scope.js';
 import { plantProjectConfig } from '../../tests/cli-capture.js';
 

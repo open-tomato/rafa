@@ -130,7 +130,7 @@ import {
 import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
-import { formatCounts, issueLine, plural } from '../../plan/plan-files.js';
+import { formatCounts, issueLine, plural } from '../../core/plan/index.js';
 import { storeRuleLine } from '../../plan/store-rules.js';
 import { validatePlan } from '../../plan/validate.js';
 

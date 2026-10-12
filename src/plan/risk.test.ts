@@ -22,7 +22,8 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parsePlan } from './parse.js';
+import { parsePlan } from '../core/plan/index.js';
+
 import {
   agentTools,
   assessPlanRisk,

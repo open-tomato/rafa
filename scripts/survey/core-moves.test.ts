@@ -108,7 +108,7 @@ describe('CORE_BARRELS', () => {
     }
   });
 
-  it('lists nine barrels, three of them for config', () => {
+  it('lists ten barrels, three of them for config and two for plan', () => {
     expect(barrelPaths()).toEqual([
       'src/core/adapters/index.ts',
       'src/core/command/index.ts',
@@ -118,6 +118,7 @@ describe('CORE_BARRELS', () => {
       'src/core/git/index.ts',
       'src/core/loop/index.ts',
       'src/core/output/index.ts',
+      'src/core/plan/block-reader.ts',
       'src/core/plan/index.ts',
     ]);
   });
@@ -125,6 +126,8 @@ describe('CORE_BARRELS', () => {
   it('answers a barrel as one, and a moved file beside it as not one', () => {
     expect(isCoreBarrel('src/core/config/sections.ts')).toBe(true);
     expect(isCoreBarrel('src/core/config/config-sections.ts')).toBe(false);
+    expect(isCoreBarrel('src/core/plan/block-reader.ts')).toBe(true);
+    expect(isCoreBarrel('src/core/plan/blocks.ts')).toBe(false);
     expect(isCoreBarrel('src/plan/index.ts')).toBe(false);
   });
 });

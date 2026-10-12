@@ -75,8 +75,8 @@
  */
 import type { ItemMergeSeams } from './item-merge.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PlansDir } from '../../core/plan/index.js';
 import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
-import type { PlansDir } from '../../plan/plan-files.js';
 
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
@@ -85,8 +85,8 @@ import { createGhRunner, createGithubTracker } from '../../adapters/tracker/gith
 import { boardId } from '../../board/naming.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { plansDirAt, stubOfPlanFile } from '../../core/plan/index.js';
 import { isPidAlive, readSessions } from '../../loop/sessions.js';
-import { plansDirAt, stubOfPlanFile } from '../../plan/plan-files.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 import {

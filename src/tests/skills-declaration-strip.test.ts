@@ -57,7 +57,7 @@ import {
 } from 'bun:test';
 
 import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 import { commitFinishedTask } from '../start/commit.js';
 import { dispatchTask } from '../start/dispatch.js';
 import { setActivePlanStub } from '../start/stamp.js';

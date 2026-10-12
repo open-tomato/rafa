@@ -89,7 +89,7 @@ import type { Fragment } from './fragment.js';
 import type { ReleaseLevelReading, ReleaseLevelSource } from './level.js';
 import type { BaseVersionOptions } from './version.js';
 import type { GitRunner } from '../core/git/index.js';
-import type { PlanReleaseLevel } from '../plan/parse.js';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';

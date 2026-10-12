@@ -234,9 +234,9 @@ const UNCLOSED_TASK_LINE = `- [ ] Write the tests  {agent=${FENCE_AGENT}}`;
 /**
  * A plan whose `rafa:context` fence is never closed, with the task line
  * that names {@link FENCE_AGENT} sitting after it, at line 6: `parsePlan`
- * reads that line as the never-closed block's body (`plan/parse.ts`'s
+ * reads that line as the never-closed block's body (`core/plan/parse.ts`'s
  * "Where the two readers disagree" note) and does not carry it into
- * {@link import('../plan/parse.js').PlanModel.tasks}, while `findNextTask`
+ * {@link import('../core/plan/index.js').PlanModel.tasks}, while `findNextTask`
  * dispatches it regardless.
  */
 const UNCLOSED_PLAN_TEXT = [

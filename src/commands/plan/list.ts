@@ -51,8 +51,8 @@
 import type { RafaCommand } from '../../core/command/index.js';
 import type { PlanList, PlanListing } from '../../plan/list.js';
 
+import { formatCounts, plural } from '../../core/plan/index.js';
 import { listPlans } from '../../plan/list.js';
-import { formatCounts, plural } from '../../plan/plan-files.js';
 
 import {
   expectNoArgument,

@@ -112,7 +112,7 @@
  * check is skipped and the next pair tried.
  */
 import type { GitRunner } from '../core/git/index.js';
-import type { PlanReleaseLevel } from '../plan/parse.js';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 

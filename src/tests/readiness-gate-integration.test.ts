@@ -72,7 +72,7 @@ import {
 } from '../board/review-stamp.js';
 import { parseSpecReview, SPEC_REVIEW_ANSWERS } from '../board/spec-review.js';
 import { CommandExit } from '../core/command/index.js';
-import { rejectedPath } from '../plan/plan-files.js';
+import { rejectedPath } from '../core/plan/index.js';
 
 import { sinkOutput } from './output-sinks.js';
 

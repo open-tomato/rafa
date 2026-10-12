@@ -202,6 +202,12 @@ export const CORE_MOVES: readonly CoreMove[] = [
  * cycle through every section file. `config-load.ts` sits alone behind
  * `load.ts`, because it imports `src/effort/store/settings.ts`, which
  * imports `index.ts` and `sections.ts` back.
+ *
+ * `plan` has two. The leaf `blocks.ts` sits alone behind
+ * `block-reader.ts`, because `parse.ts` imports `src/utils/tracker.ts`,
+ * which imports `blocks.ts` back, and one barrel over both would close
+ * a cycle through the tracker. `index.ts` holds `parse.ts` and
+ * `plan-files.ts`.
  */
 export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   adapters: ['src/core/adapters/index.ts'],
@@ -210,7 +216,7 @@ export const CORE_BARRELS: Readonly<Record<CoreSubject, readonly string[]>> = {
   git: ['src/core/git/index.ts'],
   loop: ['src/core/loop/index.ts'],
   output: ['src/core/output/index.ts'],
-  plan: ['src/core/plan/index.ts'],
+  plan: ['src/core/plan/block-reader.ts', 'src/core/plan/index.ts'],
 };
 
 /**

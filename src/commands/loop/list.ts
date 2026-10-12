@@ -34,12 +34,13 @@
  * command declares no flag.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { TaskCounts } from '../../core/plan/index.js';
 import type { LoopSessionSeams, ResolvedLoopSeams } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { isAbsolute, relative } from 'node:path';
 
+import { countTasks } from '../../core/plan/index.js';
 import {
   isLive,
   readRecords,
@@ -48,7 +49,6 @@ import {
   sessionLine,
 } from '../../loop/session-readings.js';
 import { sessionPhase } from '../../loop/sessions.js';
-import { countTasks } from '../../plan/plan-files.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

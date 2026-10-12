@@ -87,9 +87,9 @@ import { pathDirectories } from '../../check/references.js';
 import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
+import { isFile, plural } from '../../core/plan/index.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { isUnmet, readPlanNeeds, readSpecNeeds } from '../../plan/needs.js';
-import { isFile, plural } from '../../plan/plan-files.js';
 import { DEFAULT_PLAN_FILE, resolvePlanPath } from '../../start/plan-path.js';
 import { isSourceShape } from '../skill/list.js';
 

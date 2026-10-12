@@ -55,7 +55,12 @@
  * forks worktrees, and `firstLineOf`, the wording helper the runner and
  * the fork share.
  *
- * ## Two parts live outside this directory
+ * ## Four parts live outside this directory
+ *
+ * The block reader and the plan parser live in `src/core/plan/`, with
+ * the files every part of rafa depends on. This entry re-exports them
+ * from that folder's two barrels, `block-reader.ts` and `index.ts`, and
+ * the names it exports are the ones it exported before they moved.
  *
  * The roadmap puts the report parser under this subpath too, but a
  * report is no plan: it is read out of a session's output, by
@@ -113,7 +118,7 @@ export type {
   ReportStatus,
   TaskReport,
 } from '../report/parse.js';
-export type { LineSpan, RafaBlock, RafaBlockKind } from './blocks.js';
+export type { LineSpan, RafaBlock, RafaBlockKind } from '../core/plan/block-reader.js';
 export type {
   InjectionFallback,
   InjectionFallbackReason,
@@ -132,7 +137,7 @@ export type {
   PlanStage,
   PlanTask,
   PlanTaskStatus,
-} from './parse.js';
+} from '../core/plan/index.js';
 
 export { INJECT_MODES } from '../core/config/sections.js';
 export {
@@ -144,6 +149,6 @@ export {
 } from '../preflight/prerequisites-md.js';
 export { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
 export { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '../report/parse.js';
-export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from './blocks.js';
+export { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '../core/plan/block-reader.js';
 export { renderInjection } from './inject.js';
-export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from './parse.js';
+export { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '../core/plan/index.js';

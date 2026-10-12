@@ -22,8 +22,8 @@
  *
  * {@link readSessionChecklist} reads the tasks of the plan a record names,
  * counted by checkbox as `rafa plan list` counts them
- * (`../plan/plan-files.ts`): from the plan's tracker once there is one, and
- * from the plan before then. They are the whole plan's tasks, those every
+ * (`../core/plan/plan-files.ts`): from the plan's tracker once there is one,
+ * and from the plan before then. They are the whole plan's tasks, those every
  * earlier session got through included. A record whose plan and tracker
  * are both gone has none.
  *
@@ -53,8 +53,8 @@
  * system's own ({@link resolveLoopSeams}).
  */
 import type { PidProbe, SessionRecord } from './sessions.js';
+import type { TaskCounts } from '../core/plan/index.js';
 import type { PlanTask } from '../plan/index.js';
-import type { TaskCounts } from '../plan/plan-files.js';
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -62,9 +62,9 @@ import { join, relative } from 'node:path';
 
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
+import { isFile } from '../core/plan/index.js';
 import { readTaskFinishes } from '../effort/store/task-finishes.js';
 import { parsePlan } from '../plan/index.js';
-import { isFile } from '../plan/plan-files.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 import { isPidAlive, readSessions, runsDir, SessionRecordError } from './sessions.js';

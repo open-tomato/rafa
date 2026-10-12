@@ -161,11 +161,11 @@
  * do.
  */
 import type { RafaBlock } from './blocks.js';
-import type { TaskDeclaration } from '../utils/declaration.js';
+import type { TaskDeclaration } from '../../utils/declaration.js';
 
-import { parseTaskDeclaration } from '../utils/declaration.js';
-import { isStampableStub } from '../utils/plan-stamp.js';
-import { splitBlockerComment } from '../utils/tracker.js';
+import { parseTaskDeclaration } from '../../utils/declaration.js';
+import { isStampableStub } from '../../utils/plan-stamp.js';
+import { splitBlockerComment } from '../../utils/tracker.js';
 
 import { readRafaBlocks } from './blocks.js';
 

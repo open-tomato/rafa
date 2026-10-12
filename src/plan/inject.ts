@@ -98,11 +98,11 @@
  *
  * Nothing here throws.
  */
-import type { PlanModel, PlanTask, PlanTaskStatus } from './parse.js';
 import type { InjectMode } from '../core/config/sections.js';
+import type { PlanModel, PlanTask, PlanTaskStatus } from '../core/plan/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { parsePlan } from './parse.js';
+import { parsePlan } from '../core/plan/index.js';
 
 /** The dispatched task, by the two fields of `TaskInfo` it is located by. */
 export type InjectionTask = Pick<TaskInfo, 'task' | 'lineNum'>;

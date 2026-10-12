@@ -157,9 +157,9 @@
  * silently cuts a `what` short; and an empty body parses as null, which
  * is no mapping and so `malformed`.
  */
-import type { RafaBlock } from '../plan/blocks.js';
+import type { RafaBlock } from '../core/plan/block-reader.js';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 /** The block kind a spec review is read from. */
 export const SPEC_REVIEW_KIND = 'spec-review';

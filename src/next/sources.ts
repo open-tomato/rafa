@@ -270,8 +270,8 @@ import { createGhOpenPullRequests, createGhRoadmapSearch, createRoadmapReadings,
 import { CommandExit } from '../core/command/index.js';
 import { ConfigError } from '../core/config/index.js';
 import { loadConfig } from '../core/config/load.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { readRecords, resolveLoopSeams } from '../loop/session-readings.js';
-import { plansDirAt } from '../plan/plan-files.js';
 import { createGitRunner, ghPullRequestsIn, requireGhProvider, resolvePrProvider } from '../pr/index.js';
 
 import { readEpicEndRelease } from './epic-end.js';

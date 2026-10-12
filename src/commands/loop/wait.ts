@@ -90,6 +90,7 @@ import { relative } from 'node:path';
 import { EVENT_PREFIX, oneLine, padKind } from '../../adapters/output/events.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { plural } from '../../core/plan/index.js';
 import { createAwakeClock } from '../../loop/awake-clock.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import {
@@ -109,7 +110,6 @@ import {
   waitExitCode,
   WaitUntilError,
 } from '../../loop/wait-reasons.js';
-import { plural } from '../../plan/plan-files.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

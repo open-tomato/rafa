@@ -25,13 +25,12 @@
  * which is the refusal `rafa plan validate` ends with for it.
  */
 import type { PlanIssue } from './index.js';
-import type { TaskCounts } from './plan-files.js';
+import type { TaskCounts } from '../core/plan/index.js';
 
 import { readFileSync } from 'node:fs';
 
 import { CommandExit } from '../core/command/index.js';
-
-import { countTasks, isFile } from './plan-files.js';
+import { countTasks, isFile } from '../core/plan/index.js';
 
 import { parsePlan } from './index.js';
 

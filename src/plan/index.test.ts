@@ -69,6 +69,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'bun:test';
 
 import { INJECT_MODES } from '../core/config/sections.js';
+import { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from '../core/plan/block-reader.js';
+import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from '../core/plan/index.js';
 import {
   loadPlanPrerequisites,
   mergePlanPrerequisites,
@@ -79,9 +81,7 @@ import {
 import { PROBE_TIMEOUT_MS, runPreflight, runShellProbe } from '../preflight/run.js';
 import { FINDING_KINDS, FINDING_SIGNALS, parseReport, REPORT_STATUSES } from '../report/parse.js';
 
-import { isRafaBlockKind, RAFA_BLOCK_KINDS, readRafaBlocks } from './blocks.js';
 import { renderInjection } from './inject.js';
-import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS } from './parse.js';
 
 import * as entry from './index.js';
 

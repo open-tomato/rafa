@@ -115,7 +115,7 @@
 import type { CriterionCheck } from './verify-plan.js';
 import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { GitRunner } from '../core/git/index.js';
-import type { RafaBlock } from '../plan/blocks.js';
+import type { RafaBlock } from '../core/plan/block-reader.js';
 import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
 
 import { randomUUID } from 'node:crypto';
@@ -123,8 +123,8 @@ import { join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../core/git/index.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
-import { readRafaBlocks } from '../plan/blocks.js';
 import { shellQuote } from '../pr/preflight-items.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { SESSION_ID_FLAG } from '../start/dispatch.js';

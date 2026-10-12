@@ -81,7 +81,7 @@
  *
  * ## The fences
  *
- * The body is read back by `readRafaBlocks` (`src/plan/blocks.ts`), the
+ * The body is read back by `readRafaBlocks` (`src/core/plan/blocks.ts`), the
  * reader that already tells a real block from a comment illustrating the
  * format, so a comment quoting a triage inside a longer fence
  * contributes no reading. Both fences this module writes — the block and
@@ -132,7 +132,7 @@ import type { Mapping } from '../../core/config/sections.js';
 import type { PullRequestComment, PullRequests } from '../types.js';
 
 import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
-import { readRafaBlocks } from '../../plan/blocks.js';
+import { readRafaBlocks } from '../../core/plan/block-reader.js';
 import { readUnchecked, skipChecksCommand } from '../unchecked.js';
 
 import { buildFollowUpPrompt, excerptCaption, excerptLines, fencedBlock } from './follow-up.js';

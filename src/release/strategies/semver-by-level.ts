@@ -57,7 +57,7 @@
  *
  * The fold reads nothing but its arguments: no file, no git, no clock.
  */
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { ChangelogNote } from '../changelog.js';
 import type {
   Fold,

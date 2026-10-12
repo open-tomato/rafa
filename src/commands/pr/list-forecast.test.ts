@@ -22,7 +22,7 @@
  */
 import type { BaseNow, BaseReader, PrListForecast } from './list-forecast.js';
 import type { RafaCommand } from '../../core/command/index.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { PullRequestDetail, PullRequestSummary } from '../../pr/index.js';
 import type { BranchForecast } from '../../release/branch-forecast.js';
 import type { FoldFragment } from '../../release/strategy.js';

@@ -69,8 +69,8 @@
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { PlanChange } from '../../effort/store/changes.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { AuditReading } from '../../release/audit.js';

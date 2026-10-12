@@ -49,12 +49,13 @@
  * Exit code 1: the refusals `loop-sessions.ts` names.
  */
 import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { TaskCounts } from '../../core/plan/index.js';
 import type { BlockedTask } from '../../loop/blocked-tasks.js';
 import type { LoopSessionSeams, ResolvedLoopSeams, SessionEta } from '../../loop/session-readings.js';
 import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
-import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { messageOf } from '../../core/config/sections.js';
+import { countTasks } from '../../core/plan/index.js';
 import { blockedTasks } from '../../loop/blocked-tasks.js';
 import {
   estimateEta,
@@ -65,7 +66,6 @@ import {
   sessionLine,
 } from '../../loop/session-readings.js';
 import { sessionPhase } from '../../loop/sessions.js';
-import { countTasks } from '../../plan/plan-files.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {

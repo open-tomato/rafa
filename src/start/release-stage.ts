@@ -145,8 +145,8 @@ import type { ReleaseVerification, ReleaseVerificationContext } from '../release
 import { ASSUMPTIONS_HEADING } from '../board/review-stamp.js';
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { readPlanChanges } from '../effort/store/changes.js';
-import { parsePlan } from '../plan/parse.js';
 import { createGitRunner, gitSaid, pushBranch } from '../pr/index.js';
 import {
   forecastLine,

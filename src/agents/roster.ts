@@ -198,8 +198,8 @@ import type { Dirent } from 'node:fs';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { parsePlan } from '../core/plan/index.js';
 import { readTrees } from '../inventory/trees.js';
-import { parsePlan } from '../plan/parse.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
 import { isSkillTier, SKILL_TIERS } from '../schema/tiers.js';
 import { collisionMessage, findTierItem, pinKey, pinLine, readItemBytes, resolveTiers } from '../tiers/resolve.js';

@@ -81,7 +81,7 @@ import type { BlockedReading } from './blocked.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
-import { plural } from '../plan/plan-files.js';
+import { plural } from '../core/plan/index.js';
 
 import { blockedFaultMessage, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';
 

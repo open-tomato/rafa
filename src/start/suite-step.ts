@@ -257,8 +257,8 @@ import { basename, dirname, join } from 'node:path';
 
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { runsDir, updateSession } from '../loop/sessions.js';
-import { parsePlan } from '../plan/parse.js';
 import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
   BASELINE_FILE_PREFIX,

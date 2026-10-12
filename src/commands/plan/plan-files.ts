@@ -37,13 +37,13 @@
  */
 import type { RafaContext } from '../../core/command/index.js';
 import type { RafaConfig } from '../../core/config/index.js';
-import type { PlansDir } from '../../plan/plan-files.js';
+import type { PlansDir } from '../../core/plan/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 
 import { CommandExit } from '../../core/command/index.js';
 import { ConfigError } from '../../core/config/index.js';
 import { loadConfig } from '../../core/config/load.js';
-import { plansDirAt } from '../../plan/plan-files.js';
+import { plansDirAt } from '../../core/plan/index.js';
 
 /**
  * The project the dispatcher resolved for a command that declares it

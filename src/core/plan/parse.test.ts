@@ -18,8 +18,8 @@
  * closed block, and one it still picks after an unclosed fence.
  */
 import type { PlanModel } from './parse.js';
-import type { AgentEffortLookup } from '../utils/declaration.js';
-import type { TaskInfo } from '../utils/tracker.js';
+import type { AgentEffortLookup } from '../../utils/declaration.js';
+import type { TaskInfo } from '../../utils/tracker.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,8 +28,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { resolveDeclarationFlags } from '../utils/declaration.js';
-import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
+import { resolveDeclarationFlags } from '../../utils/declaration.js';
+import { findNextTask, updateTrackerLine } from '../../utils/tracker.js';
 
 import { isRafaBlockKind, readRafaBlocks } from './blocks.js';
 import { parsePlan, PLAN_BLOCK_KINDS, PLAN_HEADER_FIELDS, PLAN_RELEASE_LEVELS } from './parse.js';

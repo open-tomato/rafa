@@ -1,8 +1,8 @@
 /**
  * Tests for the injection renderer.
  *
- * Fixtures are lists of lines joined here, as `parse.test.ts` builds
- * them. A dispatched task is never a literal copied from the loop's
+ * Fixtures are lists of lines joined here, as `../core/plan/parse.test.ts`
+ * builds them. A dispatched task is never a literal copied from the loop's
  * reader: {@link dispatchedAt} blanks every other line and asks
  * `findNextTask` itself, so each `task` and `lineNum` handed to the
  * renderer is one the loop could have handed it.

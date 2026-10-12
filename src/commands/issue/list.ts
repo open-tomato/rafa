@@ -222,7 +222,7 @@ import { parseTitle } from '../../bugs/title.js';
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../plan/plan-files.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';

@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { setActiveOutput } from '../core/output/index.js';
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';

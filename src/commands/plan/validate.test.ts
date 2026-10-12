@@ -42,8 +42,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createCommandRegistry } from '../../cli/registry.js';
 import { CommandExit } from '../../core/command/index.js';
+import { issueLine } from '../../core/plan/index.js';
 import { parsePlan } from '../../plan/index.js';
-import { issueLine } from '../../plan/plan-files.js';
 import { validatePlan } from '../../plan/validate.js';
 import {
   dispatchCaptured,

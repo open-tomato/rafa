@@ -111,7 +111,7 @@ import { createGhOpenPullRequests } from '../../board/roadmap.js';
 import { CommandExit , createLinePrompter } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../plan/plan-files.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';

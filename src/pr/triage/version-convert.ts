@@ -107,7 +107,7 @@
  * `commit`. The guard's own readings are `readGuard`'s, over `HEAD`.
  */
 import type { GitRunner } from '../../core/git/index.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { GuardAnswer, GuardStamp } from '../../release/guard.js';
 import type { SettleSettings } from '../../release/settle.js';
 

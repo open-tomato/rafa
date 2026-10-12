@@ -2,7 +2,7 @@
 # Plan: Export the run summary as CSV
 
 A committed plan in the loop's checklist format, read whole by the
-real-plan cases of `src/plan/parse.test.ts`. Those cases pin its stage
+real-plan cases of `src/core/plan/parse.test.ts`. Those cases pin its stage
 names, per-stage task counts and declaration histogram as measured, so
 an edit here that moves any of them moves the pins in the same commit.
 It carries no `rafa:*` block on purpose: the cases exercise the

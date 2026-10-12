@@ -152,7 +152,7 @@ import {
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
 import { createGitRunner } from '../../core/git/index.js';
-import { plansDirAt } from '../../plan/plan-files.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { roadmapBoard } from '../issue/list.js';

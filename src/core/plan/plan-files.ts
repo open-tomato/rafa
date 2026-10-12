@@ -31,12 +31,12 @@
  * more letters, digits, `.`, `_` and `-`. It holds no slash, so a file
  * named from one never leaves the directory.
  */
-import type { PlanIssue, PlanTask } from './index.js';
+import type { PlanIssue, PlanTask } from './parse.js';
 
 import { statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
-import { isStampableStub } from '../utils/plan-stamp.js';
+import { isStampableStub } from '../../utils/plan-stamp.js';
 
 /** Where the plans of one invocation sit, in the two spellings a command needs. */
 export interface PlansDir {

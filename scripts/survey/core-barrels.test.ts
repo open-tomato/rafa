@@ -388,7 +388,10 @@ describe('subjectBarrels', () => {
       'src/core/config/load.ts',
       'src/core/config/sections.ts',
     ]);
-    expect(subjectBarrels('src/core/plan/deep/er/file.ts')).toEqual(['src/core/plan/index.ts']);
+    expect(subjectBarrels('src/core/plan/deep/er/file.ts')).toEqual([
+      'src/core/plan/block-reader.ts',
+      'src/core/plan/index.ts',
+    ]);
   });
 
   it('answers none for a path directly in src/core/, a folder with no barrel, or a path outside it', () => {

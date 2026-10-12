@@ -74,7 +74,7 @@ import { hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from '../board
 import { EPIC_LABEL_PREFIX } from '../board/epics.js';
 import { readBoardRepository } from '../board/repository.js';
 import { messageOf } from '../core/config/sections.js';
-import { plural } from '../plan/plan-files.js';
+import { plural } from '../core/plan/index.js';
 
 import { MOVE_FIX } from './init-board.js';
 

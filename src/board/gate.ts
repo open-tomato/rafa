@@ -167,7 +167,7 @@ import { dirname, resolve } from 'node:path';
 import { CommandExit } from '../core/command/index.js';
 import { messageOf } from '../core/config/sections.js';
 import { activeOutput } from '../core/output/index.js';
-import { issueLine, rejectedPath } from '../plan/plan-files.js';
+import { issueLine, rejectedPath } from '../core/plan/index.js';
 import { validatePlan } from '../plan/validate.js';
 
 import { NO_COMMENT_FLAG, SKIP_REVIEW_FLAG } from './flags.js';

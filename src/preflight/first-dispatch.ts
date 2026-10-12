@@ -56,7 +56,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 import { trackerPathFor } from '../utils/tracker.js';
 
 /** A ticked task line, as the loop and an operator write one. */

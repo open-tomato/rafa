@@ -16,7 +16,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 import { findNextTask } from '../utils/tracker.js';
 
 import {

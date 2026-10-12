@@ -43,6 +43,7 @@
  * them with its own code for no session without reading their words.
  */
 import type { RafaContext, RafaFlagSpec } from '../../core/command/index.js';
+import type { TaskCounts } from '../../core/plan/index.js';
 import type {
   ResolvedLoopSeams,
   SessionChecklist,
@@ -50,10 +51,10 @@ import type {
 } from '../../loop/session-readings.js';
 import type { SessionChange, SessionPhase, SessionRecord } from '../../loop/sessions.js';
 import type { PlanTask } from '../../plan/index.js';
-import type { TaskCounts } from '../../plan/plan-files.js';
 
 import { CommandExit } from '../../core/command/index.js';
 import { messageOf } from '../../core/config/sections.js';
+import { plural } from '../../core/plan/index.js';
 import {
   formatDuration,
   isLive,
@@ -69,7 +70,6 @@ import {
   SessionStateError,
   updateSession,
 } from '../../loop/sessions.js';
-import { plural } from '../../plan/plan-files.js';
 
 /** The flag naming a session, by the name the context's flags carry it under. */
 export const SESSION_ID_FLAG = 'session-id';

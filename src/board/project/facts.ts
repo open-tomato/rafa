@@ -107,7 +107,7 @@
 import type { FilesPage, FragmentLookup, IssueList, ListPage } from './facts-query.js';
 import type { StageFacts, StageFragment, StagePullRequest } from './rules.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { BoardIssueState } from '../roadmap-board.js';
 
 import { describeValue, isMapping } from '../../core/config/sections.js';

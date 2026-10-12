@@ -58,7 +58,7 @@ import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import { selectBoardRelations } from '../board/relations/select.js';
 import { readBoardRepository } from '../board/repository.js';
 import { messageOf } from '../core/config/sections.js';
-import { plural } from '../plan/plan-files.js';
+import { plural } from '../core/plan/index.js';
 
 import { NATIVE_MODE } from './epic/move-native.js';
 

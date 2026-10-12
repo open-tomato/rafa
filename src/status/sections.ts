@@ -190,13 +190,13 @@ import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
 import { messageOf } from '../core/config/sections.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
 import { isLive, readSessionChecklist } from '../loop/session-readings.js';
 import { readSessions } from '../loop/sessions.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
-import { plansDirAt } from '../plan/plan-files.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
 import { positionFilePath } from '../project/position.js';
 
