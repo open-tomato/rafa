@@ -37,6 +37,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .tmp
 .docs
 .local
+.claude/settings.local.json
 
 # the project scope, holding the loop-generated effort store under .rafa/effort/
 .rafa/
