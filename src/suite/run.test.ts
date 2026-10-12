@@ -50,9 +50,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   CLAUDE_CODE_ENV,
   FORCE_COLOR_ENV,
+  OUTPUT_TAIL_LINES,
   parseJunitFailures,
   parseJunitFiles,
   readNoTestFiles,
+  readOutputTail,
   readSummary,
   runSuite,
   suiteCommand,
@@ -305,6 +307,40 @@ describe('readSummary', () => {
   });
 });
 
+/** `count` numbered lines, `line 1` first. */
+function numbered(count: number): readonly string[] {
+  return Array.from({ length: count }, (_, index) => `line ${index + 1}`);
+}
+
+describe('readOutputTail', () => {
+  it('keeps the cap the plan names', () => {
+    expect(OUTPUT_TAIL_LINES).toBe(20);
+  });
+
+  it('answers no line for a stderr holding none', () => {
+    expect(readOutputTail('')).toEqual([]);
+    expect(readOutputTail('\n  \n\t\r\n')).toEqual([]);
+  });
+
+  it('answers every non-blank line of a stderr holding fewer than the cap, in order', () => {
+    const stderr = '\nerror: Cannot find module \'zod\'\n\n   \n 0 pass\r\n 1 fail  \nRan 1 test across 1 file. [1.00ms]\n';
+    expect(readOutputTail(stderr)).toEqual(['error: Cannot find module \'zod\'', ' 0 pass', ' 1 fail', 'Ran 1 test across 1 file. [1.00ms]']);
+  });
+
+  it('answers every line of a stderr holding exactly the cap', () => {
+    const lines = numbered(OUTPUT_TAIL_LINES);
+    expect(readOutputTail(lines.join('\n'))).toEqual([...lines]);
+  });
+
+  it('answers the last lines only of a stderr holding more than the cap, blank lines not counted', () => {
+    const lines = numbered(OUTPUT_TAIL_LINES + 5);
+    const tail = readOutputTail(`${lines.join('\n\n')}\n`);
+    expect(tail).toHaveLength(OUTPUT_TAIL_LINES);
+    expect(tail[0]).toBe('line 6');
+    expect(tail.at(-1)).toBe(`line ${OUTPUT_TAIL_LINES + 5}`);
+  });
+});
+
 describe('readNoTestFiles', () => {
   it('reads Bun\'s no-test-files error, and nothing else, as no test files', () => {
     expect(readNoTestFiles('bun test v1.4.2\nerror: 0 test files matching **{.test,.spec,_test_,_spec_}.{js,ts,jsx,tsx} in --cwd="/x"\n')).toBe(true);
@@ -371,6 +407,8 @@ describe('runSuite', () => {
     const seen: SeenSpawn[] = [];
     const junitFile = join(dir, 'runs', 'abc', 'task-1.junit.xml');
     const result = await runSuite({ cwd: dir, junitFile, env: { PATH: '/bin', [CLAUDE_CODE_ENV]: '1' }, spawn: recordedSpawner('mixed', 1, seen) });
+    const nonBlank = fixture('mixed.stderr.txt').split('\n')
+      .filter((line) => line !== '');
     expect(result).toEqual({
       command: ['bun', 'test', '--reporter=junit', `--reporter-outfile=${junitFile}`],
       exitCode: 1,
@@ -387,8 +425,13 @@ describe('runSuite', () => {
       errors: 1,
       junit: 'read',
       unhandled: [{ file: 'c.test.ts', firstLine: 'error: Cannot find module \'./nope.js\' from \'/tmp/scratch/c.test.ts\'' }],
+      outputTail: nonBlank.slice(-OUTPUT_TAIL_LINES),
       fileOrder: [['a.test.ts', 'sub/b.test.ts']],
     });
+    // Control: the recorded stderr holds more non-blank lines than the cap, so the tail opens partway down it.
+    expect(result.outputTail).toHaveLength(OUTPUT_TAIL_LINES);
+    expect(result.outputTail[0]).toBe('c.test.ts:');
+    expect(result.outputTail.at(-1)).toBe('Ran 7 tests across 3 files. [3.00ms]');
     expect(seen[0]?.options).toEqual({ cwd: dir, env: { PATH: '/bin' } });
   });
 
@@ -465,6 +508,15 @@ describe('runSuite', () => {
     };
     const result = await runSuite({ cwd: dir, junitFile, spawn });
     expect(result).toMatchObject({ junit: 'unreadable', failures: [] });
+    expect(result.outputTail).toEqual([]);
+  });
+
+  it('answers the whole of a short stderr as the output tail, and the last lines of a long one', async () => {
+    const short = await runSuite({ cwd: dir, paths: ['nope'], junitFile: join(dir, 'j.xml'), spawn: recordedSpawner('no-match', 1, []) });
+    expect(short.outputTail).toEqual(['Test filter "./nope" had no matches']);
+    const long = await runSuite({ cwd: dir, junitFile: join(dir, 'k.xml'), spawn: async () => ({ exitCode: 1, stderr: numbered(OUTPUT_TAIL_LINES + 1).join('\n') }) });
+    expect(long.outputTail).toHaveLength(OUTPUT_TAIL_LINES);
+    expect(long.outputTail[0]).toBe('line 2');
   });
 
   it('spawns the --changed selection when changedSince is handed', async () => {

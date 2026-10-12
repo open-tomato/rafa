@@ -38,8 +38,10 @@
  *
  * One JSON object, pretty-printed with a trailing newline, holding
  * {@link BASELINE_VERSION}, when it was recorded, the commit it was
- * recorded at, and the {@link SuiteResult} fields but `unhandled`, the
- * errors outside any test, which it holds as the `errors` count only. A
+ * recorded at, and the {@link SuiteResult} fields but two: `unhandled`,
+ * the errors outside any test, which it holds as the `errors` count only,
+ * and `outputTail`, the last lines of the run's stderr, which it does not
+ * hold at all. A
  * file that does not parse, carries another version, or lacks a field
  * reads as `unreadable` with the reason, never as a throw: the caller
  * decides whether to record the baseline again.
@@ -68,9 +70,10 @@ const JUNIT_READINGS: readonly JunitReading[] = ['read', 'missing', 'unreadable'
 
 /**
  * A suite result as the baseline file holds it: every field but
- * `unhandled`, whose errors the file keeps as the `errors` count only.
+ * `unhandled`, whose errors the file keeps as the `errors` count only,
+ * and `outputTail`, which the file does not keep.
  */
-export interface SuiteBaseline extends Omit<SuiteResult, 'unhandled'> {
+export interface SuiteBaseline extends Omit<SuiteResult, 'unhandled' | 'outputTail'> {
   readonly version: typeof BASELINE_VERSION;
   /** When the run finished, as an ISO 8601 string. */
   readonly recordedAt: string;

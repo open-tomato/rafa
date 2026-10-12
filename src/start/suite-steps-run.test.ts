@@ -58,7 +58,7 @@ const TRACKER = [
 ].join('\n');
 
 const BASELINE: SuiteBaseline = baselineOf(
-  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read', unhandled: [] },
+  { command: ['bun', 'test'], exitCode: 0, summary: 'Ran 1 test across 1 file. [1.00ms]', failures: [], errors: 0, junit: 'read', unhandled: [], outputTail: [] },
   new Date('2026-10-01T00:00:00Z'),
   BASE,
 );
@@ -509,6 +509,7 @@ function suiteResult(failures: SuiteResult['failures'] = []): SuiteResult {
     errors: 0,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
   };
 }
 

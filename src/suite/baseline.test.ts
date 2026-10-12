@@ -21,8 +21,8 @@ import {
   writeBaseline,
 } from './baseline.js';
 
-/** {@link RESULT} as a baseline holds it: without its `unhandled` list. */
-const STORED: Omit<SuiteResult, 'unhandled'> = {
+/** {@link RESULT} as a baseline holds it: without its `unhandled` list and its `outputTail`. */
+const STORED: Omit<SuiteResult, 'unhandled' | 'outputTail'> = {
   command: ['bun', 'test', '--reporter=junit', '--reporter-outfile=/tmp/x.xml'],
   exitCode: 1,
   summary: 'Ran 3 tests across 2 files. [12.00ms]',
@@ -34,7 +34,11 @@ const STORED: Omit<SuiteResult, 'unhandled'> = {
   junit: 'read',
 };
 
-const RESULT: SuiteResult = { ...STORED, unhandled: [{ file: 'c.test.ts', firstLine: 'error: boom' }] };
+const RESULT: SuiteResult = {
+  ...STORED,
+  unhandled: [{ file: 'c.test.ts', firstLine: 'error: boom' }],
+  outputTail: ['error: boom', 'Ran 3 tests across 2 files. [12.00ms]'],
+};
 
 const RECORDED_AT = new Date('2026-09-30T10:00:00.000Z');
 
@@ -78,6 +82,9 @@ describe('baselineOf', () => {
       commit: 'abc123',
     });
     expect('unhandled' in baseline).toBe(false);
+    // Control: the result holds a tail, so its absence from the baseline is the omission.
+    expect(RESULT.outputTail).toHaveLength(2);
+    expect('outputTail' in baseline).toBe(false);
     expect(baseline.failures).not.toBe(RESULT.failures);
     expect(baseline.failures[0]).not.toBe(RESULT.failures[0]);
     // A failure without a message gains no `message` key, not even an undefined one.

@@ -42,7 +42,9 @@
  * blocker on its repair task. The folded result holds both commands,
  * joined by `;`, the failures of both with each test file and name pair
  * once (a changed sweep can run in both), the errors of both summed, the
- * errors outside any test of both in run order, both summary lines, and
+ * errors outside any test of both in run order, the output tail of both
+ * in run order (so up to twice `OUTPUT_TAIL_LINES` lines, neither run's
+ * cut for the other's), both summary lines, and
  * each run's file order as its own list (`SuiteResult.fileOrder`), the
  * first run's first, since each run is its own `bun test` process and a
  * file's place is read within the process it ran in. Its exit code is the stop code when either run
@@ -153,6 +155,7 @@ export function foldResults(first: SuiteResult, second: SuiteResult, stopCode: n
     errors: foldedErrors(first, second),
     junit: foldedJunit(first, second),
     unhandled: [...first.unhandled, ...second.unhandled],
+    outputTail: [...first.outputTail, ...second.outputTail],
     fileOrder: foldedFileOrder(first, second),
   };
   return first.noTestFiles === true && second.noTestFiles === true
