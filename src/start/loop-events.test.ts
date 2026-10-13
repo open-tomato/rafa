@@ -20,11 +20,13 @@ import { createJsonOutput } from '../adapters/output/json.js';
 import { createTextOutput } from '../adapters/output/text.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { runsDir } from '../loop/sessions.js';
+import { listTrackerTasks } from '../utils/tracker.js';
 
 import {
   bindEventsFile,
   emitLoopEvent,
   eventsFilePath,
+  injectionPlace,
   summaryOf,
   taskPosition,
   taskTokens,
@@ -272,6 +274,52 @@ describe('taskPosition', () => {
     const tracker = '# Stage: one\n\n- [x] first\n- [ ] second\n- [ ] third\n';
 
     expect(taskPosition(tracker, 3)).toEqual({ index: 2, total: 3 });
+  });
+});
+
+describe('injectionPlace', () => {
+  const REPAIR = 'Repair the red task step at commit 1111111  {agent=build-error-resolver}';
+  const TRACKER = [
+    '# Stage: one',
+    '',
+    '- [x] first',
+    `- [x] ${REPAIR}  <!-- repairs: first -->`,
+    '- [ ] second  {effort=low}',
+    '',
+    '# Stage: two',
+    '',
+    '- [ ] third',
+  ].join('\n');
+
+  /** The tracker's task on `lineNum`, as its reader lists it. */
+  function taskOn(tracker: string, lineNum: number) {
+    const task = listTrackerTasks(tracker).find((held) => held.lineNum === lineNum);
+    if (task === undefined) throw new Error(`no task on line ${lineNum}`);
+    return task;
+  }
+
+  it('counts a plan task from zero among the tracker\'s tasks, repair lines left out', () => {
+    expect(injectionPlace(TRACKER, taskOn(TRACKER, 2))).toEqual({ position: 0 });
+    expect(injectionPlace(TRACKER, taskOn(TRACKER, 4))).toEqual({ position: 1 });
+    expect(injectionPlace(TRACKER, taskOn(TRACKER, 8))).toEqual({ position: 2 });
+
+    // Control: taskPosition counts the repair, so the two could differ.
+    expect(taskPosition(TRACKER, 8)).toEqual({ index: 4, total: 4 });
+  });
+
+  it('gives a repair the place of the plan task above it and the task it names', () => {
+    expect(taskOn(TRACKER, 3).task).toBe(REPAIR);
+    expect(injectionPlace(TRACKER, taskOn(TRACKER, 3))).toEqual({ position: 0, repairs: 'first' });
+  });
+
+  it('answers null for a repair that names nothing, and no task for one with none above', () => {
+    const unnamed = `- [BLOCKED] ${REPAIR}  <!-- blocked: red -->\n- [ ] first\n`;
+    const repair = taskOn(unnamed, 0);
+    expect(repair.repairs).toBeUndefined();
+
+    expect(injectionPlace(unnamed, repair)).toEqual({ position: -1, repairs: null });
+    // The plan task below it keeps the first place.
+    expect(injectionPlace(unnamed, taskOn(unnamed, 1))).toEqual({ position: 0 });
   });
 });
 
