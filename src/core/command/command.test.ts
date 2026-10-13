@@ -367,7 +367,7 @@ beforeAll(() => {
   const configPath = join(REPO_ROOT, 'tsconfig.json');
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, REPO_ROOT, undefined, configPath);
-  program = ts.createProgram({ rootNames: probes.map(([file]) => join(tempDir, file)), options: parsed.options });
+  program = ts.createProgram({ rootNames: probes.map(([file]) => join(tempDir, file)), options: { ...parsed.options, isolatedDeclarations: false } });
 }, 30_000);
 
 afterAll(() => {
