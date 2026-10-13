@@ -190,4 +190,5 @@ export function createSkillShowCommand(seams: SkillShowSeams = DEFAULT_SKILL_SHO
   return Object.freeze(command);
 }
 
-export default createSkillShowCommand();
+const command: RafaCommand = createSkillShowCommand();
+export default command;

@@ -733,4 +733,5 @@ export function createEpicCloseCommand(seams: EpicCloseSeams = {}): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createEpicCloseCommand();
+const command: RafaCommand = createEpicCloseCommand();
+export default command;

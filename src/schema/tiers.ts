@@ -87,16 +87,16 @@ export const INSTINCT_SCOPES = ['project', 'user'] as const;
 export type InstinctScope = typeof INSTINCT_SCOPES[number];
 
 /** The skills directory Claude Code loads, under a project root or the home. */
-export const CLAUDE_SKILLS_PATH = join('.claude', 'skills');
+export const CLAUDE_SKILLS_PATH: string = join('.claude', 'skills');
 
 /** The instincts directory a scope holds, under a project root or the home. */
-export const RAFA_INSTINCTS_PATH = join('.rafa', 'instincts');
+export const RAFA_INSTINCTS_PATH: string = join('.rafa', 'instincts');
 
 /** The directory rafa's own skills sit in, relative to the running `cli.js`. */
-export const BUNDLED_SKILLS_DIR = join('bundled', 'skills');
+export const BUNDLED_SKILLS_DIR: string = join('bundled', 'skills');
 
 /** The directory rafa's own programs sit in, relative to the running `cli.js`. */
-export const BUNDLED_BIN_DIR = join('bundled', 'bin');
+export const BUNDLED_BIN_DIR: string = join('bundled', 'bin');
 
 /** What a tier is resolved against. Each seam is given; none is read from the environment. */
 export interface TierSeams {

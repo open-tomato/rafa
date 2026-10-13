@@ -60,7 +60,7 @@ import { createGitRunner, gitSaid } from '../core/git/index.js';
 export const NOT_A_REPOSITORY = 'fatal: not a git repository (or any ';
 
 /** The argv, after `git`, that lists the worktrees NUL-terminated. */
-export const WORKTREE_LIST_ARGS = Object.freeze(['worktree', 'list', '--porcelain', '-z'] as const);
+export const WORKTREE_LIST_ARGS: readonly ['worktree', 'list', '--porcelain', '-z'] = Object.freeze(['worktree', 'list', '--porcelain', '-z'] as const);
 
 /** The prefix of the porcelain line naming a worktree's path. */
 const WORKTREE_PREFIX = 'worktree ';

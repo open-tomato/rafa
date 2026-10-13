@@ -66,7 +66,23 @@ export const RELATIONS_FIXTURE_REPOSITORY = 'acme/board';
 export const RELATIONS_FIXTURE_FOREIGN_REPOSITORY = 'acme/other';
 
 /** Every issue number the two fixture listings describe, named for what it is. */
-export const RELATIONS_FIXTURE = Object.freeze({
+export const RELATIONS_FIXTURE: Readonly<{
+  readonly epicAlpha: number;
+  readonly epicBeta: number;
+  readonly alphaMemberFirst: number;
+  readonly alphaMemberSecond: number;
+  readonly alphaMemberThird: number;
+  readonly betaMemberFirst: number;
+  readonly betaMemberSecond: number;
+  readonly blockedLocal: number;
+  readonly openBlocker: number;
+  readonly notPlannedBlocker: number;
+  readonly blockedForeign: number;
+  readonly waitsOnTwo: number;
+  readonly secondOpenBlocker: number;
+  readonly blockedFaultNoLine: number;
+  readonly foreignBlockerNumber: number;
+}> = Object.freeze({
   /** An epic whose checklist orders three members. */
   epicAlpha: 1,
   /** An epic whose sub-issue total exceeds the nodes answered. */

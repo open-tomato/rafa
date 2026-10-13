@@ -121,7 +121,7 @@ export interface ProposalAnswer {
  * What every session is told, before its batch. See the module note on
  * why it lives here rather than in a markdown file beside it.
  */
-export const PROPOSAL_PROMPT_HEADER = `You are filling in frontmatter fields for a batch of Claude Code skills.
+export const PROPOSAL_PROMPT_HEADER: string = `You are filling in frontmatter fields for a batch of Claude Code skills.
 
 Each file below is given with its path, its name, its current description,
 what it needs, and its body. Answer about each one with the fields its

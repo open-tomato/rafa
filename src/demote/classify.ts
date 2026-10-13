@@ -168,16 +168,16 @@ export const RULE_VERDICTS: Readonly<Record<ClassificationRule, DemotionVerdict>
 export const PROCEDURE_STEP_MINIMUM = 3;
 
 /** A heading opening a Problem section, at any level. */
-export const PROBLEM_HEADING = /^(?:the\s+)?problem\b/i;
+export const PROBLEM_HEADING: RegExp = /^(?:the\s+)?problem\b/i;
 
 /** A heading opening a Solution section, at any level. */
-export const SOLUTION_HEADING = /^(?:the\s+)?solution\b/i;
+export const SOLUTION_HEADING: RegExp = /^(?:the\s+)?solution\b/i;
 
 /** A heading opening the section `trigger` is drawn from. */
-export const WHEN_TO_USE_HEADING = /^when\s+to\s+use\b/i;
+export const WHEN_TO_USE_HEADING: RegExp = /^when\s+to\s+use\b/i;
 
 /** The line a `/learn` extraction stamps its date on. */
-export const EXTRACTED_LINE = /^\s*\*\*Extracted:\*\*\s*(\S+)/m;
+export const EXTRACTED_LINE: RegExp = /^\s*\*\*Extracted:\*\*\s*(\S+)/m;
 
 /** Extensions that make a referenced path a script. */
 export const SCRIPT_EXTENSIONS: readonly string[] = [
@@ -326,7 +326,7 @@ export const DOMAIN_MARKERS: readonly (readonly [InstinctDomain, RegExp])[] = [
  * fenced blocks, never in prose, because prose says "cannot" about
  * everything and an error string is what a recurrence matches on.
  */
-export const ERROR_WORDS
+export const ERROR_WORDS: RegExp
   = /\b(?:error|exception|traceback|panic|fatal|refused|denied|not found|no such|cannot|could not|failed|failure|unexpected|undefined)\b/i;
 
 /** Abbreviations whose full stop does not end a sentence. */

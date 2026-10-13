@@ -148,7 +148,7 @@ const STORE_ID = /^\S+$/;
  * The subject every ownership commit carries, `claim(rafa-<n>): <action>`,
  * the issue number captured first and the action second.
  */
-export const CLAIM_SUBJECT = /^claim\(rafa-([1-9]\d*)\): (\S+)$/;
+export const CLAIM_SUBJECT: RegExp = /^claim\(rafa-([1-9]\d*)\): (\S+)$/;
 
 /** One trailer line: a key of letters, digits and hyphens, a colon, a value. */
 const TRAILER_LINE = /^([A-Za-z0-9-]+):[ \t]*(.*)$/;

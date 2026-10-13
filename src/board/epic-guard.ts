@@ -43,7 +43,7 @@ import { TEMPLATES_DIRNAME, writeShippedFile } from './setup.js';
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** The path the workflow is written to, under the project root. */
-export const EPIC_GUARD_PATH = join('.github', 'workflows', 'epic-guard.yml');
+export const EPIC_GUARD_PATH: string = join('.github', 'workflows', 'epic-guard.yml');
 
 /** The name the shipped workflow carries in the templates directory. */
 export const EPIC_GUARD_FILE = 'epic-guard.yml';

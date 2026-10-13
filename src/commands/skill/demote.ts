@@ -372,4 +372,5 @@ export function createSkillDemoteCommand(seams: SkillDemoteSeams = DEFAULT_DEMOT
   return Object.freeze(command);
 }
 
-export default createSkillDemoteCommand();
+const command: RafaCommand = createSkillDemoteCommand();
+export default command;

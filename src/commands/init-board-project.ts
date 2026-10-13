@@ -608,7 +608,7 @@ export interface ProjectStepOptions {
 }
 
 /** What a line asking for `--project` is told when the board step did not run. */
-export const PROJECT_NO_BOARD_WARNING = '--project creates the GitHub project with the GitHub board,'
+export const PROJECT_NO_BOARD_WARNING: string = '--project creates the GitHub project with the GitHub board,'
   + ` and the board step did not run, so no project was created; run ${PROJECT_STEP_FIX}.`;
 
 /** A project step that set nothing up. */

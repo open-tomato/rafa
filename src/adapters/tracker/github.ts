@@ -204,7 +204,7 @@ export interface GhRunnerOptions {
 }
 
 /** The label names a draft is projected onto: the source's defaults, fixed. */
-export const GITHUB_LABELS = Object.freeze({
+export const GITHUB_LABELS: Readonly<{ modulePrefix: 'module:'; typePrefix: 'type:'; priorityPrefix: 'priority:'; needsTriage: 'needs-triage'; blockedByPrefix: 'blocked-by:OPT-'; specBlocked: 'spec:blocked'; causePrefix: 'cause:'; }> = Object.freeze({
   modulePrefix: 'module:',
   typePrefix: 'type:',
   priorityPrefix: 'priority:',

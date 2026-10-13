@@ -208,4 +208,5 @@ export function createLoopStopCommand(seams: LoopSessionSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createLoopStopCommand();
+const command: RafaCommand = createLoopStopCommand();
+export default command;

@@ -166,7 +166,7 @@ import { parseRoadmapBody, pickNextRoadmapLine, readRoadmapSkip, skipSentence } 
 const PREFIX = 'board epic walk';
 
 /** The one horizon an epic is walked into under. */
-export const NOW_HORIZON_LABEL = `${HORIZON_LABEL_PREFIX}now`;
+export const NOW_HORIZON_LABEL: string = `${HORIZON_LABEL_PREFIX}now`;
 
 /** No claims: the computed state is read only for `done`; see the module note. */
 const NO_CLAIMS: ReadonlySet<number> = new Set();

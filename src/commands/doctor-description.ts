@@ -10,7 +10,7 @@
 import { PROBE_TIMEOUT_MS } from '../preflight/run.js';
 
 /** What `rafa doctor` checks, reads and prints, and when it exits 1. */
-export const DOCTOR_DESCRIPTION = 'Checks the prerequisites `rafa loop start` checks before its first session and prints each'
+export const DOCTOR_DESCRIPTION: string = 'Checks the prerequisites `rafa loop start` checks before its first session and prints each'
   + ' check, starting no run and storing nothing: the required and optional items of'
   + ' `.rafa/config.yaml`, with the `PREREQUISITES-<stub>.md` beside the plan merged in, and, when the'
   + ' repository resolves to `pr.provider: gh`, the two required items that provider adds ahead of them:'

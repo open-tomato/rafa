@@ -52,7 +52,11 @@ import { decodeWirePayload, encodeWirePayload, WireFormatError } from '@open-tom
 export const HUB_UNREACHABLE = 'HubUnreachable';
 
 /** The path each call reaches, as the hub serves it. */
-export const HUB_CLIENT_ROUTES = Object.freeze({
+export const HUB_CLIENT_ROUTES: Readonly<{
+  status: '/v1/status';
+  push: '/v1/effort/push';
+  pull: '/v1/effort/pull';
+}> = Object.freeze({
   status: '/v1/status',
   push: '/v1/effort/push',
   pull: '/v1/effort/pull',
@@ -69,7 +73,7 @@ const REDIRECT = 300;
 
 /** The hub could not be reached: a connect failure, the timeout abort or a `5xx`. */
 export class HubUnreachable extends Error {
-  override readonly name = HUB_UNREACHABLE;
+  override readonly name: 'HubUnreachable' = HUB_UNREACHABLE;
 }
 
 /** The hub answered and refused the call: a `4xx` or a redirect. */

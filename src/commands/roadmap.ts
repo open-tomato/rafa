@@ -109,4 +109,5 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
   return Object.freeze(command);
 }
 
-export default createRoadmapCommand();
+const command: RafaCommand = createRoadmapCommand();
+export default command;

@@ -172,7 +172,7 @@ export interface BoardLabel {
 }
 
 /** The label that marks an open issue as a board; see the module note. */
-export const ROADMAP_LABEL = `${GITHUB_LABELS.typePrefix}roadmap`;
+export const ROADMAP_LABEL: string = `${GITHUB_LABELS.typePrefix}roadmap`;
 
 /**
  * The fifteen labels the workflow files under, in the order they are made.
@@ -250,7 +250,7 @@ export const BOARD_LABELS: readonly BoardLabel[] = Object.freeze([
 export const LABEL_LIST_LIMIT = 100;
 
 /** The path the spec issue template is written to, under the project root. */
-export const SPEC_TEMPLATE_PATH = join('.github', 'ISSUE_TEMPLATE', 'spec.md');
+export const SPEC_TEMPLATE_PATH: string = join('.github', 'ISSUE_TEMPLATE', 'spec.md');
 
 /** The directory the build copies the shipped templates to, beside `cli.js`. */
 export const TEMPLATES_DIRNAME = 'templates';
@@ -548,7 +548,7 @@ export function roadmapIssueBody(): string {
  * it is exported for `./issue-board.ts`, whose `createIssue` reads the
  * same line.
  */
-export const CREATED_ISSUE_URL = /^https:\/\/[^\s/]+\/[\w.-]+\/[\w.-]+\/issues\/([1-9]\d*)$/u;
+export const CREATED_ISSUE_URL: RegExp = /^https:\/\/[^\s/]+\/[\w.-]+\/[\w.-]+\/issues\/([1-9]\d*)$/u;
 
 /** What a roadmap issue step came to: the parts it made and the issue, when there is one. */
 export interface RoadmapStep {

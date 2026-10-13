@@ -791,4 +791,5 @@ export function createDoctorCommand(seams: DoctorSeams = DEFAULT_DOCTOR_SEAMS): 
   return Object.freeze(command);
 }
 
-export default createDoctorCommand();
+const command: RafaCommand = createDoctorCommand();
+export default command;

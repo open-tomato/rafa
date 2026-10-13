@@ -114,7 +114,7 @@ import { RUNNING_MANIFEST_SEAMS, validateManifest } from '../modules/manifest.js
 import { byName, skillItem, sourceItem } from './trees.js';
 
 /** Where Claude Code records its installed plugins, under the home. */
-export const INSTALLED_PLUGINS_PATH = join('.claude', 'plugins', 'installed_plugins.json');
+export const INSTALLED_PLUGINS_PATH: string = join('.claude', 'plugins', 'installed_plugins.json');
 
 /** The Claude Code version the plugin reader was written against. */
 export const PLUGINS_CLI_VERSION = '2.1.280';

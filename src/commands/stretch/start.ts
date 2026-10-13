@@ -249,9 +249,14 @@ export function readStartLine(context: RafaContext): StartLine {
 
 /** The steps already run, and how the next one is printed and run. */
 class Steps {
+  private readonly dryRun: boolean;
+  private readonly info: (line: string) => void;
   private readonly done: string[] = [];
 
-  constructor(private readonly dryRun: boolean, private readonly info: (line: string) => void) {}
+  constructor(dryRun: boolean, info: (line: string) => void) {
+    this.dryRun = dryRun;
+    this.info = info;
+  }
 
   /** Prints `line`, then runs `act` unless this is a dry run; a throw is a failed step. */
   run(line: string, act: () => void): void {
@@ -632,4 +637,5 @@ export function createStretchStartCommand(seams?: StretchStartSeams): RafaComman
   return Object.freeze(command);
 }
 
-export default createStretchStartCommand();
+const command: RafaCommand = createStretchStartCommand();
+export default command;

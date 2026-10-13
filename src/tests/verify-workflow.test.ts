@@ -56,7 +56,7 @@ const GUARD = '${{ !cancelled() }}';
 const GATES: ReadonlyArray<readonly [string, string]> = [
   ['Test', 'bun test'],
   ['Lint', 'bunx eslint .'],
-  ['Types', 'bunx tsc --noEmit'],
+  ['Types', 'bun run check-types'],
 ];
 
 /** The steps of the one job. */

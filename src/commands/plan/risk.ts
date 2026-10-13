@@ -214,4 +214,5 @@ export function createPlanRiskCommand(seams: PlanRiskSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createPlanRiskCommand();
+const command: RafaCommand = createPlanRiskCommand();
+export default command;

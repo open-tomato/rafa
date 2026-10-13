@@ -232,4 +232,5 @@ const planShowCommand: RafaCommand = {
   },
 };
 
-export default Object.freeze(planShowCommand);
+const command: RafaCommand = Object.freeze(planShowCommand);
+export default command;

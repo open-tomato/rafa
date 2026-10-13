@@ -96,7 +96,7 @@ const HEADER_PLACEHOLDERS = ['%H', '%aI', '%P', '%an', '%S', '%s'] as const;
 const FIELD_SEPARATOR = '\t';
 
 /** `--format=` argument matching {@link HEADER_PLACEHOLDERS}. */
-export const COMMIT_LOG_FORMAT = [
+export const COMMIT_LOG_FORMAT: string = [
   COMMIT_RECORD_MARKER,
   ...HEADER_PLACEHOLDERS,
 ].join('%x09');

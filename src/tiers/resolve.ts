@@ -252,7 +252,7 @@ export interface Resolution {
  * A line of rafa's vendoring header, as `sourceHeader` in
  * `commands/agent/vendor.ts` writes it.
  */
-export const VENDORED_HEADER = /^<!-- vendored by rafa from .* on \d{4}-\d{2}-\d{2} -->$/;
+export const VENDORED_HEADER: RegExp = /^<!-- vendored by rafa from .* on \d{4}-\d{2}-\d{2} -->$/;
 
 /**
  * The order Claude Code itself loads one skill name in, the copy a

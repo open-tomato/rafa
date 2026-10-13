@@ -100,7 +100,7 @@ export interface BoardStatusOptions {
 }
 
 /** The `Roadmap issue` row, under the name `./setup.ts` gives its part. */
-export const ROADMAP_ROW_NAME = `${ROADMAP_TITLE} issue`;
+export const ROADMAP_ROW_NAME: string = `${ROADMAP_TITLE} issue`;
 
 /** One row, as the rows are built. */
 function rowOf(kind: BoardPartKind, name: string, outcome: BoardStatusOutcome, detail: string): BoardRow {

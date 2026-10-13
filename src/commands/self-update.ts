@@ -166,7 +166,7 @@ export function readForceFlag(value: string | boolean | undefined): boolean {
 }
 
 /** The config key that installs past a live loop. */
-export const DURING_LOOP_KEY = SETTINGS.dangerousSelfUpdateDuringLoop.key;
+export const DURING_LOOP_KEY: string = SETTINGS.dangerousSelfUpdateDuringLoop.key;
 
 /** The refusal's lines while `loops` are live; see the module note. */
 export function liveLoopRefusalLines(loops: readonly SessionRecord[]): string[] {
@@ -276,4 +276,5 @@ export function createSelfUpdateCommand(seams: SelfUpdateSeams = DEFAULT_SELF_UP
   return Object.freeze(command);
 }
 
-export default createSelfUpdateCommand();
+const command: RafaCommand = createSelfUpdateCommand();
+export default command;

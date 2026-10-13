@@ -72,7 +72,11 @@ import type { CliEventNamed, Output } from '../../ports/index.js';
 export const PROGRESS_EVENT = 'progress';
 
 /** The three phases that print progress, each as its line spells it. */
-export const PROGRESS_PHASES = Object.freeze({
+export const PROGRESS_PHASES: Readonly<{
+  readonly adds: 'adding issues';
+  readonly facts: 'reading facts';
+  readonly writes: 'writing fields';
+}> = Object.freeze({
   adds: 'adding issues',
   facts: 'reading facts',
   writes: 'writing fields',

@@ -341,4 +341,5 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createBoardSyncCommand();
+const command: RafaCommand = createBoardSyncCommand();
+export default command;

@@ -70,7 +70,7 @@ export const AFTER_FLAG = '--after';
 export const FORCE_WRAP_UP_FLAG = '--force-wrap-up';
 
 /** The reason a directive carries, where a decision session writes its own. */
-export const DIRECTIVE_REASON = `named on the line with ${DECIDE_FLAG}`;
+export const DIRECTIVE_REASON: string = `named on the line with ${DECIDE_FLAG}`;
 
 /** What a line asks of `--continue`. */
 export interface ContinueArgs {

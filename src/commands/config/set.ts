@@ -232,4 +232,5 @@ export function createConfigSetCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createConfigSetCommand();
+const command: RafaCommand = createConfigSetCommand();
+export default command;

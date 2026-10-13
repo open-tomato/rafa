@@ -248,7 +248,14 @@ import { runAsRunningCommand } from './running.js';
 const REFUSAL = 'dispatcher';
 
 /** Every code a failed terminal event carries. */
-export const DISPATCH_ERROR_CODES = [
+export const DISPATCH_ERROR_CODES: readonly [
+  ...typeof ROUTE_REFUSALS,
+  'invalid_spec',
+  'no_project',
+  'command_exit',
+  'command_error',
+  'result_unwritable',
+] = [
   ...ROUTE_REFUSALS,
   'invalid_spec',
   'no_project',

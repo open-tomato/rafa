@@ -135,7 +135,7 @@ export {
 export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 /** The argv the remote-tracking branches are refreshed with. Never forced. */
-export const FETCH_PRUNE = Object.freeze(['fetch', '--prune']);
+export const FETCH_PRUNE: readonly string[] = Object.freeze(['fetch', '--prune']);
 
 /**
  * What {@link readCleanup} reads through: the worktree seams, the pid

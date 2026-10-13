@@ -154,4 +154,5 @@ export function createIssueEditCommand(seams: EditSeams = DEFAULT_EDIT_SEAMS): R
   return Object.freeze(command);
 }
 
-export default createIssueEditCommand();
+const command: RafaCommand = createIssueEditCommand();
+export default command;

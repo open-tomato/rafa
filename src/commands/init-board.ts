@@ -432,11 +432,11 @@ export interface EpicGuardStepOptions {
 }
 
 /** What a line asking for `--epic-guard` is told when the board step did not run. */
-export const EPIC_GUARD_NO_BOARD_WARNING = '--epic-guard installs the epic guard workflow with the GitHub board,'
+export const EPIC_GUARD_NO_BOARD_WARNING: string = '--epic-guard installs the epic guard workflow with the GitHub board,'
   + ` and the board step did not run, so it was not installed; run ${EPIC_GUARD_FIX}.`;
 
 /** What a line asking for `--epic-guard` is told under `board.relationships: native`. */
-export const EPIC_GUARD_NATIVE_REFUSAL = 'board.relationships is native: --epic-guard was refused, since the'
+export const EPIC_GUARD_NATIVE_REFUSAL: string = 'board.relationships is native: --epic-guard was refused, since the'
   + ' tracker keeps one parent per issue and there is no second epic: label for the workflow to remove,'
   + ' so it was not installed.';
 

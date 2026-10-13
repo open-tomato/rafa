@@ -35,7 +35,7 @@ import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/
 const COMMAND_NAME = 'rafa effort move';
 
 /** The line the refusals end with: the step `rafa effort merge` names for a `store: ndjson` project. */
-export const MOVE_USAGE = MOVE_TO_SQLITE;
+export const MOVE_USAGE: string = MOVE_TO_SQLITE;
 
 const TO_FLAG = 'to';
 
@@ -159,4 +159,5 @@ export function createMoveCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createMoveCommand();
+const command: RafaCommand = createMoveCommand();
+export default command;

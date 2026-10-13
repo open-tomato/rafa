@@ -169,7 +169,7 @@ const USAGE = PR_USAGE.wait;
 const TIMEOUT_FLAG = 'timeout';
 
 /** Minutes a line that types no `--timeout` waits: the loop's own CI deadline. */
-export const DEFAULT_WAIT_TIMEOUT_MIN = DEFAULT_CI_TIMEOUT_MIN;
+export const DEFAULT_WAIT_TIMEOUT_MIN: number = DEFAULT_CI_TIMEOUT_MIN;
 
 /** Milliseconds in a minute, as `--timeout` is turned into a deadline. */
 const MS_PER_MIN = 60_000;
@@ -461,4 +461,5 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
   return Object.freeze(command);
 }
 
-export default createPrWaitCommand();
+const command: RafaCommand = createPrWaitCommand();
+export default command;

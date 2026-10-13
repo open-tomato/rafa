@@ -84,7 +84,7 @@ import { TEST_SCOPES } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';
 
 /** The states a session record holds, in the spec's order. */
-export const SESSION_STATES = Object.freeze(['running', 'paused', 'stopped', 'done'] as const);
+export const SESSION_STATES: readonly ['running', 'paused', 'stopped', 'done'] = Object.freeze(['running', 'paused', 'stopped', 'done'] as const);
 
 /** One of {@link SESSION_STATES}. */
 export type SessionState = (typeof SESSION_STATES)[number];
@@ -93,7 +93,7 @@ export type SessionState = (typeof SESSION_STATES)[number];
  * The phases of a run, in the order a run meets them: its tasks, the
  * wrap-up, the pull request, the CI wait, and a repair of what CI failed.
  */
-export const SESSION_PHASES = Object.freeze(['task', 'wrap-up', 'pull-request', 'ci', 'repair'] as const);
+export const SESSION_PHASES: readonly ['task', 'wrap-up', 'pull-request', 'ci', 'repair'] = Object.freeze(['task', 'wrap-up', 'pull-request', 'ci', 'repair'] as const);
 
 /** One of {@link SESSION_PHASES}. */
 export type SessionPhase = (typeof SESSION_PHASES)[number];
@@ -108,7 +108,7 @@ export const RECORD_EXTENSION = '.json';
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /** The kinds of suite step a run records, in the order a run meets them. */
-export const SESSION_STEP_KINDS = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
+export const SESSION_STEP_KINDS: readonly ['baseline', 'task', 'stage', 'pre-wrap-up'] = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
 
 /** One of {@link SESSION_STEP_KINDS}. */
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
@@ -119,13 +119,13 @@ export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
  * no `Owns:` folder narrows the run, a `tests=module` task whose module
  * holds no test file, and a stage step's own scope.
  */
-export const SESSION_STEP_REASONS = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
+export const SESSION_STEP_REASONS: readonly ['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
 
 /** One of {@link SESSION_STEP_REASONS}. */
 export type SessionStepReason = (typeof SESSION_STEP_REASONS)[number];
 
 /** The strategies a saved decision may name: the two that pass over a task. */
-export const SESSION_DECISION_STRATEGIES = Object.freeze(['jump', 'defer'] as const);
+export const SESSION_DECISION_STRATEGIES: readonly ['jump', 'defer'] = Object.freeze(['jump', 'defer'] as const);
 
 /** A record file that cannot be read, or holds no record this module accepts. */
 export class SessionRecordError extends Error {

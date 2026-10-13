@@ -192,4 +192,5 @@ export function createAgentShowCommand(seams: AgentShowSeams = DEFAULT_AGENT_SHO
   return Object.freeze(command);
 }
 
-export default createAgentShowCommand();
+const command: RafaCommand = createAgentShowCommand();
+export default command;

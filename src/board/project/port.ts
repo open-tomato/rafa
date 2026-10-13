@@ -77,7 +77,11 @@ export const PROJECT_PAGE_SIZE = 100;
 export const PROJECT_PORT_PREFIX = 'board project';
 
 /** The `dataType` GitHub answers for each kind of field rafa writes. */
-export const FIELD_DATA_TYPES = Object.freeze({
+export const FIELD_DATA_TYPES: Readonly<{
+  readonly singleSelect: 'SINGLE_SELECT';
+  readonly number: 'NUMBER';
+  readonly text: 'TEXT';
+}> = Object.freeze({
   singleSelect: 'SINGLE_SELECT',
   number: 'NUMBER',
   text: 'TEXT',

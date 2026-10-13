@@ -95,7 +95,7 @@ import { NOTHING_DISPATCHED } from './session.js';
 const RUNTIME_FLAG = '--runtime';
 
 /** Where versions sit under the home: `~/.rafa/runtime/<version>/`. */
-export const RUNTIME_SUBDIR = join('.rafa', 'runtime');
+export const RUNTIME_SUBDIR: string = join('.rafa', 'runtime');
 
 /** A runtime's entry, in a version's directory and in a directory a path names. */
 export const RUNTIME_ENTRY = 'cli.js';
@@ -112,7 +112,7 @@ export const RUNTIME_COMMAND: readonly string[] = ['start'];
  * `runtime/install.ts` holds a `package.json` version to it before it
  * names a directory by one.
  */
-export const VERSION_SHAPE =/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?$/;
+export const VERSION_SHAPE: RegExp =/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?$/;
 
 /** How to spell the flag, as every refusal about its value says. */
 const SPELLING = '`--runtime=<version>` for a build under `~/.rafa/runtime/`, or `--runtime=<path>` for a `cli.js` or the directory holding it';

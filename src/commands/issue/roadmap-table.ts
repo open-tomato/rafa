@@ -116,7 +116,7 @@ export const SYMBOL_GAP = ' ';
 const ELLIPSIS = '…';
 
 /** The eight columns, in order, as the header line spells them. */
-export const ROADMAP_COLUMNS = Object.freeze([
+export const ROADMAP_COLUMNS: readonly ['#', 'state', 'type', 'spec', 'blocked by', 'has', 'refs', 'title'] = Object.freeze([
   '#',
   'state',
   'type',

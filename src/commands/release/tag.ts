@@ -743,4 +743,5 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
   return Object.freeze(command);
 }
 
-export default createReleaseTagCommand();
+const command: RafaCommand = createReleaseTagCommand();
+export default command;

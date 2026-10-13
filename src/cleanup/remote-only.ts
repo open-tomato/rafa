@@ -139,7 +139,7 @@ export const STRETCH_PREFIX = 'stretch/';
  * and the ref a symbolic one points at, empty for a branch. Tabs
  * separate the fields, which git refuses in a ref name.
  */
-export const REMOTE_BRANCH_FORMAT = [
+export const REMOTE_BRANCH_FORMAT: string = [
   '%(refname:lstrip=3)',
   '%(committerdate:unix)',
   '%(symref)',
