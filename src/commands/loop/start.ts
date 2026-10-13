@@ -80,9 +80,10 @@ const wrapped = wrapPhaseZeroCommand({
     + ' for each migration the effort store holds that this rafa does not know and that is additive. It'
     + ' refuses to start while `RAFA_EFFORT_DIR` is set, since a loop records to the project\'s own'
     + ' store. Started on'
-    + ' `main` or `master` it offers to create the plan\'s `feat/<stub>` from the latest'
-    + ' `origin/<base>` and run there, `--create-branch` answering that without asking, and refuses'
-    + ' the run when the offer is not taken. `--as-worktree` runs the plan in a worktree of its own on'
+    + ' `main` or `master`, or on a detached `HEAD`, it offers to create the plan\'s `feat/<stub>` from'
+    + ' the latest `origin/<base>` and run there, `--create-branch` answering that without asking, and'
+    + ' refuses the run when the offer is not taken. On a detached `HEAD` the base is `pr.base`, else'
+    + ' the branch `origin/HEAD` names. `--as-worktree` runs the plan in a worktree of its own on'
     + ' that branch instead, leaving the main checkout as it is, and is refused beside'
     + ' `--create-branch`. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
     + ' the plan, the branch, the pid, the start, the state and the running task, and under `--roadmap`'
@@ -196,10 +197,11 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'create-branch',
-      description: 'On `main` or `master`, creates `feat/<plan-stub>` from the latest `origin/<base>`'
-        + ' and runs the plan there without asking, or switches to that branch when it already'
-        + ' exists. Refuses rather than move when a tracked file is modified, the fetch fails or the'
-        + ' base has diverged from its remote.',
+      description: 'On `main` or `master`, or on a detached `HEAD`, creates `feat/<plan-stub>` from the'
+        + ' latest `origin/<base>` and runs the plan there without asking, or switches to that branch'
+        + ' when it already exists. On a detached `HEAD` the base is `pr.base`, else the branch'
+        + ' `origin/HEAD` names. Refuses rather than move when a tracked file is modified, the fetch'
+        + ' fails or, on `main` or `master`, the base has diverged from its remote.',
       type: 'boolean',
     },
     {
@@ -212,7 +214,10 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'any-branch',
-      description: 'Runs on `main` or `master`, which the loop otherwise refuses.',
+      description: 'Runs on `main` or `master`, which the loop otherwise refuses. Waives nothing on a'
+        + ' detached `HEAD`: the run is offered `feat/<plan-stub>` from the latest `origin/<base>`, the'
+        + ' base being `pr.base`, else the branch `origin/HEAD` names, and refused when the offer is'
+        + ' not taken.',
       type: 'boolean',
     },
     {
