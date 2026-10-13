@@ -83,7 +83,7 @@ import { AGENT_DEFINITION_DIR } from '../utils/agent-definition.js';
 import { checkVerdict, EMPTY_FRONTMATTER, readInventoryText, summarize } from './record.js';
 
 /** The directory rafa's own agents sit in, relative to the running `cli.js`. */
-export const BUNDLED_AGENTS_DIR = join('bundled', 'agents');
+export const BUNDLED_AGENTS_DIR: string = join('bundled', 'agents');
 
 /**
  * One row as a source reads it: everything an {@link InventoryRecord}

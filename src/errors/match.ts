@@ -98,7 +98,7 @@ function sharedFloor(query: ReadonlySet<string>): number {
 export function suggestCodes(
   text: string,
   entries: readonly ErrorCodeEntry[],
-  limit = SUGGESTION_LIMIT,
+  limit: number = SUGGESTION_LIMIT,
 ): readonly CodeSuggestion[] {
   const query = contentWords(text);
   const floor = sharedFloor(query);
@@ -122,7 +122,7 @@ function leafWords(entry: ErrorCodeEntry): ReadonlySet<string> {
 /** Every pair inside one family reading alike at `threshold` or above, in list order. */
 export function nearDuplicates(
   entries: readonly ErrorCodeEntry[],
-  threshold = NEAR_DUPLICATE_SCORE,
+  threshold: number = NEAR_DUPLICATE_SCORE,
 ): readonly NearDuplicate[] {
   const pairs = entries.flatMap((first, index) => entries.slice(index + 1)
     .filter((second) => familyOf(first.code) === familyOf(second.code))
