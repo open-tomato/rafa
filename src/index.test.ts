@@ -711,6 +711,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['readRequiredFlag']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readPullArgument']],
   ]],
+  ['./commands/pr/close.js', [
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../issue/issue-tracker.js', ['readRequiredFlag']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
+  ]],
   ['./commands/pr/list.js', [
     ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/index.js', ['createGitRunner']],
@@ -1680,6 +1685,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/view.js',
       './commands/pr/open.js',
       './commands/pr/retarget.js',
+      './commands/pr/close.js',
       './commands/pr/list.js',
       './commands/pr/wait.js',
       './commands/pr/merge.js',

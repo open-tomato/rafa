@@ -63,6 +63,7 @@ module's note is the long form.
 | `src/commands/pr/wait.ts` | `rafa pr wait [<n>] [--timeout=<minutes>]`: polls one pull request's checks until they settle or the deadline passes, reading and writing nothing else. Exit code 0 for green (every check passed); 1 for red (a check failed) or none (no check registered yet); 3 for a deadline that passed with checks still running or pending. The `--timeout` flag takes a minute count from 1, defaulting to `DEFAULT_CI_TIMEOUT_MIN`; the number is read from the line, so `rafa pr wait --timeout 41` is a 41-minute wait on the branch's own PR, not a wait on #41. The verdict state values are `green`, `red`, `none`, `pending`, and `timeout`. A green run ends with the one step that follows; the other four each carry their report as the message of their `CommandExit`. The poll is the `waitForChecks` the loop's own CI gate uses, so one wait and the loop agree about what green means and how often a pull request is asked. This command alone hands it the head's committed time (`PullRequestDetail.headCommittedAt`, read through `get`): zero checks on a head younger than `FIRST_CHECK_GRACE_MS` (120 s, `src/pr/checks.ts`) are polled again, so a wait typed just after a push holds until the first check registers. A null time, or a head past the grace, gets none, and the gate and `pr triage --resolve` pass no time at all. A `none` ending reads the detail once more and prints the does-not-merge-cleanly line only when it reads `conflicting`; otherwise it names `rafa pr wait <n>` to ask again and `rafa pr show <n>`. The report is the data of a json-mode terminal result when green, or its error message when not. See `--no-hint` under the ending hint. |
 | `src/commands/pr/open.ts` | `rafa pr open --head=<branch> --base=<branch> --title=<text> --body-file=<path>`: the four flags read and a head equal to the base refused, the body file read whole and refused when it cannot be read or holds nothing but whitespace, then `findOpen(head)` asked before `PullRequests.create`, so a head already holding an open pull request has that pull request printed with `opened: false` and none opened, warned about when its base is another. The line and the body file are read before the config, so a refusal of either makes no provider. Exit code 0 for one opened or already open; 2 where `pr.provider` is not `gh`; 1 for every other refusal. Starts no session and declares no `spends` |
 | `src/commands/pr/retarget.ts` | `rafa pr retarget <n> --base=<branch>`: the number and `--base` read first, then `get(n)` for the base the pull request is on now, then `PullRequests.editBase` only when that base differs (compared exactly), printing the line `retargetedLine` (`src/start/pr-retarget.ts`) builds. A pull request already on the base sends no edit and exits 0. A refused line makes no provider. Exit code 0 for one retargeted or already on the base; 2 where `pr.provider` is not `gh`; 1 for every other refusal, a refused edit and an absent pull request among them. Starts no session and declares no `spends` |
+| `src/commands/pr/close.ts` | `rafa pr close <n> --reason=<text> [--delete-branch] [--yes]`: one open pull request closed without merging it. The line is read first (the two switches, exactly one number, then `--reason`, required and not blank), so a refused line makes no provider; then `get(n)`, refusing a pull request the repository does not hold, one already merged and one already closed, each naming its state. It prints the title, the head branch and the issues a merge would have closed (`PullRequestDetail.closes`), saying they stay open, then asks `Close #<n> without merging? [y/N]`; `--yes` answers it, and without a terminal and without `--yes` it refuses before anything is printed to stdout. `PullRequests.close` is the last call and the only write, with the reason as the closing comment; the head branch stays unless `--delete-branch` is on the line. Exit code 0 for a close and for a declined question; 2 where `pr.provider` is not `gh`; 1 for every other refusal, a rejected provider call among them. With `--output=json` the `PrCloseResult` (number, title, head, issues, `closed`, `branchDeleted`) is the data of the terminal result event. Starts no session and declares no `spends` |
 | `src/commands/pr/triage-read.ts` | what `pr triage` gathers that is neither the line nor the pull request: the Actions run id off a check link, the `--log-failed` capture of each failing run, the repository's workflow count when no check reported, and the conflicting file list, read with `git merge-tree` between refs resolved first and never fetched |
 | `src/commands/pr/triage-resolve.ts` | what `--resolve` does with an assessment: the worktree added and removed, the pinned plan filled and capped at `pr.resolveBudget`, one loop run an attempt, the CI wait after each, the attempt guard's two stops, the comment with its dependabot rebase note, and the exit code 3 a run that gave up ends with; a `conflict-version` assessment is dispatched to `./triage-convert.ts` ahead of the pinned-plan check and the loop path |
 | `src/commands/pr/triage-convert.ts` | the `conflict-version` run of `--resolve`: the resolve worktree added, `convertStampedVersion` (`src/pr/triage/version-convert.ts`) making one commit that turns the stamped changelog section into a release fragment and sets the version file and the changelog back to the merge base's, the branch pushed with `pushResolved` and never forced, and the worktree removed; no plan, no session, no CI wait, no attempt raised and no comment written, exit 0 when converted or already unstamped and 3 when the conversion or the push is refused |
@@ -400,8 +401,8 @@ New; it replaces no earlier text. What a row or an action added to
   `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`; `issue list`,
   `issue show`, `issue create`, `issue comment`, `issue move`,
   `issue ready`, `issue unblock`, `issue check` and `issue edit`;
-  `pr current`, `pr show`, `pr view`, `pr list`, `pr wait`, `pr merge`
-  and `pr triage`;
+  `pr current`, `pr show`, `pr view`, `pr open`, `pr retarget`,
+  `pr close`, `pr list`, `pr wait`, `pr merge` and `pr triage`;
   `effort collect`, `effort report`, `effort dashboard`, `effort fix-schema`, `effort copy`, `effort schema`, `effort migrate`, `effort merge`, `effort import`, `effort move`, `module list`, `module exec`,
   `agent vendor`, `agent list`, `agent show`, `agent search`, `skill check`,
   `skill list`, `skill show`, `skill search`, `skill demote`, `skill backfill`, `instinct check`, `instinct list`,
@@ -2478,7 +2479,9 @@ New; it replaces no earlier text. What a row or an action added to
   declare the argument `n` and no flag. `pr merge`
   declares the argument `n` and the flags `yes`, `skip-checks`, `method` and `hint`, and
   `pr triage` the argument `n` and the flags `comment`, `resolve`,
-  `max-attempts` and `hint`; each declares `text` and `json`.
+  `max-attempts` and `hint`, and `pr close` the argument `n` and the
+  flags `reason`, `delete-branch` and `yes`; each declares `text` and
+  `json`.
 - **How they refuse**: each wrapped command throws `CommandExit` with the
   whole refusal as its message, so text mode writes it to stderr as the
   phase 0 command printed it and json mode carries it in the terminal
@@ -2590,7 +2593,13 @@ New; it replaces no earlier text. What a row or an action added to
   worktree), `--skip-checks` on a pull request that reports checks, no
   terminal to ask on without `--yes`, `--yes` beside `--skip-checks` where
   workflows exist or their count could not be read, a provider that would
-  not merge, and a clean-up step that failed. `pr triage` throws 1 for a
+  not merge, and a clean-up step that failed. `pr close` throws 1 for a
+  line naming no number, a second word, a word that is no whole number
+  from 1, a switch that swallowed the number, a `--reason` left out, bare
+  or blank, a config that cannot be used, a number the repository has no
+  pull request for, a pull request already merged or already closed, no
+  terminal to ask on without `--yes`, and a provider call that rejected.
+  `pr triage` throws 1 for a
   stray word, a word that is no whole number from 1, a flag that swallowed
   the number, a config that cannot be used, a `--max-attempts` that is no
   whole number from 1, `--resolve` beside `--no-comment`, a number the
@@ -2998,7 +3007,9 @@ the same process (#863).
   BYTE-IDENTICAL. That is the expected reading and not a writer that
   never fired; the control that tells them apart is dirtying one snapshot
   with an extra line and re-running the updater, which returns the file
-  to its original sha.
+  to its original sha. Registering `pr close` read exactly so: every
+  snapshot byte-identical after the updater, and a dirtied `rafa.txt`
+  returned to its sha (measured on 2026-10-13).
 - **A new SUBJECT moves `rafa.txt` alone.** The root roster is the only
   one of the seven that lists subjects; the other six render a single
   command or subtree and are untouched. Read which files actually differ
