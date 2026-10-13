@@ -38,7 +38,7 @@
  * the {@link PrRetargetResult} is the data of the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { retargetedLine } from '../../start/pr-retarget.js';
 import { readRequiredFlag } from '../issue/issue-tracker.js';
@@ -143,4 +143,5 @@ export function createPrRetargetCommand(seams: PrSeams = DEFAULT_PR_SEAMS): Rafa
   return Object.freeze(command);
 }
 
-export default createPrRetargetCommand();
+const command: RafaCommand = createPrRetargetCommand();
+export default command;

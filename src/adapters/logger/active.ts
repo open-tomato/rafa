@@ -1,7 +1,7 @@
 /**
  * The logger this process writes its diagnostics through (#950), held
- * beside the active output (`../output/active.ts`), for the same reason:
- * a module far from any command still has somewhere to warn.
+ * beside the active output (`src/core/output/active.ts`), for the same
+ * reason: a module far from any command still has somewhere to warn.
  *
  * Until something sets another, it is a console logger at verbosity 0
  * with no colour, writing through the active output. The dispatcher
@@ -80,8 +80,8 @@ import type { Logger } from '../../ports/index.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { messageOf } from '../../config-sections.js';
-import { activeOutput } from '../output/active.js';
+import { messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 
 import { createConsoleLogger } from './console.js';
 import { activeLoggerSettings, DEFAULT_LOGGER_KIND } from './settings.js';

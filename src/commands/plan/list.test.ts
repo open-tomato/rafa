@@ -35,9 +35,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { plansDirAt } from '../../core/plan/index.js';
 import { parsePlan } from '../../plan/index.js';
 import { listPlans } from '../../plan/list.js';
-import { plansDirAt } from '../../plan/plan-files.js';
 import { dispatchInProject, eventsOf, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 import planListCommand, { openPlans, renderPlanList } from './list.js';

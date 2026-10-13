@@ -14,7 +14,7 @@
  * finish beside one, a finish at the start beside one after it, and blocked
  * tasks left beside open ones.
  */
-import type { TaskCounts } from '../../plan/plan-files.js';
+import type { TaskCounts } from '../../core/plan/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,6 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { isPidAlive } from '../../core/loop/index.js';
 import {
   estimateEta,
   formatDuration,
@@ -32,8 +33,7 @@ import {
   sessionLine,
   STOP_POLL_MS,
   STOP_WAIT_MS,
-} from '../../loop/session-readings.js';
-import { isPidAlive } from '../../loop/sessions.js';
+} from '../../core/loop/readings.js';
 import {
   DEMO_PLAN,
   DEMO_PLAN_PATH,

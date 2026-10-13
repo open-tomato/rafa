@@ -97,13 +97,12 @@
  * `./merge.ts` should post it straight after the merge rather than
  * behind the local clean-up, which can fail and would silently drop it.
  */
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 import type { GitRunner, PullRequestComment, PullRequests } from '../../pr/index.js';
 import type { BaseWorkflowReading, UncheckedCase, UncheckedReading } from '../../pr/unchecked.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readUnchecked } from '../../pr/unchecked.js';
 import { workflowsRunOnPullRequestsInto } from '../../pr/workflow-triggers.js';
 

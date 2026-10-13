@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 import { plantScratchRepo } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
@@ -139,6 +139,8 @@ function plant(realGit: string): ScratchRepo {
   const base = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: scratch.repo, encoding: 'utf8' }).trim();
   git(scratch, scratch.repo, 'remote', 'add', 'origin', originPath);
   git(scratch, scratch.repo, 'push', '-q', '-u', 'origin', base);
+  // The run reads its base from origin/HEAD, which a bare clone-less remote add leaves unset.
+  git(scratch, scratch.repo, 'remote', 'set-head', 'origin', base);
 
   mkdirSync(join(scratch.repo, '.plans'));
   writeFileSync(join(scratch.repo, PLAN_REL), `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`, 'utf8');

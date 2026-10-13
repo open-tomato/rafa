@@ -45,7 +45,7 @@
  * `browse` the provider rejected.
  */
 import type { PrSeams, PullSource } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { SEPARATOR } from './current.js';
 import {
@@ -155,4 +155,5 @@ export function createPrViewCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
   return Object.freeze(command);
 }
 
-export default createPrViewCommand();
+const command: RafaCommand = createPrViewCommand();
+export default command;

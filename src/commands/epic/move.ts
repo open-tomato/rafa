@@ -145,9 +145,8 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { BoardRelations, RelationWrite } from '../../board/relations/port.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { OpenPullRequestLister, RoadmapPullRequest } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { branchNameOf } from '../../board/epic-horizon.js';
@@ -163,10 +162,9 @@ import { createGhIssueBoard } from '../../board/issue-board.js';
 import { readBoardRepository } from '../../board/repository.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { branchClaims, closedIssuesIn, createGhOpenPullRequests, parseRoadmapBody, scanClaimBranches } from '../../board/roadmap.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { issueProject, lineRefusal, readTextFlag } from '../issue/issue-tracker.js';
 
 import { moveTarget, refreshProjectAfterEpic } from './epic-project.js';
@@ -787,4 +785,5 @@ export function createEpicMoveCommand(seams: EpicMoveSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createEpicMoveCommand();
+const command: RafaCommand = createEpicMoveCommand();
+export default command;

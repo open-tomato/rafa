@@ -68,14 +68,14 @@ import type { BlockedReading } from '../../board/blocked.js';
 import type { IssueDraft, Tracker } from '../../ports/index.js';
 
 import { BLOCKED_BY_FIELD, readBlockedBy } from '../../board/blocked.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 import { onTracker } from './issue-tracker.js';
 
 /**
  * How many issues the board listing asks for. `gh issue list` honours
  * a limit above 100, as `OPEN_ISSUES_LIMIT` in
- * `adapters/tracker/github.ts` records.
+ * `adapters/tracker/github-open-issues.ts` records.
  */
 export const KNOWN_LIST_LIMIT = 1000;
 

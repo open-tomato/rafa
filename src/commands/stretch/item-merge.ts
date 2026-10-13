@@ -39,12 +39,19 @@
  *      `open-tomato/rafa`: a merged pull request answers
  *      `"mergeCommit":{"oid":"<sha>"}` and `"state":"MERGED"`, an open one
  *      `"mergeCommit":null`.
- *   4. The newest run on the base, read through `readNewestRun`
- *      (`src/ci/runs.ts`) every {@link CI_POLL_MS}, until it is a
- *      completed run on the merge commit. The wait gives up after
- *      {@link CI_WAIT_MS}, after {@link CI_READ_TRIES} failed reads in a
- *      row, or on an interrupt, each with a warning, and the item goes
- *      on: the merge is done, so its ledger line is written either way.
+ *   4. The run on the merge commit, read through `readNewestRun`
+ *      (`src/ci/runs.ts`) by the base and that commit every
+ *      {@link CI_POLL_MS}, until it is completed, red or green. A push
+ *      to the base after the merge starts a run of its own, listed first
+ *      on the branch; asked for by commit, it is never the row read
+ *      (#1029). The wait gives up after {@link CI_WAIT_MS}, after
+ *      {@link CI_READ_TRIES} failed reads in a row, or on an interrupt,
+ *      each with a warning, and the item goes on: the merge is done, so
+ *      its ledger line is written either way. The {@link CI_WAIT_MS}
+ *      warning says which of two things the last read that answered
+ *      found: no run on the commit, or a run on it that had not ended.
+ *      Step 6 still reads the newest run of the base, which after such
+ *      a push is not the run this step waited on.
  *   5. One line appended to the item ledger, `.rafa/stretch/<n>/items.ndjson`
  *      (`src/stretch/items.ts`): the issue, the plan stub, the pull
  *      request, the merge commit, a `Closes #<n>` line per issue the body
@@ -61,22 +68,24 @@
  *
  * {@link mergeDryRunLines} are the lines steps 2 to 6 print in a dry run
  * with `--wait`; the pull request's number is not known before the loop
- * opens it, so the lines name it `<pr>`.
+ * opens it, so the lines name it `<pr>`, and the merge commit is not
+ * known before the merge, so the `gh run list` line names it
+ * `--commit <merge-commit>`.
  *
  * Every process goes through {@link ItemMergeSeams}, so no test runs
  * `rafa`, reaches GitHub or sleeps.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaContext } from '../../cli/command.js';
+import type { BranchRun } from '../../ci/runs.js';
+import type { RafaContext } from '../../core/command/index.js';
 import type { Tracker } from '../../ports/index.js';
-import type { FiledAtReader } from '../../stretch/pit-readings.js';
 
 import { readFileSync } from 'node:fs';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
 import { readNewestRun, runListArgs } from '../../ci/runs.js';
-import { CommandExit } from '../../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
 import { eventsFileOf, readEventsFrom } from '../../loop/events-file.js';
 import { appendItem, itemsPath, lastItemTime } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
@@ -87,13 +96,13 @@ import { STRETCH_BRANCH_PREFIX, stretchRecordPath } from './start.js';
 /** The command's spelling, as its refusals name it. */
 const COMMAND_NAME = 'rafa stretch item';
 
-/** How long apart two reads of the integration branch's newest run are. */
+/** How long apart two reads of the run on the merge commit are. */
 export const CI_POLL_MS = 30_000;
 
 /** How long the item waits for the run on the merge commit to end. */
-export const CI_WAIT_MS = 90 * 60_000;
+export const CI_WAIT_MS: number = 90 * 60_000;
 
-/** How many reads of the newest run may fail in a row before the wait gives up. */
+/** How many reads of the run on the merge commit may fail in a row before the wait gives up. */
 export const CI_READ_TRIES = 3;
 
 /** The flags the merge runs with: no checks to wait on, and no question. */
@@ -117,16 +126,24 @@ const SHORT_SHA = 7;
 /** A full commit sha. */
 const SHA = /^[0-9a-f]{40}$/;
 
+/** What a dry run's line shows where the merge commit will be. */
+const MERGE_COMMIT_PLACEHOLDER = '<merge-commit>';
+
+/**
+ * The sha a dry run builds its `gh run list` line with, shown as
+ * {@link MERGE_COMMIT_PLACEHOLDER}: `runListArgs` refuses a commit that is
+ * not a full sha, and the placeholder is not one.
+ */
+const STAND_IN_SHA = '0'.repeat(40);
+
 /** The processes, `gh` and clock this half reaches through; see the module note. */
 export interface ItemMergeSeams {
   /** Runs a rafa line on this terminal and answers its exit code, or null when it could not start. */
   readonly runRafa: (argv: readonly string[], cwd: string, env: Readonly<Record<string, string>>) => Promise<number | null>;
   /** The `gh` runner for the project root. */
   readonly gh: (root: string) => GhRunner;
-  /** The tracker the open bugs are read from. */
+  /** The tracker the open bugs are read from, each with the time it was filed. */
   readonly tracker: (gh: GhRunner) => Pick<Tracker, 'openIssues'>;
-  /** Each bug's filing time, or undefined to leave the bugs filed since unread. */
-  readonly filedAt: (gh: GhRunner) => FiledAtReader | undefined;
   /** Waits `ms` milliseconds. */
   readonly sleep: (ms: number) => Promise<void>;
   readonly now: () => Date;
@@ -294,9 +311,10 @@ function mergeArgv(rafa: readonly string[], number: number): string[] {
 /** The lines a dry run with `--wait` prints for steps 2 to 6; see the module note. */
 export function mergeDryRunLines(rafa: readonly string[], root: string, n: number): string[] {
   const base = `${STRETCH_BRANCH_PREFIX}${String(n)}`;
+  const runList = lineText(['gh', ...runListArgs({ branch: base, commit: STAND_IN_SHA })]).replace(STAND_IN_SHA, MERGE_COMMIT_PLACEHOLDER);
   return [
     `${lineText([...rafa, 'pr', 'merge'])} <pr> ${lineText(MERGE_FLAGS)}`,
-    `${lineText(['gh', ...runListArgs({ branch: base })])}  (again every ${String(CI_POLL_MS / 1_000)}s until the run on the merge commit ends)`,
+    `${runList}  (again every ${String(CI_POLL_MS / 1_000)}s until the run on the merge commit ends)`,
     `append the item to ${itemsPath(root, n)}`,
     `print the pit-stop readings of ${base}`,
   ];
@@ -333,17 +351,26 @@ interface RunWait {
   readonly commit: string;
 }
 
-/** Step 4: waits until the newest run on the branch is a completed run on the merge commit; see the module note. */
+/** What the wait's bound says of the last read that answered: no run at `at`, or `found`, which had not ended. */
+function unendedText(found: BranchRun | null, at: string): string {
+  return found === null
+    ? `no run on ${at} was found`
+    : `run ${String(found.id)} (${found.workflow}) on ${at} had not ended`;
+}
+
+/** Step 4: waits until the run on the merge commit, read by branch and commit, is completed; see the module note. */
 async function awaitRun(context: RafaContext, wait: RunWait, seams: ItemMergeSeams): Promise<void> {
   const at = `${wait.branch} at ${short(wait.commit)}`;
   const since = seams.now().getTime();
   let failedReads = 0;
+  let found: BranchRun | null = null;
   context.output.info(`waiting for the run on ${at} to end`);
   for (;;) {
     try {
-      const run = await readNewestRun(wait.gh, { branch: wait.branch });
+      const run = await readNewestRun(wait.gh, { branch: wait.branch, commit: wait.commit });
       failedReads = 0;
-      if (run !== null && run.commit === wait.commit && run.state === 'completed') {
+      found = run;
+      if (run !== null && run.state === 'completed') {
         context.output.info(`run ${String(run.id)} (${run.workflow}) on ${at} ended: ${run.conclusion ?? 'no conclusion'}`);
         return;
       }
@@ -355,7 +382,7 @@ async function awaitRun(context: RafaContext, wait: RunWait, seams: ItemMergeSea
       }
     }
     if (seams.now().getTime() - since >= CI_WAIT_MS) {
-      context.output.warn(`no run on ${at} ended within ${String(CI_WAIT_MS / 60_000)} minutes; the readings below are of the newest run`);
+      context.output.warn(`${unendedText(found, at)} within ${String(CI_WAIT_MS / 60_000)} minutes`);
       return;
     }
     if (context.signal.aborted) {
@@ -407,10 +434,7 @@ async function mergeItem(context: RafaContext, item: WaitedItem, number: number,
     ? ', closing no issue'
     : `, ${closes.join(', ')}`}`);
 
-  const readings = await readPitReadings(
-    { gh, tracker: seams.tracker(gh), filedAt: seams.filedAt(gh) },
-    { branch: merged.base, since },
-  );
+  const readings = await readPitReadings({ gh, tracker: seams.tracker(gh) }, { branch: merged.base, since });
   for (const line of renderPitReadings(readings)) info(line);
 }
 
@@ -433,27 +457,4 @@ export async function afterLoopWait(context: RafaContext, item: WaitedItem, wait
     : waitExit;
   throw new CommandExit(code, `❌ ${COMMAND_NAME}: rafa loop wait --session-id=${item.sessionId} ended with exit code`
     + ` ${String(waitExit)} and no pull request to merge; nothing was merged.`);
-}
-
-/** Reads the time issue `ref` was filed through `gh issue view`, null when `gh` does not say. */
-export function ghFiledAt(gh: GhRunner): FiledAtReader {
-  return async (ref) => {
-    const result = await gh(['issue', 'view', ref.externalId, '--json', 'createdAt']);
-    if (!result.ok) return null;
-    let row: unknown;
-    try {
-      row = JSON.parse(result.stdout) as unknown;
-    } catch {
-      return null;
-    }
-    const at = isMapping(row)
-      ? row['createdAt']
-      : undefined;
-    const time = typeof at === 'string'
-      ? Date.parse(at)
-      : Number.NaN;
-    return Number.isNaN(time)
-      ? null
-      : new Date(time);
-  };
 }

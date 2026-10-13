@@ -78,7 +78,7 @@
  * report can say where the name came from rather than implying the
  * runner said it.
  */
-import { describeValue } from '../../config-sections.js';
+import { describeValue } from '../../core/config/sections.js';
 
 /**
  * How many lines of the tail the evidence carries, counted from the

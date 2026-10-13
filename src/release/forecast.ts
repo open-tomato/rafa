@@ -52,8 +52,8 @@
  * waits, which is not folded, and `failed` as above. `rafa release
  * status` prints it; like {@link forecastRelease} it reads nothing.
  */
-import type { ReleaseStrategy } from '../config-readers.js';
 import type { FoldFragment, ReleaseStrategyAdapter } from './strategy.js';
+import type { ReleaseStrategy } from '../core/config/sections.js';
 
 import { foldWithStrategy } from './strategy.js';
 import { parseSemanticVersion } from './version.js';

@@ -88,14 +88,14 @@ import type { RoadmapLine, RoadmapReadings, RoadmapSkip } from './roadmap.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { ClaimBranchReading } from '../claims/git.js';
 import type { Ownership } from '../claims/record.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
-import { CLAIMS_STALE_DISABLED } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { CLAIMS_STALE_DISABLED } from '../core/config/sections.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 
 import {

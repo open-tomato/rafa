@@ -42,10 +42,10 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
-import { refused } from './config-sections.js';
+import { refused } from './core/config/sections.js';
 
 /** The fewest retry sessions `loop.wrapUp.retries` accepts as a number. */
 export const WRAP_UP_RETRIES_MIN = 1;

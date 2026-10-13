@@ -149,7 +149,7 @@
  * inside it. A section holding nothing but the template's comment is one
  * fault, and naming it twice sends the author looking for a second one.
  */
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 /** The label a person puts on an issue that is ready to plan from. */
 export const SPEC_READY_LABEL = 'spec:ready';
@@ -258,7 +258,7 @@ const PLACEHOLDER_SHAPES: readonly PlaceholderShape[] = [
  * A store change named by a version number rather than by what it adds;
  * the spec's own pattern, read over prose with its code spans removed.
  */
-export const PINNED_MIGRATION = /\b(?:migration|schema version)s?\s+#?\d+\b/iu;
+export const PINNED_MIGRATION: RegExp = /\b(?:migration|schema version)s?\s+#?\d+\b/iu;
 
 /** One store change pinned by number, where it sits and how it reads. */
 export interface PinnedMigration {

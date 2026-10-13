@@ -30,8 +30,8 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { ConfigRoots } from '../config-load.js';
-import type { InjectMode } from '../config.js';
+import type { ConfigRoots } from '../core/config/load.js';
+import type { InjectMode } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -56,11 +56,12 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';
+import { injectionPlace } from '../start/loop-events.js';
 import { announcePlanIssues, injectSourceLabel, loadRunConfig } from '../start/run-config.js';
 import { buildWrapUpPrompt } from '../start/wrap-up.js';
 import { planStubFromPrompt, stampPrompt } from '../utils/plan-stamp.js';
@@ -125,6 +126,9 @@ const PROMPT_CONTENT = 'The loop stages and commits on your behalf.';
 /** The line the loop writes above every task prompt. */
 const DISPATCHED_HEAD = `Your scoped task is: ${DISPATCHED_TASK}`;
 
+/** A task text the plan holds on no line. */
+const UNHELD_TASK = 'Add a route the plan never names';
+
 /** The branch a wrap-up is told to push to. */
 const BRANCH = 'feat/an-injection-fixture';
 
@@ -149,6 +153,19 @@ function nextTaskAfter(done: number): TaskInfo {
   const task = findNextTask(tracker);
   if (task === null) throw new Error(`no task left after ${done} ticked`);
   return task;
+}
+
+/** A repair's sentence, as a red step writes one. */
+const REPAIR_TASK = 'Repair the red task step at commit 1111111';
+
+/**
+ * The plan as its tracker once every task is ticked and a red step has
+ * left a blocked repair after the last one, its line ending in
+ * `comment` before the blocker.
+ */
+function trackerWithRepair(comment: string): string {
+  const line = `- [BLOCKED] ${REPAIR_TASK}  {agent=build-error-resolver} ${comment}  <!-- blocked: the suite went red -->`;
+  return `${PLAN.replaceAll('- [ ] ', '- [x] ')}${line}\n`;
 }
 
 /** The first line of a prompt. */
@@ -331,7 +348,7 @@ interface DispatchRun {
 }
 
 /** Dispatches one task under `mode`, recording the spawn's prompt. */
-async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<DispatchRun> {
+async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo, tracker?: string): Promise<DispatchRun> {
   const prompts: string[] = [];
   const run: TaskSessionRunner = (prompt) => {
     prompts.push(prompt);
@@ -342,6 +359,9 @@ async function dispatchIn(mode: InjectMode, taskInfo: TaskInfo): Promise<Dispatc
     taskInfo,
     promptContent: PROMPT_CONTENT,
     planContent: PLAN,
+    ...(tracker === undefined
+      ? {}
+      : { place: injectionPlace(tracker, taskInfo) }),
     inject: mode,
     repoRoot: tempRoot,
     checkout: tempRoot,
@@ -426,29 +446,70 @@ describe('a task dispatched under each mode', () => {
     }
   });
 
-  it('hands over the whole plan, and says why, when the task has moved', async () => {
+  it('hands over the whole plan, and says why, when the plan holds no task with the text', async () => {
     const task = nextTaskAfter(1);
-    const moved = { ...task, lineNum: task.lineNum + 1 };
-    const { result } = await dispatchIn('stage', moved);
+    const { result } = await dispatchIn('stage', { ...task, task: UNHELD_TASK });
 
     expect(result.injection.requested).toBe('stage');
     expect(result.injection.mode).toBe('full');
-    expect(result.injection.fallback?.reason).toBe('no-task-at-line');
+    expect(result.injection.fallback?.reason).toBe('no-task-with-text');
     expect(result.prompt.endsWith(`\n${PLAN}`)).toBe(true);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('`stage` not rendered');
-    expect(warnings[0]).toContain(`line ${moved.lineNum + 1} of the plan`);
+    expect(warnings[0]).toContain('the plan holds no task with the dispatched text');
 
-    // The same dispatch at the task's own line renders and says nothing.
+    // The same dispatch with the task's own text renders and says nothing.
     warnings = [];
     const inPlace = await dispatchIn('stage', task);
     expect(inPlace.result.injection.mode).toBe('stage');
     expect(warnings).toEqual([]);
   });
 
+  it('renders the stage of a task its tracker holds on a lower line than the plan does', async () => {
+    // #865: a repair line inserted above the task moves it down in the
+    // tracker alone, and the plan holds no task where it now sits.
+    const task = nextTaskAfter(1);
+    const moved = await dispatchIn('stage', { ...task, lineNum: task.lineNum + 1 });
+    const inPlace = await dispatchIn('stage', task);
+
+    expect(moved.result.injection).toEqual(inPlace.result.injection);
+    expect(moved.result.injection.mode).toBe('stage');
+    expect(warnings).toEqual([]);
+  });
+
+  it('renders a repair by the task its tracker line names, and warns about nothing', async () => {
+    const tracker = trackerWithRepair(` <!-- repairs: ${OTHER_STAGE_TASK} -->`);
+    const repair = findNextTask(tracker)!;
+    expect(repair.repairs).toBe(OTHER_STAGE_TASK);
+
+    const { result } = await dispatchIn('stage', repair, tracker);
+    expect(result.injection.mode).toBe('stage');
+    expect(result.injection.fallback).toBeNull();
+    expect(result.prompt).toContain(`${ROUTES_CONTEXT}\n\n- [x] ${OTHER_STAGE_TASK}\n- [ ] ${REPAIR_TASK}\n`);
+    expect(result.prompt).not.toContain(SCHEMA_CONTEXT);
+    expect(warnings).toEqual([]);
+
+    // Control: dispatched with no place, the repair is looked up as a
+    // plan task, the plan holds none with its text, and the loop warns.
+    const unplaced = await dispatchIn('stage', repair);
+    expect(unplaced.result.injection.fallback?.reason).toBe('no-task-with-text');
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('hands a repair that names nothing the whole plan, and warns about nothing', async () => {
+    const tracker = trackerWithRepair('');
+    const repair = findNextTask(tracker)!;
+    expect(repair.repairs).toBeUndefined();
+
+    const { result } = await dispatchIn('stage', repair, tracker);
+    expect(result.injection).toEqual({ requested: 'stage', mode: 'full', text: PLAN, fallback: null });
+    expect(result.prompt.endsWith(`\n${PLAN}`)).toBe(true);
+    expect(warnings).toEqual([]);
+  });
+
   it('warns about nothing under `full`, which locates no task', async () => {
     const task = nextTaskAfter(1);
-    const { result } = await dispatchIn('full', { ...task, lineNum: task.lineNum + 1 });
+    const { result } = await dispatchIn('full', { ...task, task: UNHELD_TASK });
 
     expect(result.injection.fallback).toBeNull();
     expect(warnings).toEqual([]);
@@ -457,7 +518,7 @@ describe('a task dispatched under each mode', () => {
 
 describe('the wrap-up session', () => {
   it('is handed the whole plan, which a stage rendering is not', () => {
-    const prompt = buildWrapUpPrompt(BRANCH, 'main', PLAN);
+    const prompt = buildWrapUpPrompt(BRANCH, 'main', PLAN, 'gh');
     const stage = renderInjection({ mode: 'stage', plan: PLAN, task: nextTaskAfter(1) });
 
     expect(prompt.endsWith(`\n${PLAN}`)).toBe(true);
@@ -471,13 +532,13 @@ describe('the wrap-up session', () => {
 
   it('keeps its classifier key first, the plan and the stamp after it', () => {
     const stub = 'an-injection-fixture';
-    const stamped = stampPrompt(stub, buildWrapUpPrompt(BRANCH, 'main', PLAN));
+    const stamped = stampPrompt(stub, buildWrapUpPrompt(BRANCH, 'main', PLAN, 'gh'));
 
     expect(classifyPromptContent(stamped)).toBe('wrap-up');
     expect(planStubFromPrompt(stamped)).toBe(stub);
 
     // The plan written ABOVE the instructions buckets as nothing.
-    const prepended = `${PLAN}\n${buildWrapUpPrompt(BRANCH, 'main', '')}`;
+    const prepended = `${PLAN}\n${buildWrapUpPrompt(BRANCH, 'main', '', 'gh')}`;
     expect(classifyPromptContent(prepended)).toBe('other');
   });
 
@@ -491,8 +552,11 @@ describe('the wrap-up session', () => {
     expect(start).toContain('await runWrapUp({');
     expect(start).toContain('          planContent,\n');
     expect(wrapUpRun).toContain('await preserveProgress(planContent, settingSources, release, serving, wrapUpLearning, base, checkout, readProvider().provider, { stepOnly });');
-    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, openPullRequest, release, lessons, extras.stepOnly)');
+    expect(wrapUp).toContain('buildWrapUpPrompt(branch, base, planContent, provider, openPullRequest, release, lessons, extras.stepOnly)');
     expect(start).toContain('inject: injectMode,');
+    // The place of the task in the plan, and what a repair names, are
+    // read off the tracker the task came from.
+    expect(start).toContain('        place: injectionPlace(trackerContent, taskInfo),\n');
     expect(start).not.toContain('await preserveProgress(injection');
     expect(wrapUpRun).not.toContain('await preserveProgress(injection');
   });

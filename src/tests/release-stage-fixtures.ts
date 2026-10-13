@@ -31,8 +31,8 @@ import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 import type { ReleaseRefused, ReleaseVerified } from '../release/verify.js';
 import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { RELEASE_AUTO } from '../config-sections.js';
+import { RELEASE_AUTO } from '../core/config/sections.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { serializeFragment } from '../release/fragment.js';
 
 import { sinkOutput } from './output-sinks.js';
@@ -41,10 +41,10 @@ export const REPO = '/repo';
 export const BRANCH = 'feat/rafa-21-changelog-and-release';
 export const PR = 21;
 export const PLAN_ID = 'rafa-21-changelog-and-release';
-export const FRAGMENT_PATH = `.changes/${PLAN_ID}.md`;
-export const SUBJECT = `chore: release fragment ${PLAN_ID}`;
+export const FRAGMENT_PATH: string = `.changes/${PLAN_ID}.md`;
+export const SUBJECT: string = `chore: release fragment ${PLAN_ID}`;
 export const SHA = '9f1c0de1c0ffee0000000000000000000000abcd';
-export const BASE_COMMIT = 'b'.repeat(40);
+export const BASE_COMMIT: string = 'b'.repeat(40);
 
 /** The settings a case runs under: this repository's defaults. */
 export const SETTINGS: ReleaseStageSettings = {
@@ -58,7 +58,7 @@ export const SETTINGS: ReleaseStageSettings = {
 };
 
 /** A plan the way the loop writes one: a title heading and a `rafa:plan` block. */
-export const PLAN = [
+export const PLAN: string = [
   '# Plan: rafa-21 — changelog and release',
   '',
   '```rafa:plan',
@@ -129,7 +129,7 @@ export const VERIFIED: ReleaseVerified = {
 };
 
 /** A verification that refused, with step 1's text already back on disk. */
-export const REFUSAL_SENTENCE = `no release commit: ${FRAGMENT_PATH} carries the level major, not the plan's minor,`
+export const REFUSAL_SENTENCE: string = `no release commit: ${FRAGMENT_PATH} carries the level major, not the plan's minor,`
   + ` and ${FRAGMENT_PATH} was restored to the text the loop wrote`;
 
 export const REFUSED: ReleaseRefused = {
@@ -159,7 +159,7 @@ export const FORECAST: BranchForecast = {
 };
 
 /** The forecast line {@link FORECAST} renders. */
-export const FORECAST_LINE = 'Release forecast: this branch ships as the next minor, 0.5.0 if merged now'
+export const FORECAST_LINE: string = 'Release forecast: this branch ships as the next minor, 0.5.0 if merged now'
   + ' (semver-by-level, origin/main at 0.4.0, 1 fragment waiting)';
 
 /**
@@ -213,6 +213,7 @@ export function detail(body: string): PullRequestDetail {
     ...SUMMARY,
     body,
     headRefOid: 'deadbeef',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],
@@ -298,6 +299,7 @@ export function stubPulls(script: Script, calls: string[], bodies: string[]): Pu
     checks: () => unreached('checks'),
     browse: () => unreached('browse'),
     merge: () => unreached('merge'),
+    close: () => unreached('close'),
     create: () => unreached('create'),
     editTitle: () => unreached('editTitle'),
     editBase: () => unreached('editBase'),
@@ -357,7 +359,7 @@ export function stub(script: Script): Recorded {
 }
 
 /** The argv a fragment commit sends, over the path named. */
-export function commitArgv(path = FRAGMENT_PATH, subject = SUBJECT): string[] {
+export function commitArgv(path: string = FRAGMENT_PATH, subject: string = SUBJECT): string[] {
   return [
     `${REPO}: git add -- ${path}`,
     `${REPO}: git diff --cached --quiet -- ${path}`,

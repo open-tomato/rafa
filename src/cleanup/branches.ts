@@ -69,13 +69,13 @@
  * {@link BranchesUnread} naming what went wrong, the shape
  * {@link GitRunner} itself has.
  */
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
+import { gitSaid } from '../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
-import { gitSaid } from '../pr/git.js';
 
 /** The `for-each-ref` format every branch is read with; see the module note. */
-export const BRANCH_FORMAT = [
+export const BRANCH_FORMAT: string = [
   '%(refname:lstrip=2)',
   '%(upstream:short)',
   '%(upstream:track,nobracket)',

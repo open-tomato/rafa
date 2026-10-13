@@ -30,7 +30,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../../adapters/output/active.js';
+import { setActiveOutput } from '../../core/output/index.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 
 import { createRefreshingGhIssueBoard, refreshFailedWarning, refreshIssueItems, withProjectRefresh } from './issue-board-refresh.js';

@@ -129,8 +129,8 @@ import type { Epic, EpicRelations, Epics } from '../../board/epics.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { LineRowsOptions, RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { IssueSeams } from '../issue/issue-tracker.js';
 import type { TableStyle } from '../issue/roadmap-table.js';
 
@@ -149,10 +149,10 @@ import {
   parseRoadmapBody,
   ROADMAP_REFUSAL_EXIT,
 } from '../../board/roadmap.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
-import { plansDirAt } from '../../plan/plan-files.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { DEFAULT_ISSUE_SEAMS, issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { roadmapBoard } from '../issue/list.js';
@@ -481,4 +481,5 @@ export function createEpicShowCommand(seams: EpicShowSeams = DEFAULT_ISSUE_SEAMS
   return Object.freeze(command);
 }
 
-export default createEpicShowCommand();
+const command: RafaCommand = createEpicShowCommand();
+export default command;

@@ -28,7 +28,7 @@
  */
 import type { PrListRow, PrListResult } from './list.js';
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { ChecksReading, PullRequestDetail, PullRequests, PullRequestSummary } from '../../pr/index.js';
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
@@ -137,6 +137,7 @@ function stubPulls(answers: StubAnswers = {}): PullRequests {
       ...summary({ number }),
       body: '',
       headRefOid: 'abc',
+      headCommittedAt: null,
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],

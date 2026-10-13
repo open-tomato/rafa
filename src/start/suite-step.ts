@@ -8,7 +8,7 @@
  * Each step runs `bun test` itself (`suite/run.ts`: no timeout,
  * `CLAUDECODE` and `FORCE_COLOR` removed, failures read from Bun's JUnit
  * file), appends
- * one {@link SessionStep} to the run record (`loop/sessions.ts`) BEFORE
+ * one {@link SessionStep} to the run record (`core/loop/sessions.ts`) BEFORE
  * anything acts on it, prints what it found, and answers a
  * {@link StepOutcome}. Deciding whether the run goes on is the caller's:
  * nothing here stops the loop.
@@ -17,7 +17,7 @@
  *
  * | Step | Runs | Blocks |
  * |---|---|---|
- * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing |
+ * | baseline ({@link ensureBaseline}) | the full suite, once per plan | nothing; halts the run when it failed outside any test case |
  * | task ({@link runTaskStep}) | `taskStepScope` (`suite/scope.ts`) over the task's diff | a repair task it inserts, or the repair it followed |
  * | stage ({@link runStageStep}) | `stageStepScope` over the stage's diff | a repair task it inserts |
  * | pre-wrap-up ({@link runPreWrapUpStep}) | the full suite | a repair task it inserts, or the ticked one it inserted before |
@@ -28,6 +28,13 @@
  * full suite runs at HEAD and is written there. Its failures are the
  * KNOWN ones every later step is split against, and a red baseline
  * blocks nothing: that is what lets a run starting on a red `main` go on.
+ * One baseline is not written: a run that exited nonzero and listed no
+ * failing case (`failedOutsideAnyCase`, below). Its step is recorded
+ * with its tail, no stage enters the ledger, and it answers
+ * {@link BaselineOutcome.halted}, on which the caller
+ * (`suite-steps-run.ts`) stops the run before a session and says why. A
+ * stored baseline of that shape is recorded again, with a line saying
+ * so (`suite-outside-case.ts` holds the lines and their account).
  *
  * **A task step** runs the scope `taskStepScope` answers from the task
  * line's `tests=` value and the diff from the task's base commit to
@@ -94,10 +101,15 @@
  *
  * A step is red when it has a failure the baseline does not hold (a test
  * file and full test name, compared as a pair: `splitFailures`), when it
- * counts more errors outside any test than the baseline counted, or when
+ * counts more errors outside any test than the baseline counted, when
  * it exited nonzero with no summary line, so that Bun reported nothing
- * this module could read; a task step is also red on a red lint or a red
- * type step (above).
+ * this module could read, or when it exited nonzero and listed no
+ * failing case at all, whatever the baseline holds
+ * (`failedOutsideAnyCase`, `suite-outside-case.ts`, whose note is the
+ * account of it, #945); a task step is also red on a red lint or a red
+ * type step (above). A step red that last way is recorded with
+ * `outsideCase: true` and its run's `outputTail`, and its blocker
+ * quotes the tail's end.
  * Known failures are printed as known and never make a step red. The
  * error rule compares a scoped run's count against the FULL baseline's,
  * so an inherited load error outside the scope can hide a new one inside
@@ -110,7 +122,8 @@
  * an error can come from a file that throws on one load and not the
  * next. The first run is recorded and printed with the file and first
  * line of each error, then the retake is settled as the step. A retake
- * holding no more errors than the baseline prints one `Intermittent`
+ * holding no more errors than the baseline, and not failed outside any
+ * test case, prints one `Intermittent`
  * warning naming the first run's files and lines, and blocks nothing;
  * a retake over the count again is red, and halts the run as any red
  * step does. The retake writes over the first run's JUnit and output
@@ -177,7 +190,7 @@
  * Such a run answers nothing about the tree: a `bun test` killed midway
  * prints no summary, which would otherwise read as red and insert a
  * repair task. So an interrupted step is recorded with `interrupted: true`
- * (`loop/sessions.ts`) and no new failure, is never red, writes no
+ * (`core/loop/sessions.ts`) and no new failure, is never red, writes no
  * blocker, and answers {@link StepOutcome.interrupted}, on which the
  * caller ends the run as `rafa loop stop` does. An interrupted baseline
  * is not written and enters no stage in the ledger, and an interrupted
@@ -215,7 +228,7 @@
  * the plan's `Owns:` folders through {@link SuiteStepContext.owns},
  * which {@link planOwnsReader} builds over a `gh` runner, reading them
  * at most once per run. Every line goes through the active output
- * (`adapters/output/active.ts`).
+ * (`core/output/active.ts`).
  *
  * ## Where the stage step lives
  *
@@ -239,12 +252,12 @@
  * {@link retakeOnErrors} and the two JUnit file paths, exported for it.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
-import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
+import type { RepairSite, StepVerdict } from './suite-blocker.js';
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../loop/sessions.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../core/loop/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -255,10 +268,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
-import { runsDir, updateSession } from '../loop/sessions.js';
-import { parsePlan } from '../plan/parse.js';
+import { messageOf } from '../core/config/sections.js';
+import { runsDir, updateSession } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
   BASELINE_FILE_PREFIX,
@@ -279,6 +292,7 @@ import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
 import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { failedOutsideAnyCase, outsideCaseRecord, storedOutsideCaseLine } from './suite-outside-case.js';
 import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
@@ -296,7 +310,7 @@ export const STAGE_LEDGER_PREFIX = 'SUITE_STAGES';
 export const STAGE_LEDGER_VERSION = 1;
 
 /** The exit code `Bun.spawn` answers for a child ended by SIGINT: 128 plus its number. See the module note. */
-export const SIGINT_EXIT_CODE = 128 + constants.signals.SIGINT;
+export const SIGINT_EXIT_CODE: number = 128 + constants.signals.SIGINT;
 
 /** How many known failures a step lists by name before it counts the rest. */
 const KNOWN_LISTED = 10;
@@ -364,6 +378,8 @@ export interface BaselineOutcome {
   readonly step: SessionStep | null;
   /** True when the run was read as a stop on SIGINT: the baseline was not written. */
   readonly interrupted: boolean;
+  /** True when the run failed outside any test case: the baseline was not written, and the run stops. See the module note. */
+  readonly halted: boolean;
 }
 
 /** One stage whose step was taken, or that the baseline covered. */
@@ -549,7 +565,7 @@ export function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): 
   const { fresh, known } = splitFailures(result.failures, baseline);
   const newErrors = Math.max(0, (result.errors ?? 0) - (baseline?.errors ?? 0));
   const unreported = result.exitCode !== 0 && result.summary === null && result.noTestFiles !== true;
-  return { fresh, known, newErrors, unreported };
+  return { fresh, known, newErrors, unreported, outsideCase: failedOutsideAnyCase(result) };
 }
 
 /** True when `result` ended on SIGINT or the runner received it; see the module note. */
@@ -559,7 +575,7 @@ export function isStepInterrupted(context: Pick<SuiteStepContext, 'isInterrupted
 
 /** True when a verdict blocks. */
 function isRed(verdict: StepVerdict): boolean {
-  return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
+  return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported || verdict.outsideCase;
 }
 
 /** A new failure as the run record holds it: its pair, and its error lines when Bun printed any. */
@@ -571,10 +587,10 @@ function recordedFailure(failure: SuiteFailure): SuiteFailure {
 
 /**
  * The step the run record holds for `result`, its `reason` right after
- * its scope when it has one and `stepOnly` last when it holds a file;
- * see the module note.
+ * its scope when it has one, `stepOnly` when it holds a file, and last
+ * what a run failed outside any test case keeps; see the module note.
  */
-function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[], stepOnly: readonly SessionStepOnly[] = []): SessionStep {
+function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, verdict: Pick<StepVerdict, 'fresh' | 'outsideCase'>, stepOnly: readonly SessionStepOnly[] = []): SessionStep {
   const { kind, scope, reason } = settling;
   return {
     kind,
@@ -586,10 +602,11 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
     exitCode: result.exitCode,
     summary: result.summary,
     failures: result.failures.map((failure) => ({ file: failure.file, name: failure.name })),
-    newFailures: fresh.map(recordedFailure),
+    newFailures: verdict.fresh.map(recordedFailure),
     ...(stepOnly.length === 0
       ? {}
       : { stepOnly }),
+    ...outsideCaseRecord(verdict, result),
   };
 }
 
@@ -622,9 +639,9 @@ export interface Settling {
   readonly baseline: SuiteBaseline | null;
   /**
    * What a red step's repair task is for (`suite-blocker.ts`): its kind
-   * and, for a task step, the task's sentence; null when it writes none.
+   * and the task step's task or the stage step's stage; null when it writes none.
    */
-  readonly repair: { readonly kind: RepairStepKind; readonly task?: string } | null;
+  readonly repair: Omit<RepairSite, 'commit'> | null;
   /** The task step's lint, when it ran; see the module note. */
   readonly lint?: LintOutcome;
   /** The task step's type step, when it ran; see the module note. */
@@ -653,7 +670,7 @@ function checkBlockers(settling: Pick<Settling, 'lint' | 'types'>): readonly str
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
 function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result } = settling;
-  const step: SessionStep = { ...stepOf(settling, result, []), interrupted: true };
+  const step: SessionStep = { ...stepOf(settling, result, { fresh: [], outsideCase: false }), interrupted: true };
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
   activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
@@ -665,7 +682,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
   const { kind, label, result, baseline, alone } = settling;
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
-  const step = stepOf(settling, result, verdict.fresh, alone?.stepOnly);
+  const step = stepOf(settling, result, verdict, alone?.stepOnly);
   recordStep(seams, step);
   announce(label, result, verdict.known);
   announceStepOnly(context, settling);
@@ -704,13 +721,13 @@ export async function retakeOnErrors(context: SuiteStepContext, seams: Required<
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settling;
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
   if (!isErrorsOnly(verdict, settling)) return settling;
-  recordStep(seams, stepOf(settling, result, verdict.fresh, alone?.stepOnly));
+  recordStep(seams, stepOf(settling, result, verdict, alone?.stepOnly));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
   activeOutput().warn(`🔁 The ${label} counted ${verdict.newErrors} more error(s) outside any test than the baseline and nothing else red (${named}); taking it once more.`);
   const retake = await rerun();
   const again = verdictOf(retake, baseline);
-  if (again.newErrors === 0 && !isStepInterrupted(context, retake)) {
+  if (again.newErrors === 0 && !again.outsideCase && !isStepInterrupted(context, retake)) {
     activeOutput().warn(`⚠️  Intermittent: the retake of the ${label} counted no more errors outside any test than the baseline. The first run's: ${named}. The run goes on.`);
   }
   return alone === undefined
@@ -730,24 +747,32 @@ export function runOne(context: SuiteStepContext, seams: Required<SuiteStepSeams
 /**
  * The baseline the run's steps are split against: the stored one, or a
  * full run recorded now, with its step, and the stages already complete
- * entered in the ledger. See the module note.
+ * entered in the ledger; or, for a run that failed outside any test
+ * case, that run unwritten and answered as halted. See the module note.
  */
 export async function ensureBaseline(context: SuiteStepContext): Promise<BaselineOutcome> {
   const seams = seamsOf(context);
   const path = baselinePathFor(context.trackerPath);
   const reading = readBaseline(path);
-  if (reading.state === 'read') {
+  if (reading.state === 'read' && !failedOutsideAnyCase(reading.baseline)) {
     const known = reading.baseline.failures.length;
     activeOutput().info(`📏 Suite baseline reused from ${basename(path)} (${reading.baseline.recordedAt}): ${known} known failure(s).`);
-    return { baseline: reading.baseline, step: null, interrupted: false };
+    return { baseline: reading.baseline, step: null, interrupted: false, halted: false };
   }
   if (reading.state === 'unreadable') activeOutput().warn(`⚠️  ${basename(path)} does not read (${reading.reason}); recording the baseline again.`);
+  if (reading.state === 'read') activeOutput().warn(storedOutsideCaseLine(basename(path), reading.baseline));
 
   const commit = readHead(seams.git);
   const result = await runOne(context, seams, 'baseline', {});
   const baseline = baselineOf(result, seams.now(), commit);
   const settling: Settling = { kind: 'baseline', scope: 'full', label: 'suite baseline', result, baseline, repair: null };
-  if (isStepInterrupted(context, result)) return { baseline, step: settleInterrupted(seams, settling).step, interrupted: true };
+  if (isStepInterrupted(context, result)) return { baseline, step: settleInterrupted(seams, settling).step, interrupted: true, halted: false };
+  if (failedOutsideAnyCase(result)) {
+    const step = stepOf(settling, result, verdictOf(result, baseline));
+    recordStep(seams, step);
+    announce(settling.label, result, []);
+    return { baseline, step, interrupted: false, halted: true };
+  }
   try {
     writeBaseline(path, baseline);
   } catch (error) {
@@ -756,7 +781,7 @@ export async function ensureBaseline(context: SuiteStepContext): Promise<Baselin
   const outcome = settleStep(context, seams, settling);
   const covered = completeStages(readFileSync(context.trackerPath, 'utf8'));
   addToLedger(context.trackerPath, covered.map((stage) => ({ ...stage, commit, via: 'baseline' as const })));
-  return { baseline, step: outcome.step, interrupted: false };
+  return { baseline, step: outcome.step, interrupted: false, halted: false };
 }
 
 /** The runs a task step or a stage step's fallback makes: its own, and the paths of a second run over the always-run files, or none. */

@@ -12,8 +12,8 @@
  */
 import type { PlantedProject } from './cli-capture.js';
 import type { SubjectSpec } from '../cli/registry.js';
-import type { LoopSessionSeams } from '../loop/session-readings.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
+import type { LoopSessionSeams } from '../core/loop/readings.js';
 
 import {
   mkdirSync,
@@ -24,7 +24,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { runsDir, sessionFilePath } from '../loop/sessions.js';
+import { runsDir, sessionFilePath } from '../core/loop/index.js';
 
 import { eventsOf, plantProject } from './cli-capture.js';
 
@@ -44,7 +44,7 @@ export const STARTED_AT = '2026-09-15T12:00:00.000Z';
 export const PID = 7171;
 
 /** The plan every planted project holds under `.plans/`. */
-export const DEMO_PLAN = [
+export const DEMO_PLAN: string = [
   '# Plan: demo',
   '',
   '# Stage: one',
@@ -57,7 +57,7 @@ export const DEMO_PLAN = [
 ].join('\n');
 
 /** Its tracker: the first task ticked, the second blocked, the rest open. */
-export const DEMO_TRACKER = DEMO_PLAN
+export const DEMO_TRACKER: string = DEMO_PLAN
   .replace('- [ ] First task', '- [x] First task')
   .replace('- [ ] Second task', '- [BLOCKED] Second task');
 

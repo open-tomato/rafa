@@ -1,7 +1,7 @@
 /**
  * The commit helper's refusal paths, read the way the loop reads them.
  *
- * `utils/commit.test.ts` beside the module already drives every
+ * `core/git/commit.test.ts` beside the module already drives every
  * function it exports, mostly through an injected runner. What no
  * case there can do — and what a refusal case needs more than any
  * other shape — is say that a refusal is a REFUSAL rather than a
@@ -95,7 +95,7 @@
  * `result.stdout` is empty for every fixture here. The colocated
  * stub suite owns that claim and can redden it.
  */
-import type { CommitAttempt } from '../utils/commit.js';
+import type { CommitAttempt } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -115,7 +115,7 @@ import {
   commitTaskWork,
   deriveCommitSubject,
   normaliseTaskText,
-} from '../utils/commit.js';
+} from '../core/git/index.js';
 
 /**
  * A plan task sentence of the length this loop's plans really carry.

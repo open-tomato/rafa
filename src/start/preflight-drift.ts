@@ -6,7 +6,7 @@
  * ## Every second run
  *
  * The runs are counted from the session records under `.rafa/runs/`
- * (`loop/sessions.ts`): each `loop start` writes one under a new id
+ * (`core/loop/sessions.ts`): each `loop start` writes one under a new id
  * before its preflight runs, so the count this run reads includes its
  * own record. An even count is a due run, so the 2nd, the 4th and every
  * later second run of the project check, whatever plan each runs. A
@@ -37,24 +37,24 @@
  */
 import type { BoardListing } from '../board/roadmap-board.js';
 import type { DriftBranches } from '../claims/drift.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { readdirSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createCachedBoardListing } from '../board/board-cache.js';
 import { scanClaimBranches } from '../board/roadmap.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { messageOf } from '../config-sections.js';
-import { errorCode, isSessionId, runsDir } from '../loop/sessions.js';
-import { createGitRunner } from '../pr/git.js';
+import { messageOf } from '../core/config/sections.js';
+import { createGitRunner } from '../core/git/index.js';
+import { errorCode, isSessionId, runsDir } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { resolvePrProvider } from '../pr/provider.js';
 
 /** A due run is one whose record count is a multiple of this; see the module note. */
 export const DRIFT_EVERY = 2;
 
-/** What a record's file name ends in, as `loop/sessions.ts` writes it. */
+/** What a record's file name ends in, as `core/loop/sessions.ts` writes it. */
 const RECORD_EXTENSION = '.json';
 
 /** The seams the drift check reads through. */

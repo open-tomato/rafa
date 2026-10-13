@@ -2,7 +2,7 @@
  * Tests for taking a root (`root-choice.ts`): each candidate as the list
  * shows it, the question, `--yes`'s first candidate, a named path, each
  * kind of answer and the prompt loop, over a scripted prompter; the line
- * prompter itself is tested in `src/cli/prompt/confirm.test.ts`.
+ * prompter itself is tested in `src/core/command/confirm.test.ts`.
  *
  * The candidates are built here, over directories under this file's own
  * temporary root, so each case names exactly the list it reads. One
@@ -13,7 +13,7 @@
  */
 import type { RootReading } from './root-choice.js';
 import type { RootCandidate, RootCandidates } from './roots.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';

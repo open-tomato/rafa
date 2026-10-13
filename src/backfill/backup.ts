@@ -37,7 +37,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { BACKFILL_PATH } from './proposal-file.js';
 
 /** `<base>/.rafa/backfill/backup`, relative to a `<base>`. */
-export const BACKUP_PATH = join(BACKFILL_PATH, 'backup');
+export const BACKUP_PATH: string = join(BACKFILL_PATH, 'backup');
 
 /** What became of one file's backup. */
 export type BackupKind = 'copied' | 'kept' | 'tracked' | 'outside' | 'missing';

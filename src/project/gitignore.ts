@@ -122,14 +122,14 @@
  * `print`, the active output's `warn` when none is given, read at each
  * notice as `config-load.ts` reads it. Nothing here reads the home.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { describeValue, messageOf } from '../config-sections.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { HOP_FILE } from '../next/hop-record.js';
 
 import { POSITION_FILE } from './position.js';
@@ -148,7 +148,7 @@ const PRIVATE_TRIAGE = 'triage/private';
 const CACHE_DIR = 'cache';
 
 /** The digest of the flags the notice last saw, relative to the project root. */
-export const TRACKING_DIGEST_FILE = join(SCOPE_DIR, DIGEST_NAME);
+export const TRACKING_DIGEST_FILE: string = join(SCOPE_DIR, DIGEST_NAME);
 
 /** The line above the entry. */
 export const BLOCK_BEGIN = '# >>> rafa tracking: rafa rewrites the lines up to the end marker';
@@ -371,7 +371,7 @@ export function exposureNotice(root: string): string {
 
 /**
  * The default notice sink: the active output's `warn`
- * (`adapters/output/active.ts`), read at each notice.
+ * (`core/output/active.ts`), read at each notice.
  */
 function printWarning(message: string): void {
   activeOutput().warn(message);

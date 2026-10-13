@@ -138,8 +138,8 @@
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { RelationsMoveFailure, RelationsMovePlan, RelationsMoveResult } from '../board/relations/move.js';
 import type { BoardPart, BoardSetupReport } from '../board/setup.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
-import type { BoardRelationshipMode, PrProvider } from '../config-sections.js';
+import type { Prompter } from '../core/command/index.js';
+import type { BoardRelationshipMode, PrProvider } from '../core/config/sections.js';
 
 import { join } from 'node:path';
 
@@ -151,7 +151,7 @@ import { createNativeRelations } from '../board/relations/native.js';
 import { readBoardRepository } from '../board/repository.js';
 import { createGhBoardListing } from '../board/roadmap-board.js';
 import { anythingAt, boardChanged, setUpBoard } from '../board/setup.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** The answers that mean yes to the question, which is spelled `[y/N]`. */
 export const YES_ANSWERS: readonly string[] = ['y', 'yes'];
@@ -432,11 +432,11 @@ export interface EpicGuardStepOptions {
 }
 
 /** What a line asking for `--epic-guard` is told when the board step did not run. */
-export const EPIC_GUARD_NO_BOARD_WARNING = '--epic-guard installs the epic guard workflow with the GitHub board,'
+export const EPIC_GUARD_NO_BOARD_WARNING: string = '--epic-guard installs the epic guard workflow with the GitHub board,'
   + ` and the board step did not run, so it was not installed; run ${EPIC_GUARD_FIX}.`;
 
 /** What a line asking for `--epic-guard` is told under `board.relationships: native`. */
-export const EPIC_GUARD_NATIVE_REFUSAL = 'board.relationships is native: --epic-guard was refused, since the'
+export const EPIC_GUARD_NATIVE_REFUSAL: string = 'board.relationships is native: --epic-guard was refused, since the'
   + ' tracker keeps one parent per issue and there is no second epic: label for the workflow to remove,'
   + ' so it was not installed.';
 

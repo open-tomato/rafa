@@ -20,7 +20,7 @@
  */
 import type { AloneSaid } from './suite-blocker.js';
 import type { SuiteStepContext } from './suite-step.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -31,8 +31,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { parsePlan } from '../plan/parse.js';
+import { setActiveOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
@@ -118,6 +118,7 @@ function result(overrides: Partial<SuiteResult> = {}): SuiteResult {
     errors: 0,
     junit: 'read',
     unhandled: [],
+    outputTail: [],
     ...overrides,
   };
 }
@@ -792,7 +793,7 @@ describe('a stage step and a pre-wrap-up step', () => {
 });
 
 describe('blockerText and the files run alone', () => {
-  const verdict = (fresh: readonly SuiteFailure[], newErrors = 0) => ({ fresh, known: [], newErrors, unreported: false });
+  const verdict = (fresh: readonly SuiteFailure[], newErrors = 0) => ({ fresh, known: [], newErrors, unreported: false, outsideCase: false });
   const stepOnly = [{ file: LEAKY, tests: ['claude > first', 'claude > second'], errorLines: [SPEND], position: 5, before: [BROKEN] }];
 
   /** What a step's retakes said, nothing unless `part` holds it. */
@@ -800,20 +801,20 @@ describe('blockerText and the files run alone', () => {
 
   it('marks only the files red again alone, and leaves a file not run alone as it was', () => {
     const other: SuiteFailure = { file: 'src/other.test.ts', name: 'x' };
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([BROKE, other]), said({ redAlone: [BROKEN], taken: 1 }));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([BROKE, other]), said({ redAlone: [BROKEN], taken: 1 }));
     expect(text).toContain(`New failing test files: ${BROKEN} (1 test, red again when run alone), src/other.test.ts (1 test).`);
     expect(text).not.toContain('Red only in the step');
   });
 
   it('lists the files green alone apart, after what Bun printed, each with its count', () => {
     const second = { file: 'src/b.test.ts', tests: ['b > only'], errorLines: [], position: null, before: [] };
-    const text = blockerText('stage step', { exitCode: 1, unhandled: [] }, verdict([BROKE]), said({ stepOnly: [...stepOnly, second], redAlone: [BROKEN], taken: 3 }));
+    const text = blockerText('stage step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([BROKE]), said({ stepOnly: [...stepOnly, second], redAlone: [BROKEN], taken: 3 }));
     expect(text.endsWith(`Red only in the step, green alone: not yours to fix: ${LEAKY} (2 tests), src/b.test.ts (1 test).`)).toBe(true);
   });
 
   it('lists them too when the step is red on errors outside any test alone', () => {
     const unhandled = [{ file: 'src/boom.test.ts', firstLine: 'error: boom' }];
-    const text = blockerText('pre-wrap-up step', { exitCode: 1, unhandled }, verdict([], 1), said({ stepOnly, taken: 1 }));
+    const text = blockerText('pre-wrap-up step', { exitCode: 1, unhandled, outputTail: [] }, verdict([], 1), said({ stepOnly, taken: 1 }));
     expect(text).not.toContain('New failing test files');
     expect(text).toContain('1 more error(s) outside any test than the baseline');
     expect(text).toContain(`Red only in the step, green alone: not yours to fix: ${LEAKY} (2 tests).`);
@@ -821,12 +822,12 @@ describe('blockerText and the files run alone', () => {
 
   it('names a file past the cap as not run alone, and the first file red only in the step when every file run alone was', () => {
     const past: SuiteFailure = { file: 'src/past.test.ts', name: 'x' };
-    const all = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([past]), said({ stepOnly, notRun: [past.file], taken: 1 }));
+    const all = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([past]), said({ stepOnly, notRun: [past.file], taken: 1 }));
     expect(all).toContain('New failing test files: src/past.test.ts (1 test, not run alone).');
     expect(all).toContain(`Every one of the 1 run alone was green alone, so these likely share one cause: ${LEAKY} was the first to go red, after ${BROKEN}.`);
 
     // The control: one more file run alone, which was not red only in the step, and no cause is named.
-    const some = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([past]), said({ stepOnly, notRun: [past.file], taken: 2 }));
+    const some = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([past]), said({ stepOnly, notRun: [past.file], taken: 2 }));
     expect(some).toContain('1 file was not run alone, past the 2 the step runs alone, and may be order-dependent too');
     expect(some).not.toContain('share one cause');
   });
@@ -834,13 +835,13 @@ describe('blockerText and the files run alone', () => {
   it('says a first file that ran first went red with no file before it', () => {
     const past: SuiteFailure = { file: 'src/past.test.ts', name: 'x' };
     const first = [{ file: LEAKY, tests: ['claude > first'], errorLines: [], position: 1, before: [] }];
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([past]), said({ stepOnly: first, notRun: [past.file], taken: 1 }));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([past]), said({ stepOnly: first, notRun: [past.file], taken: 1 }));
     expect(text).toContain(`so these likely share one cause: ${LEAKY} was the first to go red.`);
   });
 
   it('writes the blocker of a step with no retake as it was before', () => {
-    const before = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([BROKE]));
-    expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([BROKE]), said({}))).toBe(before);
+    const before = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([BROKE]));
+    expect(blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([BROKE]), said({}))).toBe(before);
     expect(before).toContain(`New failing test files: ${BROKEN} (1 test).`);
   });
 });

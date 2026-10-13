@@ -49,7 +49,7 @@ import { createFakeProjectGh, FAKE_PROJECT_REPOSITORY, FAKE_TEMPLATE_FIELDS } fr
 import { openProjectRunner, retryReporter } from '../board/project/project-runner.js';
 import { flakyGh, TIMED_OUT_STDERR } from '../board/project/retry-fake.js';
 import { callNumber } from '../board/project/retry.js';
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../tests/cli-capture.js';
 import { sinkOutput } from '../tests/output-sinks.js';
@@ -295,7 +295,7 @@ describe('setUpProject, a first run', () => {
     expect(projectSetupChanged(report)).toBe(true);
 
     const held = await heldOn(router, COPY_NUMBER);
-    expect([...held.keys()]).toEqual(ADDED);
+    expect([...held.keys()]).toEqual([...ADDED]);
     expect(held.get(30)?.get('Rank')).toBe(2);
     expect(held.get(30)?.get('Stage')).toBe('Done');
     expect(held.get(50)?.get('Stage')).toBe('In review');

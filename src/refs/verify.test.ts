@@ -28,7 +28,7 @@
 import type { RefVerifySeams, SymbolOutliner } from './verify.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { DescribeDocument, DescribedAction } from '../cli/describe.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -39,8 +39,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
-import { SETTINGS } from '../config-schema.js';
-import { createGitRunner } from '../pr/git.js';
+import { SETTINGS } from '../core/config/index.js';
+import { createGitRunner } from '../core/git/index.js';
 
 import { ABSENT, blobFingerprint, issueFingerprint, PRESENT, UNREADABLE } from './stamp.js';
 import { createRefVerifier, ghIssueReader, RefVerifyError, tsSymbolsOutliner, verifyRef } from './verify.js';

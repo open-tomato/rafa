@@ -213,7 +213,7 @@ export interface ProvenanceMap {
 }
 
 /** The default import pattern: Phase 0 imported `agentic-research`'s loop (PR #1). */
-export const IMPORT_SUBJECT = /^Phase 0(?![\w])/;
+export const IMPORT_SUBJECT: RegExp = /^Phase 0(?![\w])/;
 
 const RAFA_LINK = /\brafa-(\d+):/g;
 const HASH_LINK = /\(#(\d+)\)/g;

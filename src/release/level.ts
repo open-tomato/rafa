@@ -8,7 +8,7 @@
  * highest among the plan's notes, and `none` when there are none" — and
  * this module is that sentence and nothing else. It reads no file, opens
  * no store and asks no git: a caller hands it the plan's `release` field
- * (`plan/parse.ts`) and the notes `readPlanChanges` answered for the
+ * (`core/plan/parse.ts`) and the notes `readPlanChanges` answered for the
  * plan's stub, so the whole rule is drivable from a literal.
  *
  * ## The declaration wins outright, `none` included
@@ -24,7 +24,7 @@
  * `none` is a declaration like any other: `release: none` is a plan
  * saying it ships no bump, and it silences notes that say otherwise. A
  * plan with NO `release` line leaves the field null and declares nothing,
- * which is what sends the reading to the notes. `plan/parse.ts` is what
+ * which is what sends the reading to the notes. `core/plan/parse.ts` is what
  * keeps the two apart, and a level spelled any other way never arrives
  * here — it is null there, reported as `unusable-field`.
  *
@@ -53,7 +53,7 @@
  * caller that wants to word them differently; the level is the same, and
  * the wrap-up skips the bump either way.
  */
-import type { PlanReleaseLevel } from '../plan/parse.js';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 import type { ChangeLevel } from '../report/parse.js';
 
 /**

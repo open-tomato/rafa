@@ -215,9 +215,9 @@ import type {
   RoadmapSearch,
   RoadmapSkip,
 } from './roadmap.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { Output } from '../ports/index.js';
-import type { GitRunner } from '../pr/git.js';
 
 import { readHopRecord, staleAgainst } from '../next/hop-record.js';
 import { readPositionFile } from '../project/position.js';

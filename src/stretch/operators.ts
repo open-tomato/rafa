@@ -43,18 +43,18 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RAFA_VERSION } from '../cli/version.js';
-import { errorCode } from '../loop/sessions.js';
+import { RAFA_VERSION } from '../core/command/index.js';
+import { errorCode } from '../core/loop/index.js';
 import { readManifestVersion } from '../release/version.js';
 import { realEntry } from '../schema/tiers.js';
 
 import { stretchFolder } from './folder.js';
 
 /** The operators folder beside the running entry. */
-export const BUNDLED_OPERATORS_DIR = join('bundled', 'operators');
+export const BUNDLED_OPERATORS_DIR: string = join('bundled', 'operators');
 
 /** The file that makes the operators folder a Claude Code plugin. */
-export const PLUGIN_MANIFEST = join('.claude-plugin', 'plugin.json');
+export const PLUGIN_MANIFEST: string = join('.claude-plugin', 'plugin.json');
 
 /** The name of a stretch's own copy inside `.rafa/stretch/<n>/`. */
 export const OPERATORS_COPY = 'operators';

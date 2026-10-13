@@ -75,7 +75,7 @@
  * passes `--effort` and the CLI is left to refuse the name.
  */
 import type { AgentEffortLookup } from './declaration.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -87,7 +87,7 @@ import { isAgentName } from './declaration.js';
 export { readFrontmatter };
 
 /** Where definitions live under either root. */
-export const AGENT_DEFINITION_DIR = join('.claude', 'agents');
+export const AGENT_DEFINITION_DIR: string = join('.claude', 'agents');
 
 /** Which root a definition resolved under. */
 export type AgentDefinitionScope = 'project' | 'user';

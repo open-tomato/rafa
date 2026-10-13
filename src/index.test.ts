@@ -17,6 +17,20 @@
  * containment case, and one added to both reds the spelled list, so
  * neither grows the root unseen.
  *
+ * The first config module is read through its barrel,
+ * `src/core/config/index.ts`, the one path a file outside `src/core/`
+ * may import it by. The barrel is wider than the root: it also holds
+ * the schema's indexes and the item readers, which the tree reads and
+ * the package does not publish. Those twelve names are spelled under
+ * {@link CONFIG_BARREL_ONLY} and left out of the containment case, so a
+ * name added to the barrel still reds it until the name is added to the
+ * root or to that list. The ten runtime names `config.ts` re-exports
+ * from `config-sections.ts` (`INJECT_MODES` and the like) are on the
+ * other barrel, `sections.ts`, and are held by the spelled list alone.
+ * The second config module, `config-load.ts`, is read through a barrel
+ * of its own, `src/core/config/load.ts`, which holds that module's
+ * names and no other, so nothing is left out of its containment case.
+ *
  * The CLI cases read imports off source. `src/rafa.ts` imports the
  * dispatcher, the help renderer, the core registry, the module loader
  * and the since-last-command notice's command hook alone, and that
@@ -25,20 +39,21 @@
  * a command registered and not spelled goes red. Each of those modules
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, `board sync`, the five plan readers, `plan list`, `plan show`,
- * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
- * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
- * `issue` actions, and `module list` and `module exec` from the registry are held to be
- * the command modules wrapping none. `describe` runs the roster builder
- * of `src/cli/describe.ts`, which is no root export, and each of the first
- * three plan readers imports `parsePlan` from the `./plan` entry, which is
- * one, where `plan risk` and `plan needs` import their readings from
- * `src/plan/risk.ts` and `src/plan/needs.ts`, which are not. A binding a module
- * takes by name, as `loop start` takes the CI defaults its flags show,
- * is a value and not a command, and is not held. Every parsed import list
- * is also held to the spelled one, which is what keeps a parser that
- * matched nothing from passing vacuously.
+ * terminal runs and a service cannot import goes red. The command
+ * modules wrapping none are held too: the case that reaches the phase 0
+ * commands spells them path by path, every module of `COMMAND_MODULES`
+ * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths
+ * is the one to read, where a list kept in this note fell behind it.
+ * `describe` runs the roster builder of `src/cli/describe.ts`, which is
+ * no root export. `plan show` imports `parsePlan` from the `./plan`
+ * entry, which is one, where `plan list`, `plan validate`, `plan risk`
+ * and `plan needs` import their readings from `src/plan/list.ts`,
+ * `src/plan/validate.ts`, `src/plan/risk.ts` and `src/plan/needs.ts`,
+ * which are not. A binding a module takes by name, as `loop start`
+ * takes the CI defaults its flags show, is a value and not a command,
+ * and is not held. Every parsed import list is also held to the spelled
+ * one, which is what keeps a parser that matched nothing from passing
+ * vacuously.
  *
  * The import cases run a probe in a fresh process, from an empty
  * directory outside any repository: import one module by absolute path,
@@ -110,32 +125,34 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './adapters/registry.js';
-import * as registryModule from './adapters/registry.js';
 import { TRUSTED_PERMISSIONS } from './board/trust.js';
-import { loadConfig, readConfigFile } from './config-load.js';
-import * as configLoadModule from './config-load.js';
+import { CORE_ADAPTER_REGISTRY, createAdapterRegistry, PORT_VERSIONS } from './core/adapters/index.js';
+import * as registryModule from './core/adapters/index.js';
+import {
+  CONFIG_DEFAULTS,
+  CONFIG_FILE,
+  ConfigError,
+  configFilePath,
+  MODULE_SOURCE_KINDS,
+  parseConfigText,
+  PREREQUISITE_KINDS,
+  resolveConfig,
+} from './core/config/index.js';
+import * as configBarrel from './core/config/index.js';
+import { loadConfig, readConfigFile } from './core/config/load.js';
+import * as configLoadModule from './core/config/load.js';
 import {
   BOARD_PROJECT_TEMPLATE_DEFAULT,
   BOARD_RELATIONSHIP_MODES,
   CLAUDE_SETTING_SOURCES,
-  CONFIG_DEFAULTS,
-  CONFIG_FILE,
   CONFIG_VERSIONS,
-  ConfigError,
-  configFilePath,
   INJECT_MODES,
-  MODULE_SOURCE_KINDS,
   OUTPUT_MODES,
-  parseConfigText,
   PR_PROVIDERS,
-  PREREQUISITE_KINDS,
   RELEASE_AUTO,
-  resolveConfig,
   STORE_BACKENDS,
   SYNC_STRATEGIES,
-} from './config.js';
-import * as configModule from './config.js';
+} from './core/config/sections.js';
 import effortCollect from './effort/collect.js';
 import effortReport from './effort/report.js';
 import {
@@ -356,6 +373,30 @@ const REEXPORTS: readonly (readonly [string, unknown, unknown])[] = [
   ['validateManifest', entry.validateManifest, validateManifest],
 ];
 
+/**
+ * The runtime names the config barrel holds and the root does not
+ * publish: the schema's indexes and the item readers.
+ */
+const CONFIG_BARREL_ONLY: readonly string[] = [
+  'MODULE_SOURCE_KEYS',
+  'OPTIONAL_ITEM_KEYS',
+  'REQUIRED_ITEM_KEYS',
+  'SECTIONS',
+  'SETTINGS',
+  'SETTING_BY_KEY',
+  'SETTING_NAMES',
+  'isCommandLineSetting',
+  'knownKeysAbove',
+  'moduleSource',
+  'optionalPrerequisite',
+  'requiredPrerequisite',
+];
+
+/** The config barrel's runtime names less {@link CONFIG_BARREL_ONLY}. */
+const configModule: Record<string, unknown> = Object.fromEntries(
+  Object.entries(configBarrel).filter(([name]) => !CONFIG_BARREL_ONLY.includes(name)),
+);
+
 /** The modules whose every runtime name the root also carries. */
 const CONTAINED: readonly (readonly [string, Record<string, unknown>])[] = [
   ['the ./plan entry', planEntry],
@@ -403,14 +444,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./refs-check.js', ['registryRoster']],
   ]],
   ['./commands/plan/list.js', [
+    ['../../core/plan/index.js', ['formatCounts', 'plural']],
     ['../../plan/list.js', ['listPlans']],
-    ['../../plan/plan-files.js', ['formatCounts', 'plural']],
     ['./plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolvePlansDir']],
   ]],
   ['./commands/plan/show.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/plan/index.js', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'planFileName']],
     ['../../plan/index.js', ['parsePlan']],
-    ['../../plan/plan-files.js', ['checkbox', 'countTasks', 'formatCounts', 'isFile', 'issueLine', 'planFileName']],
     ['../../utils/plan-stamp.js', ['isStampableStub']],
     ['./plan-files.js', ['expectOneArgument', 'requireProject', 'resolvePlansDir']],
   ]],
@@ -424,10 +465,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'unresolvedPlanSkills',
       'unresolvedSkillLine',
     ]],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
-    ['../../plan/plan-files.js', ['formatCounts', 'issueLine', 'plural']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
+    ['../../core/plan/index.js', ['formatCounts', 'issueLine', 'plural']],
     ['../../plan/store-rules.js', ['storeRuleLine']],
     ['../../plan/validate.js', ['validatePlan']],
     ['./plan-files.js', ['expectOneArgument']],
@@ -435,21 +476,21 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/plan/risk.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../plan/plan-files.js', ['isFile', 'plural']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/git/index.js', ['createGitRunner']],
+    ['../../core/plan/index.js', ['isFile', 'plural']],
     ['../../plan/risk.js', ['assessPlanRisk', 'renderRiskText']],
-    ['../../pr/git.js', ['createGitRunner']],
     ['../../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['./plan-files.js', ['expectAtMostOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/plan/needs.js', [
     ['../../check/references.js', ['pathDirectories']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
+    ['../../core/plan/index.js', ['isFile', 'plural']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../plan/needs.js', ['isUnmet', 'readPlanNeeds', 'readSpecNeeds']],
-    ['../../plan/plan-files.js', ['isFile', 'plural']],
     ['../../start/plan-path.js', ['DEFAULT_PLAN_FILE', 'resolvePlanPath']],
     ['../skill/list.js', ['isSourceShape']],
     ['./plan-files.js', ['expectAtMostOneArgument', 'readSwitch', 'requireProject']],
@@ -463,26 +504,26 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../wrap.js', ['wrapPhaseZeroCommand']],
   ]],
   ['./commands/loop/stop.js', [
-    ['../../config-sections.js', ['messageOf']],
-    ['../../loop/session-readings.js', ['isLive', 'planLabel', 'readSessionChecklist', 'refusal', 'resolveLoopSeams']],
-    ['../../loop/sessions.js', ['errorCode', 'readSession', 'SessionRecordError']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/loop/index.js', ['errorCode', 'readSession', 'SessionRecordError']],
+    ['../../core/loop/readings.js', ['isLive', 'planLabel', 'readSessionChecklist', 'refusal', 'resolveLoopSeams']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['checkboxAt', 'pickSession', 'sessionIdFlag']],
   ]],
   ['./commands/loop/pause.js', [
-    ['../../loop/session-readings.js', ['isLive', 'refusal', 'resolveLoopSeams']],
+    ['../../core/loop/readings.js', ['isLive', 'refusal', 'resolveLoopSeams']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['pickSession', 'sessionIdFlag', 'writeSession']],
   ]],
   ['./commands/loop/resume.js', [
-    ['../../loop/session-readings.js', ['isLive', 'refusal', 'resolveLoopSeams']],
+    ['../../core/loop/readings.js', ['isLive', 'refusal', 'resolveLoopSeams']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['pickSession', 'sessionIdFlag', 'writeSession']],
   ]],
   ['./commands/loop/status.js', [
-    ['../../config-sections.js', ['messageOf']],
-    ['../../loop/blocked-tasks.js', ['blockedTasks']],
-    ['../../loop/session-readings.js', [
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/loop/index.js', ['sessionPhase']],
+    ['../../core/loop/readings.js', [
       'estimateEta',
       'isLive',
       'readSessionChecklist',
@@ -490,26 +531,27 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'resolveLoopSeams',
       'sessionLine',
     ]],
-    ['../../loop/sessions.js', ['sessionPhase']],
-    ['../../plan/plan-files.js', ['countTasks']],
+    ['../../core/plan/index.js', ['countTasks']],
+    ['../../loop/blocked-tasks.js', ['blockedTasks']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['etaLine', 'phasedCounts', 'phaseNote', 'pickSession', 'sessionIdFlag']],
   ]],
   ['./commands/loop/list.js', [
-    ['../../loop/session-readings.js', ['isLive', 'readRecords', 'readSessionChecklist', 'resolveLoopSeams', 'sessionLine']],
-    ['../../loop/sessions.js', ['sessionPhase']],
-    ['../../plan/plan-files.js', ['countTasks']],
+    ['../../core/loop/index.js', ['sessionPhase']],
+    ['../../core/loop/readings.js', ['isLive', 'readRecords', 'readSessionChecklist', 'resolveLoopSeams', 'sessionLine']],
+    ['../../core/plan/index.js', ['countTasks']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['phasedCounts', 'phaseNote', 'projectRoot']],
   ]],
   ['./commands/loop/wait.js', [
     ['../../adapters/output/events.js', ['EVENT_PREFIX', 'oneLine', 'padKind']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/loop/index.js', ['readSession', 'SessionRecordError']],
+    ['../../core/loop/readings.js', ['refusal', 'resolveLoopSeams']],
+    ['../../core/plan/index.js', ['plural']],
     ['../../loop/awake-clock.js', ['createAwakeClock']],
     ['../../loop/events-file.js', ['eventsFileOf', 'readEventsFrom']],
-    ['../../loop/session-readings.js', ['refusal', 'resolveLoopSeams']],
-    ['../../loop/sessions.js', ['readSession', 'SessionRecordError']],
     ['../../loop/wait-reasons.js', [
       'DEFAULT_WAIT_UNTIL',
       'matchEvent',
@@ -522,7 +564,6 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
       'waitExitCode',
       'WaitUntilError',
     ]],
-    ['../../plan/plan-files.js', ['plural']],
     ['../plan/plan-files.js', ['expectNoArgument']],
     ['./loop-sessions.js', ['lineRefusal', 'NoSessionRefusal', 'pickSession', 'sessionIdFlag']],
   ]],
@@ -538,10 +579,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-rows.js', ['createPlanDirNames']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'ROADMAP_REFUSAL_EXIT']],
     ['../../bugs/title.js', ['parseTitle']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../plan/plan-files.js', ['plansDirAt']],
-    ['../../pr/git.js', ['createGitRunner']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
+    ['../../core/plan/index.js', ['plansDirAt']],
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['../plan/refs-check.js', ['registryRoster']],
@@ -570,7 +611,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES', 'ISSUE_TYPES']],
     ['../../board/project/add-issue.js', ['addAndRefreshIssue']],
     ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../triage/triage.js', ['TRIAGE_MODULE']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
     ['./create-blocked.js', ['readSpecLine', 'settleSpecLine']],
@@ -610,11 +651,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard']],
     ['../../board/readiness.js', ['hasSpecReadyLabel', 'READINESS_REFUSAL_EXIT', 'requireCompleteSpec', 'SPEC_READY_LABEL']],
     ['../../board/trust.js', ['ghBoardTrust', 'requireTrustedBoardAuthor']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
-    ['../../pr/git.js', ['createGitRunner']],
     ['../../start/branch-decision.js', ['answeredYes']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
@@ -623,16 +663,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/blocked.js', ['SPEC_BLOCKED_LABEL']],
     ['../../board/project/issue-board-refresh.js', ['createRefreshingGhIssueBoard', 'refreshFailedWarning', 'refreshIssueItems']],
     ['../../board/unblock.js', ['isUnblockFailure', 'runUnblock']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['./unblock-native.js', ['nativeUnblockReport', 'NATIVE_UNBLOCK_LINE', 'refreshNativeUnblock', 'unblockRelationshipsMode']],
   ]],
   ['./commands/issue/check.js', [
     ['../../board/naming.js', ['boardId', 'notesFileName', 'SPEC_EXTENSION']],
     ['../../board/refs-gate.js', ['memoiseVerifier']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../refs/reading.js', ['readCopyRefs', 'readRefsText', 'restampCopyRefs']],
     ['../../refs/stamp.js', ['fingerprintText', 'RefsBlockError']],
     ['../../refs/verify.js', ['RefVerifyError']],
@@ -641,16 +680,18 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/issue/edit.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../adapters/tracker/issue-values.js', ['ISSUE_PRIORITIES']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['./edit-priority.js', ['PRIORITY_FLAG']],
     ['./edit-run.js', ['editIssue', 'renderEditReport']],
   ]],
   ['./commands/pr/current.js', [
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'openPrContext', 'pickPullRequest', 'PR_USAGE']],
   ]],
   ['./commands/pr/show.js', [
     ['../../board/roadmap.js', ['closedIssuesIn']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/index.js', ['formatRows']],
     ['./current.js', ['SEPARATOR']],
     ['./last-triage.js', ['readLastTriage']],
@@ -661,7 +702,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'onProvider', 'openPrContext', 'pickPullRequest', 'PR_USAGE', 'readPullArgument']],
   ]],
   ['./commands/pr/open.js', [
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['readRequiredFlag']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE']],
   ]],
@@ -670,8 +711,13 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../issue/issue-tracker.js', ['readRequiredFlag']],
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readPullArgument']],
   ]],
+  ['./commands/pr/close.js', [
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../issue/issue-tracker.js', ['readRequiredFlag']],
+    ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'lineRefusal', 'onProvider', 'openPrContext', 'PR_USAGE', 'readBooleanFlag', 'readPullArgument']],
+  ]],
   ['./commands/pr/list.js', [
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/index.js', ['createGitRunner']],
     ['../../release/enabled.js', ['resolveReleaseEnabled']],
     ['./current.js', ['SEPARATOR']],
@@ -679,7 +725,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./pr-context.js', ['DEFAULT_PR_SEAMS', 'expectNoArguments', 'onProvider', 'openPrContext', 'PR_USAGE']],
   ]],
   ['./commands/pr/wait.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', ['failingRows', 'formatRows', 'waitForChecks']],
     ['../../start/pr-lifecycle.js', ['CI_POLL_INTERVAL_MS', 'DEFAULT_CI_TIMEOUT_MIN']],
@@ -693,8 +739,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-tick.js', ['tickSentence']],
     ['../../board/roadmap.js', ['closedIssuesIn']],
     ['../../board/unblock-after-merge.js', ['unblockAfterMerge']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['../../effort/store/plan-ci.js', ['recordPlanCi']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', [
@@ -720,8 +765,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/pr/triage.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/store/plan-ci.js', ['recordPlanCi']],
     ['../../next/ending.js', ['endWithNextStep', 'HINT_FLAG_SPEC']],
     ['../../pr/index.js', ['createGitRunner']],
@@ -747,23 +792,23 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/effort/collect.js', [['../../effort/collect.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/report.js', [['../../effort/report.js', ['default']], ['../wrap.js', ['wrapPhaseZeroCommand']]]],
   ['./commands/effort/dashboard.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
     ['../../effort/dashboard-format.js', ['formatDashboard']],
     ['../../effort/dashboard.js', ['readDashboard']],
     ['../../effort/report-args.js', ['parseReportArgs']],
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
   ]],
   ['./commands/effort/fix-schema.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/loop/index.js', ['readSessions']],
     ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/fix-schema.js', ['fixStoreSchema', 'SchemaFixRefusal']],
     ['../../effort/store/sqlite.js', ['sqliteStorePath']],
-    ['../../loop/sessions.js', ['readSessions']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch']],
   ]],
   ['./commands/effort/copy.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/copy.js', ['copyEffortStore', 'EffortCopyFailure', 'EffortCopyRefusal']],
     ['../../effort/store/location.js', ['EFFORT_DIR_VARIABLE']],
@@ -771,16 +816,16 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject']],
   ]],
   ['./commands/effort/schema.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/store/location.js', ['effortStoreDir']],
     ['../../effort/store/schema-report.js', ['gateMeaning', 'readSchemaReport']],
     ['../../effort/store/sqlite.js', ['SQLITE_STORE_FILE_NAME']],
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject']],
   ]],
   ['./commands/effort/migrate.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/development-build.js', ['DevelopmentBuildRefusedError']],
     ['../../effort/store/location.js', ['effortStoreDir']],
@@ -790,8 +835,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./fix-schema.js', ['keepsIdLine']],
   ]],
   ['./commands/effort/merge.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/file-stamp.js', ['fileStamp']],
     ['../../effort/store/development-build.js', ['DevelopmentBuildRefusedError']],
     ['../../effort/store/location.js', ['effortStoreDir']],
@@ -808,8 +853,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./merge.js', ['mergeRefusalExit', 'mergeTargetPath', 'renderMerge']],
   ]],
   ['./commands/effort/move.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/store/bring-forward.js', ['SchemaRefusedError']],
     ['../../effort/store/development-build.js', ['DevelopmentBuildRefusedError']],
     ['../../effort/store/location.js', ['effortStoreDir']],
@@ -818,25 +863,25 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/module/list.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
-  ['./commands/module/exec.js', [['../../cli/command.js', ['CommandExit']], ['../../cli/registry.js', ['mountKey']]]],
+  ['./commands/module/exec.js', [['../../cli/registry.js', ['mountKey']], ['../../core/command/index.js', ['CommandExit']]]],
   ['./commands/agent/vendor.js', [
     ['../../agents/roster.js', ['readAgentDirectory']],
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../inventory/trees.js', ['bundledAgentsDirectory']],
     ['../../utils/agent-definition.js', ['AGENT_DEFINITION_DIR', 'readFrontmatter']],
   ]],
   ['./commands/agent/list.js', [
     ['../../agents/roster.js', ['VENDOR_COMMAND']],
     ['../../check/references.js', ['pathDirectories']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
     ['../../schema/tiers.js', ['SKILL_TIERS']],
@@ -856,7 +901,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ]],
   ]],
   ['./commands/agent/show.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../inventory/show.js', ['findShown', 'readShowView', 'renderShowView']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
     ['../skill/list.js', ['projectInventory', 'warningLines']],
@@ -868,10 +913,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/skill/list.js', [
     ['../../check/references.js', ['pathDirectories']],
-    ['../../cli/command.js', ['CommandExit']],
     ['../../cli/prompt/terminal.js', ['processTerminal', 'refuseWithoutTerminal']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../inventory/browse.js', ['browse']],
     ['../../inventory/index.js', ['buildInventory']],
     ['../../modules/load.js', ['loadModules', 'moduleSettings']],
@@ -879,14 +924,14 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/skill/show.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../inventory/show.js', ['findShown', 'readShowView', 'renderShowView']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
     ['./list.js', ['DEFAULT_SKILL_LIST_SEAMS', 'projectInventory', 'warningLines']],
   ]],
   ['./commands/skill/search.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../effort/store/index.js', ['selectEffortStore']],
     ['../../inventory/search/index.js', ['droppedLine', 'rankSearch', 'runSearch']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch']],
@@ -894,7 +939,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/skill/demote.js', [
     ['../../check/references.js', ['pathDirectories']],
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../demote/apply.js', ['applyDemotion', 'DEMOTION_ACTION_KINDS', 'planDemotion']],
     ['../../demote/classify.js', ['DEMOTION_VERDICTS']],
     ['../../demote/draft.js', ['buildDemotionReport']],
@@ -908,8 +953,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../backfill/proposal-file.js', ['ANSWERED_ROW', 'BACKFILL_PATH', 'readProposalFiles', 'REVIEWED_FILE']],
     ['../../backfill/propose.js', ['applyProposals', 'PROPOSAL_ACTION_KINDS', 'runProposalPass']],
     ['../../check/references.js', ['pathDirectories']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../demote/select.js', ['resolveDemotionScope']],
   ]],
   ['./commands/instinct/check.js', [
@@ -917,9 +962,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/instinct/list.js', [
     ['../../adapters/learning/held.js', ['toHeldRecords']],
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../learning/index.js', ['triggerKey']],
     ['../../schema/scope-records.js', ['readScopes']],
     ['../plan/plan-files.js', ['expectNoArgument', 'resolveProjectConfig']],
@@ -927,31 +972,31 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./promote.js', ['makeLearningAdapter', 'refusedPullMessage']],
   ]],
   ['./commands/instinct/show.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../schema/instinct.js', ['ACTION_HEADING', 'CAUSE_HEADING']],
     ['../../schema/scope-records.js', ['readScopes']],
     ['../plan/plan-files.js', ['expectOneArgument']],
     ['./instinct-records.js', ['findRecords', 'instinctProject']],
   ]],
   ['./commands/instinct/flag.js', [
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['expectTwoArguments']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/instinct/promote.js', [
-    ['../../adapters/registry.js', ['CORE_ADAPTER_REGISTRY']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/adapters/index.js', ['CORE_ADAPTER_REGISTRY']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../learning/index.js', ['promotable']],
     ['../plan/plan-files.js', ['expectNoArgument', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/release/status.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../effort/attribution.js', ['planStubsFromFileNames', 'resolvePlanStub']],
     ['../../effort/store/changes.js', ['readPlanChanges']],
     ['../../pr/index.js', ['createGitRunner']],
@@ -965,7 +1010,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/release/settle.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
     ['../../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../pr/index.js', ['createGitRunner', 'ghPullRequestsIn', 'requireGhProvider', 'resolvePrProvider']],
     ['../../release/settle-pr.js', ['settleByPr']],
     ['../../release/settle-push.js', ['settleByPush']],
@@ -977,9 +1022,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./settle-project.js', ['refreshProjectAfterSettle']],
   ]],
   ['./commands/release/tag.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config.js', ['ConfigError']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['ConfigError']],
+    ['../../core/config/load.js', ['loadConfig']],
     ['../../pr/index.js', ['createGitRunner', 'gitSaid']],
     ['../../release/receipt.js', ['readReceiptVerdict', 'receiptProblem']],
     ['../../release/status-readings.js', ['changelogVersions', 'readTags']],
@@ -998,8 +1043,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/place.js', ['resolvePlace']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/setup.js', ['ROADMAP_LABEL']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../switch.js', ['defaultBoardOnce']],
   ]],
@@ -1009,8 +1054,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/project/project-runner.js', ['commandRetrySeams', 'openProjectRunner']],
     ['../../board/project/refresh-warnings.js', ['rateLimitWarning']],
     ['../../board/project/sync.js', ['syncProject']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
   ['./commands/epic/show.js', [
@@ -1024,10 +1069,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-epic-rows.js', ['claimsOf', 'onceSeams', 'readListedEpics', 'readModeEpicProblems']],
     ['../../board/roadmap-rows.js', ['createPlanDirNames', 'readCurrentPlace', 'readLineRows']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests', 'createGhRoadmapSearch', 'parseRoadmapBody', 'ROADMAP_REFUSAL_EXIT']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../plan/plan-files.js', ['plansDirAt']],
-    ['../../pr/git.js', ['createGitRunner']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
+    ['../../core/plan/index.js', ['plansDirAt']],
     ['../doctor-refs.js', ['readDoctorRefs', 'roadmapRefsCells']],
     ['../issue/issue-tracker.js', ['DEFAULT_ISSUE_SEAMS', 'issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../issue/list.js', ['roadmapBoard']],
@@ -1049,8 +1094,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-epic-rows.js', ['HORIZONS']],
     ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
     ['../../board/setup.js', ['LABEL_LIST_LIMIT', 'listBoardLabels']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal', 'readChoiceFlag', 'readRequiredFlag']],
     ['../switch.js', ['defaultBoardOnce']],
     ['./epic-project.js', ['newEpicTarget', 'refreshProjectAfterEpic']],
@@ -1073,10 +1118,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/repository.js', ['readBoardRepository']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap.js', ['branchClaims', 'closedIssuesIn', 'createGhOpenPullRequests', 'parseRoadmapBody', 'scanClaimBranches']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../pr/git.js', ['createGitRunner']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./epic-project.js', ['moveTarget', 'refreshProjectAfterEpic']],
     ['./horizon-change.js', ['TO_FLAG', 'workPhrase']],
@@ -1099,17 +1143,17 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/issue-board.js', ['createGhIssueBoard']],
     ['../../board/relations/labels.js', ['LABELS_READS']],
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
+    ['../../core/loop/index.js', ['claudeArgs', 'spawnClaudeCaptured']],
     ['../../effort/epic-cost.js', ['readEpicCost', 'renderEpicCost']],
     ['../../effort/store/index.js', ['selectEffortStore']],
     ['../../epic/verify-plan.js', ['buildVerifyPrompt', 'criteriaToAsk', 'parseVerifyPlan', 'readVerifyPrompt', 'splitCriteria']],
     ['../../epic/verify-run.js', ['runVerification']],
-    ['../../pr/git.js', ['createGitRunner']],
     ['../../start/dispatch.js', ['SESSION_ID_FLAG']],
     ['../../start/triage.js', ['unresolvedTracker']],
     ['../../triage/triage.js', ['namedSecrets', 'triageReport']],
-    ['../../utils/claude.js', ['claudeArgs', 'spawnClaudeCaptured']],
     ['../issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
     ['../plan/plan-files.js', ['readSwitch']],
     ['./epic-project.js', ['closeTarget', 'refreshProjectAfterEpic']],
@@ -1126,10 +1170,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-board.js', ['createGhBoardListing']],
     ['../../board/roadmap-tick.js', ['createGhRoadmapBody']],
     ['../../board/roadmap.js', ['createGhOpenPullRequests']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../pr/git.js', ['createGitRunner']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
     ['../issue/issue-tracker.js', ['issueProject', 'lineRefusal', 'readTextFlag']],
     ['./cancel-unblock.js', ['keptLinksLine', 'readUnblockStill']],
     ['./epic-project.js', ['cancelTarget', 'refreshProjectAfterEpic']],
@@ -1139,8 +1182,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/git.js', ['claimBranchIssue', 'fetchClaimBranches', 'makeOwnershipCommit', 'pushOwnershipCommit', 'readClaimBranch']],
     ['../../claims/labels.js', ['unlabelReleased']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/index.js', ['gitSaid']],
     ['../../start/branch-decision.js', ['BRANCH_PREFIX', 'REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
@@ -1148,7 +1191,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/claim/hand.js', [
     ['../../claims/device.js', ['holdsClaim']],
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
@@ -1157,7 +1200,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/claim/accept.js', [
     ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/record.js', ['parseClaimMessage']],
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
@@ -1169,8 +1212,8 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../board/roadmap-claims.js', ['idleText']],
     ['../../claims/device.js', ['holdsClaim']],
     ['../../claims/stale.js', ['readClaimState']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['CLAIMS_STALE_DISABLED', 'messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['CLAIMS_STALE_DISABLED', 'messageOf']],
     ['../../start/branch-decision.js', ['REMOTE']],
     ['../../start/preflight-claim.js', ['createStartPreflightClaim']],
     ['../plan/plan-files.js', ['requireProject', 'resolveProjectConfig']],
@@ -1178,11 +1221,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/update/current.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../../cli/version.js', ['RAFA_VERSION']],
-    ['../../config-load.js', ['loadConfig']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit', 'createLinePrompter', 'RAFA_VERSION']],
+    ['../../core/config/load.js', ['loadConfig']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../../pr/provider.js', ['resolvePrProvider']],
     ['../../project/lock.js', ['LOCK_FILE', 'readProjectLock']],
     ['../../project/scaffold.js', ['scaffoldConflicts']],
@@ -1214,10 +1255,11 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./stub.js', ['createUpdateStub']],
   ]],
   ['./commands/config/set.js', [
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['configFilePath']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../utils/agent-shell.js', ['AGENT_SHELL_ENV', 'isAgentShell']],
     ['../plan/plan-files.js', ['expectOneArgument', 'requireProject']],
   ]],
   ['./commands/ci/status.js', [
@@ -1225,20 +1267,20 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../../ci/failed-cases.js', ['readFailedCases']],
     ['../../ci/runs.js', ['readNewestRun']],
     ['../../ci/status-reading.js', ['CI_STATUS_EXIT', 'readFailedLog', 'renderCiStatus', 'verdictOf']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
     ['../issue/issue-tracker.js', ['readNonBlankFlag', 'readRequiredFlag']],
     ['../plan/plan-files.js', ['requireProject']],
   ]],
   ['./commands/stretch/start.js', [
     ['../../cleanup/branches.js', ['readRemoteHead']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
-    ['../../loop/sessions.js', ['readSessions']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['configFilePath']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/git/index.js', ['createGitRunner', 'gitSaid']],
+    ['../../core/loop/index.js', ['readSessions']],
     ['../../next/sources.js', ['DEFAULT_BASE_BRANCH']],
-    ['../../pr/git.js', ['createGitRunner', 'gitSaid']],
     ['../../stretch/folder.js', [
       'agentFilePath',
       'defaultSeams',
@@ -1275,24 +1317,24 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ['./commands/stretch/item.js', [
     ['../../adapters/tracker/github.js', ['createGhRunner', 'createGithubTracker']],
     ['../../board/naming.js', ['boardId']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['messageOf']],
-    ['../../loop/sessions.js', ['isPidAlive', 'readSessions']],
-    ['../../plan/plan-files.js', ['plansDirAt', 'stubOfPlanFile']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/sections.js', ['messageOf']],
+    ['../../core/loop/index.js', ['isPidAlive', 'readSessions']],
+    ['../../core/plan/index.js', ['plansDirAt', 'stubOfPlanFile']],
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/launch.js', ['DEFAULT_RAFA_COMMAND', 'lineText']],
     ['../plan/plan-files.js', ['expectOneArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
-    ['./item-merge.js', ['afterLoopWait', 'ghFiledAt', 'mergeDryRunLines']],
+    ['./item-merge.js', ['afterLoopWait', 'mergeDryRunLines']],
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX']],
   ]],
   ['./commands/stretch/end.js', [
     ['../../cleanup/branches.js', ['readRemoteHead']],
-    ['../../cli/command.js', ['CommandExit']],
-    ['../../config-sections.js', ['describeValue', 'isMapping', 'messageOf']],
     ['../../config-set.js', ['ConfigSetRefusal', 'withConfigSetting']],
-    ['../../config.js', ['configFilePath']],
+    ['../../core/command/index.js', ['CommandExit']],
+    ['../../core/config/index.js', ['configFilePath']],
+    ['../../core/config/sections.js', ['describeValue', 'isMapping', 'messageOf']],
+    ['../../core/git/index.js', ['createGitRunner']],
     ['../../next/sources.js', ['DEFAULT_BASE_BRANCH']],
-    ['../../pr/git.js', ['createGitRunner']],
     ['../../stretch/folder.js', ['stretchFolder']],
     ['../../stretch/items.js', ['malformedItemLines', 'readItems']],
     ['../../stretch/launch.js', ['lineText']],
@@ -1303,7 +1345,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./start.js', ['PR_BASE_KEY', 'STRETCH_BRANCH_PREFIX', 'stretchBranch', 'stretchRecordPath']],
   ]],
   ['./commands/bug/codes.js', [
-    ['../../cli/command.js', ['CommandExit']],
+    ['../../core/command/index.js', ['CommandExit']],
     ['../../errors/codes.js', ['familyOf', 'NEW_CONTEXT_LEAF', 'UNKNOWN_FAMILY']],
     ['../../errors/match.js', ['nearDuplicates', 'suggestCodes']],
     ['../../errors/rafa-codes.js', ['FAMILY_DESCRIPTIONS', 'listedCodes']],
@@ -1311,16 +1353,15 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'requireProject', 'resolveProjectConfig']],
   ]],
   ['./commands/status.js', [
-    ['../cli/command.js', ['CommandExit']],
+    ['../core/command/index.js', ['CommandExit']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../status/render.js', ['renderStatus', 'statusData']],
     ['../status/sections.js', ['readStatusSections']],
     ['./plan/plan-files.js', ['resolveProjectConfig']],
   ]],
   ['./commands/next.js', [
-    ['../cli/command.js', ['CommandExit']],
-    ['../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../config-sections.js', ['messageOf']],
+    ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../core/config/sections.js', ['messageOf']],
     ['../effort/sync/contact.js', ['pullBeforeRead']],
     ['../next/actions.js', ['actionInvocation', 'runAction']],
     ['../next/ceiling.js', ['ALWAYS_ASKED', 'allowedUnasked', 'BARE_YES_ACTIONS', 'readYesCeiling', 'YES_ACTIONS', 'YES_FLAG']],
@@ -1366,9 +1407,9 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../board/roadmap.js', ['createGhRoadmapSearch', 'parseRoadmapBody', 'scanClaimBranches']],
     ['../board/setup.js', ['ROADMAP_LABEL']],
     ['../claims/drift.js', ['checkDrift', 'driftLines']],
-    ['../cli/command.js', ['CommandExit']],
-    ['../config-sections.js', ['messageOf']],
-    ['../pr/git.js', ['createGitRunner']],
+    ['../core/command/index.js', ['CommandExit']],
+    ['../core/config/sections.js', ['messageOf']],
+    ['../core/git/index.js', ['createGitRunner']],
     ['../project/position.js', ['hop', 'positionFilePath', 'rehome', 'writePositionFile']],
     ['./issue/issue-tracker.js', ['issueProject', 'issueSubjectConfig', 'lineRefusal']],
   ]],
@@ -1377,11 +1418,10 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../agents/vendorable.js', ['vendorableAgents', 'vendorableAgentWarnings']],
     ['../board/project/progress.js', ['commandProgressFeed']],
     ['../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../cli/command.js', ['CommandExit']],
-    ['../cli/prompt/confirm.js', ['createLinePrompter']],
-    ['../config-load.js', ['loadConfig']],
-    ['../config-sections.js', ['messageOf']],
-    ['../config.js', ['ConfigError', 'configFilePath']],
+    ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
+    ['../core/config/index.js', ['ConfigError', 'configFilePath']],
+    ['../core/config/load.js', ['loadConfig']],
+    ['../core/config/sections.js', ['messageOf']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../project/gitignore.js', ['applyTracking', 'GITIGNORE_FILE', 'GitignoreError', 'TRACKING_DIGEST_FILE', 'withTrackingBlock']],
@@ -1405,13 +1445,12 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
   ]],
   ['./commands/doctor.js', [
     ['../board/project/project-runner.js', ['commandRetrySeams']],
-    ['../cli/command.js', ['CommandExit']],
-    ['../cli/version.js', ['versionLine']],
-    ['../config-load.js', ['loadConfig']],
-    ['../config-sections.js', ['messageOf']],
-    ['../config.js', ['ConfigError']],
+    ['../core/command/index.js', ['CommandExit', 'versionLine']],
+    ['../core/config/index.js', ['ConfigError']],
+    ['../core/config/load.js', ['loadConfig']],
+    ['../core/config/sections.js', ['messageOf']],
+    ['../core/plan/index.js', ['isFile']],
     ['../effort/sync/doctor-reading.js', ['readDoctorEffortSync']],
-    ['../plan/plan-files.js', ['isFile']],
     ['../pr/preflight-items.js', ['ghPreflightItems']],
     ['../pr/provider.js', ['resolvePrProvider']],
     ['../preflight/first-dispatch.js', ['isFirstDispatch']],
@@ -1436,24 +1475,24 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['./plan/refs-check.js', ['registryRoster']],
   ]],
   ['./commands/cleanup.js', [
-    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
-    ['../cli/command.js', ['CommandExit']],
-    ['../cli/prompt/confirm.js', ['createLinePrompter']],
+    ['../cleanup/index.js', ['cleanupSteps', 'defaultCleanupSeams', 'deletedNotPushed', 'dryRunLines', 'readCleanup', 'runCleanupSteps']],
     ['../cli/prompt/multi-select.js', ['multiSelect']],
     ['../cli/prompt/terminal.js', ['processTerminal']],
+    ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
-    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
+    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
     ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],
   ['./commands/self-update.js', [
-    ['../cli/command.js', ['CommandExit']],
-    ['../config-load.js', ['loadConfig']],
-    ['../config-schema.js', ['SETTINGS']],
-    ['../config-sections.js', ['messageOf']],
-    ['../loop/sessions.js', ['isPidAlive', 'readSessions']],
+    ['../core/command/index.js', ['CommandExit']],
+    ['../core/config/index.js', ['SETTINGS']],
+    ['../core/config/load.js', ['loadConfig']],
+    ['../core/config/sections.js', ['messageOf']],
+    ['../core/loop/index.js', ['isPidAlive']],
     ['../project/bin-path.js', ['readBinPath']],
     ['../runtime/install.js', ['exitCodeFor', 'installRuntime', 'outcomeProblem', 'runBuild']],
+    ['../runtime/live-loops.js', ['liveLoopsOf']],
     ['./plan/plan-files.js', ['expectNoArgument']],
   ]],
   ['./commands/describe.js', [['../../package.json', ['version']], ['../cli/describe.js', ['describeRegistry']]]],
@@ -1569,6 +1608,15 @@ describe('the package root entry', () => {
     expect(names.length).toBeGreaterThan(0);
     expect(missing).toEqual([]);
   });
+
+  it('leaves off the root exactly the config barrel names spelled as the barrel\'s alone', () => {
+    const onRoot: Record<string, unknown> = entry;
+    const offRoot = Object.keys(configBarrel)
+      .filter((name) => !(name in onRoot))
+      .sort();
+
+    expect(offRoot).toEqual([...CONFIG_BARREL_ONLY].sort());
+  });
 });
 
 describe('what the CLI reaches, through the entry', () => {
@@ -1637,6 +1685,7 @@ describe('what the CLI reaches, through the entry', () => {
       './commands/pr/view.js',
       './commands/pr/open.js',
       './commands/pr/retarget.js',
+      './commands/pr/close.js',
       './commands/pr/list.js',
       './commands/pr/wait.js',
       './commands/pr/merge.js',

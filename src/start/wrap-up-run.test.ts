@@ -10,10 +10,12 @@
  * step 3 after it returns, and all three BEFORE the CI gate. A second
  * claim is which directory each of those calls is pointed at.
  *
- * `runWrapUp` itself is not driven: it spawns a real Claude session, a
- * real `git push` and the real CI gate with no seam, as the wrap-up
- * branch did while it sat in `start.ts`, whose suite explains the same
- * choice. So the wiring is read off the source instead, and read
+ * `runWrapUp` itself is driven only for the prompt its session is handed
+ * (the last `describe`, over stand-in `claude` and `gh` executables on a
+ * scratch PATH): it spawns a real Claude session, a real `git push` and
+ * the real CI gate with no injected seam, as the wrap-up branch did
+ * while it sat in `start.ts`, whose suite explains the same choice. So
+ * the wiring is read off the source instead, and read
  * STRUCTURALLY: the module is parsed with TypeScript, `runWrapUp`'s body
  * is located, and every call inside it is collected in source order
  * with its arguments as written. A substring check could not tell a
@@ -89,26 +91,35 @@ import type { PullRequestDelivery, PullRequestDeliverySeams, RunnerAttempt } fro
 import type { CliEvent } from '../ports/index.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
+import type { Instinct } from '../schema/instinct.js';
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { localInstinctsDir } from '../adapters/learning/local.js';
 import { assumptionsHeading } from '../board/review-stamp.js';
+import { loadConfig } from '../core/config/load.js';
+import { setActiveOutput } from '../core/output/index.js';
+import { actionHash } from '../learning/index.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
+import { writeInstinct } from '../schema/instinct.js';
+import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
 import { bindEventsFile, unbindEventsFile } from './loop-events.js';
 import { retargetPullRequest } from './pr-retarget.js';
+import { NO_PROVIDER_REASON } from './promoted-check.js';
 import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease } from './release-stage.js';
-import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
+import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor, runWrapUp } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
 interface BodyCall {
@@ -1069,5 +1080,211 @@ describe('the release written into the delivered pull request', () => {
     expect(finish.written?.block).toContain(FORECAST_LINE);
     expect(finish.body?.number).toBeNull();
     expect(bodyEdits(fake)).toEqual([]);
+  });
+});
+
+/**
+ * `runWrapUp` driven in a scratch checkout, through the one place a
+ * wrap-up session is spawned: a stand-in `claude` on the PATH that
+ * keeps the prompt it was handed on stdin, and a stand-in `gh` that
+ * logs every call and fails it. So what is read is the prompt the
+ * session got, and which `gh` calls the run made on the way to it.
+ */
+describe('runWrapUp over the spawn seam', () => {
+  const BASE = 'trunk';
+  const saved = { PATH: process.env.PATH, HOME: process.env.HOME };
+  let scratchRoot = '';
+
+  beforeEach(() => {
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    if (scratchRoot !== '') rmSync(scratchRoot, { recursive: true, force: true });
+    scratchRoot = '';
+  });
+
+  /** The scratch repository a case plants; see `plantScratchRepo`. */
+  type Scratch = ReturnType<typeof plantScratchRepo>;
+
+  /** The input of the one `runWrapUp` call every case makes. */
+  function wrapUpInput(scratch: Scratch, head: string): Parameters<typeof runWrapUp>[0] {
+    const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+    const noop = (): void => {};
+    return {
+      session: { id: 'run-1', wrapUpStarted: noop, pullRequestStarted: noop, ciStarted: noop, repairStarted: noop, finished: noop },
+      repoRoot: scratch.repo,
+      checkout: scratch.repo,
+      settings: config,
+      planStub: null,
+      planContent: '# Plan\n\n- [x] A task\n',
+      settingSources: ['project'],
+      serving: { root: scratch.repo, home: scratch.home, settings: config, run: 'run-1' },
+      wrapUpLearning: { kind: 'local', home: scratch.home, blessMinConfidence: 0.5, repoRoot: scratch.repo, promoteAfter: 3, promoteMinConfidence: 0.7 },
+      expected: { projectRoot: scratch.repo, checkout: scratch.repo, branch: 'feat/wrap-up-prompt', head },
+      ciWait: false,
+      ciTimeoutMin: 1,
+      ciAttempts: 0,
+      isInterrupted: () => false,
+    };
+  }
+
+  /** Runs the wrap-up in this process; answers no warnings, as the output is silent. */
+  async function wrapUpInProcess(scratch: Scratch, head: string): Promise<readonly string[]> {
+    try {
+      await runWrapUp(wrapUpInput(scratch, head));
+    } catch {
+      // Under `gh` the stand-in refuses every call, so the delivery after
+      // the session may end the run; only the first prompt is read.
+    }
+    return [];
+  }
+
+  /**
+   * Runs the wrap-up in a child bun process started with the scratch PATH,
+   * and answers the `warn` lines it wrote. The planted `gh` is reached only
+   * so: `Bun.spawn` of a bare `gh` resolves against the PATH the process
+   * started with, which a `process.env.PATH` set here does not move.
+   */
+  async function wrapUpInChild(scratch: Scratch, head: string): Promise<readonly string[]> {
+    const input = wrapUpInput(scratch, head);
+    const warningsFile = join(scratch.bin, 'warnings.json');
+    const here = import.meta.dir;
+    const driver = join(scratch.bin, 'driver.ts');
+    writeFileSync(driver, [
+      'import { writeFileSync } from \'node:fs\';',
+      `import { setActiveOutput } from '${join(here, '../core/output/index.js')}';`,
+      `import { sinkOutput } from '${join(here, '../tests/output-sinks.js')}';`,
+      `import { runWrapUp } from '${join(here, 'wrap-up-run.js')}';`,
+      'const warnings: string[] = [];',
+      'setActiveOutput(sinkOutput({ warn: (line) => { warnings.push(line); } }));',
+      'const input = { ...JSON.parse(process.env.WRAP_UP_INPUT ?? \'{}\'), isInterrupted: () => false, session: { id: \'run-1\', wrapUpStarted() {}, pullRequestStarted() {}, ciStarted() {}, repairStarted() {}, finished() {} } };',
+      'try { await runWrapUp(input); } catch { /* the delivery may end the run */ }',
+      `writeFileSync('${warningsFile}', JSON.stringify(warnings));`,
+      '',
+    ].join('\n'), 'utf8');
+    const bunDir = dirname(Bun.which('bun') ?? '');
+    const child = Bun.spawn(['bun', driver], {
+      cwd: scratch.repo,
+      env: { ...process.env, PATH: `${scratch.path}:${bunDir}`, HOME: scratch.home, WRAP_UP_INPUT: JSON.stringify(input) },
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await child.exited;
+    return existsSync(warningsFile)
+      ? JSON.parse(readFileSync(warningsFile, 'utf8')) as string[]
+      : [];
+  }
+
+  /** The one promotable lesson {@link wrapUpUnder} plants on request: three sources at 0.7. */
+  const LESSON_ID = 'left-unanswered-1a2b3c4d';
+  const LESSON_LINE = `Lessons listed for promotion that this pull request does not carry: \`${LESSON_ID}\` (no answer in the \`rafa:promoted\` block).`;
+
+  /** The lesson the stand-in session never answers. */
+  function promotable(): Instinct {
+    const action = `the action of ${LESSON_ID}`;
+    return {
+      id: LESSON_ID,
+      trigger: `the trigger of ${LESSON_ID}`,
+      kind: 'gotcha',
+      domain: 'workflow',
+      confidence: 0.7,
+      usageCount: 3,
+      sources: ['session-a', 'session-b', 'session-c'],
+      artifact: null,
+      signal: 'loud',
+      scope: 'project',
+      projectId: null,
+      source: 'task-report',
+      evidence: [{ plan: 'rafa-25', task: 'a task', session: 'session-a', outcome: 'done' }],
+      promotedTo: null,
+      createdAt: '2026-09-20T10:00:00.000Z',
+      updatedAt: '2026-09-21T10:00:00.000Z',
+      action,
+      cause: 'it recurred',
+      actionHash: actionHash(action),
+    };
+  }
+
+  /**
+   * Runs the wrap-up under `provider` and answers the first prompt the
+   * session got, the `gh` calls and the `warn` lines. With `withLesson`
+   * the project library holds one promotable lesson.
+   */
+  async function wrapUpUnder(provider: 'none' | 'gh', withLesson = false): Promise<{ prompt: string; ghCalls: string; warnings: readonly string[] }> {
+    const scratch = plantScratchRepo(tmpdir());
+    scratchRoot = join(scratch.repo, '..');
+    plantProjectConfig(scratch.repo, `pr:\n  provider: ${provider}\n  base: ${BASE}\nrelease:\n  enabled: false\n`);
+    if (withLesson) {
+      const dir = localInstinctsDir(scratch.repo);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${LESSON_ID}.md`), writeInstinct(promotable()));
+    }
+    const git = (...args: string[]): string => execFileSync('git', args, {
+      cwd: scratch.repo,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
+    }).trim();
+    git('checkout', '-q', '-b', 'feat/wrap-up-prompt');
+    git('commit', '-q', '--allow-empty', '-m', 'chore: start');
+    const head = git('rev-parse', 'HEAD');
+    const promptFile = join(scratch.bin, 'prompt.txt');
+    const ghLog = join(scratch.bin, 'gh.log');
+    writeFileSync(join(scratch.bin, 'claude'), `#!/bin/sh\n[ -e '${promptFile}' ] || cat > '${promptFile}'\nexit 0\n`, 'utf8');
+    writeFileSync(join(scratch.bin, 'gh'), `#!/bin/sh\necho "$@" >> '${ghLog}'\nexit 1\n`, 'utf8');
+    chmodSync(join(scratch.bin, 'claude'), 0o755);
+    chmodSync(join(scratch.bin, 'gh'), 0o755);
+    process.env.PATH = scratch.path;
+    process.env.HOME = scratch.home;
+    const warnings = withLesson
+      ? await wrapUpInChild(scratch, head)
+      : await wrapUpInProcess(scratch, head);
+    return {
+      prompt: readFileSync(promptFile, 'utf8'),
+      ghCalls: existsSync(ghLog)
+        ? readFileSync(ghLog, 'utf8')
+        : '',
+      warnings,
+    };
+  }
+
+  it('hands the session no pull request step under pr.provider none, and looks none up', async () => {
+    const { prompt, ghCalls } = await wrapUpUnder('none');
+
+    expect(prompt).not.toContain('gh pr create');
+    expect(prompt).not.toContain('gh pr edit');
+    expect(prompt).not.toContain('Closes #');
+    expect(prompt).toContain('`pr.provider` is `none`');
+    expect(prompt).toContain('this run ends with the branch pushed and no pull request is opened');
+    expect(ghCalls).toBe('');
+  });
+
+  it('hands the session the create bullet naming the base under pr.provider gh', async () => {
+    const { prompt } = await wrapUpUnder('gh');
+
+    expect(prompt).toContain(`gh pr create --base ${BASE}`);
+    expect(prompt).not.toContain('`pr.provider` is `none`');
+  });
+
+  it('logs no gh call under pr.provider none for a lesson left unanswered, and names its line with the provider as the reason', async () => {
+    const { prompt, ghCalls, warnings } = await wrapUpUnder('none', true);
+
+    // The lesson was listed and left unanswered, so the check reached its line.
+    expect(prompt).toContain(`- \`${LESSON_ID}\``);
+    expect(ghCalls).toBe('');
+    expect(warnings).toContain(`   ${NO_PROVIDER_REASON}: ${LESSON_LINE}`);
+  });
+
+  it('logs the gh pr lookup under pr.provider gh for the same lesson', async () => {
+    const { prompt, ghCalls, warnings } = await wrapUpUnder('gh', true);
+
+    expect(prompt).toContain(`- \`${LESSON_ID}\``);
+    expect(ghCalls).toContain('pr list');
+    expect(warnings.some((line) => line.includes(NO_PROVIDER_REASON))).toBe(false);
   });
 });

@@ -6,12 +6,15 @@
  * reading agrees that version is the one to tag, and then prints the
  * publish line rather than publishing.
  *
- * The loop writes a version and a changelog entry with every pull
- * request and stops there (`src/start/release-stage.ts`): the merge
- * commit is not its to tag. This action is the operator step the
- * changelog and release spec puts after the merge (its step 4), and
- * `rafa pr merge` already names it as a follow-up
- * (`src/commands/pr/merge-followups.ts`).
+ * The loop writes a change fragment with every pull request and stops
+ * there (`src/start/release-stage.ts`): the merge commit is not its to
+ * tag, and the version and the changelog section are written on the
+ * base branch by `rafa release settle`. This action is the operator
+ * step the changelog and release spec puts after the merge (its step
+ * 4). `rafa pr merge` names `rafa release settle` as its follow-up,
+ * not this action (`src/commands/pr/merge-followups.ts`), and the tag
+ * settle does not write itself is this action's
+ * (`src/release/settle-tag.ts`).
  *
  * One git command here writes — `git tag <tag> <commit>` — and it is
  * the last thing the run does, save the push `--push` asks for after it. Everything before it is a read, and every
@@ -22,12 +25,12 @@
  *
  * The spec's definition of done asks for two of them outright:
  * "`release tag` refuses when the tag exists or the tree is not
- * `main`". The third is the agreement between the two files the loop
+ * `main`". The third is the agreement between the two files settle
  * wrote: the version file's version has to be the one the changelog's
  * NEWEST section names. That pairing is what makes the tag mean
  * something — a tag on a version no changelog section describes is a
  * release nobody can read the notes of, and a version file that ran
- * ahead of its changelog is a wrap-up that half ran.
+ * ahead of its changelog is a settle that half ran.
  *
  * Two more readings can fail and neither may pass silently: a version
  * file that declares no version, and a `git tag --list` that did not
@@ -166,7 +169,7 @@
  */
 import type { ReleaseCommitReading } from './release-commit.js';
 import type { ReleaseSeams } from './status.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { ReceiptVerdict } from '../../release/receipt.js';
@@ -176,9 +179,9 @@ import type { TagPushed } from '../../release/tag-push.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { createGitRunner, gitSaid } from '../../pr/index.js';
 import { readReceiptVerdict, receiptProblem } from '../../release/receipt.js';
 import { changelogVersions, readTags } from '../../release/status-readings.js';
@@ -740,4 +743,5 @@ export function createReleaseTagCommand(seams: ReleaseSeams = DEFAULT_RELEASE_SE
   return Object.freeze(command);
 }
 
-export default createReleaseTagCommand();
+const command: RafaCommand = createReleaseTagCommand();
+export default command;

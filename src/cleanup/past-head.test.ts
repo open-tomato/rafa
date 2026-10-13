@@ -4,7 +4,7 @@
  * and one branch per case, each with a head commit a merged pull
  * request carries and the commits past it.
  */
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { MergedPullRequest } from '../pr/types.js';
 
 import { spawnSync } from 'node:child_process';

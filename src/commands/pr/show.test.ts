@@ -27,7 +27,7 @@
  */
 import type { PrSeams } from './pr-context.js';
 import type { PrShowReading } from './show.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
@@ -126,6 +126,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     updatedAt: '2026-09-18T11:00:00Z',
     body: 'what this pull request does',
     headRefOid: HEAD_OID,
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

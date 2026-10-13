@@ -16,7 +16,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { errorCode } from '../loop/sessions.js';
+import { errorCode } from '../core/loop/index.js';
 
 import { stretchFolder } from './folder.js';
 

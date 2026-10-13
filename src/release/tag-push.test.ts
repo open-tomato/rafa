@@ -11,7 +11,7 @@
  * origin without it taking the tag, and its sentence is held to carry
  * the hook's words and no porcelain `Done` line.
  */
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { pushTag, trackedRemote } from './tag-push.js';

@@ -77,7 +77,7 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { EpicTickResult } from '../board/epic-tick.js';
 import type { SpecIssue } from '../board/issue.js';
 import type { RoadmapLine, RoadmapSkip } from '../board/roadmap.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -145,7 +145,7 @@ const SPECS_DIR = '.rafa/specs';
 const PROBE = [
   'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,
@@ -192,7 +192,7 @@ const PROBE = [
 const PROBE_WITH_PROMPT = [
   'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,

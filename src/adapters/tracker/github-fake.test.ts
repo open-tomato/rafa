@@ -20,6 +20,13 @@
  * reason, the reopen case here and the adapter's four reopen cases. A
  * search of the title alone reddened no case here and the contract's body
  * case, since this file searches titles and the contract a body.
+ *
+ * Three mutations of the label rules of `issue edit` were driven on
+ * 2026-10-13 over `src/adapters/tracker/`, at 500 pass before and after,
+ * the module restored byte-identical (sha256) after each, and each
+ * reddened its own refusal row here and no adapter case: a label added
+ * that the repository lacks, which reddened the case adding it once made
+ * as well, one added that the issue holds, and one removed that it lacks.
  */
 import type { FakeGh } from './github-fake.js';
 
@@ -127,6 +134,45 @@ describe('the recorded gh fake', () => {
       .toEqual(failure('fake gh: does not model --json field "issueType"\n'));
   });
 
+  it('stamps each created issue from its clock, and writes the time as recorded in a view and in a listing', async () => {
+    const times = ['2026-10-08T19:15:57Z', '2026-10-12T05:50:18Z'];
+    const fake = createFakeGh({ now: () => times.shift() ?? '' });
+    await fake.run(issueCreate('Older', 'bug'));
+    await fake.run(issueCreate('Newer', 'bug'));
+
+    expect(await fake.run(['issue', 'view', '1', '--json', 'number,createdAt']))
+      .toEqual({ ok: true, stdout: '{"createdAt":"2026-10-08T19:15:57Z","number":1}\n', stderr: '' });
+    expect((await fake.run(['issue', 'list', '--json', 'number,createdAt'])).stdout)
+      .toBe('[{"createdAt":"2026-10-12T05:50:18Z","number":2},{"createdAt":"2026-10-08T19:15:57Z","number":1}]\n');
+    expect((await fake.run(['issue', 'view', '1', '--json', 'number'])).stdout).toBe('{"number":1}\n');
+  });
+
+  it('keeps the time through a comment, an edit and a close, and takes another through update alone', async () => {
+    const fake = createFakeGh({ now: () => '2026-10-08T19:15:57Z' });
+    await fake.run(issueCreate('t', 'bug'));
+
+    await fake.run(['issue', 'comment', '1', '--body', 'noted']);
+    await fake.run(['issue', 'edit', '1', '--title', 'Edited']);
+    await fake.run(closeIssue('1', 'completed'));
+
+    expect(fake.issue('1')).toMatchObject({ title: 'Edited', state: 'CLOSED', createdAt: '2026-10-08T19:15:57Z' });
+    fake.update('1', (issue) => ({ ...issue, createdAt: 'not a time' }));
+    expect((await fake.run(['issue', 'view', '1', '--json', 'createdAt'])).stdout).toBe('{"createdAt":"not a time"}\n');
+  });
+
+  it('stamps from the system clock, to the second in UTC as gh writes a time, when handed no clock', async () => {
+    const before = Date.now();
+    const fake = createFakeGh();
+
+    await fake.run(issueCreate('t', 'bug'));
+
+    const createdAt = fake.issue('1')?.createdAt ?? '';
+    expect(createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // To the second: the stamp may read up to a second before the clock did.
+    expect(Date.parse(createdAt)).toBeGreaterThan(before - 1000);
+    expect(Date.parse(createdAt)).toBeLessThanOrEqual(Date.now());
+  });
+
   it('lists newest first and open alone by default, narrowed by state, labels, search text and limit', async () => {
     const fake = createFakeGh();
     await fake.run(issueCreate('Replay window', 'bug'));
@@ -202,7 +248,22 @@ describe('the recorded gh fake', () => {
     [['issue', 'edit', '1', '--body-file', '-'], undefined, 'fake gh: issue edit --body-file - was handed no stdin\n'],
     [['issue', 'edit', '1', '--body-file', 'body.md'], undefined, 'fake gh: issue edit models --body-file - alone\n'],
     [['issue', 'edit', '1', '--body', 'b', '--body-file', '-'], 'b', 'fake gh: issue edit models --body or --body-file, never both\n'],
-    [['issue', 'edit', '1'], undefined, 'fake gh: issue edit models --title or a body, and was handed neither\n'],
+    [['issue', 'edit', '1'], undefined, 'fake gh: issue edit models --title, a body or a label, and was handed none\n'],
+    [
+      ['issue', 'edit', '1', '--add-label', 'priority:high'],
+      undefined,
+      'fake gh: issue edit --add-label models a label the repository holds, and was handed priority:high\n',
+    ],
+    [
+      ['issue', 'edit', '1', '--add-label', 'question,bug'],
+      undefined,
+      'fake gh: issue edit --add-label models a label the issue lacks, and was handed bug\n',
+    ],
+    [
+      ['issue', 'edit', '1', '--remove-label', 'bug,wontfix'],
+      undefined,
+      'fake gh: issue edit --remove-label models a label the issue holds, and was handed wontfix\n',
+    ],
     [['issue', 'edit', '1', '--body', 'b'], 'b', 'fake gh: issue edit reads no stdin, and was handed some\n'],
     [['issue', 'comment', '1', '--body', 'b'], 'b', 'fake gh: issue comment reads no stdin, and was handed some\n'],
   ])('refuses the edit %p handed stdin %p, editing nothing', async (args, stdin, stderr) => {
@@ -210,7 +271,29 @@ describe('the recorded gh fake', () => {
     await fake.run(issueCreate('t', 'bug'));
 
     expect(await fake.run(args, stdin)).toEqual(failure(stderr));
-    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', comments: [] });
+    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', labels: ['bug'], comments: [] });
+  });
+
+  it('edits labels through --add-label and --remove-label, each split on commas, the added after those kept', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug', 'question', 'wontfix'));
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'enhancement,duplicate', '--remove-label', 'bug,wontfix']))
+      .toEqual({ ok: true, stdout: 'https://github.com/open-tomato/rafa/issues/1\n', stderr: '' });
+    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', labels: ['question', 'enhancement', 'duplicate'] });
+    expect(await fake.run(['issue', 'edit', '1', '--remove-label', 'question', '--remove-label', 'duplicate'])).toMatchObject({ ok: true });
+    expect(fake.issue('1')?.labels).toEqual(['enhancement']);
+  });
+
+  it('adds a label to an issue once the repository holds it, the one it refused before', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug'));
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'priority:high'])).toMatchObject({ ok: false });
+    await fake.run(['label', 'create', 'priority:high', '--force']);
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'priority:high'])).toMatchObject({ ok: true });
+    expect(fake.issue('1')?.labels).toEqual(['bug', 'priority:high']);
   });
 
   it('fails an edit of an issue it does not hold as a view of one fails', async () => {

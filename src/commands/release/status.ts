@@ -68,9 +68,9 @@
  * `loadConfig` refuses. Both exit 1.
  */
 import type { WaitingReading, WaitingSettings } from './status-fragments.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { PlanChange } from '../../effort/store/changes.js';
-import type { PlanReleaseLevel } from '../../plan/parse.js';
 import type { GitRunner } from '../../pr/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { AuditReading } from '../../release/audit.js';
@@ -79,10 +79,10 @@ import type { TagReading, UntaggedReading } from '../../release/status-readings.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { messageOf } from '../../config-sections.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { messageOf } from '../../core/config/sections.js';
 import { planStubsFromFileNames, resolvePlanStub } from '../../effort/attribution.js';
 import { readPlanChanges } from '../../effort/store/changes.js';
 import { createGitRunner } from '../../pr/index.js';
@@ -526,4 +526,5 @@ export function createReleaseStatusCommand(seams: ReleaseSeams = DEFAULT_RELEASE
   return Object.freeze(command);
 }
 
-export default createReleaseStatusCommand();
+const command: RafaCommand = createReleaseStatusCommand();
+export default command;

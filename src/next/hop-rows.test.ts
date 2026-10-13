@@ -34,7 +34,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { NEXT_ROADMAP_STATES, NEXT_STATES, readNextState } from './state.js';
@@ -260,6 +260,7 @@ function detail(pull: PlantedPull): PullRequestDetail {
     ...summary(),
     body: `Closes #${String(C)}`,
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable: pull.mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],

@@ -19,12 +19,14 @@
  *   not read, never as zero.
  * - **Bugs filed since**: those of the same open bugs filed after
  *   `since`, the caller's cut-off (the last ledger line's time,
- *   `lastItemTime` in `./items.ts`, else the stretch's start). The port
- *   names no filing time on any issue (`src/ports/index.ts`: neither
- *   `OpenIssue` nor `Issue` carries one), so the time of each bug is
- *   read through a {@link FiledAtReader} the caller hands over. Without
- *   one the reading is not read, with the reason. A bug filed and closed
- *   between two items is not open, so it is not listed.
+ *   `lastItemTime` in `./items.ts`, else the stretch's start). Each
+ *   bug's time is the `createdAt` its `OpenIssue` carries
+ *   (`src/ports/index.ts`), so the one listing that counts the bugs
+ *   dates them too and no call is sent per bug. A tracker answers null
+ *   where it names no time; with one such bug, or one whose time does
+ *   not parse, the reading is not read and names the bug, since a bug
+ *   left out would read as not filed. A bug filed and closed between
+ *   two items is not open, so it is not listed.
  *
  * ## Each reading stands alone
  *
@@ -36,24 +38,19 @@
  */
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { CiStatusReading } from '../ci/status-reading.js';
-import type { IssueRef, OpenIssue, Tracker } from '../ports/index.js';
+import type { OpenIssue, Tracker } from '../ports/index.js';
 
 import { readFailedCases } from '../ci/failed-cases.js';
 import { readNewestRun } from '../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
-import { messageOf } from '../config-sections.js';
-
-/** The time an issue was filed, or null when the tracker does not say. */
-export type FiledAtReader = (ref: IssueRef) => Promise<Date | null>;
+import { messageOf } from '../core/config/sections.js';
 
 /** Where the readings come from. */
 export interface PitSeams {
   /** The runner `gh run list` and `gh run view` are sent through. */
   readonly gh: GhRunner;
-  /** The tracker port, read for its open bugs. */
+  /** The tracker port, read for its open bugs and the time each was filed. */
   readonly tracker: Pick<Tracker, 'openIssues'>;
-  /** Each bug's filing time; see the module note. Left out, the bugs filed since are not read. */
-  readonly filedAt?: FiledAtReader;
 }
 
 /** What to read. */
@@ -89,9 +86,6 @@ export interface PitReadings {
   readonly filedSince: Reading<{ readonly since: string; readonly bugs: readonly FiledBug[] }>;
 }
 
-/** Why the bugs filed since are not read when no {@link FiledAtReader} is given. */
-export const NO_FILED_AT = 'the tracker port names no filing time, and no reader of one was given';
-
 /** Why the open bugs are not read on a tracker without `openIssues`. */
 export const NO_OPEN_ISSUES = 'the tracker lists no open issues (it has no openIssues)';
 
@@ -102,7 +96,7 @@ export async function readPitReadings(seams: PitSeams, query: PitQuery): Promise
   const openBugs: Reading<number> = bugs.ok
     ? { ok: true, value: bugs.value.length }
     : bugs;
-  return { ci, openBugs, filedSince: await readFiledSince(bugs, seams.filedAt, query.since) };
+  return { ci, openBugs, filedSince: readFiledSince(bugs, query.since) };
 }
 
 /** The CI reading, in the shape `rafa ci status` reads. */
@@ -132,30 +126,32 @@ async function readOpenBugs(tracker: Pick<Tracker, 'openIssues'>): Promise<reado
   return tracker.openIssues('bug');
 }
 
-/** The open bugs filed after `since`, oldest first. */
-async function readFiledSince(
-  bugs: Reading<readonly OpenIssue[]>,
-  filedAt: FiledAtReader | undefined,
-  since: Date,
-): Promise<PitReadings['filedSince']> {
+/** The time `bug` was filed, null when it carries none or one that does not parse. */
+function filedAtOf(bug: OpenIssue): Date | null {
+  if (bug.createdAt === null) return null;
+  const time = Date.parse(bug.createdAt);
+  return Number.isNaN(time)
+    ? null
+    : new Date(time);
+}
+
+/** The open bugs filed after `since`, oldest first, each dated by its own `createdAt`. */
+function readFiledSince(bugs: Reading<readonly OpenIssue[]>, since: Date): PitReadings['filedSince'] {
   if (!bugs.ok) return bugs;
-  if (filedAt === undefined) return { ok: false, reason: NO_FILED_AT };
   if (Number.isNaN(since.getTime())) return { ok: false, reason: 'the cut-off is not a valid time' };
-  return attempt(async () => {
-    const dated = await Promise.all(bugs.value.map(async (bug) => ({ bug, at: await filedAt(bug.ref) })));
-    const unknown = dated.filter((entry) => entry.at === null).map((entry) => `#${entry.bug.ref.externalId}`);
-    if (unknown.length > 0) throw new Error(`no filing time for ${unknown.join(', ')}`);
-    const filed = dated
-      .filter((entry): entry is { bug: OpenIssue; at: Date } => entry.at !== null && entry.at.getTime() > since.getTime())
-      .sort((a, b) => a.at.getTime() - b.at.getTime())
-      .map(({ bug, at }): FiledBug => ({
-        id: bug.ref.externalId,
-        title: bug.title,
-        url: bug.ref.url,
-        filedAt: at.toISOString(),
-      }));
-    return { since: since.toISOString(), bugs: filed };
-  });
+  const dated = bugs.value.map((bug) => ({ bug, at: filedAtOf(bug) }));
+  const unknown = dated.filter((entry) => entry.at === null).map((entry) => `#${entry.bug.ref.externalId}`);
+  if (unknown.length > 0) return { ok: false, reason: `no filing time for ${unknown.join(', ')}` };
+  const filed = dated
+    .filter((entry): entry is { bug: OpenIssue; at: Date } => entry.at !== null && entry.at.getTime() > since.getTime())
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .map(({ bug, at }): FiledBug => ({
+      id: bug.ref.externalId,
+      title: bug.title,
+      url: bug.ref.url,
+      filedAt: at.toISOString(),
+    }));
+  return { ok: true, value: { since: since.toISOString(), bugs: filed } };
 }
 
 /** `read()`'s value, or the reason it threw. */

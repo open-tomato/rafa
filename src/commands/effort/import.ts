@@ -34,7 +34,7 @@
  * result, as `rafa effort merge` writes it.
  */
 import type { MergeCommandSeams } from './merge.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { MergeResult } from '../../effort/store/merge-store.js';
 import type { FileSyncOptions } from '../../effort/sync/file.js';
 import type { Sync } from '../../ports/index.js';
@@ -162,4 +162,5 @@ export function createImportCommand(seams: ImportCommandSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createImportCommand();
+const command: RafaCommand = createImportCommand();
+export default command;

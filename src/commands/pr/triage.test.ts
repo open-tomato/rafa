@@ -53,7 +53,7 @@
  * itself.
  */
 import type { TriageSeams } from './triage.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';
@@ -141,6 +141,15 @@ const NUL = String.fromCharCode(0);
 
 /** A merged tree OID, which is what a conflicted merge-tree stdout opens with. */
 const OID = '0'.repeat(40);
+
+/**
+ * A git runner whose `merge-tree` names `bun.lock` as the one
+ * conflicting path, both refs resolving. Shared by the cases that need
+ * a conflict to be READ and do not look at what git was sent.
+ */
+const LOCKFILE_CONFLICT: GitRunner = (args): GitResult => (args[0] === 'rev-parse'
+  ? { ok: true, stdout: '', stderr: '' }
+  : { ok: false, stdout: [OID, 'bun.lock', '', ''].join(NUL), stderr: '' });
 
 /** A git runner that resolves nothing, so no conflict is read locally. */
 const NO_REFS: GitRunner = () => ({ ok: false, stdout: '', stderr: 'stub git: no such ref' });
@@ -396,6 +405,40 @@ describe('assessing the pull request a number names', () => {
     expect(sent.some((args) => args[0] === 'merge-tree')).toBe(true);
     expect(outcome.run.stdout).toContain('conflict-lockfile — simple — attempts 0 of 2');
     expect(outcome.run.stdout).toContain('Conflicting files: bun.lock');
+  });
+
+  it('assesses a head that conflicts though every check passed, as a conflict class and not as green', async () => {
+    const outcome = await overFake(
+      [{ ...RED_41, checks: [PASSING_GATES], mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }],
+      ['41'],
+      { git: LOCKFILE_CONFLICT },
+    );
+
+    expect(outcome.run.exitCode).toBe(0);
+    expect(outcome.run.stdout).toContain('conflict-lockfile — simple — attempts 0 of 2');
+    expect(outcome.run.stdout).toContain('Conflicting files: bun.lock');
+    expect(outcome.run.stdout).toContain('Checks verdict: green');
+    expect(outcome.run.stdout).not.toContain('nothing to triage');
+    expect(outcome.fake.pull(41)?.comments.at(-1)?.body).toContain('class: "conflict-lockfile"');
+  });
+
+  it('leaves the same green rows as nothing to triage while GitHub has no answer, asking git nothing', async () => {
+    const sent: string[][] = [];
+    const git: GitRunner = (args): GitResult => {
+      sent.push([...args]);
+      return LOCKFILE_CONFLICT(args);
+    };
+
+    const outcome = await overFake(
+      [{ ...RED_41, checks: [PASSING_GATES], mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' }],
+      ['41'],
+      { git },
+    );
+
+    expect(outcome.run.stdout).toContain('so there is nothing to triage');
+    expect(outcome.run.stdout).not.toContain('conflict-');
+    expect(sent).toEqual([]);
+    expect(outcome.fake.pull(41)?.comments ?? []).toEqual([]);
   });
 
   it('asks git nothing for a head GitHub says merges cleanly', async () => {

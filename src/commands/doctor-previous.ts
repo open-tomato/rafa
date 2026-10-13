@@ -15,7 +15,7 @@
  * does. A warning here is not a fault: `doctor` keeps its exit code
  * whatever this reading says. This module prints nothing.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { countPreviousCopies, PREVIOUS_COPY_WARN_ABOVE, previousDir } from '../board/previous-copy.js';
 

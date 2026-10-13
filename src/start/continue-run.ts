@@ -127,7 +127,7 @@
  * (errors outside any test, no summary), end the run with
  * {@link DECISION_STOP_EXIT} and a `halt` naming the count.
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type { FinishedTask } from './commit.js';
 import type { ContinueArgs } from './continue-args.js';
@@ -138,15 +138,15 @@ import type { RetryRefusal, RetryTask, RunRetries } from './retry-budget.js';
 import type { NeededDecision, RunSession } from './session.js';
 import type { StepOutcome } from './suite-step.js';
 import type { BeforeSessionAnswer } from './suite-steps-run.js';
-import type { OutputMode } from '../config-sections.js';
-import type { ClaudeSettingSource, RafaConfig } from '../config.js';
-import type { CapturingSpawner } from '../utils/claude.js';
+import type { RafaConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource, OutputMode } from '../core/config/sections.js';
+import type { CapturingSpawner } from '../core/loop/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { findNextTask, listOpenTasks, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { heldOnNothingLeftBehind } from './commit.js';

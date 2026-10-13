@@ -15,16 +15,16 @@
  * refusal sits beside the same row resolving once the agent is held,
  * so a check that answered unresolved for everything would fail.
  */
-import type { RouteTarget, ValueAt } from '../config-sections.js';
 import type { Resolution, TierRow, TierSettings } from './resolve.js';
 import type { RoutingContext } from './routing.js';
+import type { RouteTarget, ValueAt } from '../core/config/sections.js';
 import type { InventorySource } from '../inventory/record.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { BUILT_IN_AGENTS } from '../agents/roster.js';
-import { routeTable } from '../config-readers.js';
-import { CONFIG_DEFAULTS, parseConfigText } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText } from '../core/config/index.js';
+import { routeTable } from '../core/config/sections.js';
 
 import { resolveTiers } from './resolve.js';
 import {

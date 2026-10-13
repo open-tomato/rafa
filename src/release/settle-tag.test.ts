@@ -13,7 +13,7 @@ import type { Fragment } from './fragment.js';
 import type { SettleDelivered, SettleTagOutcome } from './settle-tag.js';
 import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuilt, SettleSettings } from './settle.js';
-import type { ReleaseTagMode } from '../config-readers.js';
+import type { ReleaseTagMode } from '../core/config/sections.js';
 import type { GitResult, GitRunner, PullRequestSummary } from '../pr/index.js';
 
 import { execFileSync } from 'node:child_process';
@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
 import { serializeFragment } from './fragment.js';

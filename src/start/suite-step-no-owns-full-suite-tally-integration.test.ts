@@ -32,7 +32,7 @@
  * proves the fallback's always-run run passes through the slow-sweep
  * guard.
  *
- * One assertion reads the run record's `steps` (`../loop/sessions.ts`)
+ * One assertion reads the run record's `steps` (`../core/loop/sessions.ts`)
  * for the seven entries this two-stage, two-task plan takes — baseline,
  * the first stage's two task steps, that stage's own stage step (its
  * last task's commit is also the stage's last), the second stage's two
@@ -52,7 +52,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../loop/sessions.js';
+import { readSessions } from '../core/loop/index.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

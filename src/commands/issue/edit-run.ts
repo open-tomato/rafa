@@ -10,91 +10,86 @@
  * opened, so a refused line reads no config and runs no `gh`: one issue
  * number, and an append (`--append-file=<file>` or `--append=<text>`,
  * with a required `--reason`, `--while-in-development` allowed), a
- * replace (`--replace-file=<file>`, `--title` allowed beside it) or a
- * title change (`--title` alone). `--reason` and
- * `--while-in-development` beside anything but an append are refused,
- * as are flags that do not combine and a value that is blank. A file is
- * read as `issue create --body-file` reads one, `-` for standard input
- * ({@link readEditRequest}), and refused when it cannot be read or holds
- * nothing but whitespace. Each refusal exits 1 naming {@link EDIT_USAGE}.
+ * replace (`--replace-file=<file>`, `--title` allowed beside it), a title
+ * change (`--title` alone) or a priority (`--priority=<priority>`,
+ * `--title` allowed beside it), which `./edit-priority.ts` reads, plans
+ * and words: its request is of kind `title`, so gate 4 weighs it as a
+ * title change, and its write answers `replaced`. `--reason` and
+ * `--while-in-development` go with an append only, and flags that do not
+ * combine and a blank value are refused. A file is read as `issue create
+ * --body-file` reads one, `-` for standard input, and refused when
+ * unreadable or blank. Each refusal exits 1 naming {@link EDIT_USAGE}.
  *
  * ## The order
  *
  * {@link runIssueEdit} reads the issue once through the tracker's
- * `editable`, then weighs four gates, and the first refusal ends the
- * run with nothing written:
+ * `editable`, then weighs four gates, and the first refusal ends the run
+ * with nothing written:
  *
- *  1. ownership, who edits: the login `gh api user` answers, weighed
- *     over the project's `BoardTrust` (`readEditorTrust`,
- *     `src/board/trust.ts`). A lookup that fails refuses as
- *     `ownership-unknown`, never as trusted;
+ *  1. ownership, who edits: the login `gh api user` answers, over the
+ *     project's `BoardTrust` (`readEditorTrust`, `src/board/trust.ts`); a
+ *     lookup that fails refuses as `ownership-unknown`, never as trusted;
  *  2. ownership, whose issue: the issue's author over the SAME trust,
- *     refused with the remedy `plan create` gives, "a member must open
- *     the spec";
+ *     refused with `plan create`'s remedy, "a member must open the spec";
  *  3. the text: the leak refusal over the text the edit adds, the new
- *     title included, and the completeness refusal over the whole new
- *     body of a `type:spec` issue that was complete before
- *     (`src/board/issue-edit-text.ts`);
+ *     title included, and the completeness refusal over the new body of a
+ *     `type:spec` issue complete before (`src/board/issue-edit-text.ts`);
  *  4. spec to code: the labels, the open state and the saved copies under
  *     `specs.dir` (`src/board/issue-edit-state.ts`).
  *
- * A refusal is an {@link EditRefusal}, a `CommandExit` with exit code 2
- * whose message opens `❌ refused <gate>: `, the gate named as
- * {@link EditRefusalName} spells it.
+ * A refusal is an {@link EditRefusal}: exit code 2, its message opening
+ * `❌ refused <gate>: `, the gate as {@link EditRefusalName} spells it.
  *
  * On the `local` tracker gates 1 and 2 answer `local` and pass, asking
- * nobody: its issues are files under the project's own `.rafa/issues/`,
- * which whoever runs rafa there can write without it. The rule is keyed
- * on the tracker's kind, never on an empty author, so an adapter
- * answering an empty login by mistake is weighed over `gh` and refused.
+ * nobody: its issues are the project's own files under `.rafa/issues/`.
+ * The rule is keyed on the tracker's kind, never on an empty author, so
+ * an adapter answering an empty login is weighed over `gh` and refused.
  *
  * ## Already, and dry run
  *
- * After the gates pass, an append whose dated block (same day, reason
- * and text) is already the body's last part answers `already` and
- * writes nothing (`carriesUpdateBlock`, `src/board/issue-edit-body.ts`).
- * It is weighed after the gates, so a line run again on an issue since
- * closed or claimed is told so rather than told it is done.
+ * After the gates pass, an append whose dated block (same day, reason and
+ * text) is already the body's last part answers `already` and writes
+ * nothing (`carriesUpdateBlock`, `src/board/issue-edit-body.ts`), as does
+ * a priority the issue holds alone. Both are weighed after the gates, so
+ * a line run again on an issue since closed or claimed is told so.
  *
- * `--dry-run` weighs every gate as without it and writes nothing: the
- * report holds the added part, each gate's reading and the outcome the
- * edit would have. A refusal still exits 2, its message opening with the
- * readings of the gates that passed before it.
+ * `--dry-run` weighs every gate and writes nothing: the report holds the
+ * added part, each gate's reading and the outcome the edit would have. A
+ * refusal still exits 2, the readings of the gates passed opening it.
  *
  * ## After the write
  *
  * The run writes through `edit` and reads the issue again, CRLF read as
  * LF and trailing whitespace at the very end ignored, since GitHub may
  * normalise both. The re-read must hold what was written
- * ({@link writeHeld}): for an append the body read before byte for
- * byte, then the separator and the block and nothing else; for a
- * replace the new body; for a title change the old body; and the new
- * title where one was written. Anything else is `conflict`, exit code
- * 1, with the body read before and the body read after saved as
- * `.rafa/scratch/rafa-<n>-edit-before-<stamp>.md` and
- * `rafa-<n>-edit-after-<stamp>.md` ({@link saveConflictBodies}), and the
- * message naming both paths.
+ * ({@link writeHeld}): for an append the body read before byte for byte,
+ * then the separator and the block and nothing else; for a replace the
+ * new body; for a title or a priority the old body; and the new title and
+ * the new priority where one was written. Anything else is `conflict`,
+ * exit code 1, its message naming the bodies {@link saveConflictBodies}
+ * saved: `.rafa/scratch/rafa-<n>-edit-before-<stamp>.md` and
+ * `rafa-<n>-edit-after-<stamp>.md`.
  *
  * The write sends the whole body, so the check finds an edit landing
- * after the write and before the re-read, and a write the tracker did
- * not keep as sent; an edit landing between the first read and the
- * write is overwritten by it and leaves the re-read nothing to see.
+ * after the write and before the re-read, and a write the tracker did not
+ * keep as sent; an edit landing between the first read and the write is
+ * overwritten by it and leaves the re-read nothing to see.
  *
  * ## Outcomes
  *
- * {@link EditOutcome}: `appended`, `replaced` (body, title or both),
+ * {@link EditOutcome}: `appended`, `replaced` (body, title or priority),
  * `already` and `stale-copy` exit 0, `conflict` exits 1
  * ({@link editExitCode}). `stale-copy`, an append on a planned issue or
- * on a claimed one under `--while-in-development`, names
- * `rafa plan create --issue=<n> --refresh`, which the run never runs.
+ * on a claimed one under `--while-in-development`, names `rafa plan
+ * create --issue=<n> --refresh`, which the run never runs.
  */
 import type { IssueSeams, IssueTrackerData, LineFlags } from './issue-tracker.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { EditKind, EditStateInput, EditStateReading } from '../../board/issue-edit-state.js';
 import type { BoardTrust, EditorLogin, EditorRefusal, TrustReading } from '../../board/trust.js';
-import type { RafaContext } from '../../cli/command.js';
-import type { EditableIssue, IssueEdit, IssueRef, Tracker } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
+import type { EditableIssue, IssueEdit, IssuePriority, IssueRef, Tracker } from '../../ports/index.js';
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -126,11 +121,12 @@ import {
   TRUST_REFUSAL_EXIT,
   trustRefusalMessage,
 } from '../../board/trust.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
-import { createGitRunner } from '../../pr/git.js';
 
+import { planPriorityEdit, priorityMessage, readPriorityFlag } from './edit-priority.js';
 import {
   issueName,
   issueProject,
@@ -143,17 +139,17 @@ import {
 } from './issue-tracker.js';
 
 /** The usage line a line refusal names. */
-export const EDIT_USAGE = 'rafa issue edit <n> (--append-file=<file> | --append=<text>) --reason=<text>'
-  + ' [--while-in-development] | (--replace-file=<file> [--title=<text>] | --title=<text>) [--dry-run]';
+export const EDIT_USAGE: string = 'rafa issue edit <n> (--append-file=<file> | --append=<text>) --reason=<text>'
+  + ' [--while-in-development] | ((--replace-file=<file> | --priority=<priority>) [--title=<text>] | --title=<text>) [--dry-run]';
 
 /** The exit code every gate refusal ends with: `TRUST_REFUSAL_EXIT`, `LEAK_REFUSAL_EXIT` and `BOARD_REFUSAL_EXIT` are all 2. */
-export const EDIT_REFUSAL_EXIT = TRUST_REFUSAL_EXIT;
+export const EDIT_REFUSAL_EXIT: number = TRUST_REFUSAL_EXIT;
 
 /** The exit code a `conflict` ends with. */
 export const EDIT_CONFLICT_EXIT = 1;
 
 /** Where a conflict's two bodies are saved, under the project root. */
-export const EDIT_SCRATCH_DIR = join('.rafa', 'scratch');
+export const EDIT_SCRATCH_DIR: string = join('.rafa', 'scratch');
 
 /** The file value that reads standard input. */
 const STDIN_PATH = '-';
@@ -196,6 +192,8 @@ export interface EditRequest {
   readonly reason: string | null;
   /** The new title, or null when the title stays. */
   readonly title: string | null;
+  /** The new priority, when the line names one: the request is then of kind `title`, its title null or new. */
+  readonly priority?: IssuePriority;
   readonly whileInDevelopment: boolean;
   readonly dryRun: boolean;
 }
@@ -322,6 +320,7 @@ function readEditFlags(flags: LineFlags) {
     reason: readNonBlankFlag(flags, FLAG.reason, EDIT_USAGE),
     replaceFile: readNonBlankFlag(flags, FLAG.replaceFile, EDIT_USAGE),
     title: readNonBlankFlag(flags, FLAG.title, EDIT_USAGE),
+    priority: readPriorityFlag(flags, EDIT_USAGE),
     whileInDevelopment: readSwitch(flags, FLAG.whileInDevelopment),
     dryRun: readSwitch(flags, FLAG.dryRun),
   };
@@ -344,7 +343,7 @@ function appendLine(issue: number, read: EditFlags): EditLine {
 
 /** A line of `kind` with no reason and no opening of a claim. */
 function lineOf(issue: number, read: EditFlags, kind: EditKind, source: EditTextSource | null): EditLine {
-  return { issue, kind, source, reason: null, title: read.title ?? null, whileInDevelopment: false, dryRun: read.dryRun };
+  return { issue, kind, source, reason: null, title: read.title ?? null, priority: read.priority, whileInDevelopment: false, dryRun: read.dryRun };
 }
 
 /**
@@ -365,7 +364,7 @@ export function readEditLine(args: readonly string[], flags: LineFlags): EditLin
   if (appending) return appendLine(issue, read);
 
   if (read.reason !== undefined) {
-    throw lineRefusal(`--${FLAG.reason} goes with an append only: a replace and a title change take none`, EDIT_USAGE);
+    throw lineRefusal(`--${FLAG.reason} goes with an append only: a replace, a title change and a priority take none`, EDIT_USAGE);
   }
   if (read.whileInDevelopment) {
     throw lineRefusal(
@@ -376,9 +375,9 @@ export function readEditLine(args: readonly string[], flags: LineFlags): EditLin
   if (read.replaceFile !== undefined) {
     return lineOf(issue, read, 'replace', { from: 'file', flag: FLAG.replaceFile, path: read.replaceFile });
   }
-  if (read.title !== undefined) return lineOf(issue, read, 'title', null);
+  if (read.title !== undefined || read.priority !== undefined) return lineOf(issue, read, 'title', null);
   throw lineRefusal(
-    `Name the edit: --${FLAG.appendFile}, --${FLAG.append}, --${FLAG.replaceFile} or --${FLAG.title}`,
+    `Name the edit: --${FLAG.appendFile}, --${FLAG.append}, --${FLAG.replaceFile}, --${FLAG.title} or --priority`,
     EDIT_USAGE,
   );
 }
@@ -463,6 +462,7 @@ interface PlannedEdit {
 
 /** The edit `request` makes over `found`, read at `now`. */
 function planEdit(request: EditRequest, found: EditableIssue, now: Date): PlannedEdit {
+  if (request.priority !== undefined) return planPriorityEdit({ priority: request.priority, title: request.title }, found);
   const titled = request.title === null
     ? {}
     : { title: request.title };
@@ -603,6 +603,7 @@ export function writeHeld(
 ): boolean {
   const { change } = planned;
   if (change.title !== undefined && reread.title !== change.title) return false;
+  if (change.priority !== undefined && reread.priority !== change.priority) return false;
   const before = found.body.replace(/\r\n/gu, '\n');
   const after = reread.body.replace(/\r\n/gu, '\n');
   if (planned.block !== null) return originalPartHolds(before, after, normalised(planned.block));
@@ -648,6 +649,7 @@ function heldOutcome(request: EditRequest, state: EditStateReading): EditOutcome
 
 /** The sentence a held or would-be `outcome` is printed as. */
 function outcomeMessage(request: EditRequest, outcome: EditOutcome, branch: string | null, name: string): string {
+  if (request.priority !== undefined) return priorityMessage({ priority: request.priority, title: request.title }, outcome === 'already', name);
   switch (outcome) {
     case 'appended':
       return `Appended an update to ${name}; the original part is unchanged.`;

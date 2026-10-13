@@ -24,7 +24,7 @@
  *      its deprecation lines when it has any and runs in an async scope
  *      of its own (see "The scope a command runs in"), with its
  *      context's output as the active output
- *      (`src/adapters/output/active.ts`) in the invocation's output mode,
+ *      (`src/core/output/active.ts`) in the invocation's output mode,
  *      with a logger and logger settings of its own (see "The logger"),
  *      and recorded as the running command with its context's parsed
  *      flags (`running.ts`), for a reader below its `run` to ask; a help
@@ -62,7 +62,7 @@
  * values and put the previous ones back in a `finally`, a stack: two
  * that overlapped and ended in the order they started left the first's
  * output and record for the rest of the process, and the spend guard
- * (`src/utils/claude.ts`) then refused every session a later test file
+ * (`src/core/loop/claude.ts`) then refused every session a later test file
  * started, naming a command that had ended. The logger and its settings
  * were the same stack: each of the two read the other's while both ran,
  * and the last to end left a logger and settings of a command that had
@@ -153,8 +153,8 @@
  * ## The project
  *
  * A command runs inside a project unless it declares
- * `needsProject: false` (`command.ts`), as `module exec`, `init` and
- * `describe` do.
+ * `needsProject: false` (`src/core/command/command.ts`), as
+ * `module exec`, `init` and `describe` do.
  * Once its spec is read, `resolveScope` (`src/project/scope.ts`) walks up
  * from the working directory, {@link DispatchOptions.cwd}, to the first
  * directory holding `.rafa/config.yaml`, passing over the home,
@@ -207,9 +207,10 @@
  * command declares one. A help request names a command without running
  * it, and prints none.
  *
- * A flag declaring `deprecated` (`command.ts`) is read as its `use` when
- * it is typed bare ahead of any `--`, spelled `--<name>` or `-<name>`, or
- * so for one of its aliases, which `parseArgs` reads alike. The words of
+ * A flag declaring `deprecated` (`src/core/command/command.ts`) is read
+ * as its `use` when it is typed bare ahead of any `--`, spelled
+ * `--<name>` or `-<name>`, or so for one of its aliases, which
+ * `parseArgs` reads alike. The words of
  * `use` take the typed word's place in the line the context is assembled
  * from, so `rafa effort report --json` runs in json mode, as
  * `rafa effort report --output=json` does, and the command's `argv` keeps
@@ -218,13 +219,13 @@
  *
  *   rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"
  */
-import type { RafaCommand, RafaContext, RafaFlagSpec } from './command.js';
 import type { CliContext } from './core/types.js';
 import type { ModuleCommandEntry, ModuleImporter } from './modules.js';
 import type { CommandRegistry } from './registry.js';
 import type { CommandRoute, HelpRequest, Route, RouteRefusalCode } from './route.js';
 import type { LoggerResolver } from '../adapters/logger/active.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
 import type { CliEvent, CliEventResult, Logger, LogLevel, Output } from '../ports/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
@@ -233,22 +234,28 @@ import { homedir } from 'node:os';
 import { activeLogger, runWithActiveLogger } from '../adapters/logger/active.js';
 import { colourEnabled } from '../adapters/logger/colour.js';
 import { DEFAULT_LOGGER_KIND, runWithLoggerSettings } from '../adapters/logger/settings.js';
-import { runWithActiveOutput } from '../adapters/output/active.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
+import { CommandExit , versionLine } from '../core/command/index.js';
+import { runWithActiveOutput } from '../core/output/index.js';
 import { resolveScope, ScopeError } from '../project/scope.js';
 
-import { CommandExit } from './command.js';
 import { assembleContext } from './core/assembleContext.js';
 import { loadModuleCommands } from './modules.js';
 import { ROUTE_REFUSALS, routeLine } from './route.js';
 import { runAsRunningCommand } from './running.js';
-import { versionLine } from './version.js';
 
 /** What every refusal the dispatcher throws opens with. */
 const REFUSAL = 'dispatcher';
 
 /** Every code a failed terminal event carries. */
-export const DISPATCH_ERROR_CODES = [
+export const DISPATCH_ERROR_CODES: readonly [
+  ...typeof ROUTE_REFUSALS,
+  'invalid_spec',
+  'no_project',
+  'command_exit',
+  'command_error',
+  'result_unwritable',
+] = [
   ...ROUTE_REFUSALS,
   'invalid_spec',
   'no_project',

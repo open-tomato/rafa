@@ -49,7 +49,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
 
 import {
   CONFIG_SETTINGS_LINES,

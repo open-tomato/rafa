@@ -34,7 +34,7 @@
  * extras dropped; and keys named after `Object.prototype` members
  * matched as fields. Six rows of the no-block table and the CRLF case
  * went red under none of them: what they pin is the block reader's
- * fence and line rules, which `plan/blocks.test.ts` drives.
+ * fence and line rules, which `core/plan/blocks.test.ts` drives.
  *
  * Seven more were driven on 2026-09-20, when `changes` joined the
  * report: the list never read and `changes` dropped from the key roster

@@ -66,7 +66,7 @@ import type { ReadinessGap } from './readiness.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import {
   findListSectionGaps,

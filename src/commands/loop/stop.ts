@@ -7,14 +7,14 @@
  * It picks a session reading `running` or `paused` (`loop-sessions.ts`)
  * and sends SIGINT to the pid its record names. This command marks
  * nothing: the loop answers the signal (`src/start.ts`). It passes it on
- * to the Claude session it is running (`utils/claude.ts`), marks that
+ * to the Claude session it is running (`core/loop/claude.ts`), marks that
  * task `[BLOCKED]`, stores its report and ends, writing `stopped` to the
  * record. A run held by a pause ends within one read of its record
  * (`start/pause.ts`), with no task marked.
  *
  * The command then reads the record every `STOP_POLL_MS` milliseconds
  * until it reads `stopped` or `done`, for at most `STOP_WAIT_MS`, both in
- * `loop/session-readings.ts`. Once it does, it reads the line of the task the
+ * `core/loop/session-readings.ts`. Once it does, it reads the line of the task the
  * record ended at in the plan's tracker, and says what the line holds:
  * `[BLOCKED]` for a task the stop interrupted, `[x]` for one that finished
  * before the signal landed. A record ending with no task was running none.
@@ -40,20 +40,20 @@
  * refuses for any reason but the pid being gone. A record that cannot be
  * read after the signal is refused too, the signal having been sent.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../loop/session-readings.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { SessionRecord } from '../../core/loop/index.js';
+import type { LoopSessionSeams, ResolvedLoopSeams, SessionChecklist } from '../../core/loop/readings.js';
 import type { PlanTask } from '../../plan/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
+import { errorCode, readSession, SessionRecordError } from '../../core/loop/index.js';
 import {
   isLive,
   planLabel,
   readSessionChecklist,
   refusal,
   resolveLoopSeams,
-} from '../../loop/session-readings.js';
-import { errorCode, readSession, SessionRecordError } from '../../loop/sessions.js';
+} from '../../core/loop/readings.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 
 import {
@@ -208,4 +208,5 @@ export function createLoopStopCommand(seams: LoopSessionSeams = {}): RafaCommand
   return Object.freeze(command);
 }
 
-export default createLoopStopCommand();
+const command: RafaCommand = createLoopStopCommand();
+export default command;

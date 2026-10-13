@@ -27,10 +27,10 @@
  * null, and the dispatcher's second check on it, which no case could
  * tell apart from the first, went.
  */
-import type { RafaCommand } from './command.js';
 import type { CommandHook, DispatchOptions, DispatchOutcome } from './dispatch.js';
 import type { CommandRoute } from './route.js';
 import type { OutputStream } from '../adapters/output/stream.js';
+import type { RafaCommand } from '../core/command/index.js';
 import type { ProjectFound } from '../project/scope.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -40,10 +40,10 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { activeLoggerSettings, DEFAULT_LOGGER_SETTINGS, setActiveLoggerSettings } from '../adapters/logger/settings.js';
-import { setActiveOutput } from '../adapters/output/active.js';
+import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
-import { CommandExit } from './command.js';
 import { dispatch } from './dispatch.js';
 import { createCommandRegistry } from './registry.js';
 import { restoreRunningCommand } from './running.js';

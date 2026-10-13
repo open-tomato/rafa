@@ -45,9 +45,13 @@
  *     could disagree with the wrap-up gate about what green means. The
  *     port answers rows and the verdict over them ({@link ChecksReading});
  *     the waiting is done by the caller around {@link PullRequests.checks}.
- *   - There is no `close`, and nothing is cached. Each call asks the
- *     provider, because a triage that acted on a stale reading would act
- *     on a pull request that has already moved.
+ *   - Nothing is cached. Each call asks the provider, because a triage
+ *     that acted on a stale reading would act on a pull request that has
+ *     already moved.
+ *   - {@link PullRequests.close} closes WITHOUT merging, and decides
+ *     nothing: whether the pull request is open, what its closing leaves
+ *     open and whether a person agreed are its caller's to have read and
+ *     asked first.
  *
  * ## Why the members are function-typed properties
  *
@@ -180,6 +184,15 @@ export interface PullRequestDetail extends PullRequestSummary {
   readonly body: string;
   /** The head commit, which a triage comment is pinned to. */
   readonly headRefOid: string;
+  /**
+   * When the head commit was committed, ISO 8601, as the provider
+   * answers it; null when it does not. It is the commit's own date and
+   * NOT the push time, so a commit made earlier and pushed just now
+   * reads as old. `rafa pr wait` reads it for the grace a young head
+   * gets before zero checks reads as none (`FIRST_CHECK_GRACE_MS` in
+   * `./checks.js`), and null means no grace.
+   */
+  readonly headCommittedAt: string | null;
   readonly mergeable: Mergeability;
   /**
    * GitHub's `mergeStateStatus` verbatim — `CLEAN`, `BLOCKED`, `DIRTY`,
@@ -219,7 +232,10 @@ export interface MergedPullRequest {
 /** A PR's checks, and the one verdict over them. */
 export interface ChecksReading {
   readonly rows: readonly CheckRow[];
-  /** `none` when the PR has no checks at all, which a conflict produces. */
+  /**
+   * `none` when the PR has no checks at all, which a conflict produces,
+   * and so does a head pushed before its first check registered.
+   */
   readonly verdict: ChecksVerdict;
 }
 
@@ -292,6 +308,16 @@ export interface MergeOutcome {
   readonly detail: string;
 }
 
+/** How {@link PullRequests.close} closes a pull request. */
+export interface ClosePullRequestOptions {
+  /**
+   * True to delete the head branch with the close. Required rather than
+   * defaulted, so no caller deletes a branch, or keeps one, by leaving a
+   * key out.
+   */
+  readonly deleteBranch: boolean;
+}
+
 /**
  * A pull request provider.
  *
@@ -340,6 +366,18 @@ export interface PullRequests {
   browse: (number: number) => Promise<void>;
   /** Merges the PR, or answers why the provider would not. */
   merge: (number: number, method: MergeMethod) => Promise<MergeOutcome>;
+  /**
+   * Closes the PR WITHOUT merging it, leaving `comment` as its closing
+   * comment, and answers nothing.
+   *
+   * A WRITE, so every failure throws, an absent PR among them, for the
+   * reason {@link PullRequests.editBody} gives. The comment is required
+   * and never blank: a pull request closed unmerged says why. The head
+   * branch stays where it is unless `options.deleteBranch` is true.
+   * Whether the PR is still open is the caller's to have read: what a
+   * provider answers for one already closed or merged is not held here.
+   */
+  close: (number: number, comment: string, options: ClosePullRequestOptions) => Promise<void>;
   /**
    * Opens a PR from `draft.head` into `draft.base`, answering it as
    * opened.

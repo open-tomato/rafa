@@ -32,12 +32,12 @@
  * looked in named, since an absent `~/.rafa/instincts` is an ordinary
  * state and worth seeing in the message.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { Instinct, InstinctEvidence } from '../../schema/instinct.js';
 import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 import type { InstinctScope } from '../../schema/tiers.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ACTION_HEADING, CAUSE_HEADING } from '../../schema/instinct.js';
 import { readScopes } from '../../schema/scope-records.js';
 import { expectOneArgument } from '../plan/plan-files.js';
@@ -222,4 +222,5 @@ export function createInstinctShowCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createInstinctShowCommand();
+const command: RafaCommand = createInstinctShowCommand();
+export default command;

@@ -15,9 +15,28 @@
  * What it does NOT do is the rest of that gate: no repair session, no
  * comment, no label, no merge. `verifyPullRequest` keeps those, and this
  * command is READ-ONLY — the only provider members it reaches are
- * `findOpen`, for the branch that names no number, and `checks`. A test
- * reads that off the double's own call log rather than trusting the
- * sentence (`wait.test.ts`).
+ * `findOpen`, for the branch that names no number, `get`, and `checks`.
+ * A test reads that off the double's own call log rather than trusting
+ * the sentence (`wait.test.ts`).
+ *
+ * ## The grace a young head gets, which that gate does not
+ *
+ * GitHub registers a push's runs some seconds after the push, so a wait
+ * typed in that gap polls a pull request with zero checks whose checks
+ * are about to appear. This command is the one caller that hands
+ * `waitForChecks` the head's committed time
+ * (`PullRequestDetail.headCommittedAt`, read through `get` ahead of the
+ * first poll): zero checks on a head younger than
+ * `FIRST_CHECK_GRACE_MS` is polled again, at the same interval, until a
+ * check registers, the grace has passed or the deadline has. The loop's
+ * gate and `pr triage --resolve` hand over no time and are as they were.
+ *
+ * The time is the commit's own date, not the push's, so a commit made
+ * an hour ago and pushed just now gets no grace; and a provider that
+ * answers no date for the head (null, or a date that is no time) gets
+ * none either. Both are the wait there was before. A pull request that
+ * really has no checks waits the grace out once, and only while its
+ * head is young.
  *
  * ## The reads, in the order `pr-context.ts` sets
  *
@@ -43,16 +62,31 @@
  *
  *   - `green`, exit 0: every check passed.
  *   - `red`, exit 1: one failed and none is still running.
- *   - `none`, exit 1: the pull request has no checks AT ALL, which is
- *     what a conflicting pull request produces — GitHub builds no merge
- *     ref for it and so schedules no run. `waitForChecks` answers it at
- *     once rather than waiting out the deadline, because no amount of
- *     waiting turns it into a run, and the report says what to look at.
- *     It is not green, so it is not exit 0.
+ *   - `none`, exit 1: the pull request has no checks AT ALL once any
+ *     grace has passed. Its headline says `no check registered yet`,
+ *     since that is all zero checks can show: a head with no workflow
+ *     matching it, a conflict, and a run GitHub is slow to register all
+ *     read the same. `waitForChecks` answers it without waiting out the
+ *     deadline, because past the grace no amount of waiting is known to
+ *     turn it into a run. It is not green, so it is not exit 0.
+ *
+ *     What follows the rows is decided by ONE more `get`, made at this
+ *     ending alone: a detail reading `conflicting` gets the line saying
+ *     the pull request does not merge cleanly, which is why no run was
+ *     scheduled — GitHub builds no merge ref for it. Every other reading
+ *     (`mergeable`, `unknown`, a pull request the read does not find)
+ *     gets the line naming `rafa pr wait <n>` to ask again and
+ *     `rafa pr show <n>`, and says nothing about merging, because
+ *     nothing was read that says so. The detail is read again rather
+ *     than kept from the read ahead of the poll: GitHub answers
+ *     `unknown` while it computes a fresh head's merge commit, which is
+ *     exactly the head the grace waits on.
  *   - `timeout`, exit 3: the deadline passed with checks still running.
  *     Nothing failed, so it is not exit 1; 3 is the code this tree
  *     already gives a run that gave up rather than one that was refused
- *     (`pr triage --resolve`'s attempt guard).
+ *     (`pr triage --resolve`'s attempt guard). A deadline shorter than
+ *     the grace can pass with no check registered at all, which is this
+ *     ending too, its headline reading `not started`.
  *   - `pending`, exit 3: unreachable from {@link waitForChecks}, which
  *     turns a pending poll at the deadline into `timeout` and otherwise
  *     polls again. It is in the map because the verdict type carries it,
@@ -74,8 +108,11 @@
  * refusal, exit 1: a branch with no open pull request names the branch
  * and points at `pr list`. A `<n>` the repository has no pull request
  * under is the provider's refusal, also exit 1, carrying `gh`'s words —
- * this command spends no `gh pr view` to find that out ahead of the
- * checks read, since the checks read answers it.
+ * the `get` ahead of the poll answers null for it and is NOT what
+ * refuses: a null detail is a head with no time, and the checks read
+ * that follows answers in `gh`'s own words, as it did before that read
+ * existed. A `get` that could not be asked at all is refused there,
+ * before any check is read.
  *
  * ## The ending, on the green run alone
  *
@@ -85,28 +122,32 @@
  * endings get none: each is a `CommandExit` carrying its own report,
  * and that report already names the rafa command for what it found —
  * `rafa pr triage <n>` for a red one, `rafa pr show <n>` for one with
- * no checks, `rafa pr wait <n>` again for a deadline that passed. A
- * hint would have to print ahead of the throw, which is ahead of the
- * report it belongs under.
+ * no checks, beside `rafa pr wait <n>` unless it conflicts, and
+ * `rafa pr wait <n>` again for a deadline that passed. A hint would
+ * have to print ahead of the throw, which is ahead of the report it
+ * belongs under.
  *
  * ## The clock and the wait are injected
  *
  * {@link PrWaitSeams} carries `clock` and `sleep` beside the provider
  * seams, and hands them to `waitForChecks`, so every case in
  * `wait.test.ts` — a pending poll that turns green, a deadline that
- * passes — runs with no timer and no real second spent. The seams are
+ * passes, a grace waited out — runs with no timer and no real second
+ * spent. The grace is measured by the same `clock`, so a case decides
+ * how old a head is by where it starts that clock. The seams are
  * spelled as `pr triage --resolve`'s are, for the same reason.
  *
  * The progress line one poll writes is `pr-lifecycle.ts`'s own spelling,
  * `[<seconds>s] <verdict> — <n> check(s)`, so a wait reads the same
- * whether the loop ran it or a person typed it.
+ * whether the loop ran it or a person typed it. A poll the grace holds
+ * reads `pending — 0 check(s)`, the verdict the wait acted on.
  */
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { CheckRow, ChecksVerdict } from '../../pr/index.js';
+import type { CheckRow, ChecksVerdict, PullRequestDetail } from '../../pr/index.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { failingRows, formatRows, waitForChecks } from '../../pr/index.js';
 import { CI_POLL_INTERVAL_MS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
@@ -128,7 +169,7 @@ const USAGE = PR_USAGE.wait;
 const TIMEOUT_FLAG = 'timeout';
 
 /** Minutes a line that types no `--timeout` waits: the loop's own CI deadline. */
-export const DEFAULT_WAIT_TIMEOUT_MIN = DEFAULT_CI_TIMEOUT_MIN;
+export const DEFAULT_WAIT_TIMEOUT_MIN: number = DEFAULT_CI_TIMEOUT_MIN;
 
 /** Milliseconds in a minute, as `--timeout` is turned into a deadline. */
 const MS_PER_MIN = 60_000;
@@ -172,6 +213,12 @@ export interface PrWaitReading {
   readonly polls: number;
   /** The deadline the line asked for, in milliseconds. */
   readonly timeoutMs: number;
+  /**
+   * True when the verdict is `none` and the detail read at that ending
+   * says the head conflicts with its base. False on every other ending,
+   * where no detail is read for it.
+   */
+  readonly conflicting: boolean;
 }
 
 /** What json mode gives as the terminal result's `data`. */
@@ -209,7 +256,7 @@ export function readTimeoutMinutes(flags: RafaContext['flags'], usage: string): 
 
 /** `1 check` or `<n> checks`, and what a pull request with none reads as. */
 function countWord(rows: readonly CheckRow[]): string {
-  if (rows.length === 0) return 'nothing reported';
+  if (rows.length === 0) return 'no check registered yet';
   return rows.length === 1
     ? '1 check'
     : `${rows.length} checks`;
@@ -227,11 +274,16 @@ function secondsWord(elapsedMs: number): string {
   return `${Math.round(elapsedMs / MS_PER_SECOND)}s`;
 }
 
-/** What the headline calls the verdict: a timeout is checks that are still running. */
-function verdictWord(verdict: ChecksVerdict | 'timeout'): string {
-  return verdict === 'timeout' || verdict === 'pending'
-    ? 'still running'
-    : verdict;
+/**
+ * What the headline calls the verdict: a timeout is checks that are
+ * still running, or that have not started when the deadline passed
+ * inside the grace with none registered.
+ */
+function verdictWord(reading: PrWaitReading): string {
+  if (reading.verdict !== 'timeout' && reading.verdict !== 'pending') return reading.verdict;
+  return reading.rows.length === 0
+    ? 'not started'
+    : 'still running';
 }
 
 /** The line under the rows, naming what to do next; green needs none. */
@@ -245,8 +297,11 @@ function followUp(reading: PrWaitReading): string | null {
     return `Failing: ${failing}${SEPARATOR}run rafa pr triage ${reading.number} to assess it.`;
   }
   if (reading.verdict === 'none') {
-    return 'A pull request that does not merge cleanly schedules no run at all;'
-      + ` run rafa pr show ${reading.number} to see whether it merges.`;
+    return reading.conflicting
+      ? `#${reading.number} does not merge cleanly, so no run is scheduled for it;`
+        + ` run rafa pr show ${reading.number} to see its merge state.`
+      : `No check has registered on #${reading.number}; run rafa pr wait ${reading.number} to ask again,`
+        + ` or rafa pr show ${reading.number} to see the pull request.`;
   }
   return `Waited the ${minutes} min this run was given;`
     + ` run rafa pr wait ${reading.number} again to keep waiting.`;
@@ -259,7 +314,7 @@ function followUp(reading: PrWaitReading): string | null {
  */
 export function renderWait(reading: PrWaitReading): string {
   const head = [
-    `checks ${verdictWord(reading.verdict)} on #${reading.number}`,
+    `checks ${verdictWord(reading)} on #${reading.number}`,
     countWord(reading.rows),
     `${pollWord(reading.polls)} in ${secondsWord(reading.elapsedMs)}`,
   ].join(SEPARATOR);
@@ -274,6 +329,22 @@ export function renderWait(reading: PrWaitReading): string {
 }
 
 /**
+ * When the head of `detail` was committed, in the clock's milliseconds,
+ * or null where there is no time to give the grace: a pull request the
+ * read did not find, a provider that answers no date, a date that is no
+ * time.
+ */
+function headTimeOf(detail: PullRequestDetail | null): number | null {
+  const committedAt = detail?.headCommittedAt ?? null;
+  const ms = committedAt === null
+    ? Number.NaN
+    : Date.parse(committedAt);
+  return Number.isNaN(ms)
+    ? null
+    : ms;
+}
+
+/**
  * Waits on the pull request the line names, or the one the branch does,
  * and answers what the poll came to. See the module note for the order
  * of the reads and for what each verdict exits with.
@@ -284,6 +355,11 @@ export async function runWait(context: RafaContext, seams: PrWaitSeams): Promise
   const pr = openPrContext(context, seams);
   const pick = await pickPullRequest(pr, asked, USAGE);
   const timeoutMs = minutes * MS_PER_MIN;
+  const readDetail = (): Promise<PullRequestDetail | null> => onProvider(
+    `read pull request #${pick.number}`,
+    () => pr.pulls.get(pick.number),
+  );
+  const headCommittedAtMs = headTimeOf(await readDetail());
 
   context.output.info(`Waiting for the checks of #${pick.number}, up to ${minutes} min.`);
   const waited = await waitForChecks({
@@ -302,6 +378,9 @@ export async function runWait(context: RafaContext, seams: PrWaitSeams): Promise
     ...seams.sleep === undefined
       ? {}
       : { sleep: seams.sleep },
+    ...headCommittedAtMs === null
+      ? {}
+      : { headCommittedAtMs },
     onPoll: (rows, verdict, elapsedMs) => {
       context.output.info(`   [${secondsWord(elapsedMs)}] ${verdict} — ${rows.length} check(s)`);
     },
@@ -314,6 +393,8 @@ export async function runWait(context: RafaContext, seams: PrWaitSeams): Promise
     elapsedMs: waited.elapsedMs,
     polls: waited.polls,
     timeoutMs,
+    // Read at this ending alone, and read again; see the module note.
+    conflicting: waited.verdict === 'none' && (await readDetail())?.mergeable === 'conflicting',
   };
   return { ...reading, exitCode: WAIT_EXIT_CODES[waited.verdict], text: renderWait(reading) };
 }
@@ -328,9 +409,12 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
     description: 'Polls the checks of one pull request until they settle or the deadline passes, printing a line'
       + ' per poll, and then prints the verdict with every check under it. Without a number it waits on the open'
       + ' pull request whose head is the branch checked out at the project root. It writes nothing: no comment,'
-      + ' no label, no merge and no repair session. Green exits 0; a red pull request and one with no checks at'
-      + ' all — which is what a pull request that does not merge cleanly produces — exit 1; a deadline that'
-      + ' passes with checks still running exits 3. The report is printed once: with `--output=json` a green'
+      + ' no label, no merge and no repair session. A pull request with no check at all is polled again while'
+      + ' its head commit is less than two minutes old, since a push\'s checks take some seconds to register,'
+      + ' and is answered at once when the head is older. Green exits 0; a red pull request and one with no'
+      + ' check registered exit 1, and the report says the pull request does not merge cleanly only when it'
+      + ' reads as conflicting; a deadline that passes with checks still running exits 3. The report is'
+      + ' printed once: with `--output=json` a green'
       + ' wait gives the verdict, the checks, the polls and the rendered text as the data of the terminal'
       + ' result event, and every other ending carries the report as the message of that event instead.'
       + ' Refuses with exit code 2 where `pr.provider` is not `gh`.',
@@ -377,4 +461,5 @@ export function createPrWaitCommand(seams: PrWaitSeams = DEFAULT_WAIT_SEAMS): Ra
   return Object.freeze(command);
 }
 
-export default createPrWaitCommand();
+const command: RafaCommand = createPrWaitCommand();
+export default command;

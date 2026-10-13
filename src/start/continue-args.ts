@@ -46,9 +46,9 @@
  */
 import type { ContinueDecision, DecisionStrategy } from './decision-parse.js';
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { RafaConfig } from '../config-schema.js';
+import type { RafaConfig } from '../core/config/index.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { DECISION_STRATEGIES } from './decision-parse.js';
 import { resolveContinueCriteria } from './decision-prompt.js';
@@ -70,7 +70,7 @@ export const AFTER_FLAG = '--after';
 export const FORCE_WRAP_UP_FLAG = '--force-wrap-up';
 
 /** The reason a directive carries, where a decision session writes its own. */
-export const DIRECTIVE_REASON = `named on the line with ${DECIDE_FLAG}`;
+export const DIRECTIVE_REASON: string = `named on the line with ${DECIDE_FLAG}`;
 
 /** What a line asks of `--continue`. */
 export interface ContinueArgs {

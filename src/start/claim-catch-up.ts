@@ -63,8 +63,8 @@
  * nothing; `rev-list --count` and `log` over a range naming an absent
  * ref exited 128 with `fatal: ambiguous argument …`; `merge-base` of two
  * commits with no shared history exited 1 writing nothing. The runner
- * does not hand the exit code on (`../pr/git.ts`), so an absent ref is
- * asked about first and named in the reason, and an empty failed
+ * does not hand the exit code on (`../core/git/git.ts`), so an absent
+ * ref is asked about first and named in the reason, and an empty failed
  * `merge-base` reads as no shared history.
  */
 import type { GitRunner } from '../pr/index.js';

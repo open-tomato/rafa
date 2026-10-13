@@ -67,9 +67,9 @@
  */
 import type { IssueSeams, LineFlags } from './issue-tracker.js';
 import type { BugRecord, BugRules } from '../../bugs/record.js';
-import type { RafaContext } from '../../cli/command.js';
+import type { RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { IssueDraft } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
 
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -87,9 +87,9 @@ import {
 import { firstProjectPath } from '../../bugs/stack-path.js';
 import { parseTitle, UNKNOWN_VALUE } from '../../bugs/title.js';
 import { codeVersionOf, errorLineOf, versionsText } from '../../bugs/versions.js';
-import { RAFA_VERSION } from '../../cli/version.js';
 import { bugRulesOf } from '../../config-schema-issues.js';
-import { createGitRunner } from '../../pr/git.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { isInside, packageOf, rootPackageOf } from '../../project/package-of.js';
 import { localPathRedactor } from '../../triage/local-paths.js';
 import { namedSecrets, redactSecrets, TRIAGE_MODULE } from '../../triage/triage.js';

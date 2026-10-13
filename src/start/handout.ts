@@ -40,8 +40,8 @@
  * `learning` pulls nothing and warns nothing, which a test driving the
  * dispatch alone names.
  */
-import type { LessonSwitch, SkillResolverName } from '../config-sections.js';
 import type { TaskLearning } from './dispatch.js';
+import type { LessonSwitch, SkillResolverName } from '../core/config/sections.js';
 import type { BlessedBundle, InstinctRecord } from '../learning/index.js';
 import type { Learning } from '../ports/index.js';
 import type { ResolvedSkill, TaskInput } from '../task/resolve-skills.js';
@@ -49,8 +49,8 @@ import type { Resolution } from '../tiers/resolve.js';
 import type { TaskDeclaration } from '../utils/declaration.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CORE_ADAPTER_REGISTRY } from '../adapters/registry.js';
+import { CORE_ADAPTER_REGISTRY } from '../core/adapters/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { SKILL_RESOLVER_BY_NAME } from '../task/resolve-skills.js';
 import { selectLessons } from '../task/select-lessons.js';

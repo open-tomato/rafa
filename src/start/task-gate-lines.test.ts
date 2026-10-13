@@ -16,9 +16,9 @@ import type { GitRunner } from '../pr/index.js';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createTextOutput } from '../adapters/output/text.js';
 import { TESTS_DEFAULTS } from '../config-schema-tests.js';
+import { setActiveOutput } from '../core/output/index.js';
 
 import {
   alwaysRunFiles,

@@ -308,7 +308,7 @@ const KIND_TABLES: { readonly [K in EffortRowKind]: KindTable<EffortRow<K>> } = 
  *
  * Exported for the report writers, whose text lands in this file too.
  */
-export const LONE_SURROGATE =
+export const LONE_SURROGATE: RegExp =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 /** One row of a batch, keyed and serialised, ready to insert. */

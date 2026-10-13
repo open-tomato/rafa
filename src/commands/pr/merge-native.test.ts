@@ -30,7 +30,7 @@
  */
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
@@ -180,6 +180,7 @@ function detail(body: string): PullRequestDetail {
     updatedAt: '2026-09-30T11:00:00Z',
     body,
     headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

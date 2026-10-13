@@ -42,17 +42,14 @@
  * recorded `gh` with no network.
  */
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { BoardAccess, UpdateApplied, UpdatePlan } from '../../project/update-current.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { RAFA_VERSION } from '../../cli/version.js';
-import { loadConfig } from '../../config-load.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit , createLinePrompter , RAFA_VERSION } from '../../core/command/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { messageOf } from '../../core/config/sections.js';
 import { resolvePrProvider } from '../../pr/provider.js';
 import { LOCK_FILE, readProjectLock } from '../../project/lock.js';
 import { scaffoldConflicts } from '../../project/scaffold.js';
@@ -338,4 +335,5 @@ export function createUpdateCurrentCommand(seams: UpdateCurrentSeams = DEFAULT_U
   return Object.freeze(command);
 }
 
-export default createUpdateCurrentCommand();
+const command: RafaCommand = createUpdateCurrentCommand();
+export default command;

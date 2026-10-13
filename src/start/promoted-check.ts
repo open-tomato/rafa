@@ -85,6 +85,14 @@
  * line is left alone, so a second check over the same answer writes
  * nothing. With no open pull request, or a provider that refuses, the
  * line goes to the operator as a warning instead.
+ *
+ * Under `pr.provider: none` there is no pull request to look for
+ * (#1051), so the wrap-up hands {@link checkWrapUpAnswer} a null
+ * `pulls`. {@link reportUnpromoted} is then not called and `gh` is not
+ * asked: the line goes to the operator as a warning opening with
+ * {@link NO_PROVIDER_REASON}, which says the provider is `none`, that no
+ * pull request carries the line, and that the lessons stay in the
+ * library. With no line to report, a null `pulls` prints nothing.
  */
 import type { PromotedReading, SkippedWithReason } from './promoted.js';
 import type { InstinctRecord } from '../learning/index.js';
@@ -93,8 +101,8 @@ import type { GitResult, GitRunner, PullRequests } from '../pr/index.js';
 
 import { isAbsolute, posix, relative } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { gitSaid } from '../pr/index.js';
 
 import { parsePromoted } from './promoted.js';
@@ -304,8 +312,12 @@ export interface WrapUpAnswerInput {
   readonly branch: string;
   /** Git, run at `repoRoot`. */
   readonly git: GitRunner;
-  /** The pull request provider the line is written through. */
-  readonly pulls: PullRequests;
+  /**
+   * The pull request provider the line is written through, or null
+   * under `pr.provider: none`, where the line is printed and no pull
+   * request is looked up.
+   */
+  readonly pulls: PullRequests | null;
   /** Makes the adapter `promoted_to` is pushed to. May throw. */
   readonly learning: () => Learning;
 }
@@ -335,9 +347,18 @@ async function recordConfirmed(input: WrapUpAnswerInput, check: PromotedCheck): 
 }
 
 /**
+ * What the line is printed behind when {@link WrapUpAnswerInput.pulls}
+ * is null: why it is in no pull request body, and where the lessons it
+ * names stay.
+ */
+export const NO_PROVIDER_REASON = 'This line is in no pull request body, as `pr.provider` is `none`, so no pull request carries it and the lessons stay in the library';
+
+/**
  * Reads the block out of the session's output, checks it, records every
- * confirmed promotion and puts the line in the pull request body.
- * Answers the check. Never throws; see the module note.
+ * confirmed promotion and puts the line in the pull request body, or,
+ * with a null `pulls`, prints it behind {@link NO_PROVIDER_REASON} and
+ * looks no pull request up. Answers the check. Never throws; see the
+ * module note.
  */
 export async function checkWrapUpAnswer(input: WrapUpAnswerInput): Promise<PromotedCheck> {
   const out = activeOutput();
@@ -352,6 +373,10 @@ export async function checkWrapUpAnswer(input: WrapUpAnswerInput): Promise<Promo
 
   const line = unpromotedLine(check, input.head);
   if (line === null) return check;
+  if (input.pulls === null) {
+    out.warn(`   ${NO_PROVIDER_REASON}: ${line}`);
+    return check;
+  }
   const report = await reportUnpromoted(input.pulls, input.branch, line);
   if (!report.written) {
     out.warn(`   This line is not in the pull request body, as ${report.problem}: ${line}`);

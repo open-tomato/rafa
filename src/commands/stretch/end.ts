@@ -85,8 +85,8 @@
  * GitHub.
  */
 import type { StretchRecord } from './start.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { MergedPullRequest } from '../../pr/types.js';
 import type { StretchItem } from '../../stretch/items.js';
 import type { PrSeams } from '../pr/pr-context.js';
@@ -95,12 +95,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { readRemoteHead } from '../../cleanup/branches.js';
-import { CommandExit } from '../../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { configFilePath } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { configFilePath } from '../../core/config/index.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
-import { createGitRunner } from '../../pr/git.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { malformedItemLines, readItems } from '../../stretch/items.js';
 import { lineText } from '../../stretch/launch.js';
@@ -395,4 +395,5 @@ export function createStretchEndCommand(seams?: StretchEndSeams): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createStretchEndCommand();
+const command: RafaCommand = createStretchEndCommand();
+export default command;

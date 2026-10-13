@@ -19,11 +19,11 @@
  * over a store it does not own. Exit code 0 otherwise. In json mode the
  * `MoveResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { KindMove, MoveResult } from '../../effort/store/move.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { SchemaRefusedError } from '../../effort/store/bring-forward.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';
@@ -35,7 +35,7 @@ import { expectNoArgument, requireProject, resolveProjectConfig } from '../plan/
 const COMMAND_NAME = 'rafa effort move';
 
 /** The line the refusals end with: the step `rafa effort merge` names for a `store: ndjson` project. */
-export const MOVE_USAGE = MOVE_TO_SQLITE;
+export const MOVE_USAGE: string = MOVE_TO_SQLITE;
 
 const TO_FLAG = 'to';
 
@@ -159,4 +159,5 @@ export function createMoveCommand(): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createMoveCommand();
+const command: RafaCommand = createMoveCommand();
+export default command;

@@ -46,7 +46,7 @@
  *
  * When the store is a project's own (`<root>/.rafa/effort/`), each loop
  * record under `<root>/.rafa/runs/` that reads `running` or `paused`
- * with its pid alive (`readSessions`, `src/loop/sessions.ts`) adds
+ * with its pid alive (`readSessions`, `src/core/loop/sessions.ts`) adds
  * ` Loop <sessionId> (pid <pid>, plan <stub>) is running on this
  * store.`, oldest first; a record with no stub names its plan's path.
  * When the records cannot be read, the text says so and names the
@@ -54,15 +54,15 @@
  * thrown before any write, so the store's bytes are left as they were.
  */
 import type { StoreEnvironment } from './location.js';
-import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
+import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute } from 'node:path';
 
-import { RAFA_VERSION } from '../../cli/version.js';
-import { messageOf } from '../../config-sections.js';
-import { isPidAlive, readSessions, runsDir } from '../../loop/sessions.js';
+import { RAFA_VERSION } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { isPidAlive, readSessions, runsDir } from '../../core/loop/index.js';
 import { SCOPE_DIR } from '../../project/scope.js';
 import { readRuntimeIdentity } from '../../runtime/identity.js';
 

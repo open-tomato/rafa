@@ -113,9 +113,9 @@ import type { BoardView } from '../board/epic-board.js';
 import type { EpicRelations, Epics } from '../board/epics.js';
 import type { ResolvedPlace } from '../board/place.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { RafaConfig } from '../config.js';
-import type { GitRunner } from '../pr/git.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
+import type { RafaConfig } from '../core/config/index.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
@@ -129,9 +129,9 @@ import { horizonOf, readListedEpics } from '../board/roadmap-epic-rows.js';
 import { createGhRoadmapSearch, parseRoadmapBody, scanClaimBranches } from '../board/roadmap.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { checkDrift, driftLines } from '../claims/drift.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
-import { createGitRunner } from '../pr/git.js';
+import { CommandExit } from '../core/command/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { createGitRunner } from '../core/git/index.js';
 import { hop, positionFilePath, rehome, writePositionFile } from '../project/position.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue/issue-tracker.js';
@@ -495,4 +495,5 @@ export function createSwitchCommand(seams: SwitchSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createSwitchCommand();
+const command: RafaCommand = createSwitchCommand();
+export default command;

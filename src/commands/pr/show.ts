@@ -86,11 +86,11 @@
  */
 import type { LastTriage } from './last-triage.js';
 import type { PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ChecksReading, ClosingIssue, PullRequestDetail } from '../../pr/index.js';
 
 import { closedIssuesIn } from '../../board/roadmap.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { formatRows } from '../../pr/index.js';
 
 import { SEPARATOR } from './current.js';
@@ -131,7 +131,7 @@ const PULL_URL_REPOSITORY = /^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+\/?$/u;
  * description names them: {@link PrShowResult}'s own keys, which
  * `show.test.ts` holds this list to.
  */
-export const PR_SHOW_JSON_FIELDS = Object.freeze([
+export const PR_SHOW_JSON_FIELDS: readonly ['detail', 'bodyCloses', 'checks', 'checksProblem', 'triage', 'triageProblem', 'text'] = Object.freeze([
   'detail',
   'bodyCloses',
   'checks',
@@ -413,4 +413,5 @@ export function createPrShowCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
   return Object.freeze(command);
 }
 
-export default createPrShowCommand();
+const command: RafaCommand = createPrShowCommand();
+export default command;

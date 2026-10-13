@@ -14,6 +14,12 @@
  * Each refusal case varies one axis of an otherwise clean situation, and
  * the clean situation is asserted beside it, so a reader that refused
  * everything and a reader that refused nothing both redden.
+ *
+ * The `no-branch` standing is one more axis, and its cases sit in a
+ * block of their own beside the `on-base` reading each was varied from.
+ * Its git fixtures are what git 2.53.0 wrote under Linux with
+ * `LC_ALL=C` on 2026-10-12, in a clone of a bare remote after `git
+ * switch --detach`.
  */
 import type {
   BranchOffer,
@@ -31,21 +37,21 @@ import { parseWorkingTree } from '../pr/index.js';
 
 import {
   answeredYes,
+  anyBranchStandsAside,
   branchNameFor,
   branchSteps,
   BRANCH_PREFIX,
-  DETACHED_HEAD,
   detachedHeadRefusal,
   hasDiverged,
-  isDetachedHead,
   localRef,
+  NO_BRANCH,
   parseBaseStanding,
   questionFor,
   readBranchOffer,
   readStepOutcome,
   REMOTE,
   remoteTrackingRef,
-  SWITCH_TO_BASE,
+  standsOn,
   trackedChanges,
   treeRefusal,
   YES_ANSWERS,
@@ -53,6 +59,9 @@ import {
 
 /** The plan every case runs for, and the base it was started on. */
 const PLAN: BranchPlan = { branch: 'feat/rafa-49', base: 'main' };
+
+/** {@link PLAN} for a run with no branch checked out, `main` being the base its caller read. */
+const NO_BRANCH_PLAN: BranchPlan = { ...PLAN, standing: 'no-branch' };
 
 /** A run on the base with nothing in the way: a terminal, no flags, no such branch anywhere. */
 function situation(over: Partial<BranchSituation> = {}): BranchSituation {
@@ -97,9 +106,13 @@ function refusalOf(outcome: StepOutcome): string {
   return outcome.message;
 }
 
-/** One step of a route, by its id. */
-function stepOf(route: 'create' | 'switch-local' | 'switch-remote', id: BranchStepId): BranchStep {
-  const step = branchSteps(route, PLAN).find((candidate) => candidate.id === id);
+/** One step of a route, by its id, for a run on the base unless `plan` says otherwise. */
+function stepOf(
+  route: 'create' | 'switch-local' | 'switch-remote',
+  id: BranchStepId,
+  plan: BranchPlan = PLAN,
+): BranchStep {
+  const step = branchSteps(route, plan).find((candidate) => candidate.id === id);
   if (step === undefined) throw new Error(`the ${route} route has no ${id} step`);
   return step;
 }
@@ -126,33 +139,46 @@ describe('the branch a plan runs on', () => {
 });
 
 describe('a detached HEAD', () => {
-  it('is the literal HEAD git answers, and no branch name is read as one', () => {
-    expect(DETACHED_HEAD).toBe('HEAD');
-    expect(isDetachedHead('HEAD')).toBe(true);
-    // Controls: a default branch, a plan branch, and names that only contain or resemble it.
-    expect(isDetachedHead('main')).toBe(false);
-    expect(isDetachedHead('feat/rafa-49')).toBe(false);
-    expect(isDetachedHead('feat/HEAD')).toBe(false);
-    expect(isDetachedHead('head')).toBe(false);
-    expect(isDetachedHead('')).toBe(false);
+  /** The way onto the plan's branch as a caller hands it in, a blank line ahead of it. */
+  const BRANCH_WAY: readonly string[] = [
+    '\n   Pass --create-branch to create feat/rafa-49 from the latest',
+    '   origin/<base> and run there.',
+  ];
+
+  it('is a standing and never the word HEAD, which is read as a name like any other', () => {
+    expect(standsOn({ ...PLAN, base: 'HEAD', standing: 'no-branch' })).toBe(NO_BRANCH);
+    // Controls: the word on the default standing is a base's name, and so is a name that contains it.
+    expect(standsOn({ ...PLAN, base: 'HEAD' })).toBe('HEAD');
+    expect(standsOn({ ...PLAN, base: 'feat/HEAD' })).toBe('feat/HEAD');
+    expect(anyBranchStandsAside({ anyBranch: true })).toBe(true);
   });
 
-  it('is refused naming git switch <base> and the worktree flag as the two ways on', () => {
-    const lines = detachedHeadRefusal('--as-worktree').split('\n');
+  it('is refused naming the way onto the plan\'s branch first and the worktree flag second', () => {
+    const refusal = detachedHeadRefusal(BRANCH_WAY, '--as-worktree');
 
-    expect(lines[0]).toStartWith('❌ Refusing to run on a detached HEAD');
-    expect(SWITCH_TO_BASE).toBe('git switch <base>');
-    const switchLine = lines.find((line) => line.includes(SWITCH_TO_BASE));
-    const worktreeLine = lines.find((line) => line.includes('--as-worktree'));
-    expect(switchLine).toBeDefined();
-    expect(worktreeLine).toBeDefined();
-    // The two ways are a column: each explanation starts at the same offset.
-    expect(switchLine?.indexOf('back onto')).toBe(worktreeLine?.indexOf('run the plan'));
+    expect(refusal).toBe([
+      '❌ Refusing to run on a detached HEAD: no branch is checked out, and a run',
+      '   commits to, pushes and opens its pull request from a branch of its own.',
+      ...BRANCH_WAY,
+      '\n   Or pass --as-worktree to run the plan in a worktree of its own, leaving',
+      '   this checkout where it is.',
+    ].join('\n'));
+    expect(refusal.indexOf('--create-branch')).toBeGreaterThan(-1);
+    expect(refusal.indexOf('--create-branch')).toBeLessThan(refusal.indexOf('--as-worktree'));
+    // `git switch <base>`, which the refusal once named first, is a way it no longer names.
+    expect(refusal).not.toContain('git switch');
   });
 
   it('names the worktree flag it is handed, not one of its own', () => {
-    expect(detachedHeadRefusal('--elsewhere')).toContain('--elsewhere');
-    expect(detachedHeadRefusal('--elsewhere')).not.toContain('--as-worktree');
+    expect(detachedHeadRefusal(BRANCH_WAY, '--elsewhere')).toContain('--elsewhere');
+    expect(detachedHeadRefusal(BRANCH_WAY, '--elsewhere')).not.toContain('--as-worktree');
+  });
+
+  it('names no worktree at all when handed no flag, and ends on the way it was handed', () => {
+    const refusal = detachedHeadRefusal(BRANCH_WAY, null);
+
+    expect(refusal).not.toContain('worktree');
+    expect(refusal).toEndWith(BRANCH_WAY.join('\n'));
   });
 });
 
@@ -467,5 +493,159 @@ describe('readStepOutcome', () => {
       '❌ Could not switch to feat/rafa-49.',
       '   The run is still on main.',
     ]);
+  });
+});
+
+describe('a run with no branch checked out', () => {
+  /** {@link situation} on the `no-branch` standing. */
+  function detached(over: Partial<BranchSituation> = {}): BranchSituation {
+    return situation({ standing: 'no-branch', ...over });
+  }
+
+  it('is named a detached HEAD where a run on the base is named after its base', () => {
+    expect(NO_BRANCH).toBe('a detached HEAD');
+    expect(standsOn(NO_BRANCH_PLAN)).toBe('a detached HEAD');
+    // Controls: the base, named or left as the default standing.
+    expect(standsOn({ ...PLAN, standing: 'on-base' })).toBe('main');
+    expect(standsOn(PLAN)).toBe('main');
+  });
+
+  it('refuses a modified tracked file, naming the detached HEAD it would leave', () => {
+    const message = treeRefusal(parseWorkingTree(' M a.txt\n?? untracked.txt\n'), NO_BRANCH_PLAN);
+    expect((message ?? '').split('\n')).toEqual([
+      '❌ Refusing to leave a detached HEAD for feat/rafa-49: the working tree has 1 change to tracked files.',
+      '    M a.txt',
+      '   Commit or stash them, then run again. Untracked files are left alone.',
+    ]);
+    // Controls: a clean tree and one holding untracked files alone both move.
+    expect(treeRefusal(parseWorkingTree(''), NO_BRANCH_PLAN)).toBeNull();
+    expect(treeRefusal(parseWorkingTree('?? untracked.txt\n'), NO_BRANCH_PLAN)).toBeNull();
+  });
+
+  it('refuses a failed fetch as a branch that would be cut from a stale base, on no branch still', () => {
+    const fetch = stepOf('create', 'fetch', NO_BRANCH_PLAN);
+    const outcome = readStepOutcome(fetch, answered({ stderr: FETCH_FATAL }), NO_BRANCH_PLAN);
+    expect(refusalOf(outcome).split('\n')).toEqual([
+      '❌ Refusing to create feat/rafa-49 from a stale origin/main: fetch origin main failed.',
+      '   fatal: \'/tmp/nothing.git\' does not appear to be a git repository',
+      '   fatal: Could not read from remote repository.',
+      '   The run is still on a detached HEAD.',
+    ]);
+    // The control: the same step having exited 0 goes on.
+    expect(readStepOutcome(fetch, answered({ ok: true }), NO_BRANCH_PLAN).kind).toBe('go');
+  });
+
+  it('stands aside with no plan stub to name a branch after, whatever the flags', () => {
+    expect(stoodAside(readBranchOffer(detached({ planStub: null })))).toBe('no-plan-stub');
+    expect(stoodAside(readBranchOffer(detached({ planStub: '   ' })))).toBe('no-plan-stub');
+    expect(stoodAside(readBranchOffer(detached({ planStub: null, createBranch: true }))))
+      .toBe('no-plan-stub');
+    expect(stoodAside(readBranchOffer(detached({ planStub: null, anyBranch: true }))))
+      .toBe('no-plan-stub');
+  });
+
+  it('stands aside with no terminal and no flag, leaving the caller to refuse', () => {
+    expect(stoodAside(readBranchOffer(detached({ canAsk: false })))).toBe('no-terminal');
+    // The control: the same run with a terminal is asked.
+    expect(asked(readBranchOffer(detached({ canAsk: true }))).route).toBe('create');
+  });
+
+  it('is asked to create the branch from the latest base, in the words a run on the base is asked', () => {
+    expect(asked(readBranchOffer(detached()))).toEqual({
+      branch: 'feat/rafa-49',
+      route: 'create',
+      question: 'Create feat/rafa-49 from the latest origin/main and run there? [y/N] ',
+    });
+    expect(asked(readBranchOffer(detached({ base: 'master' }))).question)
+      .toBe('Create feat/rafa-49 from the latest origin/master and run there? [y/N] ');
+  });
+
+  it('is asked to switch to a branch git already has, the local one over the remote-tracking one', () => {
+    const question = 'Switch to the existing feat/rafa-49? [y/N] ';
+    expect(asked(readBranchOffer(detached({ localBranch: true }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'switch-local', question });
+    expect(asked(readBranchOffer(detached({ remoteBranch: true }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'switch-remote', question });
+    expect(asked(readBranchOffer(detached({ localBranch: true, remoteBranch: true }))).route)
+      .toBe('switch-local');
+  });
+
+  it('takes the branch without asking under --create-branch, on every route and with no terminal', () => {
+    expect(taken(readBranchOffer(detached({ createBranch: true, canAsk: false }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'create' });
+    expect(taken(readBranchOffer(detached({ createBranch: true, localBranch: true }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'switch-local' });
+    expect(taken(readBranchOffer(detached({ createBranch: true, remoteBranch: true }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'switch-remote' });
+  });
+
+  it('is offered the branch under --any-branch too, which waives which branch and not having one', () => {
+    expect(anyBranchStandsAside({ anyBranch: true, standing: 'no-branch' })).toBe(false);
+    expect(asked(readBranchOffer(detached({ anyBranch: true }))).route).toBe('create');
+    expect(taken(readBranchOffer(detached({ anyBranch: true, createBranch: true }))))
+      .toEqual({ branch: 'feat/rafa-49', route: 'create' });
+    expect(stoodAside(readBranchOffer(detached({ anyBranch: true, canAsk: false })))).toBe('no-terminal');
+    // Controls: on the base the flag stands the offer aside, named or as the default standing.
+    expect(anyBranchStandsAside({ anyBranch: true, standing: 'on-base' })).toBe(true);
+    expect(anyBranchStandsAside({ anyBranch: true })).toBe(true);
+    expect(anyBranchStandsAside({ anyBranch: false, standing: 'on-base' })).toBe(false);
+    expect(anyBranchStandsAside({ anyBranch: false, standing: 'no-branch' })).toBe(false);
+    expect(stoodAside(readBranchOffer(situation({ anyBranch: true, standing: 'on-base' }))))
+      .toBe('any-branch');
+  });
+
+  it('fetches the base and cuts the branch from origin/<base> with no upstream, fast-forwarding nothing', () => {
+    const steps = branchSteps('create', NO_BRANCH_PLAN);
+    expect(steps.map((step) => step.id)).toEqual(['fetch', 'create']);
+    expect(steps.map((step) => step.argv)).toEqual([
+      ['git', 'fetch', 'origin', 'main'],
+      ['git', 'switch', '--no-track', '-c', 'feat/rafa-49', 'origin/main'],
+    ]);
+    expect(steps.map((step) => step.label)).toEqual([
+      'fetch origin main',
+      'create feat/rafa-49 from origin/main',
+    ]);
+    // The control: the two steps left out are the ones a run on the base makes.
+    expect(branchSteps('create', { ...PLAN, standing: 'on-base' }).map((step) => step.id))
+      .toEqual(['fetch', 'read-standing', 'fast-forward', 'create']);
+  });
+
+  it('switches to a branch git already has by the one step a run on the base takes', () => {
+    for (const route of ['switch-local', 'switch-remote'] as const) {
+      expect(branchSteps(route, NO_BRANCH_PLAN)).toEqual(branchSteps(route, PLAN));
+    }
+    expect(branchSteps('switch-local', NO_BRANCH_PLAN).map((step) => step.argv))
+      .toEqual([['git', 'switch', 'feat/rafa-49']]);
+    expect(branchSteps('switch-remote', NO_BRANCH_PLAN).map((step) => step.argv))
+      .toEqual([['git', 'switch', '--track', 'origin/feat/rafa-49']]);
+  });
+
+  it('goes on from every step git exited 0 for', () => {
+    for (const route of ['create', 'switch-local', 'switch-remote'] as const) {
+      for (const step of branchSteps(route, NO_BRANCH_PLAN)) {
+        expect(readStepOutcome(step, answered({ ok: true }), NO_BRANCH_PLAN).kind).toBe('go');
+      }
+    }
+  });
+
+  it('names the step that failed for the three that move the checkout, on no branch still', () => {
+    const heads = [
+      stepOf('create', 'create', NO_BRANCH_PLAN),
+      stepOf('switch-local', 'switch', NO_BRANCH_PLAN),
+      stepOf('switch-remote', 'track', NO_BRANCH_PLAN),
+    ].map((step) => refusalOf(readStepOutcome(step, answered({ stderr: 'fatal: nope' }), NO_BRANCH_PLAN)));
+    expect(heads.map((message) => message.split('\n')[0])).toEqual([
+      '❌ Could not create feat/rafa-49 from origin/main.',
+      '❌ Could not switch to feat/rafa-49.',
+      '❌ Could not check out feat/rafa-49 tracking origin/feat/rafa-49.',
+    ]);
+    for (const message of heads) expect(message).toContain('   The run is still on a detached HEAD.');
+  });
+
+  it('reads a plan and a situation naming no standing as on the base', () => {
+    for (const route of ['create', 'switch-local', 'switch-remote'] as const) {
+      expect(branchSteps(route, PLAN)).toEqual(branchSteps(route, { ...PLAN, standing: 'on-base' }));
+    }
+    expect(readBranchOffer(situation())).toEqual(readBranchOffer(situation({ standing: 'on-base' })));
   });
 });

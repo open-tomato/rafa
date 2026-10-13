@@ -144,7 +144,7 @@ import type {
   RelationsReading,
 } from './port.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 

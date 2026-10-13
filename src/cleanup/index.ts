@@ -9,10 +9,13 @@
  * so a clean worktree on one starts ticked, then `./groups.ts`'s
  * `holdBranchRows` over each branch group and those worktrees, so a
  * branch a worktree that cannot be ticked holds starts unticked naming
- * it, and last `./runs.ts` for the run records under the project's
+ * it, then `./remote-only.ts` for the unmerged branches that exist only
+ * on `origin`, compared with the base the groups were read against, and
+ * last `./runs.ts` for the run records under the project's
  * `.rafa/runs/`. {@link cleanupCounts} is the number of rows in each branch group and in Worktrees, which
- * `rafa doctor` and `rafa status` print; the run records are listed for
- * `rafa cleanup` alone and are not counted there. Like every module here
+ * `rafa doctor` and `rafa status` print; the remote-only branches and
+ * the run records are listed for `rafa cleanup` alone and are not
+ * counted there. Like every module here
  * it prints nothing and deletes nothing; `./steps.ts`, re-exported below,
  * builds and runs the removals.
  *
@@ -35,17 +38,29 @@
  * listing that cannot be read leaves no groups to count, and a worktree
  * listing that cannot be read leaves the Worktrees group unknown rather
  * than empty. The provider never fails the reading: `./groups.ts` turns
- * an unreachable one into a note.
+ * an unreachable one into a note, and `./remote-only.ts` lists no row
+ * and says so in a note.
+ *
+ * ## The remote-only reading runs for every caller
+ *
+ * `rafa doctor` and `rafa status` read through {@link readCleanup} too,
+ * and count nothing of {@link CleanupRead.remoteOnly}. They still pay
+ * for it: one `for-each-ref` over `refs/remotes/origin` in a clone with
+ * no branch there, up to four git calls when there are some, and one
+ * `list` of the provider only when a branch is on `origin` alone and
+ * unmerged. Its notes reach whoever prints {@link CleanupRead.notes}.
  */
 import type { BranchGroups, ReleasePaths } from './groups.js';
+import type { RemoteOnlyRow, RemoteOnlySettings } from './remote-only.js';
 import type { RunRow, RunSeams } from './runs.js';
 import type { WorktreeRow, WorktreeSeams } from './worktrees.js';
 import type { PullRequests } from '../pr/types.js';
 
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 
 import { readBranches } from './branches.js';
 import { classifyBranches, holdBranchRows, readProviderMerges } from './groups.js';
+import { readRemoteOnly } from './remote-only.js';
 import { readRunRecords } from './runs.js';
 import { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
@@ -72,6 +87,13 @@ export type {
   StaleRow,
 } from './groups.js';
 export type { PastHeadCommit, PastHeadRead } from './past-head.js';
+export type {
+  RemoteOnlyRead,
+  RemoteOnlyReading,
+  RemoteOnlyRow,
+  RemoteOnlySettings,
+  RemoteOnlyUnread,
+} from './remote-only.js';
 export type { RunRow, RunSeams, RunsReading } from './runs.js';
 export type {
   CleanupFiles,
@@ -99,10 +121,12 @@ export {
   MERGED_STATE_UNKNOWN,
   readProviderMerges,
 } from './groups.js';
+export { readRemoteOnly, remoteOnlyReason } from './remote-only.js';
 export { readRunRecords } from './runs.js';
 export {
   cleanupCommandLine,
   cleanupSteps,
+  deletedNotPushed,
   dryRunLines,
   forcedFlagRefusal,
   removeRunStep,
@@ -111,7 +135,7 @@ export {
 export { defaultWorktreeSeams, readWorktrees } from './worktrees.js';
 
 /** The argv the remote-tracking branches are refreshed with. Never forced. */
-export const FETCH_PRUNE = Object.freeze(['fetch', '--prune']);
+export const FETCH_PRUNE: readonly string[] = Object.freeze(['fetch', '--prune']);
 
 /**
  * What {@link readCleanup} reads through: the worktree seams, the pid
@@ -150,17 +174,30 @@ export interface CleanupSettings {
    * the config's defaults when left out (`./groups.ts`).
    */
   readonly release?: ReleasePaths;
+  /**
+   * This device's store id and the ids it replaced, which tell a claim
+   * branch only on `origin` that is this device's from one another
+   * store holds (`./remote-only.ts`). Left out or null, every held
+   * claim branch is read as another store's and is not listed.
+   */
+  readonly device?: RemoteOnlySettings['device'];
 }
 
-/** The five groups, and the notes about readings that could not be taken. */
+/** The six groups, and the notes about readings that could not be taken. */
 export interface CleanupRead extends Omit<BranchGroups, 'notes'> {
   /** True when {@link FETCH_PRUNE} ran and git answered success. */
   readonly fetched: boolean;
   /** The listed worktrees, in the order git listed them. */
   readonly worktrees: readonly WorktreeRow[];
+  /** The unmerged branches that exist only on `origin`, by name, none ticked; see `./remote-only.ts`. */
+  readonly remoteOnly: readonly RemoteOnlyRow[];
   /** The removable run records, oldest first; see `./runs.ts`. */
   readonly runs: readonly RunRow[];
-  /** One-line notes: the fetch's first, then the groups', then the run records'; empty when every reading was taken. */
+  /**
+   * One-line notes: the fetch's first, then the groups', then the
+   * remote-only reading's, then the run records'; empty when every
+   * reading was taken.
+   */
   readonly notes: readonly string[];
 }
 
@@ -174,7 +211,7 @@ export interface CleanupUnread {
 /** What {@link readCleanup} answers. Never a rejection. */
 export type CleanupReading = CleanupRead | CleanupUnread;
 
-/** The number of rows in each branch group and in Worktrees; the run records are not counted. */
+/** The number of rows in each branch group and in Worktrees; the remote-only branches and the run records are not counted. */
 export interface CleanupCounts {
   readonly merged: number;
   readonly stale: number;
@@ -195,9 +232,11 @@ export function fetchFailedNote(detail: string): string {
 /**
  * Every group `rafa cleanup` lists: {@link FETCH_PRUNE} first when
  * `settings.fetch` is true, then the branches, their three groups, the
- * worktrees with the Merged branches' names, and the run records under
- * `settings.projectRoot`. A run-record directory that cannot be read is
- * a note, never a failure.
+ * worktrees with the Merged branches' names, the branches only on
+ * `origin` that the groups' base does not reach, and the run records
+ * under `settings.projectRoot`. A remote listing git refuses is passed
+ * on as the reading's failure, as a branch listing is; a run-record
+ * directory that cannot be read is a note, never a failure.
  */
 export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings): Promise<CleanupReading> {
   const notes: string[] = [];
@@ -238,6 +277,14 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
   if (!worktrees.ok) {
     return worktrees;
   }
+  const remoteOnly = await readRemoteOnly(seams.git, seams.pulls, {
+    base: groups.base,
+    keep: settings.keep,
+    device: settings.device ?? null,
+  });
+  if (!remoteOnly.ok) {
+    return remoteOnly;
+  }
   const runs = readRunRecords(settings.projectRoot, seams);
 
   return {
@@ -248,14 +295,16 @@ export async function readCleanup(seams: CleanupSeams, settings: CleanupSettings
     stale: holdBranchRows(groups.stale, worktrees.worktrees),
     notPushed: holdBranchRows(groups.notPushed, worktrees.worktrees),
     worktrees: worktrees.worktrees,
+    remoteOnly: remoteOnly.rows,
     runs: runs.runs,
-    notes: [...notes, ...groups.notes, ...runs.notes],
+    notes: [...notes, ...groups.notes, ...remoteOnly.notes, ...runs.notes],
   };
 }
 
 /**
  * How many rows each branch group and Worktrees of `read` hold, what
- * `rafa doctor` and `rafa status` print. `read.runs` is left out.
+ * `rafa doctor` and `rafa status` print. `read.remoteOnly` and
+ * `read.runs` are left out.
  */
 export function cleanupCounts(read: CleanupRead): CleanupCounts {
   return {

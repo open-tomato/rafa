@@ -6,11 +6,11 @@
  * | Section | Composed from | Reaches |
  * | --- | --- | --- |
  * | `branch` | `readBranch`, `readPlans`, `readBranchPlan` (`src/next/readings.ts`) | git, the plans directory |
- * | `loops` | `readSessions` (`src/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
+ * | `loops` | `readSessions` (`src/core/loop/sessions.ts`), `isLive`, `readSessionChecklist` (`src/core/loop/session-readings.ts`), `blockedTasks` (`src/loop/blocked-tasks.ts`) | `.rafa/runs/`, the trackers |
  * | `pull` | `readOpenPull` (`src/next/readings.ts`) over `createGhPullRequests` | `gh` |
  * | `board` | `ghNextBoard` (`src/next/sources.ts`), `readBlockedCount` (`./blocked-count.ts`), `resolvePlace` (`src/board/place.ts`), `readWaiting` (`./waiting.ts`), `nextOwnerGate` (`src/next/owner-gate.ts`) | `gh`, git, `.rafa/position.json`, `.rafa/hop.json` |
  * | `claims` | `readClaimBranches`, `readClaims` (`./claims.ts`) over the board listing's labels | git, `gh` for the labels |
- * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests |
+ * | `housekeeping` | `readCleanup`, `cleanupCounts` (`src/cleanup/index.ts`) with `doctorCleanupSettings` (`src/cleanup/settings.ts`) | git, the disk, `gh` for merged pull requests, and for the open ones when an unmerged branch is on `origin` alone |
  *
  * Nothing here prints, and nothing spawns except through
  * {@link StatusSeams}, whose defaults are the system's own, so a unit
@@ -167,9 +167,9 @@ import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { Epic } from '../board/epics.js';
 import type { BoardIssue, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupCounts, CleanupSeams, WorktreeRow } from '../cleanup/index.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
+import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 import type { BlockedTask } from '../loop/blocked-tasks.js';
-import type { PidProbe, SessionRecord } from '../loop/sessions.js';
 import type { NextOwnerGateOptions } from '../next/owner-gate.js';
 import type { NextBoard, NextRoadmapReading, NextSources, OpenPull, PickedLine } from '../next/readings.js';
 import type { NextBoardOptions } from '../next/sources.js';
@@ -189,14 +189,14 @@ import { horizonOf } from '../board/roadmap-epic-rows.js';
 import { ROADMAP_LABEL } from '../board/setup.js';
 import { cleanupCounts, defaultCleanupSeams, readCleanup } from '../cleanup/index.js';
 import { doctorCleanupSettings } from '../cleanup/settings.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { readSessions } from '../core/loop/index.js';
+import { isLive, readSessionChecklist } from '../core/loop/readings.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { blockedTasks } from '../loop/blocked-tasks.js';
-import { isLive, readSessionChecklist } from '../loop/session-readings.js';
-import { readSessions } from '../loop/sessions.js';
 import { nextOwnerGate } from '../next/owner-gate.js';
 import { readBranch, readBranchPlan, readOpenPull, readPlans } from '../next/readings.js';
 import { DEFAULT_BASE_BRANCH, ghNextBoard } from '../next/sources.js';
-import { plansDirAt } from '../plan/plan-files.js';
 import { createGhPullRequests, createGitRunner, resolvePrProvider } from '../pr/index.js';
 import { positionFilePath } from '../project/position.js';
 

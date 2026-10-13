@@ -36,7 +36,7 @@
  * The output is made by rafa's `text` and `json` adapters in
  * `src/adapters/output/`, whose notes say where each renders differently
  * from the source. The stream defaults to `process.stdout` itself, as
- * `src/adapters/registry.ts` defaults it, where the source wraps its
+ * `src/core/adapters/registry.ts` defaults it, where the source wraps its
  * `write` in a stream of its own.
  *
  * `spec`, a command's `args` and `flags`, is handed to `parseArgs`, so
@@ -53,13 +53,13 @@
 import type { ParseArgsSpec } from './parseArgs.js';
 import type { CliContext, FlagSpec } from './types.js';
 import type { OutputStream } from '../../adapters/output/stream.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { Output } from '../../ports/index.js';
 
 import { createEventsOutput } from '../../adapters/output/events.js';
 import { createJsonOutput } from '../../adapters/output/json.js';
 import { createTextOutput } from '../../adapters/output/text.js';
-import { OUTPUT_MODES } from '../../config-sections.js';
+import { OUTPUT_MODES } from '../../core/config/sections.js';
 
 import { parseArgs } from './parseArgs.js';
 

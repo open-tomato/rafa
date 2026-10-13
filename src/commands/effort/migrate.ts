@@ -27,16 +27,16 @@
  * outcome is exit code 0. In json mode the `MigrateResult` is the data of
  * the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { MigrateResult } from '../../effort/store/migrate.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
-import type { PidProbe } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';
@@ -200,4 +200,5 @@ export function createMigrateCommand(seams: MigrateCommandSeams = {}): RafaComma
   return Object.freeze(command);
 }
 
-export default createMigrateCommand();
+const command: RafaCommand = createMigrateCommand();
+export default command;

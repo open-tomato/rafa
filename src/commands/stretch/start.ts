@@ -82,10 +82,10 @@
  * Every effect goes through {@link StretchStartSeams}, so no test reaches
  * git, tmux, `claude` or the real HOME.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
 import type { ConfigSetEdit } from '../../config-set.js';
-import type { PidProbe } from '../../loop/sessions.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { StretchFolderSeams } from '../../stretch/folder.js';
 import type { OperatorRole } from '../../stretch/launch.js';
 import type { OperatorsSeams } from '../../stretch/operators.js';
@@ -95,13 +95,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { readRemoteHead } from '../../cleanup/branches.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { configFilePath } from '../../config.js';
-import { readSessions } from '../../loop/sessions.js';
+import { CommandExit } from '../../core/command/index.js';
+import { configFilePath } from '../../core/config/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../../core/git/index.js';
+import { readSessions } from '../../core/loop/index.js';
 import { DEFAULT_BASE_BRANCH } from '../../next/sources.js';
-import { createGitRunner, gitSaid } from '../../pr/git.js';
 import {
   agentFilePath,
   defaultSeams,
@@ -249,9 +249,14 @@ export function readStartLine(context: RafaContext): StartLine {
 
 /** The steps already run, and how the next one is printed and run. */
 class Steps {
+  private readonly dryRun: boolean;
+  private readonly info: (line: string) => void;
   private readonly done: string[] = [];
 
-  constructor(private readonly dryRun: boolean, private readonly info: (line: string) => void) {}
+  constructor(dryRun: boolean, info: (line: string) => void) {
+    this.dryRun = dryRun;
+    this.info = info;
+  }
 
   /** Prints `line`, then runs `act` unless this is a dry run; a throw is a failed step. */
   run(line: string, act: () => void): void {
@@ -632,4 +637,5 @@ export function createStretchStartCommand(seams?: StretchStartSeams): RafaComman
   return Object.freeze(command);
 }
 
-export default createStretchStartCommand();
+const command: RafaCommand = createStretchStartCommand();
+export default command;

@@ -36,12 +36,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 import ts from 'typescript';
 
 import { edgeLine, readCommandsEdges } from '../../scripts/survey/commands-direction.js';
 import { listTrackedFiles } from '../../scripts/survey/files.js';
 import { bunResolver } from '../../scripts/survey/import-graph.js';
+
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -68,10 +72,18 @@ interface SplitModule {
  * The split modules measured so far: the command file and the library half
  * its readers moved to. Grows by one row per split task; see the plan's
  * "most-imported readers" and "remaining modules" stages.
+ *
+ * The library half of `src/commands/loop/loop-sessions.ts` is
+ * `src/core/loop/session-readings.ts`, and its row names the barrel over
+ * it, `src/core/loop/readings.ts`. A file outside `src/core/` imports the
+ * barrel and nothing deeper, so the barrel is what an `export … from` of
+ * that half resolves to, and a row naming the file behind it would hold
+ * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
+ * half is `src/core/plan/plan-files.ts` behind `src/core/plan/index.ts`.
  */
 const SPLIT_MODULES: readonly SplitModule[] = [
-  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/plan/plan-files.ts' },
-  { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/loop/session-readings.ts' },
+  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/core/plan/index.ts' },
+  { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/core/loop/readings.ts' },
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
   { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },
   { commandFile: 'src/commands/plan/list.ts', libraryHalf: 'src/plan/list.ts' },
@@ -89,6 +101,7 @@ const SPLIT_MODULES: readonly SplitModule[] = [
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/release/version-tag.ts' },
   { commandFile: 'src/commands/pr/merge-followups.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
   { commandFile: 'src/commands/pr/merge-cleanup.ts', libraryHalf: 'src/pr/settle-waiting.ts' },
+  { commandFile: 'src/commands/self-update.ts', libraryHalf: 'src/runtime/live-loops.ts' },
 ];
 
 /**

@@ -103,19 +103,19 @@
  */
 import type { BoardIssue, BoardListing } from './roadmap-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { isMapping } from '../config-sections.js';
+import { isMapping } from '../core/config/sections.js';
 import { SCOPE_DIR } from '../project/scope.js';
 
 import { nativeChangedArgs, nativeIssuesArgs, nativeRowFields } from './board-cache-native.js';
 import { BOARD_LISTING_LIMIT, createGhBoardListing, parseBoardListing } from './roadmap-board.js';
 
 /** Where the cache is kept, relative to the project root. */
-export const BOARD_CACHE_FILE = join(SCOPE_DIR, 'cache', 'board.json');
+export const BOARD_CACHE_FILE: string = join(SCOPE_DIR, 'cache', 'board.json');
 
 /** The shape version the file is written with; a file of another version is read as no cache. */
 export const BOARD_CACHE_VERSION = 1;

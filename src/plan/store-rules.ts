@@ -64,12 +64,11 @@
  * Everything here is pure: the callers read the plan and its
  * PREREQUISITES file and hand the text in.
  */
-import type { PlanTask } from './parse.js';
+import type { PlanTask } from '../core/plan/index.js';
 
 import { findPinnedMigrations } from '../board/readiness.js';
+import { parsePlan } from '../core/plan/index.js';
 import { parsePrerequisites } from '../preflight/prerequisites-md.js';
-
-import { parsePlan } from './parse.js';
 
 /** Which of the three rules a problem breaks. */
 export type StoreRuleKind = 'pinned-migration' | 'unprefixed-command' | 'missing-probe';
@@ -88,7 +87,7 @@ export interface StoreRuleProblem {
 export const STORE_SCHEMA_PROBE = 'rafa effort schema --check';
 
 /** The item the missing-probe problem tells the planner to add, as the dev-planner rule spells it. */
-export const STORE_SCHEMA_PROBE_ITEM = `- [ ] The installed rafa can read and write the live store: \`${STORE_SCHEMA_PROBE}\``;
+export const STORE_SCHEMA_PROBE_ITEM: string = `- [ ] The installed rafa can read and write the live store: \`${STORE_SCHEMA_PROBE}\``;
 
 /** The variable a development build's store is pointed at a copy through. */
 const EFFORT_DIR_VARIABLE = 'RAFA_EFFORT_DIR';

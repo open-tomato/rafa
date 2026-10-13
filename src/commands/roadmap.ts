@@ -28,7 +28,7 @@
  * It starts no session, so it declares no `spends`.
  */
 import type { IssueSeams } from './issue/issue-tracker.js';
-import type { RafaCommand, RafaFlagSpec } from '../cli/command.js';
+import type { RafaCommand, RafaFlagSpec } from '../core/command/index.js';
 
 import { DEFAULT_ISSUE_SEAMS } from './issue/issue-tracker.js';
 import { ISSUE_LIST_FLAGS, runIssueList } from './issue/list.js';
@@ -109,4 +109,5 @@ export function createRoadmapCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS): R
   return Object.freeze(command);
 }
 
-export default createRoadmapCommand();
+const command: RafaCommand = createRoadmapCommand();
+export default command;

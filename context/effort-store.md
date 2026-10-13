@@ -261,8 +261,8 @@ any live loop, including its own if one somehow persists.
 `local`, `file`, `git`, `service`, or `p2p`.** The default is `local`,
 which means no sync: a device keeps its own store. The user scope's
 `~/.rafa/config.yaml` already layers under the project's for every
-setting (`src/config.ts`), so the user default needs no reader of its
-own. The user and project scopes share every config key in `config.ts`,
+setting (`src/core/config/config.ts`), so the user default needs no reader of
+its own. The user and project scopes share every config key in `config.ts`,
 and a change in one scope's declaration of `effort.sync` takes effect
 when either is read. A deployment of the `service` strategy requires
 `hub.url` (the hub's address), and may name `hub.tokenSecret` (the
@@ -273,7 +273,7 @@ to `30s`, as `3s`). `selectSync` hands the three to the adapter as
 `git`, `service` or `p2p` also names its own settings under `modules:`.
 
 **Core registers two adapters in `CORE_ADAPTER_REGISTRY`
-(`src/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
+(`src/core/adapters/registry.ts`): `sync/local` (no action) and `sync/file`
 (copy exchange).** The `git`, `service` and `p2p` adapters come from
 modules loaded under `src/modules/load.ts`; core ships no code for them.
 When `rafa doctor`, the loop preflight and `describe` read the config,
@@ -358,13 +358,15 @@ import` uses the same refusal, since import is the user-facing surface
 of merge. `rafa effort move --to=sqlite` is already documented as
 migrating the store from NDJSON to SQLite.
 
-**The locked settings of the first release are `effort.sync` and
-`prerequisites.required`.** These keys cannot be changed by a plan
-pushing a settings change; only a released version can alter what a
-device must sync and what prerequisites a plan needs. `rafa-hub` serves
-these locked keys so every device on a team sees the same rules. The
-lock is declared as an immutable set in the device's settings store, not
-enforced by a migration, so a test can override it temporarily.
+**The locked settings of the first release are `effort.sync`,
+`prerequisites.required`, `claims.staleAfter` and `claims.ahead`.**
+`src/config-locked.ts` declares them as `LOCKED_SETTINGS`, a frozen list
+of setting names in file-key order. The module enforces nothing, and only
+its test reads the list. These keys cannot be changed by a plan pushing a
+settings change; only a released version can alter what a device must
+sync and what prerequisites a plan needs. No route serves them yet:
+`rafa-hub` answers `404` on `GET /v1/settings/locked`, a route its server
+leaves to a later plan.
 
 **A module that is not loaded is named by the sync strategy it
 implements.** When a project needs `git` sync but its install has no git

@@ -7,6 +7,13 @@
  * process's working directory (this repository) would answer neither.
  * The repositories are made with global and system config switched off,
  * as `project/worktree-root.test.ts` makes them.
+ *
+ * `readCheckedOutBranch` is read over the same kind of repository, with
+ * three more states: a detached HEAD, where it answers null and
+ * `getCurrentBranch` beside it answers the word `HEAD`; a branch with no
+ * commit yet, which it still names; and a directory outside every
+ * repository, where it throws, so null is proven to mean a detached HEAD
+ * and not any failure.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -17,7 +24,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { gitIdentityEnv } from '../tests/git-identity.js';
 
-import { getCurrentBranch } from './git.js';
+import { getCurrentBranch, readCheckedOutBranch } from './git.js';
 
 const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-utils-git-')));
 
@@ -63,5 +70,46 @@ describe('getCurrentBranch', () => {
     expect(own).not.toBe('feat/first-branch');
     expect(own).not.toBe('feat/second-branch');
     expect(own.length).toBeGreaterThan(0);
+  });
+});
+
+describe('readCheckedOutBranch', () => {
+  const onBranch = repositoryOn('checked-out', 'feat/checked-out');
+  const detached = repositoryOn('detached', 'feat/left-behind');
+  git(detached, ['switch', '-q', '--detach']);
+
+  it('reads the branch checked out in the directory it is handed', () => {
+    expect(readCheckedOutBranch(onBranch)).toBe('feat/checked-out');
+  });
+
+  it('answers null on a detached HEAD, where getCurrentBranch answers the word HEAD', () => {
+    expect(readCheckedOutBranch(detached)).toBeNull();
+    // The control: the same directory through the reading this one stands beside.
+    expect(getCurrentBranch(detached)).toBe('HEAD');
+  });
+
+  it('names a branch that holds no commit yet', () => {
+    const unborn = join(tempRoot, 'unborn');
+    mkdirSync(unborn);
+    git(unborn, ['init', '-q', '-b', 'feat/unborn']);
+
+    expect(readCheckedOutBranch(unborn)).toBe('feat/unborn');
+  });
+
+  it('throws outside a repository, naming the directory, rather than answering null', () => {
+    const outside = join(tempRoot, 'outside');
+    mkdirSync(outside);
+
+    expect(() => readCheckedOutBranch(outside)).toThrow(outside);
+  });
+
+  it('reads the process\'s own directory when handed none', () => {
+    // A detached checkout, as a pull request's runner has: no branch, where getCurrentBranch says HEAD.
+    const current = getCurrentBranch();
+    const expected = current === 'HEAD'
+      ? null
+      : current;
+
+    expect(readCheckedOutBranch()).toBe(expected);
   });
 });

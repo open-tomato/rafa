@@ -12,10 +12,12 @@
  * the repair session that is handed it, which reruns it, changes nothing
  * and reports done, and the next step over the same selection is red
  * again. Issue 926 measured it: `src/utils/claude.test.ts` read 21 cases
- * red in the runner's task and stage steps only, each throwing
- * `UndeclaredSpendError` from a record another file had left, and one
- * run of 2026-10-10 inserted five repair tasks for it, about 32 minutes
- * of sessions that changed no file.
+ * red in the runner's task and stage steps only, each stopped by the
+ * spend guard of `src/core/loop/claude.ts` over a record another file had
+ * left, and one run of 2026-10-10 inserted five repair tasks for it,
+ * about 32 minutes of sessions that changed no file. The guard threw
+ * at the time of that measurement; it has since been changed to warn
+ * and start the session.
  *
  * ## The retake
  *
@@ -95,8 +97,8 @@
  * of the step's new failures ({@link withoutStepOnly}), so a step whose
  * every new failure was red only in the step is green: no blocker, no
  * repair task, no halt. The recorded step keeps them in `failures` and lists
- * each such file under `stepOnly` (`loop/sessions.ts`) with the names of
- * its tests, the error lines of the first, its place in the order its
+ * each such file under `stepOnly` (`core/loop/sessions.ts`) with the names
+ * of its tests, the error lines of the first, its place in the order its
  * process ran the files, and the {@link STEP_ONLY_BEFORE} files run just
  * before it, which is where the state it met came from. One warning per
  * file says the same ({@link announceStepOnly}), with the step's output
@@ -129,15 +131,15 @@
  */
 import type { StepVerdict } from './suite-blocker.js';
 import type { Settling, SuiteStepContext, SuiteStepSeams } from './suite-step.js';
-import type { SessionStepKind, SessionStepOnly } from '../loop/sessions.js';
+import type { SessionStepKind, SessionStepOnly } from '../core/loop/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 
 import { join, relative } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
-import { runsDir } from '../loop/sessions.js';
+import { messageOf } from '../core/config/sections.js';
+import { runsDir } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { splitFailures } from '../suite/baseline.js';
 import { failingFilesOf } from '../suite/failure-lines.js';
 import { outputFileFor } from '../suite/run.js';

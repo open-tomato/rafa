@@ -37,7 +37,7 @@
 import type { OverrideReading } from './disabled.js';
 import type { InventorySeams, PrecedenceReading } from './index.js';
 import type { InventoryRecord } from './record.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

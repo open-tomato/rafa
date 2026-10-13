@@ -29,7 +29,7 @@ import type { BoardListing } from '../board/roadmap-board.js';
 
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { isWaiting } from '../board/relations/port.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** The half of the port the count reads: its mode, and its reads over one listing. */
 export type BlockedCountRelations = Pick<BoardRelations, 'mode' | 'read'>;

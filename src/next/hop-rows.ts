@@ -95,7 +95,7 @@ import type { Place } from '../project/position.js';
 
 import { samePlace } from '../board/place.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { hopDecisionSentence, oneHopAllows } from './hop-chain.js';
 import { onBase } from './readings.js';

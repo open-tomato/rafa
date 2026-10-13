@@ -10,7 +10,7 @@
  *
  * @module tests/loop-scratch
  */
-import type { OutputMode } from '../config-sections.js';
+import type { OutputMode } from '../core/config/sections.js';
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,22 +29,22 @@ import { hostToolDirs } from './stand-in-gh.js';
 const SRC_DIR = fileURLToPath(new URL('../', import.meta.url));
 
 /** The CLI entry every command case runs. */
-export const RAFA_ENTRY = join(SRC_DIR, 'rafa.ts');
+export const RAFA_ENTRY: string = join(SRC_DIR, 'rafa.ts');
 
 /** The plan stub every planting runs. */
 export const STUB = 'probe';
 
 /** The flag naming the planted plan. */
-export const PLAN_FLAG = `--plan=.plans/PLAN-${STUB}.md`;
+export const PLAN_FLAG: string = `--plan=.plans/PLAN-${STUB}.md`;
 
 /** The one task the open plan holds. */
 export const TASK = 'A task for the stand-in';
 
 /** A plan holding one open task. */
-export const PLAN_OPEN = `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`;
+export const PLAN_OPEN: string = `# Plan: ${STUB}\n\n- [ ] ${TASK}\n`;
 
 /** A plan holding no open task, and a block never closed after its last task. */
-export const PLAN_DONE = `# Plan: ${STUB}\n\n- [x] A finished task\n\n\`\`\`rafa:notes\na note never closed\n`;
+export const PLAN_DONE: string = `# Plan: ${STUB}\n\n- [x] A finished task\n\n\`\`\`rafa:notes\na note never closed\n`;
 
 /** The flags a session case runs with: the whole plan injected, so no fallback warning sits among its lines. */
 export const SESSION_FLAGS: readonly string[] = [PLAN_FLAG, '--no-ci-wait', '--inject=full'];

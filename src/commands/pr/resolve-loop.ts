@@ -61,11 +61,11 @@ import type { TriageClass } from '../../pr/triage/classes.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { pinnedPlanFileName } from '../../pr/plans/load.js';
 
 /** Where under a home directory a resolve run keeps its plans and trackers. */
-export const RESOLVE_SUBDIR = join('.rafa', 'resolve');
+export const RESOLVE_SUBDIR: string = join('.rafa', 'resolve');
 
 /** What a resolve run's directory is named before its pull request number. */
 const RUN_PREFIX = 'pr-';

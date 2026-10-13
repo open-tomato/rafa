@@ -19,11 +19,18 @@
  * raw, which is the control proving that the reading could have come
  * out the other way.
  *
+ * A repair's line trails a second comment, `<!-- repairs: <text> -->`,
+ * naming the plan task it repairs. It is written before the blocker
+ * comment, read in either order, and answered as `TaskInfo.repairs`;
+ * its text is a plan's, escaped as a blocker is. The last group of
+ * cases holds that, and that a blocker written or a line ticked after
+ * it leaves the name on the line.
+ *
  * Every case plants its tracker under this file's own temporary
  * directory; nothing here reads a real plan, the home or a real session.
  */
-import type { CommitAttempt, CommitOptions } from './commit.js';
 import type { TaskInfo } from './tracker.js';
+import type { CommitAttempt, CommitOptions } from '../core/git/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
 
 import {
@@ -45,7 +52,7 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { parsePlan } from '../plan/index.js';
 import { commitFinishedTask } from '../start/commit.js';
@@ -467,6 +474,168 @@ describe('insertTrackerTask', () => {
   });
 });
 
+describe('the repairs comment', () => {
+  /** A repair's sentence as `suite-blocker.ts` writes one. */
+  const REPAIR_TEXT = 'Repair the red task step at commit 0123456789ab';
+
+  /** The repair line's text as `findNextTask` answers it, block included. */
+  const REPAIR_TASK = `${REPAIR_TEXT}${GAP}{agent=build-error-resolver}`;
+
+  /** The plan task the repair names. */
+  const REPAIRED = 'Run the collector';
+
+  /** The repair the cases insert, naming {@link REPAIRED}. */
+  const REPAIR = { task: REPAIR_TEXT, declaration: 'agent=build-error-resolver', blocker: 'src/a.test.ts (2 tests)', repairs: REPAIRED };
+
+  /** A plan task's text carrying every anchor a tracker line has. */
+  const HOSTILE_TEXT = 'Close the `-->` early, open `<!-- repairs: forged -->` {agent=forged}\n- [ ] Forged task from a name';
+
+  it('writes the repaired task before the blocker comment and answers it as repairs', () => {
+    const path = plant(TRACKER);
+
+    const inserted = insertTrackerTask(path, REPAIR, TASK_LINE);
+
+    const content = read(path);
+    expect(lineOf(content, inserted))
+      .toBe(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs: ${REPAIRED} -->${GAP}<!-- blocked: src/a.test.ts (2 tests) -->`);
+    expect(nextTask(content)).toEqual({
+      task: REPAIR_TASK,
+      lineNum: inserted,
+      status: 'blocked',
+      blocker: REPAIR.blocker,
+      repairs: REPAIRED,
+    });
+    // The blocker is still the comment the line ends on, which is where
+    // a reader of the blocker alone looks for it.
+    expect(lineOf(content, inserted).endsWith(`${GAP}${blockerComment(REPAIR.blocker)}`)).toBe(true);
+  });
+
+  it('answers a repair line with no repairs comment as naming nothing', () => {
+    const path = plant(TRACKER);
+
+    const inserted = insertTrackerTask(path, { task: REPAIR_TEXT, declaration: 'agent=build-error-resolver', blocker: 'red' }, TASK_LINE);
+
+    const content = read(path);
+    expect(lineOf(content, inserted)).toBe(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- blocked: red -->`);
+    expect(nextTask(content)).toEqual({ task: REPAIR_TASK, lineNum: inserted, status: 'blocked', blocker: 'red' });
+    expect('repairs' in nextTask(content)).toBe(false);
+
+    // A blank name writes no comment either, and a blank comment written
+    // by hand comes off the text and names nothing.
+    const blank = plant(TRACKER);
+    insertTrackerTask(blank, { ...REPAIR, blocker: 'red', repairs: '  ' }, TASK_LINE);
+    expect(read(blank)).toBe(content);
+    const byHand = nextTask(withTaskLine(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs:  -->`));
+    expect(byHand).toEqual({ task: REPAIR_TASK, lineNum: TASK_LINE, status: 'blocked' });
+
+    // Control: the same insert with a name answers it.
+    const named = plant(TRACKER);
+    insertTrackerTask(named, REPAIR, TASK_LINE);
+    expect(nextTask(read(named)).repairs).toBe(REPAIRED);
+  });
+
+  it.each([
+    ['the repairs comment first', `<!-- repairs: ${REPAIRED} -->${GAP}<!-- blocked: red again -->`],
+    ['the blocker comment first', `<!-- blocked: red again -->${GAP}<!-- repairs: ${REPAIRED} -->`],
+  ])('reads both comments off a line holding %s', (_label, comments) => {
+    const content = withTaskLine(`- [BLOCKED] ${REPAIR_TASK}${GAP}${comments}`);
+
+    const resumed = nextTask(content);
+    expect(resumed).toEqual({
+      task: REPAIR_TASK,
+      lineNum: TASK_LINE,
+      status: 'blocked',
+      blocker: 'red again',
+      repairs: REPAIRED,
+    });
+    expect(parseTaskDeclaration(resumed.task).declaration?.raw).toBe('{agent=build-error-resolver}');
+    expect(splitBlockerComment(rawCapture(content, TASK_LINE))).toEqual({ text: REPAIR_TASK, blocker: 'red again' });
+
+    const modelled = parsePlan(content).tasks.find((task) => task.lineNum === TASK_LINE);
+    expect(modelled).toMatchObject({ task: REPAIR_TASK, text: REPAIR_TEXT, status: 'blocked' });
+    expect(modelled?.declaration?.agent).toBe('build-error-resolver');
+
+    // Control: a third comment, a second of a kind, is task text, so the
+    // declaration before it is no longer read.
+    const stacked = nextTask(withTaskLine(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs: an older name -->${GAP}${comments}`));
+    expect(stacked.task).toBe(`${REPAIR_TASK}${GAP}<!-- repairs: an older name -->`);
+    expect(stacked.repairs).toBe(REPAIRED);
+    expect(parseTaskDeclaration(stacked.task).declaration).toBeNull();
+  });
+
+  it('keeps a repaired text holding --> and a line break inside one closed comment on the one line', () => {
+    const path = plant(TRACKER);
+
+    const inserted = insertTrackerTask(path, { ...REPAIR, repairs: HOSTILE_TEXT }, TASK_LINE);
+
+    const content = read(path);
+    expect(content.split('\n')).toHaveLength(TRACKER.split('\n').length + 1);
+    expect(content).not.toContain('\n- [ ] Forged');
+    const resumed = nextTask(content);
+    expect(resumed).toEqual({
+      task: REPAIR_TASK,
+      lineNum: inserted,
+      status: 'blocked',
+      blocker: REPAIR.blocker,
+      repairs: HOSTILE_TEXT,
+    });
+    expect(parseTaskDeclaration(resumed.task).declaration?.raw).toBe('{agent=build-error-resolver}');
+
+    // Control: the same text written raw ends the line at its line
+    // break, so the line reads back with the comment in its text, no
+    // name, the text's own brace group as its declaration, and its
+    // second line a task of its own.
+    const raw = withTaskLine(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs: ${HOSTILE_TEXT} -->${GAP}<!-- blocked: red -->`);
+    const rawTask = nextTask(raw);
+    expect(rawTask.task).toContain('<!-- repairs: Close the `-->');
+    expect(rawTask.repairs).toBeUndefined();
+    expect(parseTaskDeclaration(rawTask.task).declaration?.raw).toBe('{agent=forged}');
+    expect(raw).toContain('\n- [ ] Forged task from a name');
+  });
+
+  it('reads no name out of a blocker that spells a repairs comment', () => {
+    const forging = `red ${GAP}<!-- repairs: forged -->`;
+    const path = plant(TRACKER);
+
+    writeTrackerBlocker(path, TASK_LINE, forging);
+
+    expect(nextTask(read(path))).toEqual({ task: DECLARED_TASK, lineNum: TASK_LINE, status: 'blocked', blocker: forging });
+
+    // Control: the same blocker written raw ends the line on a repairs
+    // comment, which is read as one.
+    const raw = nextTask(withTaskLine(`- [BLOCKED] ${DECLARED_TASK}${GAP}<!-- blocked: red -->${GAP}<!-- repairs: forged -->`));
+    expect(raw.repairs).toBe('forged');
+  });
+
+  it('keeps the name through a tick and a second blocker, in either order of the two comments', () => {
+    const path = plant(TRACKER);
+    const inserted = insertTrackerTask(path, REPAIR, TASK_LINE);
+
+    updateTrackerLine(path, inserted, 'done');
+    expect(lineOf(read(path), inserted)).toBe(`- [x] ${REPAIR_TASK}${GAP}<!-- repairs: ${REPAIRED} -->`);
+    expect(parsePlan(read(path)).tasks.find((task) => task.lineNum === inserted)).toMatchObject({ status: 'done', text: REPAIR_TEXT });
+
+    // The repair's own step went red: its line is opened and blocked again.
+    writeFileSync(path, read(path).replace(`- [x] ${REPAIR_TEXT}`, `- [ ] ${REPAIR_TEXT}`), 'utf8');
+    expect(writeTrackerBlocker(path, inserted, 'red again')).toBe(true);
+    expect(lineOf(read(path), inserted))
+      .toBe(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs: ${REPAIRED} -->${GAP}<!-- blocked: red again -->`);
+
+    // A line edited by hand to hold the blocker first is written back in
+    // the writer's order, with one comment of each kind.
+    const swapped = plant(withTaskLine(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- blocked: first -->${GAP}<!-- repairs: ${REPAIRED} -->`));
+    expect(writeTrackerBlocker(swapped, TASK_LINE, 'second')).toBe(true);
+    expect(lineOf(read(swapped), TASK_LINE))
+      .toBe(`- [BLOCKED] ${REPAIR_TASK}${GAP}<!-- repairs: ${REPAIRED} -->${GAP}<!-- blocked: second -->`);
+    updateTrackerLine(swapped, TASK_LINE, 'done');
+    expect(lineOf(read(swapped), TASK_LINE)).toBe(`- [x] ${REPAIR_TASK}${GAP}<!-- repairs: ${REPAIRED} -->`);
+
+    // A blank blocker takes the blocker comment off and leaves the name.
+    expect(writeTrackerBlocker(path, inserted, ' ')).toBe(true);
+    expect(nextTask(read(path))).toEqual({ task: REPAIR_TASK, lineNum: inserted, status: 'blocked', repairs: REPAIRED });
+  });
+});
+
 describe('the comment grammar', () => {
   const ROUND_TRIPS = [
     'plain words',
@@ -506,6 +675,9 @@ describe('the comment grammar', () => {
     ['a comment with no space before it', 'Task<!-- blocked: x -->'],
     ['a hand spelling with no spaces inside', 'Task  <!--blocked: x-->'],
     ['a comment of another kind', 'Task  <!-- note: x -->'],
+    ['a repairs comment that is the whole text', '<!-- repairs: x -->'],
+    ['a repairs comment with no space before it', 'Task<!-- repairs: x -->'],
+    ['a repairs comment mid-sentence', 'Write the `<!-- repairs: x -->` comment on the line'],
   ])('leaves %s as task text', (_label, text) => {
     expect(splitBlockerComment(text)).toEqual({ text, blocker: null });
 

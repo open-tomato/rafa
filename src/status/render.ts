@@ -80,13 +80,13 @@ import type { Mergeability } from '../pr/index.js';
 import { blockedLineSentence } from '../board/blocked-line.js';
 import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { idleText } from '../board/roadmap-claims.js';
-import { planLabel, sessionLine } from '../loop/session-readings.js';
-import { formatCounts } from '../plan/plan-files.js';
+import { planLabel, sessionLine } from '../core/loop/readings.js';
+import { formatCounts } from '../core/plan/index.js';
 
 import { awayLine, placeLine, waitingLine } from './place-line.js';
 
 /** Each section's title, in the order the text lists them. */
-export const STATUS_SECTION_TITLES = Object.freeze({
+export const STATUS_SECTION_TITLES: Readonly<{ branch: 'Branch'; loops: 'Loops'; pull: 'Pull request'; board: 'Board'; claims: 'Claims'; housekeeping: 'Housekeeping'; }> = Object.freeze({
   branch: 'Branch',
   loops: 'Loops',
   pull: 'Pull request',

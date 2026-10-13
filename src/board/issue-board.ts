@@ -140,7 +140,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { CREATED_ISSUE_URL } from './setup.js';
 
@@ -154,7 +154,7 @@ const REPO_PATH = '{owner}/{repo}';
 const COMMENT_ID = /^[1-9]\d*$/;
 
 /** The reasons `gh issue close --reason` accepts. */
-export const CLOSE_REASONS = Object.freeze(['completed', 'not planned'] as const);
+export const CLOSE_REASONS: readonly ['completed', 'not planned'] = Object.freeze(['completed', 'not planned'] as const);
 
 /** One of {@link CLOSE_REASONS}. */
 export type CloseReason = (typeof CLOSE_REASONS)[number];

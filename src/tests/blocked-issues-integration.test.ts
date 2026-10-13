@@ -46,7 +46,7 @@
  * asked.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { ChecksReading, GitRunner, MergeOutcome, PullRequestDetail } from '../pr/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -316,6 +316,7 @@ describe('the question asked at the end of a merge that closes #A', () => {
       updatedAt: '2026-09-21T09:00:00Z',
       body: `Closes #${String(A)}`,
       headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+      headCommittedAt: null,
       mergeable: 'mergeable',
       mergeStateStatus: 'CLEAN',
       labels: [],

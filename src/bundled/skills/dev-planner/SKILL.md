@@ -311,7 +311,7 @@ The block strip rule means:
 - A block in a stage description does not appear in the operator log line
 - A block anywhere in the plan does not appear in a commit subject or commit body
 
-The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/plan/blocks.ts`):
+The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/core/plan/blocks.ts`):
 
 - Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
 - A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
@@ -335,11 +335,12 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   holding no nested braces and at least one recognised key, and it is
   never the whole task text. Two spaces separate it from the text.
   Anything failing one of those rules stays task text — a task ending on
-  a code span carrying `{ "a": 1 }` is not a declaration. The one thing
-  that may follow the block is the loop's own: on a blocked task's
-  tracker line it writes `<!-- blocked: <text> -->` after the block, and
-  takes that comment off before the block is read. The plan itself never
-  holds one.
+  a code span carrying `{ "a": 1 }` is not a declaration. What may
+  follow the block is the loop's own: on a blocked task's tracker line
+  it writes `<!-- blocked: <text> -->` after the block, and on a repair
+  task's line `<!-- repairs: <text> -->` before that, naming the plan
+  task repaired. It takes both comments off before the block is read.
+  The plan itself never holds either.
 * Its tokens are space-separated `key=value` pairs, of the recognised keys
   in the table below; an unrecognised key is kept for telemetry and maps
   to no flag.
@@ -381,7 +382,7 @@ The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, wh
 
 ### `skills=` declaration
 
-When a task needs help from a skill, name those skills with `skills=`. Skill names must come from the skill index provided in this prompt; naming a skill no tier holds is recorded as an issue. Names are comma-separated with no spaces.
+When a task needs help from a skill, name those skills with `skills=`. Skill names must come from the skill index provided in this prompt. Naming a skill no tier holds is refused, not recorded: `rafa plan validate` exits 1 on the line that names it, and `rafa loop start`'s preflight refuses to start the plan, so nothing is dispatched. Names are comma-separated with no spaces.
 
 `skills` is a recognised key that maps to no flag: there is no CLI flag for a skill, so the names are parsed, kept on the dispatch record and stripped from the task text with the rest of the block. It stands on its own — `{skills=bun-testing}` is a declaration with no other key beside it — and a value that is not a comma-separated list of skill names is recorded as an issue rather than passed on.
 
@@ -410,6 +411,8 @@ The second example above has no `skills=` and is still a valid task declaration.
   - [ ] Drive a real `rafa loop start` over a one-task fixture plan  {tests=module}
   - [ ] Move the test preload into `bunfig.toml`  {tests=full}
 ```
+
+A task's text never asks its session for a whole-suite run, or for any command that can outlast one Bash call, since the Bash tool stops a command at 10 minutes. The runner runs the suite through `tests=full` on the task. A task that needs a long run's output reads a file that a `[start]` prerequisite or the runner wrote, such as the `.output.txt` beside a suite run's JUnit file.
 
 ---
 
@@ -444,6 +447,11 @@ The second example above has no `skills=` and is still a valid task declaration.
   --write-tree origin/<base> HEAD`) and assemble the body material — the gate
   captures, the test plan, the recorded debt — into the plan's close-out
   notes for that wrap-up session to use.
+* A task's text never asks its session for the whole suite, or for any
+  command that can outlast one Bash call. Declare `tests=full` on the task
+  and the runner runs the suite after the commit; a task that needs a long
+  run's output reads it from the file a `[start]` prerequisite or the
+  runner wrote.
 
 ---
 
@@ -472,6 +480,8 @@ The wrap-up session always receives `full` regardless of the configured mode.
   - [ ] {Tool} installed: `{tool} --version`
   - [ ] {Service name} answering on port {n}: `curl -sf http://localhost:{n}/health`
   - [ ] {VAR_NAME} set, obtained from {where}: `test -n "${VAR_NAME}"`
+  - [ ] [tasks] {Something only the tasks need}: `{command to verify}`
+  - [ ] [wrap-up] {Something only the wrap-up needs}: `{command to verify}`
 
   ## Credentials [human]
   - [ ] {Credential description}
@@ -488,6 +498,8 @@ How the file is read:
 - An item's tag is the `[auto]`, `[human]`, or `[start]` written right after its box. Without one it takes its section's tag: a heading carrying `[auto]` tags its section `auto`, one carrying `[human]` or naming `manual`, `human`, `sign-off` or `team` tags it `human`, and one carrying `[start]` tags it `start`. A heading's tag reaches the deeper headings under it and ends at the next heading of its own level or shallower. An item under no tagged heading is `human`.
 - An `auto` item's probe is the backticked span that ends it, after its final `: `. The item merges as a required prerequisite, the tier whose failure halts a run.
 - A `start` item's probe is read the same way. The item is probed on first dispatch only (skipped on resume), and failure halts a run on first dispatch.
+- An item's scope is the `[tasks]` or `[wrap-up]` marker written at its opening, after its box and after its tag when it has one (`- [ ] [auto] [tasks] ...`). Without one it takes the marker of the nearest heading above it that carries one, which reaches the deeper headings under it and ends at the next heading of its own level or shallower, as a tag does; an item's own marker outranks its heading's. With no marker anywhere the scope is `both`, and the two markers written together read as `both` too. The marker is dropped from the item's text and is never read as its probe.
+- The scope says which dispatches need an `auto` item: `tasks` the task sessions, `wrap-up` the wrap-up session, `both` every one. A marker on a `start` or `human` item is read and changes nothing: the `start` item is still probed on first dispatch only, and the `human` item is still a reminder.
 - A `human` item is a reminder: named to the operator, never probed, and never halting a run.
 - An `auto` or `start` item that does not end with `: ` and its command — the command first, text after it, or no span at all — is malformed: `rafa loop start` and `rafa doctor` refuse the plan, naming its line, and run nothing.
 
@@ -496,6 +508,7 @@ Rules:
 - An `[auto]` item holds exactly one backticked span, and that span is its command. The preflight runs it as written, so put no package name, path or other command in backticks anywhere in the item.
 - Tag an item `auto` only when a shell command proves it, and end the item with `: ` and that command. The command asks for no input and changes nothing.
 - Tag an item `start` only when a shell command proves it and it should only be checked on the first dispatch of a plan (not on resume). End it with `: ` and the command, one span, as for `auto`.
+- Mark an `auto` item `[tasks]` when only the plan's tasks need it and `[wrap-up]` when only the wrap-up does (pushing, opening the pull request, releasing); leave it unmarked when both do or when unsure, since an unmarked item is always probed. Write the marker bare, at the item's opening or on its heading, never in backticks and never after the command: text after the span makes the item malformed.
 - Make the command complete: it exits 0 when the prerequisite holds. To prove a tool is installed, probe `<tool> --version`, `<tool> --help` or `which <tool>` — never a bare subcommand such as `uvx check-jsonschema`, which exits non-zero for want of arguments.
 - Tag every step for after the plan merges `human`, as the heading above does, so no run ever executes one as a probe.
 - Do not duplicate steps already documented in the repo's contributor docs (README, CONTRIBUTING, and the like).
@@ -506,10 +519,10 @@ Rules:
 
 ## Format validation
 
-The loop parses plan files through `src/plan/parse.ts`:
+The loop parses plan files through `src/core/plan/parse.ts`:
 
-- **Block parsing** (`src/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
-- **Plan parsing** (`src/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
+- **Block parsing** (`src/core/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
+- **Plan parsing** (`src/core/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
 - **Declaration parsing** (`src/utils/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
 - **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
@@ -537,7 +550,7 @@ When the spec adds or changes anything in `.rafa/effort/`:
 When planning work on rafa commands: every command that can start a Claude
 Code session must declare its `spends` field on its `RafaCommand` definition.
 The field tells the help system, `describe` output, and the spawn guard in
-`src/utils/claude.ts` what Claude usage the command declares. It is optional,
+`src/core/loop/claude.ts` what Claude usage the command declares. It is optional,
 and takes one of four shapes:
 
 - `{ when: 'always'; what: string }` — the command always starts a session
@@ -626,4 +639,4 @@ Both follow the same structured format. The difference is:
 - **Hand-written plans** (by a planner agent): Prose in the description, stage contexts, and task granularity reflect careful thought about the work.
 - **Generated plans** (by `rafa plan`): Produced from a spec document; structure is the same.
 
-A hand-written plan read by `src/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.
+A hand-written plan read by `src/core/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.

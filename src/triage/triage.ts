@@ -249,7 +249,7 @@ import type { BugValues } from './issue-text.js';
 import type { MachineFault } from './machine-fault.js';
 import type { ComparedText, ScoredIssue } from './similarity.js';
 import type { LocalTrackerOptions } from '../adapters/tracker/local.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type {
   FindingOutcome,
   FindingsDispatch,
@@ -264,7 +264,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { createLocalTracker } from '../adapters/tracker/local.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { readTrackerRef, writeTrackerRef } from '../effort/store/tracker-refs.js';
 import { writeTrackerBlocker } from '../utils/tracker.js';
 
@@ -283,7 +283,7 @@ import { buildRefsSection, createArtifactRefsVerifier } from './refs-section.js'
 import { nearestOpenBugs } from './similarity.js';
 
 /** Where security bugs are filed, under a repository root. */
-export const PRIVATE_TRIAGE_DIR = join('.rafa', 'triage', 'private');
+export const PRIVATE_TRIAGE_DIR: string = join('.rafa', 'triage', 'private');
 
 /** The variables named as secrets whatever the config says, each when set. */
 export const SECRET_ENV_NAMES = ['GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'LINEAR_API_KEY'] as const;

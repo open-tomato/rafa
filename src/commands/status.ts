@@ -41,12 +41,12 @@
  *   that could only be printed while everything answered would be no use
  *   when something does not.
  */
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { ProjectFound } from '../project/scope.js';
 import type { StatusInput, StatusSections } from '../status/sections.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { renderStatus, statusData } from '../status/render.js';
 import { readStatusSections } from '../status/sections.js';
@@ -150,4 +150,5 @@ export function createStatusCommand(seams: StatusCommandSeams = DEFAULT_STATUS_S
   return Object.freeze(command);
 }
 
-export default createStatusCommand();
+const command: RafaCommand = createStatusCommand();
+export default command;

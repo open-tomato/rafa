@@ -20,7 +20,7 @@
  * text included. The append is best-effort: a failed write warns once on
  * stderr, naming the path and the error, and never throws into the loop.
  * {@link unbindEventsFile} ends it. The session's record, `<id>.json`
- * (`loop/sessions.ts`), stays the only `.json` file a run writes.
+ * (`core/loop/sessions.ts`), stays the only `.json` file a run writes.
  *
  * An `error` event says the run ended on an uncaught error; its line is
  * the first non-blank line of the error's message.
@@ -32,17 +32,23 @@
  * @module start/loop-events
  */
 import type { DecisionStrategy } from './decision-parse.js';
+import type { InjectionRequest } from '../plan/index.js';
+import type { TaskInfo } from '../utils/tracker.js';
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { activeOutput, activeOutputMode } from '../adapters/output/active.js';
 import { oneLine, padKind } from '../adapters/output/events.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { isSessionId, runsDir } from '../core/loop/index.js';
+import { activeOutput, activeOutputMode } from '../core/output/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { readSessionLog } from '../effort/session-log.js';
-import { isSessionId, runsDir } from '../loop/sessions.js';
 import { parsePlan } from '../plan/index.js';
+import { parseTaskDeclaration } from '../utils/declaration.js';
+import { listTrackerTasks } from '../utils/tracker.js';
+
+import { isRepairTask } from './suite-blocker.js';
 
 /** Where a task sits among its tracker's tasks, counted from 1. */
 export interface TaskPosition {
@@ -250,6 +256,40 @@ export async function unlessText<T>(read: () => Promise<T>): Promise<T | null> {
 export function taskPosition(trackerContent: string, lineNum: number): TaskPosition {
   const { tasks } = parsePlan(trackerContent);
   return { index: tasks.findIndex((task) => task.lineNum === lineNum) + 1, total: tasks.length };
+}
+
+/** True when `task`, a tracker line's text with its declaration, is a repair's. */
+function isRepairLine(task: string): boolean {
+  return isRepairTask(parseTaskDeclaration(task).text);
+}
+
+/**
+ * Where the dispatched `taskInfo` sits in its plan, as the injection
+ * renderer is told it (`plan/inject.ts`): the two fields of its request
+ * the tracker alone can answer.
+ *
+ * `position` is the task's ordinal among the tracker's tasks, repair
+ * lines not counted, from zero, which is its ordinal among the plan's
+ * tasks: a repair exists in the tracker alone. A repair holds no place
+ * of its own, so it takes the place of the plan task above it, and -1,
+ * which names no task, with none above. The tasks are counted over
+ * `listTrackerTasks`, the reader that answered `taskInfo`, where
+ * {@link taskPosition} counts every line the plan model reads, repairs
+ * included, from 1.
+ *
+ * `repairs` is present for a repair alone: the plan task its line
+ * names (`TaskInfo.repairs`), or null when it names none.
+ */
+export function injectionPlace(
+  trackerContent: string,
+  taskInfo: Pick<TaskInfo, 'task' | 'lineNum' | 'repairs'>,
+): Pick<InjectionRequest, 'position' | 'repairs'> {
+  const above = listTrackerTasks(trackerContent)
+    .filter((task) => task.lineNum < taskInfo.lineNum && !isRepairLine(task.task))
+    .length;
+  return isRepairLine(taskInfo.task)
+    ? { position: above - 1, repairs: taskInfo.repairs ?? null }
+    : { position: above };
 }
 
 /**

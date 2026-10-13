@@ -138,11 +138,10 @@ import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssue, SpecIssueReader } from '../../board/issue.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { BoardTrust, TrustReading, TrustSource } from '../../board/trust.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { RafaCommand, RafaContext , Prompter } from '../../core/command/index.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
-import type { GitRunner } from '../../pr/git.js';
 
 import { createGhRunner, moduleOfLabels, typeOfLabels } from '../../adapters/tracker/github.js';
 import { epicProblemMessage, readEpicProblems } from '../../board/epic-problems.js';
@@ -158,11 +157,10 @@ import {
   SPEC_READY_LABEL,
 } from '../../board/readiness.js';
 import { ghBoardTrust, requireTrustedBoardAuthor } from '../../board/trust.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { endWithNextStep, HINT_FLAG_SPEC } from '../../next/ending.js';
-import { createGitRunner } from '../../pr/git.js';
 import { answeredYes } from '../../start/branch-decision.js';
 
 import { issueProject, issueSubjectConfig, lineRefusal } from './issue-tracker.js';
@@ -566,4 +564,5 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
   return Object.freeze(command);
 }
 
-export default createIssueReadyCommand();
+const command: RafaCommand = createIssueReadyCommand();
+export default command;

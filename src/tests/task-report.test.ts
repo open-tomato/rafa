@@ -106,8 +106,8 @@
  * machine, never reaching a real `gh` in git's directory. The blocker case
  * reads its one `gh auth status` call.
  */
+import type { CapturedSpawnOptions, CapturingSpawner } from '../core/loop/index.js';
 import type { TaskSessionRunner } from '../start/dispatch.js';
-import type { CapturedSpawnOptions, CapturingSpawner } from '../utils/claude.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
 import { execFileSync } from 'node:child_process';
@@ -135,7 +135,8 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { CLAUDE_BASE_ARGS } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { readPlanChanges } from '../effort/store/changes.js';
 import { sqliteStorePath, withSqliteStore } from '../effort/store/sqlite.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -146,7 +147,6 @@ import {
   SESSION_ID_FLAG,
   storeTaskReport,
 } from '../start/dispatch.js';
-import { CLAUDE_BASE_ARGS } from '../utils/claude.js';
 
 import { plantProjectConfig } from './cli-capture.js';
 import { sinkOutput } from './output-sinks.js';
@@ -637,7 +637,7 @@ function rawArgsOf(scratch: Scratch, n: number): string[] {
 
 /**
  * Where the served flags of a call start: after the base arguments and
- * the two setting-source tokens (`claudeArgs` in `utils/claude.ts`).
+ * the two setting-source tokens (`claudeArgs` in `core/loop/claude.ts`).
  */
 const SERVED_AT = CLAUDE_BASE_ARGS.length + 2;
 

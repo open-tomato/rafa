@@ -15,12 +15,12 @@
  */
 
 import type { DueStage, StepOutcome, StepRuns, SuiteStepContext, SuiteStepSeams, Settling } from './suite-step.js';
-import type { SessionStep, SessionStepReason } from '../loop/sessions.js';
+import type { SessionStep, SessionStepReason } from '../core/loop/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 
 import { readFileSync } from 'node:fs';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { stageStepScope } from '../suite/scope.js';
 
 import { takeRetakes } from './suite-retake-alone.js';
@@ -108,7 +108,7 @@ export async function runStageStep(context: SuiteStepContext, stage: DueStage, b
   }
   const runs = stageRuns(context, seams, run);
   const result = await runWithAlwaysRun(context, seams, 'stage', runs);
-  const settling: Settling = { kind: 'stage', scope: recordedScope(run), reason: stageStepReason(run), label, result, baseline, repair: { kind: 'stage' } };
+  const settling: Settling = { kind: 'stage', scope: recordedScope(run), reason: stageStepReason(run), label, result, baseline, repair: { kind: 'stage', stage: stage.stage } };
   const outcome = settleStep(context, seams, await takeRetakes(context, seams, settling, () => runWithAlwaysRun(context, seams, 'stage', runs), () => diff));
   if (!outcome.interrupted) addToLedger(context.trackerPath, [{ ...stage, commit, via: 'step' }]);
   return outcome;

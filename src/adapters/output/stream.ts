@@ -9,7 +9,8 @@
  * The source spells `write` as a method. It is a function-typed property
  * here, as every port function is in `src/ports/index.ts`, whose note
  * gives the reason. `process.stdout` is assignable to it, which
- * `src/adapters/registry.ts` relies on when a context names no stream.
+ * `src/core/adapters/registry.ts` relies on when a context names no
+ * stream.
  */
 
 /** A stream an Output adapter writes whole lines to. */

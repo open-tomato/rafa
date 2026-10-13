@@ -40,7 +40,7 @@
  * `./refs-check.ts` holds why the roster is handed in rather than
  * imported there.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CommandDeclaration } from '../wrap.js';
 
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
@@ -196,4 +196,5 @@ const wrapped: RafaCommand = {
   ).run(context),
 };
 
-export default endingWith(Object.freeze(wrapped));
+const command: RafaCommand = endingWith(Object.freeze(wrapped));
+export default command;

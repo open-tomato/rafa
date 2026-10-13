@@ -34,7 +34,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { readReleaseSetting, RELEASE_ENABLED_SETTING, releaseEnabledIn, withReleaseEnabled } from './setting.js';

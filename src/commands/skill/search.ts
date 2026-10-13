@@ -34,8 +34,8 @@
  * `--no-model` runs step one alone, the keyword ranking, prints it and
  * stops: no session starts, no scratch copy is made and no effort row is
  * written. The command's `spends` declaration is `unless --no-model`, so
- * the spend guard in `src/utils/claude.ts` refuses a session that a run
- * carrying `--no-model` would start.
+ * the spend guard in `src/core/loop/claude.ts` warns about a session that a
+ * run carrying `--no-model` would start.
  *
  * ## What each kind prints
  *
@@ -61,8 +61,7 @@
  * A search reports; it exits 0 whatever it found. Exit code 1 is kept for
  * the refusals: no question or more than one, a blank question, a value
  * read into `--all` or `--no-model`, and a config that cannot be used. A
- * spawner that throws, the spend guard's refusal included, is the
- * dispatcher's to report.
+ * spawner that throws is the dispatcher's to report.
  *
  * ## Json mode
  *
@@ -74,17 +73,17 @@
  * alone under `--no-model`, as status `ranked`.
  */
 import type { SkillListSeams } from './list.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
+import type { CapturingSpawner } from '../../core/loop/index.js';
 import type { EffortStore } from '../../effort/store/types.js';
 import type { InventoryKind, InventoryRecord } from '../../inventory/record.js';
 import type { SearchOutcome } from '../../inventory/search/index.js';
 import type { RankedCandidate } from '../../inventory/search/rank.js';
 import type { ProjectFound } from '../../project/scope.js';
-import type { CapturingSpawner } from '../../utils/claude.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
+import { CommandExit } from '../../core/command/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { selectEffortStore } from '../../effort/store/index.js';
 import { droppedLine, rankSearch, runSearch } from '../../inventory/search/index.js';
 import { expectOneArgument, readSwitch } from '../plan/plan-files.js';
@@ -381,4 +380,5 @@ export function createSkillSearchCommand(seams: SearchSeams = DEFAULT_SEARCH_SEA
   return createSearchCommand('skill', seams);
 }
 
-export default createSkillSearchCommand();
+const command: RafaCommand = createSkillSearchCommand();
+export default command;

@@ -45,15 +45,15 @@
  * `outputs` and a blank `description` each reddened the completeness case
  * over the core registry and nothing else.
  */
-import type { RafaCommand } from './command.js';
 import type { DescribedAction, DescribeDocument } from './describe.js';
 import type { CommandRegistry } from './registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
 import { CORE_REGISTRY } from '../commands/index.js';
+import { commandSpelling, isTopLevel } from '../core/command/index.js';
 
-import { commandSpelling, isTopLevel } from './command.js';
 import { DESCRIBE_BINARY, DESCRIBE_SCHEMA_VERSION, describeRegistry } from './describe.js';
 import { createCommandRegistry, mountKey } from './registry.js';
 import { routeLine } from './route.js';
@@ -243,6 +243,7 @@ describe('the document over the core registry', () => {
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('dashboard');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.find((action) => action.name === 'dashboard')?.spends).toBeNull();
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('migrate');
+    expect(document.subjects.find((subject) => subject.name === 'pr')?.actions.map((action) => action.name)).toContain('close');
     expect(document.subjects.find((subject) => subject.name === 'release')?.actions.map((action) => action.name)).toContain('settle');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('merge');
     expect(document.subjects.find((subject) => subject.name === 'effort')?.actions.map((action) => action.name)).toContain('import');
@@ -290,6 +291,7 @@ describe('the document over the core registry', () => {
     expect(command('cleanup')?.spends).toBeNull();
     expect(command('status')?.spends).toBeNull();
     expect(spendsOf('issue', 'check')).toBeNull();
+    expect(spendsOf('pr', 'close')).toBeNull();
     expect(spendsOf('loop', 'status')).toBeNull();
     expect(spendsOf('effort', 'copy')).toBeNull();
     expect(spendsOf('effort', 'schema')).toBeNull();

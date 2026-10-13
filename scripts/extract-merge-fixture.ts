@@ -31,7 +31,7 @@ import type { Extract, OverlapCap } from '../src/effort/store/fixture-extract.js
 
 import { resolve } from 'node:path';
 
-import { messageOf } from '../src/config-sections.js';
+import { messageOf } from '../src/core/config/sections.js';
 import { DEFAULT_OVERLAP, DEFAULT_PER_SIDE, extractStores, writeExtract } from '../src/effort/store/fixture-extract.js';
 
 /** Prefix on every line this script writes. */

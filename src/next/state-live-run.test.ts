@@ -1,9 +1,11 @@
 /**
  * Tests for the order of row 1 of the state table (`./state.ts`),
  * `loop-running`, and the working-tree pre-condition
- * (`./preconditions.ts`), `tree-modified`: a live run's edits are
- * answered by row 1 and never offered back to the person, and the tree
- * line names the checkout it read (#444).
+ * (`./preconditions.ts`), `tree-modified`: the edits of a live run
+ * working in the checkout the tree is read in are answered by row 1 and
+ * never offered back to the person, a loop in a worktree of its own
+ * hides nothing of that checkout, and the tree line names the checkout
+ * it read (#444).
  *
  * `./state.test.ts` holds the rest of the table and is over 800 lines,
  * so these cases live here, over fakes of their own: a `GitRunner`
@@ -19,6 +21,13 @@
  * so a table that never read the tree at all would fail the pair. A run
  * that ENDED (`stopped`, `done`) is driven beside the same edits too: its
  * edits are the person's again, and the tree line has to come back.
+ *
+ * A run in a worktree of its own is driven over the same edits and over
+ * a clean tree, which answer the tree and row 1 in turn, so neither
+ * "a worktree run is never row 1" nor "any live run is row 1" passes
+ * both. Its record is also driven naming the checkout git reads, which
+ * must answer row 1 as a run with no `worktree` does. Each of those is
+ * held to the git it spent, by the call log.
  *
  * The checkout the tree line names is driven both ways: git naming a
  * top level, which the line quotes, and git refusing, where the line
@@ -42,9 +51,25 @@
  *  - the tree line never naming its checkout in `./preconditions.ts`:
  *    4 more fail, two here and the two of `./state.test.ts` that spell
  *    the whole line.
+ *
+ * Three more were driven the same way on 2026-10-12, against the 570
+ * pass and 0 fail `env -u CLAUDECODE bun test src/next/` answered that
+ * day:
+ *
+ *  - row 1 put ahead of the tree for ANY live run, as it was before a
+ *    record's `worktree` was read: 5 fail, four of the worktree cases
+ *    here and the worktree-over-a-modified-tree case of
+ *    `./state.test.ts`.
+ *  - the tree read first whatever the live runs: 8 fail, the seven cases
+ *    here that plant a run holding the tree and the main-checkout case
+ *    of `./state.test.ts`, the call log of the two-run case among them.
+ *  - a record naming the checkout no longer holding the tree
+ *    (`holdsTree` in `./readings.ts` reading the missing key alone): 5
+ *    fail, two here and three of `./readings.test.ts`. Every case of
+ *    `./state.test.ts` still passes, since none plants such a record.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { SessionRecord, SessionState } from '../loop/sessions.js';
+import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { GitResult } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -53,7 +78,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { readNextState } from './state.js';
@@ -79,6 +104,9 @@ const SESSION = '20260929-101500-beef';
 
 /** The checkout `git rev-parse --show-toplevel` names. */
 const CHECKOUT = '/work/rafa';
+
+/** A linked worktree a loop of its own works in, beside {@link CHECKOUT}. */
+const WORKTREE = '/work/rafa-worktrees/rafa-367';
 
 /** What the loop's task has changed, as `git status --porcelain` writes it. */
 const TASK_EDITS = [' M src/pr/gh.ts', ' M src/pr/index.ts', '?? src/pr/gh-fake.ts'];
@@ -200,13 +228,6 @@ describe('a live run beside the edits its task has made', () => {
     expect(state.reading).toContain('is paused on');
   });
 
-  it('answers a live run in a worktree of its own too, ahead of the tree it does not hold', async () => {
-    const worktree = run('running', { worktree: '/work/rafa-worktrees/rafa-367' });
-    const state = await readNextState(sourcesFor({ runs: [worktree], tree: TASK_EDITS }).sources);
-
-    expect(state.id).toBe('loop-running');
-  });
-
   it('reads no git at all while a run is live, the tree and its checkout included', async () => {
     const live = sourcesFor({ runs: [run('running')], tree: TASK_EDITS });
     const none = sourcesFor({ tree: TASK_EDITS });
@@ -227,6 +248,57 @@ describe('a live run beside the edits its task has made', () => {
     const state = await readNextState({ ...sources, roadmap });
 
     expect(state.id).toBe('loop-running');
+  });
+});
+
+describe('a live run in a worktree of its own, which holds none of the tree that was read', () => {
+  it('answers the tree over the same edits, naming the checkout, and the running loop once that tree is clean', async () => {
+    const edited = await readNextState(sourcesFor({ runs: [run('running', { worktree: WORKTREE })], tree: TASK_EDITS }).sources);
+    const clean = await readNextState(sourcesFor({ runs: [run('running', { worktree: WORKTREE })] }).sources);
+
+    expect([edited.id, clean.id]).toEqual(['tree-modified', 'loop-running']);
+    expect(edited.reading).toBe(
+      `the working tree at \`${CHECKOUT}\` has changes to 2 tracked files: \`src/pr/gh.ts\`, \`src/pr/index.ts\``,
+    );
+    expect(edited.proposal).toBe('commit or set aside your changes; rafa will not touch them');
+  });
+
+  it('names the checkout once and reads the tree once, whichever of the two answers', async () => {
+    const edited = sourcesFor({ runs: [run('running', { worktree: WORKTREE })], tree: TASK_EDITS });
+    const clean = sourcesFor({ runs: [run('running', { worktree: WORKTREE })] });
+
+    await readNextState(edited.sources);
+    await readNextState(clean.sources);
+
+    expect(edited.ran()).toEqual([TOPLEVEL, STATUS]);
+    expect(clean.ran()).toEqual([TOPLEVEL, STATUS]);
+  });
+
+  it('answers the running loop when another live run works in the main checkout, and asks git nothing', async () => {
+    const both = sourcesFor({ runs: [run('running', { worktree: WORKTREE }), run('paused')], tree: TASK_EDITS });
+
+    const state = await readNextState(both.sources);
+
+    expect(state.id).toBe('loop-running');
+    expect(both.ran()).toEqual([]);
+  });
+
+  it('answers the running loop for a record naming the checkout that was read, the tree left unread', async () => {
+    const here = sourcesFor({ runs: [run('running', { worktree: CHECKOUT })], tree: TASK_EDITS });
+
+    const state = await readNextState(here.sources);
+
+    expect(state.id).toBe('loop-running');
+    expect(here.ran()).toEqual([TOPLEVEL]);
+  });
+
+  it('answers the tree when git could not name the checkout, the refusal carried once', async () => {
+    const toplevel = refused('fatal: not a git repository');
+    const state = await readNextState(sourcesFor({ runs: [run('running', { worktree: WORKTREE })], tree: TASK_EDITS, toplevel }).sources);
+
+    expect(state.id).toBe('tree-modified');
+    expect(state.reading).toBe('the working tree has changes to 2 tracked files: `src/pr/gh.ts`, `src/pr/index.ts`');
+    expect(state.problems).toHaveLength(1);
   });
 });
 

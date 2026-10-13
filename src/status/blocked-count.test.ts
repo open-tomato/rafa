@@ -38,8 +38,8 @@ import type { BlockedIssuesReport } from '../board/blocked-issues.js';
 import type { BlockedReading } from '../board/blocked.js';
 import type { BoardIssue, BoardIssueLink, BoardIssueLinks, BoardListing } from '../board/roadmap-board.js';
 import type { CleanupSeams } from '../cleanup/index.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 import type { NextBoardOptions } from '../next/sources.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

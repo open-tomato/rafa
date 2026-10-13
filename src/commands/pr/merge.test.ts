@@ -33,9 +33,8 @@
  */
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { RafaCommand , Prompter } from '../../core/command/index.js';
+import type { SessionRecord } from '../../core/loop/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   ChecksReading,
@@ -113,6 +112,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     updatedAt: '2026-09-18T11:00:00Z',
     body: '',
     headRefOid: '1f0c2b7de6a94c1a0b5e3d2f4a6b8c0d1e2f3a4b',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

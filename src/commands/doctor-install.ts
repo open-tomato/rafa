@@ -13,14 +13,14 @@
  * a null, never a failure, and none changes the exit code.
  */
 import type { PreviousCopiesReading } from './doctor-previous.js';
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { LegacyStoreReading } from '../effort/store/legacy.js';
 import type { BinPathReading } from '../project/bin-path.js';
 import type { PreInitDirsReading } from '../project/pre-init-dirs.js';
 import type { ProjectFound } from '../project/scope.js';
 
-import { loadConfig } from '../config-load.js';
-import { messageOf } from '../config-sections.js';
+import { loadConfig } from '../core/config/load.js';
+import { messageOf } from '../core/config/sections.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { readBinPath } from '../project/bin-path.js';
 import { readPreInitDirs } from '../project/pre-init-dirs.js';

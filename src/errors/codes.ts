@@ -41,7 +41,7 @@ export interface ErrorCodeEntry {
 }
 
 /** A declarable code: kebab family, colon, kebab leaf. */
-export const CODE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const CODE_PATTERN: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** The leaf every family holds for a cause no leaf fits yet. */
 export const NEW_CONTEXT_LEAF = 'new-context';

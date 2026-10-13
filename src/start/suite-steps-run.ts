@@ -77,6 +77,25 @@
  * `start.ts` never retries such a stop as it may a red one
  * (`start/retry-budget.ts`).
  *
+ * ## A baseline that failed outside any test case
+ *
+ * A baseline `ensureBaseline` answers as halted (its run exited nonzero
+ * and listed no failing case, `suite-outside-case.ts`, #945) stops the
+ * run at the call that took it, which is before the run's first
+ * session: no step could be split against it, and it was not written.
+ * The lines are `baselineHaltLines`'s: the exit code with
+ * `OUTSIDE_CASE_REASON`, the likely cause (a test file that did not
+ * load), and the run's output tail off the recorded step, whole. Every
+ * later call of the run answers `stop` or false without running a step,
+ * and nothing is written on the tracker: no task is at fault.
+ *
+ * {@link RunSuiteSteps.stoppedOnSignal} answers true from then on too,
+ * though no signal made this stop. It is the one reading `start.ts`
+ * asks before it retries a suite stop or lets a `--continue` run decide
+ * on one, and neither may follow here: the baseline is taken once per
+ * run, so a retry meets the same stop, and a decision would be made on
+ * a `[BLOCKED]` task this stop says nothing about.
+ *
  * ## A step that throws
  *
  * `suite-step.ts` answers a red suite as an outcome and warns about the
@@ -95,7 +114,7 @@
  * The four steps arrive through {@link SuiteStepCalls} and `gh`, which
  * reads the plan's `Owns:` folders for `planOwnsReader`, through
  * {@link RunSuiteStepsOptions.gh}; each left out is the system's own.
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type {
   BaselineOutcome,
@@ -108,11 +127,12 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { parseTaskDeclaration, readTestScope } from '../utils/declaration.js';
 
+import { baselineHaltLines } from './suite-outside-case.js';
 import {
   ensureBaseline,
   planOwnsReader,
@@ -170,7 +190,10 @@ export interface RunSuiteSteps {
   /**
    * True once a step or the baseline of this run was read as stopped by
    * SIGINT, so the stop the loop is acting on is an interrupt and never a
-   * red step; see "A step stopped by SIGINT" in the module note.
+   * red step; see "A step stopped by SIGINT" in the module note. True
+   * also once the baseline halted the run, a stop no retry and no
+   * decision follows either; see "A baseline that failed outside any
+   * test case" there.
    */
   readonly stoppedOnSignal: () => boolean;
   /**
@@ -181,12 +204,23 @@ export interface RunSuiteSteps {
   readonly lastPreWrapUp: () => StepOutcome | null;
 }
 
-/** The baseline, `off` when ensuring it threw, or `interrupted` when SIGINT stopped it. */
-type BaselineHeld = SuiteBaseline | 'off' | 'interrupted';
+/** The baseline, `off` when ensuring it threw, `interrupted` when SIGINT stopped it, or `halted` when it failed outside any test case. */
+type BaselineHeld = SuiteBaseline | 'off' | 'interrupted' | 'halted';
+
+/** True when the baseline stopped the run: no step runs at any later call. */
+function isStopped(known: BaselineHeld): known is 'interrupted' | 'halted' {
+  return known === 'interrupted' || known === 'halted';
+}
 
 /** Says the run stops on SIGINT as `rafa loop stop` stops it, with nothing marked. */
 function announceInterrupted(): void {
   activeOutput().info('   Stopping here, as rafa loop stop does: no task is marked blocked. Run again to go on.');
+}
+
+/** Says the run stops on the halted baseline `outcome`, whose step holds its run's output tail; see the module note. */
+function announceHalted(outcome: BaselineOutcome): void {
+  const lines = baselineHaltLines({ exitCode: outcome.baseline.exitCode, outputTail: outcome.step?.outputTail ?? [] });
+  for (const line of lines) activeOutput().error(line);
 }
 
 /** Says why the run stops after the red step `outcome`. */
@@ -268,7 +302,8 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
       : { isInterrupted: options.isInterrupted }),
   };
 
-  // Set once a step or the baseline is read as stopped by SIGINT.
+  // Set once a step or the baseline is read as stopped by SIGINT, or the
+  // baseline halts the run: a stop `start.ts` neither retries nor decides.
   let signalled = false;
   const goesOnNoting = (outcome: StepOutcome | null): boolean => {
     if (outcome?.interrupted === true) signalled = true;
@@ -282,6 +317,11 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
         signalled = true;
         announceInterrupted();
         return 'interrupted';
+      }
+      if (outcome?.halted === true) {
+        signalled = true;
+        announceHalted(outcome);
+        return 'halted';
       }
       if (outcome !== null) return outcome.baseline;
       activeOutput().warn('⚠️  With no suite baseline, no suite step runs this run.');
@@ -310,7 +350,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
 
   const beforeSession = async (taskInfo: TaskInfo | null): Promise<BeforeSessionAnswer> => {
     const known = await baseline();
-    if (known === 'interrupted') return 'stop';
+    if (isStopped(known)) return 'stop';
     if (known === 'off') return 'go-on';
     if (taskInfo === null) return preWrapUp(known);
     if (taskInfo.status === 'blocked') return 'go-on';
@@ -320,7 +360,7 @@ export function createRunSuiteSteps(options: RunSuiteStepsOptions): RunSuiteStep
 
   const afterTask = async (taskInfo: TaskInfo, base: string): Promise<boolean> => {
     const known = await baseline();
-    if (known === 'interrupted') return false;
+    if (isStopped(known)) return false;
     if (known === 'off') return true;
     const { text, declaration } = parseTaskDeclaration(taskInfo.task);
     const input: TaskStepInput = { baseline: known, base, declared: readTestScope(declaration), task: text };

@@ -114,10 +114,10 @@
  * rule read at two boundaries, and `ceiling.test.ts` measures both.
  */
 import type { NextActionId } from './state.js';
-import type { RafaContext } from '../cli/command.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { RafaContext } from '../core/command/index.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { LABELS_ONLY_ACTIONS, NEXT_COMMAND_ACTIONS } from './actions.js';
 

@@ -50,10 +50,10 @@
  * the terminal result event.
  */
 import type { LineFlags, PrSeams } from './pr-context.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { PullRequestDraft, PullRequestSummary } from '../../pr/index.js';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { readRequiredFlag } from '../issue/issue-tracker.js';
 
 import { DEFAULT_PR_SEAMS, expectNoArguments, lineRefusal, onProvider, openPrContext, PR_USAGE } from './pr-context.js';
@@ -195,4 +195,5 @@ export function createPrOpenCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
   return Object.freeze(command);
 }
 
-export default createPrOpenCommand();
+const command: RafaCommand = createPrOpenCommand();
+export default command;

@@ -84,6 +84,8 @@ The Claude sessions are named `<project> stretch <n> <role>`.
 device drives it from claude.ai; `--dry-run` prints what would run. `start`
 warns about operators still linked into `~/.claude` by the launcher before
 the copies, since no new stretch reads them and one started with them may.
+Whether the tmux session stays is open: #598 rejected a tmux session on
+the host, read with capture-pane.
 
 `rafa stretch item <issue> [--wait] [--dry-run]` handles one item from
 loop start to its pit-stop readings. It takes the integration branch from
@@ -92,10 +94,30 @@ loop start to its pit-stop readings. It takes the integration branch from
 `RAFA_OUTPUT=events`, logging to `.rafa/stretch/<n>/loop-<issue>.log`.
 With `--wait`, it waits on the loop through `rafa loop wait`. Once the loop
 has a pull request, `item` merges it with `--skip-checks` into the
-integration branch, frees the worktree, waits for `verify` on the new head,
-appends the ledger line and prints the pit-stop readings: the failed cases
-by file and case, the open-bug count, and the bugs filed since the last
-item. It decides nothing; the pit stop does.
+integration branch, frees the worktree, and waits for the run on the merge
+commit. It asks for that run by commit (`--commit`), so a newer push to the
+branch that has a run of its own does not make the wait read that run. The
+wait ends on the merge commit's run, red or green. If no run is found on the
+commit, or the run found has not ended, within 90 minutes, it warns `no run
+on <branch> at <sha> was found within 90 minutes` or `run <id> (<workflow>)
+on <branch> at <sha> had not ended within 90 minutes`. Then it appends the
+ledger line and prints the pit-stop readings: the failed cases by file and
+case, the open-bug count, and the bugs filed since the last item. It decides
+nothing; the pit stop does.
+
+The filed-since line reads `Filed since <time>: <n>.`, where the time is the
+last ledger line's, or the stretch's start when the ledger holds none. Then
+one indented line per bug, `#<n> <title> (<filed time>)`, oldest first. Each
+bug's filed time is the `createdAt` its open issue carries in the tracker's
+one listing (`openIssues('bug')`, `src/ports/index.ts`), so no `gh issue view`
+runs per bug. GitHub answers it from `gh issue list`
+(`src/adapters/tracker/github-open-issues.ts`); the local tracker answers the
+record's `capturedAt`, the time the issue was created, not a file's time on
+disk. A bug with no time, or one whose time does not parse, turns the line
+into `Filed since the last item: not read: no filing time for #<n>`, since a
+bug left out would read as not filed. A tracker with no open-issue listing
+reads the same way, with its own reason. A bug filed and closed between two
+items is not open, so it is not listed.
 
 `rafa stretch end [--dry-run]` opens the integration branch into the
 default branch with `report.md` as its body and every merged item's `Closes`
@@ -125,6 +147,19 @@ the folder, the next stretch is the highest folder while it has no
 windows wait for the new stretch's `agent.json`, which the engineer writes
 when its session opens, since both find the engineer's stretch by it.
 
+`rafa self-update` installs this checkout as the global rafa. While a loop of
+the project is live it refuses at exit code 1, before the build, naming each
+loop, and `--force` does not override that wait; only
+`dangerous.selfUpdateDuringLoop: true` lets the install go on. A plan parked
+halfway is the edge case: its tracker holds an open or blocked task that no
+loop will pick up. With no loop live, that tracker does not hold the update
+back. The install warns once, naming the tracker and the line its task is on,
+and goes on, so `rafa self-update` names it and updates. With that key true
+and a loop live, the same tracker still refuses at exit code 1 unless
+`--force` is on the line. Counting only trackers whose task is not
+`[BLOCKED]` was rejected: the open task nobody runs would still stand as a
+wall.
+
 The engineer's opening message is the first of three files, with
 `{{STRETCH}}` and `{{PREVIOUS}}` filled in: the project's own
 `.rafa/stretch/engineer-prompt.md`, then, in the rafa checkout alone,
@@ -152,6 +187,32 @@ a single command, and a compound one goes to the auto-mode classifier. For
 example, `rafa pr merge <pr> && rafa cleanup` is denied; run them as two
 separate commands instead. The detached loop start that once needed a
 redirect is now `rafa stretch item`.
+
+### A `dangerous.*` key is refused
+
+A `dangerous.*` key is a person's consent to step off a check, so an
+operator session cannot set one. Claude Code sets `CLAUDECODE` in the shell
+of every command a session runs, and `rafa config set` reads that variable
+as "an agent runs this". Under it, `rafa config set
+dangerous.acceptVersionCollision=true` exits 1 before the project's config
+file is read, so the file is left byte for byte as it was. The refusal
+prints the variable it read, that nothing was written, and the exact line
+for the person to run in their own terminal:
+`rafa config set dangerous.acceptVersionCollision=true`. It covers
+`dangerous` itself and every key under `dangerous.`, known to the reader or
+not, and with `--output=json` it is the same refusal as the command's other
+refusals. Every other key is written from an operator's shell as it is
+anywhere.
+
+A `dangerous.*` key is a signature. An assistant can prepare the form and
+hand over the pen, and cannot sign. So when an operator is asked to get past
+a version collision, the step is to tell the person the line; they run it if
+they agree.
+
+Two limits. The check is the one variable, so a person who exports
+`CLAUDECODE` by hand in their own shell is refused too, and anything wider
+belongs to #914. A shell without the variable is not gated at all, so the
+refusal reads the shell and not who is typing.
 
 ### The events output
 

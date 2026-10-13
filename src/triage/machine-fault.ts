@@ -171,7 +171,7 @@ export interface MachineFault {
  * A manager named without one of these in the same field is a remedy or
  * a mention, not a fault. See the module note.
  */
-export const BUILD_FAILURE = /\b(?:abort(?:ed|s)?|broke|broken|crash(?:ed|es)?|error|errors|fail(?:ed|ing|s|ure|ures)?|unusable)\b/iu;
+export const BUILD_FAILURE: RegExp = /\b(?:abort(?:ed|s)?|broke|broken|crash(?:ed|es)?|error|errors|fail(?:ed|ing|s|ure|ures)?|unusable)\b/iu;
 
 /**
  * Every shape a bug is read for, in the order a reading takes them:

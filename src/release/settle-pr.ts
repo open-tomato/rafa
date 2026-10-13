@@ -85,7 +85,7 @@ import type { SettleWorktree } from './settle-worktree.js';
 import type { SettleBuild, SettleBuilt, SettleSettings } from './settle.js';
 import type { GitRunner, PullRequestDetail, PullRequestDraft, PullRequests, PullRequestSummary } from '../pr/index.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { gitSaid } from '../pr/index.js';
 
 import { pushSaid } from './settle-push.js';

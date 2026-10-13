@@ -28,7 +28,7 @@
  * refusal: no directory on the line, a second word, or a path that is
  * no directory.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CheckCommandSeams } from '../check-report.js';
 
 import { checkCommandRun, DEFAULT_CHECK_SEAMS, INSTINCT_CHECK_USAGE } from '../check-report.js';
@@ -76,4 +76,5 @@ export function createInstinctCheckCommand(seams: CheckCommandSeams = DEFAULT_CH
   return Object.freeze(command);
 }
 
-export default createInstinctCheckCommand();
+const command: RafaCommand = createInstinctCheckCommand();
+export default command;

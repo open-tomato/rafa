@@ -43,7 +43,7 @@
  */
 import type { BlockedLine } from '../../board/blocked-line.js';
 import type { RoadmapLine } from '../../board/roadmap.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

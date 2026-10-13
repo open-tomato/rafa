@@ -106,12 +106,13 @@
  * change to a core command's declaration, or to a default it reads from
  * a constant, goes red until they are regenerated and the diff read.
  */
-import type { CommandExample, RafaCommand } from './command.js';
 import type { ArgSpec, FlagSpec } from './core/types.js';
 import type { CommandRegistry, SubjectSpec } from './registry.js';
 import type { HelpRequest } from './route.js';
+import type { CommandExample, RafaCommand } from '../core/command/index.js';
 
-import { isTopLevel } from './command.js';
+import { isTopLevel } from '../core/command/index.js';
+
 import { mountKey } from './registry.js';
 import { SPENDS_GLYPH, spendsCondition, spendsMark } from './spends.js';
 
@@ -145,7 +146,7 @@ export const GLOBAL_FLAGS: readonly GlobalFlag[] = Object.freeze([
 ]);
 
 /** The root help's closing line, saying what the spend mark means. */
-export const SPENDS_LEGEND = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;
+export const SPENDS_LEGEND: string = `${SPENDS_GLYPH}  starts Claude Code sessions, which spend your Claude usage`;
 
 /** The indent of a block's lines under its heading. */
 const INDENT = '  ';

@@ -94,11 +94,11 @@
  * is left out. A `totalCount` below the nodes answered is refused.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { BoardRelationshipMode } from '../config-sections.js';
+import type { BoardRelationshipMode } from '../core/config/sections.js';
 import type { IssueType } from '../ports/index.js';
 
 import { moduleOfLabels, typeOfLabels } from '../adapters/tracker/github.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 /** What every refusal this module raises opens with. */
 const PREFIX = 'board listing';
@@ -112,7 +112,7 @@ export const BOARD_LIST_FIELDS = 'number,title,body,state,stateReason,labels';
  * {@link parseBoardListing} reads in that mode, in the order the module
  * note lists them.
  */
-export const nativeBoardListFields = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
+export const nativeBoardListFields: string = `${BOARD_LIST_FIELDS},parent,blockedBy,blocking,subIssuesSummary,subIssues`;
 
 /** The `--json` fields a listing read in `mode` asks for. */
 export function boardListFields(mode: BoardRelationshipMode): string {

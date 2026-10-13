@@ -1,11 +1,17 @@
 /**
  * Tests for the injection renderer.
  *
- * Fixtures are lists of lines joined here, as `parse.test.ts` builds
- * them. A dispatched task is never a literal copied from the loop's
+ * Fixtures are lists of lines joined here, as `../core/plan/parse.test.ts`
+ * builds them. A dispatched task is never a literal copied from the loop's
  * reader: {@link dispatchedAt} blanks every other line and asks
- * `findNextTask` itself, so each `task` and `lineNum` handed to the
- * renderer is one the loop could have handed it.
+ * `findNextTask` itself, so each `task` handed to the renderer is one
+ * the loop could have handed it, and {@link positionOf} counts its
+ * place over `listTrackerTasks`, the reader the loop lists a tracker's
+ * tasks with. The renderer reads no `lineNum`; the cases under
+ * `locating the task` hand it one that is wrong for the plan and hold
+ * that nothing changes. A dispatched repair is likewise one the loop's
+ * writer inserted and its reader answered ({@link repairAfter}), named
+ * by the comment `insertTrackerTask` wrote on its line.
  *
  * Every rule that keeps something OUT of a rendering has a control
  * showing the fixture carries it — the `full` rendering of the same
@@ -24,8 +30,8 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { INJECT_MODES } from '../config.js';
-import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
+import { INJECT_MODES } from '../core/config/sections.js';
+import { findNextTask, insertTrackerTask, listTrackerTasks, updateTrackerLine } from '../utils/tracker.js';
 
 import { renderInjection } from './inject.js';
 
@@ -35,20 +41,34 @@ function doc(...lines: string[]): string {
 }
 
 /**
- * The task `findNextTask` answers for the first line opening with
- * `prefix`, found with every other line blanked. Throws when no such
- * line is a task, so a fixture typo fails loudly.
+ * The task `findNextTask` answers for the line at `lineNum`, found with
+ * every other line blanked. Throws when the line is no task, so a
+ * fixture typo fails loudly.
  */
-function dispatchedAt(lines: readonly string[], prefix: string): TaskInfo {
-  const lineNum = lines.findIndex((line) => line.startsWith(prefix));
+function dispatchedOn(lines: readonly string[], lineNum: number): TaskInfo {
   const alone = lines.map((line, index) => (index === lineNum
     ? line
     : ''));
   const info = findNextTask(alone.join('\n'));
   if (lineNum < 0 || info === null) {
-    throw new Error(`fixture holds no task line opening with ${JSON.stringify(prefix)}`);
+    throw new Error(`fixture holds no task on line ${lineNum}`);
   }
   return info;
+}
+
+/** {@link dispatchedOn} the first line opening with `prefix`. */
+function dispatchedAt(lines: readonly string[], prefix: string): TaskInfo {
+  return dispatchedOn(lines, lines.findIndex((line) => line.startsWith(prefix)));
+}
+
+/**
+ * The place of `info` among the tasks the loop's reader lists in
+ * `lines`, counting from zero. Throws when it is none of them.
+ */
+function positionOf(lines: readonly string[], info: Pick<TaskInfo, 'lineNum'>): number {
+  const position = listTrackerTasks(lines.join('\n')).findIndex((task) => task.lineNum === info.lineNum);
+  if (position < 0) throw new Error(`fixture lists no task on line ${info.lineNum}`);
+  return position;
 }
 
 /** Two stages, both contexts, a declaration, prose and an ignored block. */
@@ -96,6 +116,17 @@ const PLAN = doc(...PLAN_LINES);
 /** The plan's second task, the one most cases dispatch. */
 const VALIDATOR = dispatchedAt(PLAN_LINES, '- [ ] Add the validator');
 
+/** Where every case that writes a tracker keeps it. */
+let dir = '';
+
+beforeAll(() => {
+  dir = mkdtempSync(join(tmpdir(), 'rafa-inject-'));
+});
+
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
 describe('full', () => {
   it('answers the plan byte for byte, whatever it holds', () => {
     const tracker = PLAN.replace('- [ ] Add the schema', '- [x] Add the schema');
@@ -122,7 +153,7 @@ describe('full', () => {
 
     // Control: the same task falls back under a mode that locates it.
     const stage = renderInjection({ mode: 'stage', plan: PLAN, task });
-    expect(stage.fallback?.reason).toBe('no-task-at-line');
+    expect(stage.fallback?.reason).toBe('no-task-with-text');
   });
 });
 
@@ -372,34 +403,400 @@ describe('tasks outside every stage', () => {
   });
 });
 
-describe('fallback to full', () => {
-  /** The plan with `inserted` placed right above the validator. */
-  function editedAbove(inserted: string): string {
-    return doc(...PLAN_LINES.flatMap((line) => (line === '- [ ] Add the validator'
-      ? [inserted, line]
-      : [line])));
+describe('locating the task', () => {
+  /** A repair line as `writeRepairTask` inserts one, its declaration and blocker included. */
+  function repairAt(commit: string) {
+    return { task: `Repair the red task step at commit ${commit}`, declaration: 'agent=build-error-resolver', blocker: 'the suite went red' };
   }
 
-  it.each(['stage', 'task'] as const)('%s hands over the plan when the line holds another task', (mode) => {
-    const plan = editedAbove('- [ ] Add the migration');
-    const rendered = renderInjection({ mode, plan, task: VALIDATOR });
+  /** The plan with the validator's sentence reworded, its line and place kept. */
+  const REWORDED_LINES = PLAN_LINES.map((line) => line.replace('Add the validator', 'Add the strict validator'));
+
+  /** Two stages that each close on a task of the same text. */
+  const TWICE_LINES = [
+    '# Stage: schema',
+    '',
+    '- [ ] Add the schema',
+    '- [ ] Add the tests',
+    '',
+    '# Stage: api',
+    '',
+    '- [ ] Add the route',
+    '- [ ] Add the tests',
+  ];
+
+  const TWICE = doc(...TWICE_LINES);
+  const FIRST_TESTS = dispatchedOn(TWICE_LINES, TWICE_LINES.indexOf('- [ ] Add the tests'));
+  const SECOND_TESTS = dispatchedOn(TWICE_LINES, TWICE_LINES.lastIndexOf('- [ ] Add the tests'));
+
+  it.each(['stage', 'task'] as const)('%s renders a task sitting two lines below its plan line (#865)', (mode) => {
+    const trackerPath = join(dir, `PLAN_TRACKER-repaired-${mode}.md`);
+    writeFileSync(trackerPath, PLAN);
+    const read = () => readFileSync(trackerPath, 'utf8');
+
+    // The first task is done, then two red steps each insert a repair
+    // above the next open task, and each repair is done in turn.
+    updateTrackerLine(trackerPath, findNextTask(read())!.lineNum, 'done');
+    for (const commit of ['1111111', '2222222']) {
+      const repair = insertTrackerTask(trackerPath, repairAt(commit), findNextTask(read())!.lineNum);
+      expect(findNextTask(read())?.lineNum).toBe(repair);
+      updateTrackerLine(trackerPath, repair, 'done');
+    }
+
+    const dispatched = findNextTask(read());
+    expect(dispatched).toEqual({ ...VALIDATOR, lineNum: VALIDATOR.lineNum + 2 });
+    // Control: the plan holds no task on that line, which is what the
+    // lookup by line number fell back on.
+    expect(PLAN_LINES[VALIDATOR.lineNum + 2]).toBe('');
+
+    const rendered = renderInjection({ mode, plan: PLAN, task: dispatched! });
+    expect(rendered.fallback).toBeNull();
+    expect(rendered.mode).toBe(mode);
+    expect(rendered).toEqual(renderInjection({ mode, plan: PLAN, task: VALIDATOR }));
+  });
+
+  it.each(['stage', 'task'] as const)('%s takes a text held once, whatever the line and the position say', (mode) => {
+    const handler = dispatchedAt(PLAN_LINES, '- [ ] Add the handler');
+    const elsewhere = positionOf(PLAN_LINES, handler);
+    const inPlace = renderInjection({ mode, plan: PLAN, task: VALIDATOR, position: positionOf(PLAN_LINES, VALIDATOR) });
+    expect(inPlace.fallback).toBeNull();
+    expect(inPlace.text).toContain('- [ ] Add the validator');
+
+    const moved = { ...VALIDATOR, lineNum: handler.lineNum };
+    expect(renderInjection({ mode, plan: PLAN, task: { task: VALIDATOR.task } })).toEqual(inPlace);
+    expect(renderInjection({ mode, plan: PLAN, task: moved })).toEqual(inPlace);
+    expect(renderInjection({ mode, plan: PLAN, task: moved, position: elsewhere })).toEqual(inPlace);
+
+    // Control: that position names another task, and a text nobody
+    // holds is located there, so it could have changed the answer.
+    const byPosition = renderInjection({ mode, plan: PLAN, task: { task: 'Nothing the plan says' }, position: elsewhere });
+    expect(byPosition.fallback).toBeNull();
+    expect(byPosition.text).toContain('- [ ] Add the handler');
+    expect(byPosition.text).not.toContain('Add the validator');
+  });
+
+  it('takes the task at the position when two hold the text', () => {
+    expect(SECOND_TESTS.task).toBe(FIRST_TESTS.task);
+    expect(positionOf(TWICE_LINES, FIRST_TESTS)).toBe(1);
+    expect(positionOf(TWICE_LINES, SECOND_TESTS)).toBe(3);
+
+    const first = renderInjection({ mode: 'stage', plan: TWICE, task: FIRST_TESTS, position: positionOf(TWICE_LINES, FIRST_TESTS) });
+    expect(first.fallback).toBeNull();
+    expect(first.text).toBe(doc(
+      '## Stage: schema',
+      '',
+      '- [x] Add the schema',
+      '- [ ] Add the tests',
+      '',
+      '## Stages',
+      '',
+      '1. schema (current stage)',
+      '2. api',
+    ));
+
+    const second = renderInjection({ mode: 'stage', plan: TWICE, task: SECOND_TESTS, position: positionOf(TWICE_LINES, SECOND_TESTS) });
+    expect(second.fallback).toBeNull();
+    expect(second.text).toBe(doc(
+      '## Stage: api',
+      '',
+      '- [x] Add the route',
+      '- [ ] Add the tests',
+      '',
+      '## Stages',
+      '',
+      '1. schema',
+      '2. api (current stage)',
+    ));
+
+    // The position decides and the line does not: the second task's
+    // record with the first one's position renders the first.
+    expect(renderInjection({ mode: 'stage', plan: TWICE, task: SECOND_TESTS, position: 1 })).toEqual(first);
+  });
+
+  it.each([
+    ['no position', undefined, 'the dispatch gives no position among its tasks'],
+    ['the position of a task with another text', 0, 'task number 1 is none of them'],
+    ['a position past the last task', 4, 'task number 5 is none of them'],
+  ] as const)('hands over the plan when two hold the text and it is given %s', (_name, position, said) => {
+    const rendered = renderInjection({ mode: 'stage', plan: TWICE, task: SECOND_TESTS, position });
+
+    expect(rendered).toMatchObject({ requested: 'stage', mode: 'full', text: TWICE });
+    expect(rendered.fallback?.reason).toBe('several-tasks-with-text');
+    expect(rendered.fallback?.text).toBe(`the plan holds 2 tasks with the dispatched text and ${said}, so the whole plan is handed over`);
+  });
+
+  it.each(['stage', 'task'] as const)('%s takes the task at the position when the plan reworded it', (mode) => {
+    const reworded = doc(...REWORDED_LINES);
+    const position = positionOf(PLAN_LINES, VALIDATOR);
+    const rendered = renderInjection({ mode, plan: reworded, task: VALIDATOR, position });
+
+    expect(rendered.fallback).toBeNull();
+    expect(rendered.mode).toBe(mode);
+    expect(rendered).toEqual(renderInjection({
+      mode,
+      plan: reworded,
+      task: dispatchedAt(REWORDED_LINES, '- [ ] Add the strict validator'),
+    }));
+    expect(rendered.text).toContain('- [ ] Add the strict validator');
+
+    // Near miss: with no position the reworded task is not found.
+    const unplaced = renderInjection({ mode, plan: reworded, task: VALIDATOR });
+    expect(unplaced.mode).toBe('full');
+    expect(unplaced.fallback?.reason).toBe('no-task-with-text');
+  });
+});
+
+describe('a repair', () => {
+  /** What the stage-two repair's line says, its declaration off. */
+  const REPAIR = 'Repair the red task step at commit 3333333';
+
+  /** A repair line's sentence, as `isRepairTask` reads one. */
+  const REPAIR_LINE = /^Repair the red /;
+
+  /** A dispatched repair, with the request fields the loop reads off its tracker. */
+  interface DispatchedRepair {
+    readonly task: TaskInfo;
+    readonly position: number;
+    readonly repairs: string | null;
+  }
+
+  /**
+   * The repair `findNextTask` answers once the first `done` tasks of
+   * `lines` are ticked and a red step has inserted one above the next
+   * open task, or after the last task when none is open. Its line
+   * names `repairs` when that is a text. Its position is the place of
+   * the plan task above it.
+   */
+  function repairAfter(name: string, lines: readonly string[], done: number, text: string, repairs: string | null): DispatchedRepair {
+    const trackerPath = join(dir, `PLAN_TRACKER-repair-${name}.md`);
+    writeFileSync(trackerPath, doc(...lines));
+    const read = () => readFileSync(trackerPath, 'utf8');
+    for (let ticked = 0; ticked < done; ticked += 1) {
+      updateTrackerLine(trackerPath, findNextTask(read())!.lineNum, 'done');
+    }
+
+    const entry = { task: text, declaration: 'agent=build-error-resolver', blocker: 'the suite went red' };
+    const line = insertTrackerTask(
+      trackerPath,
+      repairs === null
+        ? entry
+        : { ...entry, repairs },
+      findNextTask(read())?.lineNum ?? null,
+    );
+    const task = findNextTask(read());
+    if (task?.lineNum !== line) throw new Error('the repair is not the task the tracker answers');
+
+    const above = listTrackerTasks(read()).filter((held) => held.lineNum < line && !REPAIR_LINE.test(held.task));
+    return { task, position: above.length - 1, repairs: task.repairs ?? null };
+  }
+
+  /** The repair of `Add the route`, the first task of stage two. */
+  function routeRepair(name: string): DispatchedRepair {
+    return repairAfter(name, PLAN_LINES, 4, REPAIR, 'Add the route');
+  }
+
+  it('is answered by the tracker with the task it names and its declaration', () => {
+    const repair = routeRepair('read');
+
+    expect(repair.task).toMatchObject({
+      task: `${REPAIR}  {agent=build-error-resolver}`,
+      status: 'blocked',
+      repairs: 'Add the route',
+    });
+    // `Add the route` is the fourth of the plan's tasks.
+    expect(repair.position).toBe(3);
+  });
+
+  it('renders the stage of the task it names, its own line open below that task', () => {
+    const rendered = renderInjection({ mode: 'stage', plan: PLAN, ...routeRepair('stage') });
+
+    expect(rendered).toEqual({
+      requested: 'stage',
+      mode: 'stage',
+      fallback: null,
+      text: doc(
+        '## Plan context',
+        '',
+        'Every task keeps the store append-only.',
+        '',
+        '## Stage: api',
+        '',
+        'Routes are versioned under /v1.',
+        '',
+        '- [x] Add the route',
+        `- [ ] ${REPAIR}`,
+        '- [ ] Add the handler',
+        '',
+        '## Stages',
+        '',
+        '1. schema',
+        '2. api (current stage)',
+      ),
+    });
+  });
+
+  it('renders its own line alone under `task`, with the named task\'s contexts', () => {
+    const rendered = renderInjection({ mode: 'task', plan: PLAN, ...routeRepair('task') });
+
+    expect(rendered.fallback).toBeNull();
+    expect(rendered.text).toBe(doc(
+      '## Plan context',
+      '',
+      'Every task keeps the store append-only.',
+      '',
+      '## Stage: api',
+      '',
+      'Routes are versioned under /v1.',
+      '',
+      `- [ ] ${REPAIR}`,
+    ));
+  });
+
+  it.each(['stage', 'task'] as const)('%s is not rendered for a repair located as a plan task is', (mode) => {
+    // Control for the two cases above: the same dispatch with the
+    // name left out is looked up by the repair's own text, which the
+    // plan does not hold, so the name is what rendered the stage.
+    const { task } = routeRepair(`unnamed-${mode}`);
+    const rendered = renderInjection({ mode, plan: PLAN, task });
+
+    expect(rendered.mode).toBe('full');
+    expect(rendered.fallback?.reason).toBe('no-task-with-text');
+  });
+
+  it('shows the tasks of the stage below the named one as the plan wrote them', () => {
+    const repair = repairAfter('mid-stage', PLAN_LINES, 2, 'Repair the red task step at commit 4444444', 'Add the validator');
+    const rendered = renderInjection({ mode: 'stage', plan: PLAN, ...repair });
+
+    expect(rendered.fallback).toBeNull();
+    expect(rendered.text).toContain(doc(
+      '## Stage: schema',
+      '',
+      'Schemas live in src/schema/.',
+      '',
+      '- [x] Add the schema',
+      '- [x] Add the validator',
+      '- [ ] Repair the red task step at commit 4444444',
+      '- [ ] Add the fixtures',
+    ));
+  });
+
+  it.each(['stage', 'task'] as const)('%s falls back, and says a repair was looking, when the plan no longer holds the named task', (mode) => {
+    const repair = routeRepair(`lost-${mode}`);
+    const lost = doc(...PLAN_LINES.filter((line) => !line.includes('Add the route')));
+    const rendered = renderInjection({ mode, plan: lost, ...repair });
+
+    expect(rendered).toEqual({
+      requested: mode,
+      mode: 'full',
+      text: lost,
+      fallback: {
+        reason: 'no-task-with-text',
+        text: 'the plan holds no task with the text the dispatched repair names, so the whole plan is handed over; '
+          + 'the plan may have changed since the repair was written',
+      },
+    });
+
+    // The position names a task of that plan and is not taken for the
+    // named one: a plan task with no holder of its text is found there.
+    const byPosition = renderInjection({ mode, plan: lost, task: { task: 'Nothing the plan says' }, position: repair.position });
+    expect(byPosition.fallback).toBeNull();
+    // Control: the plan that holds the task renders.
+    expect(renderInjection({ mode, plan: PLAN, ...repair }).mode).toBe(mode);
+  });
+
+  it.each(['stage', 'task'] as const)('%s hands a repair that names nothing the whole plan with a null fallback', (mode) => {
+    const repair = repairAfter(`pre-wrap-up-${mode}`, PLAN_LINES, 5, 'Repair the red pre-wrap-up step at commit 5555555', null);
+    expect(repair.task.repairs).toBeUndefined();
+    expect(repair.repairs).toBeNull();
+
+    const rendered = renderInjection({ mode, plan: PLAN, ...repair });
+    expect(rendered).toEqual({ requested: mode, mode: 'full', text: PLAN, fallback: null });
+
+    // Control: looked up by its own text, the same line does fall back.
+    expect(renderInjection({ mode, plan: PLAN, task: repair.task }).fallback?.reason).toBe('no-task-with-text');
+  });
+
+  it('takes the named task at the position when two hold its text', () => {
+    const lines = ['# Stage: schema', '', '- [ ] Add the schema', '- [ ] Add the tests', '', '# Stage: api', '', '- [ ] Add the route', '- [ ] Add the tests'];
+    const plan = doc(...lines);
+    const first = repairAfter('twice-first', lines, 2, REPAIR, 'Add the tests');
+    const second = repairAfter('twice-second', lines, 4, REPAIR, 'Add the tests');
+    expect([first.position, second.position]).toEqual([1, 3]);
+
+    expect(renderInjection({ mode: 'stage', plan, ...first }).text).toContain(doc(
+      '## Stage: schema',
+      '',
+      '- [x] Add the schema',
+      '- [x] Add the tests',
+      `- [ ] ${REPAIR}`,
+    ));
+    expect(renderInjection({ mode: 'stage', plan, ...second }).text).toContain(doc(
+      '## Stage: api',
+      '',
+      '- [x] Add the route',
+      '- [x] Add the tests',
+      `- [ ] ${REPAIR}`,
+    ));
+
+    const unplaced = renderInjection({ mode: 'stage', plan, task: second.task, repairs: second.repairs });
+    expect(unplaced.mode).toBe('full');
+    expect(unplaced.fallback).toEqual({
+      reason: 'several-tasks-with-text',
+      text: 'the plan holds 2 tasks with the text the dispatched repair names and the dispatch gives no position among its tasks, '
+        + 'so the whole plan is handed over',
+    });
+  });
+});
+
+describe('fallback to full', () => {
+  /** A task whose text no fixture holds. */
+  const UNHELD = { task: 'Nothing the plan says' };
+
+  /** A fallback sentence naming a line of the plan, as the lookup by line number wrote them. */
+  const NAMES_A_LINE = /\bline \d/;
+
+  it.each(['stage', 'task'] as const)('%s hands over the plan when neither the text nor the position finds a task', (mode) => {
+    const pastTheEnd = listTrackerTasks(PLAN).length;
+    const rendered = renderInjection({ mode, plan: PLAN, task: UNHELD, position: pastTheEnd });
 
     expect(rendered.requested).toBe(mode);
     expect(rendered.mode).toBe('full');
-    expect(rendered.text).toBe(plan);
-    expect(rendered.fallback).toMatchObject({ reason: 'task-text-differs', line: VALIDATOR.lineNum + 1 });
+    expect(rendered.text).toBe(PLAN);
+    expect(rendered.fallback).toEqual({
+      reason: 'no-task-with-text',
+      text: `the plan holds no task with the dispatched text and no task number ${pastTheEnd + 1}, so the whole plan is handed over; `
+        + 'the plan may have changed since its tracker was copied, or the task line sits inside a rafa:* block',
+    });
 
-    // Near miss: the unedited plan holds the task where it was dispatched.
-    expect(renderInjection({ mode, plan: PLAN, task: VALIDATOR }).fallback).toBeNull();
+    // Near misses: the last position, and the text of a task, are each found.
+    expect(renderInjection({ mode, plan: PLAN, task: UNHELD, position: pastTheEnd - 1 }).fallback).toBeNull();
+    expect(renderInjection({ mode, plan: PLAN, task: VALIDATOR, position: pastTheEnd }).fallback).toBeNull();
   });
 
-  it.each(['stage', 'task'] as const)('%s hands over the plan when the line holds no task', (mode) => {
-    const plan = editedAbove('');
-    const rendered = renderInjection({ mode, plan, task: VALIDATOR });
+  it('says what was looked for with no position, and names no line of the plan', () => {
+    const onALine = { ...UNHELD, lineNum: 21 };
+    const rendered = renderInjection({ mode: 'stage', plan: PLAN, task: onALine });
 
     expect(rendered.mode).toBe('full');
-    expect(rendered.text).toBe(plan);
-    expect(rendered.fallback).toMatchObject({ reason: 'no-task-at-line', line: VALIDATOR.lineNum + 1 });
+    expect(rendered.fallback).toEqual({
+      reason: 'no-task-with-text',
+      text: 'the plan holds no task with the dispatched text, so the whole plan is handed over; '
+        + 'the plan may have changed since its tracker was copied, or the task line sits inside a rafa:* block',
+    });
+    expect(rendered.fallback?.text).not.toMatch(NAMES_A_LINE);
+
+    // Control: the sentence this one replaces is one the pattern reads.
+    expect('line 22 of the plan holds no task the plan model reads').toMatch(NAMES_A_LINE);
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])('reads the position %p as naming no task', (position) => {
+    const rendered = renderInjection({ mode: 'stage', plan: PLAN, task: UNHELD, position });
+
+    expect(rendered.mode).toBe('full');
+    expect(rendered.fallback).toEqual(renderInjection({ mode: 'stage', plan: PLAN, task: UNHELD }).fallback);
+
+    // Control: a position that names a task renders its stage.
+    expect(renderInjection({ mode: 'stage', plan: PLAN, task: UNHELD, position: 1 }).mode).toBe('stage');
   });
 
   it('hands over the plan for a task line the model reads as block body', () => {
@@ -408,13 +805,18 @@ describe('fallback to full', () => {
     const inside = dispatchedAt(lines, '- [ ] Written inside');
     expect(findNextTask(doc('- [x] Written outside', ...lines.slice(1)))).toEqual(inside);
 
-    const rendered = renderInjection({ mode: 'stage', plan: doc(...lines), task: inside });
-    expect(rendered.mode).toBe('full');
-    expect(rendered.fallback).toMatchObject({ reason: 'no-task-at-line', line: 4 });
+    // The loop counts it among the tracker's tasks, the model does not.
+    const position = positionOf(lines, inside);
+    expect(position).toBe(1);
+    for (const request of [{}, { position }]) {
+      const rendered = renderInjection({ mode: 'stage', plan: doc(...lines), task: inside, ...request });
+      expect(rendered.mode).toBe('full');
+      expect(rendered.fallback?.reason).toBe('no-task-with-text');
+    }
 
     // Near miss: the line outside the block is located.
     const outside = dispatchedAt(lines, '- [ ] Written outside');
-    const located = renderInjection({ mode: 'stage', plan: doc(...lines), task: outside });
+    const located = renderInjection({ mode: 'stage', plan: doc(...lines), task: outside, position: positionOf(lines, outside) });
     expect(located.fallback).toBeNull();
     expect(located.text).toBe(doc(
       '## Checklist',
@@ -432,16 +834,6 @@ describe('fallback to full', () => {
 });
 
 describe('a tracker walked through the loop', () => {
-  let dir = '';
-
-  beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), 'rafa-inject-'));
-  });
-
-  afterAll(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
   it('renders the same stage and task text from the plan and its tracker at every dispatch', () => {
     const trackerPath = join(dir, 'PLAN_TRACKER-walk.md');
     writeFileSync(trackerPath, PLAN);
@@ -473,5 +865,52 @@ describe('a tracker walked through the loop', () => {
     expect(stageTexts.size).toBe(5);
     // Control: the tracker the walk compared against did change.
     expect(readFileSync(trackerPath, 'utf8')).not.toBe(PLAN);
+  });
+
+  it('renders a repair inserted after a red task step as the stage it closed, and each later task as its own', () => {
+    const trackerPath = join(dir, 'PLAN_TRACKER-walk-repair.md');
+    writeFileSync(trackerPath, PLAN);
+    const read = () => readFileSync(trackerPath, 'utf8');
+    const REPAIR_LINE = /^Repair the red /;
+
+    // The stage's three tasks are done, and the last one's step was red.
+    for (let ticked = 0; ticked < 3; ticked += 1) {
+      updateTrackerLine(trackerPath, findNextTask(read())!.lineNum, 'done');
+    }
+    insertTrackerTask(
+      trackerPath,
+      { task: 'Repair the red task step at commit 6666666', declaration: 'agent=build-error-resolver', blocker: 'the suite went red', repairs: 'Add the fixtures' },
+      findNextTask(read())!.lineNum,
+    );
+
+    const seen: string[] = [];
+    let info = findNextTask(read());
+    while (info !== null && seen.length < 10) {
+      const tracker = read();
+      const isRepair = REPAIR_LINE.test(info.task);
+      const above = listTrackerTasks(tracker).filter((held) => held.lineNum < info!.lineNum && !REPAIR_LINE.test(held.task)).length;
+      const position = isRepair
+        ? above - 1
+        : above;
+      const rendered = renderInjection({ mode: 'stage', plan: PLAN, task: info, position, ...(info.repairs === undefined
+        ? {}
+        : { repairs: info.repairs }) });
+
+      expect(rendered.fallback).toBeNull();
+      expect(rendered.mode).toBe('stage');
+      const [stage, current] = isRepair || position < 3
+        ? ['## Stage: schema', '1. schema (current stage)']
+        : ['## Stage: api', '2. api (current stage)'];
+      expect(rendered.text).toContain(stage);
+      expect(rendered.text).toContain(current);
+      expect(rendered.text).toContain(`- [ ] ${info.task.replace(/\s+\{.*\}$/, '')}`);
+
+      seen.push(info.task.replace(/\s+\{.*\}$/, ''));
+      updateTrackerLine(trackerPath, info.lineNum, 'done');
+      info = findNextTask(read());
+    }
+
+    // Control: the repair came first, and every later task was dispatched.
+    expect(seen).toEqual(['Repair the red task step at commit 6666666', 'Add the route', 'Add the handler']);
   });
 });

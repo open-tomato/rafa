@@ -118,6 +118,10 @@ const MEMBERS: readonly Member[] = [
       '  }),',
     ],
   },
+  {
+    name: 'close',
+    lines: ['  close: async (_n: number, _comment: string, _options: T.ClosePullRequestOptions) => {},'],
+  },
   { name: 'create', lines: ['  create: async (_draft: T.PullRequestDraft) => summary,'] },
   { name: 'editTitle', lines: ['  editTitle: async (_n: number, _title: string) => {},'] },
   { name: 'editBase', lines: ['  editBase: async (_n: number, _base: string) => {},'] },
@@ -140,6 +144,7 @@ const RECORDS = [
   '};',
   'const detail: T.PullRequestDetail = {',
   '  ...summary, body: "Closes #20", headRefOid: "deadbeef",',
+  '  headCommittedAt: "2026-10-12T11:59:59Z",',
   '  mergeable: "mergeable", mergeStateStatus: "CLEAN", labels: ["type:spec"],',
   '  closes: [{ number: 20, repository: "open-tomato/rafa", url: "https://github.com/open-tomato/rafa/issues/20" }],',
   '};',
@@ -447,7 +452,7 @@ beforeAll(() => {
   compiled = {
     program: ts.createProgram({
       rootNames: probes.map(([file]) => join(tempDir, file)),
-      options: parsed.options,
+      options: { ...parsed.options, isolatedDeclarations: false },
     }),
     configErrors: [...config.error === undefined
       ? []

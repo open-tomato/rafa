@@ -28,8 +28,7 @@
  *    would merge again and fail it.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { PullRequestDetail, PullRequestSummary } from '../pr/index.js';
@@ -330,6 +329,7 @@ const DETAIL: PullRequestDetail = Object.freeze({
   ...SUMMARY,
   body: 'Closes #63',
   headRefOid: 'abc1234',
+  headCommittedAt: null,
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],

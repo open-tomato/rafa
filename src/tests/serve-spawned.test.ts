@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../loop/sessions.js';
+import { readSessions } from '../core/loop/index.js';
 import { SKILL_DELIVERY } from '../tiers/delivery.js';
 import { SKILL_DELIVERY_FLAG, SERVED_SKILLS_PATH } from '../tiers/serve.js';
 

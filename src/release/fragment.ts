@@ -55,11 +55,11 @@
  * {@link serializeFragment} writes the format back and throws on a
  * fragment the parser would refuse, so nothing this module writes is a
  * file it would then refuse to read. The level words and their order are
- * `PLAN_RELEASE_LEVELS` from `src/plan/parse.ts`, not a third spelling.
+ * `PLAN_RELEASE_LEVELS` from `src/core/plan/parse.ts`, not a third spelling.
  */
-import type { PlanReleaseLevel } from '../plan/parse.js';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 
-import { PLAN_RELEASE_LEVELS } from '../plan/parse.js';
+import { PLAN_RELEASE_LEVELS } from '../core/plan/index.js';
 
 /** The fence line that opens and closes a fragment's front matter. */
 export const FRAGMENT_FENCE = '---';
@@ -71,7 +71,7 @@ export const FRAGMENT_EXTENSION = '.md';
  * What a plan id has to look like to name a fragment file and to be one
  * word of the receipt comment.
  */
-export const FRAGMENT_PLAN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const FRAGMENT_PLAN_ID_PATTERN: RegExp = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** The first suffix a second fragment of one plan takes: `-2`. */
 const FIRST_REPEAT_SUFFIX = 2;

@@ -21,7 +21,7 @@
  * path without opening it (`openSqliteStore(repoRoot).path()` never
  * touches disk), so both cases hold `ROOT` absent throughout.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { LoadedModules } from '../modules/load.js';
 
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText, resolveConfig } from '../config.js';
+import { parseConfigText, resolveConfig } from '../core/config/index.js';
 import { SyncModuleMissing, selectSync } from '../effort/sync/select.js';
 import { loadModules, moduleSettings } from '../modules/load.js';
 

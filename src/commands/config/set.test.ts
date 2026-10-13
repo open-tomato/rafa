@@ -3,9 +3,9 @@
  * directory. `withConfigSetting`'s own cases (`src/config-set.test.ts`)
  * hold the three edits and every refusal reason, so these hold what the
  * command adds: the argument it splits, the file it reads and writes,
- * the old and new values it prints, json mode, and that a refusal writes
- * nothing. `pr.base` is the first key, the one a stretch points at its
- * integration branch.
+ * the old and new values it prints, json mode, that a refusal writes
+ * nothing, and the `dangerous` section refused under an agent. `pr.base`
+ * is the first key, the one a stretch points at its integration branch.
  *
  * A refusal reads the config's bytes before and after and finds them
  * equal; the first case finds them changed, so a reading that could not
@@ -13,15 +13,16 @@
  */
 import type { CapturedRun, PlantedProject } from '../../tests/cli-capture.js';
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
+import { AGENT_SHELL_ENV } from '../../utils/agent-shell.js';
 
 import { createConfigSetCommand, formatValue, NOT_SET, splitAssignment } from './set.js';
 
@@ -51,10 +52,21 @@ function textOf(project: PlantedProject): string {
   return readFileSync(configOf(project), 'utf8');
 }
 
-/** Dispatches `config set` with `words` in `project`. */
-async function run(project: PlantedProject, words: readonly string[]): Promise<CapturedRun> {
-  return dispatchInProject(['config', 'set', ...words], [CONFIG_SUBJECT], [createConfigSetCommand()], project);
+/**
+ * Dispatches `config set` with `words` in `project`, under the
+ * environment `env`: empty unless a case names one, so no case inherits
+ * the `CLAUDECODE` of the session the suite runs in.
+ */
+async function run(
+  project: PlantedProject,
+  words: readonly string[],
+  env: Readonly<Record<string, string>> = {},
+): Promise<CapturedRun> {
+  return dispatchInProject(['config', 'set', ...words], [CONFIG_SUBJECT], [createConfigSetCommand()], project, env);
 }
+
+/** The environment of a shell an agent runs. */
+const AGENT_ENV = { [AGENT_SHELL_ENV]: '1' };
 
 describe('rafa config set', () => {
   it('sets pr.base in place, prints its old and new values and keeps every comment', async () => {
@@ -135,6 +147,97 @@ describe('rafa config set: refusals write nothing', () => {
     expect(outcome.stderr).toContain(message);
     expect(outcome.stderr).toContain('Usage: rafa config set <key>=<value>');
     expect(textOf(project)).toBe(text);
+  });
+});
+
+describe('rafa config set: the dangerous section under an agent', () => {
+  it('refuses dangerous.acceptVersionCollision with exit code 1, the variable, the line to run, and the file unchanged', async () => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['dangerous.acceptVersionCollision=true'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('CLAUDECODE');
+    expect(outcome.stderr).toContain('Nothing was written.');
+    expect(outcome.stderr).toContain('rafa config set dangerous.acceptVersionCollision=true');
+    expect(textOf(project)).toBe(BASE_CONFIG);
+  });
+
+  it('refuses a dangerous key the config reader does not know, as an agent shell and not as an unknown key', async () => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['dangerous.nope=true'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('CLAUDECODE');
+    expect(outcome.stderr).toContain('rafa config set dangerous.nope=true');
+    expect(outcome.stderr).not.toContain('unknown key');
+    expect(textOf(project)).toBe(BASE_CONFIG);
+  });
+
+  it('refuses the section key itself', async () => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['dangerous=true'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('CLAUDECODE');
+    expect(textOf(project)).toBe(BASE_CONFIG);
+  });
+
+  it('refuses before the file is read: a config that cannot be read gets the agent refusal', async () => {
+    const project = plant(BASE_CONFIG);
+    rmSync(configOf(project));
+    mkdirSync(configOf(project));
+
+    const outcome = await run(project, ['dangerous.acceptVersionCollision=true'], AGENT_ENV);
+    const control = await run(project, ['pr.base=stretch/9'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.stderr).toContain('CLAUDECODE');
+    expect(outcome.stderr).not.toContain('could not be read');
+    expect(control.stderr).toContain('could not be read');
+  });
+
+  it('gives the refusal as the json run\'s error, with exit code 1 and the file unchanged', async () => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['dangerous.acceptVersionCollision=true', '--output=json'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(1);
+    expect(`${outcome.stdout}${outcome.stderr}`).toContain('CLAUDECODE');
+    expect(textOf(project)).toBe(BASE_CONFIG);
+  });
+
+  it('writes pr.base under an agent as it does anywhere', async () => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['pr.base=stretch/9'], AGENT_ENV);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(textOf(project)).toBe(BASE_CONFIG.replace('base: main', 'base: stretch/9'));
+  });
+
+  it('writes a key that only opens with the section\'s letters', async () => {
+    const project = plant('version: 1\n');
+
+    const outcome = await run(project, ['dangerousness.x=1'], AGENT_ENV);
+
+    expect(outcome.stderr).not.toContain('CLAUDECODE');
+    expect(outcome.stderr).toContain('unknown key');
+  });
+
+  it.each([
+    ['absent', {}],
+    ['empty', { [AGENT_SHELL_ENV]: '' }],
+  ] as const)('writes dangerous.acceptVersionCollision with the variable %s', async (_what, env) => {
+    const project = plant(BASE_CONFIG);
+
+    const outcome = await run(project, ['dangerous.acceptVersionCollision=true'], env);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(textOf(project)).toBe(`${BASE_CONFIG}dangerous:\n  acceptVersionCollision: true\n`);
+    expect(parseConfigText(textOf(project), 'config.yaml').values.dangerousAcceptVersionCollision).toBe(true);
   });
 });
 

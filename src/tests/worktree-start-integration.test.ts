@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import { plantScratchRepo } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';
@@ -165,6 +165,8 @@ function plantWorktreeScratch(): ScratchRepo {
   const base = currentBranch(scratch);
   git(scratch, scratch.repo, 'remote', 'add', 'origin', originPath);
   git(scratch, scratch.repo, 'push', '-q', '-u', 'origin', base);
+  // The run reads its base from origin/HEAD, which a bare clone-less remote add leaves unset.
+  git(scratch, scratch.repo, 'remote', 'set-head', 'origin', base);
 
   mkdirSync(join(scratch.repo, '.plans'));
   writeFileSync(join(scratch.repo, '.plans', `PLAN-${STUB}.md`), PLAN, 'utf8');

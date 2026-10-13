@@ -46,7 +46,7 @@
  *   - **current**: the command's working directory is the worktree or a
  *     directory inside it.
  *   - **session**: a loop session record reads `running` or `paused`
- *     (`readState`, `src/loop/sessions.ts`: a pid that is gone reads
+ *     (`readState`, `src/core/loop/sessions.ts`: a pid that is gone reads
  *     `stopped`) and is either kept under the worktree's own
  *     `.rafa/runs/`, or kept under the project root's and names the
  *     worktree's branch. The second is the common case: `.rafa/` is
@@ -89,30 +89,30 @@
  * {@link WorktreesUnread}; a failure reading one worktree is that
  * worktree's `unreadable` blocker.
  */
-import type { SessionRecord } from '../loop/sessions.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import { realpathSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
-import { readSessions, runsDir } from '../loop/sessions.js';
-import { createGitRunner, gitSaid } from '../pr/git.js';
+import { messageOf } from '../core/config/sections.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
+import { readSessions, runsDir } from '../core/loop/index.js';
 import { parseWorktrees } from '../pr/merge.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { worktreeDirAt } from '../start/worktree-dir.js';
 
 /** Where under the repository Claude Code makes its worktrees. */
-export const CLAUDE_WORKTREES_SUBDIR = join('.claude', 'worktrees');
+export const CLAUDE_WORKTREES_SUBDIR: string = join('.claude', 'worktrees');
 
 /** The argv the worktrees are listed with. */
-export const WORKTREE_LIST = Object.freeze(['worktree', 'list', '--porcelain']);
+export const WORKTREE_LIST: readonly string[] = Object.freeze(['worktree', 'list', '--porcelain']);
 
 /** The argv a worktree's administrative directory is read with. */
-export const GIT_DIR = Object.freeze(['rev-parse', '--absolute-git-dir']);
+export const GIT_DIR: readonly string[] = Object.freeze(['rev-parse', '--absolute-git-dir']);
 
 /** The argv a worktree's changes are read with; see the module note. */
-export const WORKTREE_STATUS = Object.freeze([
+export const WORKTREE_STATUS: readonly string[] = Object.freeze([
   '--no-optional-locks',
   'status',
   '--porcelain=v1',
@@ -120,7 +120,7 @@ export const WORKTREE_STATUS = Object.freeze([
 ]);
 
 /** The files of the administrative directory whose times count as modifying it. */
-export const ADMIN_FILES = Object.freeze(['HEAD', join('logs', 'HEAD'), 'index']);
+export const ADMIN_FILES: readonly string[] = Object.freeze(['HEAD', join('logs', 'HEAD'), 'index']);
 
 /** Milliseconds in one of the days `cleanup.worktreeIdleDays` counts. */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

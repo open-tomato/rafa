@@ -1,4 +1,4 @@
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { describe, expect, it } from 'bun:test';
 

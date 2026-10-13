@@ -1,5 +1,5 @@
 /**
- * The reading of a session record (`loop/sessions.ts`): the sets its
+ * The reading of a session record (`core/loop/sessions.ts`): the sets its
  * fields are checked against, the field readers that name each problem,
  * the frozen record built from fields already checked, and
  * {@link parseSessionRecord}. `sessions.ts` re-exports everything a
@@ -9,8 +9,9 @@
  * of `sessions.ts`, "The record" and "Steps".
  *
  * The two modules import each other's types alone: this one takes the
- * record's interfaces from `sessions.ts` with `import type`, which leaves
- * no import at run time, and `sessions.ts` takes its values from here.
+ * record's interfaces from `sessions.ts`, through the barrel of
+ * `src/core/loop/`, with `import type`, which leaves no import at run
+ * time, and `sessions.ts` takes its values from here.
  * The sets, the error and the id check live here so this module imports
  * no value from `sessions.ts` and the pair forms no cycle when loaded.
  *
@@ -59,6 +60,11 @@
  * position that is a whole number from 1 or null, and a list of files
  * before it), right after its `newFailures`, and leaves out any other
  * entry, and the key itself when no entry is left.
+ *
+ * A step's `outsideCase` and `outputTail`, likewise. The frozen step
+ * keeps the pair, after `stepOnly`, when `outsideCase` is `true`, with
+ * the tail as its list of strings or as an empty list when it is
+ * anything else, and leaves out both keys for any other `outsideCase`.
  */
 import type {
   SessionDecision,
@@ -66,19 +72,19 @@ import type {
   SessionStep,
   SessionStepOnly,
   SessionTaskRef,
-} from './sessions.js';
+} from '../core/loop/index.js';
 import type { HopRecord } from '../next/hop-record.js';
 import type { SuiteFailure } from '../suite/run.js';
 
 import { basename, isAbsolute } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { asHopRecord } from '../next/hop-record.js';
 import { TEST_SCOPES } from '../utils/declaration.js';
 import { isStampableStub } from '../utils/plan-stamp.js';
 
 /** The states a session record holds, in the spec's order. */
-export const SESSION_STATES = Object.freeze(['running', 'paused', 'stopped', 'done'] as const);
+export const SESSION_STATES: readonly ['running', 'paused', 'stopped', 'done'] = Object.freeze(['running', 'paused', 'stopped', 'done'] as const);
 
 /** One of {@link SESSION_STATES}. */
 export type SessionState = (typeof SESSION_STATES)[number];
@@ -87,7 +93,7 @@ export type SessionState = (typeof SESSION_STATES)[number];
  * The phases of a run, in the order a run meets them: its tasks, the
  * wrap-up, the pull request, the CI wait, and a repair of what CI failed.
  */
-export const SESSION_PHASES = Object.freeze(['task', 'wrap-up', 'pull-request', 'ci', 'repair'] as const);
+export const SESSION_PHASES: readonly ['task', 'wrap-up', 'pull-request', 'ci', 'repair'] = Object.freeze(['task', 'wrap-up', 'pull-request', 'ci', 'repair'] as const);
 
 /** One of {@link SESSION_PHASES}. */
 export type SessionPhase = (typeof SESSION_PHASES)[number];
@@ -102,7 +108,7 @@ export const RECORD_EXTENSION = '.json';
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /** The kinds of suite step a run records, in the order a run meets them. */
-export const SESSION_STEP_KINDS = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
+export const SESSION_STEP_KINDS: readonly ['baseline', 'task', 'stage', 'pre-wrap-up'] = Object.freeze(['baseline', 'task', 'stage', 'pre-wrap-up'] as const);
 
 /** One of {@link SESSION_STEP_KINDS}. */
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
@@ -113,13 +119,13 @@ export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
  * no `Owns:` folder narrows the run, a `tests=module` task whose module
  * holds no test file, and a stage step's own scope.
  */
-export const SESSION_STEP_REASONS = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
+export const SESSION_STEP_REASONS: readonly ['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] = Object.freeze(['declared', 'trigger', 'fallback', 'no-module-tests', 'stage'] as const);
 
 /** One of {@link SESSION_STEP_REASONS}. */
 export type SessionStepReason = (typeof SESSION_STEP_REASONS)[number];
 
 /** The strategies a saved decision may name: the two that pass over a task. */
-export const SESSION_DECISION_STRATEGIES = Object.freeze(['jump', 'defer'] as const);
+export const SESSION_DECISION_STRATEGIES: readonly ['jump', 'defer'] = Object.freeze(['jump', 'defer'] as const);
 
 /** A record file that cannot be read, or holds no record this module accepts. */
 export class SessionRecordError extends Error {
@@ -459,6 +465,15 @@ function stepOnlyEntry(stepOnly: unknown): { readonly stepOnly?: readonly Sessio
   }))) };
 }
 
+/** The `outsideCase` and `outputTail` entries of a frozen step: both when the mark is `true`, neither otherwise. See the module note. */
+function outsideCaseEntry(outsideCase: unknown, outputTail: unknown): Pick<SessionStep, 'outsideCase' | 'outputTail'> {
+  if (outsideCase !== true) return {};
+  const tail = isStringList(outputTail)
+    ? outputTail
+    : [];
+  return { outsideCase: true, outputTail: Object.freeze([...tail]) };
+}
+
 /** True for one of {@link SESSION_STEP_REASONS}. */
 function isSessionStepReason(value: unknown): value is SessionStepReason {
   return (SESSION_STEP_REASONS as readonly unknown[]).includes(value);
@@ -475,8 +490,9 @@ function reasonEntry(reason: unknown): { readonly reason?: SessionStepReason } {
  * A frozen step already checked, its fields in the order they are
  * written: `reason` right after `scope`, only when it is one of
  * {@link SESSION_STEP_REASONS}, `stepOnly` right after `newFailures`,
- * only when it holds a whole entry, and `interrupted` last, only when
- * there.
+ * only when it holds a whole entry, `outsideCase` with `outputTail`
+ * after it, only when the mark is `true`, and `interrupted` last, only
+ * when there.
  */
 function freezeStep(step: SessionStep): SessionStep {
   return Object.freeze({
@@ -491,6 +507,7 @@ function freezeStep(step: SessionStep): SessionStep {
     failures: freezeFailures(step.failures),
     newFailures: freezeFailures(step.newFailures),
     ...stepOnlyEntry(field(step, 'stepOnly')),
+    ...outsideCaseEntry(field(step, 'outsideCase'), field(step, 'outputTail')),
     ...(step.interrupted === true
       ? { interrupted: true as const }
       : {}),

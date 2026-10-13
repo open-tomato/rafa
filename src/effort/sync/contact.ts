@@ -81,16 +81,16 @@
  * reading it is a fault, and is rethrown as the command's own read
  * would throw it.
  */
-import type { AdapterRegistry } from '../../adapters/registry.js';
-import type { ConfigRoots } from '../../config-load.js';
-import type { ResolvedConfig } from '../../config.js';
+import type { AdapterRegistry } from '../../core/adapters/index.js';
+import type { ResolvedConfig } from '../../core/config/index.js';
+import type { ConfigRoots } from '../../core/config/load.js';
 import type { ModuleLoadSeams } from '../../modules/load.js';
 import type { Sync, SyncPullRequest, SyncPullResult, SyncPushResult } from '../../ports/index.js';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { loadConfig } from '../../config-load.js';
-import { describeValue, messageOf } from '../../config-sections.js';
-import { ConfigError } from '../../config.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { describeValue, messageOf } from '../../core/config/sections.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 
 import { selectSync } from './select.js';
@@ -106,7 +106,7 @@ const OPENING = 'effort sync';
  * this class: any error whose `name` is {@link HUB_UNREACHABLE} counts.
  */
 export class HubUnreachable extends Error {
-  override readonly name = HUB_UNREACHABLE;
+  override readonly name: 'HubUnreachable' = HUB_UNREACHABLE;
 }
 
 /** Whether a thrown value says the hub was unreachable; see the module note. */

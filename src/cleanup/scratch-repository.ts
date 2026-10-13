@@ -65,6 +65,31 @@
  *
  * `gone`, above, is the gone-only branch: no pull request names it.
  *
+ * ## The remote-only set, on request
+ *
+ * `createScratchRepository({ remoteOnly: true })` adds three branches
+ * that are on the bare remote and have no local copy: each is pushed
+ * without an upstream and its local branch is then deleted, so the
+ * clone keeps `refs/remotes/origin/<name>` and no `refs/heads/<name>`.
+ * They are what `./remote-only.ts` reads, named by
+ * {@link REMOTE_ONLY_BRANCHES}, and each holds
+ * {@link REMOTE_ONLY_COMMITS} commits, every one adding a file of its
+ * own:
+ *
+ * - `remote-unmerged`: `main` holds no copy of any of its commits.
+ * - `remote-copied`: every commit is cherry-picked onto `main`, after
+ *   `main` has moved, so the copies are other commits and `main` does
+ *   not reach its tip, while `git cherry` finds a patch-equal copy of
+ *   each.
+ * - `stretch/9`: unmerged like the first, and under the prefix a
+ *   stretch's integration branch carries.
+ *
+ * The default build leaves them out. With them, `main` holds
+ * {@link REMOTE_ONLY_COMMITS} more commits and the local branches, the
+ * worktrees and every other branch of the remote are as they are
+ * without: the two cherry-picks are the only thing the set does to
+ * what the default build makes.
+ *
  * Git runs with the fixed test identity of `../tests/git-identity.ts`
  * and without the user's or the system's configuration.
  */
@@ -78,7 +103,7 @@ import { gitIdentityEnv } from '../tests/git-identity.js';
 import { ADMIN_FILES, GIT_DIR } from './worktrees.js';
 
 /** The moment every commit is dated, except `stale`'s. */
-export const SCRATCH_NOW = new Date('2026-09-24T12:00:00Z');
+export const SCRATCH_NOW: Date = new Date('2026-09-24T12:00:00Z');
 
 /** How many days before {@link SCRATCH_NOW} the `stale` branch was last committed. */
 export const STALE_AGE_DAYS = 90;
@@ -95,7 +120,7 @@ const LATER_DAYS = 30;
  * The clock a past-head reading runs with: the worktree `wt-held` is
  * dated to it, so it is no idle at all and reads `recent`.
  */
-export const SCRATCH_LATER = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
+export const SCRATCH_LATER: Date = new Date(SCRATCH_NOW.getTime() + LATER_DAYS * MS_PER_DAY);
 
 /** The id of the release fragment `main` holds and `fragment` commits past its head. */
 export const FRAGMENT_ID = 'rafa-901';
@@ -112,10 +137,28 @@ export interface ScratchPastHead {
   readonly heldWorktree: string;
 }
 
+/**
+ * The branches of the remote-only set, by what each is for; see the
+ * module note.
+ */
+export const REMOTE_ONLY_BRANCHES = {
+  /** No commit of it has a copy on `main`. */
+  unmerged: 'remote-unmerged',
+  /** Every commit of it has a patch-equal copy on `main`. */
+  copied: 'remote-copied',
+  /** A stretch's integration branch, unmerged. */
+  stretch: 'stretch/9',
+} as const;
+
+/** How many commits each branch of {@link REMOTE_ONLY_BRANCHES} holds past `main`. */
+export const REMOTE_ONLY_COMMITS = 2;
+
 /** What {@link createScratchRepository} can be asked for. */
 export interface ScratchOptions {
   /** Add the past-head set of the module note; false when left out. */
   readonly pastHead?: boolean;
+  /** Add the remote-only set of the module note; false when left out. */
+  readonly remoteOnly?: boolean;
 }
 
 /** What {@link createScratchRepository} built. */
@@ -215,6 +258,20 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     git(['switch', '--quiet', 'main']);
     return head;
   };
+  /**
+   * A branch off `main` holding {@link REMOTE_ONLY_COMMITS} commits, each
+   * adding one file, pushed with no upstream and then deleted in the
+   * clone: on the remote, and remote-tracking here, with no local copy.
+   */
+  const remoteOnlyBranch = (name: string): void => {
+    git(['switch', '--quiet', '-c', name, 'main']);
+    for (let index = 1; index <= REMOTE_ONLY_COMMITS; index += 1) {
+      commitFile(`${name}-${String(index)}.txt`, `${name} ${String(index)}\n`, `${name} ${String(index)}`);
+    }
+    git(['push', '--quiet', 'origin', name]);
+    git(['switch', '--quiet', 'main']);
+    git(['branch', '--quiet', '-D', name]);
+  };
 
   try {
     run(['init', '--quiet', '--bare', '--initial-branch=main', bare], root);
@@ -231,6 +288,11 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
     branch('wt-clean', 1, true);
     branch('wt-dirty', 1, true);
     branch('wt-locked', 1, true);
+    if (options.remoteOnly === true) {
+      for (const name of Object.values(REMOTE_ONLY_BRANCHES)) {
+        remoteOnlyBranch(name);
+      }
+    }
 
     git(['merge', '--quiet', '--no-ff', '-m', 'merge merged', 'merged']);
     git(['merge', '--quiet', '--no-ff', '-m', 'merge wt-clean', 'wt-clean']);
@@ -244,6 +306,10 @@ export function createScratchRepository(options: ScratchOptions = {}): ScratchRe
         fragmentHead: squashedPastHead('fragment', FRAGMENT_PATH),
         sourceHead: squashedPastHead('source', 'src/extra.ts'),
       };
+    }
+    if (options.remoteOnly === true) {
+      // After the merges above: `main` has moved, so each copy is another commit.
+      git(['cherry-pick', `main..refs/remotes/origin/${REMOTE_ONLY_BRANCHES.copied}`]);
     }
     git(['push', '--quiet', 'origin', 'main']);
     git(['push', '--quiet', 'origin', '--delete', 'gone'], clone);

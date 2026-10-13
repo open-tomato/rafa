@@ -56,7 +56,7 @@
  *
  * One control was driven for those cases: taking `skills` back out of
  * `DECLARATION_KEYS` reddens SEVEN cases — the four here plus the
- * six-key roster, `plan/parse.test.ts`'s declaration case and the
+ * six-key roster, `core/plan/parse.test.ts`'s declaration case and the
  * near-miss table of `tests/declaration-negatives.test.ts` — with the
  * module restored byte-identical (sha256 checked) and green after.
  *

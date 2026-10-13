@@ -13,7 +13,7 @@
  *
  * An action of a subject sits at `src/commands/<subject>/<action>.ts`,
  * and a top-level command at `src/commands/<name>.ts`. The default export
- * of each is its command. Four of the ninety-seven registered so far wrap a
+ * of each is its command. Four of the ninety-eight registered so far wrap a
  * phase 0 command (`wrap.ts`), which keeps its own parser and its own
  * writes. `describe` wraps none: it builds its document from the registry
  * its context carries. Nor do `plan list`, `plan show`,
@@ -55,9 +55,9 @@
  * instinct scopes hold through `schema/scope-records.ts`, nor
  * `instinct flag` and `instinct promote`, which call the Learning adapter
  * `learning.adapter` names, `list --blessed` making it as `promote` does, nor
- * the nine `pr` actions, which read, open, retarget, wait on, merge and
- * triage one repository's pull requests through the PullRequests port
- * and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
+ * the ten `pr` actions, which read, open, retarget, close, wait on,
+ * merge and triage one repository's pull requests through the
+ * PullRequests port and share `pr/pr-context.ts`, nor `release status` and `release tag`, which
  * read the version file, the changelog and the repository's tags
  * through `src/release/` and share `release/status.ts`'s seams, nor
  * `release settle`, which folds the waiting fragments in a scratch
@@ -145,7 +145,11 @@
  *     one opened from a pushed head, or the one already open on the head
  *     printed and none opened;
  *     `pr retarget <n> --base=<branch>`, one moved onto another base, or
- *     none sent when it is already on it; and
+ *     none sent when it is already on it;
+ *     `pr close <n> --reason=<text> [--delete-branch] [--yes]`, one open
+ *     pull request closed without merging it after one question, the
+ *     reason left as its closing comment and the issues it would have
+ *     closed left open; and
  *     `pr triage [<n>] [--no-comment] [--max-attempts=<count>]`, one
  *     assessed in code into a class with its evidence and a follow-up
  *     prompt, the reading left as one comment per pull request. Each
@@ -367,13 +371,14 @@
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
  *   - `cleanup [--dry-run]`, top-level: the local branches, worktrees
- *     and run records that have piled up, in five groups, and the ones ticked
+ *     and run records that have piled up, and the unmerged branches only
+ *     on `origin`, in six groups, and the ones ticked
  *     removed after one question; listed only, removing nothing, without
  *     a terminal or with `--output=json`. It starts no session.
  *   - `self-update [--force]`, top-level: builds the rafa checkout and
- *     installs it as `~/.rafa/bin/rafa`, refusing while a tracker in
- *     `plan.dir` holds a task and while this version's runtime directory
- *     is already there, which `--force` replaces whole.
+ *     installs it as `~/.rafa/bin/rafa`, refusing while a loop of the
+ *     project is live and while this version's runtime directory is
+ *     already there, which `--force` replaces whole.
  *   - `describe`, top-level: the schema 2 roster of the registry the line
  *     was routed through.
  *
@@ -381,13 +386,13 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the eighteen with an action registered: a subject with
- * none would show in every roster and dispatch nothing. `skill index` is
- * in the command tree and is not registered, because nothing dispatches
- * it yet.
+ * The subjects are those `CORE_SUBJECTS` lists, each with an action
+ * registered: a subject with none would show in every roster and
+ * dispatch nothing. `skill index` is in the command tree and is not
+ * registered, because nothing dispatches it yet.
  */
-import type { RafaCommand } from '../cli/command.js';
-import type { SubjectSpec } from '../cli/registry.js';
+import type { CommandRegistry, SubjectSpec } from '../cli/registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
 
@@ -455,6 +460,7 @@ import planNeeds from './plan/needs.js';
 import planRisk from './plan/risk.js';
 import planShow from './plan/show.js';
 import planValidate from './plan/validate.js';
+import prClose from './pr/close.js';
 import prCurrent from './pr/current.js';
 import prList from './pr/list.js';
 import prMerge from './pr/merge.js';
@@ -540,6 +546,7 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
   prView,
   prOpen,
   prRetarget,
+  prClose,
   prList,
   prWait,
   prMerge,
@@ -613,4 +620,4 @@ export const CORE_COMMANDS: readonly RafaCommand[] = Object.freeze([
 ]);
 
 /** The registry `src/rafa.ts` dispatches through. */
-export const CORE_REGISTRY = createCommandRegistry({ subjects: CORE_SUBJECTS, commands: CORE_COMMANDS });
+export const CORE_REGISTRY: CommandRegistry = createCommandRegistry({ subjects: CORE_SUBJECTS, commands: CORE_COMMANDS });

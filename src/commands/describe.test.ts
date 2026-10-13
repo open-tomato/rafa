@@ -29,10 +29,10 @@
  * and builder suites.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand } from '../cli/command.js';
 import type { DescribeDocument } from '../cli/describe.js';
 import type { DispatchOptions, DispatchOutcome } from '../cli/dispatch.js';
 import type { ModuleImporter } from '../cli/modules.js';
+import type { RafaCommand } from '../core/command/index.js';
 import type { CliEvent } from '../ports/index.js';
 
 import { readFileSync } from 'node:fs';

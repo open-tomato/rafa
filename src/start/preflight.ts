@@ -97,7 +97,9 @@
  *      (`preflight/first-dispatch.ts`): the plan's `[start]` items are
  *      probed ahead of the configured required tier on a first
  *      dispatch, and on a resume each is skipped with one line naming
- *      it and why. See below.
+ *      it and why. It then **decides the scope skip**: on a run that
+ *      dispatches the wrap-up alone, the plan's `[auto]` items scoped
+ *      `tasks` are skipped the same way. See below for both.
  *  10. **Checks every item** through `runPreflight`
  *      (`preflight/run.ts`), each probe run in the repo root with this
  *      process's environment unless `checks` names another. A failed
@@ -107,7 +109,8 @@
  *      store whatever `store` selects, so a halted run, which leaves no
  *      session row, still shows in `rafa effort report`.
  *  12. **Halts, or answers.** A failed required item, or rows that could
- *      not be stored, throws `CommandExit` (`cli/command.ts`) with exit
+ *      not be stored, throws `CommandExit` (`core/command/command.ts`)
+ *      with exit
  *      code 1. Otherwise, on a first dispatch of a run holding its claim,
  *      the issue's `rafa:claimed` is swapped for `rafa:in-development`,
  *      best-effort, and the run's id, the report, the reminders and the
@@ -289,12 +292,50 @@
  *       checked: it is probed on a first dispatch alone, and
  *       PLAN_TRACKER-demo.md already holds a ticked task
  *
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * ## The scope skip
+ *
+ * An `[auto]` item of the plan's PREREQUISITES file may carry a scope,
+ * `tasks`, `wrap-up` or `both` (`preflight/prerequisites-md.ts`). A run
+ * whose tracker holds no open and no blocked task dispatches the wrap-up
+ * alone, so a check only the tasks needed guards nothing there, and
+ * halting on it strands a plan one session short of its pull request
+ * (#892). {@link requiredTier} therefore leaves the items scoped `tasks`
+ * out of such a run, the reading {@link dispatchesWrapUpAlone} takes off
+ * the tracker through `listOpenTasks` (`utils/tracker.ts`), the list
+ * `findNextTask` picks the next dispatch from.
+ *
+ *   - **One task open, or one blocked**, probes every `[auto]` item, the
+ *     `wrap-up` ones included: the run reaches the wrap-up after its
+ *     tasks, and should halt on that item before the first is paid for.
+ *   - **No tracker** is a first dispatch, the tracker being copied from
+ *     the plan after this preflight, so nothing is skipped. One that
+ *     cannot be read is treated the same, failing towards checking more.
+ *   - **Every task ticked** skips the `tasks` items and probes the
+ *     `wrap-up` and `both` ones, which halt the run as they always did.
+ *
+ * Only a plan's `[auto]` item has a scope to skip on. An item the config
+ * names carries none and is always probed, as are the provider's
+ * automatic items. A marker on a `[start]` item is read and changes
+ * nothing here, since the start tier is decided by the first dispatch
+ * alone, and one on a `[human]` item changes nothing either, since a
+ * reminder is never probed. `rafa doctor --plan=` does not run this
+ * preflight and probes every item whatever its scope.
+ *
+ * A skipped item is not checked, so it is not counted, stored, or able
+ * to halt. It is named in one line of its own, through `info`, after the
+ * start-only lines when the run prints both:
+ *
+ *     ⏭ tasks-only item tool "the compiler is installed" was not
+ *       checked: only the tasks need it, and PLAN_TRACKER-demo.md holds
+ *       no open and no blocked task
+ *
+ * Every line goes through the active output (`core/output/active.ts`).
  */
-import type { ClaudeSettingSource, PrerequisiteItem, RafaConfig } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflightSync } from './preflight-sync.js';
+import type { PrerequisiteItem, RafaConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { PreflightWriterSeams } from '../effort/store/preflight.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';
 import type {
@@ -310,7 +351,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'path';
 
-import { activeOutput } from '../adapters/output/active.js';
 import {
   collidingPlanSkills,
   missingAgentLine,
@@ -320,9 +360,10 @@ import {
   unresolvedPlanSkills,
   unresolvedSkillLine,
 } from '../agents/roster.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { effortStoreDir } from '../effort/store/location.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { readSchemaReport, unknownAdditive, unknownAdditiveWarning } from '../effort/store/schema-report.js';
@@ -337,7 +378,7 @@ import {
   prerequisitesPathForPlan,
 } from '../preflight/prerequisites-md.js';
 import { runPreflight } from '../preflight/run.js';
-import { trackerPathFor } from '../utils/tracker.js';
+import { listOpenTasks, trackerPathFor } from '../utils/tracker.js';
 
 import { markInDevelopment, refuseUnownedClaim } from './preflight-claim.js';
 import { reportStartDrift } from './preflight-drift.js';
@@ -347,7 +388,7 @@ import { refuseUnservedSync } from './preflight-sync.js';
  * The sentence a task prompt carries after its `known-missing:` lines,
  * so the session neither repairs an absence nor works around it.
  */
-export const KNOWN_MISSING_SENTENCE = 'A known-missing item is neither a bug to fix nor a credential to patch'
+export const KNOWN_MISSING_SENTENCE: string = 'A known-missing item is neither a bug to fix nor a credential to patch'
   + ' around: the preflight found it unavailable on this machine, so do the task without it.';
 
 /** What the agent roster is resolved against; see the module note. */
@@ -577,6 +618,12 @@ function refuseMalformedItems(planPath: string, items: PreflightItems): void {
   ].join('\n'));
 }
 
+/** The items of one tier a run probes, and a line for each it passes over. */
+interface DecidedTier {
+  readonly probed: readonly PrerequisiteItem[];
+  readonly skipped: readonly string[];
+}
+
 /** The line naming one start-only item a resume passed over, and why. */
 function skippedStartLine(item: PrerequisiteItem, tracker: string): string {
   return `⏭ start-only item ${item.kind} ${JSON.stringify(item.name)} was not checked:`
@@ -584,15 +631,21 @@ function skippedStartLine(item: PrerequisiteItem, tracker: string): string {
     + ` and ${tracker} already holds a ticked task`;
 }
 
-/** Prints one line per start-only item this resume passes over. */
-function announceSkippedStart(planPath: string, skipped: readonly PrerequisiteItem[]): void {
-  const tracker = basename(trackerPathFor(planPath));
+/** The line naming one `tasks` item a wrap-up-alone run passed over, and why. */
+function skippedTasksLine(item: PrerequisiteItem, tracker: string): string {
+  return `⏭ tasks-only item ${item.kind} ${JSON.stringify(item.name)} was not checked:`
+    + ' only the tasks need it,'
+    + ` and ${tracker} holds no open and no blocked task`;
+}
+
+/** Prints one line per item this run passes over, the first under a blank line. */
+function announceSkipped(lines: readonly string[]): void {
   const output = activeOutput();
-  for (const [index, item] of skipped.entries()) {
+  for (const [index, line] of lines.entries()) {
     const lead = index === 0
       ? '\n'
       : '';
-    output.info(`${lead}${skippedStartLine(item, tracker)}`);
+    output.info(`${lead}${line}`);
   }
 }
 
@@ -600,12 +653,39 @@ function announceSkippedStart(planPath: string, skipped: readonly PrerequisiteIt
  * The start-only items this run probes: the plan's on a first dispatch,
  * and none on a resume, where each is named instead. See the module note.
  */
-function startTier(planPath: string, items: PreflightItems): readonly PrerequisiteItem[] {
-  if (items.startRequired.length === 0) return NO_ITEMS;
-  if (isFirstDispatch(planPath)) return items.startRequired;
+function startTier(planPath: string, items: PreflightItems): DecidedTier {
+  if (items.startRequired.length === 0 || isFirstDispatch(planPath)) {
+    return { probed: items.startRequired, skipped: [] };
+  }
+  const tracker = basename(trackerPathFor(planPath));
+  return { probed: NO_ITEMS, skipped: items.startRequired.map((item) => skippedStartLine(item, tracker)) };
+}
 
-  announceSkippedStart(planPath, items.startRequired);
-  return NO_ITEMS;
+/**
+ * Whether the run of the plan at `planPath` dispatches the wrap-up alone:
+ * true when the tracker beside it can be read and holds no open and no
+ * blocked task, false otherwise. See the module note.
+ */
+function dispatchesWrapUpAlone(planPath: string): boolean {
+  const tracker = readIfReadable(trackerPathFor(planPath));
+  return tracker !== null && listOpenTasks(tracker).length === 0;
+}
+
+/**
+ * The required items this run probes: all of them, or all but the ones
+ * scoped `tasks` on a run that dispatches the wrap-up alone, where each
+ * is named instead. See the module note.
+ */
+function requiredTier(planPath: string, items: PreflightItems): DecidedTier {
+  const isTasksOnly = (item: PrerequisiteItem): boolean => item.scope === 'tasks';
+  if (!items.required.some(isTasksOnly) || !dispatchesWrapUpAlone(planPath)) {
+    return { probed: items.required, skipped: [] };
+  }
+  const tracker = basename(trackerPathFor(planPath));
+  return {
+    probed: items.required.filter((item) => !isTasksOnly(item)),
+    skipped: items.required.filter(isTasksOnly).map((item) => skippedTasksLine(item, tracker)),
+  };
 }
 
 /** Prints each reminder of the plan's PREREQUISITES file, by its line. */
@@ -675,8 +755,12 @@ export async function runStartPreflight(options: StartPreflightOptions): Promise
   announceReminders(options.planPath, items.reminders);
   announceUnknownMigrations(options.repoRoot);
 
+  const startOnly = startTier(options.planPath, items);
+  const required = requiredTier(options.planPath, items);
+  announceSkipped([...startOnly.skipped, ...required.skipped]);
+
   const tiers: PreflightTiers = {
-    required: [...automaticItems(options), ...startTier(options.planPath, items), ...items.required],
+    required: [...automaticItems(options), ...startOnly.probed, ...required.probed],
     optional: items.optional,
   };
   const count = tiers.required.length + tiers.optional.length;

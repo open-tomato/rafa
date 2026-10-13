@@ -204,8 +204,8 @@ import type { Epics } from '../../board/epics.js';
 import type { BoardIssueState, BoardListing } from '../../board/roadmap-board.js';
 import type { EpicHorizonGroup, MemberBlockers } from '../../board/roadmap-epic-rows.js';
 import type { RoadmapRefs, RoadmapRow } from '../../board/roadmap-rows.js';
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../cli/command.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { RafaCommand, RafaContext, RafaFlagSpec } from '../../core/command/index.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { Issue, IssueQuery, IssueType, TrackerKind } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -219,10 +219,10 @@ import { hasEpicLines, readRoadmapEpicRows } from '../../board/roadmap-epic-rows
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests, createGhRoadmapSearch, ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
 import { parseTitle } from '../../bugs/title.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
-import { plansDirAt } from '../../plan/plan-files.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { readDoctorRefs, roadmapRefsCells } from '../doctor-refs.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 import { registryRoster } from '../plan/refs-check.js';
@@ -794,4 +794,5 @@ export function createIssueListCommand(seams: IssueSeams = DEFAULT_ISSUE_SEAMS):
   return Object.freeze(command);
 }
 
-export default createIssueListCommand();
+const command: RafaCommand = createIssueListCommand();
+export default command;

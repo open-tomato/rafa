@@ -108,13 +108,13 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { readAgentDirectory } from '../agents/roster.js';
 import { checkDirectory } from '../check/run.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { RUNNING_MANIFEST_SEAMS, validateManifest } from '../modules/manifest.js';
 
 import { byName, skillItem, sourceItem } from './trees.js';
 
 /** Where Claude Code records its installed plugins, under the home. */
-export const INSTALLED_PLUGINS_PATH = join('.claude', 'plugins', 'installed_plugins.json');
+export const INSTALLED_PLUGINS_PATH: string = join('.claude', 'plugins', 'installed_plugins.json');
 
 /** The Claude Code version the plugin reader was written against. */
 export const PLUGINS_CLI_VERSION = '2.1.280';

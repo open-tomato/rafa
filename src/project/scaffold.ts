@@ -69,8 +69,8 @@
 import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS, configFilePath } from '../config.js';
+import { CONFIG_DEFAULTS, configFilePath } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
 import {
   DANGEROUS_VERSION_COLLISION_LINE,
   PR_VERSION_COLLISION_LINE,
@@ -81,10 +81,10 @@ import { DEFAULT_ROUTES } from '../tiers/routing.js';
 import { scopeAt } from './scope.js';
 
 /** The directories of a project tree, under `<root>/.rafa/`, in the order they are written. */
-export const PROJECT_TREE = Object.freeze(['specs', 'plans', 'runs', 'effort', 'instincts'] as const);
+export const PROJECT_TREE: readonly ['specs', 'plans', 'runs', 'effort', 'instincts'] = Object.freeze(['specs', 'plans', 'runs', 'effort', 'instincts'] as const);
 
 /** The directories of a user tree, under `<home>/.rafa/`. */
-export const USER_TREE = Object.freeze(['instincts'] as const);
+export const USER_TREE: readonly ['instincts'] = Object.freeze(['instincts'] as const);
 
 /** `patterns` as a YAML flow list, each double-quoted. See the module note. */
 function globsLine(patterns: readonly string[]): string {
@@ -95,7 +95,7 @@ function globsLine(patterns: readonly string[]): string {
  * Every setting of the schema but `version`, commented out at its
  * default, in the order of the spec's block. See the module note.
  */
-export const CONFIG_SETTINGS_LINES = Object.freeze([
+export const CONFIG_SETTINGS_LINES: readonly string[] = Object.freeze([
   `# store: ${CONFIG_DEFAULTS.store}                  # sqlite | ndjson`,
   '# effort:',
   `#   busyTimeoutMs: ${String(CONFIG_DEFAULTS.effortBusyTimeoutMs)}          # 1..60000 ms; how long a store open waits for another process's lock`,

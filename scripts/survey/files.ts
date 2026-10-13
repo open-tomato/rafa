@@ -148,7 +148,7 @@ export function listTrackedFiles(root: string): TrackedFiles {
  *   script reads another scope (`context/` for the decision sources).
  * @returns One line of markdown.
  */
-export function coverageLine(read: Iterable<string>, tracked: readonly string[], scope = SCOPE_LABEL): string {
+export function coverageLine(read: Iterable<string>, tracked: readonly string[], scope: string = SCOPE_LABEL): string {
   const readSet = new Set(read);
   const trackedSorted = [...new Set(tracked)].sort();
   const unread = trackedSorted.filter((path) => !readSet.has(path));

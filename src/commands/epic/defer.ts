@@ -17,7 +17,7 @@
  * session, so it declares no `spends`.
  */
 import type { EpicHorizonSeams } from './horizon-change.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
 import { REASON_FLAG } from '../../board/epic-trail.js';
 
@@ -71,4 +71,5 @@ export function createEpicDeferCommand(seams: EpicHorizonSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createEpicDeferCommand();
+const command: RafaCommand = createEpicDeferCommand();
+export default command;

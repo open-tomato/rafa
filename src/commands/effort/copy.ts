@@ -24,12 +24,12 @@
  * removed. In json mode the `EffortCopyResult`, with its `env` line, is
  * the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { EffortCopyResult } from '../../effort/store/copy.js';
 
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { copyEffortStore, EffortCopyFailure, EffortCopyRefusal } from '../../effort/store/copy.js';
 import { EFFORT_DIR_VARIABLE } from '../../effort/store/location.js';
@@ -161,4 +161,5 @@ export function createCopyCommand(seams: CopyCommandSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createCopyCommand();
+const command: RafaCommand = createCopyCommand();
+export default command;

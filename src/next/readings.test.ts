@@ -35,6 +35,11 @@
  *   path, is paired with the same two paths written as tracked ones,
  *   which answers both. A reading that dropped every line would pass
  *   the first half alone.
+ * - A live run that holds the tree is paired with one that does not: a
+ *   record with no `worktree` beside one naming another working tree,
+ *   and a record naming the checkout beside the same record once git
+ *   could not name it. Each is held to whether the checkout was asked
+ *   for at all, so a reading that always asked fails the first of them.
  *
  * ## What passes while wrong
  *
@@ -77,7 +82,7 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { RoadmapLine } from '../board/roadmap.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -87,7 +92,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { formatClaimMessage } from '../claims/record.js';
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import {
@@ -97,6 +102,7 @@ import {
   hasBranch,
   hasRun,
   hasStartedBranch,
+  holdsTree,
   once,
   onBase,
   openWorld,
@@ -204,6 +210,7 @@ function detail(over: Partial<PullRequestDetail> = {}): PullRequestDetail {
     ...summary(),
     body: 'Closes #63',
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],
@@ -519,6 +526,62 @@ describe('the checkout the working tree was read in', () => {
     const world = openWorld(sourcesOf({ git: git.git }));
 
     expect([world.checkout(), world.checkout()]).toEqual(['/work/rafa', '/work/rafa']);
+    expect(git.ran()).toEqual(['rev-parse --show-toplevel']);
+  });
+});
+
+describe('a live run that holds the tree', () => {
+  /** A checkout reader counting how often it was asked. */
+  function checkoutOf(path: string | null): { readonly read: () => string | null; readonly asked: () => number } {
+    let asked = 0;
+    return {
+      read: () => {
+        asked += 1;
+        return path;
+      },
+      asked: () => asked,
+    };
+  }
+
+  it('holds it for a record with no worktree, and never asks for the checkout', () => {
+    const checkout = checkoutOf('/work/rafa');
+
+    expect(holdsTree([record({ worktree: '/work/elsewhere' }), record()], checkout.read)).toBe(true);
+    expect(checkout.asked()).toBe(0);
+  });
+
+  it('holds it for a record naming the checkout, and not for one naming another working tree', () => {
+    const here = holdsTree([record({ worktree: '/work/rafa' })], checkoutOf('/work/rafa').read);
+    const elsewhere = holdsTree([record({ worktree: '/work/elsewhere' })], checkoutOf('/work/rafa').read);
+
+    expect([here, elsewhere]).toEqual([true, false]);
+  });
+
+  it('holds none when the checkout could not be named', () => {
+    expect(holdsTree([record({ worktree: '/work/rafa' })], checkoutOf(null).read)).toBe(false);
+  });
+
+  it('holds none with no live run, and never asks for the checkout', () => {
+    const checkout = checkoutOf('/work/rafa');
+
+    expect(holdsTree([], checkout.read)).toBe(false);
+    expect(checkout.asked()).toBe(0);
+  });
+
+  it('is read over the live records alone, an ended run in the main checkout left out', () => {
+    const git = gitOf({ 'rev-parse --show-toplevel': said('/work/rafa\n') });
+    const runs = [record(), record({ state: 'running', worktree: '/work/elsewhere' })];
+    const world = openWorld(sourcesOf({ git: git.git, runs: () => runs }));
+
+    expect([world.liveRunHoldsTree(), world.liveRunHoldsTree()]).toEqual([false, false]);
+    expect(git.ran()).toEqual(['rev-parse --show-toplevel']);
+  });
+
+  it('shares the one checkout reading with the tree line', () => {
+    const git = gitOf({ 'rev-parse --show-toplevel': said('/work/rafa\n') });
+    const world = openWorld(sourcesOf({ git: git.git, runs: () => [record({ state: 'paused', worktree: '/work/rafa' })] }));
+
+    expect([world.liveRunHoldsTree(), world.checkout()]).toEqual([true, '/work/rafa']);
     expect(git.ran()).toEqual(['rev-parse --show-toplevel']);
   });
 });

@@ -38,7 +38,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { listBoardLabels, missingBoardLabels, setUpLabels } from '../board/setup.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { writeProjectLock } from './lock.js';
 import { PROJECT_TREE, writeProjectScope } from './scaffold.js';
@@ -159,10 +159,14 @@ export type UpdateStep = 'folders' | 'lock';
 
 /** An apply that stopped at `step`, after writing `written`, which stays. */
 export class UpdateStepError extends Error {
+  readonly step: UpdateStep;
+  readonly written: readonly string[];
   override readonly name = 'UpdateStepError';
 
-  constructor(readonly step: UpdateStep, message: string, readonly written: readonly string[]) {
+  constructor(step: UpdateStep, message: string, written: readonly string[]) {
     super(message);
+    this.step = step;
+    this.written = written;
   }
 }
 

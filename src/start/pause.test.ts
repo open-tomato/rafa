@@ -19,7 +19,7 @@
  * and a task that cannot be cleared beside one that is.
  */
 import type { PauseHoldOutcome } from './pause.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import {
   chmodSync,
@@ -34,8 +34,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { runsDir, sessionFilePath, updateSession } from '../loop/sessions.js';
+import { runsDir, sessionFilePath, updateSession } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { holdWhilePaused, PAUSE_POLL_MS } from './pause.js';

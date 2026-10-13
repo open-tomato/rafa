@@ -41,7 +41,7 @@ import type { SuiteFailure } from '../suite/run.js';
 export const INHERITED_HEADING = '## Failures this run inherited';
 
 /** The sentence under the heading: what these are, and that they need no proof. */
-export const INHERITED_SENTENCE = 'These tests were already failing when this run started. '
+export const INHERITED_SENTENCE: string = 'These tests were already failing when this run started. '
   + 'They need no proof that they predate your task: do not run `git stash` or check out a clean worktree of `main` to show it. '
   + 'A bug you report for one of them, by its file and case, is recognised as inherited and files nothing.';
 

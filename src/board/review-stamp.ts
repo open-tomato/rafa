@@ -46,13 +46,13 @@
  * sentence a model folded over several lines is collapsed onto its item
  * rather than ending the list.
  *
- * Nothing here is a heading the plan model reads. `src/plan/parse.ts`
+ * Nothing here is a heading the plan model reads. `src/core/plan/parse.ts`
  * reads `# Stage: <name>` and the checklist grammar reads `- [ ] `;
  * this section is neither, so a plan opened with it parses exactly as
  * it did before, which `./review-stamp.test.ts` holds through
  * `parsePlan` over a stamped plan.
  *
- * `review` is not one of `PLAN_HEADER_FIELDS` (`src/plan/parse.ts`), so
+ * `review` is not one of `PLAN_HEADER_FIELDS` (`src/core/plan/parse.ts`), so
  * the plan reader keeps it as a `PlanHeaderExtra`: retained, acting on
  * nothing, and listed by `plan show`. That is the shape an unrecognised
  * key is supposed to have, and it is why this needs no change to the
@@ -108,13 +108,13 @@ export const REVIEW_MISSING = 'missing';
 export const REVIEW_ASSUMED = 'assumed';
 
 /** The line `--skip-review` leaves behind, indentation aside. */
-export const REVIEW_SKIPPED_LINE = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
+export const REVIEW_SKIPPED_LINE: string = `${REVIEW_FIELD}: ${REVIEW_SKIPPED}`;
 
 /** The line an unread review leaves behind, indentation aside. */
-export const REVIEW_MISSING_LINE = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
+export const REVIEW_MISSING_LINE: string = `${REVIEW_FIELD}: ${REVIEW_MISSING}`;
 
 /** The line a review of non-blocking gaps leaves behind, indentation aside. */
-export const REVIEW_ASSUMED_LINE = `${REVIEW_FIELD}: ${REVIEW_ASSUMED}`;
+export const REVIEW_ASSUMED_LINE: string = `${REVIEW_FIELD}: ${REVIEW_ASSUMED}`;
 
 /** What a stamp did, or what stopped it; `./plan-field.ts` spells the five. */
 export type ReviewStampAnswer = PlanFieldAnswer;

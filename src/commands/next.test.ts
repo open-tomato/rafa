@@ -131,8 +131,7 @@
  * read as a chain case, a reading case and two dispatched ones.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextDryRun } from '../next/lines.js';
 import type { NextState } from '../next/state.js';
@@ -144,7 +143,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { CEILING_REFUSAL_EXIT, YES_FLAG } from '../next/ceiling.js';
 import { actionOutput } from '../next/ending.js';
 import { epicEndLines } from '../next/epic-end.js';
@@ -593,6 +592,7 @@ const DETAIL: PullRequestDetail = Object.freeze({
   ...SUMMARY,
   body: 'Closes #63',
   headRefOid: 'abc1234',
+  headCommittedAt: null,
   mergeable: 'mergeable',
   mergeStateStatus: 'CLEAN',
   labels: [],

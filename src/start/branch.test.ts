@@ -22,17 +22,24 @@
  * redden. The git fixtures are what git 2.50.1 (Apple Git-155) wrote
  * under `LC_ALL=C` in a clone of a bare remote on 2026-09-20.
  *
+ * A run with no branch checked out is one more axis, `standing:
+ * 'no-branch'`, and its cases sit in a block of their own. The refusals
+ * come first there and the routes that take the branch after them, each
+ * asserted over the whole list of commands the run spawned, so a step
+ * that should not run — the fast-forward above all — reddens by being
+ * there, or by having no reply in the table.
+ *
  * The active output is module state and bun runs every test file in one
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { offerRunBranch } from './branch.js';
@@ -68,6 +75,7 @@ const CLEAN: GitReplies = {
   'rev-list --left-right --count main...origin/main': ok('0\t0\n'),
   'merge --ff-only origin/main': ok('Already up to date.\n'),
   [`switch -c ${BRANCH}`]: ok(),
+  [`switch --no-track -c ${BRANCH} origin/main`]: ok(),
   [`switch ${BRANCH}`]: ok(),
   [`switch --track origin/${BRANCH}`]: ok(),
 };
@@ -84,6 +92,18 @@ const CREATE_ROUTE: readonly string[] = [
   'rev-list --left-right --count main...origin/main',
   'merge --ff-only origin/main',
   `switch -c ${BRANCH}`,
+];
+
+/** The two commands the create route spawns for a run with no branch checked out, in order. */
+const NO_BRANCH_CREATE_ROUTE: readonly string[] = [
+  'fetch origin main',
+  `switch --no-track -c ${BRANCH} origin/main`,
+];
+
+/** The two steps of the create route that read and move a local base, which no such run has. */
+const LOCAL_BASE_STEPS: readonly string[] = [
+  'rev-list --left-right --count main...origin/main',
+  'merge --ff-only origin/main',
 ];
 
 /** A stubbed git and the commands it was given. */
@@ -478,5 +498,192 @@ describe('the steps of the create route', () => {
       .toEqual(['fetch', 'read-standing', 'fast-forward', 'create']);
     expect(moved(outcome).steps.map((step) => step.argv.join(' ')))
       .toEqual(CREATE_ROUTE.map((command) => `git ${command}`));
+  });
+});
+
+describe('a run with no branch checked out', () => {
+  /** {@link request} on the `no-branch` standing, `main` being the base its caller read. */
+  function detached(over: Partial<BranchRequest> = {}): BranchRequest {
+    return request({ standing: 'no-branch', ...over });
+  }
+
+  it('refuses a modified tracked file, naming the detached HEAD, before any step runs', async () => {
+    const git = world({ 'status --porcelain': ok(' M a.txt\n?? untracked.txt\n') });
+    const refusal = await refusalOf(offerRunBranch(detached({ createBranch: true }), seamsOver(git.git)));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain(`Refusing to leave a detached HEAD for ${BRANCH}`);
+    expect(refusal.message).toContain('1 change to tracked files');
+    expect(refusal.message).toContain(' M a.txt');
+    expect(refusal.message).not.toContain('untracked.txt');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain']);
+  });
+
+  it('refuses a tree it cannot read, on no branch still', async () => {
+    const git = world({ 'status --porcelain': failed('fatal: not a git repository') });
+    const refusal = await refusalOf(offerRunBranch(detached({ createBranch: true }), seamsOver(git.git)));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain(`Could not read the working tree before leaving a detached HEAD for ${BRANCH}.`);
+    expect(refusal.message).toContain('fatal: not a git repository');
+    expect(refusal.message).toContain('The run is still on a detached HEAD.');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain']);
+  });
+
+  it('refuses a failed fetch, creating nothing', async () => {
+    const git = world({
+      'fetch origin main': failed('fatal: Could not read from remote repository.'),
+    });
+    const refusal = await refusalOf(offerRunBranch(detached({ createBranch: true }), seamsOver(git.git)));
+
+    expect(refusal.exitCode).toBe(1);
+    expect(refusal.message).toContain(`Refusing to create ${BRANCH} from a stale origin/${BASE}`);
+    expect(refusal.message).toContain('fatal: Could not read from remote repository.');
+    expect(refusal.message).toContain('The run is still on a detached HEAD.');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', 'fetch origin main']);
+  });
+
+  it('refuses a checkout git would not do, naming the step and the ref it is cut from', async () => {
+    const git = world({
+      [`switch --no-track -c ${BRANCH} origin/main`]: failed('fatal: invalid reference: origin/main'),
+    });
+    const refusal = await refusalOf(offerRunBranch(detached({ createBranch: true }), seamsOver(git.git)));
+
+    expect(refusal.message).toContain(`Could not create ${BRANCH} from origin/${BASE}.`);
+    expect(refusal.message).toContain('fatal: invalid reference: origin/main');
+    expect(refusal.message).toContain('The run is still on a detached HEAD.');
+  });
+
+  it('reads nothing off git when the plan gave no stub, whatever the flags', async () => {
+    const git = world();
+    const missing = await offerRunBranch(detached({ planStub: null }), seamsOver(git.git));
+    const blank = await offerRunBranch(detached({ planStub: '   ', createBranch: true }), seamsOver(git.git));
+    const anyBranch = await offerRunBranch(detached({ planStub: null, anyBranch: true }), seamsOver(git.git));
+
+    expect(stoodAside(missing)).toBe('no-plan-stub');
+    expect(stoodAside(blank)).toBe('no-plan-stub');
+    expect(stoodAside(anyBranch)).toBe('no-plan-stub');
+    expect(git.ran).toEqual([]);
+  });
+
+  it('stands aside with no terminal and no flag, having read the refs and asked nothing', async () => {
+    const git = world();
+    const outcome = await offerRunBranch(detached(), seamsOver(git.git, { isTerminal: () => false }));
+
+    expect(stoodAside(outcome)).toBe('no-terminal');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ]);
+  });
+
+  it('stands aside the same way under --any-branch alone, which lets no detached HEAD through', async () => {
+    const git = world();
+    const outcome = await offerRunBranch(
+      detached({ anyBranch: true }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(stoodAside(outcome)).toBe('no-terminal');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ]);
+    // The control: on the base the same flag stands the offer aside before git is read.
+    const onBase = world();
+    const waived = await offerRunBranch(
+      request({ anyBranch: true }),
+      seamsOver(onBase.git, { isTerminal: () => false }),
+    );
+    expect(stoodAside(waived)).toBe('any-branch');
+    expect(onBase.ran).toEqual([]);
+  });
+
+  it('runs nothing and stays where it is when the answer is not yes', async () => {
+    const git = world();
+    const prompter = prompterAnswering('n');
+    const outcome = await offerRunBranch(detached(), seamsOver(git.git, { openPrompter: prompter.open }));
+
+    expect(declined(outcome).route).toBe('create');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ]);
+    expect(prompter.counts).toEqual({ opens: 1, closes: 1 });
+    expect(lines).toContain('Staying on a detached HEAD.');
+  });
+
+  it('creates the branch from origin/<base> under --create-branch, with no terminal and no fast-forward', async () => {
+    const git = world();
+    const outcome = await offerRunBranch(
+      detached({ createBranch: true }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(moved(outcome).route).toBe('create');
+    expect(moved(outcome).branch).toBe(BRANCH);
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', ...NO_BRANCH_CREATE_ROUTE]);
+    for (const step of LOCAL_BASE_STEPS) expect(git.ran).not.toContain(step);
+    expect(moved(outcome).steps.map((step) => step.id)).toEqual(['fetch', 'create']);
+    expect(moved(outcome).steps.map((step) => step.argv.join(' ')))
+      .toEqual(NO_BRANCH_CREATE_ROUTE.map((command) => `git ${command}`));
+    // The control: the same line on the base does read and fast-forward its local base.
+    const onBase = world();
+    await offerRunBranch(request({ createBranch: true }), seamsOver(onBase.git, { isTerminal: () => false }));
+    for (const step of LOCAL_BASE_STEPS) expect(onBase.ran).toContain(step);
+  });
+
+  it('creates the branch on a yes to the question a run on the base is asked', async () => {
+    const git = world();
+    const prompter = prompterAnswering('y');
+    const outcome = await offerRunBranch(detached(), seamsOver(git.git, { openPrompter: prompter.open }));
+
+    expect(prompter.asked).toEqual([`Create ${BRANCH} from the latest origin/${BASE} and run there? [y/N] `]);
+    expect(moved(outcome).route).toBe('create');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', ...NO_BRANCH_CREATE_ROUTE]);
+    expect(prompter.counts).toEqual({ opens: 1, closes: 1 });
+  });
+
+  it('creates the branch under --create-branch with --any-branch beside it', async () => {
+    const git = world();
+    const outcome = await offerRunBranch(
+      detached({ createBranch: true, anyBranch: true }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(moved(outcome).branch).toBe(BRANCH);
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', ...NO_BRANCH_CREATE_ROUTE]);
+  });
+
+  it('reports each step it ran and the branch it ended on', async () => {
+    const git = world();
+    await offerRunBranch(detached({ createBranch: true }), seamsOver(git.git));
+
+    expect(lines[0]).toContain(`Creating ${BRANCH} from the latest origin/${BASE}.`);
+    expect(lines.slice(1)).toEqual([
+      '   fetch origin main: done',
+      `   create ${BRANCH} from origin/${BASE}: done`,
+      `   The run is on ${BRANCH}.`,
+    ]);
+  });
+
+  it('switches to a local branch in one step, fetching nothing', async () => {
+    const git = world({ [LOCAL_READ]: ok('') });
+    const prompter = prompterAnswering('y');
+    const outcome = await offerRunBranch(detached(), seamsOver(git.git, { openPrompter: prompter.open }));
+
+    expect(prompter.asked).toEqual([`Switch to the existing ${BRANCH}? [y/N] `]);
+    expect(moved(outcome).route).toBe('switch-local');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', `switch ${BRANCH}`]);
+  });
+
+  it('checks out a branch only origin has, tracking it, and fetches nothing', async () => {
+    const git = world({ [REMOTE_READ]: ok('') });
+    const outcome = await offerRunBranch(
+      detached({ createBranch: true }),
+      seamsOver(git.git, { isTerminal: () => false }),
+    );
+
+    expect(moved(outcome).route).toBe('switch-remote');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', `switch --track origin/${BRANCH}`]);
+  });
+
+  it('takes the local branch when both refs are there', async () => {
+    const git = world({ [LOCAL_READ]: ok(''), [REMOTE_READ]: ok('') });
+    const outcome = await offerRunBranch(detached({ createBranch: true }), seamsOver(git.git));
+
+    expect(moved(outcome).route).toBe('switch-local');
+    expect(git.ran).toEqual([LOCAL_READ, REMOTE_READ, 'status --porcelain', `switch ${BRANCH}`]);
   });
 });

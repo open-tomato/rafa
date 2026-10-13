@@ -30,7 +30,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { describeRegistry } from '../cli/describe.js';
 import { CORE_REGISTRY } from '../commands/index.js';
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 
 import { readCopyRefs, readRefsText, restampCopyRefs, restampRefsText, unblockCommand } from './reading.js';
 import { ABSENT, issueFingerprint, NEW, PRESENT, readRefsBlock, RefsBlockError, writeRefsBlock } from './stamp.js';

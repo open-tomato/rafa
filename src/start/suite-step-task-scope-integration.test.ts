@@ -31,7 +31,7 @@
  * (`./suite-step-no-owns-full-suite-tally-integration.test.ts`'s module
  * note says the same). Six suite runs in all — the baseline, the four
  * task steps, and the pre-wrap-up step — read back from the run record's
- * `steps` (`../loop/sessions.ts`) and filtered to the four `task` ones
+ * `steps` (`../core/loop/sessions.ts`) and filtered to the four `task` ones
  * this file is about. None of the four ever fails, so the run reaches its
  * wrap-up with no task blocked. The plan's header names no issue, so
  * `readPlanOwns` (`../suite/owns.ts`) is never even asked for: no stage
@@ -47,7 +47,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { readSessions } from '../loop/sessions.js';
+import { readSessions } from '../core/loop/index.js';
 import { expectExit, plantProjectConfig } from '../tests/cli-capture.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';

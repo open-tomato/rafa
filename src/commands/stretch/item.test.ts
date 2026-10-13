@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { beginSession } from '../../loop/sessions.js';
+import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 
@@ -133,7 +133,6 @@ function plant(options: CaseOptions = {}): Case {
       return Promise.resolve({ ok: true, stdout: JSON.stringify(row), stderr: '' });
     },
     tracker: () => ({ openIssues: async () => Promise.resolve([]) }),
-    filedAt: () => undefined,
     sleep: async () => {
       clock += options.tickMs ?? 0;
       return Promise.resolve();

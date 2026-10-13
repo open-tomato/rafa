@@ -32,7 +32,7 @@ import { SKILL_DELIVERY } from './delivery.js';
 import { SERVED_PLUGIN_NAME } from './serve.js';
 
 /** The prefix a `plugin-dir` delivery puts on a served skill's name. */
-export const SERVED_SKILL_PREFIX = `${SERVED_PLUGIN_NAME}:`;
+export const SERVED_SKILL_PREFIX: string = `${SERVED_PLUGIN_NAME}:`;
 
 /**
  * The name a session knows the served skill `bare` by under `delivery`,

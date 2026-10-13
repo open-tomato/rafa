@@ -22,7 +22,7 @@
  * whose run says the row was not stored.
  */
 import type { SearchCommandResult } from './search.js';
-import type { CapturedSession, CapturingSpawner } from '../../utils/claude.js';
+import type { CapturedSession, CapturingSpawner } from '../../core/loop/index.js';
 
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

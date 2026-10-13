@@ -24,16 +24,16 @@
  * `eventsOf` to prove the data parses, and a planted `FAKE_TOKEN` read
  * from the real environment a spawned process inherits.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { EVERY_TOOL, RISK_FOOTER } from '../../plan/risk.js';
 import { dispatchInProject, eventsOf, expectExit, plantProject, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
@@ -250,6 +250,49 @@ describe('the lines the command words', () => {
   it('counts the high findings in the --strict refusal', () => {
     expect(strictRefusal({ plan: 'p.md', total: { high: 2, note: 0 }, findings: [] }))
       .toBe('❌ p.md: 2 high findings; --strict refuses a plan with any');
+  });
+});
+
+describe('the long-run reading', () => {
+  const SENTENCE = ' Run the full suite when done.';
+  const FULL_SUITE_PLAN = readFileSync(resolve(import.meta.dir, '../../plan/testdata/full-suite-task.md'), 'utf8');
+  const TASK_LINE = FULL_SUITE_PLAN.split('\n').findIndex((line) => line.includes('Run the full suite')) + 1;
+
+  it('reports one long-run note naming the task line and the tests=full fix, and exits 0 under --strict', async () => {
+    const project = plantRiskProject([['plans/full.md', FULL_SUITE_PLAN]]);
+    const run = await riskIn(project, ['plans/full.md', '--strict']);
+    const rows = run.stdout.split('\n').filter((line) => line.includes('long-run'));
+
+    expect([run.exitCode, run.stderr]).toEqual([0, '']);
+    expect(TASK_LINE).toBeGreaterThan(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('"full suite"');
+    expect(rows[0]).toContain('tests=full');
+    expect(run.stdout).toContain(`plans/full.md:${TASK_LINE} — Add the \`--summary\` flag`);
+  });
+
+  it('carries the finding in the json data', async () => {
+    const project = plantRiskProject([['plans/full.md', FULL_SUITE_PLAN]]);
+    const run = await riskIn(project, ['plans/full.md', '--strict', '--output=json']);
+    const events = eventsOf(run.stdout);
+    const data = (events[1] as { data: { findings: { kind: string; level: string; text: string; line?: number }[] } }).data;
+    const found = data.findings.filter((finding) => finding.kind === 'long-run');
+
+    expect(run.exitCode).toBe(0);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ level: 'note', line: TASK_LINE });
+    expect(found[0]?.text).toContain('tests=full');
+  });
+
+  it('reports no long-run finding over the same plan with that sentence removed', async () => {
+    const trimmed = FULL_SUITE_PLAN.replace(SENTENCE, '');
+    const project = plantRiskProject([['plans/trimmed.md', trimmed]]);
+    const run = await riskIn(project, ['plans/trimmed.md', '--output=json']);
+    const data = (eventsOf(run.stdout)[1] as { data: { findings: { kind: string }[] } }).data;
+
+    expect(trimmed).not.toBe(FULL_SUITE_PLAN);
+    expect(run.exitCode).toBe(0);
+    expect(data.findings.filter((finding) => finding.kind === 'long-run')).toEqual([]);
   });
 });
 

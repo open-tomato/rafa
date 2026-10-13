@@ -1,7 +1,7 @@
 /**
  * Where a source reaches `console` or `process.exit` in its code, for the
  * cases holding a module to the active output
- * (`src/adapters/output/active.ts`).
+ * (`src/core/output/active.ts`).
  *
  * The source is parsed with TypeScript and walked, so a comment or a
  * string naming either is no reading. `loop-output.test.ts` holds the

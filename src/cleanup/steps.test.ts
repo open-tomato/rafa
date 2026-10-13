@@ -2,15 +2,18 @@
  * The cleanup steps as data over hand-built rows, the force guard over
  * every flag spelling it names, the runner over a scripted git, and once
  * over a real scratch repository so the refusals the module note records
- * are read from git itself.
+ * are read from git itself. The one remote write, the delete of a ticked
+ * remote-only row, is read the same three ways, its real run over a
+ * clone of a bare remote that holds a branch named `-f`.
  */
 import type { LocalBranch } from './branches.js';
 import type { MergedBy, MergedRow, NotPushedRow, StaleRow } from './groups.js';
 import type { PastHeadCommit } from './past-head.js';
+import type { RemoteOnlyRow } from './remote-only.js';
 import type { RunRow } from './runs.js';
 import type { CleanupFiles, CleanupSelection } from './steps.js';
 import type { WorktreeRow } from './worktrees.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,12 +22,14 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../pr/git.js';
+import { createGitRunner } from '../core/git/index.js';
 
 import {
   cleanupCommandLine,
   cleanupSteps,
   deleteBranchStep,
+  deletedNotPushed,
+  deleteRemoteBranchStep,
   dryRunLines,
   forcedFlagRefusal,
   needsForcedDelete,
@@ -92,6 +97,19 @@ function worktreeRow(path: string, branch: string | null, tickable = true): Work
     reason: tickable
       ? 'clean'
       : '1 changed file',
+  };
+}
+
+/** A remote-only row as `./remote-only.ts` reads one: never ticked, two of its three commits with no copy on the base. */
+function remoteOnlyRow(name: string): RemoteOnlyRow {
+  return {
+    group: 'remote-only',
+    name,
+    lastCommit: NOW,
+    commits: 3,
+    uncopied: 2,
+    ticked: false,
+    reason: '2 of 3 commits with no patch-equal copy on origin/main',
   };
 }
 
@@ -286,9 +304,48 @@ describe('cleanupSteps', () => {
       merged: [mergedRow('done'), mergedRow('squashed', ['pull-request'])],
       stale: [staleRow('old')],
       notPushed: [notPushedRow('local')],
+      remoteOnly: [remoteOnlyRow('fix/force-f')],
     }));
-    expect(plan.steps).toHaveLength(5);
-    expect(plan.steps.map((step) => forcedFlagRefusal(step.argv))).toEqual([null, null, null, null, null]);
+    expect(plan.steps).toHaveLength(6);
+    expect(plan.steps.map((step) => forcedFlagRefusal(step.argv))).toEqual([null, null, null, null, null, null]);
+  });
+});
+
+describe('deletedNotPushed', () => {
+  it('leaves out a row a ticked, removable worktree holds, which cleanupSteps withholds (#978)', () => {
+    const picked = selection({ worktrees: [worktreeRow('/w/local', 'local')], notPushed: [notPushedRow('local')] });
+    expect(deletedNotPushed(picked)).toEqual([]);
+    expect(cleanupSteps(picked).withheld.map((entry) => entry.subject)).toEqual(['local']);
+  });
+
+  it('leaves out a row an untickable worktree holds (#860)', () => {
+    const held: NotPushedRow = { ...notPushedRow('local'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } };
+    expect(deletedNotPushed(selection({ notPushed: [held] }))).toEqual([]);
+  });
+
+  it('names a row no worktree holds (control)', () => {
+    const row = notPushedRow('local');
+    const picked = selection({ notPushed: [row] });
+    expect(deletedNotPushed(picked)).toEqual([row]);
+    expect(dryRunLines(cleanupSteps(picked))).toEqual(['git branch -D local']);
+  });
+
+  it('names exactly the rows cleanupSteps turns into a delete-branch step, in the order handed over', () => {
+    const free = notPushedRow('free');
+    const other = notPushedRow('other');
+    const picked = selection({
+      worktrees: [worktreeRow('/w/local', 'local'), worktreeRow('/w/dirty', 'stuck', false)],
+      notPushed: [
+        free,
+        notPushedRow('local'),
+        notPushedRow('stuck'),
+        { ...notPushedRow('pinned'), heldBy: { path: '/w/pinned', name: 'pinned', blockers: ['locked'] } },
+        other,
+      ],
+    });
+    const deleted = cleanupSteps(picked).steps.filter((step) => step.kind === 'delete-branch').map((step) => step.subject);
+    expect(deletedNotPushed(picked).map((row) => row.branch.name)).toEqual(['free', 'other']);
+    expect(deleted).toEqual(['free', 'other']);
   });
 });
 
@@ -355,6 +412,9 @@ describe('forcedFlagRefusal', () => {
   it.each([
     ['--force'],
     ['--force=yes'],
+    ['--force-with-lease'],
+    ['--force-with-lease=old-fix:abc123'],
+    ['--force-if-includes'],
     ['-f'],
     ['-ff'],
     ['-df'],
@@ -374,8 +434,22 @@ describe('forcedFlagRefusal', () => {
     [['git', 'worktree', 'remove', '/w/feature-fix']],
     [['git', 'branch', '-d', 'fix/force']],
     [['git', 'branch', '-D', 'feature']],
+    [['git', 'push', 'origin', '--delete', 'old-fix']],
+    [['git', 'push', 'origin', '--delete', 'fix/force-f']],
+    [['git', 'push', 'origin', '--delete', '+plus']],
   ])('lets %p through', (argv) => {
     expect(forcedFlagRefusal(argv)).toBeNull();
+  });
+
+  it.each([
+    ['--force'],
+    ['--force-with-lease'],
+    ['--force-if-includes'],
+    ['-f'],
+  ])('refuses a remote delete carrying %s', (flag) => {
+    expect(forcedFlagRefusal(['git', 'push', 'origin', '--delete', flag, 'old-fix'])).toBe(
+      `rafa cleanup refuses a forced removal: \`${flag}\`. Nothing was run.`,
+    );
   });
 });
 
@@ -539,6 +613,274 @@ describe('run-record steps', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('remote-only steps', () => {
+  it('turns a ticked remote-only row into one step, git push origin --delete <name>', () => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('old-fix')] }));
+    expect(plan.steps).toEqual([{
+      kind: 'delete-remote-branch',
+      subject: 'old-fix',
+      argv: ['git', 'push', 'origin', '--delete', 'old-fix'],
+      after: null,
+    }]);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('builds no step for an unticked row: only the rows handed over are deleted on origin', () => {
+    const listed = [remoteOnlyRow('old-fix'), remoteOnlyRow('spike'), remoteOnlyRow('wip')];
+    const ticked = listed.filter((row) => row.name === 'spike');
+    const plan = cleanupSteps(selection({ remoteOnly: ticked }));
+    expect(plan.steps.map((step) => step.argv.join(' '))).toEqual(['git push origin --delete spike']);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('builds no step when no row was ticked, the field empty or left out', () => {
+    expect(cleanupSteps(selection({ remoteOnly: [] }))).toEqual({ steps: [], withheld: [] });
+    expect(cleanupSteps(selection({}))).toEqual({ steps: [], withheld: [] });
+  });
+
+  it('builds no remote write from any other group, a ticked Stale row with an upstream included', () => {
+    const plan = cleanupSteps(selection({
+      worktrees: [worktreeRow('/w/a', 'done')],
+      merged: [mergedRow('done'), mergedRow('squashed', ['pull-request'])],
+      stale: [staleRow('old')],
+      notPushed: [notPushedRow('local')],
+      runs: [runRow('r1')],
+    }));
+    expect(plan.steps).toHaveLength(6);
+    expect(plan.steps.filter((step) => step.kind === 'delete-remote-branch')).toEqual([]);
+    expect(plan.steps.filter((step) => step.argv.includes('push'))).toEqual([]);
+  });
+
+  it('control: the same selection with one ticked remote-only row holds exactly one remote write', () => {
+    const plan = cleanupSteps(selection({
+      worktrees: [worktreeRow('/w/a', 'done')],
+      merged: [mergedRow('done'), mergedRow('squashed', ['pull-request'])],
+      stale: [staleRow('old')],
+      notPushed: [notPushedRow('local')],
+      runs: [runRow('r1')],
+      remoteOnly: [remoteOnlyRow('old-fix')],
+    }));
+    expect(plan.steps.filter((step) => step.argv.includes('push')).map((step) => [step.kind, step.subject]))
+      .toEqual([['delete-remote-branch', 'old-fix']]);
+  });
+
+  it('puts the remote deletes after the local branches and before the run records', () => {
+    const plan = cleanupSteps(selection({
+      runs: [runRow('r1')],
+      remoteOnly: [remoteOnlyRow('old-fix')],
+      merged: [mergedRow('done')],
+      worktrees: [worktreeRow('/w/a', 'other')],
+    }));
+    expect(plan.steps.map((step) => step.kind)).toEqual([
+      'remove-worktree',
+      'delete-branch',
+      'delete-remote-branch',
+      'remove-run',
+    ]);
+  });
+
+  it.each([
+    ['-f', '-f'],
+    ['--force', '--force'],
+    ['--force-with-lease', '--force-with-lease'],
+    ['--receive-pack=x', '\'--receive-pack=x\''],
+    ['-', '-'],
+  ])('withholds a row named %s, which git would read as an option, and builds no step for it', (name, quoted) => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow(name), remoteOnlyRow('old-fix')] }));
+    expect(dryRunLines(plan)).toEqual(['git push origin --delete old-fix']);
+    expect(plan.withheld).toEqual([{
+      kind: 'delete-remote-branch',
+      subject: name,
+      reason: 'its name opens with `-`, which git reads as an option, not as a branch; to delete it on origin:'
+        + ` git push origin --delete -- ${quoted}`,
+    }]);
+  });
+
+  it('control: a dash inside a name withholds nothing', () => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('fix-f'), remoteOnlyRow('a/-f')] }));
+    expect(dryRunLines(plan)).toEqual(['git push origin --delete fix-f', 'git push origin --delete a/-f']);
+    expect(plan.withheld).toEqual([]);
+  });
+
+  it('prints one --dry-run line per ticked row, quoting a name the shell would read', () => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('old-fix'), remoteOnlyRow('fix/$HOME'), remoteOnlyRow('+plus')] }));
+    expect(dryRunLines(plan)).toEqual([
+      'git push origin --delete old-fix',
+      'git push origin --delete \'fix/$HOME\'',
+      'git push origin --delete \'+plus\'',
+    ]);
+  });
+
+  it('builds a frozen step', () => {
+    const step = deleteRemoteBranchStep('old-fix');
+    expect(Object.isFrozen(step)).toBe(true);
+    expect(Object.isFrozen(step.argv)).toBe(true);
+  });
+
+  it('runs the push through git without its leading git, and a refused one does not stop the rest', () => {
+    const refusal = 'error: unable to delete \'gone\': remote ref does not exist';
+    const { git, calls } = scriptedGit({ 'push origin --delete gone': said(false, refusal) });
+    const { files, removed } = scriptedFiles();
+    const plan = cleanupSteps(selection({
+      remoteOnly: [remoteOnlyRow('gone'), remoteOnlyRow('old-fix')],
+      runs: [runRow('r1', true, false)],
+    }));
+    const outcomes = runCleanupSteps(git, plan, files);
+    expect(calls).toEqual(['push origin --delete gone', 'push origin --delete old-fix']);
+    expect(removed).toEqual(['/p/.rafa/runs/r1.json']);
+    expect(outcomes.map((outcome) => [outcome.command, outcome.ran, outcome.ok, outcome.said])).toEqual([
+      ['git push origin --delete gone', true, false, refusal],
+      ['git push origin --delete old-fix', true, true, ''],
+      ['rm /p/.rafa/runs/r1.json', true, true, ''],
+    ]);
+  });
+
+  it.each([
+    ['--force'],
+    ['--force-with-lease'],
+    ['--force-if-includes'],
+    ['-f'],
+  ])('refuses a remote delete forced with %s without spawning git, and runs the rest', (flag) => {
+    const { git, calls } = scriptedGit();
+    const forced = Object.freeze({
+      ...deleteRemoteBranchStep('old-fix'),
+      argv: ['git', 'push', 'origin', '--delete', flag, 'old-fix'],
+    });
+    const outcomes = runCleanupSteps(git, { steps: [forced, deleteRemoteBranchStep('spike')], withheld: [] });
+    expect(calls).toEqual(['push origin --delete spike']);
+    expect(outcomes[0]).toMatchObject({
+      ran: false,
+      ok: false,
+      command: `git push origin --delete ${flag} old-fix`,
+      said: `rafa cleanup refuses a forced removal: \`${flag}\`. Nothing was run.`,
+    });
+  });
+
+  it('refuses a step built by hand for a name that is a force flag, without spawning git', () => {
+    const { git, calls } = scriptedGit();
+    const outcomes = runCleanupSteps(git, { steps: [deleteRemoteBranchStep('--force')], withheld: [] });
+    expect(calls).toEqual([]);
+    expect(outcomes[0]?.said).toBe('rafa cleanup refuses a forced removal: `--force`. Nothing was run.');
+  });
+
+  it('control: the same step without the flag is spawned', () => {
+    const { git, calls } = scriptedGit();
+    runCleanupSteps(git, { steps: [deleteRemoteBranchStep('old-fix')], withheld: [] });
+    expect(calls).toEqual(['push origin --delete old-fix']);
+  });
+});
+
+describe('runCleanupSteps over a real remote', () => {
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'rafa-cleanup-steps-remote-')));
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+
+  function sh(cwd: string, ...args: string[]): string {
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } });
+    if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+    return result.stdout;
+  }
+
+  /** The identity `git commit-tree` needs in the bare remote, which holds no `user.*` of its own. */
+  const IDENTITY = {
+    GIT_AUTHOR_NAME: 'Test',
+    GIT_AUTHOR_EMAIL: 'test@example.com',
+    GIT_COMMITTER_NAME: 'Test',
+    GIT_COMMITTER_EMAIL: 'test@example.com',
+  };
+
+  const origin = join(scratch, 'origin.git');
+  const repo = join(scratch, 'repo');
+  sh(scratch, 'init', '-q', '--bare', '-b', 'main', origin);
+  sh(scratch, 'init', '-q', '-b', 'main', repo);
+  sh(repo, 'config', 'user.email', 'test@example.com');
+  sh(repo, 'config', 'user.name', 'Test');
+  sh(repo, 'commit', '-q', '--allow-empty', '-m', 'root');
+  sh(repo, 'remote', 'add', 'origin', origin);
+  sh(repo, 'push', '-q', 'origin', 'main');
+  const tip = sh(repo, 'rev-parse', 'main').trim();
+  // Written in the remote itself: `git branch` refuses a name that opens with a dash, a remote does not.
+  for (const name of ['old-fix', 'kept', '+plus', 'plus', '-f']) sh(origin, 'update-ref', `refs/heads/${name}`, tip);
+  sh(repo, 'fetch', '-q', 'origin');
+
+  /** The branches the remote holds, read in the remote itself. */
+  function remoteBranches(): string[] {
+    return sh(origin, 'for-each-ref', '--format=%(refname:lstrip=2)', 'refs/heads').split('\n')
+      .filter((line) => line !== '');
+  }
+
+  /**
+   * The branches this clone believes the remote holds. `origin/HEAD` is
+   * left out: git 2.53.0 wrote it on the fetch above, and whether a
+   * fetch writes it depends on the git version.
+   */
+  function trackedBranches(): string[] {
+    return sh(repo, 'for-each-ref', '--format=%(refname:lstrip=3)', 'refs/remotes/origin').split('\n')
+      .filter((line) => line !== '' && line !== 'HEAD');
+  }
+
+  it('control: the remote holds every branch before any step, the one named -f among them', () => {
+    expect(remoteBranches()).toEqual(['+plus', '-f', 'kept', 'main', 'old-fix', 'plus']);
+    expect(trackedBranches()).toEqual(['+plus', '-f', 'kept', 'main', 'old-fix', 'plus']);
+  });
+
+  it('deletes the ticked branch on the remote and in the clone\'s tracking refs, and no other', () => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('old-fix')] }));
+    const outcomes = runCleanupSteps(createGitRunner(repo), plan);
+    expect(outcomes.map((outcome) => [outcome.command, outcome.ran, outcome.ok])).toEqual([
+      ['git push origin --delete old-fix', true, true],
+    ]);
+    expect(outcomes[0]?.said).toContain(' - [deleted]         old-fix');
+    expect(remoteBranches()).toEqual(['+plus', '-f', 'kept', 'main', 'plus']);
+    expect(trackedBranches()).toEqual(['+plus', '-f', 'kept', 'main', 'plus']);
+  });
+
+  it('reports a branch the remote no longer holds as a step that did not run clean', () => {
+    const outcomes = runCleanupSteps(createGitRunner(repo), { steps: [deleteRemoteBranchStep('old-fix')], withheld: [] });
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok])).toEqual([[true, false]]);
+    expect(outcomes[0]?.said).toContain('error: unable to delete \'old-fix\': remote ref does not exist');
+    expect(remoteBranches()).toEqual(['+plus', '-f', 'kept', 'main', 'plus']);
+  });
+
+  it('deletes a branch whose tip moved on the remote after the fetch: the delete is not conditional', () => {
+    const tree = sh(origin, 'rev-parse', `${tip}^{tree}`).trim();
+    const moved = spawnSync('git', ['commit-tree', tree, '-p', tip, '-m', 'pushed after the fetch'], {
+      cwd: origin,
+      encoding: 'utf8',
+      env: { ...process.env, LC_ALL: 'C', ...IDENTITY },
+    }).stdout.trim();
+    sh(origin, 'update-ref', 'refs/heads/kept', moved);
+    expect(sh(repo, 'rev-parse', 'refs/remotes/origin/kept').trim()).toBe(tip);
+    expect(sh(origin, 'rev-parse', 'refs/heads/kept').trim()).not.toBe(tip);
+
+    const outcomes = runCleanupSteps(createGitRunner(repo), cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('kept')] })));
+    expect(outcomes.map((outcome) => outcome.ok)).toEqual([true]);
+    expect(remoteBranches()).toEqual(['+plus', '-f', 'main', 'plus']);
+  });
+
+  it('deletes the branch named +plus and leaves plus: a leading + forces nothing under --delete', () => {
+    const outcomes = runCleanupSteps(createGitRunner(repo), cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('+plus')] })));
+    expect(outcomes.map((outcome) => outcome.ok)).toEqual([true]);
+    expect(remoteBranches()).toEqual(['-f', 'main', 'plus']);
+  });
+
+  it('leaves a branch named -f on the remote: withheld by the builder, refused unspawned by the guard', () => {
+    const plan = cleanupSteps(selection({ remoteOnly: [remoteOnlyRow('-f')] }));
+    expect(plan.steps).toEqual([]);
+    const outcomes = runCleanupSteps(createGitRunner(repo), { steps: [deleteRemoteBranchStep('-f')], withheld: [] });
+    expect(outcomes.map((outcome) => [outcome.ran, outcome.ok])).toEqual([[false, false]]);
+    expect(remoteBranches()).toEqual(['-f', 'main', 'plus']);
+  });
+
+  it('measures what the withheld reason offers: git reads the bare name as a flag, and -- deletes it', () => {
+    const bare = spawnSync('git', ['push', 'origin', '--delete', '-f'], { cwd: repo, encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } });
+    expect(bare.status).toBe(128);
+    expect(bare.stderr).toContain('fatal: --delete doesn\'t make sense without any refs');
+    expect(remoteBranches()).toEqual(['-f', 'main', 'plus']);
+    sh(repo, 'push', '-q', 'origin', '--delete', '--', '-f');
+    expect(remoteBranches()).toEqual(['main', 'plus']);
   });
 });
 

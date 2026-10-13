@@ -26,24 +26,39 @@
  *
  * ## Where each is read
  *
- * The tree is read AFTER row 1, `loop-running`, and ahead of every other
- * row. A loop that is running or paused edits a checkout as its task
- * goes, and those edits are the loop's, not the person's: committing
- * them puts a half-finished task on the loop's branch, and setting them
- * aside takes them out from under the running session (#444). So while a
- * run is live, row 1 answers and the tree is never read; once no run is
- * live, no edit in any checkout is a live run's, and the tree reading
- * can offer every one of them back to the person. Row 1 reads
- * `.rafa/runs/` alone, so putting it first spends nothing the tree
- * reading would not have.
+ * The tree is read ahead of every row from row 2 on. Whether it is read
+ * ahead of row 1, `loop-running`, depends on WHERE the live runs work.
+ *
+ * A loop that is running or paused edits its checkout as its task goes,
+ * and those edits are the loop's, not the person's: committing them puts
+ * a half-finished task on the loop's branch, and setting them aside
+ * takes them out from under the running session (#444). So while a live
+ * run works in the checkout the tree is read in, row 1 answers first and
+ * the tree is never read. Row 1 reads `.rafa/runs/` alone, so putting it
+ * first spends nothing the tree reading would not have.
+ *
+ * A loop in a worktree of its own edits that worktree and nothing else.
+ * A change to a tracked file in the checkout read here is then the
+ * person's, however many loops are live elsewhere, and row 1 answering
+ * first would hide it behind a loop that never made it. So when no live
+ * run works in this checkout the tree is read first: a modified tree
+ * answers `tree-modified`, and a clean one leaves row 1 to answer for
+ * the loop. With no live run at all, no edit in any checkout is a live
+ * run's, and the tree reading offers every one of them back.
+ *
+ * Which of the two holds is `NextWorld.liveRunHoldsTree`
+ * (`./readings.ts`), read off each live record's `worktree`: a record
+ * with none ran in the project root, and one naming a working tree ran
+ * there.
  *
  * The tree reading names the checkout it read because that is not
  * always the checkout the command runs in: git is reached at the
  * project root, which is the main checkout even when `rafa next` runs in
- * a linked worktree beside it. The name is `git rev-parse
- * --show-toplevel` at the project root, asked only once the tree has
- * shown a change; a name git could not give is carried as a problem and
- * the line reads "the working tree" alone.
+ * a linked worktree beside it, the worktree of a live loop included. The
+ * name is `git rev-parse --show-toplevel` at the project root, asked
+ * once the tree has shown a change, or before that when live runs all
+ * name a worktree to compare it with; a name git could not give is
+ * carried as a problem and the line reads "the working tree" alone.
  *
  * The provider is read where the table would read it, ahead of rows 5,
  * 6, 7 and 8 and not before: asking it earlier would spend a `gh` call
@@ -55,8 +70,8 @@
 import type { NextWorld } from './readings.js';
 import type { RowAnswer } from './state.js';
 
-import { messageOf } from '../config-sections.js';
-import { plural } from '../plan/plan-files.js';
+import { messageOf } from '../core/config/sections.js';
+import { plural } from '../core/plan/index.js';
 
 /** How many changed files the tree pre-condition names before eliding. */
 const MAX_NAMED_FILES = 5;
@@ -87,8 +102,8 @@ function treeLabel(checkout: string | null): string {
 
 /**
  * Pre-condition 1: the working tree has changes to tracked files. Prose
- * only, and no tool named; read once row 1 has found no live run, see
- * the module note.
+ * only, and no tool named; read unless a live run works in the checkout
+ * it reads, see the module note.
  */
 export function readTreeModified(world: NextWorld): RowAnswer | null {
   const paths = world.tracked();

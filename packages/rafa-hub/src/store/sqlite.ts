@@ -104,7 +104,7 @@ import { DEFAULT_STORE_FILE } from '../config.js';
 export const HUB_PACKAGE = '@open-tomato/rafa-hub';
 
 /** What a refused push is told to do next. */
-export const HUB_UPGRADE = `upgrade the hub to a ${HUB_PACKAGE} release whose rafa knows these migrations, then push again`;
+export const HUB_UPGRADE: string = `upgrade the hub to a ${HUB_PACKAGE} release whose rafa knows these migrations, then push again`;
 
 /** A push whose store has applied migrations this hub does not know. */
 export class HubUpgradeRequired extends Error {

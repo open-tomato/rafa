@@ -20,8 +20,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../cli/command.js';
-import { CONFIG_DEFAULTS } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
 import {
   checkbox,
   countTasks,
@@ -33,7 +33,7 @@ import {
   plural,
   rejectedPath,
   stubOfPlanFile,
-} from '../../plan/plan-files.js';
+} from '../../core/plan/index.js';
 import { scopeAt } from '../../project/scope.js';
 import { plantProjectConfig } from '../../tests/cli-capture.js';
 

@@ -15,7 +15,7 @@
  * so it declares no `spends`.
  */
 import type { EpicHorizonSeams } from './horizon-change.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
 import { REASON_FLAG } from '../../board/epic-trail.js';
 
@@ -67,4 +67,5 @@ export function createEpicPromoteCommand(seams: EpicHorizonSeams = {}): RafaComm
   return Object.freeze(command);
 }
 
-export default createEpicPromoteCommand();
+const command: RafaCommand = createEpicPromoteCommand();
+export default command;

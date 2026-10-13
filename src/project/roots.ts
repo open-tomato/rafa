@@ -98,7 +98,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
-import { describeValue, messageOf } from '../config-sections.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { DISK_FILE_SYSTEM, SCOPE_DIR, selfAndAncestors } from './scope.js';
 import { NOT_A_REPOSITORY } from './worktree-root.js';
@@ -129,10 +129,10 @@ export const REFUSED_ROOTS: readonly RefusedRoot[] = Object.freeze([
 ]);
 
 /** Why the home directory is refused, as a {@link RefusedRoot} `why`. */
-export const HOME_WHY = `is the home directory, whose ${SCOPE_DIR}/ is the user scope`;
+export const HOME_WHY: string = `is the home directory, whose ${SCOPE_DIR}/ is the user scope`;
 
 /** The marker files found by name alone. */
-export const MONOREPO_MARKER_FILES = Object.freeze([
+export const MONOREPO_MARKER_FILES: readonly ['turbo.json', 'pnpm-workspace.yaml', 'nx.json', 'lerna.json'] = Object.freeze([
   'turbo.json',
   'pnpm-workspace.yaml',
   'nx.json',

@@ -80,15 +80,15 @@ import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectFieldKey, ProjectRef } from '../../board/project/port.js';
 import type { ProjectChange } from '../../board/project/refresh-values.js';
 import type { ProjectSynced } from '../../board/project/sync.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { commandProgressFeed } from '../../board/project/progress.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { rateLimitWarning } from '../../board/project/refresh-warnings.js';
 import { syncProject } from '../../board/project/sync.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 
 /** The usage line a refusal names. */
@@ -341,4 +341,5 @@ export function createBoardSyncCommand(seams: BoardSyncSeams = {}): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createBoardSyncCommand();
+const command: RafaCommand = createBoardSyncCommand();
+export default command;

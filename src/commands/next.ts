@@ -255,8 +255,7 @@
  * whose `pr.provider` is not `gh`, and whatever an action threw for an
  * action that failed, or the native-mode repository read threw.
  */
-import type { RafaCommand, RafaContext, RafaFlagSpec } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter, RafaCommand, RafaContext, RafaFlagSpec } from '../core/command/index.js';
 import type { PullBeforeReadInput } from '../effort/sync/contact.js';
 import type { NextActionOptions, NextInvocation } from '../next/actions.js';
 import type { NextCeiling } from '../next/ceiling.js';
@@ -266,9 +265,8 @@ import type { DryEpic, NextSources } from '../next/readings.js';
 import type { NextSourceSeams, OpenedNextSources } from '../next/sources.js';
 import type { NextActionId, NextAnswerId, NextState } from '../next/state.js';
 
-import { CommandExit } from '../cli/command.js';
-import { createLinePrompter } from '../cli/prompt/confirm.js';
-import { messageOf } from '../config-sections.js';
+import { CommandExit , createLinePrompter } from '../core/command/index.js';
+import { messageOf } from '../core/config/sections.js';
 import { pullBeforeRead } from '../effort/sync/contact.js';
 import { actionInvocation, runAction } from '../next/actions.js';
 import { ALWAYS_ASKED, allowedUnasked, BARE_YES_ACTIONS, readYesCeiling, YES_ACTIONS, YES_FLAG } from '../next/ceiling.js';
@@ -721,7 +719,11 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
       },
     ],
     outputs: ['text', 'json'],
-    spends: { when: 'through', what: 'when the step it runs is one of the above' },
+    spends: {
+      when: 'through',
+      what: 'when the step it runs starts a session: `plan` runs `rafa plan create` and its one planning session,'
+        + ' and `start` and `resume` run `rafa loop start` and the sessions of its loop',
+    },
     run: async (context) => {
       const report = await runNext(context, seams);
       if (context.outputMode === 'json') context.output.result(report);
@@ -730,4 +732,5 @@ export function createNextCommand(seams: NextCommandSeams = DEFAULT_NEXT_SEAMS):
   return Object.freeze(command);
 }
 
-export default createNextCommand();
+const command: RafaCommand = createNextCommand();
+export default command;

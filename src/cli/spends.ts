@@ -30,7 +30,7 @@
  * none. {@link spendsMark} is the mark ending a roster line: the bare
  * {@link SPENDS_GLYPH}, followed by the condition when there is one.
  */
-import { describeValue } from '../config-sections.js';
+import { describeValue } from '../core/config/sections.js';
 
 /** The mark help puts on a command that spends Claude usage. */
 export const SPENDS_GLYPH = '🪙';

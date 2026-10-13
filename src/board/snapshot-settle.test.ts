@@ -49,7 +49,7 @@
  */
 import type { SpecIssue } from './issue.js';
 import type { RefreshOffer, RefreshOfferRequest } from './snapshot-settle.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,8 +57,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { lazyPrompter } from '../commands/issue/ready.js';
+import { CommandExit } from '../core/command/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import {

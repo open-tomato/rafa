@@ -30,17 +30,17 @@
  * failed), each changing no byte of either file. Exit code 0 otherwise.
  * In json mode the `MergeResult` is the data of the terminal result.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe } from '../../core/loop/index.js';
 import type { MergeOptions, MergeResult, TableMerge } from '../../effort/store/merge-store.js';
 import type { SqliteMigration } from '../../effort/store/migrations.js';
 import type { ProjectIdentity } from '../../effort/store/store-identity.js';
-import type { PidProbe } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
 import { join, resolve } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { DevelopmentBuildRefusedError } from '../../effort/store/development-build.js';
 import { effortStoreDir } from '../../effort/store/location.js';
@@ -275,4 +275,5 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createMergeCommand();
+const command: RafaCommand = createMergeCommand();
+export default command;

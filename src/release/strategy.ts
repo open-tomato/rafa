@@ -35,7 +35,8 @@
  *
  * {@link RELEASE_STRATEGY_ADAPTERS} is keyed by the values
  * `release.strategy` accepts (`RELEASE_STRATEGIES` in
- * `src/config-readers.ts`), typed as a complete record of them, so a
+ * `src/core/config/config-readers.ts`), typed as a complete record of
+ * them, so a
  * name added to the config's closed list without an adapter fails the
  * type check rather than a settle.
  *
@@ -45,8 +46,8 @@
  * prints that line, and every answer — success or not — names the
  * strategy that gave it.
  */
-import type { ReleaseStrategy } from '../config-readers.js';
 import type { Fragment } from './fragment.js';
+import type { ReleaseStrategy } from '../core/config/sections.js';
 
 import { createSemverByLevel } from './strategies/semver-by-level.js';
 

@@ -36,7 +36,7 @@
  * probe logs the directory it ran in, so the append order of one log
  * file is the order the fork ran them in.
  */
-import type { PrerequisiteItem } from '../config.js';
+import type { PrerequisiteItem } from '../core/config/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { PreflightTiers } from '../preflight/run.js';
 
@@ -57,9 +57,9 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { resolveConfig } from '../config.js';
+import { CommandExit } from '../core/command/index.js';
+import { resolveConfig } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { DEFAULT_GH_HOST, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { forkWorktree } from '../preflight/fork.js';
 import { KNOWN_MISSING_SENTENCE, runStartPreflight } from '../start/preflight.js';
@@ -315,6 +315,49 @@ describe('a pr.provider: gh run over a stand-in gh', () => {
 
       expect(inStart.stderr).not.toContain('preflight halted');
       expect(existsSync(callsFile(inn, 'count'))).toBe(true);
+    },
+    RUN_TIMEOUT,
+  );
+});
+
+describe('a failing [tasks] item over a plan whose tasks are all ticked', () => {
+  const TASK = 'A task whose box the tracker has ticked';
+  const ITEM = 'Fixtures built';
+
+  /** Plants a scratch whose tracker holds `box` for its one task, beside a PREREQUISITES file with one failing `[tasks]` item. */
+  function plant(box: ' ' | 'x', branch: string): CliScratch {
+    const scratch = plantCliScratch(['pr:', '  provider: none'], TASK, branch);
+    const plans = join(scratch.repo, '.plans');
+    writeFileSync(join(plans, 'PLAN_TRACKER-halts.md'), `# Plan: halts\n\n- [${box}] ${TASK}\n`, 'utf8');
+    writeFileSync(
+      join(plans, 'PREREQUISITES-halts.md'),
+      `# Prerequisites\n\n- [ ] [auto] [tasks] ${ITEM}: \`exit 1\`\n`,
+      'utf8',
+    );
+    return scratch;
+  }
+
+  it(
+    'names the skipped item, spawns the wrap-up and exits 0, beside the same plan with one task open'
+      + ' that halts on the item with nothing spawned',
+    () => {
+      const ticked = plant('x', 'feat/scope-ticked');
+      const open = plant(' ', 'feat/scope-open');
+
+      const tickedStart = runLoopStart(ticked, [PLAN_FLAG, '--no-ci-wait']);
+      const openStart = runLoopStart(open, [PLAN_FLAG, '--no-ci-wait']);
+
+      expectExit(tickedStart, 0, { ...ticked });
+      expect(tickedStart.stdout + tickedStart.stderr).toContain('tasks-only item');
+      expect(tickedStart.stdout + tickedStart.stderr).toContain(JSON.stringify(`${ITEM}: \`exit 1\``));
+      expect(tickedStart.stderr).not.toContain('preflight halted');
+      // The wrap-up session ran: the stand-in counted a call.
+      expect(existsSync(callsFile(ticked, 'count'))).toBe(true);
+
+      expect(openStart.exitCode).not.toBe(0);
+      expect(openStart.stderr).toContain('❌ preflight halted: 1 required item failed');
+      expect(openStart.stderr).toContain(ITEM);
+      expect(existsSync(callsFile(open, 'count'))).toBe(false);
     },
     RUN_TIMEOUT,
   );

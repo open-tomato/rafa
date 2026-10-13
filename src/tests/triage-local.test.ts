@@ -54,8 +54,8 @@ import {
   it,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { createLocalTracker, localIssuesDir } from '../adapters/tracker/local.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { BLOCKER_PROMPT_PREFIX, dispatchTask } from '../start/dispatch.js';
 import { createPrivateTriageTracker, privateTriageDir, triageReport } from '../triage/triage.js';
 import { escapeBlockerText, findNextTask } from '../utils/tracker.js';

@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { configFilePath } from '../config.js';
+import { configFilePath } from '../core/config/index.js';
 import { plantScratchRepo, runRafa } from '../tests/cli-capture.js';
 
 const SPAWN_TIMEOUT = 60_000;

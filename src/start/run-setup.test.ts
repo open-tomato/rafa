@@ -17,6 +17,14 @@
  * throws when it is opened: a case that reached the terminal reddens
  * instead of hanging.
  *
+ * A run with no branch checked out, a detached HEAD, is the same wiring
+ * on the `no-branch` standing: the cases hand in the base its caller
+ * read and assert the argv that ran, so the branch is shown cut from
+ * `origin/<base>` and not from a local base, and the answer where the
+ * offer was not taken is null, which the guard refuses with or without
+ * `--any-branch`. Each sits beside the case on a branch it was varied
+ * from.
+ *
  * `refuseWorktreeBesideCreateBranch` reads the words alone, so its
  * cases hand it lines and read what it throws; each refusing case is
  * paired with the same line less one flag, which returns, so the
@@ -40,8 +48,8 @@ import type { GitResult } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { CONTINUE_OFF, DIRECTIVE_REASON } from './continue-args.js';
@@ -169,7 +177,7 @@ describe('readRunArgs --retry', () => {
 });
 
 /** The `CommandExit` the guard threw, or null when it let the run through. */
-function refusalOf(planStub: string | null, branch: string, args: readonly string[]): CommandExit | null {
+function refusalOf(planStub: string | null, branch: string | null, args: readonly string[]): CommandExit | null {
   try {
     guardRunBranch(planStub, branch, args);
     return null;
@@ -359,6 +367,65 @@ describe('guardRunBranch', () => {
     expect(message).not.toContain('Pass --create-branch');
   });
 
+  /** The two lines every refusal of a run with no branch checked out opens with. */
+  const DETACHED_HEAD_LINES: readonly string[] = [
+    '❌ Refusing to run on a detached HEAD: no branch is checked out, and a run',
+    '   commits to, pushes and opens its pull request from a branch of its own.',
+  ];
+
+  /** The refusal a run with no branch checked out gets for a plan whose file names a stub. */
+  function detachedRefusal(stub: string): string {
+    return [
+      ...DETACHED_HEAD_LINES,
+      `\n   Pass --create-branch to create feat/${stub} from the latest`,
+      '   origin/<base> and run there.',
+      '   On a terminal the run asks that as a question instead of refusing.',
+      '\n   Or pass --as-worktree to run the plan in a worktree of its own, leaving',
+      '   this checkout where it is.',
+      NOTHING_DISPATCHED,
+    ].join('\n');
+  }
+
+  it('refuses no branch with exit code 1, naming --create-branch and its branch first and --as-worktree second', () => {
+    const refusal = refusalOf(STUB, null, []);
+    const message = refusal?.message ?? '';
+
+    expect(refusal?.exitCode).toBe(1);
+    expect(message).toBe(detachedRefusal(STUB));
+    expect(message.indexOf(`--create-branch to create feat/${STUB}`)).toBeGreaterThan(-1);
+    expect(message.indexOf('--create-branch')).toBeLessThan(message.indexOf('--as-worktree'));
+    expect([...warnings, ...others]).toEqual([]);
+  });
+
+  it('refuses no branch under --any-branch too, with the same refusal and no warning', () => {
+    for (const args of [['--any-branch'], ['--any-branch', '--create-branch']]) {
+      const refusal = refusalOf(STUB, null, args);
+
+      expect(refusal?.exitCode).toBe(1);
+      expect(refusal?.message).toBe(detachedRefusal(STUB));
+    }
+    expect(warnings).toEqual([]);
+
+    // The control: the flag still lets a branch through, the default one included.
+    expect(refusalOf(STUB, 'main', ['--any-branch'])).toBeNull();
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('offers the `git` line for no branch and a plan with no stub, naming no flag that could not help', () => {
+    const message = refusalOf(null, null, [])?.message ?? '';
+
+    expect(message).toBe([
+      ...DETACHED_HEAD_LINES,
+      '\n   git checkout -b feat/this-plan',
+      '   --create-branch names the branch after the plan\'s stub, as',
+      '   `PLAN-<stub>.md` spells it, and this plan file spells none.',
+      NOTHING_DISPATCHED,
+    ].join('\n'));
+    expect(message).not.toContain('Pass --create-branch');
+    // `--as-worktree` names its worktree after the stub and refuses a plan with none.
+    expect(message).not.toContain('--as-worktree');
+  });
+
   it('allows a feature branch, writing nothing', () => {
     expect(refusalOf(STUB, `feat/${STUB}`, [])).toBeNull();
     expect([...warnings, ...others]).toEqual([]);
@@ -415,17 +482,33 @@ describe('resolveRunBranch', () => {
     'rev-list --left-right --count main...origin/main': ok('0\t0\n'),
     'merge --ff-only origin/main': ok('Already up to date.\n'),
     [`switch -c ${BRANCH}`]: ok(),
+    [`switch --no-track -c ${BRANCH} origin/main`]: ok(),
     [`switch ${BRANCH}`]: ok(),
   };
 
-  /** {@link CLEAN} with `over` laid over it, a terminal when `canAsk`, and a prompter nothing may open. */
-  function seams(over: Readonly<Record<string, GitResult>> = {}, canAsk = false): BranchSeams {
+  /** What the offer reads before any answer: whether git has `feat/<stub>`, locally then on `origin`. */
+  const REF_READS: readonly string[] = [
+    `show-ref --verify --quiet refs/heads/${BRANCH}`,
+    `show-ref --verify --quiet refs/remotes/origin/${BRANCH}`,
+  ];
+
+  /**
+   * {@link CLEAN} with `over` laid over it, a terminal when `canAsk`, and
+   * a prompter nothing may open. Every argv git was asked for lands in
+   * `ran`, in order.
+   */
+  function seams(
+    over: Readonly<Record<string, GitResult>> = {},
+    canAsk = false,
+    ran: string[] = [],
+  ): BranchSeams {
     const replies: Readonly<Record<string, GitResult>> = { ...CLEAN, ...over };
     return {
       git: () => (args) => {
         const key = args.join(' ');
         const reply = replies[key];
         if (reply === undefined) throw new Error(`the stub has no reply for git ${key}`);
+        ran.push(key);
         return reply;
       },
       isTerminal: () => canAsk,
@@ -446,14 +529,28 @@ describe('resolveRunBranch', () => {
     },
   };
 
-  /** The branch the run goes on, for a plan stub, a base and a run's words. */
+  /** The branch the run goes on, for a plan stub, the branch it was started on and a run's words. */
   function resolved(
     planStub: string | null,
     base: string,
     args: readonly string[],
     over: BranchSeams,
-  ): Promise<string> {
+  ): Promise<string | null> {
     return resolveRunBranch({ checkout: REPO, planStub, base, args }, over);
+  }
+
+  /**
+   * The same for a run with no branch checked out, `base` being the base
+   * its caller read for it: the branch it goes on, or null when it is
+   * still on none.
+   */
+  function resolvedDetached(
+    planStub: string | null,
+    args: readonly string[],
+    over: BranchSeams,
+    base = 'main',
+  ): Promise<string | null> {
+    return resolveRunBranch({ checkout: REPO, planStub, base, standing: 'no-branch', args }, over);
   }
 
   beforeEach(() => {
@@ -501,53 +598,116 @@ describe('resolveRunBranch', () => {
     expect(await resolved(null, 'main', ['--create-branch'], NO_GIT)).toBe('main');
   });
 
-  /** The `CommandExit` resolving threw, or null when it answered a branch. */
-  async function resolveRefusalOf(base: string, args: readonly string[], over: BranchSeams): Promise<CommandExit | null> {
-    try {
-      await resolved(STUB, base, args, over);
-      return null;
-    } catch (error) {
-      if (error instanceof CommandExit) return error;
-      throw error;
-    }
-  }
-
-  // Every line that runs on the checkout's own HEAD: plain, `--create-branch`,
-  // `--any-branch`, and both.
-  const OWN_HEAD_LINES: readonly (readonly string[])[] = [
-    [],
+  // The two lines that answer the question yes before it is asked.
+  const CREATING_LINES: readonly (readonly string[])[] = [
     ['--create-branch'],
-    ['--any-branch'],
     ['--any-branch', '--create-branch'],
   ];
 
-  for (const args of OWN_HEAD_LINES) {
-    it(`refuses a detached HEAD under [${args.join(' ')}] with exit 1, reading no git`, async () => {
-      const refusal = await resolveRefusalOf('HEAD', args, NO_GIT);
+  for (const args of CREATING_LINES) {
+    it(`creates feat/<stub> from origin/<base> with no branch checked out under [${args.join(' ')}]`, async () => {
+      const ran: string[] = [];
+      const branch = await resolvedDetached(STUB, args, seams({}, false, ran));
 
+      expect(branch).toBe(BRANCH);
+      // The fetch, then the branch cut from the fetched ref: no local base is read or fast-forwarded.
+      expect(ran).toEqual([
+        ...REF_READS,
+        'status --porcelain',
+        'fetch origin main',
+        `switch --no-track -c ${BRANCH} origin/main`,
+      ]);
+      expect(refusalOf(STUB, branch, args)).toBeNull();
+    });
+  }
+
+  it('walks the four steps of the base for the same line on main, the control for the two above', async () => {
+    const ran: string[] = [];
+
+    expect(await resolved(STUB, 'main', ['--create-branch'], seams({}, false, ran))).toBe(BRANCH);
+    expect(ran).toEqual([
+      ...REF_READS,
+      'status --porcelain',
+      'fetch origin main',
+      'rev-list --left-right --count main...origin/main',
+      'merge --ff-only origin/main',
+      `switch -c ${BRANCH}`,
+    ]);
+  });
+
+  it('cuts the branch from the base it was handed, with no branch checked out', async () => {
+    const ran: string[] = [];
+    const onStretch = {
+      'fetch origin stretch/21': ok(),
+      [`switch --no-track -c ${BRANCH} origin/stretch/21`]: ok(),
+    };
+    const branch = await resolvedDetached(STUB, ['--create-branch'], seams(onStretch, false, ran), 'stretch/21');
+
+    expect(branch).toBe(BRANCH);
+    expect(ran.slice(-2)).toEqual(['fetch origin stretch/21', `switch --no-track -c ${BRANCH} origin/stretch/21`]);
+  });
+
+  it('switches to a feat/<stub> git already has with no branch checked out, fetching nothing', async () => {
+    const ran: string[] = [];
+    const local = { [`show-ref --verify --quiet refs/heads/${BRANCH}`]: ok() };
+
+    expect(await resolvedDetached(STUB, ['--create-branch'], seams(local, false, ran))).toBe(BRANCH);
+    expect(ran).toEqual([...REF_READS, 'status --porcelain', `switch ${BRANCH}`]);
+  });
+
+  // The two lines that answer nothing: no terminal is there to ask either.
+  const UNANSWERED_LINES: readonly (readonly string[])[] = [[], ['--any-branch']];
+
+  for (const args of UNANSWERED_LINES) {
+    it(`answers no branch under [${args.join(' ')}] with no terminal, which the guard refuses`, async () => {
+      const ran: string[] = [];
+      const branch = await resolvedDetached(STUB, args, seams({}, false, ran));
+      const refusal = refusalOf(STUB, branch, args);
+
+      expect(branch).toBeNull();
+      // `--any-branch` stood nothing aside: the refs were read with it as without it.
+      expect(ran).toEqual([...REF_READS]);
       expect(refusal?.exitCode).toBe(1);
       expect(refusal?.message).toStartWith('❌ Refusing to run on a detached HEAD');
-      expect(refusal?.message).toContain('git switch <base>');
-      expect(refusal?.message).toContain('--as-worktree');
+      expect(refusal?.message).toContain(`--create-branch to create ${BRANCH}`);
       expect(refusal?.message).toEndWith(NOTHING_DISPATCHED);
     });
   }
 
-  it('refuses a detached HEAD for a plan whose file names no stub', async () => {
-    let thrown: unknown;
-    try {
-      await resolveRunBranch({ checkout: REPO, planStub: null, base: 'HEAD', args: ['--create-branch'] }, NO_GIT);
-    } catch (error) {
-      thrown = error;
-    }
-    expect((thrown as CommandExit).exitCode).toBe(1);
+  it('answers no branch for a plan whose file names no stub, reading no git, and the guard prints the git line', async () => {
+    const args = ['--create-branch'];
+    const branch = await resolvedDetached(null, args, NO_GIT);
+
+    expect(branch).toBeNull();
+    expect(refusalOf(null, branch, args)?.message).toContain('git checkout -b feat/this-plan');
   });
 
-  it('refuses nothing on a branch, the control for the detached-HEAD cases', async () => {
-    // Same lines, a named branch instead of HEAD: none of them is refused here.
-    for (const args of OWN_HEAD_LINES) {
-      expect(await resolveRefusalOf('feat/other', args, NO_GIT)).toBeNull();
+  it('answers no branch once the question is declined on a terminal, and the branch on a yes', async () => {
+    const asked: string[] = [];
+    const answering = (answer: string): BranchSeams => ({
+      ...seams({}, true),
+      openPrompter: () => ({
+        say: () => undefined,
+        ask: (question) => {
+          asked.push(question);
+          return Promise.resolve(answer);
+        },
+        close: () => undefined,
+      }),
+    });
+    const question = `Create ${BRANCH} from the latest origin/main and run there? [y/N] `;
+
+    expect(await resolvedDetached(STUB, [], answering('n'))).toBeNull();
+    expect(await resolvedDetached(STUB, ['--any-branch'], answering('y'))).toBe(BRANCH);
+    expect(asked).toEqual([question, question]);
+  });
+
+  it('answers the branch a run is on wherever one is checked out, the control for the cases on none', async () => {
+    // Same lines, a named branch instead of none: each answers that branch, reading no git.
+    for (const args of [...CREATING_LINES, ...UNANSWERED_LINES]) {
+      expect(await resolved(STUB, 'feat/other', args, NO_GIT)).toBe('feat/other');
     }
-    expect(await resolveRefusalOf('main', ['--create-branch'], seams())).toBeNull();
+    // And on the base an offer not taken answers the base, never null.
+    expect(await resolved(STUB, 'main', [], seams())).toBe('main');
   });
 });

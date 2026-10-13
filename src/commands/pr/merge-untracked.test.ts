@@ -94,6 +94,7 @@ function detail(headOid: string): PullRequestDetail {
     updatedAt: '2026-09-30T11:00:00Z',
     body: 'Adds a file.',
     headRefOid: headOid,
+    headCommittedAt: null,
     mergeable: 'mergeable',
     mergeStateStatus: 'CLEAN',
     labels: [],

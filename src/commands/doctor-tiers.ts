@@ -119,13 +119,13 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
+import { CLAUDE_BIN } from '../core/loop/index.js';
 import { SKILL_USE_CLI_VERSION } from '../effort/skill-use.js';
 import { buildInventory } from '../inventory/index.js';
 import { readFrontmatter } from '../schema/frontmatter.js';
 import { PROVENANCE_FIELD } from '../schema/provenance.js';
 import { SERVE_CLI_VERSION } from '../tiers/delivery.js';
 import { provenanceBlock, SKILL_FILE } from '../tiers/serve.js';
-import { CLAUDE_BIN } from '../utils/claude.js';
 
 import { PATH_KEY, readSessionEnv } from './doctor-deep-env.js';
 import { renderDeepSection } from './doctor-deep-row.js';
@@ -325,7 +325,7 @@ export function noProvenanceRows(
 }
 
 /** The pin's row: none on a match, a warning on a difference, a note when unread. See "The pin". */
-export function cliVersionRows(installed: string | null, pinned = SERVE_CLI_VERSION): readonly TierDoctorRow[] {
+export function cliVersionRows(installed: string | null, pinned: string = SERVE_CLI_VERSION): readonly TierDoctorRow[] {
   if (installed === pinned) return [];
   const name = 'Claude Code';
   if (installed === null) {
@@ -349,7 +349,7 @@ export function cliVersionRows(installed: string | null, pinned = SERVE_CLI_VERS
  * The skill-use pin's row: a warning when `installed` is read and is not
  * `pinned`, nothing on a match or when unread. See "The skill-use pin".
  */
-export function skillUseVersionRows(installed: string | null, pinned = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
+export function skillUseVersionRows(installed: string | null, pinned: string = SKILL_USE_CLI_VERSION): readonly TierDoctorRow[] {
   if (installed === null || installed === pinned) return [];
   return [row(
     'skill-use-version',

@@ -21,7 +21,7 @@ import { join, sep } from 'node:path';
 
 import { describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS, CONFIG_FILE } from '../config.js';
+import { CONFIG_DEFAULTS, CONFIG_FILE } from '../core/config/index.js';
 
 import { PRE_INIT_DIRS, preInitWarning, readPreInitDirs } from './pre-init-dirs.js';
 

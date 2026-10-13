@@ -53,13 +53,13 @@
  * without it.
  */
 import type { AgentListSeams } from './list.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ClaudeSettingSource } from '../../config-sections.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { ClaudeSettingSource } from '../../core/config/sections.js';
 import type { Inventory } from '../../inventory/index.js';
 import type { ShowView } from '../../inventory/show.js';
 import type { ProjectFound } from '../../project/scope.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { findShown, readShowView, renderShowView } from '../../inventory/show.js';
 import { expectOneArgument, readSwitch } from '../plan/plan-files.js';
 import { projectInventory, warningLines } from '../skill/list.js';
@@ -192,4 +192,5 @@ export function createAgentShowCommand(seams: AgentShowSeams = DEFAULT_AGENT_SHO
   return Object.freeze(command);
 }
 
-export default createAgentShowCommand();
+const command: RafaCommand = createAgentShowCommand();
+export default command;

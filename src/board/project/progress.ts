@@ -65,14 +65,18 @@
  * system's own when left out.
  */
 import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { CliEventNamed, Output } from '../../ports/index.js';
 
 /** The name of the json event a progress line is emitted as. */
 export const PROGRESS_EVENT = 'progress';
 
 /** The three phases that print progress, each as its line spells it. */
-export const PROGRESS_PHASES = Object.freeze({
+export const PROGRESS_PHASES: Readonly<{
+  readonly adds: 'adding issues';
+  readonly facts: 'reading facts';
+  readonly writes: 'writing fields';
+}> = Object.freeze({
   adds: 'adding issues',
   facts: 'reading facts',
   writes: 'writing fields',

@@ -8,7 +8,7 @@
  *    locked ones;
  *  - ticking the Not-pushed branch asks the second question, and `n`
  *    keeps it (answered `y` it is deleted, so the question decides);
- *  - with no terminal the five groups print, exit 0, and nothing is
+ *  - with no terminal the six groups print, exit 0, and nothing is
  *    removed;
  *  - `--dry-run` prints the git commands and removes nothing.
  *
@@ -18,9 +18,9 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { existsSync } from 'node:fs';
 
@@ -168,12 +168,12 @@ describe('rafa cleanup over the scratch repository', () => {
     expect(branches()).toContain('stale');
   });
 
-  it('prints the five groups and removes nothing without a terminal', async () => {
+  it('prints the six groups and removes nothing without a terminal', async () => {
     const before = branches();
     const { run, asked } = await cleanup([], { isTTY: false });
     expect(run.exitCode).toBe(0);
     expect(asked).toEqual([]);
-    for (const title of ['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records']) expect(run.stdout).toContain(title);
+    for (const title of ['Merged', 'Stale', 'Not pushed', 'Worktrees', 'Run records', 'Only on origin']) expect(run.stdout).toContain(title);
     for (const name of [...DELETED, ...KEPT.slice(1)]) expect(run.stdout).toContain(name);
     expect(run.stdout).toContain('git push origin --delete stale');
     expect(branches()).toEqual(before);

@@ -12,9 +12,9 @@
  */
 import type { CapturedRun } from './cli-capture.js';
 import type { ScratchRepository } from '../cleanup/scratch-repository.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
 import type { CleanupCommandSeams } from '../commands/cleanup.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

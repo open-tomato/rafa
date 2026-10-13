@@ -95,7 +95,7 @@
  * failed, the message naming the file and what the error said.
  */
 import type { AgentDefinitionFile } from '../../agents/roster.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { SkillTier } from '../../schema/tiers.js';
 
@@ -103,7 +103,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { basename, join } from 'node:path';
 
 import { readAgentDirectory } from '../../agents/roster.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { bundledAgentsDirectory } from '../../inventory/trees.js';
 import { AGENT_DEFINITION_DIR, readFrontmatter } from '../../utils/agent-definition.js';
 
@@ -364,4 +364,5 @@ export function createAgentVendorCommand(
   return Object.freeze(command);
 }
 
-export default createAgentVendorCommand();
+const command: RafaCommand = createAgentVendorCommand();
+export default command;

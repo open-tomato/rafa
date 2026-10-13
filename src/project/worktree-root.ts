@@ -40,14 +40,14 @@
  * The directory is refused unless it is absolute, since running git in
  * a relative one would read the process's working directory. Git is
  * reached through a {@link GitRunner} opened for the directory,
- * `createGitRunner` from `src/pr/git.ts` when left out, which already
+ * `createGitRunner` from `src/core/git/git.ts` when left out, which already
  * sets `LC_ALL=C` so the refusal line matched is git's untranslated one.
  */
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
 import { isAbsolute } from 'node:path';
 
-import { createGitRunner, gitSaid } from '../pr/git.js';
+import { createGitRunner, gitSaid } from '../core/git/index.js';
 
 /**
  * The start of the line git prints when no directory at or above holds
@@ -60,7 +60,7 @@ import { createGitRunner, gitSaid } from '../pr/git.js';
 export const NOT_A_REPOSITORY = 'fatal: not a git repository (or any ';
 
 /** The argv, after `git`, that lists the worktrees NUL-terminated. */
-export const WORKTREE_LIST_ARGS = Object.freeze(['worktree', 'list', '--porcelain', '-z'] as const);
+export const WORKTREE_LIST_ARGS: readonly ['worktree', 'list', '--porcelain', '-z'] = Object.freeze(['worktree', 'list', '--porcelain', '-z'] as const);
 
 /** The prefix of the porcelain line naming a worktree's path. */
 const WORKTREE_PREFIX = 'worktree ';

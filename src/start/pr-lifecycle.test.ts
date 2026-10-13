@@ -83,6 +83,12 @@
  * lockfile line hard-coded to `origin/main`, 2; and `runWrapUp` handing
  * the gate `'main'` in place of its `base`, 1.
  *
+ * The no-branch case hands the gate a `currentBranch` that answers null
+ * and pins `calls` to empty under both providers, with a control beside
+ * it on a branch. It was written before the return it covers and failed
+ * on 2026-10-12 with `['read provider', 'gh auth status', 'pr list
+ * null', ...]` in place of the empty list.
+ *
  * Every repair session records the setting sources it was handed beside
  * its prompt. The sources the cases hand over are not the default, so a
  * gate that bound the default in their place reddens.
@@ -93,7 +99,7 @@
 import type { PrLifecyclePhases, PrLifecycleSeams } from './pr-lifecycle.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type {
   ChecksReading,
   PrProviderReading,
@@ -110,17 +116,17 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
 import { fetchClaimBranches, makeOwnershipCommit, pushNewClaimBranch, pushOwnershipCommit } from '../claims/git.js';
 import { resolveBaseBranch } from '../cleanup/index.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { runClaude } from '../core/loop/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { createGitRunner, parseChecks, verdictOf } from '../pr/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
-import { runClaude } from '../utils/claude.js';
-import { getCurrentBranch } from '../utils/git.js';
+import { getCurrentBranch, readCheckedOutBranch } from '../utils/git.js';
 import { planStubFromPrompt } from '../utils/plan-stamp.js';
 
 import {
@@ -259,6 +265,7 @@ function detail(
     state,
     body: 'Closes #20',
     headRefOid: 'deadbeef',
+    headCommittedAt: null,
     mergeable,
     mergeStateStatus,
     labels: [],
@@ -410,6 +417,41 @@ beforeEach(() => {
 afterEach(() => {
   setActiveOutput(null);
   setActivePlanStub(null);
+});
+
+describe('verifyPullRequest, with no branch checked out', () => {
+  it('warns once and returns: no push, no provider reading, no pull request', async () => {
+    // Under each provider, since the push is the `none` path's and the
+    // pull request the `gh` path's: both are behind the provider reading.
+    for (const provider of [GH_READING, NONE_BY_CONFIG]) {
+      const run = stub({ provider });
+      const seams: PrLifecycleSeams = { ...run.seams, currentBranch: () => null };
+      warnings = [];
+
+      await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, seams, phasesInto(run.calls));
+
+      // Every seam but the branch reading records itself in `calls`, the
+      // phases among them, and the provider members the stub does not
+      // script refuse.
+      expect(run.calls).toEqual([]);
+      expect(run.prompts).toEqual([]);
+      expect(warnings).toEqual([
+        '\n⚠️  No branch is checked out (detached HEAD) — nothing to push and no pull request to verify.',
+      ]);
+      expect(logs).toEqual([]);
+      expect(errors).toEqual([]);
+    }
+  });
+
+  it('takes the gate\'s usual path on a branch', async () => {
+    // The control: the same stub with its branch reads the provider.
+    const run = stub({ provider: NONE_BY_CONFIG });
+
+    await verifyPullRequest(LONG_TIMEOUT_MS, 2, SOURCES, BASE, run.seams);
+
+    expect(run.calls).toEqual(['read provider', `git push ${BRANCH}`]);
+    expect(warnings.join('\n')).not.toContain('No branch is checked out');
+  });
 });
 
 describe('verifyPullRequest, before any poll', () => {
@@ -1042,7 +1084,7 @@ describe('refusedPushReaderIn, over a bare remote and two clones', () => {
 
 describe('PR_LIFECYCLE_SEAMS', () => {
   it('holds the real helpers and leaves the clock to waitForChecks', () => {
-    expect(PR_LIFECYCLE_SEAMS.currentBranch).toBe(getCurrentBranch);
+    expect(PR_LIFECYCLE_SEAMS.currentBranch).toBe(readCheckedOutBranch);
     // The provider is the real `gh` adapter, and nothing here calls a
     // member of it: every one would spawn `gh` in this checkout.
     expect(PR_LIFECYCLE_SEAMS.pulls.kind).toBe('gh');
@@ -1081,6 +1123,17 @@ describe('prLifecycleSeamsIn', () => {
     // own directory would answer that one.
     expect(prLifecycleSeamsIn(dir).currentBranch()).toBe('feat/seams-in-a-directory');
     expect(getCurrentBranch()).not.toBe('feat/seams-in-a-directory');
+  });
+
+  it('reads a detached HEAD in that directory as null, never as the word HEAD', () => {
+    git(['switch', '-q', '--detach']);
+    try {
+      expect(prLifecycleSeamsIn(dir).currentBranch()).toBeNull();
+      // The control: the reader this seam left answers the word there.
+      expect(getCurrentBranch(dir)).toBe('HEAD');
+    } finally {
+      git(['switch', '-q', 'feat/seams-in-a-directory']);
+    }
   });
 
   it('spawns each repair session in that directory, under the sources it is handed', async () => {

@@ -123,15 +123,15 @@
  * facts reads and the field writes print their phases where the command
  * renders them (`../board/project/progress.ts`).
  */
+import type { BoardStepResult } from './init-board.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { Project, ProjectItem, ProjectPort, ProjectRef } from '../board/project/port.js';
 import type { ProgressFeed } from '../board/project/progress.js';
 import type { ProjectRunnerSeams, RetryReport } from '../board/project/project-runner.js';
 import type { ProjectRefresh, ProjectRefreshed, RefreshConfig, RefreshOptions } from '../board/project/refresh.js';
 import type { BoardOutcome } from '../board/setup.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
-import type { RafaConfig } from '../config.js';
-import type { BoardStepResult } from './init-board.js';
+import type { Prompter } from '../core/command/index.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { readIssueFacts } from '../board/project/facts.js';
 import { createGhProjectPort } from '../board/project/gh.js';
@@ -148,7 +148,7 @@ import { readRefreshBoard, refreshProjectItems } from '../board/project/refresh.
 import { rankOf, stageOf } from '../board/project/rules.js';
 import { readBoardRepository } from '../board/repository.js';
 import { readRoadmapSetting } from '../board/setup-config.js';
-import { isMapping, messageOf } from '../config-sections.js';
+import { isMapping, messageOf } from '../core/config/sections.js';
 
 import { PROJECT_NUMBER_SETTING, writeProjectNumber } from './init-board-project-setting.js';
 import { YES_ANSWERS } from './init-board.js';
@@ -608,7 +608,7 @@ export interface ProjectStepOptions {
 }
 
 /** What a line asking for `--project` is told when the board step did not run. */
-export const PROJECT_NO_BOARD_WARNING = '--project creates the GitHub project with the GitHub board,'
+export const PROJECT_NO_BOARD_WARNING: string = '--project creates the GitHub project with the GitHub board,'
   + ` and the board step did not run, so no project was created; run ${PROJECT_STEP_FIX}.`;
 
 /** A project step that set nothing up. */

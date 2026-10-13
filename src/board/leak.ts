@@ -85,7 +85,7 @@
  * the accident of pasting a real path or key, not a control against an
  * author who wants to publish one.
  */
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 /** The exit code a refused body ends the command with; the spec's own. */
 export const LEAK_REFUSAL_EXIT = 2;

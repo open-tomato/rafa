@@ -30,7 +30,7 @@
  * as written is named to the operator once, at start. `start/run-config.ts`
  * does both. The same resolution names the setting sources every session the
  * run spawns loads, task, wrap-up and CI repair alike: `loop.settingSources`,
- * `project,local` unless a config names others (`utils/claude.ts`).
+ * `project,local` unless a config names others (`core/loop/claude.ts`).
  *
  * A `--runtime=<path|version>` naming an installed rafa other than the one
  * running sends the whole run there, before anything else is read
@@ -55,20 +55,20 @@
  * either way. Everywhere else it is the project root. Both are settled
  * in `start/run-checkout.ts`.
  *
- * Ahead of the branch guard, a run started on `main` or `master` is
- * offered the plan's own branch (`resolveRunBranch` in
- * `start/run-setup.ts`, the offer itself in `start/branch.ts`): with a
- * terminal it is asked whether to create
+ * Ahead of the branch guard, a run started on `main` or `master`, or on
+ * a detached HEAD, is offered the plan's own branch (`resolveRunBranch`
+ * in `start/run-setup.ts`, the offer itself in `start/branch.ts`): with
+ * a terminal it is asked whether to create
  * `feat/<plan-stub>` from the latest `origin/<base>` and run there, or
  * whether to switch to that branch when it already exists, and
  * `--create-branch` answers yes without asking. A run that moved carries
  * the new branch into the guard and into the session record below, so
  * neither reads the base the run started on. Nothing is offered under
- * `--any-branch`, for a plan whose file names no stub, or with no
- * terminal and no flag, and the guard then has the last word as it
- * always did. Every refusal along the way — a modified tracked file, a
- * fetch that failed, a base that has diverged — is thrown from there as
- * exit code 1, and leaves the run on its base.
+ * `--any-branch` on a branch, for a plan whose file names no stub, or
+ * with no terminal and no flag, and the guard then has the last word: a
+ * run left on no branch it refuses under every line. Every refusal on
+ * the way — a modified tracked file, a fetch that failed, a base that has
+ * diverged — is thrown as exit code 1, and leaves the run where it was.
  *
  * `--as-worktree` takes the place of that offer: no question is asked,
  * and `feat/<plan-stub>` is cut from the latest `origin/<base>`, or taken
@@ -91,7 +91,7 @@
  * checked, the run opens its session (`start/session.ts`): it
  * writes `.rafa/runs/<session-id>.json` under a new id, naming the plan's
  * stub and path, the branch, this process's pid, the start time, the state
- * `running` and no task (`loop/sessions.ts`), and under `--roadmap` the
+ * `running` and no task (`core/loop/sessions.ts`), and under `--roadmap` the
  * `rafa next --roadmap` hop that is away, when one is. A record of the plan refuses
  * the run when it names another branch, whatever its state, or names this
  * branch and still reads `running` or `paused`; a record whose pid is gone
@@ -218,17 +218,17 @@
  * --runtime     the installed rafa the run goes on in: a version under
  *               `~/.rafa/runtime/`, or a path to a `cli.js` or its directory
  *               (`start/runtime.ts`).
- * --create-branch on `main` or `master`, create `feat/<plan-stub>` from the
- *               latest `origin/<base>` and run there without asking, or
- *               switch to that branch when it is already there
- *               (`start/branch.ts`). Read by `start/run-setup.ts` alone.
+ * --create-branch on `main`, `master` or a detached HEAD, create
+ *               `feat/<plan-stub>` from the latest `origin/<base>` and run
+ *               there without asking, or switch to that branch when it is
+ *               there (`start/branch.ts`). Read by `start/run-setup.ts` alone.
  * --as-worktree run in a linked worktree of `feat/<plan-stub>` at
  *               `loop.worktreeDir/<stub>`, created from the latest
  *               `origin/<base>` when the branch is not there yet, and leave
  *               the main checkout as it is (`start/run-checkout.ts`).
  * --any-branch  run where the loop stands, whatever branch that is: no
- *               offer is made and the guard (`start/run-setup.ts`)
- *               checks nothing.
+ *               offer is made and the guard (`start/run-setup.ts`) checks
+ *               nothing. On a detached HEAD, no branch, it waives nothing.
  * --roadmap     stamp the hop record, when a hop is away, on the run's
  *               session record as its `hop` (`start/session.ts`). What
  *               `rafa next --roadmap` passes to the loop it starts.
@@ -275,13 +275,14 @@
  * `start/suite-step.ts`, `start/suite-steps-run.ts`, `start/retry-budget.ts`,
  * `start/continue-run.ts` and `start/forced-draft.ts` write goes
  * through the active output
- * (`adapters/output/active.ts`): what went to `console.log` through
+ * (`core/output/active.ts`): what went to `console.log` through
  * `info`, `console.warn` through `warn` and `console.error` through
  * `error`, each message as it was. Under the dispatcher that is the
  * invocation's output, so json mode reads each as a `log` event.
  *
- * The run is refused by throwing `CommandExit` (`cli/command.ts`) and
- * never by `process.exit`, so the dispatcher writes the terminal event.
+ * The run is refused by throwing `CommandExit`
+ * (`core/command/command.ts`) and never by `process.exit`, so the
+ * dispatcher writes the terminal event.
  * A line asking for `-d|--detached`, refused before anything else is
  * read (`start/run-config.ts`), `--as-worktree` beside
  * `--create-branch`, refused right after it (`start/run-setup.ts`), a
@@ -349,14 +350,14 @@
  * A SIGINT interrupts the run whether a terminal's Ctrl-C sends it to the
  * loop's process group or `rafa loop stop` sends it to the loop's pid
  * alone. The handler passes it on to the Claude session running at that
- * moment (`utils/claude.ts`), so the task ends then rather than when its
+ * moment (`core/loop/claude.ts`), so the task ends then rather than when its
  * session would have, and the task is marked `[BLOCKED]`. A SIGINT during
  * a suite step, whether it ended `bun test` or reached the loop alone, is
  * a stop and not a red step (`start/suite-step.ts`): the step is recorded
  * `interrupted`, no task is marked, and the run returns, its record
  * `stopped`, as it does when a pause's hold ends on the signal.
  */
-import type { ResolvedConfig } from './config.js';
+import type { ResolvedConfig } from './core/config/index.js';
 import type { FindingOutcome } from './effort/store/findings.js';
 import type { TaskLearning } from './start/dispatch.js';
 import type { TaskHandout } from './start/handout.js';
@@ -368,10 +369,11 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { activeOutput } from './adapters/output/active.js';
-import { CommandExit } from './cli/command.js';
-import { messageOf } from './config-sections.js';
-import { ConfigError } from './config.js';
+import { CommandExit } from './core/command/index.js';
+import { ConfigError } from './core/config/index.js';
+import { messageOf } from './core/config/sections.js';
+import { interruptClaudeSessions } from './core/loop/index.js';
+import { activeOutput } from './core/output/index.js';
 import { createHubContact } from './effort/sync/contact.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { createGitRunner } from './pr/index.js';
@@ -395,6 +397,7 @@ import {
 import {
   bindEventsFile,
   emitLoopEvent,
+  injectionPlace,
   taskPosition,
   taskTokens,
   unbindEventsFile,
@@ -431,7 +434,6 @@ import { readAlwaysRunFiles } from './start/task-gate-lines.js';
 import { createStartTriage, runStartFailures } from './start/triage.js';
 import { readTypeCheckRecipe } from './start/type-step.js';
 import { runWrapUp } from './start/wrap-up-run.js';
-import { interruptClaudeSessions } from './utils/claude.js';
 import { parseTaskDeclaration } from './utils/declaration.js';
 import { planStubFromPath } from './utils/plan-stamp.js';
 import { deferUntil } from './utils/schedule.js';
@@ -500,14 +502,15 @@ export default async function start(args: string[], repoRoot: string): Promise<v
   const planStub = planStubFromPath(planPath);
   // Where git runs and every session is spawned, and the branch there
   // (`start/run-checkout.ts`): the working tree the run was started in,
-  // on `main` or `master` offered `feat/<stub>` first, or under
+  // on `main`, `master` or no branch offered `feat/<stub>` first, or under
   // `--as-worktree` the worktree added for that branch. The branch is the
-  // one the guard reads and the session record below names, so a run
-  // that moved is never guarded on, and never records, the base it
-  // started from.
+  // one the guard reads and the session record below names, so a run that
+  // moved never records the base it started from. Null, for no branch, is
+  // refused by the guard, which asserts a name for every reading below.
   const { checkout, branch } = await settleRunCheckout({
     projectRoot: repoRoot,
     worktreeDir: runConfig.config.loopWorktreeDir,
+    prBase: runConfig.config.prBase,
     planStub,
     args,
   });
@@ -777,6 +780,7 @@ export default async function start(args: string[], repoRoot: string): Promise<v
         taskInfo,
         promptContent,
         planContent,
+        place: injectionPlace(trackerContent, taskInfo),
         inject: injectMode,
         repoRoot,
         checkout,

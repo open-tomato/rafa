@@ -14,11 +14,13 @@
  * then, before anything else is read.
  *
  * `--create-branch` is read by `src/start/run-setup.ts` ahead of its
- * branch guard, and only on `main` or `master`: it answers yes to the question the run
- * would otherwise ask a terminal (`start/branch.ts`). It is declared
- * beside `--any-branch` because the two are the pair an operator on the
- * base chooses between — leave the base, or stay on it deliberately —
- * and `--any-branch` outranks it.
+ * branch guard, and only on `main` or `master` or with no branch checked
+ * out: it answers yes to the question the run would otherwise ask a
+ * terminal (`start/branch.ts`). It is declared beside `--any-branch`
+ * because the two are the pair an operator on the base chooses between —
+ * leave the base, or stay on it deliberately — and `--any-branch`
+ * outranks it there. With no branch checked out `--any-branch` waives
+ * nothing, and the run is refused without the other.
  *
  * `--as-worktree` is declared beside them for the same reason: it is
  * the third answer to that question, the plan's branch in a worktree
@@ -54,7 +56,7 @@
  * words `start` is handed, so the command refuses it before it runs
  * `start` rather than let the run go on in this runtime.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { endingWith, HINT_FLAG_SPEC } from '../../next/ending.js';
 import { DEFAULT_CI_ATTEMPTS, DEFAULT_CI_TIMEOUT_MIN } from '../../start/pr-lifecycle.js';
@@ -78,9 +80,10 @@ const wrapped = wrapPhaseZeroCommand({
     + ' for each migration the effort store holds that this rafa does not know and that is additive. It'
     + ' refuses to start while `RAFA_EFFORT_DIR` is set, since a loop records to the project\'s own'
     + ' store. Started on'
-    + ' `main` or `master` it offers to create the plan\'s `feat/<stub>` from the latest'
-    + ' `origin/<base>` and run there, `--create-branch` answering that without asking, and refuses'
-    + ' the run when the offer is not taken. `--as-worktree` runs the plan in a worktree of its own on'
+    + ' `main` or `master`, or on a detached `HEAD`, it offers to create the plan\'s `feat/<stub>` from'
+    + ' the latest `origin/<base>` and run there, `--create-branch` answering that without asking, and'
+    + ' refuses the run when the offer is not taken. On a detached `HEAD` the base is `pr.base`, else'
+    + ' the branch `origin/HEAD` names. `--as-worktree` runs the plan in a worktree of its own on'
     + ' that branch instead, leaving the main checkout as it is, and is refused beside'
     + ' `--create-branch`. Each run writes its session record to `.rafa/runs/<session-id>.json`:'
     + ' the plan, the branch, the pid, the start, the state and the running task, and under `--roadmap`'
@@ -194,10 +197,11 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'create-branch',
-      description: 'On `main` or `master`, creates `feat/<plan-stub>` from the latest `origin/<base>`'
-        + ' and runs the plan there without asking, or switches to that branch when it already'
-        + ' exists. Refuses rather than move when a tracked file is modified, the fetch fails or the'
-        + ' base has diverged from its remote.',
+      description: 'On `main` or `master`, or on a detached `HEAD`, creates `feat/<plan-stub>` from the'
+        + ' latest `origin/<base>` and runs the plan there without asking, or switches to that branch'
+        + ' when it already exists. On a detached `HEAD` the base is `pr.base`, else the branch'
+        + ' `origin/HEAD` names. Refuses rather than move when a tracked file is modified, the fetch'
+        + ' fails or, on `main` or `master`, the base has diverged from its remote.',
       type: 'boolean',
     },
     {
@@ -210,7 +214,10 @@ const wrapped = wrapPhaseZeroCommand({
     },
     {
       name: 'any-branch',
-      description: 'Runs on `main` or `master`, which the loop otherwise refuses.',
+      description: 'Runs on `main` or `master`, which the loop otherwise refuses. Waives nothing on a'
+        + ' detached `HEAD`: the run is offered `feat/<plan-stub>` from the latest `origin/<base>`, the'
+        + ' base being `pr.base`, else the branch `origin/HEAD` names, and refused when the offer is'
+        + ' not taken.',
       type: 'boolean',
     },
     {
@@ -264,4 +271,5 @@ const loopStart: RafaCommand = Object.freeze({
   },
 });
 
-export default endingWith(loopStart);
+const command: RafaCommand = endingWith(loopStart);
+export default command;

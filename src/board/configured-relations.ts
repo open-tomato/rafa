@@ -30,7 +30,7 @@
  */
 import type { EpicRelations } from './epics.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { selectBoardRelations } from './relations/select.js';
 import { readBoardRepository } from './repository.js';

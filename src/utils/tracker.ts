@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 export interface TaskInfo {
   task: string;
@@ -13,23 +13,38 @@ export interface TaskInfo {
    * answered before comments were written.
    */
   blocker?: string;
+  /**
+   * The text of the repairs comment the line trails, unescaped: the plan
+   * task a repair's line names ({@link insertTrackerTask}). Absent when
+   * the line trails none, or a blank one, which is every line that is no
+   * repair, a repair of the whole suite, and a repair written before
+   * the comment was.
+   */
+  repairs?: string;
 }
 
 /** What opens a blocker comment. */
 const BLOCKER_OPEN = '<!-- blocked: ';
 
-/** What closes one. */
+/** What opens a repairs comment. */
+const REPAIRS_OPEN = '<!-- repairs: ';
+
+/** What closes either. */
 const BLOCKER_CLOSE = ' -->';
 
 /** The spaces written before a comment, as a tracker spells a declaration's. */
 const BLOCKER_GAP = '  ';
 
+/** The two comments a tracker line may trail, by the word each opens with. */
+type CommentKind = 'blocked' | 'repairs';
+
 /**
- * A blocker comment at the end of a task's text, after whitespace. The
- * capture is the escaped text, which holds neither `<!--` nor `-->`, so
- * only the text's last opener can start a match.
+ * A blocker or repairs comment at the end of a task's text, after
+ * whitespace. The first capture is its kind and the second its escaped
+ * text, which holds neither `<!--` nor `-->`, so only the text's last
+ * opener can start a match.
  */
-const BLOCKER_COMMENT = /\s<!-- blocked: ((?:(?!<!--|-->).)*) -->$/;
+const TRAILING_COMMENT = /\s<!-- (blocked|repairs): ((?:(?!<!--|-->).)*) -->$/;
 
 /** An open or blocked task line's checkbox, as `findNextTask` reads it. */
 const OPEN_TASK_PREFIX = /^- \[(?: |BLOCKED)\] /;
@@ -113,6 +128,15 @@ export function blockerComment(blocker: string): string {
   return `${BLOCKER_OPEN}${escapeBlockerText(blocker)}${BLOCKER_CLOSE}`;
 }
 
+/**
+ * The comment a repair's tracker line trails for `repaired`, the text of
+ * the plan task it repairs: `<!-- repairs: <escaped text> -->`, escaped
+ * as {@link blockerComment} escapes a blocker.
+ */
+export function repairsComment(repaired: string): string {
+  return `${REPAIRS_OPEN}${escapeBlockerText(repaired)}${BLOCKER_CLOSE}`;
+}
+
 /** A task's text split from the blocker comment it may trail. */
 export interface BlockerSplit {
   /** The text before the comment, or the input unchanged without one. */
@@ -123,22 +147,69 @@ export interface BlockerSplit {
 
 /** A comment found at the end of a text, and what came before it. */
 interface FoundComment {
+  /** Which of the two comments it is. */
+  readonly kind: CommentKind;
   /** The text before the comment, trailing spaces off. Never blank. */
   readonly before: string;
   /** The comment's text, still escaped. */
   readonly escaped: string;
 }
 
-/** The blocker comment `text` ends on, or null; see {@link splitBlockerComment}. */
-function findBlockerComment(text: string): FoundComment | null {
+/** The blocker or repairs comment `text` ends on, or null; see {@link splitBlockerComment}. */
+function findTrailingComment(text: string): FoundComment | null {
   const trimmed = text.trimEnd();
-  const match = BLOCKER_COMMENT.exec(trimmed);
-  const escaped = match?.[1];
-  if (match === null || escaped === undefined) return null;
+  const match = TRAILING_COMMENT.exec(trimmed);
+  const kind = match?.[1];
+  const escaped = match?.[2];
+  if (match === null || escaped === undefined || (kind !== 'blocked' && kind !== 'repairs')) return null;
   const before = trimmed.slice(0, match.index).trimEnd();
   return before.length === 0
     ? null
-    : { before, escaped };
+    : { kind, before, escaped };
+}
+
+/** A task's text with the comments it trails taken off, each still escaped. */
+interface TrailingComments {
+  /** The text before the comments, trailing spaces off, or the input unchanged without one. */
+  readonly text: string;
+  /** The blocker comment's escaped text, or null without that comment. */
+  readonly blocked: string | null;
+  /** The repairs comment's escaped text, or null without that comment. */
+  readonly repairs: string | null;
+}
+
+/**
+ * The comments `taskText` ends on, one of each kind at most and in
+ * either order, and the text before them; see {@link splitBlockerComment}.
+ */
+function splitTrailingComments(taskText: string): TrailingComments {
+  const last = findTrailingComment(taskText);
+  if (last === null) return { text: taskText, blocked: null, repairs: null };
+  const earlier = findTrailingComment(last.before);
+  const found = earlier === null || earlier.kind === last.kind
+    ? [last]
+    : [last, earlier];
+  return {
+    text: found.at(-1)?.before ?? last.before,
+    blocked: found.find((comment) => comment.kind === 'blocked')?.escaped ?? null,
+    repairs: found.find((comment) => comment.kind === 'repairs')?.escaped ?? null,
+  };
+}
+
+/** A comment's escaped text as its reader answers it: unescaped, or null without a comment or with a blank one. */
+function commentText(escaped: string | null): string | null {
+  if (escaped === null) return null;
+  const text = unescapeBlockerText(escaped);
+  return text.trim().length === 0
+    ? null
+    : text;
+}
+
+/** `escaped`, a repairs comment's text as a line holds it, written back after a gap; nothing for null. */
+function keptRepairs(escaped: string | null): string {
+  return escaped === null
+    ? ''
+    : `${BLOCKER_GAP}${REPAIRS_OPEN}${escaped}${BLOCKER_CLOSE}`;
 }
 
 /**
@@ -161,17 +232,21 @@ function findBlockerComment(text: string): FoundComment | null {
  * text. Without a comment `text` is the input unchanged and `blocker` is
  * null. With one, `text` is what came before it, trailing spaces off, and
  * `blocker` is its text unescaped, or null when that is blank.
+ *
+ * A repair's line trails a second comment, `<!-- repairs: <text> -->`
+ * ({@link repairsComment}), held to the same four rules. The writer puts
+ * it before the blocker comment, so the blocker is still what the line
+ * ends on, and it is read on either side of it: one comment of each kind
+ * comes off the end of the text, whichever is last. `text` holds neither,
+ * so the three modules reading a line through this function
+ * (`plan/parse.ts`, `loop/blocked-tasks.ts`, `start/pass-over.ts`) meet
+ * the task's text and its declaration as they do on any other line. A
+ * second comment of one kind is task text. What the repairs comment says
+ * is answered by `findNextTask` alone, as {@link TaskInfo.repairs}.
  */
 export function splitBlockerComment(taskText: string): BlockerSplit {
-  const found = findBlockerComment(taskText);
-  if (found === null) return { text: taskText, blocker: null };
-  const blocker = unescapeBlockerText(found.escaped);
-  return {
-    text: found.before,
-    blocker: blocker.trim().length === 0
-      ? null
-      : blocker,
-  };
+  const { text, blocked } = splitTrailingComments(taskText);
+  return { text, blocker: commentText(blocked) };
 }
 
 /** A line split from the carriage return a CRLF tracker ends it with. */
@@ -181,15 +256,18 @@ function splitCarriageReturn(line: string): { body: string; cr: string } {
     : { body: line, cr: '' };
 }
 
-/** An open or blocked task line with its blocker comment off, or the line as it was. */
+/**
+ * An open or blocked task line with its blocker comment off, or the
+ * line as it was. A repairs comment stays on it, after the text.
+ */
 function withoutBlockerComment(line: string): string {
   const { body, cr } = splitCarriageReturn(line);
   const prefix = OPEN_TASK_PREFIX.exec(body)?.[0];
   if (prefix === undefined) return line;
-  const found = findBlockerComment(body.slice(prefix.length));
-  return found === null
+  const found = splitTrailingComments(body.slice(prefix.length));
+  return found.blocked === null
     ? line
-    : `${prefix}${found.before}${cr}`;
+    : `${prefix}${found.text}${keptRepairs(found.repairs)}${cr}`;
 }
 
 /**
@@ -217,12 +295,22 @@ export interface TrackerTask extends Omit<TaskInfo, 'status'> {
   status: TaskInfo['status'] | 'done';
 }
 
-/** The record for one task line's capture, its blocker comment taken off. */
+/** The record for one task line's capture, its blocker and repairs comments taken off. */
 function taskInfoOf(capture: string, lineNum: number, status: TrackerTask['status']): TrackerTask {
-  const { text, blocker } = splitBlockerComment(capture.trim());
-  return blocker === null
-    ? { task: text, lineNum, status }
-    : { task: text, lineNum, status, blocker };
+  const found = splitTrailingComments(capture.trim());
+  const blocker = commentText(found.blocked);
+  const repairs = commentText(found.repairs);
+  return {
+    task: found.text,
+    lineNum,
+    status,
+    ...(blocker === null
+      ? {}
+      : { blocker }),
+    ...(repairs === null
+      ? {}
+      : { repairs }),
+  };
 }
 
 /** Each checkbox a task line opens with, and the status it reads as. */
@@ -264,11 +352,11 @@ const NO_LINES: ReadonlySet<number> = new Set();
  * line is its body. Without this rule a `- [ ] ` at column 0 in a
  * `rafa:context` body was dispatched as a task, and its text reached all
  * four sites, the git history among them. So an open or blocked task
- * line inside a block is that block's body, as `plan/parse.ts` reads it,
+ * line inside a block is that block's body, as `core/plan/parse.ts` reads it,
  * whatever the block's kind: a `rafa:report`, or a kind a later phase
  * names, included.
  *
- * Blocks are found by `plan/blocks.ts`, which tracks fences the way a
+ * Blocks are found by `core/plan/blocks.ts`, which tracks fences the way a
  * renderer shows them. Every other fence stays transparent: a `- [ ] `
  * at column 0 inside a `text` illustration fence is dispatched as it
  * always was, and so is one inside a `rafa:` fence nested in such an
@@ -295,6 +383,20 @@ const NO_LINES: ReadonlySet<number> = new Set();
  * prompt, its log line and its commit. The comment comes off an
  * unchecked line too, one an operator unblocked by hand.
  *
+ * ## So does a repairs comment
+ *
+ * A repair task exists in the tracker alone, so its line says which
+ * plan task it repairs: `<!-- repairs: <text> -->`, written after the
+ * declaration and before the blocker comment ({@link insertTrackerTask}).
+ * It comes off here with the blocker comment and for the same reason,
+ * read on either side of it, and its text rides on
+ * {@link TaskInfo.repairs}, unescaped. A line trailing none answers no
+ * `repairs`: a plan task, a repair that names nothing, and every repair
+ * a tracker held before the comment was written. The comment stays on
+ * the line when it is ticked and when a blocker is written on it again
+ * ({@link updateTrackerLine}, {@link writeTrackerBlocker}), so a repair
+ * blocked a second time still names its task.
+ *
  * ## Lines a run passes over
  *
  * {@link FindNextTaskOptions.skipLines} names lines never answered,
@@ -316,9 +418,10 @@ export function findNextTask(
  * Every task line of a tracker, ticked ones included, in tracker order,
  * read by the rules {@link findNextTask} answers one by: only a line
  * opening `- [ ] `, `- [BLOCKED] ` or `- [x] ` counts, never one inside
- * a closed `rafa:*` block, and a blocker comment comes off the text. A
- * `--continue` run counts the copies of a repeated task text over these
- * (`start/pass-over.ts`), so ticking one copy renumbers no other.
+ * a closed `rafa:*` block, and a blocker or repairs comment comes off
+ * the text. A `--continue` run counts the copies of a repeated task text
+ * over these (`start/pass-over.ts`), so ticking one copy renumbers no
+ * other.
  */
 export function listTrackerTasks(trackerContent: string): TrackerTask[] {
   const lines = trackerContent.split('\n');
@@ -355,7 +458,8 @@ export function listOpenTasks(trackerContent: string): TaskInfo[] {
  * Rewrites one tracker line to the given status.
  *
  * `done` ticks the box and takes a blocker comment off the line, the
- * task no longer being blocked on anything. `blocked` changes the box
+ * task no longer being blocked on anything; a repairs comment stays,
+ * the line still being that task's repair. `blocked` changes the box
  * alone, so a line already carrying a comment keeps it byte-identical:
  * a task blocked again by a failed session or a refused commit, which
  * write no text of their own, keeps the text it was last blocked on.
@@ -390,7 +494,9 @@ export function updateTrackerLine(
  * most recently. A blank `blocker` writes no comment and takes an earlier
  * one off. The next `findNextTask` answers the text on
  * {@link TaskInfo.blocker}, and the dispatch hands it to the task's
- * session as a line of its prompt (`start/dispatch.ts`).
+ * session as a line of its prompt (`start/dispatch.ts`). A repairs
+ * comment the line trails is kept as it is written and stays before the
+ * blocker comment, moved there when a hand put it after.
  *
  * The text is untrusted, a session having written it, and every reader
  * of a tracker matches from the start of a line, so it is escaped rather
@@ -420,19 +526,19 @@ export function writeTrackerBlocker(
   const prefix = OPEN_TASK_PREFIX.exec(body)?.[0];
   if (prefix === undefined) return false;
 
-  const rest = body.slice(prefix.length);
-  const text = (findBlockerComment(rest)?.before ?? rest).trimEnd();
+  const found = splitTrailingComments(body.slice(prefix.length));
+  const text = found.text.trimEnd();
   if (text.trim().length === 0) return false;
 
   const comment = blocker.trim().length === 0
     ? ''
     : `${BLOCKER_GAP}${blockerComment(blocker)}`;
-  lines[lineNum] = `- [BLOCKED] ${text}${comment}${cr}`;
+  lines[lineNum] = `- [BLOCKED] ${text}${keptRepairs(found.repairs)}${comment}${cr}`;
   fs.writeFileSync(trackerPath, lines.join('\n'), 'utf8');
   return true;
 }
 
-/** Any task line's checkbox, ticked included, as `plan/parse.ts` reads the checklist. */
+/** Any task line's checkbox, ticked included, as `core/plan/parse.ts` reads the checklist. */
 const ANY_TASK_PREFIX = /^- \[(?: |x|BLOCKED)\] /;
 
 /** A character that ends a line for a tracker reader or for JavaScript's `.`. */
@@ -449,6 +555,12 @@ export interface InsertedTask {
   readonly declaration: string;
   /** The text of its blocker comment, escaped as {@link writeTrackerBlocker} escapes it. */
   readonly blocker: string;
+  /**
+   * The text of the plan task the line repairs, written as its repairs
+   * comment and escaped as the blocker is. Absent or blank writes no
+   * such comment: the line names no task.
+   */
+  readonly repairs?: string;
 }
 
 /** Throws unless `entry` writes one task line whose declaration is the last brace group. */
@@ -484,6 +596,16 @@ function endOfChecklist(lines: readonly string[], inBlock: ReadonlySet<number>):
  * comment on the one line. Being blocked, it is the line `findNextTask`
  * answers first, wherever it sits.
  *
+ * With {@link InsertedTask.repairs} the line names the plan task it
+ * repairs, in a comment of its own between the declaration and the
+ * blocker:
+ * `- [BLOCKED] <task>  {<declaration>}  <!-- repairs: ... -->  <!-- blocked: ... -->`.
+ * The text is a plan task's, which may hold a `-->`, a brace group or
+ * a backtick, so it is escaped as the blocker is and no reader takes
+ * part of it for the line's declaration or for a second comment. The
+ * blocker stays the comment the line ends on. `findNextTask` answers
+ * the name as {@link TaskInfo.repairs}.
+ *
  * With `beforeLine` it goes directly above that task line, so it sits
  * under the stage heading of the task it precedes and the task moves
  * down one line. With null it goes directly after the checklist's last
@@ -517,8 +639,12 @@ export function insertTrackerTask(
 
   const at = beforeLine ?? endOfChecklist(lines, inBlock);
   const { cr } = splitCarriageReturn(lines[0] ?? '');
+  const repaired = entry.repairs ?? '';
+  const repairs = repaired.trim().length === 0
+    ? ''
+    : `${BLOCKER_GAP}${repairsComment(repaired)}`;
   const line = `- [BLOCKED] ${entry.task.trim()}${BLOCKER_GAP}{${entry.declaration.trim()}}`
-    + `${BLOCKER_GAP}${blockerComment(entry.blocker)}${cr}`;
+    + `${repairs}${BLOCKER_GAP}${blockerComment(entry.blocker)}${cr}`;
   const written = [...lines.slice(0, at), line, ...lines.slice(at)];
   fs.writeFileSync(trackerPath, written.join('\n'), 'utf8');
   return at;

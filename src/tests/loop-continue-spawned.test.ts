@@ -27,8 +27,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readSessions } from '../core/loop/index.js';
 import { eventsFileOf, readEventsFrom } from '../loop/events-file.js';
-import { readSessions } from '../loop/sessions.js';
 import { BLOCKER_PROMPT_PREFIX } from '../start/dispatch.js';
 
 import { expectExit } from './cli-capture.js';

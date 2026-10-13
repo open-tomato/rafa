@@ -108,10 +108,22 @@
  * ordinary one. The other is a fresh assessment whose class is `green`
  * or `no-checks`, the second being what a resolved conflict answers in
  * a repository that schedules no run for the merge ref at all
- * (`src/pr/checks.ts`: `none` is a verdict, not a wait). The conflict
- * `--resolve` was asked to clear is gone either way; whether to merge
- * with no checks is `rafa pr merge --skip-checks`'s question, not this
- * one's.
+ * (`src/pr/checks.ts`: `none` is a verdict, not a wait). Whether to
+ * merge with no checks is `rafa pr merge --skip-checks`'s question, not
+ * this one's.
+ *
+ * Neither reading is taken while the pull request still conflicts
+ * ({@link stillConflicts}). Passing rows on a head that does not merge
+ * are rows from before the base moved (`src/pr/triage/rerun.ts`), and
+ * they are exactly what a green, conflicting pull request carries into
+ * its resolve run: the assessment hands it the plan for its
+ * `conflict-*` class like any other conflict, and the CI wait after an
+ * attempt then reads those same rows as green at once. Taken alone,
+ * that verdict would end an attempt that pushed nothing, or one that
+ * pushed and left the conflict, as resolved, and write `resolved` into
+ * the comment of a pull request nobody can merge (#889). So such an
+ * attempt ends as the conflict class it still is, and the two guards
+ * read it like any other attempt that fixed nothing.
  *
  * ## The comment is written twice per attempt, and once more at the end
  *
@@ -174,8 +186,8 @@ import type { FailedLogEvidence } from '../../pr/triage/evidence.js';
 import type { ExcerptReading } from '../../pr/triage/follow-up.js';
 import type { SettleSettings } from '../../release/settle.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { waitForChecks } from '../../pr/index.js';
 import { withTaskBudget } from '../../pr/plans/budget.js';
 import { hasPinnedPlan, loadPinnedPlan } from '../../pr/plans/load.js';
@@ -204,13 +216,13 @@ export const RESOLVE_STOP_EXIT = 3;
 export const RESOLVE_REFUSE_EXIT = 2;
 
 /** How long the CI wait after an attempt runs for, from the loop's own gate. */
-export const RESOLVE_CI_TIMEOUT_MS = DEFAULT_CI_TIMEOUT_MIN * 60_000;
+export const RESOLVE_CI_TIMEOUT_MS: number = DEFAULT_CI_TIMEOUT_MIN * 60_000;
 
 /** The reading taken when an attempt pushed nothing; see the module note. */
 export const ATTEMPT_OUTCOME_UNCHANGED = 'the attempt pushed nothing, so it ended as it began';
 
 /** What a comment on a dependabot branch says about the push; the spec's rule. */
-export const DEPENDABOT_REBASE_NOTE = 'Note: rafa pushed to this dependabot branch. Dependabot stops'
+export const DEPENDABOT_REBASE_NOTE: string = 'Note: rafa pushed to this dependabot branch. Dependabot stops'
   + ' rebasing a branch once anyone else has pushed to it, so this pull request will not be'
   + ' refreshed by dependabot again; close it and let dependabot open a new one if that is wanted.';
 
@@ -453,10 +465,20 @@ interface AttemptEnd {
   readonly assessment: TriageAssessment;
   /** The log that assessment was read from; see the module note. */
   readonly evidence: FailedLogEvidence | undefined;
-  /** True when the pull request is green; see the module note. */
+  /** True when the pull request is green and no longer conflicts; see the module note. */
   readonly green: boolean;
   /** What is said about a run that pushed nothing, or null when it pushed. */
   readonly unchanged: string | null;
+}
+
+/**
+ * Whether a reading of the pull request still conflicts: the fresh
+ * assessment's own answer, which had the conflicting file list to break
+ * an `unknown` with, and for a reading that assessed nothing the re-run
+ * reading's, made from the detail that reading fetched.
+ */
+export function stillConflicts(reading: Pick<TriageReading, 'assessment' | 'rerun'>): boolean {
+  return reading.assessment?.conflicting ?? reading.rerun.conflicting;
 }
 
 /** Reads what one attempt ended as, out of the CI wait and a fresh assessment. */
@@ -468,9 +490,10 @@ async function endOfAttempt(
   const reading = await run.reassess();
   const fresh = reading.assessment;
   const assessment = fresh ?? before.assessment;
-  const green = waited.verdict === 'green'
+  const passed = waited.verdict === 'green'
     || fresh?.triageClass === 'green'
     || fresh?.triageClass === 'no-checks';
+  const green = passed && !stillConflicts(reading);
   return {
     reading,
     outcome: { triageClass: assessment.triageClass, step: assessment.step },

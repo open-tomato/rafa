@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';
@@ -165,6 +165,7 @@ function detailAt(head: string): PullRequestDetail {
     updatedAt: NOW,
     body: '',
     headRefOid: head,
+    headCommittedAt: null,
     mergeable: 'conflicting',
     mergeStateStatus: 'DIRTY',
     labels: [],
@@ -196,7 +197,7 @@ function readingOf(w: World, detail: PullRequestDetail, as?: TriageClass): Triag
     : { ...classified, triageClass: as, simple: false };
   return {
     detail,
-    rerun: readTriageRerun({ comment: null, head: detail.headRefOid, rows: [] }),
+    rerun: readTriageRerun({ comment: null, head: detail.headRefOid, pr: detail, rows: [] }),
     ignored: [],
     assessment,
     logs: null,

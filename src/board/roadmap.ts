@@ -13,7 +13,7 @@
  *
  * Nothing here spawns. The board arrives through the {@link GhRunner}
  * seam declared in `src/adapters/tracker/github.ts` and git through the
- * {@link GitRunner} declared in `src/pr/git.ts`, as they do for the
+ * {@link GitRunner} declared in `src/core/git/git.ts`, as they do for the
  * tracker, the pull request provider, the trust reading and the issue
  * snapshot. Every case in `./roadmap.test.ts` drives a fake of its own
  * over a planted roadmap body: none reaches GitHub, spawns `gh` or
@@ -139,12 +139,12 @@
 import type { SpecIssueReader } from './issue.js';
 import type { BranchClaim, RemoteClaimReader } from './roadmap-claims.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { ClaimsStaleAfter } from '../config-sections.js';
-import type { GitRunner } from '../pr/git.js';
+import type { ClaimsStaleAfter } from '../core/config/sections.js';
+import type { GitRunner } from '../core/git/index.js';
 
-import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS } from '../config-schema.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { boardId, BRANCH_PREFIX } from './naming.js';
 import {

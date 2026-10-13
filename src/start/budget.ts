@@ -26,7 +26,7 @@
  *     measured.
  *
  * Only stdout is read: the loop captures a task session's stdout and
- * leaves its stderr to the operator (`utils/claude.ts`), and the
+ * leaves its stderr to the operator (`core/loop/claude.ts`), and the
  * measurement found the line on stdout.
  *
  * ## What becomes of the task
@@ -46,7 +46,7 @@
 import type { TaskDispatch } from './dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
+import { activeOutput } from '../core/output/index.js';
 import { BUDGET_FLAG } from '../utils/declaration.js';
 import { updateTrackerLine, writeTrackerBlocker } from '../utils/tracker.js';
 

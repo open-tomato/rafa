@@ -42,9 +42,18 @@
  * holding untracked files alone beside the same two paths written as
  * tracked ones; and the unusable provider beside a provider that
  * answers no pull request, which is row 13. Both are held to asking
- * NOTHING they did not need, by the call log of the double. A live run
- * beside a modified tree, which row 1 takes ahead of the tree, and the
- * checkout the tree line names, are driven in `./state-live-run.test.ts`.
+ * NOTHING they did not need, by the call log of the double.
+ *
+ * Row 1 goes ahead of the tree only for a live run working in the
+ * checkout the tree was read in (#444), and the four standings that
+ * settles are driven here as two pairs: a run in the main checkout
+ * beside the same modified tree with a run in a worktree of its own, and
+ * that worktree run beside the same run over a clean tree. A table that
+ * put row 1 first for any live run fails the first pair, and one that
+ * never answered a worktree run fails the second. No live run over the
+ * modified tree is the control under both. What each standing asks of
+ * git, and the checkout the tree line names, are driven in
+ * `./state-live-run.test.ts`.
  *
  * ## What passes while wrong
  *
@@ -104,7 +113,7 @@
  */
 import type { NextBoard, NextRoadmapReading, NextSources } from './readings.js';
 import type { BlockedLine } from '../board/blocked-line.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { ChecksVerdict, GitResult, Mergeability, PullRequestDetail, PullRequests, PullRequestSummary } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -114,7 +123,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { formatClaimMessage } from '../claims/record.js';
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { isPrecondition, NEXT_PRECONDITIONS, NEXT_STATES, readNextState } from './state.js';
@@ -251,6 +260,7 @@ function detail(pull: PlantedPull): PullRequestDetail {
     ...summary(pull),
     body: 'Closes #63',
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable: pull.mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],
@@ -783,6 +793,43 @@ describe('the two pre-conditions, among the rows', () => {
     });
 
     expect([state.id, state.problems.length]).toEqual(['tree-modified', 0]);
+  });
+});
+
+/** A linked worktree a loop works in, beside the main checkout the tree is read in. */
+const WORKTREE = '/work/rafa-worktrees/rafa-63';
+
+/** A tracked file changed in the main checkout, as `git status --porcelain` writes it. */
+const EDITED = [' M src/next/state.ts'];
+
+describe('a live run, and the checkout the tree was read in', () => {
+  it('reads a live run in the main checkout over a modified tree as row 1, the edits being the loop\'s', async () => {
+    const state = await stateOf({ runs: [record()], tree: EDITED });
+
+    expect(state.id).toBe('loop-running');
+    expect(`${state.reading}\n${state.proposal}`).not.toContain('set aside');
+  });
+
+  it('reads a live run in a worktree of its own over a modified main tree as the tree, naming the checkout', async () => {
+    const state = await stateOf({ runs: [record({ worktree: WORKTREE })], tree: EDITED });
+
+    expect(state.id).toBe('tree-modified');
+    expect(state.reading).toBe(`the working tree at \`${CHECKOUT}\` has changes to 1 tracked file: \`src/next/state.ts\``);
+    expect(state.proposal).toBe('commit or set aside your changes; rafa will not touch them');
+  });
+
+  it('reads a live run in a worktree of its own over a clean tree as row 1', async () => {
+    const state = await stateOf({ runs: [record({ worktree: WORKTREE })], tree: [] });
+
+    expect(state.id).toBe('loop-running');
+    expect(state.reading).toBe(`a loop for \`${STUB}\` is running on \`${PLAN_BRANCH}\`, session 20260921-110000-abcd`);
+  });
+
+  it('reads no live run over a modified tree as the tree', async () => {
+    const none = await stateOf({ tree: EDITED });
+    const ended = await stateOf({ runs: [record({ state: 'stopped' })], tree: EDITED });
+
+    expect([none.id, ended.id]).toEqual(['tree-modified', 'tree-modified']);
   });
 });
 

@@ -133,9 +133,9 @@ import type { SpecIssueReader } from './issue.js';
 import type { BoardIssue, BoardIssueState, BoardListing } from './roadmap-board.js';
 import type { BlockerCell, LineRowsOptions, RoadmapRow, RoadmapRowsOptions } from './roadmap-rows.js';
 import type { RoadmapLine, RoadmapReadings } from './roadmap.js';
-import type { GitResult, GitRunner } from '../pr/git.js';
+import type { GitResult, GitRunner } from '../core/git/index.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { cancelledEpicNoticeLines } from './epic-cancel-notice.js';
 import { epicProblemMessage, HORIZON_LABEL_PREFIX, readEpicProblems, readHorizonProblems } from './epic-problems.js';
@@ -145,7 +145,7 @@ import { hasPlanFor, readNativeBlockersColumn, readRoadmapRows } from './roadmap
 import { createRoadmapReadings, scanClaimBranches } from './roadmap.js';
 
 /** The three horizons, in the order their groups are printed. */
-export const HORIZONS = Object.freeze(['now', 'next', 'later'] as const);
+export const HORIZONS: readonly ['now', 'next', 'later'] = Object.freeze(['now', 'next', 'later'] as const);
 
 /** When an epic is planned. */
 export type Horizon = typeof HORIZONS[number];

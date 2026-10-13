@@ -106,21 +106,21 @@
  * the fetch, `rev-parse`, `merge-base`, `show`, `ls-tree`, `add` and
  * `commit`. The guard's own readings are `readGuard`'s, over `HEAD`.
  */
-import type { PlanReleaseLevel } from '../../plan/parse.js';
+import type { GitRunner } from '../../core/git/index.js';
+import type { PlanReleaseLevel } from '../../core/plan/index.js';
 import type { GuardAnswer, GuardStamp } from '../../release/guard.js';
 import type { SettleSettings } from '../../release/settle.js';
-import type { GitRunner } from '../git.js';
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
+import { gitSaid } from '../../core/git/index.js';
 import { directoryPrefix } from '../../release/fragment-tree.js';
 import { allocateFragmentName, FRAGMENT_PLAN_ID_PATTERN, serializeFragment } from '../../release/fragment.js';
 import { readGuard } from '../../release/guard.js';
 import { compareVersions } from '../../release/status-readings.js';
 import { gitPathOf, parseSemanticVersion, readManifestVersion, RELEASE_REMOTE, replaceManifestVersion } from '../../release/version.js';
-import { gitSaid } from '../git.js';
 
 /** What one conversion reads. */
 export interface VersionConvertInput {

@@ -4,8 +4,8 @@
  * moved with. What a commit SAYS is `./record.ts`'s; this module only
  * makes, moves and reads the commits.
  *
- * Git is reached through a `GitRunner` (`src/pr/git.ts`), never a shell
- * string, and every operation answers rather than throws when git
+ * Git is reached through a `GitRunner` (`src/core/git/git.ts`), never a
+ * shell string, and every operation answers rather than throws when git
  * refuses or cannot run. The one throw is a caller's mistake: a branch
  * that is not `feat/rafa-<n>` or `feat/rafa-<n>-<slug>`, a pushed commit
  * or a lease that is not a full sha, or a record `formatClaimMessage`
@@ -110,10 +110,10 @@ import { BRANCH_PREFIX, localRef, REMOTE, remoteTrackingRef } from '../start/bra
 import { formatClaimMessage, parseClaimMessage, readOwnership } from './record.js';
 
 /** The branches a claim can live on, as a glob under `refs/heads/`. */
-export const CLAIM_BRANCH_GLOB = `${BRANCH_PREFIX}rafa-*`;
+export const CLAIM_BRANCH_GLOB: string = `${BRANCH_PREFIX}rafa-*`;
 
 /** The one refspec {@link fetchClaimBranches} fetches. */
-export const CLAIM_REFSPEC = `+refs/heads/${CLAIM_BRANCH_GLOB}:refs/remotes/${REMOTE}/${CLAIM_BRANCH_GLOB}`;
+export const CLAIM_REFSPEC: string = `+refs/heads/${CLAIM_BRANCH_GLOB}:refs/remotes/${REMOTE}/${CLAIM_BRANCH_GLOB}`;
 
 /** A claim branch: `feat/rafa-<n>`, or `feat/rafa-<n>-<slug>`. */
 const CLAIM_BRANCH = /^feat\/rafa-([1-9]\d*)(?:-\S+)?$/;

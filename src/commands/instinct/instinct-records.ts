@@ -29,7 +29,7 @@
  * cannot be read at all is still reachable by the name it is filed
  * under.
  */
-import type { RafaContext } from '../../cli/command.js';
+import type { RafaContext } from '../../core/command/index.js';
 import type { ProjectFound } from '../../project/scope.js';
 import type { InstinctRecordEntry, ScopeListing } from '../../schema/scope-records.js';
 

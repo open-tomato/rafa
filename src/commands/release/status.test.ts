@@ -30,7 +30,7 @@
  *     the fence skip is known to be doing something.
  */
 import type { ReleaseSeams, ReleaseStatusReading, ReleaseStatusResult } from './status.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { PlanChange } from '../../effort/store/changes.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner } from '../../pr/index.js';

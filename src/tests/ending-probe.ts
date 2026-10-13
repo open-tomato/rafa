@@ -22,7 +22,7 @@
  * same state, which is what keeps this file honest as the wording
  * changes.
  */
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { NextEndingSeams } from '../next/ending.js';
 import type { NextState } from '../next/state.js';
 
@@ -46,10 +46,10 @@ export const ENDING_GREEN: NextState = Object.freeze({
 });
 
 /** The line a run with no terminal is printed for {@link ENDING_GREEN}. */
-export const ENDING_LINE = `👉 Next: merge #${ENDING_PR} into \`${ENDING_BASE}\` — rafa pr merge ${ENDING_PR} --yes`;
+export const ENDING_LINE: string = `👉 Next: merge #${ENDING_PR} into \`${ENDING_BASE}\` — rafa pr merge ${ENDING_PR} --yes`;
 
 /** The question a run with a terminal is put for {@link ENDING_GREEN}. */
-export const ENDING_QUESTION = `Merge #${ENDING_PR} into \`${ENDING_BASE}\`? [y/N] `;
+export const ENDING_QUESTION: string = `Merge #${ENDING_PR} into \`${ENDING_BASE}\`? [y/N] `;
 
 /** What one probe is built over; each left out is the probe's own. */
 export interface EndingProbeOptions {

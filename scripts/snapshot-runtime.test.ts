@@ -1,3 +1,5 @@
+import type { SessionRecord } from '../src/core/loop/index.js';
+
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve, sep } from 'node:path';
@@ -21,6 +23,10 @@ import { defaultSeams, readOptions, runSnapshot, TAG } from './snapshot-runtime.
  * `--force` is held at both ends: the words {@link readOptions} reads,
  * and the options reaching the install, which the case pairs with the
  * same world refusing without them.
+ *
+ * A live loop is a session record planted under the checkout's
+ * `.rafa/runs/` naming this test process's own pid, read by the install's
+ * default reading since the script's seams name none.
  */
 
 let base = '';
@@ -63,14 +69,30 @@ function seamsOver(repoRoot: string, home: string, out: string[]): Parameters<ty
   };
 }
 
+/** Writes the record of a loop of `repoRoot` in `state`, its pid this test process's own. */
+function plantLoop(repoRoot: string, state: SessionRecord['state']): void {
+  const record: SessionRecord = {
+    sessionId: 'planted',
+    planStub: 'a',
+    plan: '.rafa/plans/PLAN-a.md',
+    branch: 'feat/a',
+    pid: process.pid,
+    startedAt: '2026-10-12T10:00:00.000Z',
+    state,
+    task: null,
+  };
+  writeFile(join(repoRoot, '.rafa', 'runs', `${record.sessionId}.json`), `${JSON.stringify(record, null, 2)}\n`);
+}
+
 describe('defaultSeams', () => {
-  it('names this checkout and the home it is handed, and prefixes every line', () => {
+  it('names this checkout and the home it is handed, prefixes every line, and names no reading of the live loops', () => {
     const home = join(base, 'home');
 
     const seams = defaultSeams(home);
 
     expect(seams.repoRoot).toBe(resolve(import.meta.dir, '..'));
     expect(seams.home).toBe(home);
+    expect(seams.liveLoops).toBeUndefined();
     expect(TAG).toBe('[snapshot]');
   });
 });
@@ -104,9 +126,10 @@ describe('runSnapshot', () => {
     expect(readlinkSync(join(home, '.rafa', 'bin', 'rafa'))).toBe(join(runtimeDir, 'cli.js'));
   });
 
-  it('writes the refusal to error after the prefix and answers 1, building nothing', () => {
+  it('writes the refusal to error after the prefix and answers 1, building nothing, while a loop is live', () => {
     const { repoRoot, home } = plantCheckout();
     writeFile(join(repoRoot, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] a task left\n');
+    plantLoop(repoRoot, 'running');
     const out: string[] = [];
     const errors: string[] = [];
 
@@ -116,6 +139,24 @@ describe('runSnapshot', () => {
     expect(errors[0]).toStartWith(`${TAG} REFUSED — 1 plan tracker(s) in .rafa/plans`);
     expect(errors.join('\n')).toContain('PLAN_TRACKER-a.md:1  [ ] a task left');
     expect(out.some((line) => line.includes('building'))).toBe(false);
+  });
+
+  it('installs beside a tracker with a task left once its loop is done, warning on stderr after the prefix', () => {
+    const { repoRoot, home } = plantCheckout();
+    writeFile(join(repoRoot, '.rafa', 'plans', 'PLAN_TRACKER-a.md'), '- [ ] a task left\n');
+    plantLoop(repoRoot, 'done');
+    const warned: string[] = [];
+    const errors: string[] = [];
+    const seams = { ...seamsOver(repoRoot, home, []), warn: (line: string): number => warned.push(`${TAG} warn: ${line}`) };
+
+    const code = runSnapshot(seams, (line) => errors.push(line), join(home, '.rafa', 'bin'));
+
+    expect(code).toBe(EXIT_DONE);
+    expect(errors).toEqual([]);
+    expect(warned).toEqual([
+      `${TAG} warn: installing with 1 plan tracker(s) in .rafa/plans still holding a task: ${join('.rafa', 'plans', 'PLAN_TRACKER-a.md')}:1`,
+    ]);
+    expect(readlinkSync(join(home, '.rafa', 'bin', 'rafa'))).toBe(join(home, '.rafa', 'runtime', '9.8.7', 'cli.js'));
   });
 
   it('installs ~/.rafa/bin/rafa and warns when ~/.rafa/bin is not ahead of ~/.bun/bin on PATH', () => {

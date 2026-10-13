@@ -74,19 +74,19 @@
  * `rafa`, a planning session or a loop.
  */
 import type { ItemMergeSeams } from './item-merge.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
-import type { PlansDir } from '../../plan/plan-files.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
+import type { PlansDir } from '../../core/plan/index.js';
 
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 
 import { createGhRunner, createGithubTracker } from '../../adapters/tracker/github.js';
 import { boardId } from '../../board/naming.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
-import { isPidAlive, readSessions } from '../../loop/sessions.js';
-import { plansDirAt, stubOfPlanFile } from '../../plan/plan-files.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { isPidAlive, readSessions } from '../../core/loop/index.js';
+import { plansDirAt, stubOfPlanFile } from '../../core/plan/index.js';
 import { stretchFolder } from '../../stretch/folder.js';
 import { DEFAULT_RAFA_COMMAND, lineText } from '../../stretch/launch.js';
 import {
@@ -96,7 +96,7 @@ import {
   resolveProjectConfig,
 } from '../plan/plan-files.js';
 
-import { afterLoopWait, ghFiledAt, mergeDryRunLines } from './item-merge.js';
+import { afterLoopWait, mergeDryRunLines } from './item-merge.js';
 import { PR_BASE_KEY, STRETCH_BRANCH_PREFIX } from './start.js';
 
 /** The command's spelling, as its refusals name it. */
@@ -115,7 +115,7 @@ export const LOOP_OUTPUT = 'events';
 export const RECORD_POLL_MS = 2_000;
 
 /** How long an item without `--wait` looks for the loop's session record. */
-export const RECORD_WAIT_MS = 5 * 60_000;
+export const RECORD_WAIT_MS: number = 5 * 60_000;
 
 /** How many of the log's last lines a loop that ended early is shown by. */
 export const LOG_TAIL_LINES = 20;
@@ -494,7 +494,6 @@ export function defaultStretchItemSeams(): StretchItemSeams {
     isAlive: isPidAlive,
     gh: (root) => createGhRunner({ cwd: root }),
     tracker: (gh) => createGithubTracker({ gh }),
-    filedAt: ghFiledAt,
     sleep: (ms) => Bun.sleep(ms),
     now: () => new Date(),
     rafa: DEFAULT_RAFA_COMMAND,
@@ -542,4 +541,5 @@ export function createStretchItemCommand(seams?: StretchItemSeams): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createStretchItemCommand();
+const command: RafaCommand = createStretchItemCommand();
+export default command;

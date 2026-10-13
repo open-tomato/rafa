@@ -10,13 +10,16 @@
  * It installs this checkout: builds it, copies `dist/` into
  * `~/.rafa/runtime/<version>/`, links `~/.rafa/bin/rafa` at the copied
  * `cli.js`, and prints the path the link resolves to. It refuses while a
- * tracker in `plan.dir` has an open or blocked task, and while
- * `~/.rafa/runtime/<version>/` is already there, both before building.
+ * tracker in `plan.dir` has an open or blocked task and a loop recorded
+ * under this checkout is live, and while `~/.rafa/runtime/<version>/` is
+ * already there, both before building. With no such loop it installs
+ * beside that tracker, one warning naming each one.
  *
  * `--force`, the one word the line takes, is passed through: it installs
  * over a runtime directory already there, replacing it whole, so nothing
- * the old build left is kept. Any other word ends the script at exit
- * code 2, before anything is read.
+ * the old build left is kept, and beside a tracker with a task left
+ * under a live loop. Any other word ends the script at exit code 2,
+ * before anything is read.
  *
  * Every line goes out after `[snapshot] `: progress to stdout, and a
  * refusal, a failure and a config warning to stderr. After an install it
@@ -33,13 +36,15 @@
  * another, and {@link runSnapshot} the seams, where a refusal goes, the
  * `PATH` it reads and the install options, so a test points every path
  * under a temporary directory of its own and never runs the real build.
+ * The seams name no reading of the live loops, so the install reads the
+ * session records under the checkout (`src/runtime/live-loops.ts`).
  */
 import type { InstallOptions, InstallSeams } from '../src/runtime/install.js';
 
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { messageOf } from '../src/config-sections.js';
+import { messageOf } from '../src/core/config/sections.js';
 import { readBinPath } from '../src/project/bin-path.js';
 import { EXIT_COULD_NOT_RUN, exitCodeFor, FORCE_FLAG, installRuntime, outcomeProblem, runBuild } from '../src/runtime/install.js';
 

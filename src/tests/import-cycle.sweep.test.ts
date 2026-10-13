@@ -8,7 +8,7 @@
  * The map it reads is `docs/survey/cluster-map.json`: the eight-cluster,
  * non-test run exported once at base commit `102d26c` (see
  * `docs/survey/README.md`). The tracked `docs/survey/import-graph.json`
- * is a different, 32-cluster run that includes test files, made to chart
+ * is a different run that includes test files, made to chart
  * betweenness and folder spread rather than to anchor a package cut; this
  * sweep does not read it.
  *
@@ -42,15 +42,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setDefaultTimeout } from 'bun:test';
 
 import { crossClusterCycles } from '../../scripts/survey/cluster-cycles.js';
 import { classifyFile, coverageLine, listTrackedFiles } from '../../scripts/survey/files.js';
 import { buildImportGraph, bunResolver, readMetafile } from '../../scripts/survey/import-graph.js';
 
+import { SWEEP_TIMEOUT } from './sweep-timeout.js';
+
+setDefaultTimeout(SWEEP_TIMEOUT);
+
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CLUSTER_MAP_PATH = join(REPO_ROOT, 'docs', 'survey', 'cluster-map.json');
-const SWEEP_TIMEOUT = 150_000;
 
 /** The shape of `docs/survey/cluster-map.json`. */
 interface ClusterMap {

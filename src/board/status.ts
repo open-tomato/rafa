@@ -57,7 +57,7 @@ import type { Stats } from 'node:fs';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 import { createGhRoadmapSearch, ROADMAP_SETTING, ROADMAP_TITLE, severalRoadmapsMessage } from './roadmap.js';
 import { readRoadmapSetting } from './setup-config.js';
@@ -100,7 +100,7 @@ export interface BoardStatusOptions {
 }
 
 /** The `Roadmap issue` row, under the name `./setup.ts` gives its part. */
-export const ROADMAP_ROW_NAME = `${ROADMAP_TITLE} issue`;
+export const ROADMAP_ROW_NAME: string = `${ROADMAP_TITLE} issue`;
 
 /** One row, as the rows are built. */
 function rowOf(kind: BoardPartKind, name: string, outcome: BoardStatusOutcome, detail: string): BoardRow {

@@ -45,7 +45,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { NEXT_STATES, readNextState } from './state.js';
@@ -93,6 +93,7 @@ function detail(mergeable: Mergeability): PullRequestDetail {
     ...summary(),
     body: 'Closes #86',
     headRefOid: 'abc1234',
+    headCommittedAt: null,
     mergeable,
     mergeStateStatus: 'CLEAN',
     labels: [],

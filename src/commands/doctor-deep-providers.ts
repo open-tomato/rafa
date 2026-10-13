@@ -70,13 +70,13 @@
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { GhResult, GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
 import type { TrustReading } from '../board/trust.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { PrProviderReading, ResolvePrProviderOptions } from '../pr/provider.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
 import { createGhPermissions, readAuthorTrust } from '../board/trust.js';
-import { isMapping } from '../config-sections.js';
+import { isMapping } from '../core/config/sections.js';
 import { ghHostOf, ghMissingMessage, ghUnauthenticatedMessage } from '../pr/preflight-items.js';
 import { resolvePrProvider } from '../pr/provider.js';
 

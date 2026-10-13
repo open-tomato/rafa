@@ -22,9 +22,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createAdapterRegistry, PORT_VERSIONS } from '../../adapters/registry.js';
+import { createFakeGh } from '../../adapters/tracker/github-fake.js';
+import { createGithubTracker } from '../../adapters/tracker/github.js';
 import { createLocalTracker, localIssuesDir } from '../../adapters/tracker/local.js';
 import { renderUpdateBlock } from '../../board/issue-edit-body.js';
+import { createAdapterRegistry, PORT_VERSIONS } from '../../core/adapters/index.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 
 import { requireEditingTracker } from './edit-run.js';
@@ -173,5 +175,118 @@ describe('rafa issue edit, dispatched', () => {
     expect(paths.map((path) => existsSync(join(project.root, path)))).toEqual([true, true]);
     expect(readFileSync(join(project.root, paths[0] ?? ''), 'utf8')).toBe(BODY);
     expect(readFileSync(join(project.root, paths[1] ?? ''), 'utf8')).toBe(await read());
+  });
+});
+
+describe('rafa issue edit --priority, dispatched', () => {
+  const PRIORITY = ['issue', 'edit', '1', '--priority=high'];
+  const command = () => [createIssueEditCommand({ gh: noGh, now: () => NOW })];
+
+  /** A local project's tracker, to read the priority back through `get`. */
+  async function plantTracker() {
+    const { project, read } = await plantLocalIssue();
+    const tracker = createLocalTracker({ issuesDir: localIssuesDir(project.root), fallbackReason: null });
+    return { project, read, tracker };
+  }
+
+  it.each([
+    ['--append', [`--append=${TEXT}`, `--reason=${REASON}`], '--priority and --append cannot be used together'],
+    ['--replace-file', ['--replace-file=body.md'], '--priority and --replace-file cannot be used together'],
+  ])('refuses --priority beside %s with exit 1, writing nothing', async (_name, extra, message) => {
+    const { project, read, tracker } = await plantTracker();
+
+    const outcome = await dispatchInProject([...PRIORITY, ...extra], SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stdout]).toEqual([1, '']);
+    expect(outcome.stderr).toContain(message);
+    expect(await read()).toBe(BODY);
+    expect((await tracker.get(REF)).priority).toBeNull();
+  });
+
+  it('refuses a priority outside the four, naming it, with exit 1', async () => {
+    const { project, tracker } = await plantTracker();
+
+    const outcome = await dispatchInProject(['issue', 'edit', '1', '--priority=critical'], SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stdout]).toEqual([1, '']);
+    expect(outcome.stderr).toContain('critical');
+    expect((await tracker.get(REF)).priority).toBeNull();
+  });
+
+  it('refuses a closed issue with exit 2, leaving its priority as it was', async () => {
+    const { project, tracker } = await plantTracker();
+    await tracker.transition(REF, 'done');
+
+    const outcome = await dispatchInProject(PRIORITY, SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stdout]).toEqual([2, '']);
+    expect(outcome.stderr.toLowerCase()).toContain('closed');
+    expect((await tracker.get(REF)).priority).toBeNull();
+  });
+
+  it('prints the swap under --dry-run and writes nothing', async () => {
+    const { project, read, tracker } = await plantTracker();
+
+    const outcome = await dispatchInProject([...PRIORITY, '--dry-run'], SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect(outcome.stdout).toContain('priority: needs-triage → high');
+    expect(outcome.stdout).toContain('--dry-run: nothing was written');
+    expect(await read()).toBe(BODY);
+    expect((await tracker.get(REF)).priority).toBeNull();
+  });
+
+  it('swaps the priority on the local tracker, read back through get', async () => {
+    const { project, read, tracker } = await plantTracker();
+
+    const outcome = await dispatchInProject(PRIORITY, SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect((await tracker.get(REF)).priority).toBe('high');
+    expect(await read()).toBe(BODY);
+  });
+
+  it('swaps the priority and removes needs-triage in one gh issue edit on the GitHub fake', async () => {
+    const fake = createFakeGh();
+    const github = createGithubTracker({ gh: fake.run });
+    const ref = await github.create({ ...DRAFT, priority: 'low' });
+    fake.update(ref.externalId, (issue) => ({ ...issue, labels: [...issue.labels, 'needs-triage'] }));
+    const project = plantProject(mkdtempSync(join(tempBase, 'case-')), 'tracker:\n  default: github\n  fallback: [local]\n');
+    const before = fake.calls().length;
+    const gh: GhRunner = (args, input) => {
+      if (args[0] === 'api' && args[1] === 'user') return Promise.resolve({ ok: true, stdout: '{"login":"rafa-fake","id":1}', stderr: '' });
+      if (args[0] === 'api' && /collaborators\/[^/]+\/permission$/u.test(args[1] ?? '')) {
+        return Promise.resolve({ ok: true, stdout: '{"permission":"write"}', stderr: '' });
+      }
+      return fake.run(args, input);
+    };
+
+    const outcome = await dispatchInProject(
+      ['issue', 'edit', ref.externalId, '--priority=high'],
+      SUBJECTS,
+      [createIssueEditCommand({ gh, now: () => NOW })],
+      project,
+    );
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    expect((await github.get(ref)).priority).toBe('high');
+    const labels = fake.issue(ref.externalId)?.labels ?? [];
+    expect(labels).toContain('priority:high');
+    expect(labels).not.toContain('priority:low');
+    expect(labels).not.toContain('needs-triage');
+    const edits = fake.calls().slice(before)
+      .filter((call) => call[0] === 'issue' && call[1] === 'edit');
+    expect(edits).toHaveLength(1);
+  });
+
+  it('sets a priority beside --title in one run, leaving the body alone', async () => {
+    const { project, read, tracker } = await plantTracker();
+
+    const outcome = await dispatchInProject([...PRIORITY, '--title=Faster plan list'], SUBJECTS, command(), project);
+
+    expect([outcome.exitCode, outcome.stderr]).toEqual([0, '']);
+    const issue = await tracker.get(REF);
+    expect([issue.priority, issue.title]).toEqual(['high', 'Faster plan list']);
+    expect(await read()).toBe(BODY);
   });
 });

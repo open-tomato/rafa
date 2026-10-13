@@ -15,10 +15,43 @@
  *    fast-forwarded, since doing so is a merge IN the main checkout,
  *    which is the one thing this module must not touch. A local base
  *    that is behind or has diverged therefore does not matter here.
- *  - `switch-local` adds the worktree on the existing local branch, and
- *    `switch-remote` on a new local branch tracking `origin/feat/<stub>`.
- *    Neither fetches the branch: a branch that already exists is never
- *    fetched over, the decision module's rule. Both then catch up (below).
+ *  - `switch-local` adds the worktree on the existing local branch, whose
+ *    upstream is left as it was found.
+ *  - `switch-remote` adds it on a new local branch cut from
+ *    `origin/feat/<stub>` with `--no-track`, then sets that branch's
+ *    upstream to `origin/feat/<stub>` in a `set-upstream` step of its
+ *    own (below).
+ *
+ * Neither of the last two fetches the branch: a branch that already
+ * exists is never fetched over, the decision module's rule. Both then
+ * catch up (below).
+ *
+ * ## The upstream step
+ *
+ * A branch's upstream is written to the one `.git/config` the main
+ * checkout and every linked worktree share, and git refuses a second
+ * writer at once rather than making it wait. An add that carried the
+ * write (`--track`) therefore lost to another run's add started in the
+ * same instant, and was left with a local `feat/<stub>` holding no
+ * upstream and no worktree (issue #960; measured below). So the add of
+ * `switch-remote` writes nothing to that file, and the upstream is the
+ * `set-upstream` step after it, run through `setUpstream`
+ * (`./worktree-upstream.ts`) in the project root: tried again only while
+ * git says the config file is locked, `UPSTREAM_TRIES` times with a
+ * pause between two tries. The pause is the `sleep` seam.
+ *
+ * A step that fails is refused, naming the branch and the upstream line
+ * (`upstreamRefusal`), and what becomes of the worktree the add made
+ * depends on why:
+ *
+ *  - the lock still held after the last try: the worktree is removed
+ *    with `git worktree remove --force <path>` before the refusal, and
+ *    the refusal says so. The local branch is kept, since the line the
+ *    refusal names sets its upstream; a run started again then finds it
+ *    and takes route `switch-local`. A removal git refused is said in
+ *    the refusal too, with git's own lines beneath;
+ *  - any other failure: the run ends after that one try with git's text,
+ *    nothing is removed, and the refusal says the worktree was left.
  *
  * ## A worktree already there
  *
@@ -111,26 +144,58 @@
  * path of one that already held `feat/x` exited 128 with `fatal:
  * '<path>' already exists`, which is why the listing is read first.
  *
+ * Measured on git 2.53.0 under Linux with `LC_ALL=C` (2026-10-12), in a
+ * project on `main` holding `origin/feat/x` and no local `feat/x`, with
+ * `.git/config.lock` created by hand and held throughout:
+ *
+ *  - `git worktree add --track -b feat/x <path> origin/feat/x` exited
+ *    255, having written `Preparing worktree (new branch 'feat/x')` and
+ *    then `error: could not lock config file .git/config: File exists`.
+ *    It left `refs/heads/feat/x` behind with no upstream (`git config
+ *    branch.feat/x.merge` exited 1), no entry at `<path>` in the listing
+ *    and no directory there. That is issue #960 with the other writer
+ *    stood in for by the lock file, and why the add carries no upstream.
+ *  - `git worktree add --no-track -b feat/x <path> origin/feat/x` exited
+ *    0 under the same held lock, and the config read exited 1 after it:
+ *    this add writes nothing to the shared config file, so it does not
+ *    meet the lock at all.
+ *  - The upstream line then exited 1 with the lock message
+ *    `./worktree-upstream.ts` records in its own note.
+ *  - `git worktree remove --force <path>` exited 0 under the held lock,
+ *    printing nothing. The listing then held the main checkout alone,
+ *    `<path>` was gone (its parent directories were left, empty),
+ *    `refs/heads/feat/x` was still there, `git status --short` in the
+ *    main checkout printed nothing and its branch was still `main`.
+ *  - With the lock deleted, the upstream line exited 0 and `git config
+ *    branch.feat/x.merge` answered `refs/heads/feat/x`; a second branch
+ *    added with `--no-track` and the line, no lock held at any point,
+ *    read `origin/feat/y` as its `@{upstream}`.
+ *  - `git worktree remove --force` on a path the listing has no worktree
+ *    at exited 128 with `fatal: '<path>' is not a working tree`.
+ *
  * ## Refusals
  *
  * Every refusal is a `CommandExit` with exit code 1, the shape
  * `./branch.ts` refuses with, and each ends by saying the main checkout
- * was left alone, which the last reading above is the ground for.
+ * was left alone, which the `git status --short` readings above are the
+ * ground for.
  */
 import type { BranchPlan, BranchRoute } from './branch-decision.js';
 import type { ClaimCatchUpReading } from './claim-catch-up.js';
+import type { Sleep } from './worktree-upstream.js';
 import type { GitResult, GitRunner, WorktreeEntry } from '../pr/index.js';
 
 import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 import { createGitRunner, gitSaid, parseWorktrees } from '../pr/index.js';
 
 import { branchNameFor, localRef, readBranchOffer, REMOTE, remoteTrackingRef } from './branch-decision.js';
 import { readClaimCatchUp } from './claim-catch-up.js';
 import { worktreeDirAt } from './worktree-dir.js';
+import { isConfigLockRefusal, setUpstream, upstreamArgv, upstreamRefusal } from './worktree-upstream.js';
 
 /** The indent a quoted git line carries, as `./branch.ts` indents its own. */
 const INDENT = '   ';
@@ -150,17 +215,23 @@ export interface WorktreeRequest {
   readonly base: string;
 }
 
-/** How this module reaches git. */
+/** How this module reaches git, and how it waits between two tries of the upstream step. */
 export interface WorktreeSeams {
   /** The git runner for a root. `createGitRunner` when left out. */
   readonly git?: (root: string) => GitRunner;
+  /**
+   * The pause between two tries of the `set-upstream` step, which returns
+   * once it is over. `Bun.sleepSync` when left out; a test hands in one
+   * that waits for nothing.
+   */
+  readonly sleep?: Sleep;
 }
 
 /** The seams the run uses: the system's own. */
 export const DEFAULT_WORKTREE_SEAMS: WorktreeSeams = Object.freeze({});
 
 /** One step of adding the worktree, in the order it runs. */
-export type WorktreeStepId = 'fetch' | 'add';
+export type WorktreeStepId = 'fetch' | 'add' | 'set-upstream';
 
 /** One step: what it is called, and exactly what it runs. */
 export interface WorktreeStep {
@@ -214,7 +285,7 @@ function addStep(route: BranchRoute, plan: BranchPlan, path: string): WorktreeSt
     return {
       id: 'add',
       label,
-      argv: ['git', 'worktree', 'add', '--track', '-b', plan.branch, path, `${REMOTE}/${plan.branch}`],
+      argv: ['git', 'worktree', 'add', '--no-track', '-b', plan.branch, path, `${REMOTE}/${plan.branch}`],
     };
   }
   return {
@@ -225,12 +296,27 @@ function addStep(route: BranchRoute, plan: BranchPlan, path: string): WorktreeSt
 }
 
 /**
+ * The step that sets the upstream of the branch `switch-remote` added,
+ * its argv the upstream line of `./worktree-upstream.ts`. The runner
+ * gives this step to `setUpstream` rather than spawning the argv once.
+ */
+function upstreamStep(plan: BranchPlan): WorktreeStep {
+  return {
+    id: 'set-upstream',
+    label: `set the upstream of ${plan.branch} to ${REMOTE}/${plan.branch}`,
+    argv: upstreamArgv(plan.branch),
+  };
+}
+
+/**
  * The steps a route runs, in order, frozen. Only `create` fetches, and
- * it fetches the base alone; see the module note.
+ * it fetches the base alone; only `switch-remote` sets an upstream, in a
+ * step after its add. See the module note.
  */
 export function worktreeSteps(route: BranchRoute, plan: BranchPlan, path: string): readonly WorktreeStep[] {
   const add = addStep(route, plan, path);
-  if (route !== 'create') return Object.freeze([add]);
+  if (route === 'switch-local') return Object.freeze([add]);
+  if (route === 'switch-remote') return Object.freeze([add, upstreamStep(plan)]);
   return Object.freeze([
     { id: 'fetch', label: `fetch ${REMOTE} ${plan.base}`, argv: ['git', 'fetch', REMOTE, plan.base] },
     add,
@@ -376,6 +462,40 @@ export function stepRefusal(
   return [`❌ Could not ${step.label}.`, ...quotedLines(gitSaid(result)), ...fetchNote, UNTOUCHED].join('\n');
 }
 
+/**
+ * The lines saying what became of the worktree the add made once the
+ * upstream step failed: `removal` is what `git worktree remove --force`
+ * answered, or null when it was never run.
+ */
+function addedWorktreeLines(plan: BranchPlan, path: string, removal: GitResult | null): readonly string[] {
+  if (removal === null) return [`${INDENT}The worktree added at ${path} was left in place, holding ${plan.branch}.`];
+  if (removal.ok) {
+    return [`${INDENT}The worktree added at ${path} was removed and ${plan.branch} was kept: run again once its upstream is set.`];
+  }
+  return [
+    `${INDENT}The worktree added at ${path} could not be removed and still holds ${plan.branch}:`,
+    ...quotedLines(gitSaid(removal)),
+  ];
+}
+
+/**
+ * Ends the run on a failed `set-upstream` step whose last try answered
+ * `result`. A step that gave up on a lock still held has the worktree
+ * the add made removed first, through `git` (the project root); any
+ * other failure removes nothing. The refusal names the branch and the
+ * upstream line either way; see the module note.
+ */
+function refuseUpstream(git: GitRunner, plan: BranchPlan, path: string, result: GitResult): never {
+  const removal = isConfigLockRefusal(result)
+    ? git(['worktree', 'remove', '--force', path])
+    : null;
+  throw new CommandExit(1, `\n${[
+    upstreamRefusal(plan.branch, result),
+    ...addedWorktreeLines(plan, path, removal),
+    UNTOUCHED,
+  ].join('\n')}`);
+}
+
 /** Whether git can see `ref`; any failure reads as no such branch, as `./branch.ts` reads it. */
 function refExists(git: GitRunner, ref: string): boolean {
   return git(['show-ref', '--verify', '--quiet', ref]).ok;
@@ -501,14 +621,16 @@ export function catchUpExisting(
  * Answers the worktree the run now has. A plan with no stub, a worktree
  * already there that cannot be reused, a failed fetch on `create`, an
  * add git refused — a branch checked out elsewhere, named by that
- * checkout's path, above all — and a catch-up merge git refused are each
- * a `CommandExit` with exit code 1; see the module note.
+ * checkout's path, above all — an upstream step that failed or gave up
+ * on a locked config file, and a catch-up merge git refused are each a
+ * `CommandExit` with exit code 1; see the module note.
  */
 export function addRunWorktree(
   request: WorktreeRequest,
   seams: WorktreeSeams = DEFAULT_WORKTREE_SEAMS,
 ): WorktreeOutcome {
   const gitIn = seams.git ?? createGitRunner;
+  const sleep = seams.sleep ?? Bun.sleepSync;
   const git = gitIn(request.projectRoot);
   const stub = request.planStub?.trim() ?? '';
   if (stub === '') {
@@ -536,11 +658,14 @@ export function addRunWorktree(
   const steps = worktreeSteps(offer.route, plan, path);
   activeOutput().info(openingLine(offer.route, plan));
   for (const step of steps) {
-    const result = git(step.argv.slice(1));
+    const result = step.id === 'set-upstream'
+      ? setUpstream(git, plan.branch, sleep)
+      : git(step.argv.slice(1));
     if (result.ok) {
       activeOutput().info(`${INDENT}${step.label}: done`);
       continue;
     }
+    if (step.id === 'set-upstream') refuseUpstream(git, plan, path, result);
     const listing = step.id === 'add'
       ? readListing(git)
       : [];

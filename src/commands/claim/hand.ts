@@ -72,10 +72,10 @@
  */
 import type { ClaimCommandSeams, ClaimDoing, ClaimSeamsFactory, FoundBranch } from './release.js';
 import type { ClaimRecord } from '../../claims/record.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { holdsClaim } from '../../claims/device.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { REMOTE } from '../../start/branch-decision.js';
 import { createStartPreflightClaim } from '../../start/preflight-claim.js';
 import { requireProject, resolveProjectConfig } from '../plan/plan-files.js';
@@ -284,4 +284,5 @@ export function createClaimHandCommand(makeSeams: ClaimSeamsFactory = DEFAULT_SE
   return Object.freeze(command);
 }
 
-export default createClaimHandCommand();
+const command: RafaCommand = createClaimHandCommand();
+export default command;

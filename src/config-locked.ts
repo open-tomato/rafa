@@ -16,7 +16,7 @@
  *
  * @module
  */
-import type { ConfigSetting } from './config-schema.js';
+import type { ConfigSetting } from './core/config/index.js';
 
 /** The settings a team shares across every device, in file-key order. */
 export const LOCKED_SETTINGS: readonly ConfigSetting[] = Object.freeze([

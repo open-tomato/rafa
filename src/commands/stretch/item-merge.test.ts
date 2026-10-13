@@ -7,9 +7,10 @@
  * runs and merged at {@link MERGE_SHA} after it; `run list` is the
  * recorded fake of `src/ci/runs-fake.ts`, one list of runs per read so a
  * case can move the run from in progress to completed; `run view
- * --log-failed` answers the captured log of `src/ci/testdata/`; and
- * `issue view` answers each bug's filing time. The events file, the
- * session record, the ledger and `stretch.json` are real files.
+ * --log-failed` answers the captured log of `src/ci/testdata/`. Each
+ * open bug carries its own `createdAt`, so `issue view` is not modelled.
+ * The events file, the session record, the ledger and `stretch.json` are
+ * real files.
  *
  * Controls: every refusal and every loop without a pull request reads
  * the ledger as absent beside a full run that finds it written, and the
@@ -29,7 +30,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { createFakeRunsGh } from '../../ci/runs-fake.js';
-import { beginSession } from '../../loop/sessions.js';
+import { runListArgs } from '../../ci/runs.js';
+import { beginSession } from '../../core/loop/index.js';
 import { eventsFilePath } from '../../start/loop-events.js';
 import { appendItem, itemsPath, readItems } from '../../stretch/items.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
@@ -38,7 +40,6 @@ import {
   CI_POLL_MS,
   CI_READ_TRIES,
   CI_WAIT_MS,
-  ghFiledAt,
   mergeDryRunLines,
   noPullRequestLine,
   PR_VIEW_FIELDS,
@@ -64,6 +65,8 @@ const PR = 901;
 const BRANCH = 'stretch/4';
 const MERGE_SHA = 'c4da2c4c63b2e9d585d3a76ffbda1c49e3ce60d1';
 const OLD_SHA = '0326b9da1b76e75bfdd0ed3b2002897e5bae75e4';
+/** The commit of a push to the branch after the merge, whose run is listed before the merge commit's. */
+const NEWER_SHA = 'fb9abe9c1d2e3f405162738495a6b7c8d9e0f1a2';
 const START = Date.parse('2026-10-07T09:00:00.000Z');
 const BODY = 'Plan for #812.\n\nCloses #812\nFixes #812\ncloses #604\n';
 const THREE_CASES = await Bun.file(new URL('../../ci/testdata/three-cases.log-failed.txt', import.meta.url)).text();
@@ -83,8 +86,10 @@ function verifyRun(fields: Partial<FakeRun> = {}): FakeRun {
   };
 }
 
-function bug(id: string, title: string): OpenIssue {
-  return { ref: { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` }, title, body: '' };
+/** An open bug filed at `createdAt`. */
+function bug(id: string, title: string, createdAt: string): OpenIssue {
+  const ref: OpenIssue['ref'] = { opt: 0, kind: 'github', externalId: id, url: `https://example.test/issues/${id}` };
+  return { ref, title, body: '', createdAt };
 }
 
 /** What a case changes about the fakes. */
@@ -104,8 +109,6 @@ interface CaseOptions {
   /** How many `run list` reads fail before the fake answers. */
   readonly failedListReads?: number;
   readonly bugs?: readonly OpenIssue[];
-  /** Each bug's filing time, by number. */
-  readonly filed?: Readonly<Record<string, string>>;
 }
 
 interface Case {
@@ -163,12 +166,6 @@ function plant(options: CaseOptions = {}): Case {
       return createFakeRunsGh(runs).gh(args);
     }
     if (args[0] === 'run' && args[1] === 'view') return answer({ ok: true, stdout: THREE_CASES, stderr: '' });
-    if (args[0] === 'issue' && args[1] === 'view') {
-      const at = options.filed?.[args[2] ?? ''];
-      return answer(at === undefined
-        ? { ok: false, stdout: '', stderr: 'GraphQL: Could not resolve to an issue' }
-        : { ok: true, stdout: `${JSON.stringify({ createdAt: at })}\n`, stderr: '' });
-    }
     return answer({ ok: false, stdout: '', stderr: `fake gh: not modelled: ${args.join(' ')}` });
   };
 
@@ -195,7 +192,6 @@ function plant(options: CaseOptions = {}): Case {
     isAlive: (pid) => pid === LOOP_PID,
     gh: () => gh,
     tracker: () => ({ openIssues: async () => Promise.resolve([...(options.bugs ?? [])]) }),
-    filedAt: ghFiledAt,
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
@@ -233,8 +229,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
         [verifyRun({ status: 'in_progress', conclusion: '' })],
         [verifyRun()],
       ],
-      bugs: [bug('870', 'filed during the item'), bug('700', 'filed long ago')],
-      filed: { 870: '2026-10-07T09:10:00Z', 700: '2026-09-01T00:00:00Z' },
+      bugs: [bug('870', 'filed during the item', '2026-10-07T09:10:00Z'), bug('700', 'filed long ago', '2026-09-01T00:00:00Z')],
     });
 
     const outcome = await run(planted);
@@ -272,8 +267,7 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
 
   it('counts new bugs from the last ledger line written before this one, not from its own', async () => {
     const planted = plant({
-      bugs: [bug('871', 'after the last item'), bug('869', 'before the last item')],
-      filed: { 871: '2026-10-07T09:05:00Z', 869: '2026-10-07T07:00:00Z' },
+      bugs: [bug('871', 'after the last item', '2026-10-07T09:05:00Z'), bug('869', 'before the last item', '2026-10-07T07:00:00Z')],
     });
     appendItem(planted.project.root, 4, {
       issue: '604',
@@ -293,8 +287,40 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).not.toContain('#869');
   });
 
+  it('lists the bugs filed since the ledger\'s last line oldest first, from the listing alone, with no issue view per bug', async () => {
+    const planted = plant({
+      bugs: [
+        bug('874', 'filed last', '2026-10-07T09:08:00Z'),
+        bug('869', 'filed before the last item', '2026-10-07T07:00:00Z'),
+        bug('873', 'filed first', '2026-10-07T08:30:00Z'),
+      ],
+    });
+    appendItem(planted.project.root, 4, {
+      issue: '604',
+      plan: 'rafa-604-config-set',
+      pullRequest: 880,
+      mergeCommit: OLD_SHA,
+      closes: ['Closes #604'],
+      at: '2026-10-07T08:00:00.000Z',
+    });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expectInOrder(outcome.stdout, [
+      'Bugs: 3 open.',
+      'Filed since 2026-10-07T08:00:00.000Z: 2.',
+      '   #873 filed first',
+      '   #874 filed last',
+    ]);
+    expect(outcome.stdout).not.toContain('Filed since the last item: not read');
+    expect(outcome.stdout).not.toContain('#869');
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue' && args[1] === 'view')).toEqual([]);
+    expect(planted.ghCalls.filter((args) => args[0] === 'issue')).toEqual([]);
+  });
+
   it('counts new bugs from stretch.json\'s start when the ledger is empty', async () => {
-    const planted = plant({ bugs: [bug('872', 'during the stretch')], filed: { 872: '2026-10-07T06:00:00Z' } });
+    const planted = plant({ bugs: [bug('872', 'during the stretch', '2026-10-07T06:00:00Z')] });
     mkdirSync(join(planted.project.root, '.rafa', 'stretch', '4'), { recursive: true });
     writeFileSync(stretchRecordPath(planted.project.root, 4), JSON.stringify({ startedAt: '2026-10-07T05:00:00.000Z' }));
 
@@ -304,14 +330,48 @@ describe('rafa stretch item --wait, a loop that opened a pull request', () => {
     expect(outcome.stdout).toContain('Filed since 2026-10-07T05:00:00.000Z: 1.');
   });
 
-  it('gives up on a run that never comes after the wait\'s bound, and still writes the ledger line', async () => {
+  it('gives up when no run on the merge commit is found within the wait\'s bound, and still writes the ledger line', async () => {
     const planted = plant({ runs: [[verifyRun({ headSha: OLD_SHA })]] });
 
     const outcome = await run(planted);
 
     expect(outcome.exitCode).toBe(0);
     expect(planted.sleeps).toHaveLength(CI_WAIT_MS / CI_POLL_MS);
-    expect(outcome.stdout).toContain(`warn: no run on ${BRANCH} at c4da2c4 ended within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).toContain(`warn: no run on ${BRANCH} at c4da2c4 was found within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).not.toContain('had not ended within');
+    expect(outcome.stdout).not.toContain('the readings below are of the newest run');
+    expect(readItems(planted.project.root, 4).items).toHaveLength(1);
+  });
+
+  it('ends the wait on a red run of the merge commit while a newer green run of the branch is listed first', async () => {
+    const newer = verifyRun({ databaseId: 37190099999, headSha: NEWER_SHA, conclusion: 'success', createdAt: '2026-10-07T09:40:00Z' });
+    const planted = plant({ runs: [[newer, verifyRun()]] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.sleeps).toEqual([]);
+    expect(planted.ghCalls.filter((args) => args[1] === 'list')).toEqual([
+      runListArgs({ branch: BRANCH, commit: MERGE_SHA }),
+      runListArgs({ branch: BRANCH }),
+    ]);
+    expectInOrder(outcome.stdout, [
+      `waiting for the run on ${BRANCH} at c4da2c4 to end`,
+      `run 37190089292 (verify) on ${BRANCH} at c4da2c4 ended: failure`,
+      `CI: ✅ ${BRANCH}: verify run 37190099999 is success on ${NEWER_SHA.slice(0, 7)}.`,
+    ]);
+    expect(outcome.stdout).not.toContain('warn:');
+  });
+
+  it('says the run it found had not ended when the merge commit\'s run is still going at the wait\'s bound', async () => {
+    const planted = plant({ runs: [[verifyRun({ status: 'in_progress', conclusion: '' })]] });
+
+    const outcome = await run(planted);
+
+    expect(outcome.exitCode).toBe(0);
+    expect(planted.sleeps).toHaveLength(CI_WAIT_MS / CI_POLL_MS);
+    expect(outcome.stdout).toContain(`warn: run 37190089292 (verify) on ${BRANCH} at c4da2c4 had not ended within ${String(CI_WAIT_MS / 60_000)} minutes`);
+    expect(outcome.stdout).not.toContain('warn: no run on');
     expect(readItems(planted.project.root, 4).items).toHaveLength(1);
   });
 
@@ -493,29 +553,6 @@ describe('viewPull', () => {
   });
 });
 
-describe('ghFiledAt', () => {
-  it('reads createdAt, and null where gh fails or answers something else', async () => {
-    const answers: Record<string, GhResult> = {
-      1: { ok: true, stdout: '{"createdAt":"2026-10-05T15:08:56Z"}\n', stderr: '' },
-      2: { ok: false, stdout: '', stderr: 'GraphQL: Could not resolve' },
-      3: { ok: true, stdout: '{"createdAt":"soon"}', stderr: '' },
-      4: { ok: true, stdout: 'nope', stderr: '' },
-    };
-    const asked: string[][] = [];
-    const read = ghFiledAt(async (args) => {
-      asked.push([...args]);
-      return Promise.resolve(answers[args[2] ?? ''] ?? { ok: false, stdout: '', stderr: '' });
-    });
-    const ref = (id: string): OpenIssue['ref'] => ({ opt: 0, kind: 'github', externalId: id, url: null });
-
-    expect((await read(ref('1')))?.toISOString()).toBe('2026-10-05T15:08:56.000Z');
-    expect(await read(ref('2'))).toBeNull();
-    expect(await read(ref('3'))).toBeNull();
-    expect(await read(ref('4'))).toBeNull();
-    expect(asked[0]).toEqual(['issue', 'view', '1', '--json', 'createdAt']);
-  });
-});
-
 describe('the dry run', () => {
   it('prints the merge half\'s lines after the loop wait line, and runs none of them', async () => {
     const planted = plant();
@@ -527,7 +564,7 @@ describe('the dry run', () => {
     expect(planted.ghCalls).toEqual([]);
     const lines = mergeDryRunLines(['rafa'], planted.project.root, 4);
     expect(lines[0]).toBe('rafa pr merge <pr> --skip-checks --yes');
-    expect(lines[1]).toStartWith(`gh run list --branch ${BRANCH} --limit 1 --json`);
+    expect(lines[1]).toStartWith(`gh run list --branch ${BRANCH} --commit <merge-commit> --limit 1 --json`);
     expectInOrder(outcome.stdout, ['rafa loop wait --session-id=<session id>', ...lines, 'dry run: would start the loop']);
     expect(existsSync(itemsPath(planted.project.root, 4))).toBe(false);
   });

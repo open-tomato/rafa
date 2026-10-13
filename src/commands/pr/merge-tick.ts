@@ -102,7 +102,7 @@ import { tickEpics } from '../../board/epic-tick.js';
 import { createGhRoadmapBody, tickRoadmapIssue } from '../../board/roadmap-tick.js';
 import { closedIssuesIn, createGhRoadmapSearch, parseRoadmapBody } from '../../board/roadmap.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 
 /** What {@link tickRoadmapAfterMerge} is asked: what the epic tick reads, and what the boards add. */
 export interface MergeTickOptions extends EpicTickOptions {

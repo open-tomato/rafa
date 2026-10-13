@@ -16,11 +16,11 @@
  * list of mappings does.
  */
 
-import type { SettingSpec } from './config-schema.js';
-import type { Reader, Reading } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader, Reading } from './core/config/sections.js';
 import type { ErrorCodeEntry } from './errors/codes.js';
 
-import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from './config-sections.js';
+import { below, isMapping, listOf, oneOf, refused, refusedWith, text } from './core/config/sections.js';
 import { codeProblem, ERROR_LEVELS } from './errors/codes.js';
 import { RAFA_CODES } from './errors/rafa-codes.js';
 

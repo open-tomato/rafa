@@ -59,6 +59,20 @@
  * moved ahead of the provider's automatic items 1, the skip lines not
  * printed 3, and the tracker dropped from the skip line 3.
  *
+ * The scope skip is driven over a plan whose PREREQUISITES file carries
+ * one `[auto]` item of each scope, with the tracker planted by the case.
+ * The skip sits beside a control differing in one box of the tracker,
+ * and the three trackers that probe everything (one task open, one
+ * blocked, none there) run in one case. Before the skip existed the
+ * every-task-ticked run halted on its failing `tasks` item, which is
+ * #892. Seven mutations of `start/preflight.ts` were driven against the
+ * file on 2026-10-13, run alone on a baseline of 49 pass and restored
+ * sha256-identical: an absent tracker read as wrap-up alone reddened 1
+ * case, a blocked task not counted 1, the `wrap-up` items skipped too 3,
+ * the skip lines not printed 3, the two kinds of skip line swapped 1,
+ * the skipped items still probed 3, and the tracker dropped from the
+ * line 3.
+ *
  * The sync-strategy check is driven over configs parsed from text, and
  * every other case runs under the config default, `effort.sync: local`.
  * Its refusal sits beside a control differing only in the strategy, which
@@ -86,13 +100,13 @@
  * with each of three strings of `src/start.ts` mutated in turn, and each
  * mutation changed the reading it aimed at.
  */
-import type { TierPin } from '../config-sections.js';
-import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
+import type { ClaudeSettingSource, TierPin } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
@@ -113,13 +127,13 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { PORT_VERSIONS } from '../adapters/registry.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
+import { PORT_VERSIONS } from '../core/adapters/index.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
@@ -977,6 +991,151 @@ describe('the start-only tier of the plan', () => {
     expect(existsSync(sqliteStorePath(resumedRoot))).toBe(false);
     expect(resumed.info).toEqual([`\n${skipLine(CLEAN_CHECKOUT)}`]);
     expect(resumed.warn).toEqual([]);
+  });
+});
+
+/** A `[tasks]` item of {@link SCOPED_PREREQUISITES}, and its probe. */
+const COMPILER = 'The compiler is installed: `cc --version`';
+const COMPILER_PROBE = 'cc --version';
+
+/** Its `[wrap-up]` item, and its probe. */
+const REMOTE = 'The remote answers: `git ls-remote origin`';
+const REMOTE_PROBE = 'git ls-remote origin';
+
+/** Its unmarked item, scoped `both`, and its probe. */
+const LINTER = 'The linter is installed: `eslint --version`';
+const LINTER_PROBE = 'eslint --version';
+
+/** A PREREQUISITES file holding one `[auto]` item of each scope. */
+const SCOPED_PREREQUISITES = [
+  '# Prerequisites',
+  '',
+  '## Toolchain [auto]',
+  `- [ ] [tasks] ${COMPILER}`,
+  `- [ ] [wrap-up] ${REMOTE}`,
+  `- [ ] ${LINTER}`,
+  '',
+].join('\n');
+
+/** A tracker whose every task is ticked: the run dispatches the wrap-up alone. */
+const ALL_TICKED = '# Stage: one\n\n- [x] Write it\n- [x] Test it\n';
+
+/** The line a wrap-up-alone run names one skipped `tasks` item with. */
+function scopeSkipLine(name: string): string {
+  return `⏭ tasks-only item tool ${JSON.stringify(name)} was not checked:`
+    + ' only the tasks need it,'
+    + ` and PLAN_TRACKER-${STUB}.md holds no open and no blocked task`;
+}
+
+/** Every scoped probe answered with exit 0, `failing` answered with exit 1. */
+function scopedAnswers(failing: string | null = null): Record<string, ProbeRun> {
+  const probes = [COMPILER_PROBE, REMOTE_PROBE, LINTER_PROBE];
+  return Object.fromEntries(probes.map((probe) => [
+    probe,
+    probe === failing
+      ? answered(1, 'sh: not there')
+      : answered(0),
+  ]));
+}
+
+describe('the scope of an auto item of the plan', () => {
+  it('skips a failing tasks item once every task is ticked, where the same tracker with one task open halts on it (#892)', async () => {
+    const root = rootWithPrerequisites(SCOPED_PREREQUISITES);
+    const openRoot = rootWithPrerequisites(SCOPED_PREREQUISITES);
+    plantTracker(root, ALL_TICKED);
+    // The control differs in one box of the tracker.
+    plantTracker(openRoot, ALL_TICKED.replace('- [x] Test it', '- [ ] Test it'));
+    const answers = scopedAnswers(COMPILER_PROBE);
+
+    const wrapUpAlone = await drive(root, settingsOf([], []), answers);
+    const open = await drive(openRoot, settingsOf([], []), answers);
+
+    // Nothing skipped is checked, counted or stored: two items, two rows.
+    expect(wrapUpAlone.refusal).toBeNull();
+    expect(wrapUpAlone.probes).toEqual([`${REMOTE_PROBE} in ${root}`, `${LINTER_PROBE} in ${root}`]);
+    expect(storedRows(root).map((row) => `${row.tier} ${row.item} ${row.outcome}`)).toEqual([
+      `required ${REMOTE} pass`,
+      `required ${LINTER} pass`,
+    ]);
+    expect(wrapUpAlone.info).toEqual([
+      `\n${scopeSkipLine(COMPILER)}`,
+      CHECKING_ONE.replace('1 prerequisite', '2 prerequisite'),
+      '   Preflight passed.',
+    ]);
+    expect(wrapUpAlone.warn).toEqual([]);
+
+    expect(open.result).toBeNull();
+    expect(open.refusal?.exitCode).toBe(1);
+    expect(open.refusal?.message).toContain(`tool ${JSON.stringify(COMPILER)}`);
+    expect(open.info).toEqual([CHECKING_ONE.replace('1 prerequisite', '3 prerequisite')]);
+  });
+
+  it('probes every item, the wrap-up ones included, with one task open, one task blocked, or no tracker', async () => {
+    const trackers: Readonly<Record<string, string | null>> = {
+      open: ALL_TICKED.replace('- [x] Test it', '- [ ] Test it'),
+      blocked: ALL_TICKED.replace('- [x] Test it', '- [BLOCKED] Test it  <!-- blocked: the suite is red -->'),
+      absent: null,
+    };
+
+    for (const [name, tracker] of Object.entries(trackers)) {
+      const root = rootWithPrerequisites(SCOPED_PREREQUISITES);
+      if (tracker !== null) plantTracker(root, tracker);
+
+      const run = await drive(root, settingsOf([], []), scopedAnswers());
+
+      expect([name, run.refusal]).toEqual([name, null]);
+      expect([name, run.probes]).toEqual([name, [
+        `${COMPILER_PROBE} in ${root}`,
+        `${REMOTE_PROBE} in ${root}`,
+        `${LINTER_PROBE} in ${root}`,
+      ]]);
+      expect([name, run.info]).toEqual([name, [
+        CHECKING_ONE.replace('1 prerequisite', '3 prerequisite'),
+        '   Preflight passed.',
+      ]]);
+    }
+  });
+
+  it('still halts on a failing wrap-up item, and on a failing unmarked one, once every task is ticked', async () => {
+    for (const [failing, item] of [[REMOTE_PROBE, REMOTE], [LINTER_PROBE, LINTER]] as const) {
+      const root = rootWithPrerequisites(SCOPED_PREREQUISITES);
+      plantTracker(root, ALL_TICKED);
+
+      const run = await drive(root, settingsOf([], []), scopedAnswers(failing));
+
+      expect(run.result).toBeNull();
+      expect(run.refusal?.exitCode).toBe(1);
+      expect(run.refusal?.message).toContain('preflight halted: 1 required item failed');
+      expect(run.refusal?.message).toContain(`tool ${JSON.stringify(item)}`);
+      // The tasks item is skipped all the same, and the halt is of the items left.
+      expect(run.probes).not.toContain(`${COMPILER_PROBE} in ${root}`);
+      expect(run.info[0]).toBe(`\n${scopeSkipLine(COMPILER)}`);
+    }
+  });
+
+  it('keeps a config item, which has no scope, and names the scope skips after the start-only ones', async () => {
+    const root = rootWithPrerequisites([
+      SCOPED_PREREQUISITES,
+      '## Starting state [start]',
+      `- [ ] ${CLEAN_CHECKOUT}`,
+      '',
+    ].join('\n'));
+    plantTracker(root, ALL_TICKED);
+
+    const run = await drive(root, settingsOf([BUN], []), { ...scopedAnswers(), 'bun --version': answered(0) });
+
+    expect(run.refusal).toBeNull();
+    expect(run.probes).toEqual([
+      `bun --version in ${root}`,
+      `${REMOTE_PROBE} in ${root}`,
+      `${LINTER_PROBE} in ${root}`,
+    ]);
+    expect(run.info).toEqual([
+      `\n${skipLine(CLEAN_CHECKOUT)}`,
+      scopeSkipLine(COMPILER),
+      CHECKING_ONE.replace('1 prerequisite', '3 prerequisite'),
+      '   Preflight passed.',
+    ]);
   });
 });
 

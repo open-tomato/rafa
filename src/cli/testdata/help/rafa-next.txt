@@ -27,7 +27,9 @@ Description:
   terminal result event, and under `--roadmap` the hops that ran as well.
 
 Spends:
-  🪙 when the step it runs is one of the above
+  🪙 when the step it runs starts a session: `plan` runs `rafa plan create` and
+  its one planning session, and `start` and `resume` run `rafa loop start` and
+  the sessions of its loop
 
 Flags:
   --dry-run       boolean

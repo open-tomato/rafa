@@ -56,7 +56,7 @@
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { OwnerResolution } from '../../board/owner-resolve.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { Place } from '../../project/position.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -66,8 +66,8 @@ import { createOwnerResolver } from '../../board/owner-resolve.js';
 import { resolvePlace } from '../../board/place.js';
 import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { ROADMAP_LABEL } from '../../board/setup.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 
@@ -252,4 +252,5 @@ export function createBoardListCommand(seams: BoardListSeams = {}): RafaCommand 
   return Object.freeze(command);
 }
 
-export default createBoardListCommand();
+const command: RafaCommand = createBoardListCommand();
+export default command;
