@@ -69,7 +69,7 @@ export interface EpicCost {
 }
 
 /** The line under the cost; see the module note. */
-export const MEMBERSHIP_NOTE =
+export const MEMBERSHIP_NOTE: string =
   'cost follows membership at close time: it counts the sessions of the issues in the epic now, '
   + 'so work on an issue moved out is not counted and work on an issue moved in is';
 

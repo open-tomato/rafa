@@ -106,7 +106,7 @@ const OPENING = 'effort sync';
  * this class: any error whose `name` is {@link HUB_UNREACHABLE} counts.
  */
 export class HubUnreachable extends Error {
-  override readonly name = HUB_UNREACHABLE;
+  override readonly name: 'HubUnreachable' = HUB_UNREACHABLE;
 }
 
 /** Whether a thrown value says the hub was unreachable; see the module note. */
