@@ -27,6 +27,7 @@ import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../sui
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';
 
+import { OUTSIDE_CASE_REASON } from './suite-outside-case.js';
 import {
   alwaysRunJunitFileFor,
   blockerText,
@@ -353,8 +354,8 @@ describe('runTaskStep', () => {
     expect(linesAt('warn').some((line) => line.includes('runs the full suite'))).toBe(true);
   });
 
-  it('is red on more errors outside any test than the baseline counted, and not on as many', async () => {
-    const atBaseline = contextWith([result({ exitCode: 1, errors: 1 })]);
+  it('is red on more errors outside any test than the baseline counted, and not on as many beside a known failure', async () => {
+    const atBaseline = contextWith([red([KNOWN], { errors: 1 })]);
     const same = await runTaskStep(atBaseline.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(same.red).toBe(false);
     // As many as the baseline is no excess, so the step is not retaken.
@@ -364,6 +365,42 @@ describe('runTaskStep', () => {
     const outcome = await runTaskStep(more.context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toContain('1 more error(s) outside any test');
+  });
+
+  it('is red on a nonzero exit listing no failing case, though the baseline counts as many errors (#945)', async () => {
+    const tail = ['error: Cannot find package \'zod\' from \'/repo/src/a.test.ts\'', ' 0 pass', ' 1 fail', ' 1 error', 'Ran 1 test across 1 file. [1.00ms]'];
+    const { context, seen } = contextWith([result({ exitCode: 1, errors: 1, outputTail: tail })]);
+    const outcome = await runTaskStep(context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
+
+    expect(outcome.red).toBe(true);
+    // No excess of errors over the baseline's, so the step is not retaken.
+    expect(seen.runs).toHaveLength(1);
+    expect(seen.steps).toEqual([{ ...seen.steps[0]!, exitCode: 1, failures: [], newFailures: [], outsideCase: true, outputTail: tail }]);
+    expect(outcome.blocker).toContain(`bun test exited 1 and listed no failing test: ${OUTSIDE_CASE_REASON}.`);
+    expect(outcome.blocker).toContain('Cannot find package \'zod\'');
+    expect(outcome.blocker).not.toContain('more error(s) outside any test');
+    const next = findNextTask(readFileSync(trackerPath, 'utf8'));
+    expect(next?.task).toBe(`Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}`);
+    expect(next?.blocker).toBe(outcome.blocker ?? '');
+  });
+
+  it('is green on the same exit and error count once the run lists a known failing case, recording no outsideCase key', async () => {
+    const { context, seen } = contextWith([red([KNOWN], { errors: 1, outputTail: [' 1 fail', ' 1 error'] })]);
+    const outcome = await runTaskStep(context, { ...input, baseline: { ...baselineWith(), errors: 1 } });
+
+    expect(outcome.red).toBe(false);
+    expect(Object.keys(seen.steps[0] ?? {})).toEqual(['kind', 'scope', 'reason', 'command', 'exitCode', 'summary', 'failures', 'newFailures']);
+    expect(readFileSync(trackerPath, 'utf8')).toBe(TRACKER);
+  });
+
+  it('records a step stopped by the runner\'s SIGINT as interrupted and never as failed outside any case', async () => {
+    const { context, seen } = contextWith([result({ exitCode: 1, errors: 1, outputTail: [' 1 error'] })]);
+    const outcome = await runTaskStep(interruptedBy(context, true), { ...input, baseline: { ...baselineWith(), errors: 1 } });
+
+    expect(outcome).toMatchObject({ red: false, interrupted: true, blocker: null });
+    expect(seen.steps[0]?.interrupted).toBe(true);
+    expect(seen.steps[0]?.outsideCase).toBeUndefined();
+    expect(seen.steps[0]?.outputTail).toBeUndefined();
   });
 
   it('is red on a nonzero exit with no summary line', async () => {
@@ -440,6 +477,20 @@ describe('a step with errors outside any test', () => {
     expect(outcome.red).toBe(true);
     expect(outcome.blocker).toContain(`src/boom.test.ts threw "${thrown.firstLine}"`);
     expect(findNextTask(readFileSync(trackerPath, 'utf8'))?.blocker).toBe(outcome.blocker ?? '');
+    expect(linesAt('warn').some((line) => line.includes('Intermittent'))).toBe(false);
+  });
+
+  it('halts on a retake at the baseline\'s count that still lists no failing case, printing no intermittent line', async () => {
+    const baseline = { ...baselineWith(), errors: 1 };
+    const more = result({ exitCode: 1, errors: 2, unhandled: [thrown] });
+    const { context, seen } = contextWith([more, result({ exitCode: 1, errors: 1, outputTail: [' 1 error'] })]);
+    const outcome = await runTaskStep(context, { ...input, baseline });
+
+    expect(seen.runs).toHaveLength(2);
+    expect(seen.steps.map((step) => step.outsideCase)).toEqual([true, true]);
+    expect(outcome.red).toBe(true);
+    expect(outcome.blocker).toContain(OUTSIDE_CASE_REASON);
+    expect(outcome.blocker).not.toContain('more error(s) outside any test');
     expect(linesAt('warn').some((line) => line.includes('Intermittent'))).toBe(false);
   });
 
@@ -1199,7 +1250,7 @@ describe('runPreWrapUpStep', () => {
 
 describe('blockerText', () => {
   it('names each new file once with its count and the command running them', () => {
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false });
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, { fresh: [FRESH, KNOWN, FRESH_TWO], known: [], newErrors: 0, unreported: false, outsideCase: false });
     expect(text).toContain('src/new.test.ts (2 tests), src/old.test.ts (1 test)');
     expect(text).toContain('Run bun test ./src/new.test.ts ./src/old.test.ts');
     expect(text).not.toContain('\n');

@@ -94,10 +94,15 @@
  *
  * A step is red when it has a failure the baseline does not hold (a test
  * file and full test name, compared as a pair: `splitFailures`), when it
- * counts more errors outside any test than the baseline counted, or when
+ * counts more errors outside any test than the baseline counted, when
  * it exited nonzero with no summary line, so that Bun reported nothing
- * this module could read; a task step is also red on a red lint or a red
- * type step (above).
+ * this module could read, or when it exited nonzero and listed no
+ * failing case at all, whatever the baseline holds
+ * (`failedOutsideAnyCase`, `suite-outside-case.ts`, whose note is the
+ * account of it, #945); a task step is also red on a red lint or a red
+ * type step (above). A step red that last way is recorded with
+ * `outsideCase: true` and its run's `outputTail`, and its blocker
+ * quotes the tail's end.
  * Known failures are printed as known and never make a step red. The
  * error rule compares a scoped run's count against the FULL baseline's,
  * so an inherited load error outside the scope can hide a new one inside
@@ -110,7 +115,8 @@
  * an error can come from a file that throws on one load and not the
  * next. The first run is recorded and printed with the file and first
  * line of each error, then the retake is settled as the step. A retake
- * holding no more errors than the baseline prints one `Intermittent`
+ * holding no more errors than the baseline, and not failed outside any
+ * test case, prints one `Intermittent`
  * warning naming the first run's files and lines, and blocks nothing;
  * a retake over the count again is red, and halts the run as any red
  * step does. The retake writes over the first run's JUnit and output
@@ -279,6 +285,7 @@ import { findNextTask } from '../utils/tracker.js';
 
 import { runEslint } from './lint-step.js';
 import { blockerText, isRepairTask, unhandledNames, writeRepairTask } from './suite-blocker.js';
+import { failedOutsideAnyCase, outsideCaseRecord } from './suite-outside-case.js';
 import { announceStepOnly, stillRedIn, takeRetakes, withoutStepOnly } from './suite-retake-alone.js';
 import { reportSlowSweeps } from './sweep-timing.js';
 import { foldResults, readTaskAlwaysRun, withAlwaysRun } from './task-always-run.js';
@@ -549,7 +556,7 @@ export function verdictOf(result: SuiteResult, baseline: SuiteBaseline | null): 
   const { fresh, known } = splitFailures(result.failures, baseline);
   const newErrors = Math.max(0, (result.errors ?? 0) - (baseline?.errors ?? 0));
   const unreported = result.exitCode !== 0 && result.summary === null && result.noTestFiles !== true;
-  return { fresh, known, newErrors, unreported };
+  return { fresh, known, newErrors, unreported, outsideCase: failedOutsideAnyCase(result) };
 }
 
 /** True when `result` ended on SIGINT or the runner received it; see the module note. */
@@ -559,7 +566,7 @@ export function isStepInterrupted(context: Pick<SuiteStepContext, 'isInterrupted
 
 /** True when a verdict blocks. */
 function isRed(verdict: StepVerdict): boolean {
-  return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported;
+  return verdict.fresh.length > 0 || verdict.newErrors > 0 || verdict.unreported || verdict.outsideCase;
 }
 
 /** A new failure as the run record holds it: its pair, and its error lines when Bun printed any. */
@@ -571,10 +578,10 @@ function recordedFailure(failure: SuiteFailure): SuiteFailure {
 
 /**
  * The step the run record holds for `result`, its `reason` right after
- * its scope when it has one and `stepOnly` last when it holds a file;
- * see the module note.
+ * its scope when it has one, `stepOnly` when it holds a file, and last
+ * what a run failed outside any test case keeps; see the module note.
  */
-function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, fresh: readonly SuiteFailure[], stepOnly: readonly SessionStepOnly[] = []): SessionStep {
+function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: SuiteResult, verdict: Pick<StepVerdict, 'fresh' | 'outsideCase'>, stepOnly: readonly SessionStepOnly[] = []): SessionStep {
   const { kind, scope, reason } = settling;
   return {
     kind,
@@ -586,10 +593,11 @@ function stepOf(settling: Pick<Settling, 'kind' | 'scope' | 'reason'>, result: S
     exitCode: result.exitCode,
     summary: result.summary,
     failures: result.failures.map((failure) => ({ file: failure.file, name: failure.name })),
-    newFailures: fresh.map(recordedFailure),
+    newFailures: verdict.fresh.map(recordedFailure),
     ...(stepOnly.length === 0
       ? {}
       : { stepOnly }),
+    ...outsideCaseRecord(verdict, result),
   };
 }
 
@@ -653,7 +661,7 @@ function checkBlockers(settling: Pick<Settling, 'lint' | 'types'>): readonly str
 /** Records an interrupted step and says the run stops on it, writing no blocker; see the module note. */
 function settleInterrupted(seams: Required<SuiteStepSeams>, settling: Settling): StepOutcome {
   const { kind, label, result } = settling;
-  const step: SessionStep = { ...stepOf(settling, result, []), interrupted: true };
+  const step: SessionStep = { ...stepOf(settling, result, { fresh: [], outsideCase: false }), interrupted: true };
   recordStep(seams, step);
   activeOutput().info(`🧪 ${label}: ${result.command.join(' ')} exited ${result.exitCode}; ${result.summary ?? 'no summary line'}`);
   activeOutput().info(`⏹  The ${label} was interrupted by SIGINT: read as a stop, not as failures, so no task is marked blocked.`);
@@ -665,7 +673,7 @@ export function settleStep(context: SuiteStepContext, seams: Required<SuiteStepS
   const { kind, label, result, baseline, alone } = settling;
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settleInterrupted(seams, settling);
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
-  const step = stepOf(settling, result, verdict.fresh, alone?.stepOnly);
+  const step = stepOf(settling, result, verdict, alone?.stepOnly);
   recordStep(seams, step);
   announce(label, result, verdict.known);
   announceStepOnly(context, settling);
@@ -704,13 +712,13 @@ export async function retakeOnErrors(context: SuiteStepContext, seams: Required<
   if (isStepInterrupted(context, result) || isCheckInterrupted(settling) || alone?.interrupted === true) return settling;
   const verdict = withoutStepOnly(verdictOf(result, baseline), alone);
   if (!isErrorsOnly(verdict, settling)) return settling;
-  recordStep(seams, stepOf(settling, result, verdict.fresh, alone?.stepOnly));
+  recordStep(seams, stepOf(settling, result, verdict, alone?.stepOnly));
   announce(label, result, verdict.known);
   const named = unhandledNames(result.unhandled);
   activeOutput().warn(`🔁 The ${label} counted ${verdict.newErrors} more error(s) outside any test than the baseline and nothing else red (${named}); taking it once more.`);
   const retake = await rerun();
   const again = verdictOf(retake, baseline);
-  if (again.newErrors === 0 && !isStepInterrupted(context, retake)) {
+  if (again.newErrors === 0 && !again.outsideCase && !isStepInterrupted(context, retake)) {
     activeOutput().warn(`⚠️  Intermittent: the retake of the ${label} counted no more errors outside any test than the baseline. The first run's: ${named}. The run goes on.`);
   }
   return alone === undefined

@@ -170,8 +170,9 @@ lines are kept in `.rafa/runs/<session>/suite/<kind>.output.txt`,
 beside the failed cases the next paragraph describes. A task,
 stage or pre-wrap-up step whose only red is that excess is taken once
 more over the same run (`src/start/suite-step.ts`). A retake at or under
-the baseline's count prints an `Intermittent` warning naming the first
-run's files and lines, and the run goes on; a retake over it again is
+the baseline's count, and not red by the next paragraph, prints an
+`Intermittent` warning naming the first run's files and lines, and the
+run goes on; a retake over it again is
 red, and the run halts as it does on any red step. Both runs are
 recorded, and the files on disk are the retake's. A step red on that
 excess AND on new failures runs its newly red files alone first
@@ -179,6 +180,19 @@ excess AND on new failures runs its newly red files alone first
 only red and the step is then taken once more, since state one file
 leaves behind can both fail a later file and throw between tests. The
 step's run is retaken once at most.
+
+**A run that exits nonzero and lists no failing case is red, whatever
+the baseline holds.** The exit code is the reading
+(`failedOutsideAnyCase`, `src/start/suite-outside-case.ts`), and no
+wording of Bun's stderr decides it. A task, stage or pre-wrap-up step
+is red on it even when the baseline counted as many errors, which is
+how a checkout whose test files never loaded reads on every run. Left
+as they were: a run Bun found no test file for, a SIGINT stop, and a
+run listing failures, which are split against the baseline as above.
+The blocker names the reason, `the run failed outside any test case`,
+and quotes the end of the run's stderr within a few hundred characters;
+the recorded step carries `outsideCase: true` and that tail whole as
+`outputTail`. A step red on this alone is not retaken.
 
 **A failed case's error is read from stderr, and the step keeps its
 first lines.** Bun 1.3.14, the pinned version, writes every thrown

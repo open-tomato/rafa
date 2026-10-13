@@ -4,8 +4,9 @@
  *
  * {@link blockerText} names each new failing test file with its count,
  * the command running them (`bun test <files>`), what Bun printed for
- * them, and the errors or the missing summary when those made the step
- * red. What Bun printed is the first error line of each new failure
+ * them, and the errors, the missing summary or the run that failed
+ * outside any test case when those made the step red. What Bun printed
+ * is the first error line of each new failure
  * (`suite/failure-lines.ts`), which the JUnit report does not hold:
  * quoted by file, each distinct line once with how many of the file's
  * tests printed it. The blocker is one tracker line, the repair task's
@@ -45,7 +46,14 @@
  * are named by file and first line, as Bun's stderr printed them
  * ({@link unhandledNames}): the JUnit report holds no file for them.
  * The baseline keeps only their count, so every block of the run is
- * named, the inherited ones included. Each path in a `bun test` command
+ * named, the inherited ones included. A run that exited nonzero and
+ * listed no failing case ({@link StepVerdict.outsideCase}) has that said
+ * in `outsideCaseText`'s sentence (`suite-outside-case.ts`): its exit
+ * code, `OUTSIDE_CASE_REASON`, and the end of the run's output tail,
+ * kept to a few hundred characters as the error lines are, by that
+ * module's own two caps. It follows the sentences on the errors and on
+ * the missing summary, which the same run can also be red on. Each path
+ * in a `bun test` command
  * is written as {@link runnablePath} spells it, `./` before a relative
  * one: bun reads an argument without `./` or `/` as a substring filter,
  * so a bare `x.test.ts` would also run `a/x.test.ts`.
@@ -91,6 +99,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parsePlan } from '../plan/parse.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 
+import { outsideCaseText } from './suite-outside-case.js';
+
 /** A step's failures split against the baseline, and what else can make it red. */
 export interface StepVerdict {
   readonly fresh: readonly SuiteFailure[];
@@ -98,6 +108,8 @@ export interface StepVerdict {
   readonly newErrors: number;
   /** True when Bun exited nonzero and printed no summary. */
   readonly unreported: boolean;
+  /** True when the run failed outside any test case (`failedOutsideAnyCase`, `suite-outside-case.ts`). */
+  readonly outsideCase: boolean;
 }
 
 /** Each file among `failures` and how many of its tests failed, in first-seen order. */
@@ -311,12 +323,13 @@ const STEP_ONLY_LEAD = 'Red only in the step, green alone: not yours to fix';
 /**
  * The blocker a red step writes: the new failing files with their
  * counts, the command running them and what Bun printed for them, then
- * the errors outside any test by file and first line, or the missing
- * summary, when those made it red. `label` names the step. `alone` is
+ * the errors outside any test by file and first line, the missing
+ * summary, or the run that failed outside any test case with the end of
+ * its output, when those made it red. `label` names the step. `alone` is
  * what the step's newly red files read when run alone, when they were:
  * see the module note.
  */
-export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled'>, verdict: StepVerdict, alone?: AloneSaid): string {
+export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' | 'unhandled' | 'outputTail'>, verdict: StepVerdict, alone?: AloneSaid): string {
   const files = failingFiles(verdict.fresh);
   const parts = [`The runner's ${label} found failures the suite baseline does not hold.`];
   const afterTouched = (alone?.afterTouched ?? []).filter((entry) => files.some(([file]) => file === entry.file));
@@ -338,6 +351,7 @@ export function blockerText(label: string, result: Pick<SuiteResult, 'exitCode' 
   if (afterTouched.length > 0) parts.push(afterTouchedText(afterTouched));
   if (verdict.newErrors > 0) parts.push(errorsText(verdict.newErrors, result.unhandled));
   if (verdict.unreported) parts.push(`bun test exited ${result.exitCode} and printed no summary line.`);
+  if (verdict.outsideCase) parts.push(outsideCaseText(result));
   const stepOnly = alone?.stepOnly ?? [];
   if (stepOnly.length > 0) parts.push(`${STEP_ONLY_LEAD}: ${stepOnly.map((entry) => `${entry.file} (${testCount(entry.tests.length)})`).join(', ')}.`);
   return parts.join(' ');

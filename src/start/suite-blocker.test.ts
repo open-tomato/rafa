@@ -3,11 +3,15 @@
  * relative path gains `./` so bun reads it as a path, not a substring
  * filter, and an absolute one is written as it is. Then the error lines
  * it quotes for the new failures, by file, and the caps that keep that
- * quote short on the tracker line. Then the pre-wrap-up
+ * quote short on the tracker line. Then the sentence on a run that
+ * failed outside any test case, which is `outsideCaseText`'s
+ * (`suite-outside-case.ts`), written only for a verdict holding that
+ * reading. Then the pre-wrap-up
  * repair {@link writeRepairTask} writes, over a real tracker file under a
  * temporary directory: inserted after the last task, or the ticked one
  * blocked again on a second red, each claim paired with its control.
  */
+import type { StepVerdict } from './suite-blocker.js';
 import type { SuiteFailure } from '../suite/run.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,8 +34,9 @@ import {
   runnablePath,
   writeRepairTask,
 } from './suite-blocker.js';
+import { OUTSIDE_CASE_REASON, outsideCaseText, TAIL_QUOTED_LENGTH } from './suite-outside-case.js';
 
-const verdict = (fresh: readonly SuiteFailure[], newErrors = 0) => ({ fresh, known: [], newErrors, unreported: false });
+const verdict = (fresh: readonly SuiteFailure[], newErrors = 0) => ({ fresh, known: [], newErrors, unreported: false, outsideCase: false });
 
 describe('runnablePath', () => {
   it('prefixes a relative path with ./ and leaves an absolute or ./-led one as it is', () => {
@@ -44,19 +49,19 @@ describe('runnablePath', () => {
 
 describe('blockerText paths', () => {
   it('writes a nested failing file with ./ before it', () => {
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: 'src/a/b/x.sweep.test.ts', name: 'x > y' }]));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([{ file: 'src/a/b/x.sweep.test.ts', name: 'x > y' }]));
     expect(text).toContain('Run bun test ./src/a/b/x.sweep.test.ts and make them pass.');
   });
 
   it('writes an absolute failing file as it is', () => {
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: '/repo/src/x.test.ts', name: 'x > y' }]));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([{ file: '/repo/src/x.test.ts', name: 'x > y' }]));
     expect(text).toContain('Run bun test /repo/src/x.test.ts and make them pass.');
     expect(text).not.toContain('./repo');
   });
 
   it('writes the files of errors outside any test the same way', () => {
     const unhandled = [{ file: 'src/a/boom.test.ts', firstLine: 'Error: x' }, { file: '/abs/boom.test.ts', firstLine: null }];
-    const text = blockerText('stage step', { exitCode: 1, unhandled }, verdict([], 2));
+    const text = blockerText('stage step', { exitCode: 1, unhandled, outputTail: [] }, verdict([], 2));
     expect(text).toContain('Run bun test ./src/a/boom.test.ts /abs/boom.test.ts and make each load.');
   });
 });
@@ -66,7 +71,7 @@ describe('blockerText error lines', () => {
   const thrown = (name: string): SuiteFailure => ({ file: 'src/utils/claude.test.ts', name, errorLines: [SPEND, 'second line'] });
 
   it('quotes the first error line of a file\'s new failures once, with how many tests printed it', () => {
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([thrown('a'), thrown('b'), thrown('c')]));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([thrown('a'), thrown('b'), thrown('c')]));
     expect(text).toBe([
       'The runner\'s task step found failures the suite baseline does not hold.',
       'New failing test files: src/utils/claude.test.ts (3 tests).',
@@ -85,28 +90,28 @@ describe('blockerText error lines', () => {
       { file: 'sub/two.test.ts', name: 'two > fourth', errorLines: ['error: first boom'] },
     ];
     expect(ERROR_LINES_QUOTED).toBe(1);
-    expect(blockerText('stage step', { exitCode: 1, unhandled: [] }, verdict(fresh))).toContain(
+    expect(blockerText('stage step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict(fresh))).toContain(
       'What Bun printed for them: sub/two.test.ts "error: first boom" (2 tests), and 1 more line; a.test.ts "this test timed out after 50ms." (1 test).',
     );
   });
 
   it('counts the lines of one file past the cap, and the files past theirs', () => {
     const lines = ['one', 'two', 'three', 'four', 'five'].map((word, index): SuiteFailure => ({ file: 'a.test.ts', name: `t${index}`, errorLines: [`error: ${word}`] }));
-    expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(lines))).toContain(
+    expect(blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict(lines))).toContain(
       'What Bun printed for them: a.test.ts "error: one" (1 test), and 4 more lines.',
     );
     const files = Array.from({ length: ERROR_FILES_QUOTED + 2 }, (_, index): SuiteFailure => ({ file: `f${index}.test.ts`, name: 't', errorLines: ['error: x'] }));
-    const text = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict(files));
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict(files));
     expect(text).toContain(`f${ERROR_FILES_QUOTED - 1}.test.ts "error: x" (1 test); and 2 more files.`);
     expect(text).not.toContain(`f${ERROR_FILES_QUOTED}.test.ts "error: x"`);
   });
 
   it('cuts a quoted line at the cap, marking the cut, and leaves a line at the cap whole', () => {
     const at = 'x'.repeat(ERROR_LINE_QUOTED_LENGTH);
-    const whole = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [at] }]));
+    const whole = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [at] }]));
     expect(whole).toContain(`a.test.ts "${at}" (1 test).`);
 
-    const cut = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [`${at}yz`] }]));
+    const cut = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([{ file: 'a.test.ts', name: 't', errorLines: [`${at}yz`] }]));
     expect(cut).toContain(`a.test.ts "${at}..." (1 test).`);
     expect(cut).not.toContain('xy');
   });
@@ -134,8 +139,8 @@ describe('blockerText error lines', () => {
 
   it('says nothing of what Bun printed when no new failure carries a line, and leaves out a file without one', () => {
     const bare: SuiteFailure = { file: 'src/bare.test.ts', name: 'x > y' };
-    expect(blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([bare]))).not.toContain('What Bun printed');
-    const mixed = blockerText('task step', { exitCode: 1, unhandled: [] }, verdict([bare, thrown('a')]));
+    expect(blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([bare]))).not.toContain('What Bun printed');
+    const mixed = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, verdict([bare, thrown('a')]));
     expect(mixed).toContain(`What Bun printed for them: src/utils/claude.test.ts "${SPEND}" (1 test).`);
     expect(mixed).toContain('New failing test files: src/bare.test.ts (1 test), src/utils/claude.test.ts (1 test).');
   });
@@ -148,6 +153,44 @@ const PRE_WRAP_UP_REPAIR = 'Repair the red pre-wrap-up step at commit 0123456789
 function finished(extra: readonly string[] = []): string {
   return ['# Plan: fixture', '', '# Stage: One', '', '- [x] first task', '- [x] second task', ...extra, '', 'Trailing prose.', ''].join('\n');
 }
+
+describe('blockerText and a run failed outside any test case', () => {
+  const tail = ['error: Cannot find package \'zod\' from \'/repo/src/a.test.ts\'', ' 0 pass', ' 1 fail', ' 1 error', 'Ran 1 test across 1 file. [1.00ms]'];
+  const outside = (part: Partial<StepVerdict> = {}): StepVerdict => ({ ...verdict([]), outsideCase: true, ...part });
+
+  it('names the reason and quotes the run\'s tail, as the sentence of suite-outside-case.ts', () => {
+    const result = { exitCode: 1, unhandled: [], outputTail: tail };
+    const text = blockerText('task step after "second task"', result, outside());
+    expect(text).toBe(`The runner's task step after "second task" found failures the suite baseline does not hold. ${outsideCaseText(result)}`);
+    expect(text).toContain(OUTSIDE_CASE_REASON);
+    expect(text).toContain('"error: Cannot find package \'zod\' from \'/repo/src/a.test.ts\'"');
+    expect(text).not.toContain('\n');
+  });
+
+  it('writes no such sentence for a verdict that is not that reading, whatever the tail holds', () => {
+    const text = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: tail }, verdict([{ file: 'src/x.test.ts', name: 'x > y' }]));
+    expect(text).not.toContain(OUTSIDE_CASE_REASON);
+    expect(text).not.toContain('Cannot find package');
+  });
+
+  it('follows the sentences on the errors and on the missing summary when the run is red on those too', () => {
+    const unhandled = [{ file: 'src/boom.test.ts', firstLine: 'error: boom' }];
+    const text = blockerText('stage step', { exitCode: 1, unhandled, outputTail: tail }, outside({ newErrors: 1, unreported: true }));
+    const errors = text.indexOf('1 more error(s) outside any test');
+    const silent = text.indexOf('printed no summary line');
+    const reason = text.indexOf(OUTSIDE_CASE_REASON);
+    expect(errors).toBeGreaterThan(-1);
+    expect(silent).toBeGreaterThan(errors);
+    expect(reason).toBeGreaterThan(silent);
+  });
+
+  it('keeps the sentence to a few hundred characters for a tail of forty long lines', () => {
+    const wide = Array.from({ length: 40 }, (_, index) => `${index} ${'z'.repeat(400)}`);
+    const short = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: [] }, outside());
+    const long = blockerText('task step', { exitCode: 1, unhandled: [], outputTail: wide }, outside());
+    expect(long.length - short.length).toBeLessThan(TAIL_QUOTED_LENGTH + 100);
+  });
+});
 
 describe('writeRepairTask for a pre-wrap-up step', () => {
   let dir: string;
