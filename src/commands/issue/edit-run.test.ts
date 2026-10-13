@@ -1,7 +1,9 @@
 /**
  * Tests for the run of `rafa issue edit` (`./edit-run.ts`): the line
  * rules, the four gates in order, `--dry-run`, the write, `already`, the
- * re-read with `conflict` and its two saved bodies, and the outcomes.
+ * re-read with `conflict` and its two saved bodies, and the outcomes. A
+ * `--priority` line is followed through the same run; its own rules are
+ * `./edit-priority.test.ts`'s.
  *
  * The run is driven over a fake tracker held in memory, whose `edit`
  * can be made to change the body around the write, and a stand-in `gh`
@@ -18,7 +20,7 @@
 import type { EditRequest } from './edit-run.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { RafaCommand } from '../../core/command/index.js';
-import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
+import type { EditableIssue, IssueDraft, IssueEdit, IssuePriority, IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -285,6 +287,12 @@ describe('readEditLine, the edits a line may ask for', () => {
     expect(readEditLine(['12'], { 'replace-file': 'b.md', title: 'New' })).toMatchObject({ kind: 'replace', title: 'New' });
     expect(readEditLine(['12'], { title: 'New' })).toMatchObject({ kind: 'title', title: 'New', source: null });
   });
+
+  it('reads a priority alone and with a title as a line of kind title, and no priority off a line without the flag', () => {
+    expect(readEditLine(['12'], { priority: 'high' })).toMatchObject({ kind: 'title', title: null, priority: 'high', source: null });
+    expect(readEditLine(['12'], { priority: 'low', title: 'New' })).toMatchObject({ kind: 'title', title: 'New', priority: 'low' });
+    expect(readEditLine(['12'], { title: 'New' }).priority).toBeUndefined();
+  });
 });
 
 describe('readEditLine, the refusals of the line, each exit 1 naming the usage', () => {
@@ -302,6 +310,11 @@ describe('readEditLine, the refusals of the line, each exit 1 naming the usage',
     ['--while-in-development beside a replace', ['12'], { 'replace-file': 'b.md', 'while-in-development': true }, 'goes with an append only'],
     ['--while-in-development beside a title', ['12'], { title: 'New', 'while-in-development': true }, 'goes with an append only'],
     ['a blank reason', ['12'], { append: TEXT, reason: '  ' }, '--reason cannot be blank'],
+    ['a priority beside an append', ['12'], { priority: 'high', append: TEXT, reason: REASON }, '--priority and --append cannot be used together'],
+    ['a priority beside a replace', ['12'], { priority: 'high', 'replace-file': 'b.md' }, '--priority and --replace-file cannot be used together'],
+    ['a priority outside the four', ['12'], { priority: 'soon' }, '--priority is "soon", expected one of: '],
+    ['a reason beside a priority', ['12'], { priority: 'high', reason: REASON }, '--reason goes with an append only'],
+    ['--while-in-development beside a priority', ['12'], { priority: 'high', 'while-in-development': true }, 'goes with an append only'],
     ['a title typed bare', ['12'], { title: true }, '--title needs a value'],
     ['a value given to --dry-run', ['12'], { title: 'New', 'dry-run': 'maybe' }, '--dry-run takes no value'],
   ];
@@ -444,6 +457,85 @@ describe('runIssueEdit, replace and title', () => {
     expect(made.outcome).toBe('replaced');
     expect(fake.edits).toEqual([{ title: 'Renamed' }]);
     expect(fake.held().body).toBe(COMPLETE);
+  });
+});
+
+describe('runIssueEdit, a priority', () => {
+  /** A request for `priority`, of the kind a `--priority` line reads as. */
+  function priorityRequest(priority: IssuePriority, over: Partial<EditRequest> = {}): EditRequest {
+    return { ...appendRequest(), kind: 'title', text: null, reason: null, priority, ...over };
+  }
+
+  it('sets the priority in one write, the body and the title untouched', async () => {
+    const fake = fakeTracker({ priority: null, labels: [SPEC_LABEL, 'needs-triage'] });
+
+    const made = await run(fake, priorityRequest('high'));
+
+    expect(made).toMatchObject({ outcome: 'replaced', exitCode: 0, written: true });
+    expect(fake.edits).toEqual([{ priority: 'high' }]);
+    expect(fake.held()).toMatchObject({ body: COMPLETE, title: TITLE, priority: 'high' });
+    expect(made.message).toBe('Set the priority of github issue 12 to high; it is out of triage.');
+  });
+
+  it('writes a title beside the priority in the same write', async () => {
+    const fake = fakeTracker({ priority: 'low' });
+
+    const made = await run(fake, priorityRequest('urgent', { title: 'Renamed' }));
+
+    expect(fake.edits).toEqual([{ title: 'Renamed', priority: 'urgent' }]);
+    expect(made.message).toContain('Changed the title of github issue 12 and set its priority to urgent');
+  });
+
+  it('answers already and writes nothing for a priority the issue holds alone', async () => {
+    const fake = fakeTracker({ priority: 'high', labels: [SPEC_LABEL, 'priority:high'] });
+
+    const made = await run(fake, priorityRequest('high'));
+
+    expect(made).toMatchObject({ outcome: 'already', exitCode: 0, written: false });
+    expect(fake.edits).toEqual([]);
+    expect(made.message).toContain('already holds priority high');
+  });
+
+  it('prints the swap under --dry-run and writes nothing', async () => {
+    const fake = fakeTracker({ priority: null, labels: [SPEC_LABEL, 'needs-triage'] });
+
+    const made = await run(fake, priorityRequest('high', { dryRun: true }));
+
+    expect(made).toMatchObject({ outcome: 'replaced', written: false, added: 'priority: needs-triage → high' });
+    expect(made.readings.map((reading) => reading.gate)).toEqual(['editor', 'author', 'text', 'state']);
+    expect(renderEditReport(made).slice(-3)).toEqual([
+      'added:',
+      'priority: needs-triage → high',
+      '--dry-run: nothing was written; the edit would answer replaced.',
+    ]);
+    expect(fake.edits).toEqual([]);
+  });
+
+  it('refuses a closed issue at gate 4, as it refuses a title change on one', async () => {
+    const fake = fakeTracker({ priority: null, open: false });
+
+    const refusal = await refusalOf(run(fake, priorityRequest('high')));
+
+    expect(refusal.refusal).toBe('closed');
+    expect(fake.edits).toEqual([]);
+  });
+
+  it('refuses with exit 1 a tracker whose editable reads no priority', async () => {
+    const fake = fakeTracker();
+
+    const running = run(fake, priorityRequest('high'));
+
+    await expect(running).rejects.toMatchObject({ exitCode: 1, message: expect.stringContaining('cannot set a priority') });
+    expect(fake.edits).toEqual([]);
+  });
+
+  it('answers conflict for a priority the tracker did not keep', async () => {
+    const fake = fakeTracker({ priority: null }, { afterEdit: (issue) => ({ ...issue, priority: null }) });
+
+    const made = await run(fake, priorityRequest('high'));
+
+    expect(made).toMatchObject({ outcome: 'conflict', exitCode: 1, written: true });
+    expect(fake.edits).toEqual([{ priority: 'high' }]);
   });
 });
 

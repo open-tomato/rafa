@@ -1,20 +1,23 @@
 /**
- * `rafa issue edit <n>`: one issue's body appended to, its body replaced
- * or its title changed, after four gates, and the outcome
- * (`.rafa/specs/rafa-812-spec-rafa-issue-edit.md`). The run, its gates
- * and its outcomes live in `./edit-run.ts`; this module declares the
- * command and prints what a run came to.
+ * `rafa issue edit <n>`: one issue's body appended to, its body
+ * replaced, its title changed or its priority set, after four gates, and
+ * the outcome (`.rafa/specs/rafa-812-spec-rafa-issue-edit.md`). The run,
+ * its gates and its outcomes live in `./edit-run.ts`, and what
+ * `--priority` adds to a run in `./edit-priority.ts`; this module
+ * declares the command and prints what a run came to.
  *
  * It is an atomic action of the `issue` subject: it edits and answers.
- * It never re-plans, re-labels or refreshes a saved spec copy; a
- * `stale-copy` names `rafa plan create --issue=<n> --refresh` and stops
- * there.
+ * It never re-plans or refreshes a saved spec copy; a `stale-copy` names
+ * `rafa plan create --issue=<n> --refresh` and stops there. The one
+ * re-labelling it does is `--priority`'s: the priority swapped and the
+ * issue taken out of triage, in the same write.
  *
  * ## What it prints
  *
  * In text mode, the lines `renderEditReport` gives: the outcome's
  * sentence, and under `--dry-run` each gate's reading and the added part
- * before it. In json mode the terminal result's `data` is the
+ * before it, which for a priority is the swap, `priority: needs-triage →
+ * high`. In json mode the terminal result's `data` is the
  * `IssueEditResult`: the report and the tracker it went through.
  *
  * ## Exit codes
@@ -31,8 +34,10 @@
 import type { EditSeams } from './edit-run.js';
 import type { RafaCommand } from '../../core/command/index.js';
 
+import { ISSUE_PRIORITIES } from '../../adapters/tracker/issue-values.js';
 import { CommandExit } from '../../core/command/index.js';
 
+import { PRIORITY_FLAG } from './edit-priority.js';
 import { editIssue, renderEditReport } from './edit-run.js';
 
 /** The seams the registered command runs with: the system's own, every one. */
@@ -52,7 +57,9 @@ export function createIssueEditCommand(seams: EditSeams = DEFAULT_EDIT_SEAMS): R
       + ' allowing the edit. An append (`--append-file` or `--append`, with `--reason`) adds a block'
       + ' `**Updated <YYYY-MM-DD>, <reason>:**` below the body, leaving the original part byte for byte; the'
       + ' same block already closing the body answers `already`. `--replace-file` replaces the body and'
-      + ' `--title` the title. After the write the issue is read again: a body that no longer holds what was'
+      + ' `--title` the title. `--priority` sets the priority, removes every other and takes the issue out'
+      + ' of triage in one write, alone or beside `--title`, weighed by the gates as a title change; a priority'
+      + ' the issue already holds alone answers `already`. After the write the issue is read again: a body that no longer holds what was'
       + ' written answers `conflict` with exit code 1, the bodies read before and after saved under'
       + ' `.rafa/scratch/`. An append on an issue already planned answers `stale-copy` and names'
       + ' `rafa plan create --issue=<n> --refresh`, which it never runs. `--dry-run` prints each gate\'s'
@@ -70,12 +77,12 @@ export function createIssueEditCommand(seams: EditSeams = DEFAULT_EDIT_SEAMS): R
       {
         name: 'append-file',
         description: 'A file holding the text to append, read whole; `-` reads standard input.'
-          + ' Needs --reason. Not with --append, --replace-file or --title.',
+          + ' Needs --reason. Not with --append, --replace-file, --title or --priority.',
         type: 'string',
       },
       {
         name: 'append',
-        description: 'The text to append. Needs --reason. Not with --append-file, --replace-file or --title.',
+        description: 'The text to append. Needs --reason. Not with --append-file, --replace-file, --title or --priority.',
         type: 'string',
       },
       {
@@ -85,12 +92,18 @@ export function createIssueEditCommand(seams: EditSeams = DEFAULT_EDIT_SEAMS): R
       },
       {
         name: 'replace-file',
-        description: 'A file holding the new body, read whole; `-` reads standard input. Not with an append.',
+        description: 'A file holding the new body, read whole; `-` reads standard input. Not with an append or --priority.',
         type: 'string',
       },
       {
         name: 'title',
-        description: 'The new title, alone or beside --replace-file. Not with an append.',
+        description: 'The new title, alone or beside --replace-file or --priority. Not with an append.',
+        type: 'string',
+      },
+      {
+        name: PRIORITY_FLAG,
+        description: `The new priority, one of ${ISSUE_PRIORITIES.join(', ')}: it replaces the one the issue holds and takes`
+          + ' the issue out of triage. Alone or beside --title. Not with an append or --replace-file.',
         type: 'string',
       },
       {
@@ -116,6 +129,10 @@ export function createIssueEditCommand(seams: EditSeams = DEFAULT_EDIT_SEAMS): R
       {
         cmd: 'rafa issue edit 57 --title="Faster plan show"',
         note: 'Changes the title of #57 and leaves its body alone.',
+      },
+      {
+        cmd: 'rafa issue edit 57 --priority=high --dry-run',
+        note: 'Prints each gate\'s reading and the swap, such as `priority: needs-triage → high`, and writes nothing.',
       },
       {
         cmd: 'rafa issue edit 57 --replace-file=spec.md --output=json',
