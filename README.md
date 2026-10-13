@@ -182,9 +182,11 @@ the next one, so you rarely have to remember it.
    stored, one commit. A task that reports `blocked` is marked and the
    run stops with the reason; fix what it names and start again, and the
    blocked task goes first. After the last task a wrap-up session syncs
-   with the base, commits a release fragment when the project has them
-   (the plan's level and notes), pushes, opens the pull request and waits
-   for CI, spending repair sessions on a red one.
+   with the base and rewrites the release fragment's notes into changelog
+   lines, when the project has fragments. The loop writes the fragment
+   (the plan's level and notes) and commits it, pushes, opens the pull
+   request and waits for CI, spending repair sessions on a red one. The
+   version and the changelog are left to `rafa release settle`.
 
    From another terminal: `rafa loop status`, `rafa loop pause` (after the
    running task), `rafa loop stop` (now).
@@ -205,12 +207,12 @@ the next one, so you rarely have to remember it.
 
 ### Release fragments and settling
 
-A branch no longer owns a version number. Instead, the wrap-up commits a
-release fragment (a small markdown file naming the plan, level and notes),
-and `rafa release settle` assigns the version on the base branch after
-merges. This lets several branches merge in any order without a version
-collision: whichever machine settles first releases all waiting fragments
-under one version.
+A branch no longer owns a version number. Instead, the loop's wrap-up
+writes and commits a release fragment (a small markdown file naming the
+plan, level and notes), and `rafa release settle` assigns the version and
+folds the changelog on the base branch after merges. This lets several
+branches merge in any order without a version collision: whichever
+machine settles first releases all waiting fragments under one version.
 
 The pull request shows a forecast of what version the branch would get if
 merged now. The fragment is stored under `release.fragments` (default

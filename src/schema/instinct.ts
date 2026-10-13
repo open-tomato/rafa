@@ -806,13 +806,20 @@ export function writeInstinct(instinct: Instinct, newline = '\n'): string {
 }
 
 /**
- * `instinct` as the Learning port reads it: the merge fields and
- * nothing else. `status` is `active` because a record is only flagged
- * by a merge that found a rival action, which is the port's decision
- * and never the file's; `kind`, `domain`, `scope`, `project_id`,
- * `source`, `evidence`, `sources`, `promoted_to` and the cause stay
- * behind in the file, which remains the record of where the instinct
- * came from.
+ * `instinct` as a record of the Learning port, with the port's required
+ * fields and `artifact`. `status` is `active` because a record is only
+ * flagged by a merge that found a rival action, which is the port's
+ * decision and never the file's.
+ *
+ * `kind`, `domain`, `scope`, `project_id`, `source`, `evidence` and the
+ * cause stay behind in the file, which remains the record of where the
+ * instinct came from: the port's record has no field for them.
+ *
+ * `sources` and `promoted_to` are left out too, although the port's
+ * record has an optional field for each. A record this function answers
+ * therefore reads as one with no sources kept and not promoted, whatever
+ * the file says. `toHeldRecord` in `src/adapters/learning/held.ts` is the
+ * conversion that carries both.
  *
  * `artifact` is omitted rather than written empty when the record
  * names none, so a payload never claims a recurrence key of `''`.

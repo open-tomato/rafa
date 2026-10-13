@@ -11,7 +11,7 @@ before running or suggesting any `gh`, `rafa` or branch-cleanup command.
 ## Testing a change
 
 An isolated or small change is tested at its own scope. The full suite
-takes about 20 minutes a pass, so it is never the quick check:
+takes 6.4 minutes a pass, so it is never the quick check:
 
 - `changed`: `bun test --changed=<base>`, with `tsc` and `eslint` on the
   changed files. The default.

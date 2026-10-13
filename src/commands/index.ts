@@ -381,10 +381,10 @@
  * command runs (`src/cli/dispatch.ts`), unless the command declares it
  * among its `lastingAliases`, as `epic show` declares `epic`.
  *
- * The subjects are the eighteen with an action registered: a subject with
- * none would show in every roster and dispatch nothing. `skill index` is
- * in the command tree and is not registered, because nothing dispatches
- * it yet.
+ * The subjects are those `CORE_SUBJECTS` lists, each with an action
+ * registered: a subject with none would show in every roster and
+ * dispatch nothing. `skill index` is in the command tree and is not
+ * registered, because nothing dispatches it yet.
  */
 import type { SubjectSpec } from '../cli/registry.js';
 import type { RafaCommand } from '../core/command/index.js';

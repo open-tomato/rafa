@@ -31,7 +31,7 @@ module's note is the long form.
 | `src/schema/scope-records.ts` | the two instinct scopes read as records: which files in a scope are records, what one file reads as, `readScope` and `readScopes`; read by both commands, the local Learning adapter and the skills report |
 | `src/commands/release/` | `release status`, the version `release.versionFile` declares, the latest release tag by semantic version precedence, the versions `release.changelog` calls released that carry no tag, the change notes pending for the current plan and the fragments waiting on `origin/<pr.base>` as last fetched with their settle forecast (`status-fragments.ts`) and the audit of the changelog's released history (`src/release/audit.ts`), writing nothing; `release settle`, below; and `release tag [--push]`, which puts `v<version>` on the commit of the release branch that set the version and prints the push and publish lines rather than running them; with `--push` it pushes the tag to the remote the release branch tracks (`origin` when it tracks none) through `src/release/tag-push.ts` and drops the push line, and a push that fails exits 1 with git's words and keeps the local tag |
 | `src/commands/release/settle.ts` | `rafa release settle [--dry-run]`: fetches `origin/<pr.base>` (`main` when unset) and works in the scratch worktree `withSettleWorktree` adds and removes (`src/release/settle-worktree.ts`), so the caller's checkout and index are never touched. `--dry-run` answers `readSettle` at the worktree's `HEAD` and writes nothing; otherwise `release.settle` picks `settleByPush` or `settleByPr`, the latter resolving the `gh` provider first as every `pr` action does (exit 2 without one), and `tagSettle` applies `release.tag`. Every run prints the strategy, the base commit and version, the fragments in fold order (path, level, title, add date and commit) and, for a fold that answered, `Version: <base> → <next>`, then one line for the delivery and one for a tag. Exit 0 for a dry run that folded or found nothing, a delivery that landed, a push another settle superseded and nothing to settle; exit 1 for an unfetchable or unreadable base, a fragment that does not parse (none is folded), a strategy that threw, an unbuilt commit, a refused or protected push, a failed pull request step and a failed tag after a landed push, the reading printed above the refusal either way. In json mode a run exiting 0 gives the reading, the delivery, the tag and the project refresh as the terminal result's data. With `board.project.number` set, a push that left the base without the folded fragments is followed by the project refresh of `settle-project.ts`: the issues closed by the pull requests that added them, read off `associatedPullRequests` through `gh api graphql`, each line a warning that keeps the exit code. Assembles no `git` or `gh` argv of its own, starts no session and declares no `spends` |
-| `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing; `board sync [--dry-run] [--output=json]`, every item of the repository's GitHub project refreshed (over `src/board/project/refresh.ts`) and every open issue missing from it added (no refresh with `board.project.number` unset), reading nothing and starting no session so it declares no `spends`. `--dry-run` prints each change without writing; `--output=json` prints the changes as the result's data. Each run warns about failures (the `project` scope missing, a rate-limit refusal, an unknown field), names the fix, and keeps the exit code at 0. No auto-add rule is set, and with the project unset the command does nothing and exits 0 |
+| `src/commands/board/` | `board list`, every open `type:roadmap` board and the default board when it lacks the label, one line each with its owner and whether GitHub resolves it, its epic count, and the `current` and `home` marks, read off one board listing and writing nothing; `board sync [--dry-run] [--output=json]`, every item of the repository's GitHub project refreshed (over `src/board/project/refresh.ts`) and every open issue missing from it added (no refresh with `board.project.number` unset), reading nothing and starting no session so it declares no `spends`. `--dry-run` prints each change without writing; `--output=json` prints the changes as the result's data. Each run warns about failures (the `project` scope missing, a rate-limit refusal, an unknown field) and names the fix; a missing `project` scope, a number naming no project and a rate-limit refusal exit 2 (`BOARD_SYNC_REFUSAL_EXIT`, `src/commands/board/sync.ts`), and an unknown field keeps the exit code at 0. No auto-add rule is set, and with `board.project.number` unset the command refuses with exit 1 naming `rafa init --board --project` |
 | `src/board/relations/port.ts` | the `BoardRelations` interface and its adapters: `mode` (one of `labels` or `native`), the three reading functions (`epicOf`, `membersOf`, `blockersOf` with their truncation reading, `freedBy`), the three writing functions' types (to be called through the `GhRunner` seam), and the per-mode listing fields that `BOARD_LIST_FIELDS` carries to the cache |
 | `src/board/relations/labels.ts` | the `labels` adapter, delivering `labels` mode: membership from `epic:<slug>` labels, order from the epic's checklist, waiting from `spec:blocked` labels and `Blocked by:` lines with the four faults, and `readUnblockableIssues` read by the unblock step of `pr merge` |
 | `src/board/relations/native.ts` | the `native` adapter, delivering `native` mode: membership from the `parent` field, order from the `subIssues` array if `gh` answers it (the checklist otherwise), waiting from `blockedBy` nodes each with their state, and `readFreedIssues` read by `pr merge` to print what a merge freed |
@@ -435,15 +435,16 @@ New; it replaces no earlier text. What a row or an action added to
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
-- **`loop start --create-branch` creates the feature branch when on main or
-  master** (`start/run-config.ts`): when the working directory is checked
-  out on `main` or `master`, the flag creates `feat/<stub>` from the latest
-  `origin/<base>`, where `<base>` is the tracking branch of the default
-  branch, instead of printing a checkout instruction. Without the flag, the
-  loop prints the command to run. The flag is read from the parsed line and
-  handed into `start`, which resolves the plan from `.rafa/plans/` unless
-  `plan.dir` in the config names another directory, then uses that plan's
-  stub to name the new branch.
+- **`loop start --create-branch` creates the feature branch when on
+  `main`, `master` or a detached HEAD** (`start/run-setup.ts`): when the
+  working directory is checked out on `main` or `master`, or on no branch
+  at all, the flag creates `feat/<stub>` from the latest `origin/<base>`,
+  where `<base>` is `pr.base` when set, else `origin/HEAD`. Without the
+  flag a terminal asks the same question, and any other run is refused,
+  naming the flag. The flag is read from the parsed line and handed into
+  `start`, which resolves the plan from `.rafa/plans/` unless `plan.dir`
+  in the config names another directory, then uses that plan's stub to
+  name the new branch.
 - **`loop start --roadmap` stamps the away hop on the session record**
   (`start/session.ts`): `rafa next --roadmap` passes the flag to the loop
   it starts, and the run's `.rafa/runs/<session-id>.json` then carries the
@@ -752,12 +753,15 @@ New; it replaces no earlier text. What a row or an action added to
   before. Both read the mode the dispatcher sets beside the active
   output. `src/tests/loop-output.test.ts` spawns `loop start` in both
   modes.
-- **A wrap-up that could not open its PR still ends `ok`.**
+- **A wrap-up without a pull request ends by `pr.provider`.**
   `preserveProgress` (`start/wrap-up.ts`) reads only the wrap-up
-  session's exit code, and a `gh pr create` failing inside that session,
-  as it does with no GitHub remote, is the session's own tool use: it
-  ends 0, so the terminal `result` reads `ok: true`. Only the wrap-up's
-  `log` lines say the PR was not opened.
+  session's exit code, so a `gh pr create` that fails inside the session,
+  as with no GitHub remote, still lets the run on. Under
+  `pr.provider: none` the run ends `done` with a `no-pr` event and no
+  retry follows. Under a provider the `loop.wrapUp.retries` sessions come
+  first, then the runner opens the pull request (`start/wrap-up-run.ts`),
+  and a delivery that cannot open it ends the run `stopped` with exit
+  code 1, its message ending with `DELIVERY_BLOCKED_TAIL`.
 - **What json mode gives for the others**: `effort report` gives the
   report as the terminal result's `data`, the document phase 0's `--json`
   printed with the task report tallies, the preflight halts and the
@@ -2428,10 +2432,12 @@ New; it replaces no earlier text. What a row or an action added to
   `done` finishes since the session started
   (`effort/store/task-finishes.ts`). `list` lists every live record and
   reads no branch; a row names each session's branch and end with the
-  `worktree` column (`src/commands/loop/loop-sessions.ts`): the path to the
-  worktree if the run was started with `--as-worktree` (`start/session.ts`),
-  or `in the main checkout` if the checkout is the project root. In json mode each gives its reading as the result's
-  `data`; text mode writes lines.
+  `worktree` column, built by `checkoutColumn`
+  (`src/commands/loop/list.ts`) from the record's `worktree` key
+  (`src/core/loop/sessions.ts`, set for a run started with
+  `--as-worktree`, `start/session.ts`): the path to the worktree, or
+  `in the main checkout` when the record carries none. In json mode each
+  gives its reading as the result's `data`; text mode writes lines.
 - **Type `--tracker` after the stub.** `parseArgs` gives a flag the next
   word as its value unless that word opens with `-`, whatever type the
   flag declares, so `rafa plan show --tracker my-plan` hands `plan show`
@@ -2617,10 +2623,12 @@ New; it replaces no earlier text. What a row or an action added to
   answers it (`src/project/scope.ts`), or null for a command declaring
   `needsProject: false`.
 - **A command runs inside a project** unless it declares
-  `needsProject: false`, as `module exec`, `skill check`, `instinct check`,
-  `init` and `describe` do; the dispatcher
-  resolves none for such a command. `commandProblem` refuses a
-  `needsProject` that is no boolean.
+  `needsProject: false`, as `module exec`, `skill check`,
+  `instinct check`, `init` and `describe` do; the dispatcher resolves
+  none for such a command. `commandProblem` refuses a `needsProject` that
+  is no boolean. Open spec #276 would change which commands need a
+  project; until it lands, every command not declaring
+  `needsProject: false` is refused outside one.
 - **A command refuses by throwing `CommandExit(code, message)`.** It
   calls no `process.exit`. The dispatcher never reads `process.exitCode`,
   so a command that sets it and returns ends as a success.
