@@ -23,8 +23,8 @@
  * moving between them is a refactor, never a change of behaviour. This
  * file is intended as the public surface, re-exporting everything the
  * other two modules export for a caller to import rather than reaching
- * into a sibling; however, 75
- * modules currently import `config-sections.ts`'s names directly,
+ * into a sibling; however, most
+ * callers import `config-sections.ts`'s names directly,
  * through its barrel `core/config/sections.js`. The one
  * exception is `MergeMethod`, which `config-sections.ts` re-exports
  * from `pr/types.ts` so `config-schema-release.ts` can type a field with

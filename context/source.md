@@ -161,8 +161,9 @@ certifies a cut.
   not a member of its own workspace.
 - **Every other route into core stays unresolved.** A deep path or an
   unmapped subpath fails with `Cannot find package '@open-tomato/rafa'`
-  under bun and `TS2307` under tsc. Each package's
-  `src/core-subpaths.test.ts` holds this, holds the map to the two
+  under bun and `TS2307` under tsc. Each package's own
+  `core-subpaths.test.ts`, under `packages/<name>/src/`, holds this,
+  holds the map to the two
   subpaths as a closed list, and holds each entry equal to the root
   `exports`. A new subpath goes into both files and that list.
 - **Which gates reach a package.** `bun run test` runs its tests.

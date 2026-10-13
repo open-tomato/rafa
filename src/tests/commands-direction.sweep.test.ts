@@ -74,10 +74,11 @@ interface SplitModule {
  * it, `src/core/loop/readings.ts`. A file outside `src/core/` imports the
  * barrel and nothing deeper, so the barrel is what an `export … from` of
  * that half resolves to, and a row naming the file behind it would hold
- * nothing.
+ * nothing. The same holds for `src/commands/plan/plan-files.ts`, whose
+ * half is `src/core/plan/plan-files.ts` behind `src/core/plan/index.ts`.
  */
 const SPLIT_MODULES: readonly SplitModule[] = [
-  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/plan/plan-files.ts' },
+  { commandFile: 'src/commands/plan/plan-files.ts', libraryHalf: 'src/core/plan/index.ts' },
   { commandFile: 'src/commands/loop/loop-sessions.ts', libraryHalf: 'src/core/loop/readings.ts' },
   { commandFile: 'src/commands/release/status.ts', libraryHalf: 'src/release/status-readings.ts' },
   { commandFile: 'src/commands/epic/move-native.ts', libraryHalf: 'src/board/repository.ts' },

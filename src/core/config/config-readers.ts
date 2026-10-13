@@ -14,9 +14,11 @@
  * still holds every rule about a VALUE but the release plan's, below,
  * and the two item shapes, which `config-items.ts` reads;
  * {@link mapOf} is here rather than there because what it rules on is a KEY: the names a map
- * setting's file spells below its own key. Outside the config modules
- * only `tiers/routing.test.ts` imports this file, reading a file's
- * `routing` through {@link routeTable} as the schema does.
+ * setting's file spells below its own key. Outside `src/core/config/`
+ * no file imports this one by path: its names are read through the
+ * barrel `sections.ts`, by the release modules for the release plan's
+ * lists and by `tiers/routing.test.ts`, which reads a file's `routing`
+ * through {@link routeTable} as the schema does.
  *
  * The closed lists and readers of the release plan's keys —
  * `release.strategy`, `release.settle`, `release.tag`,
