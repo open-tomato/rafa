@@ -382,7 +382,7 @@ The recognised keys are the `DECLARATION_KEYS` of `src/utils/declaration.ts`, wh
 
 ### `skills=` declaration
 
-When a task needs help from a skill, name those skills with `skills=`. Skill names must come from the skill index provided in this prompt; naming a skill no tier holds is recorded as an issue. Names are comma-separated with no spaces.
+When a task needs help from a skill, name those skills with `skills=`. Skill names must come from the skill index provided in this prompt. Naming a skill no tier holds is refused, not recorded: `rafa plan validate` exits 1 on the line that names it, and `rafa loop start`'s preflight refuses to start the plan, so nothing is dispatched. Names are comma-separated with no spaces.
 
 `skills` is a recognised key that maps to no flag: there is no CLI flag for a skill, so the names are parsed, kept on the dispatch record and stripped from the task text with the rest of the block. It stands on its own — `{skills=bun-testing}` is a declaration with no other key beside it — and a value that is not a comma-separated list of skill names is recorded as an issue rather than passed on.
 
