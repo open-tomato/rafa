@@ -257,7 +257,7 @@ process, one after another, so a module-level value one test file
 leaves behind is read by every file after it. A file failed that way
 is green from a shell and green in the repair session handed it: on
 2026-10-10 one run inserted five repair tasks for
-`src/utils/claude.test.ts`, 21 cases red in the runner's steps only,
+`src/core/loop/claude.test.ts`, 21 cases red in the runner's steps only,
 and each repair session reran it, found it green and changed nothing.
 So a task, stage or pre-wrap-up step that reads new failures runs each
 newly red test file alone, as `bun test ./<file>`, one process per
@@ -515,7 +515,7 @@ naming `<repo>/node_modules/@types` absolutely (left out, every file
 reports `Cannot find module 'bun:test'`) — and run `./node_modules/.bin/tsc
 -p` on it. Test files already carry errors no gate ever reported, so
 compare against the base before attributing one to the diff: TS2769 where a
-`readonly` array reaches `toEqual` (`src/config-schema.test.ts`,
+`readonly` array reaches `toEqual` (`src/core/config/config-schema.test.ts`,
 `src/project/scaffold.test.ts`, `src/commands/index.test.ts`), and on the
 `it(name, { timeout }, fn)` form in the spawned suites. A type-level claim
 that must stay checked belongs in the suite instead, as in

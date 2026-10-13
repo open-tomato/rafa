@@ -88,11 +88,11 @@
  * same place only outside a worktree.
  *
  * What the gate tells the operator goes through the active output
- * (`adapters/output/active.ts`): the wait, each poll, a green verdict
+ * (`core/output/active.ts`): the wait, each poll, a green verdict
  * and a merged PR through `info`; a skipped check, a PR not found, a
  * deadline passed, a PR with no checks and a red one through `warn`; and
  * a failed repair session and the escalation through `error`. A repair
- * session's own stdout reaches the operator through `utils/claude.ts`,
+ * session's own stdout reaches the operator through `core/loop/claude.ts`,
  * as `log` events in json mode.
  *
  * ## The phase on the run record
@@ -110,10 +110,11 @@
  * `PROMPT_SHAPES` in `effort/classify.ts` names this file as the source
  * its drift guard reads that prefix and its infix from.
  */
+import type { RunSession } from './session.js';
 import type { DeviceStoreId } from '../claims/device.js';
 import type { RefusedPushReading } from '../claims/lost.js';
-import type { ClaudeSettingSource } from '../config.js';
-import type { RunSession } from './session.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { ClaudeSpawner } from '../core/loop/index.js';
 import type {
   CheckRow,
   PrProviderReading,
@@ -123,15 +124,15 @@ import type {
   WaitOptions,
   WaitResult,
 } from '../pr/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { readDeviceStoreId } from '../claims/device.js';
 import { claimBranchIssue } from '../claims/git.js';
 import { claimLostReport, readRefusedPush } from '../claims/lost.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { runClaude, spawnClaude } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
 import {
   compareUrl,
   createGitRunner,
@@ -143,7 +144,6 @@ import {
   resolvePrProvider,
   waitForChecks,
 } from '../pr/index.js';
-import { runClaude, spawnClaude } from '../utils/claude.js';
 import { readCheckedOutBranch } from '../utils/git.js';
 
 import { withStamp } from './stamp.js';

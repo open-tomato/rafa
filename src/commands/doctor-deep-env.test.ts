@@ -9,7 +9,7 @@
  * that reads the same world, changed in one place, as applied.
  */
 import type { SessionEnvSeams } from './doctor-deep-env.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { SpawnEnv } from '../utils/session-env.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

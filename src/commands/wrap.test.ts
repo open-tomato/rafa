@@ -43,8 +43,8 @@
  */
 import type { CommandDeclaration, PhaseZeroCommand } from './wrap.js';
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { RafaCommand } from '../cli/command.js';
 import type { DispatchOutcome } from '../cli/dispatch.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,9 +52,9 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit, commandProblem } from '../cli/command.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
+import { CommandExit, commandProblem } from '../core/command/index.js';
 import { plantProjectConfig } from '../tests/cli-capture.js';
 
 import { wrapPhaseZeroCommand } from './wrap.js';

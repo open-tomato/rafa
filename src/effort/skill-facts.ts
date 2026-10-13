@@ -89,10 +89,10 @@
  * throws when the store cannot be read, and when a list column holds
  * anything but a list of strings, which no writer stores.
  */
-import type { SkillResolverName } from '../config-sections.js';
 import type { PlanCiRow } from './store/plan-ci.js';
 import type { ReportedSkills } from './store/reports.js';
 import type { SkillInvocation } from './store/skill-invocations.js';
+import type { SkillResolverName } from '../core/config/sections.js';
 
 import { existsSync } from 'node:fs';
 

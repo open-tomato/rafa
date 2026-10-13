@@ -42,11 +42,11 @@
  * project that named one keeps naming it whether or not it has written
  * there yet.
  */
-import type { RafaConfig } from '../config.js';
+import type { RafaConfig } from '../core/config/index.js';
 
 import { normalize, sep } from 'node:path';
 
-import { CONFIG_DEFAULTS, CONFIG_FILE } from '../config.js';
+import { CONFIG_DEFAULTS, CONFIG_FILE } from '../core/config/index.js';
 
 /** The two settings this reading judges. */
 export type PreInitSetting = 'planDir' | 'specsDir';

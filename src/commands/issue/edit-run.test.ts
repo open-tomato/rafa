@@ -17,7 +17,7 @@
  */
 import type { EditRequest } from './edit-run.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { EditableIssue, IssueDraft, IssueEdit, IssueRef, Tracker, TrackerKind } from '../../ports/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,7 +33,7 @@ import { branchName } from '../../board/naming.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { createGhEditorLogin, ghBoardTrust } from '../../board/trust.js';
 import { IN_DEVELOPMENT_LABEL } from '../../claims/stale.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 

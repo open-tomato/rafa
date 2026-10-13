@@ -114,7 +114,7 @@
  * The four steps arrive through {@link SuiteStepCalls} and `gh`, which
  * reads the plan's `Owns:` folders for `planOwnsReader`, through
  * {@link RunSuiteStepsOptions.gh}; each left out is the system's own.
- * Every line goes through the active output (`adapters/output/active.ts`).
+ * Every line goes through the active output (`core/output/active.ts`).
  */
 import type {
   BaselineOutcome,
@@ -127,9 +127,9 @@ import type { GhRunner } from '../adapters/tracker/github.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
-import { activeOutput } from '../adapters/output/active.js';
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { parseTaskDeclaration, readTestScope } from '../utils/declaration.js';
 
 import { baselineHaltLines } from './suite-outside-case.js';

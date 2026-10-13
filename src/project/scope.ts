@@ -113,13 +113,13 @@
  * from. A home that does not resolve is not refused: nothing can sit
  * under it, so it is no directory the walk climbs.
  */
-import type { ConfigRoots } from '../config-load.js';
+import type { ConfigRoots } from '../core/config/load.js';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-import { describeValue, messageOf } from '../config-sections.js';
-import { CONFIG_FILE, configFilePath } from '../config.js';
+import { CONFIG_FILE, configFilePath } from '../core/config/index.js';
+import { describeValue, messageOf } from '../core/config/sections.js';
 
 import { mainCheckoutOf, WorktreeRootError } from './worktree-root.js';
 

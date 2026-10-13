@@ -49,12 +49,12 @@
  * message a person reads, and `resolved` as this module stat'd it, for
  * the module that opens it next.
  */
-import type { ReleaseEnabled } from '../config-sections.js';
+import type { ReleaseEnabled } from '../core/config/sections.js';
 
 import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { RELEASE_AUTO } from '../config-sections.js';
+import { RELEASE_AUTO } from '../core/config/sections.js';
 
 /**
  * The three `release` settings a reading is made from, named as

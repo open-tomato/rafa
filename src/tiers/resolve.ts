@@ -140,7 +140,7 @@
  * also carries that pin and the copies that outrank it (see "A skill
  * pin must name the copy Claude Code loads").
  */
-import type { ClaudeSettingSource, TierPin, TierSwitch } from '../config-sections.js';
+import type { ClaudeSettingSource, TierPin, TierSwitch } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
 import type { SkillTier } from '../schema/tiers.js';
 

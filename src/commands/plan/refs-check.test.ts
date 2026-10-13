@@ -46,8 +46,8 @@
  * over the registry with the module mounted and one over it without.
  */
 import type { ResolvedSpec } from '../../board/spec-source.js';
-import type { RafaCommand } from '../../cli/command.js';
 import type { DescribeDocument, DescribedAction } from '../../cli/describe.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { Output } from '../../ports/index.js';
 import type { RefVerifier } from '../../refs/verify.js';
 
@@ -61,8 +61,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { version } from '../../../package.json';
 import { BOARD_REFUSAL_EXIT } from '../../board/exit-codes.js';
 import { acceptStaleRefsPassLine } from '../../board/refs-gate.js';
-import { CommandExit } from '../../cli/command.js';
 import { describeRegistry } from '../../cli/describe.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ABSENT, PRESENT, readRefsBlock, writeRefsBlock } from '../../refs/stamp.js';
 import { sinkOutput } from '../../tests/output-sinks.js';
 import { CORE_REGISTRY } from '../index.js';

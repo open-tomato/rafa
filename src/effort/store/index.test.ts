@@ -41,8 +41,8 @@
  * failed in the copied entry's opener record (TS2741).
  *
  * The opener record and the name lookup then moved into the adapter
- * registry, `src/adapters/registry.ts`. Four of the readings above were
- * taken again there on 2026-09-14, one run each, with the suite at 27
+ * registry, `src/core/adapters/registry.ts`. Four of the readings above
+ * were taken again there on 2026-09-14, one run each, with the suite at 27
  * pass before and after and every module restored byte-identical. The
  * openers swapped in the registry's record reddened nine cases. The
  * registry's `find` indexing an object rather than its `Map` reddened the
@@ -56,7 +56,8 @@
  */
 import type { SelectedEffortStore } from './index.js';
 import type { CommitEffortRow, SessionEffortRow } from './types.js';
-import type { RafaConfig, StoreBackend } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { StoreBackend } from '../../core/config/sections.js';
 
 import {
   existsSync,
@@ -72,8 +73,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { TRUSTED_PERMISSIONS } from '../../board/trust.js';
-import { loadConfig } from '../../config-load.js';
-import { resolveConfig, STORE_BACKENDS } from '../../config.js';
+import { resolveConfig } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
+import { STORE_BACKENDS } from '../../core/config/sections.js';
 import * as wire from '../sync/wire.js';
 
 import { mergeStore } from './merge-store.js';

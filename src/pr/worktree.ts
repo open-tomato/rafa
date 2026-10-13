@@ -104,13 +104,14 @@
  * a closed set of merge step names; widening it to fit this module would
  * be a change to the merge command in a commit that is about worktrees.
  */
-import type { GitRunner } from './git.js';
 import type { WorktreeEntry } from './merge.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { gitSaid } from './git.js';
+import { gitSaid } from '../core/git/index.js';
+
 import { parseWorktrees } from './merge.js';
 import { shellQuote } from './preflight-items.js';
 

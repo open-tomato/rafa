@@ -40,10 +40,10 @@
  * command line has no spelling for `false` or a number this module
  * would not have to invent.
  */
-import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
-import { refused } from './config-sections.js';
+import { refused } from './core/config/sections.js';
 
 /** The most `triage.similarity.threshold` accepts. */
 export const SIMILARITY_THRESHOLD_MAX = 1;

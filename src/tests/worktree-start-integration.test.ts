@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config-schema.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import { plantScratchRepo } from './cli-capture.js';
 import { gitIdentityEnv } from './git-identity.js';

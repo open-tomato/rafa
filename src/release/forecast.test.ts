@@ -15,7 +15,7 @@
  *    minor case is where they differ.
  */
 import type { FoldFragment, ReleaseStrategyAdapter } from './strategy.js';
-import type { PlanReleaseLevel } from '../plan/parse.js';
+import type { PlanReleaseLevel } from '../core/plan/index.js';
 
 import { describe, expect, test } from 'bun:test';
 

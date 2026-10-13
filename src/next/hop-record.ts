@@ -53,7 +53,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { asPlace } from '../project/position.js';
 import { scopeAt } from '../project/scope.js';
 
@@ -130,7 +130,7 @@ function issuesMatchKind(kind: HopKind, blocked: number | null, target: number |
 /**
  * `value` as a hop record, or null when it is not one: the check
  * {@link readHopRecord} makes on the parsed file, which the session record
- * makes on its `hop` field (`src/loop/sessions.ts`).
+ * makes on its `hop` field (`src/core/loop/sessions.ts`).
  */
 export function asHopRecord(value: unknown): HopRecord | null {
   if (!isRecord(value)) return null;

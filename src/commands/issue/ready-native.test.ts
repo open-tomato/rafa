@@ -15,7 +15,7 @@ import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { SpecIssueReader } from '../../board/issue.js';
 import type { BoardTrust } from '../../board/trust.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +24,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { SPEC_LABEL } from '../../board/issue.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';
 

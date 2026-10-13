@@ -69,7 +69,7 @@
  *    `./state.test.ts` still passes, since none plants such a record.
  */
 import type { NextBoard, NextSources } from './readings.js';
-import type { SessionRecord, SessionState } from '../loop/sessions.js';
+import type { SessionRecord, SessionState } from '../core/loop/index.js';
 import type { GitResult } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
@@ -78,7 +78,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { plansDirAt } from '../plan/plan-files.js';
+import { plansDirAt } from '../core/plan/index.js';
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
 import { readNextState } from './state.js';

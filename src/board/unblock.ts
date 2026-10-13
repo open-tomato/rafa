@@ -114,8 +114,8 @@ import type { IssueBoard } from './issue-board.js';
 import type { SpecIssueReader } from './issue.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
-import { plural } from '../plan/plan-files.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
+import { plural } from '../core/plan/index.js';
 
 import { BLOCKED_LIST_LIMIT, KNOWN_LIST_LIMIT } from './blocked-issues.js';
 import { blockedFaultMessage, hasSpecBlockedLabel, readBlockedBy, SPEC_BLOCKED_LABEL } from './blocked.js';

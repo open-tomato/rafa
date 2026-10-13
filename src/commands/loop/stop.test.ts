@@ -15,8 +15,8 @@
  * never ending within the wait; a refused signal beside a pid already
  * gone. The refusals of the pick are held in `status.test.ts`.
  */
-import type { LoopSessionSeams } from '../../loop/session-readings.js';
-import type { SessionRecord } from '../../loop/sessions.js';
+import type { SessionRecord } from '../../core/loop/index.js';
+import type { LoopSessionSeams } from '../../core/loop/readings.js';
 
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,8 +24,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { STOP_POLL_MS } from '../../loop/session-readings.js';
-import { sessionFilePath, updateSession } from '../../loop/sessions.js';
+import { sessionFilePath, updateSession } from '../../core/loop/index.js';
+import { STOP_POLL_MS } from '../../core/loop/readings.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER_PATH,

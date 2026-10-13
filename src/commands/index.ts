@@ -386,8 +386,8 @@
  * in the command tree and is not registered, because nothing dispatches
  * it yet.
  */
-import type { RafaCommand } from '../cli/command.js';
 import type { SubjectSpec } from '../cli/registry.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { createCommandRegistry } from '../cli/registry.js';
 

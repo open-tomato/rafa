@@ -74,7 +74,7 @@
  */
 import type { Readable } from 'node:stream';
 
-import { CommandExit } from '../command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 /** The keys a prompt reads that carry no character. */
 export const NAMED_KEYS = ['up', 'down', 'enter', 'escape', 'backspace', 'ctrl-c'] as const;

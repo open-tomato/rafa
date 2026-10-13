@@ -56,7 +56,7 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { loadConfig } from '../../config-load.js';
+import { loadConfig } from '../../core/config/load.js';
 import { parseReport, REPORT_STATUSES } from '../../report/parse.js';
 
 import { FINDING_OUTCOMES } from './findings.js';

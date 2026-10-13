@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import {
   buildPlanPrompt,
   formatProgressSection,

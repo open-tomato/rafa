@@ -73,14 +73,14 @@ import type { EpicMoveResult } from './move.js';
 import type { EpicNewResult } from './new.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
 import type { ProjectRefresh, RefreshConfig, RefreshOptions, RefreshWidening } from '../../board/project/refresh.js';
-import type { RafaContext } from '../../cli/command.js';
+import type { RafaContext } from '../../core/command/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { addAndRefreshIssue } from '../../board/project/add-issue.js';
 import { refreshIssueItems } from '../../board/project/issue-board-refresh.js';
 import { commandRetrySeams, openProjectRunner } from '../../board/project/project-runner.js';
 import { BOARD_SYNC_FIX } from '../../board/project/refresh-warnings.js';
-import { messageOf } from '../../config-sections.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig } from '../issue/issue-tracker.js';
 
 /** Refreshes `issues`, widened by `widening`; `refreshProjectItems` unless a test plants another. */

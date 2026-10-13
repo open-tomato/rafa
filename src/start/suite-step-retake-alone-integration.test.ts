@@ -36,7 +36,7 @@
  * tracker file.
  */
 import type { StepOutcome, SuiteStepContext } from './suite-step.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 
@@ -46,8 +46,8 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { parsePlan } from '../plan/parse.js';
+import { setActiveOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { baselineOf } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';

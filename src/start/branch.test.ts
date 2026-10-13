@@ -33,13 +33,13 @@
  * process, so each case sets a sink and the last one sets it back.
  */
 import type { BranchOutcome, BranchRequest, BranchSeams } from './branch.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 
 import { offerRunBranch } from './branch.js';

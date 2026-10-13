@@ -51,14 +51,14 @@
  * {@link ConfigSetResult} is the data of the terminal result event, and
  * a refusal is the `CommandExit` it is in text mode.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
 import { ConfigSetRefusal, withConfigSetting } from '../../config-set.js';
-import { configFilePath } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { configFilePath } from '../../core/config/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { AGENT_SHELL_ENV, isAgentShell } from '../../utils/agent-shell.js';
 import { expectOneArgument, requireProject } from '../plan/plan-files.js';
 

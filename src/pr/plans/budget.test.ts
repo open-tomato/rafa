@@ -33,7 +33,7 @@ import type { TriageBlock } from '../triage/comment.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { parsePlan } from '../../plan/parse.js';
+import { parsePlan } from '../../core/plan/index.js';
 import { parseTaskDeclaration } from '../../utils/declaration.js';
 
 import { budgetEntry, BUDGET_KEY, withTaskBudget } from './budget.js';

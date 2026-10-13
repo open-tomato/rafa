@@ -31,7 +31,7 @@
  *     version it no longer serves. Each version is declared here as a
  *     number literal type, gathered in {@link PortVersions} under the
  *     port types the adapter registry keys by. The number core compares
- *     is `PORT_VERSIONS` in `src/adapters/registry.ts`, held equal to
+ *     is `PORT_VERSIONS` in `src/core/adapters/registry.ts`, held equal to
  *     these literals there.
  *
  * ## Where each port comes from

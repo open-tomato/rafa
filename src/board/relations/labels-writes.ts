@@ -63,7 +63,7 @@ import type { ChecklistEditResult } from '../epic-checklist.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapBody } from '../roadmap-tick.js';
 
-import { describeValue } from '../../config-sections.js';
+import { describeValue } from '../../core/config/sections.js';
 import { hasSpecBlockedLabel, SPEC_BLOCKED_LABEL } from '../blocked.js';
 import { appendLine, editChecklist, removeLine, tickLine } from '../epic-checklist.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf, readEpics } from '../epics.js';

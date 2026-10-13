@@ -30,8 +30,8 @@
  * two calls that carry the mode to the dispatch and the plan to the
  * wrap-up, and `start/wrap-up.ts` for the plan reaching its prompt.
  */
-import type { ConfigRoots } from '../config-load.js';
-import type { InjectMode } from '../config.js';
+import type { ConfigRoots } from '../core/config/load.js';
+import type { InjectMode } from '../core/config/sections.js';
 import type { TaskDispatch, TaskSessionRunner } from '../start/dispatch.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
@@ -56,8 +56,8 @@ import {
   spyOn,
 } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CONFIG_DEFAULTS, ConfigError } from '../config.js';
+import { CONFIG_DEFAULTS, ConfigError } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { renderInjection } from '../plan/index.js';
 import { dispatchTask } from '../start/dispatch.js';

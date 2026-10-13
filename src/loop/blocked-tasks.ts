@@ -24,11 +24,11 @@
  * ## What is read
  *
  * The checklist handed over (`readSessionChecklist`,
- * `./session-readings.ts`) and nothing else: no file, no record and no
+ * `../core/loop/session-readings.ts`) and nothing else: no file, no record and no
  * store. A session with no checklist, its plan and tracker both gone,
  * has no blocked task.
  */
-import type { SessionChecklist } from './session-readings.js';
+import type { SessionChecklist } from '../core/loop/readings.js';
 
 import { splitBlockerComment } from '../utils/tracker.js';
 

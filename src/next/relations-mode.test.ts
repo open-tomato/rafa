@@ -21,7 +21,7 @@
  * case.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { RafaCommand } from '../cli/command.js';
+import type { RafaCommand } from '../core/command/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

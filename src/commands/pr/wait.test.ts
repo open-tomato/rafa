@@ -55,7 +55,7 @@
  * to come from the read at the ending.
  */
 import type { PrWaitReading, PrWaitSeams } from './wait.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type {
   CheckRow,

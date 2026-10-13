@@ -46,9 +46,9 @@
  */
 import type { ContinueDecision, DecisionStrategy } from './decision-parse.js';
 import type { LoopRetries } from '../config-schema-loop-retries.js';
-import type { RafaConfig } from '../config-schema.js';
+import type { RafaConfig } from '../core/config/index.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 
 import { DECISION_STRATEGIES } from './decision-parse.js';
 import { resolveContinueCriteria } from './decision-prompt.js';

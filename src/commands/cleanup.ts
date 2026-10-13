@@ -90,11 +90,10 @@ import type {
   StaleRow,
   WorktreeRow,
 } from '../cleanup/index.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { MultiGroup } from '../cli/prompt/multi-select.js';
 import type { Key, Terminal } from '../cli/prompt/terminal.js';
-import type { RafaConfig } from '../config.js';
+import type { RafaCommand, RafaContext , Prompter } from '../core/command/index.js';
+import type { RafaConfig } from '../core/config/index.js';
 import type { PullRequests } from '../pr/types.js';
 import type { ProjectFound } from '../project/scope.js';
 
@@ -106,10 +105,9 @@ import {
   readCleanup,
   runCleanupSteps,
 } from '../cleanup/index.js';
-import { CommandExit } from '../cli/command.js';
-import { createLinePrompter } from '../cli/prompt/confirm.js';
 import { multiSelect } from '../cli/prompt/multi-select.js';
 import { processTerminal } from '../cli/prompt/terminal.js';
+import { CommandExit , createLinePrompter } from '../core/command/index.js';
 import { ghPullRequestsIn, resolvePrProvider } from '../pr/index.js';
 
 import {

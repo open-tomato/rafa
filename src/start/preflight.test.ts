@@ -100,13 +100,13 @@
  * with each of three strings of `src/start.ts` mutated in turn, and each
  * mutation changed the reading it aimed at.
  */
-import type { TierPin } from '../config-sections.js';
-import type { ClaudeSettingSource, OptionalPrerequisiteItem, PrerequisiteItem } from '../config.js';
 import type { StartPreflightClaim } from './preflight-claim.js';
 import type { StartPreflightDrift } from './preflight-drift.js';
 import type { StartPreflight, StartPreflightOptions, StartPreflightSettings } from './preflight.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
+import type { OptionalPrerequisiteItem, PrerequisiteItem } from '../core/config/index.js';
+import type { ClaudeSettingSource, TierPin } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 import type { PrerequisiteSettings } from '../preflight/prerequisites-md.js';
 import type { ProbeRun, ProbeRunner } from '../preflight/run.js';
@@ -127,13 +127,13 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { PORT_VERSIONS } from '../adapters/registry.js';
 import { createGhIssueBoard } from '../board/issue-board.js';
 import { makeOwnershipCommit } from '../claims/git.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { CommandExit } from '../cli/command.js';
-import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../config.js';
+import { PORT_VERSIONS } from '../core/adapters/index.js';
+import { CommandExit } from '../core/command/index.js';
+import { CONFIG_DEFAULTS, parseConfigText, resolveConfig } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { classifyPromptContent } from '../effort/classify.js';
 import { readPreflightHalts } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';

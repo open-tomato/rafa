@@ -27,7 +27,7 @@
  * after a plan that can run to hundreds of lines.
  *
  * The final message is what the earlier session wrote to stdout, as
- * `runClaudeCaptured` (`utils/claude.ts`) answers it: the CLI runs with
+ * `runClaudeCaptured` (`core/loop/claude.ts`) answers it: the CLI runs with
  * `-p` in text mode, where stdout is the session's final message. It is
  * quoted whole, each line behind `> ` and indented under the bullet, so
  * a fence or a heading inside it stays inside the quote and cannot read
@@ -57,13 +57,13 @@
  * verifies or commits, and would leave the dirty tree the runner then
  * refuses to open a pull request over (`start/runner-pr.ts`).
  */
-import type { ClaudeSettingSource, PrProvider } from '../config.js';
 import type { SessionServing } from './serving.js';
 import type { RunStepOnly } from './step-only-report.js';
 import type { WrapUpLearning } from './wrap-up.js';
+import type { ClaudeSettingSource, PrProvider } from '../core/config/sections.js';
+import type { CapturingSpawner } from '../core/loop/index.js';
 import type { InstinctRecord } from '../learning/index.js';
 import type { ReleasePreparation } from '../release/prepare.js';
-import type { CapturingSpawner } from '../utils/claude.js';
 
 import { buildWrapUpPrompt, runWrapUpSession } from './wrap-up.js';
 

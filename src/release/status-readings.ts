@@ -60,12 +60,12 @@
  * line out rather than read a failed tag listing as no tags.
  */
 import type { SemanticVersion } from './version.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { gitSaid } from '../pr/git.js';
+import { gitSaid } from '../core/git/index.js';
 
 import { parseSemanticVersion } from './version.js';
 

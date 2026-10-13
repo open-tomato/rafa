@@ -20,7 +20,7 @@
  * never by bytes.
  */
 import type { FileSyncOptions } from './file.js';
-import type { AdapterContext } from '../../adapters/registry.js';
+import type { AdapterContext } from '../../core/adapters/index.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 import type { Device } from '../../tests/merged-stores.js';
 
@@ -31,8 +31,8 @@ import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY } from '../../adapters/registry.js';
-import { beginSession } from '../../loop/sessions.js';
+import { CORE_ADAPTER_REGISTRY } from '../../core/adapters/index.js';
+import { beginSession } from '../../core/loop/index.js';
 import { copyDevice, freshDevice } from '../../tests/merged-stores.js';
 import { EffortCopyRefusal } from '../store/copy.js';
 import { writeDispatch } from '../store/dispatches.js';

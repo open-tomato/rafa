@@ -58,10 +58,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../../config.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
+import { setActiveOutput } from '../../core/output/index.js';
 import { actionHash } from '../../learning/index.js';
 import { parseInstinct, writeInstinct } from '../../schema/instinct.js';
-import { setActiveOutput } from '../output/active.js';
 
 import { createLocalLearning, localInstinctsDir, userInstinctsDir } from './local.js';
 

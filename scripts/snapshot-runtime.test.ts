@@ -1,4 +1,4 @@
-import type { SessionRecord } from '../src/loop/sessions.js';
+import type { SessionRecord } from '../src/core/loop/index.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

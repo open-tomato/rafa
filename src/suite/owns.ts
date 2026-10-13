@@ -47,7 +47,7 @@ import { epicContextArgs } from '../board/epic-context.js';
 import { EPIC_LABEL_PREFIX, epicSlugsOf } from '../board/epics.js';
 import { createGhSpecIssueReader } from '../board/issue.js';
 import { parseBoardListing } from '../board/roadmap-board.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** Why a plan has no `Owns:` folders; the module note lists each. */
 export type PlanOwnsReason = 'no-issue' | 'no-epic' | 'no-owns-line' | 'gh-failed';

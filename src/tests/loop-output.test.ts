@@ -13,7 +13,7 @@
  * `src/start/forced-draft.ts`,
  * `src/adapters/tracker/resolve.ts`,
  * `src/adapters/tracker/local.ts`,
- * `src/start/pr-lifecycle.ts`, `src/utils/claude.ts` and
+ * `src/start/pr-lifecycle.ts`, `src/core/loop/claude.ts` and
  * `src/utils/schedule.ts` hold no `console` member and no `process.exit`
  * in their code, and each calls `activeOutput()`, or `activeLogger()`,
  * whose console logger writes through the active output. Each is parsed with
@@ -129,7 +129,7 @@
  * 1, which reddened the interrupt case of `task-report.test.ts` alone.
  *
  * The session cases came with `start/dispatch.ts`, `start/pr-lifecycle.ts`,
- * `utils/claude.ts` and `utils/schedule.ts` joining the scan. Twenty
+ * `core/loop/claude.ts` and `utils/schedule.ts` joining the scan. Twenty
  * mutations of those modules, the dispatcher and `active.ts` were driven
  * on 2026-09-15, one run each over ten suites, with 228 pass before and
  * after and every file restored sha256-identical. These cases reddened
@@ -155,8 +155,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { parsePlan } from '../plan/index.js';
 import { preserveProgress } from '../start/wrap-up.js';
 
@@ -190,7 +190,7 @@ const ROUTED_MODULES: string[] = [
   'adapters/tracker/resolve.ts',
   'adapters/tracker/local.ts',
   'start/pr-lifecycle.ts',
-  'utils/claude.ts',
+  'core/loop/claude.ts',
   'utils/schedule.ts',
 ];
 

@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { createGitRunner } from '../../pr/index.js';
 import { serializeFragment } from '../../release/fragment.js';
 import { RUNTIME_SUBDIR } from '../../start/runtime.js';

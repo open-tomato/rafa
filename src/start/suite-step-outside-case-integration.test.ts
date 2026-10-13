@@ -26,7 +26,7 @@
  * it is written and the run goes on, a task step names the file in its
  * blocker, and no record carries `outsideCase` or a tail.
  */
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteSpawner } from '../suite/run.js';
 
@@ -36,7 +36,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { runSuite } from '../suite/run.js';
 import { sinkOutput } from '../tests/output-sinks.js';

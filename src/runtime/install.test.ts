@@ -1,5 +1,5 @@
 import type { InstallOutcome, InstallSeams } from './install.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import {
   chmodSync,

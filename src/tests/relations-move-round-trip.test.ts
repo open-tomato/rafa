@@ -50,8 +50,8 @@
  * their own labels-to-native cases with.
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
 import type { DoctorSeams } from '../commands/doctor.js';
+import type { Prompter } from '../core/command/index.js';
 
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,7 +64,7 @@ import { markMessage, MARKS_HEADING } from '../commands/doctor-marks.js';
 import { createDoctorCommand } from '../commands/doctor.js';
 import { MOVE_FIX } from '../commands/init-board.js';
 import { createInitCommand, DEFAULT_INIT_SEAMS } from '../commands/init.js';
-import { plural } from '../plan/plan-files.js';
+import { plural } from '../core/plan/index.js';
 
 import { dispatchInProject, eventsOf, plantProject } from './cli-capture.js';
 

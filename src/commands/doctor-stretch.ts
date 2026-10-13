@@ -42,12 +42,12 @@
  * `StretchFolderSeams`; left out, the system's own, so
  * `src/commands/doctor.ts` wires the row with its one call.
  */
-import type { RafaContext } from '../cli/command.js';
+import type { RafaContext } from '../core/command/index.js';
 import type { AgentReading, StretchFolderSeams, StretchLiveness } from '../stretch/folder.js';
 
 import { relative } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 import { defaultSeams, projectName, stretchLiveness, tmuxSessionName } from '../stretch/folder.js';
 
 import { stretchOfBase } from './stretch/item.js';

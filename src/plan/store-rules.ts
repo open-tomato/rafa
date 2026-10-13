@@ -64,12 +64,11 @@
  * Everything here is pure: the callers read the plan and its
  * PREREQUISITES file and hand the text in.
  */
-import type { PlanTask } from './parse.js';
+import type { PlanTask } from '../core/plan/index.js';
 
 import { findPinnedMigrations } from '../board/readiness.js';
+import { parsePlan } from '../core/plan/index.js';
 import { parsePrerequisites } from '../preflight/prerequisites-md.js';
-
-import { parsePlan } from './parse.js';
 
 /** Which of the three rules a problem breaks. */
 export type StoreRuleKind = 'pinned-migration' | 'unprefixed-command' | 'missing-probe';

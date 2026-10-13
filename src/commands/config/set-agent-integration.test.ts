@@ -16,7 +16,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { expectExit, plantScratchRepo, runRafa } from '../../tests/cli-capture.js';
 
 const KEY_LINE = 'dangerous.acceptVersionCollision=true';

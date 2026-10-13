@@ -18,8 +18,8 @@
  * migrations can be installed, that comes first.
  *
  * The swap is refused while any loop session under the project reads
- * `running` or `paused` (`readSessions`, `src/loop/sessions.ts`), since a
- * loop writing the store while it is renamed would lose those writes,
+ * `running` or `paused` (`readSessions`, `src/core/loop/sessions.ts`), since
+ * a loop writing the store while it is renamed would lose those writes,
  * and from a development build, whose migrations may be a branch's. A
  * dry run reads the store and writes only its own parallel file, which it
  * deletes, so it runs beside a live loop and from a development build.
@@ -32,16 +32,16 @@
  * `src/effort/file-stamp.ts`, which files outside `src/commands/` read
  * too; this file re-exports none of it.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { PidProbe, SessionRecord } from '../../core/loop/index.js';
 import type { FixSchemaResult } from '../../effort/store/fix-schema.js';
-import type { PidProbe, SessionRecord } from '../../loop/sessions.js';
 import type { RuntimeIdentity } from '../../runtime/identity.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
+import { readSessions } from '../../core/loop/index.js';
 import { fileStamp } from '../../effort/file-stamp.js';
 import { fixStoreSchema, SchemaFixRefusal } from '../../effort/store/fix-schema.js';
 import { sqliteStorePath } from '../../effort/store/sqlite.js';
-import { readSessions } from '../../loop/sessions.js';
 import { expectNoArgument, readSwitch } from '../plan/plan-files.js';
 
 /** The command's spelling, as its refusals name it. */

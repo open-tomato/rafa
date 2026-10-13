@@ -155,13 +155,12 @@
  *
  * Nothing here throws.
  */
-import type { PlanModel, PlanTask, PlanTaskStatus } from './parse.js';
-import type { InjectMode } from '../config.js';
+import type { InjectMode } from '../core/config/sections.js';
+import type { PlanModel, PlanTask, PlanTaskStatus } from '../core/plan/index.js';
 import type { TaskInfo } from '../utils/tracker.js';
 
+import { parsePlan } from '../core/plan/index.js';
 import { parseTaskDeclaration } from '../utils/declaration.js';
-
-import { parsePlan } from './parse.js';
 
 /**
  * The dispatched task, by the one field of `TaskInfo` it is located by.

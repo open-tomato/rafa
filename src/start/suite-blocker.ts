@@ -108,14 +108,14 @@
  * caller halts on.
  */
 import type { AfterTouched, AloneReading } from './suite-retake-alone.js';
-import type { PlanTask } from '../plan/parse.js';
+import type { PlanTask } from '../core/plan/index.js';
 import type { SuiteFailure, SuiteResult } from '../suite/run.js';
 import type { UnhandledError } from '../suite/unhandled.js';
 import type { InsertedTask } from '../utils/tracker.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { parsePlan } from '../plan/parse.js';
+import { parsePlan } from '../core/plan/index.js';
 import { insertTrackerTask, writeTrackerBlocker } from '../utils/tracker.js';
 
 import { outsideCaseText } from './suite-outside-case.js';

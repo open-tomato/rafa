@@ -16,7 +16,7 @@
  * call, to `.rafa/sync-calls.log` under the repository the adapter is
  * made for, so a case reads what each end-of-task pull did.
  */
-import type { AdapterContext } from '../../../adapters/registry.js';
+import type { AdapterContext } from '../../../core/adapters/index.js';
 import type { Sync, SyncPullRequest, SyncPullResult } from '../../../ports/index.js';
 
 import { appendFileSync, mkdirSync } from 'node:fs';

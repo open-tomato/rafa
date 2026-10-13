@@ -61,7 +61,7 @@
  * exercised in-process below, and unit-level in each module's own
  * suite.
  */
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 import type { TaskReportInput } from '../report/record.js';
 
 import {
@@ -79,10 +79,10 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { runsDir, sessionFilePath } from '../core/loop/index.js';
 import { sessionLogDir } from '../effort/collect.js';
 import { LEGACY_GATE_OPEN } from '../effort/store/migrations.js';
 import { migrateSchema, sqliteStorePath, SQLITE_MIGRATIONS, SQLITE_SCHEMA_VERSION } from '../effort/store/sqlite.js';
-import { runsDir, sessionFilePath } from '../loop/sessions.js';
 import { recordTaskReport } from '../report/record.js';
 
 import { expectExit, plantProjectConfig, plantScratchRepo, runRafa } from './cli-capture.js';

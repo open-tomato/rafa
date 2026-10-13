@@ -142,7 +142,7 @@
 import type { DoctorResult, DoctorSeams } from './doctor.js';
 import type { OutputStream } from '../adapters/output/stream.js';
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
-import type { PrerequisiteItem } from '../config.js';
+import type { PrerequisiteItem } from '../core/config/index.js';
 import type { ProbeOptions, ProbeRun } from '../preflight/run.js';
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -161,8 +161,8 @@ import { BOARD_LABELS, SPEC_TEMPLATE_PATH } from '../board/setup.js';
 import { ROADMAP_ROW_NAME } from '../board/status.js';
 import { dispatch } from '../cli/dispatch.js';
 import { createCommandRegistry } from '../cli/registry.js';
-import { versionLine } from '../cli/version.js';
-import { configFilePath } from '../config.js';
+import { versionLine } from '../core/command/index.js';
+import { configFilePath } from '../core/config/index.js';
 import { readLegacyStore } from '../effort/store/legacy.js';
 import { writePreflightChecks } from '../effort/store/preflight.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';

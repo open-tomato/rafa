@@ -91,9 +91,8 @@ import type { Epic } from '../../board/epics.js';
 import type { IssueBoard } from '../../board/issue-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
 import type { PlanNames } from '../../board/roadmap-rows.js';
-import type { RafaContext } from '../../cli/command.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
-import type { GitRunner } from '../../pr/git.js';
+import type { RafaContext , Prompter } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
 import { applyHorizonChange, EPIC_HORIZON_REFUSAL_EXIT, readHorizonChange } from '../../board/epic-horizon.js';
@@ -109,11 +108,10 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createPlanDirNames } from '../../board/roadmap-rows.js';
 import { createGhOpenPullRequests } from '../../board/roadmap.js';
-import { CommandExit } from '../../cli/command.js';
-import { createLinePrompter } from '../../cli/prompt/confirm.js';
-import { messageOf } from '../../config-sections.js';
-import { plansDirAt } from '../../plan/plan-files.js';
-import { createGitRunner } from '../../pr/git.js';
+import { CommandExit , createLinePrompter } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
+import { createGitRunner } from '../../core/git/index.js';
+import { plansDirAt } from '../../core/plan/index.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readTextFlag } from '../issue/issue-tracker.js';
 
 import { horizonTarget, refreshProjectAfterEpic } from './epic-project.js';

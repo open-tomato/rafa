@@ -111,7 +111,7 @@ import type { InventoryKind } from '../inventory/record.js';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
-import { isSessionId, runsDir } from '../loop/sessions.js';
+import { isSessionId, runsDir } from '../core/loop/index.js';
 import { readFrontmatterDocument } from '../schema/frontmatter.js';
 import { checkProvenance, PROVENANCE_FIELD, readProvenance } from '../schema/provenance.js';
 

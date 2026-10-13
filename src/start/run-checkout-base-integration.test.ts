@@ -13,7 +13,7 @@
  *  - with `prBase` naming a second remote branch: the worktree is cut
  *    from that branch.
  */
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 

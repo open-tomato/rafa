@@ -21,12 +21,13 @@
  * reddened 4, a refusal naming hidden actions 3, routing past `--` 2, and
  * a bare `exec` action refused 2.
  */
-import type { RafaCommand } from './command.js';
 import type { HelpRequest, Route } from './route.js';
+import type { RafaCommand } from '../core/command/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { commandSpelling } from './command.js';
+import { commandSpelling } from '../core/command/index.js';
+
 import { createCommandRegistry } from './registry.js';
 import { routeLine } from './route.js';
 

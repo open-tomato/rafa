@@ -42,7 +42,7 @@
  *   the full suite". It is a `note`, which `--strict` does not refuse.
  */
 import type { RiskLevel } from './commands.js';
-import type { PlanTask } from '../parse.js';
+import type { PlanTask } from '../../core/plan/index.js';
 
 import { shellTokens } from './commands.js';
 import { COMMAND_WRAPPERS } from './patterns.js';

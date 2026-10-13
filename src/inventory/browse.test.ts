@@ -10,8 +10,8 @@ import type { Key, Terminal } from '../cli/prompt/terminal.js';
 
 import { describe, expect, test } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
 import { INTERRUPT_EXIT_CODE, NO_TERMINAL_TEXT } from '../cli/prompt/terminal.js';
+import { CommandExit } from '../core/command/index.js';
 
 import {
   browse,

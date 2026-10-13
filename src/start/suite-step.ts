@@ -8,7 +8,7 @@
  * Each step runs `bun test` itself (`suite/run.ts`: no timeout,
  * `CLAUDECODE` and `FORCE_COLOR` removed, failures read from Bun's JUnit
  * file), appends
- * one {@link SessionStep} to the run record (`loop/sessions.ts`) BEFORE
+ * one {@link SessionStep} to the run record (`core/loop/sessions.ts`) BEFORE
  * anything acts on it, prints what it found, and answers a
  * {@link StepOutcome}. Deciding whether the run goes on is the caller's:
  * nothing here stops the loop.
@@ -190,7 +190,7 @@
  * Such a run answers nothing about the tree: a `bun test` killed midway
  * prints no summary, which would otherwise read as red and insert a
  * repair task. So an interrupted step is recorded with `interrupted: true`
- * (`loop/sessions.ts`) and no new failure, is never red, writes no
+ * (`core/loop/sessions.ts`) and no new failure, is never red, writes no
  * blocker, and answers {@link StepOutcome.interrupted}, on which the
  * caller ends the run as `rafa loop stop` does. An interrupted baseline
  * is not written and enters no stage in the ledger, and an interrupted
@@ -228,7 +228,7 @@
  * the plan's `Owns:` folders through {@link SuiteStepContext.owns},
  * which {@link planOwnsReader} builds over a `gh` runner, reading them
  * at most once per run. Every line goes through the active output
- * (`adapters/output/active.ts`).
+ * (`core/output/active.ts`).
  *
  * ## Where the stage step lives
  *
@@ -257,7 +257,7 @@ import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
 import type { TestsSettings } from '../config-schema-tests.js';
-import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../loop/sessions.js';
+import type { SessionStep, SessionStepKind, SessionStepOnly, SessionStepReason } from '../core/loop/index.js';
 import type { GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteFailure, SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -268,10 +268,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { messageOf } from '../config-sections.js';
-import { runsDir, updateSession } from '../loop/sessions.js';
-import { parsePlan } from '../plan/parse.js';
+import { messageOf } from '../core/config/sections.js';
+import { runsDir, updateSession } from '../core/loop/index.js';
+import { activeOutput } from '../core/output/index.js';
+import { parsePlan } from '../core/plan/index.js';
 import { createGitRunner, gitSaid } from '../pr/index.js';
 import {
   BASELINE_FILE_PREFIX,

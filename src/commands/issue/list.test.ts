@@ -29,9 +29,9 @@
 import type { LineFlags } from './issue-tracker.js';
 import type { RoadmapListResult } from './list.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
+import type { GitRunner } from '../../core/git/index.js';
 import type { Issue, IssueDraft } from '../../ports/index.js';
-import type { GitRunner } from '../../pr/git.js';
 import type { LiveReading } from '../../refs/stamp.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';
 
@@ -48,7 +48,7 @@ import { changedArgs, WATERMARK_ARGS } from '../../board/board-cache.js';
 import { BOARDS_LIST_ARGS } from '../../board/boards.js';
 import { SPEC_READY_LABEL } from '../../board/readiness.js';
 import { ROADMAP_REFUSAL_EXIT } from '../../board/roadmap.js';
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { ABSENT, PRESENT, UNREADABLE, writeRefsBlock } from '../../refs/stamp.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { completeSpecBody } from '../../tests/spec-bodies.js';

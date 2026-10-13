@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { createGitRunner } from '../../pr/git.js';
+import { createGitRunner } from '../../core/git/index.js';
 import { classifyTriage } from '../../pr/triage/classify.js';
 import { readTriageRerun } from '../../pr/triage/rerun.js';
 import { resolveWorktreePath } from '../../pr/worktree.js';

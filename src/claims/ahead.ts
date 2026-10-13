@@ -64,7 +64,7 @@
  * for each, exit 0.
  */
 import type { RoadmapLine, RoadmapReadings } from '../board/roadmap.js';
-import type { ClaimsAhead } from '../config-sections.js';
+import type { ClaimsAhead } from '../core/config/sections.js';
 import type { GitRunner } from '../pr/index.js';
 
 import { planStub } from '../board/naming.js';

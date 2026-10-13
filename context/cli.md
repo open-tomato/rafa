@@ -12,16 +12,16 @@ module's note is the long form.
 | Module | Holds |
 | --- | --- |
 | `src/cli/core/` | `types.ts`, `parseArgs.ts` and `assembleContext.ts`, copied from open-tomato's `cli-core` |
-| `src/cli/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
+| `src/core/command/command.ts` | `RafaCommand`, `RafaContext`, `CommandExit`, and the shape check `commandProblem` |
 | `src/cli/registry.ts` | subjects, core commands, aliases, and the `module/<name>` mounts |
 | `src/cli/route.ts` | a line read into a command, a help request, a version request or a refusal, with no side effect |
 | `src/cli/modules.ts` | module command entries imported and mounted, one warning per file skipped |
 | `src/cli/dispatch.ts` | one invocation: the context, the async scope a command runs in with its active output, its logger and the running command recorded while it runs (`running.ts`), the events, the deprecation line and the exit code |
 | `src/cli/help.ts` | `renderHelp`, the three help levels rendered from the registry, and `GLOBAL_FLAGS` |
-| `src/cli/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
+| `src/core/command/version.ts` | `RAFA_VERSION`, the `package.json` version the build inlines, and `versionLine`, the `rafa <version>` line |
 | `src/cli/describe.ts` | `describeRegistry`, the schema 2 roster built from the registry, module-provided actions included |
 | `src/cli/testdata/help/` | the frozen text of `rafa --help`, `rafa loop --help`, `rafa loop start --help`, `rafa loop wait --help`, `rafa next --help`, `rafa issue ready --help`, `rafa issue edit --help` and `rafa release tag --help` |
-| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts`, `confirm.ts` and `page.ts` the five prompts for text input, single selection, multi-selection, confirmation and paged lists in raw mode on standard error |
+| `src/cli/prompt/` | the prompt kit: `terminal.ts` the keys read, raw mode and SIGINT handling, and `text.ts`, `select.ts`, `multi-select.ts` and `page.ts` the four prompts for text input, single selection, multi-selection and paged lists in raw mode on standard error; `confirm.ts`, the confirmation prompt, is `src/core/command/confirm.ts` |
 | `src/modules/load.ts` | the modules `allowList:` names, loaded from their `modules:` sources: manifests checked, adapters registered, command entries handed on |
 | `src/commands/module/` | `module list`, what each configured module came to, and `module exec`, the `exec` action mounted modules are reached through |
 | `src/commands/agent/` | `agent vendor`, a rafa-tier or `~/.claude/agents` definition copied into the project with a source header, naming its tier; `agent list`, the agents the inventory holds, with `--source` (aliased `--tier`), `--state` and `--hidden-from-loop` filters and `-i` browse; `agent show`, one definition whole through the show view; and `agent search`, the agents that answer a question through the same runner as skill search |
@@ -36,13 +36,13 @@ module's note is the long form.
 | `src/board/relations/labels.ts` | the `labels` adapter, delivering `labels` mode: membership from `epic:<slug>` labels, order from the epic's checklist, waiting from `spec:blocked` labels and `Blocked by:` lines with the four faults, and `readUnblockableIssues` read by the unblock step of `pr merge` |
 | `src/board/relations/native.ts` | the `native` adapter, delivering `native` mode: membership from the `parent` field, order from the `subIssues` array if `gh` answers it (the checklist otherwise), waiting from `blockedBy` nodes each with their state, and `readFreedIssues` read by `pr merge` to print what a merge freed |
 | `src/board/relations/select.ts` | `selectBoardRelations(config)`, shaped like `selectEffortStore`, a module-local table keyed by `board.relationships` kind (`labels` or `native`), a `TypeError` naming the kinds when the value is none of them, registered as no port type |
-| `src/board/relations/contract.ts` | a test helper, not a test file, shaped like `src/adapters/tracker/contract.ts`: `relationsContractCases` answered as a list and `runRelationsContract` registering it, run by `labels.test.ts` and `native.test.ts` over fixture listings describing the same board, never adding to `src/adapters/registry.ts` |
+| `src/board/relations/contract.ts` | a test helper, not a test file, shaped like `src/adapters/tracker/contract.ts`: `relationsContractCases` answered as a list and `runRelationsContract` registering it, run by `labels.test.ts` and `native.test.ts` over fixture listings describing the same board, never adding to `src/core/adapters/registry.ts` |
 | `src/commands/epic/` | `epic show`, one epic's issues as the Roadmap table, aliased `epic` for good, so `rafa epics`, `rafa epics <n>`, `rafa epic` and `rafa epic <n>` run it with no deprecation line; `epic new`, which creates an epic's issue from the epic template, its line on the current board and, in `labels` mode only, its `epic:<slug>` label; `epic defer` and `epic promote`, thin declarations over `horizon-change.ts`, which reads their line, asks the reason and the keep question, and makes the horizon swap, the comment and the pull request closes; and `epic move`, which moves an issue to another epic through the relationships port's `setParent` and exports its move core, `readEpicMove` and `applyEpicMove`, for `epic cancel`, with `move-native.ts` reading the mode off the config and the epic a native issue leaves off its parent; and `epic close`, the closing gate, the subject's one spender, which plans a check per acceptance criterion over `src/epic/verify-plan.ts`, runs the checks against `origin/main` over `src/epic/verify-run.ts`, files each failure through `triageReport`, and closes the epic with its cost printed beside its estimate; and `epic cancel`, which lists the epic's dependents off `src/board/epic-dependents.ts`, asks move, unblock or cancel for each, applies a move through `move.ts`'s core, and closes the epic as not planned, with `cancel-unblock.ts` reading what an unblocked dependent still waits on in each relationships mode; and `epic-project.ts`, the project refresh each of the six actions runs once its writes landed, over the epic, its members and every item whose Rank shifted, the new epic added to the project first, each line a warning that keeps the exit code |
 | `src/commands/claim/` | `claim release <n>`, which releases a claim the store owns, leaving the issue claimable by other devices; `claim hand <n> --to=<store id>`, which hands over a claim to another device for acceptance; `claim accept <n>`, which accepts a handed-over claim from another device; and `claim take <n> [--stale]`, which takes a claim held too long, failing if the claimed issue was written in this run or if `--stale` is not named and the claim is not stale by `claims.staleAfter` |
 | `src/commands/check-report.ts` | what `skill check` and `instinct check` share: the words each reads off a line, the seams, the lines a run prints and the exit code |
 | `src/commands/index.ts` | the core roster: `CORE_SUBJECTS`, `CORE_COMMANDS` and `CORE_REGISTRY` |
 | `src/commands/wrap.ts` | `wrapPhaseZeroCommand`: a phase 0 command behind a declaration |
-| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share that reads a command's context, arguments or flags: the project it was handed, the config that project resolves (`resolveProjectConfig`), the plans directory by that config (`resolvePlansDir`), the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value. The task counts, the file names, an issue as a line and `rejectedPath` are its library half, `src/plan/plan-files.ts`, which imports nothing under `src/commands/` |
+| `src/commands/plan/plan-files.ts` | what `plan list`, `plan show`, `plan validate`, `plan risk` and `plan needs` share that reads a command's context, arguments or flags: the project it was handed, the config that project resolves (`resolveProjectConfig`), the plans directory by that config (`resolvePlansDir`), the argument refusals and `readSwitch`, which refuses a word the parser read into a flag taking no value. The task counts, the file names, an issue as a line and `rejectedPath` are its library half, `src/core/plan/plan-files.ts`, which imports nothing under `src/commands/` |
 | `src/commands/plan/risk.ts` | `rafa plan risk [<plan>] [--strict]`: the reading of `src/plan/risk.ts` over one plan, in code and starting no session, so it declares no `spends`. The plan resolves against the project root as `loop start --plan=` resolves it, and with none named is the default plan `loop start` falls back to; a plan named that is no file, no default plan, two plans and `--strict` typed ahead of the plan (which the parser reads as its value) are refused with exit code 1. The config gives `loop.settingSources` and the account settings; git and `gh` run at the project root; the environment is `RafaContext.env`, of which only the keys are read. Text mode prints `renderRiskText` a line at a time; json mode gives the `RiskReport` as the terminal result's data. Exit code 0 whatever it finds; 1 under `--strict` when any finding is `high`, where text mode prints the whole report first and json mode writes each `high` as an `error` log event, since a failed result carries no data. Every code span of an open task line is read as a command, so a span that only names one reports it: the rafa-69 plan's own `git push --force` fixture task reads `high` `destructive`, by design. An open task's sentence that asks its session for a whole-suite run (the phrase "full suite" or "whole suite", or a code span running `bun test` with no path; `bun test src/plan/` and `bun test --changed=<base>` are not one) is a `long-run` `note` from `src/plan/risk/long-runs.ts`, naming the line and the fix, `tests=full` on the task; a `note`, so `--strict` exits 0 on it |
 | `src/commands/plan/needs.ts` | `rafa plan needs [<plan> | --spec=<file> | --issue=<n>] [--missing] [--source=<source>]`: the reading of `src/plan/needs.ts` over one plan or one spec, in code and starting no session, so it declares no `spends`. A plan resolves as `plan risk` resolves its own, the default plan when none is named. `--spec` and `--issue` go through `resolveCreateSpec` (`spec-route.ts`) handed no offer, so a spec is found and an issue checked and snapshotted under `specs.dir` exactly as `plan create` does, and an issue `plan create` refuses is refused with the same code. The inventory is built as `skill list` builds it, `PATH` read off `RafaContext.env`. `--missing` keeps what `isUnmet` reports and the stacks not met, prints nothing at all when nothing is kept, and exits 1 when anything is, json mode writing each kept row as an `error` log event first; `--source` keeps the agents and skills one source holds, so it drops every MCP server, program, missing item and stack row, and refuses only a value written as no source. A plan beside `--spec` or `--issue`, `--spec` beside `--issue`, `--missing` typed ahead of the plan, a plan that is no file, no default plan and a config `loadConfig` refuses are exit code 1. Exit code 0 otherwise, whatever it finds |
 | `src/commands/plan/ready-offer.ts` | the offer `plan create --issue` and `plan create --next` make on an issue carrying no `spec:ready` label: `rafa issue ready`'s run over the issue the route already read, made only where there is a terminal, and never under `--dry-run` |
@@ -56,7 +56,7 @@ module's note is the long form.
 | `src/commands/issue/check.ts` | `rafa issue check <n> [--stamp]`: the references issue `<n>`'s saved copy names, each with its state, read by the verifier check 4 builds (`createPlanRefsVerifier`) and starting no session, so it declares no `spends`. The copy is found by number, the one `rafa-<n>-<slug>.md` under `specs.dir` beside the notes file; none is refused naming `rafa plan create --issue=<n>`, two naming both, each with exit code 1, as are a line it refuses, a config refused, a board issue `gh` could not read and a refs block the codec will not read. A plain check is `readCopyRefs`, which writes the first stamps of a reference it has none for; `--stamp` prints the rows read against the old stamps and verifies each for drift, then re-stamps every reference (`restampCopyRefs`) over one memoised verifier. Exit code 0 whatever the states are. Json mode gives the issue, the copy's path, `stamped` and every reference with its `kind`, `text`, `line`, `state`, `fingerprint` and `stamp` as one word each |
 | `src/commands/issue/edit.ts` | `rafa issue edit <n>`: one issue on the tracker the chain lands on appended to (`--append-file=<file>` or `--append=<text>`, with `--reason`, `--while-in-development` allowed), its body replaced (`--replace-file=<file>`, `--title` allowed beside it) or its title changed (`--title` alone), the run being `editIssue` in `./edit-run.ts`. The command prints `renderEditReport`'s lines in text mode, each gate's reading and the added part first under `--dry-run`, and gives the report with its tracker as the data of a json-mode terminal result. Exit code 0 for `appended`, `replaced`, `already` and `stale-copy`, the last naming `rafa plan create --issue=<n> --refresh`, which it never runs; 2 for a gate's refusal, `--dry-run` included; 1 for a line refusal, a tracker read or write rejected, and `conflict`, whose report is the message of the `CommandExit`, as `pr wait` carries a non-zero ending, so both `.rafa/scratch/` paths reach the person in either mode. It starts no session, so it declares no `spends` |
 | `src/commands/issue/issue-tracker.ts` | what the nine `issue` actions share: the tracker resolved through the chain, the ref an id names, the line readers and the refusals |
-| `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status`, `list` and `wait` share that reads a context or flags: the `--session-id` flag, the session a line picks, the write to its record, a phase and an ETA as written, and the refusals, the two finding no session a `NoSessionRefusal`. Its library half is `src/loop/session-readings.ts`: the records under a root, a session's checklist and rough ETA, a session as a line and the seams, which any folder may import |
+| `src/commands/loop/loop-sessions.ts` | what `loop stop`, `pause`, `resume`, `status`, `list` and `wait` share that reads a context or flags: the `--session-id` flag, the session a line picks, the write to its record, a phase and an ETA as written, and the refusals, the two finding no session a `NoSessionRefusal`. Its library half is `src/core/loop/session-readings.ts`: the records under a root, a session's checklist and rough ETA, a session as a line and the seams, which any folder may import |
 | `src/commands/loop/wait.ts` | `rafa loop wait [--session-id=<id>] [--until=<reasons>] [--timeout=<minutes>]`: follows one run until a reason `--until` asks for happens, in code and starting no session, so it declares no `spends`. The session is picked as `loop status` picks it; the two refusals finding none exit 2, every other refusal of the pick 1. `--until` is read by `src/loop/wait-reasons.ts`, whose `WAIT_REASONS` table the help, the json result and the exit code all read: `pr` 0, `no-pr` 10, `halt` 11, `error` 12, `blocked` (event `task-blocked`) 13, `exit` (the record's pid not alive, or the record reading `stopped` or `done`) 14, `quiet:<minutes>` 15; left out it is `pr,no-pr,halt,error,exit`. An entry it refuses, a `--timeout` that is no whole number from 1 and a stray word exit 1. Every `WAIT_POLL_MS` (5 s) a poll reads the events file from the last offset (`src/loop/events-file.ts`, from byte 0 so a run that already ended answers), then the record and its pid, reading the events once more before answering `exit`, then the awake clock (`src/loop/awake-clock.ts`) for `quiet`, counted from the last event read, and `--timeout`, counted from the wait's start, exit 16; both count awake minutes, and on macOS, where the clock counts through sleep, a long sleep can raise a false `quiet`, which the help says. A run with no events file is noted once as a warning and the wait goes on. It prints one `rafa·` line: the event's summary, or a line naming `exit`, `quiet` or `timeout`, the last two adding the minutes suspended. In json mode the result (reason, exit code, line, event, session id, state, pid and liveness, awake and suspended minutes) is a named `wait` event, and the terminal result's `data` for `pr` alone, since the dispatcher drops a payload on a non-zero exit; for any other reason the terminal error's message is the line. The branch reader, pid probe, record read, clock, sleep and poll length are seams |
 | `src/commands/pr/` | `pr current`, the open pull request of the branch checked out at the project root on one line; `pr show`, it in full with its checks and its last triage; `pr view`, it opened in the browser; `pr list`, the open pull requests as rows; `pr merge`, one merged, its `Closes #<n>` line ticked on the roadmap and both branches cleaned up after it; `pr triage`, one assessed in code into a class with its evidence and a follow-up prompt, and under `--resolve` handed to the ordinary loop over the pinned plan for its class, or for `conflict-version` converted in code with no session; and `pr wait`, its checks polled until they settle, the deadline passes or it turns out to have none, exiting 0 green, 1 red and on no checks at all, and 3 at the deadline |
 | `src/commands/pr/wait.ts` | `rafa pr wait [<n>] [--timeout=<minutes>]`: polls one pull request's checks until they settle or the deadline passes, reading and writing nothing else. Exit code 0 for green (every check passed); 1 for red (a check failed) or none (no check registered yet); 3 for a deadline that passed with checks still running or pending. The `--timeout` flag takes a minute count from 1, defaulting to `DEFAULT_CI_TIMEOUT_MIN`; the number is read from the line, so `rafa pr wait --timeout 41` is a 41-minute wait on the branch's own PR, not a wait on #41. The verdict state values are `green`, `red`, `none`, `pending`, and `timeout`. A green run ends with the one step that follows; the other four each carry their report as the message of their `CommandExit`. The poll is the `waitForChecks` the loop's own CI gate uses, so one wait and the loop agree about what green means and how often a pull request is asked. This command alone hands it the head's committed time (`PullRequestDetail.headCommittedAt`, read through `get`): zero checks on a head younger than `FIRST_CHECK_GRACE_MS` (120 s, `src/pr/checks.ts`) are polled again, so a wait typed just after a push holds until the first check registers. A null time, or a head past the grace, gets none, and the gate and `pr triage --resolve` pass no time at all. A `none` ending reads the detail once more and prints the does-not-merge-cleanly line only when it reads `conflicting`; otherwise it names `rafa pr wait <n>` to ask again and `rafa pr show <n>`. The report is the data of a json-mode terminal result when green, or its error message when not. See `--no-hint` under the ending hint. |
@@ -732,14 +732,14 @@ New; it replaces no earlier text. What a row or an action added to
   `start/dispatch.ts`, `start/triage.ts`, `start/release-stage.ts`,
   `start/retry-budget.ts`, `start/continue-run.ts`,
   `start/forced-draft.ts`, `adapters/tracker/resolve.ts`,
-  `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `utils/claude.ts`
+  `adapters/tracker/local.ts`, `start/pr-lifecycle.ts`, `core/loop/claude.ts`
   and `utils/schedule.ts`.
   For the others they are `src/plan.ts`,
   `commands/plan/plan-record.ts`,
   `effort/collect.ts` and `effort/report.ts`, and for
   every command `loadConfig`'s default warning sink in
-  `src/config-load.ts`. `console.log`'s and `console.info`'s lines go at
-  `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
+  `src/core/config/config-load.ts`. `console.log`'s and `console.info`'s lines
+  go at `info`, `console.warn`'s at `warn` and `console.error`'s at `error`,
   each message as it was. In text mode an `info` line is the bytes
   `console.log` wrote, and a warning or an error goes to stdout after
   `warn: ` or `error: `, where `console` wrote it bare on stderr. So
@@ -1794,7 +1794,7 @@ New; it replaces no earlier text. What a row or an action added to
   a session would be asked about, and NOTHING is written.
   With `--propose` it runs `runProposalPass` (`src/backfill/propose.ts`):
   one `claude -p` session per batch of twenty through the capturing
-  spawner of `src/utils/claude.ts`, the setting sources
+  spawner of `src/core/loop/claude.ts`, the setting sources
   `loop.settingSources` resolves to, and one
   `<base>/.rafa/backfill/proposals-<nn>.yaml` per batch, each
   `status: draft` and each row of a session that answered nothing
@@ -2416,13 +2416,13 @@ New; it replaces no earlier text. What a row or an action added to
   git reads it there, and `status` alone falls back on the newest record of
   that branch (`loop/loop-sessions.ts`). `stop` sends SIGINT to the
   record's pid; `loop start` passes it on to its running Claude session
-  (`utils/claude.ts`) and marks that task `[BLOCKED]`. `stop` then waits up
+  (`core/loop/claude.ts`) and marks that task `[BLOCKED]`. `stop` then waits up
   to 30 seconds for the record to read `stopped` or `done` and names what
   the tracker holds at the task's line; a run still going then is warned
   about, exit code 0. `pause` writes `paused` and nothing else, and the
   loop holds between tasks while its record reads so (`start/pause.ts`);
   `resume` writes `running`. Each moves a record only from the state it
-  read (`onlyFrom`, `loop/sessions.ts`), and leaves a record already where
+  read (`onlyFrom`, `core/loop/sessions.ts`), and leaves a record already where
   it would put it unchanged, exit code 0. `status` counts the plan's tasks
   from its tracker and gives a live session a rough ETA from the store's
   `done` finishes since the session started
@@ -2509,8 +2509,8 @@ New; it replaces no earlier text. What a row or an action added to
   (`start/preflight.ts`). A record of the plan refuses the
   run when it names another branch, whatever its state, or names this
   branch and reads `running` or `paused`, a pid that is gone reading
-  `stopped` (`start/session.ts`, `loop/sessions.ts`). `plan create` throws 1
-  for an unusable config, none of `--spec`, `--issue` and `--next` named, a
+  `stopped` (`start/session.ts`, `core/loop/sessions.ts`). `plan create` throws
+  1 for an unusable config, none of `--spec`, `--issue` and `--next` named, a
   spec found neither against the project root nor under `specs.dir`, a plan
   already there, and for a planner's rejection the exit code a `claude`
   planner's rejection carries, or 1; 2 for an issue author without write
@@ -2789,7 +2789,7 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   a second result and any `start` or `result` handed to `emit`. A refusal
   there ends the command as `command_error`.
 - **While a command runs, its context's output is the active output**
-  (`src/adapters/output/active.ts`), in the invocation's output mode,
+  (`src/core/output/active.ts`), in the invocation's output mode,
   which `activeOutputMode()` answers. Both are held in an async scope of
   the invocation's own (`runWithActiveOutput`, an `AsyncLocalStorage`),
   beside the running command (`runAsRunningCommand`,
@@ -2862,7 +2862,7 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
   the command's own, however often it is typed:
   `rafa: "rafa effort report --json" is deprecated; use "rafa effort report --output=json"`.
   `effort report`'s `--json` is the one such flag, so it runs in json
-  mode. `deprecated` sits on `RafaFlagSpec` (`src/cli/command.ts`), not
+  mode. `deprecated` sits on `RafaFlagSpec` (`src/core/command/command.ts`), not
   on the copied `FlagSpec`, and `commandProblem` refuses one naming no
   `use`.
 - **The result error codes** are the five routing refusals, `invalid_spec` (a
@@ -2871,7 +2871,7 @@ text mode; see `src/cli/dispatch.ts`'s module note) are options.
 - **Help is text only.** `renderUsage`, one usage line per level, renders
   it for a caller naming no renderer; `src/rafa.ts` hands in `renderHelp`.
 - **So is the version.** A version route writes `rafa <version>`
-  (`src/cli/version.ts`) to stdout and ends 0; json mode writes its two
+  (`src/core/command/version.ts`) to stdout and ends 0; json mode writes its two
   events and no text, where `rafa describe` gives the same version as
   data.
 
@@ -2900,7 +2900,7 @@ session does:
 
 A command without a `spends` declaration declares nothing.
 
-The spend guard in `src/utils/claude.ts` warns when the running command's
+The spend guard in `src/core/loop/claude.ts` warns when the running command's
 `spends` declaration does not cover the session it starts, and starts the
 session anyway: usage is at most a warning, never a gate. The running
 command is the one the dispatcher recorded with its parsed flags

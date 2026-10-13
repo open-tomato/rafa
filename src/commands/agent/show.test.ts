@@ -31,7 +31,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 import { dispatchInProject, eventsOf, plantProjectConfig } from '../../tests/cli-capture.js';
 
 import { agentShowView, createAgentShowCommand, unknownAgentMessage } from './show.js';

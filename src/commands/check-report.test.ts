@@ -33,7 +33,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { dispatchCaptured, eventsOf } from '../tests/cli-capture.js';
 
 import {

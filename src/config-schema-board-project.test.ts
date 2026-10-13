@@ -24,18 +24,18 @@
  * whose least is `0`, so for it `0` is the accepting edge and `-1` the
  * refusal beside it.
  */
-import type { ConfigSetting } from './config-schema.js';
-import type { ConfigOverrides } from './config.js';
+import type { ConfigOverrides, ConfigSetting } from './core/config/index.js';
 
 import { describe, expect, it } from 'bun:test';
 
-import { isCommandLineSetting, SETTINGS } from './config-schema.js';
 import {
   CONFIG_DEFAULTS,
   ConfigError,
+  isCommandLineSetting,
   parseConfigText,
   resolveConfig,
-} from './config.js';
+  SETTINGS,
+} from './core/config/index.js';
 
 /** The label every project-file case parses under. No file is read at it. */
 const PATH = '/repo/.rafa/config.yaml';

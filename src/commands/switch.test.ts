@@ -19,7 +19,7 @@
  */
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import type { BoardIssue } from '../board/roadmap-board.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 import type { Place, Position } from '../project/position.js';
 import type { PlantedProject } from '../tests/cli-capture.js';
 

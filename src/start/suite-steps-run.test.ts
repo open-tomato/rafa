@@ -23,7 +23,7 @@ import type {
   TaskStepInput,
 } from './suite-step.js';
 import type { SuiteStepCalls } from './suite-steps-run.js';
-import type { SessionStep } from '../loop/sessions.js';
+import type { SessionStep } from '../core/loop/index.js';
 import type { GitResult, GitRunner } from '../pr/index.js';
 import type { SuiteBaseline } from '../suite/baseline.js';
 import type { SuiteResult, SuiteRunOptions } from '../suite/run.js';
@@ -35,7 +35,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { setActiveOutput } from '../adapters/output/active.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { baselineOf, baselinePathFor, readBaseline, writeBaseline } from '../suite/baseline.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { findNextTask } from '../utils/tracker.js';

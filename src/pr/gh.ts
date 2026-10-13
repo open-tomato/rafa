@@ -180,7 +180,7 @@ import type {
 import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 
 import { createGhRunner } from '../adapters/tracker/github.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 
 import { parseChecks, verdictOf } from './checks.js';
 import { CLOSING_ISSUES_FIELD, readClosingIssues } from './gh-closing-issues.js';

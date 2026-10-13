@@ -24,13 +24,13 @@
  * location refuses, and exit code 2 when the file cannot be read as a
  * store.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { SchemaReport, SchemaReportOptions } from '../../effort/store/schema-report.js';
 
 import { join } from 'node:path';
 
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { effortStoreDir } from '../../effort/store/location.js';
 import { gateMeaning, readSchemaReport } from '../../effort/store/schema-report.js';
 import { SQLITE_STORE_FILE_NAME } from '../../effort/store/sqlite.js';

@@ -126,7 +126,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { ConfigError } from '../config.js';
+import { ConfigError } from '../core/config/index.js';
 import { expectExit } from '../tests/cli-capture.js';
 import { scratchHomeEnv } from '../tests/scratch-home-env.js';
 import { stampPrompt } from '../utils/plan-stamp.js';

@@ -69,8 +69,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'bun:test';
 import ts from 'typescript';
 
+import { readSessions } from './core/loop/index.js';
 import { eventsFileOf, readEventsFrom } from './loop/events-file.js';
-import { readSessions } from './loop/sessions.js';
 import { CHECKOUT_MOVED } from './start/checkout-guard.js';
 import { BLOCKER_PROMPT_PREFIX } from './start/dispatch.js';
 import { plantProjectConfig } from './tests/cli-capture.js';

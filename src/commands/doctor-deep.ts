@@ -59,11 +59,11 @@
  * No reading here changes doctor's exit code or adds a preflight item:
  * every row is `ok`, `warn` or `note` (`./doctor-deep-row.ts`).
  */
+import type { EnvDifference, EnvLayer, PathDifference, SessionEnvReading } from './doctor-deep-env.js';
 import type { DeepRow, DeepSection } from './doctor-deep-row.js';
 import type { GhRunner, GhRunnerOptions } from '../adapters/tracker/github.js';
-import type { ClaudeSettingSource } from '../config-sections.js';
-import type { ResolvedConfig } from '../config.js';
-import type { EnvDifference, EnvLayer, PathDifference, SessionEnvReading } from './doctor-deep-env.js';
+import type { ResolvedConfig } from '../core/config/index.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { ModuleLoadSeams } from '../modules/load.js';
 import type { NeedsSeams, NeedsWarning } from '../plan/needs.js';
 import type { ResolvePrProviderOptions } from '../pr/provider.js';

@@ -43,7 +43,7 @@ import type { OpenIssue, Tracker } from '../ports/index.js';
 import { readFailedCases } from '../ci/failed-cases.js';
 import { readNewestRun } from '../ci/runs.js';
 import { CI_STATUS_EXIT, readFailedLog, renderCiStatus, verdictOf } from '../ci/status-reading.js';
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
 
 /** Where the readings come from. */
 export interface PitSeams {

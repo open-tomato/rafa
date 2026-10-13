@@ -44,7 +44,7 @@ import type { InstallOptions, InstallSeams } from '../src/runtime/install.js';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { messageOf } from '../src/config-sections.js';
+import { messageOf } from '../src/core/config/sections.js';
 import { readBinPath } from '../src/project/bin-path.js';
 import { EXIT_COULD_NOT_RUN, exitCodeFor, FORCE_FLAG, installRuntime, outcomeProblem, runBuild } from '../src/runtime/install.js';
 

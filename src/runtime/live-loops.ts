@@ -19,9 +19,9 @@
  * the main checkout, so a caller holding a linked worktree's root reads
  * none of them.
  */
-import type { PidProbe, SessionRecord } from '../loop/sessions.js';
+import type { PidProbe, SessionRecord } from '../core/loop/index.js';
 
-import { isPidAlive, readSessions } from '../loop/sessions.js';
+import { isPidAlive, readSessions } from '../core/loop/index.js';
 
 /**
  * The loops recorded under `<root>/.rafa/runs/` that read `running` or

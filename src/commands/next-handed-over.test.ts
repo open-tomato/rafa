@@ -25,7 +25,7 @@
  *    that would allow it.
  */
 import type { NextChainOptions, NextChainReport } from './next.js';
-import type { RafaCommand, RafaContext } from '../cli/command.js';
+import type { RafaCommand, RafaContext } from '../core/command/index.js';
 import type { NextCeiling } from '../next/ceiling.js';
 import type { NextState } from '../next/state.js';
 import type { GitResult, GitRunner, PullRequestDetail, PullRequestSummary } from '../pr/index.js';

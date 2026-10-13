@@ -124,11 +124,11 @@ import type { BranchForecast } from './branch-forecast.js';
 import type { ReleaseLevelNote } from './level.js';
 import type { SettleSettings } from './settle.js';
 import type { FoldFragment } from './strategy.js';
-import type { GitRunner } from '../pr/git.js';
+import type { GitRunner } from '../core/git/index.js';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { gitSaid } from '../core/git/index.js';
 import { readPlanChanges } from '../effort/store/changes.js';
-import { gitSaid } from '../pr/git.js';
 
 import { forecastLine } from './branch-forecast.js';
 import { forecastRelease } from './forecast.js';

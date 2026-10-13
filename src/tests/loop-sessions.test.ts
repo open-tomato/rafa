@@ -53,12 +53,12 @@
  *     not that directory exists.
  *
  * Every case reads the session record through `readSessions`
- * (`loop/sessions.ts`) rather than through a known id, since a spawned
+ * (`core/loop/sessions.ts`) rather than through a known id, since a spawned
  * run picks its own.
  */
 import type { SessionStatus } from '../commands/loop/status.js';
 import type { StopResult } from '../commands/loop/stop.js';
-import type { SessionRecord } from '../loop/sessions.js';
+import type { SessionRecord } from '../core/loop/index.js';
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -78,8 +78,8 @@ import { fileURLToPath } from 'node:url';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { readSessions } from '../core/loop/index.js';
 import { sqliteStorePath } from '../effort/store/sqlite.js';
-import { readSessions } from '../loop/sessions.js';
 import { NOTHING_REPORTED_OR_COMMITTED } from '../start/commit.js';
 
 import { expectExit, plantProjectConfig } from './cli-capture.js';

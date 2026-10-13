@@ -26,8 +26,8 @@
  * `--session-id` picking a record the branch does not name, with the
  * branch reader throwing to show it is never read then.
  */
-import type { LoopSessionSeams } from '../../loop/session-readings.js';
-import type { SessionPhase, SessionRecord } from '../../loop/sessions.js';
+import type { SessionPhase, SessionRecord } from '../../core/loop/index.js';
+import type { LoopSessionSeams } from '../../core/loop/readings.js';
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,9 +36,9 @@ import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { SESSION_PHASES } from '../../core/loop/index.js';
 import { writeTaskReport } from '../../effort/store/reports.js';
 import { SQLITE_SCHEMA_VERSION, sqliteStorePath } from '../../effort/store/sqlite.js';
-import { SESSION_PHASES } from '../../loop/sessions.js';
 import { dispatchInProject } from '../../tests/cli-capture.js';
 import {
   DEMO_TRACKER,

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { isMapping } from '../config-sections.js';
+import { isMapping } from '../core/config/sections.js';
 
 import { EPIC_GUARD_PATH, epicGuardSource, readEpicGuard, writeEpicGuard } from './epic-guard.js';
 

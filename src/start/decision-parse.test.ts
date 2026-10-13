@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { readRafaBlocks } from '../plan/blocks.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 
 import { UNREADABLE_PREFIX, parseDecision } from './decision-parse.js';
 import { DECISION_PROMPT_FILE, readBundledFile } from './decision-prompt.js';

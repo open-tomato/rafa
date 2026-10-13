@@ -63,7 +63,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 
 import { GITHUB_LABELS } from '../adapters/tracker/github.js';
 import { CLAIMED_LABEL, IN_DEVELOPMENT_LABEL } from '../claims/stale.js';
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { projectConfigText } from '../project/scaffold.js';
 
 import { SPEC_BLOCKED_LABEL } from './blocked.js';

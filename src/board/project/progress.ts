@@ -65,7 +65,7 @@
  * system's own when left out.
  */
 import type { BoardProjectProgressSeconds } from '../../config-schema-board-project.js';
-import type { OutputMode } from '../../config-sections.js';
+import type { OutputMode } from '../../core/config/sections.js';
 import type { CliEventNamed, Output } from '../../ports/index.js';
 
 /** The name of the json event a progress line is emitted as. */

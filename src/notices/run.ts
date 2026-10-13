@@ -10,14 +10,12 @@
  * (`src/plan.ts`). Each hands in the `loop.settingSources` its own
  * configuration resolved, which the danger notice names.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { homedir } from 'node:os';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { createLinePrompter } from '../cli/prompt/confirm.js';
-import { RAFA_VERSION } from '../cli/version.js';
+import { CommandExit , createLinePrompter , RAFA_VERSION } from '../core/command/index.js';
+import { activeOutput } from '../core/output/index.js';
 
 import { offerNotices } from './notices.js';
 

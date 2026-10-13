@@ -311,7 +311,7 @@ The block strip rule means:
 - A block in a stage description does not appear in the operator log line
 - A block anywhere in the plan does not appear in a commit subject or commit body
 
-The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/plan/blocks.ts`):
+The strip happens where the loop reads the next task, `findNextTask` in `src/utils/tracker.ts`, and it follows fences the way a renderer shows them (`src/core/plan/blocks.ts`):
 
 - Only a closed, top-level `rafa:*` block hides its lines. Every other fence is transparent, so a `- [ ] ` line at column 0 inside a `markdown` or `text` illustration, or inside a `rafa:` fence nested in one, is dispatched as a task. A plan that illustrates the format indents its example lines.
 - A `rafa:` fence that is never closed hides nothing, because taking the rest of the document as its body would end the plan with its tasks unrun. `parsePlan` reports it as `unclosed-block`, and each open task line after it as `task-in-block`.
@@ -519,10 +519,10 @@ Rules:
 
 ## Format validation
 
-The loop parses plan files through `src/plan/parse.ts`:
+The loop parses plan files through `src/core/plan/parse.ts`:
 
-- **Block parsing** (`src/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
-- **Plan parsing** (`src/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
+- **Block parsing** (`src/core/plan/blocks.ts`): Reads fenced `rafa:*` blocks. Tolerates documents with no blocks. Retains unknown kinds.
+- **Plan parsing** (`src/core/plan/parse.ts`): Builds the plan model over blocks and the checklist grammar. Each stage captures the tasks under it and the first `rafa:stage-context` block between its heading and the next `# Stage:` heading.
 - **Declaration parsing** (`src/utils/declaration.ts`): Takes a trailing `{...}` block off a task line and reads its `key=value` entries. The block counts only when one of its keys is a recognized key (see Task declarations).
 - **Report parsing** (`src/report/parse.ts`): Reads the last `rafa:report` block from agent output and parses its YAML body. Answers an explicit absence record if no block is present.
 
@@ -550,7 +550,7 @@ When the spec adds or changes anything in `.rafa/effort/`:
 When planning work on rafa commands: every command that can start a Claude
 Code session must declare its `spends` field on its `RafaCommand` definition.
 The field tells the help system, `describe` output, and the spawn guard in
-`src/utils/claude.ts` what Claude usage the command declares. It is optional,
+`src/core/loop/claude.ts` what Claude usage the command declares. It is optional,
 and takes one of four shapes:
 
 - `{ when: 'always'; what: string }` — the command always starts a session
@@ -639,4 +639,4 @@ Both follow the same structured format. The difference is:
 - **Hand-written plans** (by a planner agent): Prose in the description, stage contexts, and task granularity reflect careful thought about the work.
 - **Generated plans** (by `rafa plan`): Produced from a spec document; structure is the same.
 
-A hand-written plan read by `src/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.
+A hand-written plan read by `src/core/plan/parse.ts` produces the same data model as a generated one. This is the property the structured format enforces.

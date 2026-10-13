@@ -3,7 +3,8 @@
  * reads it: through `registry.js`'s public exports alone, one example
  * apiece of the four claims the registry stands on.
  *
- * `src/adapters/registry.test.ts` and `src/adapters/tracker/resolve.test.ts`
+ * `src/core/adapters/registry.test.ts` and
+ * `src/adapters/tracker/resolve.test.ts`
  * carry the mutation-driven grid behind each of those claims, one case
  * per kind, each made with a context built just for that kind. Repeating
  * that grid here would add nothing the size of this file could earn
@@ -30,9 +31,9 @@
  *     `local` then writes into the issue it captures on disk.
  */
 import type { OutputStream } from '../adapters/output/stream.js';
-import type { AdapterContext, AnyAdapter } from '../adapters/registry.js';
+import type { AdapterContext, AnyAdapter } from '../core/adapters/index.js';
+import type { ClaudeSpawner } from '../core/loop/index.js';
 import type { Tracker } from '../ports/index.js';
-import type { ClaudeSpawner } from '../utils/claude.js';
 
 import {
   existsSync,
@@ -45,11 +46,11 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../adapters/registry.js';
 import { draftFixture } from '../adapters/tracker/contract.js';
 import { createFakeGh } from '../adapters/tracker/github-fake.js';
 import { parseLocalIssue } from '../adapters/tracker/local.js';
 import { resolveTracker } from '../adapters/tracker/resolve.js';
+import { CORE_ADAPTER_REGISTRY, PORT_VERSIONS } from '../core/adapters/index.js';
 
 /** What `gh auth status` writes with no hosts, as the fake records it. */
 const NOT_LOGGED_IN = 'You are not logged into any GitHub hosts. To log in, run: gh auth login';

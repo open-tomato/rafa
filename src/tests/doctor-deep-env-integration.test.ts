@@ -5,7 +5,7 @@
  * read through the reading's seams with a shell environment built for
  * the case.
  */
-import type { ClaudeSettingSource } from '../config-sections.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

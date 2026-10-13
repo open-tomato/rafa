@@ -63,9 +63,10 @@
  * is not the root still writes the file the adapter looks for (#171).
  *
  * The command writes every line the operator reads through the active
- * output (`adapters/output/active.ts`), at `info`, each message as
+ * output (`core/output/active.ts`), at `info`, each message as
  * `console.log` printed it in phase 0. It refuses by throwing
- * `CommandExit` (`cli/command.ts`) and never by `process.exit`, so the
+ * `CommandExit` (`core/command/command.ts`) and never by
+ * `process.exit`, so the
  * dispatcher writes the terminal event. A rejection throws the exit code
  * a `claude` planner's rejection carries, or 1 for any other, with the
  * rejection's message. An unusable config, a line naming no spec source
@@ -212,14 +213,14 @@
  * so a plan is generated under the sources its tasks run under. A config
  * the loop cannot run on refuses the command before any session starts.
  */
-import type { AdapterRegistry } from './adapters/registry.js';
 import type { GhRunner } from './adapters/tracker/github.js';
 import type { EpicContext } from './board/epic-context.js';
 import type { ResolvedSpec } from './board/spec-source.js';
 import type { DescribeDocument } from './cli/describe.js';
 import type { GateBase } from './commands/plan/review-gate.js';
-import type { RouteTarget } from './config-sections.js';
-import type { RafaConfig } from './config.js';
+import type { AdapterRegistry } from './core/adapters/index.js';
+import type { RafaConfig } from './core/config/index.js';
+import type { RouteTarget } from './core/config/sections.js';
 import type { TierSettings } from './tiers/resolve.js';
 
 import fs from 'fs';
@@ -227,22 +228,22 @@ import { homedir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { activeOutput } from './adapters/output/active.js';
 import { planFilePath } from './adapters/planner/claude.js';
-import { CORE_ADAPTER_REGISTRY } from './adapters/registry.js';
 import { createGhRunner } from './adapters/tracker/github.js';
 import { readEpicContext } from './board/epic-context.js';
 import { readGateFlags } from './board/gate.js';
 import { claimPlanIssue } from './claims/plan-claim.js';
-import { CommandExit } from './cli/command.js';
 import { createPlanClaimContext, resolveAndClaim } from './commands/plan/claim-route.js';
 import { recordPlanIssue } from './commands/plan/plan-record.js';
 import { announceCreateRefs, checkCreateRefs } from './commands/plan/refs-check.js';
 import { generateOrExit, settleReview } from './commands/plan/review-gate.js';
 import { resolveCreateSpec } from './commands/plan/spec-route.js';
 import { enforceStoreRules } from './commands/plan/store-check.js';
-import { loadConfig } from './config-load.js';
-import { ConfigError } from './config.js';
+import { CORE_ADAPTER_REGISTRY } from './core/adapters/index.js';
+import { CommandExit } from './core/command/index.js';
+import { ConfigError } from './core/config/index.js';
+import { loadConfig } from './core/config/load.js';
+import { activeOutput } from './core/output/index.js';
 import { requireNoticesAnswered } from './notices/run.js';
 import { BUNDLED_SKILLS_DIR } from './schema/tiers.js';
 import { branchNameFor } from './start/branch-decision.js';

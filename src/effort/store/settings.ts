@@ -1,6 +1,6 @@
 /**
  * The settings every effort store open reads: one module-level value
- * with a setter, as `adapters/output/active.ts` holds the active
+ * with a setter, as `core/output/active.ts` holds the active
  * output, rather than an argument threaded through the dozen callers of
  * `withSqliteStore`, none of which has anything to say about locks.
  *
@@ -22,12 +22,12 @@
  * case that sets a value sets `null` after it, or every file bun runs
  * later opens its stores with that case's timeout.
  */
-import { CONFIG_DEFAULTS } from '../../config-schema.js';
+import { CONFIG_DEFAULTS } from '../../core/config/index.js';
 import {
   BUSY_TIMEOUT_MAX_MS,
   BUSY_TIMEOUT_MIN_MS,
   isBusyTimeoutMs,
-} from '../../config-sections.js';
+} from '../../core/config/sections.js';
 
 /** What every effort store open reads. */
 export interface StoreSettings {

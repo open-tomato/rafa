@@ -40,12 +40,12 @@
  */
 import type { BugRules } from './bugs/record.js';
 import type { ErrorsSettings } from './config-schema-errors.js';
-import type { SettingSpec } from './config-schema.js';
-import type { Reader, Reading } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader, Reading } from './core/config/sections.js';
 
 import { BUILT_IN_ENVIRONMENTS } from './bugs/places.js';
 import { ACTION_SHAPE, DEFAULT_BUG_TITLE, MODULE_SHAPE, templateProblem, UNKNOWN_VALUE } from './bugs/title.js';
-import { listOf, refused } from './config-sections.js';
+import { listOf, refused } from './core/config/sections.js';
 import { listedCodes } from './errors/rafa-codes.js';
 
 /** The `issues` settings. */

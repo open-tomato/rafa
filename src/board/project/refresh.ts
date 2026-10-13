@@ -188,7 +188,7 @@ import type { ProgressFeed } from './progress.js';
 import type { ProjectChange, RefreshBoard } from './refresh-values.js';
 import type { ProjectWritesOptions, ProjectWritesResult } from './writes.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaConfig } from '../../config.js';
+import type { RafaConfig } from '../../core/config/index.js';
 import type { BoardIssue } from '../roadmap-board.js';
 import type { RoadmapSearch } from '../roadmap.js';
 

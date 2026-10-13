@@ -31,8 +31,8 @@ import type { ReleasePrepared, ReleaseSkipped } from '../release/prepare.js';
 import type { ReleaseRefused, ReleaseVerified } from '../release/verify.js';
 import type { ReleaseStageInput, ReleaseStageSeams, ReleaseStageSettings } from '../start/release-stage.js';
 
-import { setActiveOutput } from '../adapters/output/active.js';
-import { RELEASE_AUTO } from '../config-sections.js';
+import { RELEASE_AUTO } from '../core/config/sections.js';
+import { setActiveOutput } from '../core/output/index.js';
 import { serializeFragment } from '../release/fragment.js';
 
 import { sinkOutput } from './output-sinks.js';

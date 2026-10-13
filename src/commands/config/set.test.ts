@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { parseConfigText } from '../../config.js';
+import { parseConfigText } from '../../core/config/index.js';
 import { projectConfigText } from '../../project/scaffold.js';
 import { dispatchInProject, eventsOf, plantProject } from '../../tests/cli-capture.js';
 import { AGENT_SHELL_ENV } from '../../utils/agent-shell.js';

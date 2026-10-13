@@ -30,7 +30,7 @@
  */
 import type { MergeSeams } from './merge.js';
 import type { GhResult, GhRunner } from '../../adapters/tracker/github.js';
-import type { Prompter } from '../../cli/prompt/confirm.js';
+import type { Prompter } from '../../core/command/index.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { GitResult, GitRunner, PullRequestDetail } from '../../pr/index.js';
 import type { PlantedProject } from '../../tests/cli-capture.js';

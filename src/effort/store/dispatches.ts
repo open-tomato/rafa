@@ -99,12 +99,12 @@
  *   - Any text holding a lone UTF-16 surrogate, which SQLite text cannot
  *     hold.
  */
-import type { SkillResolverName } from '../../config-sections.js';
+import type { SkillResolverName } from '../../core/config/sections.js';
 import type { TaskDeclaration } from '../../utils/declaration.js';
 
 import { existsSync } from 'node:fs';
 
-import { SKILL_RESOLVERS } from '../../config-sections.js';
+import { SKILL_RESOLVERS } from '../../core/config/sections.js';
 
 import { describeValue, textProblem } from './findings.js';
 import { STAMPED_COLUMNS, stampedValues } from './origins.js';

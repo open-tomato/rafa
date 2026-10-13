@@ -134,9 +134,9 @@ import type { ChecklistEditResult } from '../../board/epic-checklist.js';
 import type { CreatedIssue, IssueBoard } from '../../board/issue-board.js';
 import type { BoardIssue } from '../../board/roadmap-board.js';
 import type { Horizon } from '../../board/roadmap-epic-rows.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { RafaConfig } from '../../config-schema.js';
-import type { BoardRelationshipMode } from '../../config-sections.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { RafaConfig } from '../../core/config/index.js';
+import type { BoardRelationshipMode } from '../../core/config/sections.js';
 import type { LineFlags } from '../issue/issue-tracker.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';
@@ -151,8 +151,8 @@ import { createGhBoardListing } from '../../board/roadmap-board.js';
 import { HORIZONS } from '../../board/roadmap-epic-rows.js';
 import { createGhRoadmapBody } from '../../board/roadmap-tick.js';
 import { LABEL_LIST_LIMIT, listBoardLabels } from '../../board/setup.js';
-import { CommandExit } from '../../cli/command.js';
-import { messageOf } from '../../config-sections.js';
+import { CommandExit } from '../../core/command/index.js';
+import { messageOf } from '../../core/config/sections.js';
 import { issueProject, issueSubjectConfig, lineRefusal, readChoiceFlag, readRequiredFlag } from '../issue/issue-tracker.js';
 import { defaultBoardOnce } from '../switch.js';
 

@@ -43,13 +43,13 @@
  * A git that cannot answer, which `gitToplevel` and `mainCheckoutOf`
  * throw for rather than answer "no repository", refuses the run with
  * exit code 1 and the reading's own message, as every refusal before the
- * session record is thrown (`cli/command.ts`).
+ * session record is thrown (`core/command/command.ts`).
  */
 import type { GitToplevelProbe } from '../project/roots.js';
 
-import { activeOutput } from '../adapters/output/active.js';
-import { CommandExit } from '../cli/command.js';
-import { messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { messageOf } from '../core/config/sections.js';
+import { activeOutput } from '../core/output/index.js';
 import { gitToplevel } from '../project/roots.js';
 import { mainCheckoutOf } from '../project/worktree-root.js';
 

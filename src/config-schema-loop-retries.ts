@@ -43,10 +43,10 @@
  * flag that outranks it for one run is `loop start --retry=<n>`, read
  * by `start/run-setup.ts`.
  */
-import type { SettingSpec } from './config-schema.js';
-import type { Reader } from './config-sections.js';
+import type { SettingSpec } from './core/config/index.js';
+import type { Reader } from './core/config/sections.js';
 
-import { refused } from './config-sections.js';
+import { refused } from './core/config/sections.js';
 
 /** The fewest retries `loop.retries` accepts as a number. */
 export const LOOP_RETRIES_MIN = 1;

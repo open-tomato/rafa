@@ -52,7 +52,7 @@ import { SPEC_BLOCKED_LABEL } from '../board/blocked.js';
 import { SPEC_LABEL } from '../board/issue.js';
 import { planStub } from '../board/naming.js';
 import { SPEC_READY_LABEL } from '../board/readiness.js';
-import { parseSessionRecord, runsDir } from '../loop/sessions.js';
+import { parseSessionRecord, runsDir } from '../core/loop/index.js';
 import { hopFilePath, readHopRecord } from '../next/hop-record.js';
 import { positionFilePath } from '../project/position.js';
 import { projectConfigText } from '../project/scaffold.js';
@@ -209,7 +209,7 @@ function buildProbe(prlistFile: string): string {
   return [
     'import { mkdirSync, writeFileSync } from "node:fs";',
     'import { join } from "node:path";',
-    `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+    `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
     `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
     `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
     `import { createNextCommand } from ${JSON.stringify(join(SRC_DIR, 'commands', 'next.ts'))};`,

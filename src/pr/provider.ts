@@ -65,9 +65,9 @@
  * twice for every action. A reading of `gh` means the operator asked for
  * the GitHub CLI, not that the CLI answered.
  */
-import type { PrProvider } from '../config-sections.js';
+import type { PrProvider } from '../core/config/sections.js';
 
-import { CommandExit } from '../cli/command.js';
+import { CommandExit } from '../core/command/index.js';
 import { gitRemoteUrl, normalizeRemote } from '../schema/project-id.js';
 
 /** The host a GitHub remote names; its subdomains carry it as a suffix. */

@@ -13,8 +13,8 @@
  * `withSourceHeader`, the writer `rafa agent vendor` uses, so the
  * header pattern here is tied to what that writer actually writes.
  */
-import type { TierPin } from '../config-sections.js';
 import type { ReadItemBytes, TierItem, TierRow, TierSettings } from './resolve.js';
+import type { TierPin } from '../core/config/sections.js';
 import type { InventoryKind, InventorySource } from '../inventory/record.js';
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,7 +24,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { withSourceHeader } from '../commands/agent/vendor.js';
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import {
   collisionMessage,

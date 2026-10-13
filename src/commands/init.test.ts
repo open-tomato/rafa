@@ -79,7 +79,7 @@
  */
 import type { InitResult, InitSeams } from './init.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
-import type { Prompter } from '../cli/prompt/confirm.js';
+import type { Prompter } from '../core/command/index.js';
 
 import {
   existsSync,
@@ -99,7 +99,7 @@ import { delimiter, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { BOARD_LABELS } from '../board/setup.js';
-import { parseConfigText } from '../config.js';
+import { parseConfigText } from '../core/config/index.js';
 import { readBinPath } from '../project/bin-path.js';
 import { BLOCK_BEGIN, BLOCK_END } from '../project/gitignore.js';
 import { candidateLines } from '../project/root-choice.js';

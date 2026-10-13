@@ -5,7 +5,7 @@
  */
 import type { LoggerHarness } from '../adapters/logger/contract.js';
 import type { LoggerSettings } from '../adapters/logger/settings.js';
-import type { OutputMode } from '../config-sections.js';
+import type { OutputMode } from '../core/config/sections.js';
 import type { CliEvent, Logger, Output } from '../ports/index.js';
 
 import { createConsoleLogger } from '../adapters/logger/console.js';

@@ -63,7 +63,7 @@ const SPEC_TITLE = 'The board routes';
 const PROBE = [
   'import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";',
   'import { join } from "node:path";',
-  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'adapters', 'registry.ts'))};`,
+  `import { createAdapterRegistry } from ${JSON.stringify(join(SRC_DIR, 'core', 'adapters', 'index.ts'))};`,
   `import { dispatch } from ${JSON.stringify(join(SRC_DIR, 'cli', 'dispatch.ts'))};`,
   `import { createCommandRegistry } from ${JSON.stringify(join(SRC_DIR, 'cli', 'registry.ts'))};`,
   `import declared from ${JSON.stringify(join(SRC_DIR, 'commands', 'plan', 'create.ts'))};`,

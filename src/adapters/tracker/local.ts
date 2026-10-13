@@ -72,7 +72,7 @@
  *     path naming a file. The source answered no issues for every
  *     failure. An issue file `find` cannot read is skipped and reported
  *     through `warn`, which defaults to the active output's `warn`
- *     (`src/adapters/output/active.ts`), read when the report is made.
+ *     (`src/core/output/active.ts`), read when the report is made.
  *     The source wrote the report with `console.warn`.
  *   - Names. The source's say pending, since its captures wait for a
  *     sync rafa does not port: `PendingCapture` is
@@ -129,8 +129,8 @@ import type {
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { describeValue, isMapping, messageOf } from '../../config-sections.js';
-import { activeOutput } from '../output/active.js';
+import { describeValue, isMapping, messageOf } from '../../core/config/sections.js';
+import { activeOutput } from '../../core/output/index.js';
 
 import { ISSUE_PRIORITIES, ISSUE_STATES, ISSUE_TYPES } from './issue-values.js';
 

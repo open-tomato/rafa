@@ -74,7 +74,7 @@
  * ## One check, one session
  *
  * Each session is spawned through the capturing door
- * (`../utils/claude.ts`) under the caller's `loop.settingSources`, with
+ * (`../core/loop/claude.ts`) under the caller's `loop.settingSources`, with
  * `--session-id` and an id the runner picks, then `--tools` naming
  * {@link CHECK_TOOLS}, last, since `--tools` is variadic. `Bash` is there
  * because a check names a command to run; nothing enforces that the
@@ -113,22 +113,22 @@
  * command. Every check runs whatever the ones before it answered.
  */
 import type { CriterionCheck } from './verify-plan.js';
-import type { ClaudeSettingSource } from '../config.js';
-import type { RafaBlock } from '../plan/blocks.js';
-import type { GitRunner } from '../pr/git.js';
-import type { CapturedSession, CapturingSpawner } from '../utils/claude.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
+import type { GitRunner } from '../core/git/index.js';
+import type { CapturedSession, CapturingSpawner } from '../core/loop/index.js';
+import type { RafaBlock } from '../core/plan/block-reader.js';
 
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
-import { messageOf } from '../config-sections.js';
+import { messageOf } from '../core/config/sections.js';
+import { gitSaid } from '../core/git/index.js';
+import { claudeArgs, spawnClaudeCaptured } from '../core/loop/index.js';
+import { readRafaBlocks } from '../core/plan/block-reader.js';
 import { DEFAULT_BASE_BRANCH } from '../next/sources.js';
-import { readRafaBlocks } from '../plan/blocks.js';
-import { gitSaid } from '../pr/git.js';
 import { shellQuote } from '../pr/preflight-items.js';
 import { WORKTREES_SUBDIR } from '../pr/worktree.js';
 import { SESSION_ID_FLAG } from '../start/dispatch.js';
-import { claudeArgs, spawnClaudeCaptured } from '../utils/claude.js';
 
 import { fenceFor } from './verify-plan.js';
 

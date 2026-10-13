@@ -47,7 +47,7 @@
 import type { IssueSeams, IssueTrackerData } from './issue-tracker.js';
 import type { MoveProjectOptions } from './move-project.js';
 import type { GhRunner } from '../../adapters/tracker/github.js';
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
 import type { IssueRef, IssueState } from '../../ports/index.js';
 
 import { createGhRunner } from '../../adapters/tracker/github.js';

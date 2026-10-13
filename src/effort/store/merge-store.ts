@@ -116,7 +116,7 @@ import type { DevelopmentProbe } from './development-build.js';
 import type { SqliteMigration } from './migrations.js';
 import type { SchemaUse } from './schema-plan.js';
 import type { ProjectIdentity } from './store-identity.js';
-import type { StoreBackend } from '../../config.js';
+import type { StoreBackend } from '../../core/config/sections.js';
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';

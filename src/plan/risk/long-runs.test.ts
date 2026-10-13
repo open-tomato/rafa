@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'bun:test';
 
-import { parsePlan } from '../parse.js';
+import { parsePlan } from '../../core/plan/index.js';
 import { openTasks } from '../risk.js';
 
 import { LONG_RUN_FIX, longRunOf, readLongRuns } from './long-runs.js';

@@ -586,7 +586,7 @@ command spawns a second Claude session, no prompt asks the person to
 continue in Claude Code, and no runtime dependency enters the package:
 the prompt kit runs in raw mode on `stdio` and every session reads the
 API from the `RafaContext.env` values or the `.rafa/config.yaml`, so the
-loop's own machinery (`src/utils/claude.ts` for the session and
+loop's own machinery (`src/core/loop/claude.ts` for the session and
 `src/effort/store/` for the record) runs all the code.
 
 ### Bug sweep convention

@@ -29,13 +29,13 @@
  * Exit code 1 for an argument, and for a config `loadConfig` refuses. The
  * command declares no flag.
  */
-import type { RafaCommand, RafaContext } from '../../cli/command.js';
-import type { ModuleSource } from '../../config-items.js';
+import type { RafaCommand, RafaContext } from '../../core/command/index.js';
+import type { ModuleSource } from '../../core/config/index.js';
 import type { ConfiguredModule, ModuleLoadSeams } from '../../modules/load.js';
 
-import { CommandExit } from '../../cli/command.js';
-import { loadConfig } from '../../config-load.js';
-import { ConfigError } from '../../config.js';
+import { CommandExit } from '../../core/command/index.js';
+import { ConfigError } from '../../core/config/index.js';
+import { loadConfig } from '../../core/config/load.js';
 import { loadModules, moduleSettings } from '../../modules/load.js';
 import { expectNoArgument } from '../plan/plan-files.js';
 

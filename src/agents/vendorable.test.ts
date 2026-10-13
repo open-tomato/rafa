@@ -18,7 +18,7 @@
  * carries a rafa entry of its own, so the checkout's `src/bundled/agents`
  * is never the rafa tier a case reads.
  */
-import type { ClaudeSettingSource } from '../config.js';
+import type { ClaudeSettingSource } from '../core/config/sections.js';
 import type { TierSettings } from '../tiers/resolve.js';
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +27,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'bun:test';
 
-import { CONFIG_DEFAULTS } from '../config.js';
+import { CONFIG_DEFAULTS } from '../core/config/index.js';
 
 import { VENDOR_COMMAND } from './roster.js';
 import { vendorableAgentLine, vendorableAgents, vendorableAgentWarnings } from './vendorable.js';

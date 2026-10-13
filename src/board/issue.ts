@@ -211,8 +211,8 @@ import type { GhResult, GhRunner } from '../adapters/tracker/github.js';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { CommandExit } from '../cli/command.js';
-import { describeValue, isMapping, messageOf } from '../config-sections.js';
+import { CommandExit } from '../core/command/index.js';
+import { describeValue, isMapping, messageOf } from '../core/config/sections.js';
 import { carryRefsBlock, readRefsBlock } from '../refs/stamp.js';
 
 import { REFRESH_FLAG } from './flags.js';

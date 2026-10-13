@@ -8,7 +8,7 @@
  * `src/commands/skill/backfill.test.ts` covers the command's own words
  * and refusals through a scripted spawner SEAM. This file is the one
  * place the pass runs through its real door instead
- * (`utils/claude.ts`'s default `spawnClaudeCaptured`), which resolves
+ * (`core/loop/claude.ts`'s default `spawnClaudeCaptured`), which resolves
  * `claude` off the actual process environment rather than off
  * `dispatchInProject`'s own `env` — so the seam a case controls here is
  * the OS `PATH` itself, prepended in `beforeAll` and restored in

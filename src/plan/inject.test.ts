@@ -1,8 +1,8 @@
 /**
  * Tests for the injection renderer.
  *
- * Fixtures are lists of lines joined here, as `parse.test.ts` builds
- * them. A dispatched task is never a literal copied from the loop's
+ * Fixtures are lists of lines joined here, as `../core/plan/parse.test.ts`
+ * builds them. A dispatched task is never a literal copied from the loop's
  * reader: {@link dispatchedAt} blanks every other line and asks
  * `findNextTask` itself, so each `task` handed to the renderer is one
  * the loop could have handed it, and {@link positionOf} counts its
@@ -30,7 +30,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { INJECT_MODES } from '../config.js';
+import { INJECT_MODES } from '../core/config/sections.js';
 import { findNextTask, insertTrackerTask, listTrackerTasks, updateTrackerLine } from '../utils/tracker.js';
 
 import { renderInjection } from './inject.js';

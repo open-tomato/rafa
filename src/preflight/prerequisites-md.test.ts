@@ -43,7 +43,7 @@ import { isAbsolute, join, relative } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { parseConfigText, resolveConfig } from '../config.js';
+import { parseConfigText, resolveConfig } from '../core/config/index.js';
 
 import {
   loadPlanPrerequisites,

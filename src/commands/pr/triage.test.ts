@@ -53,7 +53,7 @@
  * itself.
  */
 import type { TriageSeams } from './triage.js';
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 import type { NextEndingSeams } from '../../next/ending.js';
 import type { CliEvent } from '../../ports/index.js';
 import type { FakePrComment, FakePrGh, FakePullRequestSeed } from '../../pr/gh-fake.js';

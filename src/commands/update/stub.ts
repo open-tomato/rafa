@@ -8,9 +8,9 @@
  * `rafa` and `port` are hidden spellings of `project`, so the roster
  * lists `project` once while all three are dispatched.
  */
-import type { RafaCommand } from '../../cli/command.js';
+import type { RafaCommand } from '../../core/command/index.js';
 
-import { CommandExit } from '../../cli/command.js';
+import { CommandExit } from '../../core/command/index.js';
 
 /** Where the issues live. */
 const ISSUES_URL = 'https://github.com/open-tomato/rafa/issues';

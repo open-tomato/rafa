@@ -46,7 +46,7 @@
  */
 import type { IssueRef, IssueType, OpenIssue, Tracker } from '../../ports/index.js';
 
-import { describeValue, isMapping } from '../../config-sections.js';
+import { describeValue, isMapping } from '../../core/config/sections.js';
 
 import { ISSUE_TYPES } from './issue-values.js';
 
