@@ -675,14 +675,18 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
       + ' `dangerous.acceptVersionCollision` is true, and `pr.versionCollision` sets whether a `missing` or'
       + ' `stale` branch merges silently, with a warning, after its own question, or not at all. A step that fails never undoes the merge: it'
       + ' prints what is left as commands to paste and exits 1. After the merge it ticks the `Closes #<n>` line of'
-      + ' every issue the pull request closes on every open board whose checklist lists it, or on the roadmap issue while no issue carries `type:roadmap`, warning rather than failing when that write'
+      + ' every issue the pull request closes, first on the checklist of the open epic that issue\'s `epic:` label'
+      + ' names, printing one line per epic, then on every open board whose checklist lists it, or on the roadmap'
+      + ' issue while no issue carries `type:roadmap`, warning rather than failing when one of those writes'
       + ' does not land. It ends by reading every open issue whose "Blocked by:" line names an issue this pull'
       + ' request closes, asking whether to remove `spec:blocked` from each one whose blockers have all closed;'
       + ' `--yes` does not answer that question, and every failure of that reading is a warning. With'
       + ' board.relationships set to native it ticks no epic checklist and, in place of that reading, prints the'
       + ' open issues the merge freed, whose blockers GitHub clears by itself, asking nothing and writing nothing. With'
       + ' `--output=json` the pull request, the method, the steps that ran, the follow-ups, the roadmap tick and'
-      + ' the unblock reading, or the freed issues in native mode, are the data of the terminal result event. Refuses with exit code 2 where'
+      + ' the unblock reading, or the freed issues in native mode, are the data of the terminal result event;'
+      + ' the tick of each closed issue\'s epic checklist is one line per epic and no key of that data, and under'
+      + ' native there is none. Refuses with exit code 2 where'
       + ' `pr.provider` is not `gh`.',
     args: [
       {
