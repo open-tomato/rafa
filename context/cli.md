@@ -435,7 +435,7 @@ New; it replaces no earlier text. What a row or an action added to
   its `start` dropped and its failed `result` thrown with its code and
   message. The child writes its own session record, so `loop stop` signals
   the child.
-- - **`loop start --create-branch` creates the feature branch when on
+- **`loop start --create-branch` creates the feature branch when on
   `main`, `master` or a detached HEAD** (`start/run-setup.ts`): when the
   working directory is checked out on `main` or `master`, or on no branch
   at all, the flag creates `feat/<stub>` from the latest `origin/<base>`,
@@ -753,7 +753,7 @@ New; it replaces no earlier text. What a row or an action added to
   before. Both read the mode the dispatcher sets beside the active
   output. `src/tests/loop-output.test.ts` spawns `loop start` in both
   modes.
-- - **A wrap-up without a pull request ends by `pr.provider`.**
+- **A wrap-up without a pull request ends by `pr.provider`.**
   `preserveProgress` (`start/wrap-up.ts`) reads only the wrap-up
   session's exit code, so a `gh pr create` that fails inside the session,
   as with no GitHub remote, still lets the run on. Under
@@ -2622,7 +2622,7 @@ New; it replaces no earlier text. What a row or an action added to
   the project the dispatcher resolved for the command, as `resolveScope`
   answers it (`src/project/scope.ts`), or null for a command declaring
   `needsProject: false`.
-- - **A command runs inside a project** unless it declares
+- **A command runs inside a project** unless it declares
   `needsProject: false`, as `module exec`, `skill check`,
   `instinct check`, `init` and `describe` do; the dispatcher resolves
   none for such a command. `commandProblem` refuses a `needsProject` that

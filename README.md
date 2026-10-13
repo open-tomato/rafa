@@ -210,9 +210,9 @@ the next one, so you rarely have to remember it.
 A branch no longer owns a version number. Instead, the loop's wrap-up
 writes and commits a release fragment (a small markdown file naming the
 plan, level and notes), and `rafa release settle` assigns the version and
-folds the changelog on the base branch after merges. This lets several branches merge in any order without a version
-collision: whichever machine settles first releases all waiting fragments
-under one version.
+folds the changelog on the base branch after merges. This lets several
+branches merge in any order without a version collision: whichever
+machine settles first releases all waiting fragments under one version.
 
 The pull request shows a forecast of what version the branch would get if
 merged now. The fragment is stored under `release.fragments` (default

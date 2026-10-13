@@ -667,16 +667,16 @@ request exists, the runner opens one itself with the title `rafa-<n>: <plan
 title>` and a body opening with `Closes #<n>`, the release fragment's notes,
 and a line saying the wrap-up did not finish. If opening fails (for instance,
 if the branch has not been merged into the base yet or was pushed while the
-working tree had conflicts), the run ends `blocked` with the step and branch
-named. A pull request a retry or the runner opened is then given the release
-forecast or failure sentence the release step found no pull request to write
-to (`carryReleaseIntoPullRequest`, `src/start/release-body.ts`), before the
-retarget and the CI wait; one the release step already wrote to is not written
-again, and a blocked delivery writes nothing. With `pr.provider: none`, no
-pull request is read or opened: the CI gate's `none` path
-(`src/start/pr-lifecycle.ts`) pushes the branch, prints the compare URL when
-origin names a web host, skips the CI wait, and the run ends `done` with the
-branch pushed and no pull request.
+working tree had conflicts), the run ends `stopped` with exit code 1, the
+report naming the step and branch. A pull request a retry or the runner opened
+is then given the release forecast or failure sentence the release step found
+no pull request to write to (`carryReleaseIntoPullRequest`,
+`src/start/release-body.ts`), before the retarget and the CI wait; one the
+release step already wrote to is not written again, and a blocked delivery
+writes nothing. With `pr.provider: none`, no pull request is read or opened:
+the CI gate's `none` path (`src/start/pr-lifecycle.ts`) pushes the branch,
+prints the compare URL when origin names a web host, skips the CI wait, and the
+run ends `done` with the branch pushed and no pull request.
 
 **The wrap-up prompt is written for `pr.provider: none` too.**
 `buildWrapUpPrompt` (`src/start/wrap-up.ts`) takes the provider the run
