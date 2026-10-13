@@ -1480,7 +1480,7 @@ const COMMAND_MODULES: readonly (readonly [string, ImportList])[] = [
     ['../cli/prompt/terminal.js', ['processTerminal']],
     ['../core/command/index.js', ['CommandExit', 'createLinePrompter']],
     ['../pr/index.js', ['ghPullRequestsIn', 'resolvePrProvider']],
-    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
+    ['./cleanup-render.js', ['branchRowLine', 'CLEANUP_GROUP_TITLES', 'cleanupData', 'cleanupNameWidth', 'remoteOnlyRowLine', 'renderCleanup', 'runRowLine', 'worktreeRowLine']],
     ['./issue/ready.js', ['lazyPrompter']],
     ['./plan/plan-files.js', ['expectNoArgument', 'readSwitch', 'resolveProjectConfig']],
   ]],

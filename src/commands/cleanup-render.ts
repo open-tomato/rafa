@@ -1,5 +1,5 @@
 /**
- * The words `rafa cleanup` shows for what `src/cleanup/` read: the five
+ * The words `rafa cleanup` shows for what `src/cleanup/` read: the six
  * groups as text lines, one line per row, and the same reading as the
  * JSON data of the terminal result event. It prints nothing and deletes
  * nothing; `./cleanup.ts` writes these lines and, where there is a
@@ -10,20 +10,22 @@
  * The notes come first, one `note: <line>` each, because they qualify
  * every row below them (a failed fetch, an unreachable provider). Then
  * the four groups in the order the spec's Design table lists them —
- * Merged, Stale, Not pushed, Worktrees — and last Run records, each
- * under a heading naming how many rows it holds, and each row one line,
- * indented two spaces: its name, its date and its reason. The names are
- * padded per kind of row ({@link cleanupNameWidth}): the three branch
- * groups to the widest branch name, the worktrees to the widest
- * worktree path and the run records to the widest plan, so the dates
- * line up within a kind and a long worktree path never widens a branch
- * row past what its own name, date and reason need. A
- * group with no rows still shows its heading and {@link NO_ROWS_TEXT},
- * so a listing always names all five groups: the no-terminal run's
- * definition of done is that it prints them.
+ * Merged, Stale, Not pushed, Worktrees — then Run records, and last
+ * Only on origin, each under a heading naming how many rows it holds,
+ * and each row one line, indented two spaces: its name, its date and
+ * its reason. The names are padded per kind of row
+ * ({@link cleanupNameWidth}): the three branch groups to the widest
+ * branch name, the worktrees to the widest worktree path, the run
+ * records to the widest plan and the branches only on `origin` to the
+ * widest of their own names, so the dates line up within a kind and a
+ * long worktree path never widens a branch row past what its own name,
+ * date and reason need. A group with no rows still shows its heading
+ * and {@link NO_ROWS_TEXT}, so a listing always names all six groups:
+ * the no-terminal run's definition of done is that it prints them.
  *
- * A branch row's date is its last commit; a worktree row's is when it
- * was last modified, {@link UNKNOWN_DATE} when that could not be read.
+ * A branch row's date is its last commit, a branch only on `origin`
+ * included; a worktree row's is when it was last modified,
+ * {@link UNKNOWN_DATE} when that could not be read.
  * A run record's row is named by its plan (the stub, or the plan path
  * when the record carries none) and dated by when the run started,
  * {@link UNKNOWN_DATE} when the record's `startedAt` does not parse;
@@ -31,10 +33,23 @@
  * it. Every date is the UTC calendar day, `YYYY-MM-DD`, so a line reads
  * the same on every machine and in every test.
  *
+ * ## The branches only on origin
+ *
+ * A row of the sixth group ({@link remoteOnlyRowLine}) is the branch's
+ * name without `origin/`, which the heading already says, the date of
+ * its tip, and the reason `src/cleanup/remote-only.ts` worded: how many
+ * of its commits have no patch-equal copy on the base against how many
+ * it holds, or that every commit has one. The count is the reading's,
+ * never recomputed here, so the line and the JSON data cannot disagree
+ * with it. The line names no command: deleting the branch on `origin`
+ * is a step `src/cleanup/steps.ts` builds for a row the person ticked,
+ * and `--dry-run` prints that step's line.
+ *
  * ## The remote delete a Stale row names
  *
- * Nothing remote is deleted by the command. A Stale row has an upstream
- * that is not gone, so the remote branch is still there, and its line
+ * The command deletes no Stale row's remote branch. A Stale row has an
+ * upstream that is not gone, so the remote branch is still there, and
+ * its line
  * ends naming the command the person may run: {@link remoteDeleteLine},
  * `git push origin --delete <b>`. The remote and the name are read off
  * the upstream (`origin/feature` → `origin`, `feature`) rather than
@@ -54,10 +69,14 @@
  * rows carry beyond that (`mergedBy` and the pull request number,
  * `idleDays` and the remote delete line, the commit count, a
  * worktree's blocker kinds), each run record's session id, paths, plan
- * and start time as the record holds it, the counts `cleanupCounts`
- * gives (branches and worktrees; the run records are counted by the
- * length of `runs`), and the notes. It holds no ticks the person made: with `--output=json` the
- * command asks nothing and removes nothing.
+ * and start time as the record holds it, each branch only on `origin`
+ * as `remoteOnly` (its name, its tip's date, `commits`, `uncopied`, its
+ * reason, and `ticked`, false for every one), the counts
+ * `cleanupCounts` gives (local branches and worktrees; the run records
+ * are counted by the length of `runs` and the branches only on `origin`
+ * by the length of `remoteOnly`), and the notes. It holds no ticks the
+ * person made: with `--output=json` the command asks nothing and
+ * removes nothing.
  */
 import type {
   BranchRow,
@@ -66,6 +85,7 @@ import type {
   MergedBy,
   MergedRow,
   NotPushedRow,
+  RemoteOnlyRow,
   RunRow,
   StaleRow,
   WorktreeBlockKind,
@@ -75,13 +95,14 @@ import type {
 import { cleanupCounts } from '../cleanup/index.js';
 import { shellQuote } from '../pr/preflight-items.js';
 
-/** The five group headings, in the order they are listed. */
+/** The six group headings, in the order they are listed. */
 export const CLEANUP_GROUP_TITLES = Object.freeze({
   merged: 'Merged',
   stale: 'Stale',
   notPushed: 'Not pushed',
   worktrees: 'Worktrees',
   runs: 'Run records',
+  remoteOnly: 'Only on origin',
 });
 
 /** The line an empty group shows under its heading. */
@@ -157,6 +178,21 @@ export interface RunRowData {
   readonly ticked: boolean;
 }
 
+/** A branch that exists only on `origin`, as JSON data. */
+export interface RemoteOnlyRowData {
+  /** Its name, without `origin/`. */
+  readonly name: string;
+  /** The tip's committer date, ISO 8601. */
+  readonly lastCommit: string;
+  /** The commits it holds past the base, merge commits left out. */
+  readonly commits: number;
+  /** How many of `commits` have no patch-equal copy on the base. */
+  readonly uncopied: number;
+  readonly reason: string;
+  /** Always false: no such row starts ticked. */
+  readonly ticked: boolean;
+}
+
 /** The JSON data of the terminal result event; see the module note. */
 export interface CleanupData {
   readonly base: string;
@@ -167,6 +203,7 @@ export interface CleanupData {
   readonly notPushed: readonly NotPushedRowData[];
   readonly worktrees: readonly WorktreeRowData[];
   readonly runs: readonly RunRowData[];
+  readonly remoteOnly: readonly RemoteOnlyRowData[];
   readonly notes: readonly string[];
 }
 
@@ -229,24 +266,37 @@ export function runRowLine(row: RunRow, width = 0): string {
 }
 
 /**
- * The kinds of row a name column is measured over: the Merged, Stale
- * and Not-pushed groups together (`branches`), the worktrees and the
- * run records.
+ * One row of the branches only on `origin`: its name padded to `width`,
+ * its tip's date and its reason, which holds the copy count; see the
+ * module note.
  */
-export type CleanupNameKind = 'branches' | 'worktrees' | 'runs';
+export function remoteOnlyRowLine(row: RemoteOnlyRow, width = 0): string {
+  return columns(row.name, width, cleanupDate(row.lastCommit), row.reason);
+}
+
+/**
+ * The kinds of row a name column is measured over: the Merged, Stale
+ * and Not-pushed groups together (`branches`), the worktrees, the run
+ * records and the branches only on `origin` (`remoteOnly`).
+ */
+export type CleanupNameKind = 'branches' | 'worktrees' | 'runs' | 'remoteOnly';
+
+/** The names of `read`'s rows of each kind, as their lines show them. */
+const NAMES_OF: Readonly<Record<CleanupNameKind, (read: CleanupRead) => readonly string[]>> = Object.freeze({
+  branches: (read: CleanupRead) => [...read.merged, ...read.stale, ...read.notPushed].map((row) => row.branch.name),
+  worktrees: (read: CleanupRead) => read.worktrees.map((row) => row.path),
+  runs: (read: CleanupRead) => read.runs.map((row) => row.plan),
+  remoteOnly: (read: CleanupRead) => read.remoteOnly.map((row) => row.name),
+});
 
 /**
  * The widest name among `read`'s rows of `kind`: the column those rows'
  * names are padded to. Each kind is measured on its own, so a long
- * worktree path pads the worktree rows only; 0 when the kind has no rows.
+ * worktree path pads the worktree rows only, and a long name on `origin`
+ * no local branch's row; 0 when the kind has no rows.
  */
 export function cleanupNameWidth(read: CleanupRead, kind: CleanupNameKind): number {
-  const names = kind === 'branches'
-    ? [...read.merged, ...read.stale, ...read.notPushed].map((row) => row.branch.name)
-    : kind === 'worktrees'
-      ? read.worktrees.map((row) => row.path)
-      : read.runs.map((row) => row.plan);
-  return names.reduce((widest, name) => Math.max(widest, name.length), 0);
+  return NAMES_OF[kind](read).reduce((widest, name) => Math.max(widest, name.length), 0);
 }
 
 /** The lines text mode writes for `read`; see the module note. */
@@ -254,6 +304,7 @@ export function renderCleanup(read: CleanupRead): readonly string[] {
   const branchWidth = cleanupNameWidth(read, 'branches');
   const worktreeWidth = cleanupNameWidth(read, 'worktrees');
   const runWidth = cleanupNameWidth(read, 'runs');
+  const remoteWidth = cleanupNameWidth(read, 'remoteOnly');
   const branchLines = (rows: readonly BranchRow[]): string[] => rows.map((row) => branchRowLine(row, branchWidth));
   return [
     ...read.notes.map((note) => `note: ${note}`),
@@ -262,6 +313,7 @@ export function renderCleanup(read: CleanupRead): readonly string[] {
     ...groupLines(CLEANUP_GROUP_TITLES.notPushed, branchLines(read.notPushed)),
     ...groupLines(CLEANUP_GROUP_TITLES.worktrees, read.worktrees.map((row) => worktreeRowLine(row, worktreeWidth))),
     ...groupLines(CLEANUP_GROUP_TITLES.runs, read.runs.map((row) => runRowLine(row, runWidth))),
+    ...groupLines(CLEANUP_GROUP_TITLES.remoteOnly, read.remoteOnly.map((row) => remoteOnlyRowLine(row, remoteWidth))),
   ];
 }
 
@@ -276,6 +328,7 @@ export function cleanupData(read: CleanupRead): CleanupData {
     notPushed: read.notPushed.map(notPushedData),
     worktrees: read.worktrees.map(worktreeData),
     runs: read.runs.map(runData),
+    remoteOnly: read.remoteOnly.map(remoteOnlyData),
     notes: [...read.notes],
   };
 }
@@ -344,6 +397,17 @@ function runData(row: RunRow): RunRowData {
     eventsPath: row.eventsPath,
     plan: row.plan,
     startedAt: row.startedAt,
+    ticked: row.ticked,
+  };
+}
+
+function remoteOnlyData(row: RemoteOnlyRow): RemoteOnlyRowData {
+  return {
+    name: row.name,
+    lastCommit: row.lastCommit.toISOString(),
+    commits: row.commits,
+    uncopied: row.uncopied,
+    reason: row.reason,
     ticked: row.ticked,
   };
 }

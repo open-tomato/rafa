@@ -371,7 +371,8 @@
  *     checks, checked and printed with no run started, beside two
  *     warnings about the install.
  *   - `cleanup [--dry-run]`, top-level: the local branches, worktrees
- *     and run records that have piled up, in five groups, and the ones ticked
+ *     and run records that have piled up, and the unmerged branches only
+ *     on `origin`, in six groups, and the ones ticked
  *     removed after one question; listed only, removing nothing, without
  *     a terminal or with `--output=json`. It starts no session.
  *   - `self-update [--force]`, top-level: builds the rafa checkout and
