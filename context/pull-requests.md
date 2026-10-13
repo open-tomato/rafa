@@ -6,7 +6,7 @@ a class with follow-up remediation.
 
 ### The `pr` subject
 
-Eight actions read and control pull requests:
+Ten actions read and control pull requests:
 
 - `pr current` — one line: `#n`, title, state, checks verdict, URL (URL
   alone when that is all `gh` answers)
@@ -34,10 +34,23 @@ Eight actions read and control pull requests:
   `PullRequests.editBase`, printing the line `retargetedLine` builds; `<n>`
   is required here, never the branch's; one already on that base is a
   no-op, exit 0
+- `pr close <n> --reason=<text> [--delete-branch] [--yes]` — close one open
+  PR WITHOUT merging it, over `PullRequests.close`, the reason left as its
+  closing comment; `<n>` is on the line, never the branch's. It prints the
+  title, the head and the issues a merge would have closed, which stay
+  open, then asks `Close #<n> without merging? [y/N]`; `--yes` answers it,
+  and without a terminal and without `--yes` it refuses. The head branch
+  stays on the remote unless `--delete-branch` is on the line
 
-`<n>` defaults to the open PR of the current branch. Every action carries a
-summary, examples and `outputs: [text, json]`; each one in the core roster
-carries help snapshots too.
+One pull request made obsolete by another change is the case it is for:
+`rafa pr close 41 --reason="Replaced by #52 on the new base."` shows #41,
+its head and the issues it would have closed, asks, and on a yes closes
+it with that reason as its comment. Those issues stay open.
+
+`<n>` defaults to the open PR of the current branch, except for `pr close`
+and `pr retarget`, which act on the number they are given. Every action
+carries a summary, examples and `outputs: [text, json]`; each one in the
+core roster carries help snapshots too.
 
 `pr wait` composes `waitForChecks` (`src/pr/checks.ts`) over the provider's
 `checks` and is READ-ONLY: no repair session, no comment, no label, no
@@ -127,6 +140,22 @@ with `base` exactly, sends nothing when they match, prints one
 `↪ Retargeted pull request #<n> from <old> to <new> (pr.base).` line
 after an edit, and turns a refused edit into one warning naming the
 pull request, both bases and what `gh` said, never a throw.
+
+`close(number, comment, { deleteBranch })` is `gh pr close <n>
+--comment=<comment>`, with `--delete-branch` after it only when
+`deleteBranch` is true. It is built in `src/pr/gh-close.ts`, which
+`src/pr/gh.ts` hands its runner to, a split that keeps `gh.ts` under its
+size cap as `gh-closing-issues.ts` did for its read. A WRITE shaped like
+`editBase`: a bad number, a blank or
+non-string comment and a `deleteBranch` that is not a boolean are refused
+as TypeErrors before `gh` is sent anything, and a failed command throws
+naming `gh pr close <n>` and what it wrote, the comment left out of the
+name. It answers nothing and reads nothing back. Closing a pull request
+closes none of the issues it links. The port does not read the state
+first, so the caller does: `pr close` reads `get(n)` and refuses a pull
+request that is merged, closed or absent before the close is sent. The
+fake refuses a close of a pull request that is not open, and a close with
+no comment, the same way (`src/pr/gh-fake.ts`).
 
 `listMerged` is rafa-94's, for `rafa cleanup`: it answers the recent
 merged pull requests as `MergedPullRequest` rows — `number`,
