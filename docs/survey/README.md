@@ -1,5 +1,9 @@
 # Monorepo survey
 
+> **Dated record.** This directory is a record of the tree at the survey's own run, commit `6c35a2b`. Each entry below
+> names the commit its input was read at. Paths, counts and cluster membership have moved since and are not corrected
+> here.
+
 This directory holds the static maps, contract traces, and timing measurements gathered by rafa-862 in preparation for
 the monorepo cut (epic #801). Every map is read at a named commit, every trace is written by hand from the import graph,
 and costs are recorded in the effort store. Read this file first: each entry below names its source and the commit where
