@@ -52,6 +52,11 @@
  *   - `gh repo view --json nameWithOwner` wrote
  *     `{"nameWithOwner":"open-tomato/rafa"}` in this repository.
  *   - `gh issue create --help` says the new issue URL is printed to stdout.
+ *   - `gh issue edit --help`, read on 2026-10-13 with `gh` 2.102.0, names
+ *     `--add-label name  Add labels by name` and `--remove-label name
+ *     Remove labels by name`, and shows `gh issue edit 23 --add-label
+ *     "bug,help wanted" --remove-label "core"`, so both values are split
+ *     on commas as `--label` is.
  *
  * Not recorded, since reading them would write to a repository: what
  * `gh issue create`, `gh issue comment`, `gh issue reopen`,
@@ -64,6 +69,13 @@
  * `gh issue create` fails whole on a label that does not exist and that a
  * reopen clears the close reason, are the source's, and every message
  * this module makes up opens with `fake gh:`.
+ *
+ * Not recorded either, for the same reason: what `gh issue edit` does
+ * with an `--add-label` naming a label the repository lacks or the
+ * issue holds already, or a `--remove-label` naming one the issue
+ * lacks. The fake refuses all three, a rule of its own and not the
+ * source's, so an adapter that leaned on any of them fails the case
+ * that sent it. A label an edit adds lands after those the issue keeps.
  *
  * ## Strict
  *
@@ -78,7 +90,7 @@
  * modelled to read it: a stdin handed to any other command is refused,
  * and so is that edit handed none, which `gh` would read as an empty
  * body. `--body-file` naming a file, `--body` beside `--body-file`, and
- * an edit naming neither a title nor a body are refused too.
+ * an edit naming no title, no body and no label are refused too.
  *
  * ## Recording
  *
@@ -205,7 +217,10 @@ const COMMANDS: ReadonlyMap<string, CommandShape> = new Map([
   ['issue list', { values: ['--state', '--json', '--limit', '--label', '--search', '--repo'], switches: [], positionals: 0 }],
   ['issue comment', { values: ['--body', '--repo'], switches: [], positionals: 1 }],
   ['issue reopen', { values: ['--repo'], switches: [], positionals: 1 }],
-  ['issue edit', { values: ['--title', '--body', '--body-file', '--repo'], switches: [], positionals: 1 }],
+  [
+    'issue edit',
+    { values: ['--title', '--body', '--body-file', '--add-label', '--remove-label', '--repo'], switches: [], positionals: 1 },
+  ],
   ['api', { values: ['-X', '-f'], switches: [], positionals: 1 }],
 ]);
 
@@ -269,9 +284,9 @@ function flagValue(parsed: ParsedCommand, name: string): string | undefined {
   return parsed.flags.get(name)?.at(-1);
 }
 
-/** Every label a command's `--label` flags name, each split on commas as recorded. */
-function labelValues(parsed: ParsedCommand): string[] {
-  return (parsed.flags.get('--label') ?? []).flatMap((value) => value.split(','));
+/** Every label a command's `flag` flags name, `--label` when left out, each split on commas as recorded. */
+function labelValues(parsed: ParsedCommand, flag = '--label'): string[] {
+  return (parsed.flags.get(flag) ?? []).flatMap((value) => value.split(','));
 }
 
 /** Makes a fake `gh` over an empty repository; see the module note. */
@@ -439,10 +454,29 @@ export function createFakeGh(options: FakeGhOptions = {}): FakeGh {
       const body = bodyFile === undefined
         ? flagValue(parsed, '--body')
         : stdin;
-      if (title === undefined && body === undefined) return failed('fake gh: issue edit models --title or a body, and was handed neither\n');
+      const added = labelValues(parsed, '--add-label');
+      const removed = labelValues(parsed, '--remove-label');
+      if (title === undefined && body === undefined && added.length + removed.length === 0) {
+        return failed('fake gh: issue edit models --title, a body or a label, and was handed none\n');
+      }
       const issue = namedIssue(parsed.positionals[0] ?? '');
       if ('ok' in issue) return issue;
-      store({ ...issue, title: title ?? issue.title, body: body ?? issue.body });
+      const unmade = added.find((label) => !labels.has(label));
+      if (unmade !== undefined) {
+        return failed(`fake gh: issue edit --add-label models a label the repository holds, and was handed ${unmade}\n`);
+      }
+      const held = added.find((label) => issue.labels.includes(label));
+      if (held !== undefined) return failed(`fake gh: issue edit --add-label models a label the issue lacks, and was handed ${held}\n`);
+      const lacked = removed.find((label) => !issue.labels.includes(label));
+      if (lacked !== undefined) {
+        return failed(`fake gh: issue edit --remove-label models a label the issue holds, and was handed ${lacked}\n`);
+      }
+      store({
+        ...issue,
+        title: title ?? issue.title,
+        body: body ?? issue.body,
+        labels: [...issue.labels.filter((label) => !removed.includes(label)), ...added],
+      });
       return ok(`${urlOf(issue.number)}\n`);
     }],
 

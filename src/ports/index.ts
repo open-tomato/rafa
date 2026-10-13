@@ -351,17 +351,31 @@ export interface EditableIssue {
    * on a tracker that holds no accounts, such as `local`.
    */
   readonly author: string;
+  /**
+   * The priority the tracker holds for the issue, or null when triage
+   * has set none, as `get` answers {@link IssueDraft.priority}. Absent on
+   * a tracker whose `edit` writes no priority: a caller reads it here
+   * before it hands {@link IssueEdit} a priority, and hands none to a
+   * tracker that answers none.
+   */
+  readonly priority?: IssuePriority | null;
 }
 
 /**
- * What one `edit` writes: a new body, a new title, or both. Whatever
- * it leaves out stays as the tracker holds it. A body is written whole:
- * an append is the caller's, which hands the old body with its update
- * below it. The union holds an edit to at least one of the two.
+ * What one `edit` writes: a new body, a new title, a new priority, or
+ * any of the three together. Whatever it leaves out stays as the
+ * tracker holds it. A body is written whole: an append is the caller's,
+ * which hands the old body with its update below it. A priority is
+ * written in place of the one the issue held, and takes the issue out
+ * of triage: after it the tracker holds that priority and no other, and
+ * no mark that triage has yet to set one. An edit never returns an
+ * issue to triage, so the member holds no null. The union holds an edit
+ * to at least one of the three.
  */
 export type IssueEdit =
-  | { readonly body: string; readonly title?: string }
-  | { readonly body?: string; readonly title: string };
+  | { readonly body: string; readonly title?: string; readonly priority?: IssuePriority }
+  | { readonly body?: string; readonly title: string; readonly priority?: IssuePriority }
+  | { readonly body?: string; readonly title?: string; readonly priority: IssuePriority };
 
 /** What a tracker's platform supports beyond issues themselves. */
 export interface TrackerCapabilities {
@@ -419,17 +433,19 @@ export interface Tracker {
   openIssues?: (type: IssueType) => Promise<OpenIssue[]>;
   /**
    * The issue's title, body, open state, labels and author, in one
-   * read. Rejects for a ref the tracker does not hold. rafa's own
-   * member, absent from the source, and optional with {@link edit}: a
-   * tracker without the two cannot have a body edited, and
-   * `rafa issue edit` refuses with a line naming the tracker's kind.
+   * read, with its priority on a tracker whose `edit` writes one.
+   * Rejects for a ref the tracker does not hold. rafa's own member,
+   * absent from the source, and optional with {@link edit}: a tracker
+   * without the two cannot have a body edited, and `rafa issue edit`
+   * refuses with a line naming the tracker's kind.
    */
   editable?: (ref: IssueRef) => Promise<EditableIssue>;
   /**
-   * Writes the body, the title or both that `change` names, leaving
-   * the rest of the issue as it was, so that `editable` and `get` read
-   * the written text back unchanged. Rejects when the tracker refuses
-   * the write or does not hold the ref. Optional with {@link editable}.
+   * Writes the body, the title and the priority that `change` names,
+   * leaving the rest of the issue as it was, so that `editable` and
+   * `get` read the written text and priority back unchanged. Rejects
+   * when the tracker refuses the write or does not hold the ref.
+   * Optional with {@link editable}.
    */
   edit?: (ref: IssueRef, change: IssueEdit) => Promise<void>;
 }

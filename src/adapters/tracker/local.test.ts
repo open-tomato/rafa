@@ -78,9 +78,17 @@
  * title ignored reddened the contract's title case and three here; the
  * state and comments reset on an edit reddened the kept-fields case; and
  * the ref answered as passed in, not as read, the labels-and-author case.
+ *
+ * Three mutations of the priority `editable` reads and `edit` writes
+ * were driven on 2026-10-13 over `src/adapters/tracker/`, at 500 pass
+ * before and after, the module restored byte-identical (sha256) after
+ * each. The priority left unwritten reddened three contract cases and
+ * six here; the check of a priority dropped, its three refusal rows
+ * alone, a null among them; and no priority answered, four contract
+ * cases and two here.
  */
 import type { LocalIssueRecord, LocalTrackerOptions } from './local.js';
-import type { IssueRef, IssueState, IssueType, Output, Tracker } from '../../ports/index.js';
+import type { IssueEdit, IssueRef, IssueState, IssueType, Output, Tracker } from '../../ports/index.js';
 
 import {
   existsSync,
@@ -198,6 +206,7 @@ runTrackerContract({
   expectsProjects: false,
   expectedKind: 'local',
   editsIssues: true,
+  editsPriority: true,
   create: async () => {
     contractDir = freshDir('contract');
     return localTracker(contractDir);
@@ -824,6 +833,7 @@ describe('editing a local issue', () => {
       open: true,
       labels: [],
       author: '',
+      priority: 'urgent',
     });
   });
 
@@ -886,7 +896,65 @@ describe('editing a local issue', () => {
     expect(readIssue(dir, 1).draft).toMatchObject({ body, title });
   });
 
-  it('refuses an edit naming neither a body nor a title, leaving the file as it was', async () => {
+  it('rewrites the priority field alone, keeping every other field the file holds', async () => {
+    const dir = freshDir('edit-priority');
+    const ref = await localTracker(dir).create(draftFixture({ priority: null, blockedBy: [259], specBlocked: true }));
+    const later = localTracker(dir, { fallbackReason: null, now: () => LATER });
+    await later.comment(ref, 'seen again');
+    await later.transition(ref, 'in-review');
+    const before = readIssue(dir, 1);
+
+    await later.edit?.(ref, { priority: 'high' });
+
+    expect(readIssue(dir, 1)).toEqual({ ...before, draft: { ...before.draft, priority: 'high' } });
+    expect(before.draft.priority).toBeNull();
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).toContain('\npriority: high\n');
+  });
+
+  it('answers the priority the file holds, null before triage sets one, and the one an edit swapped in', async () => {
+    const dir = freshDir('edit-priority-read');
+    const tracker = localTracker(dir);
+    const unset = await tracker.create(draftFixture({ priority: null }));
+    const set = await tracker.create(draftFixture({ priority: 'low' }));
+
+    expect([(await tracker.editable?.(unset))?.priority, (await tracker.editable?.(set))?.priority]).toEqual([null, 'low']);
+    await tracker.edit?.(set, { priority: 'urgent' });
+
+    expect([(await tracker.editable?.(unset))?.priority, (await tracker.editable?.(set))?.priority]).toEqual([null, 'urgent']);
+  });
+
+  it('writes a priority beside a title and a body in one rewrite', async () => {
+    const dir = freshDir('edit-priority-all');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture({ priority: null }));
+
+    await tracker.edit?.(ref, { title: 'Narrow the window', body: 'Narrowed.\n', priority: 'medium' });
+
+    expect(await tracker.get(ref)).toMatchObject({ title: 'Narrow the window', body: 'Narrowed.\n', priority: 'medium' });
+  });
+
+  it.each([
+    ['one the port does not name', 'p0', '"p0"'],
+    ['a null, which a file may hold', null, 'null'],
+    ['a number', 1, '1'],
+  ])('refuses a priority that is %s, leaving the file as it was, beside one it writes', async (_name, priority, described) => {
+    const dir = freshDir('edit-priority-invalid');
+    const tracker = localTracker(dir);
+    const ref = await tracker.create(draftFixture({ priority: 'low' }));
+    const before = readFileSync(join(dir, '1.md'), 'utf8');
+
+    // Cast: each priority is one the port's type rules out, as an untyped caller could still hand over.
+    const bad = { priority } as unknown as IssueEdit;
+
+    await expect(tracker.edit?.(ref, bad)).rejects.toThrow(
+      `local tracker: refused to write an invalid issue: priority is ${described}, expected one of: urgent, high, medium, low`,
+    );
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).toBe(before);
+    await tracker.edit?.(ref, { priority: 'high' });
+    expect(readFileSync(join(dir, '1.md'), 'utf8')).not.toBe(before);
+  });
+
+  it('refuses an edit naming no body, no title and no priority, leaving the file as it was', async () => {
     const dir = freshDir('edit-empty');
     const tracker = localTracker(dir);
     const ref = await tracker.create(draftFixture());
@@ -895,7 +963,7 @@ describe('editing a local issue', () => {
     const empty = {} as unknown as { body: string };
 
     await expect(tracker.edit?.(ref, empty)).rejects.toThrow(
-      'local tracker: refused an edit naming neither a body nor a title',
+      'local tracker: refused an edit naming no body, no title and no priority',
     );
     expect(readFileSync(join(dir, '1.md'), 'utf8')).toBe(before);
     await tracker.edit?.(ref, { body: 'Changed.\n' });

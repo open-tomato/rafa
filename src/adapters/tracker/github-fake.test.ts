@@ -20,6 +20,13 @@
  * reason, the reopen case here and the adapter's four reopen cases. A
  * search of the title alone reddened no case here and the contract's body
  * case, since this file searches titles and the contract a body.
+ *
+ * Three mutations of the label rules of `issue edit` were driven on
+ * 2026-10-13 over `src/adapters/tracker/`, at 500 pass before and after,
+ * the module restored byte-identical (sha256) after each, and each
+ * reddened its own refusal row here and no adapter case: a label added
+ * that the repository lacks, which reddened the case adding it once made
+ * as well, one added that the issue holds, and one removed that it lacks.
  */
 import type { FakeGh } from './github-fake.js';
 
@@ -241,7 +248,22 @@ describe('the recorded gh fake', () => {
     [['issue', 'edit', '1', '--body-file', '-'], undefined, 'fake gh: issue edit --body-file - was handed no stdin\n'],
     [['issue', 'edit', '1', '--body-file', 'body.md'], undefined, 'fake gh: issue edit models --body-file - alone\n'],
     [['issue', 'edit', '1', '--body', 'b', '--body-file', '-'], 'b', 'fake gh: issue edit models --body or --body-file, never both\n'],
-    [['issue', 'edit', '1'], undefined, 'fake gh: issue edit models --title or a body, and was handed neither\n'],
+    [['issue', 'edit', '1'], undefined, 'fake gh: issue edit models --title, a body or a label, and was handed none\n'],
+    [
+      ['issue', 'edit', '1', '--add-label', 'priority:high'],
+      undefined,
+      'fake gh: issue edit --add-label models a label the repository holds, and was handed priority:high\n',
+    ],
+    [
+      ['issue', 'edit', '1', '--add-label', 'question,bug'],
+      undefined,
+      'fake gh: issue edit --add-label models a label the issue lacks, and was handed bug\n',
+    ],
+    [
+      ['issue', 'edit', '1', '--remove-label', 'bug,wontfix'],
+      undefined,
+      'fake gh: issue edit --remove-label models a label the issue holds, and was handed wontfix\n',
+    ],
     [['issue', 'edit', '1', '--body', 'b'], 'b', 'fake gh: issue edit reads no stdin, and was handed some\n'],
     [['issue', 'comment', '1', '--body', 'b'], 'b', 'fake gh: issue comment reads no stdin, and was handed some\n'],
   ])('refuses the edit %p handed stdin %p, editing nothing', async (args, stdin, stderr) => {
@@ -249,7 +271,29 @@ describe('the recorded gh fake', () => {
     await fake.run(issueCreate('t', 'bug'));
 
     expect(await fake.run(args, stdin)).toEqual(failure(stderr));
-    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', comments: [] });
+    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', labels: ['bug'], comments: [] });
+  });
+
+  it('edits labels through --add-label and --remove-label, each split on commas, the added after those kept', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug', 'question', 'wontfix'));
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'enhancement,duplicate', '--remove-label', 'bug,wontfix']))
+      .toEqual({ ok: true, stdout: 'https://github.com/open-tomato/rafa/issues/1\n', stderr: '' });
+    expect(fake.issue('1')).toMatchObject({ title: 't', body: 'body', labels: ['question', 'enhancement', 'duplicate'] });
+    expect(await fake.run(['issue', 'edit', '1', '--remove-label', 'question', '--remove-label', 'duplicate'])).toMatchObject({ ok: true });
+    expect(fake.issue('1')?.labels).toEqual(['enhancement']);
+  });
+
+  it('adds a label to an issue once the repository holds it, the one it refused before', async () => {
+    const fake = createFakeGh();
+    await fake.run(issueCreate('t', 'bug'));
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'priority:high'])).toMatchObject({ ok: false });
+    await fake.run(['label', 'create', 'priority:high', '--force']);
+
+    expect(await fake.run(['issue', 'edit', '1', '--add-label', 'priority:high'])).toMatchObject({ ok: true });
+    expect(fake.issue('1')?.labels).toEqual(['bug', 'priority:high']);
   });
 
   it('fails an edit of an issue it does not hold as a view of one fails', async () => {

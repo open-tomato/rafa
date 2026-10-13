@@ -61,6 +61,16 @@
  *     `openIssues`, the pair is held only when an adapter is run with
  *     `editsIssues: true`; one run without it is held to leaving both
  *     out instead, by one case in place of the five.
+ *   - A priority through the pair: four more cases, held only when an
+ *     adapter run with `editsIssues: true` is also run with
+ *     `editsPriority: true`. `editable` answers a created issue's
+ *     priority, and null for one triage has set none for. `edit` writes
+ *     a priority alone that `editable` and `get` read back, leaving the
+ *     title, the body and every other issue; swaps one priority for
+ *     another; and writes one beside a title. An adapter with the pair
+ *     run without `editsPriority` is held to an `editable` answering no
+ *     priority instead, by one case in place of the four, since the
+ *     port reads an absent priority as a tracker that writes none.
  *   - The cases are also answered as a list, by
  *     {@link trackerContractCases}, each a name and a function that
  *     rejects when the adapter breaks the case. {@link runTrackerContract}
@@ -110,6 +120,11 @@ export interface TrackerContractOptions {
    * through rather than being held to one it never wrote.
    */
   readonly editsIssues?: boolean;
+  /**
+   * Whether the adapter's pair reads and writes a priority. False when
+   * left out, and read only beside `editsIssues: true`.
+   */
+  readonly editsPriority?: boolean;
 }
 
 /** One contract case: its name, and a run that rejects when the adapter breaks it. */
@@ -263,7 +278,98 @@ function editableRow(issue: EditableIssue): Omit<EditableIssue, 'ref'> & { reado
   return { ...rest, id: ref.externalId, kind: ref.kind };
 }
 
-/** The cases of the optional `editable` and `edit` pair, or the one case holding it left out. */
+/** The cases of a priority through the pair, or the one case holding `editable` to answering none. */
+function priorityCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
+  const { create } = options;
+  if (options.editsPriority !== true) {
+    return [
+      {
+        name: 'answers no priority from editable, run without the priority edit',
+        run: async () => {
+          const tracker = await create();
+          await tracker.preflight();
+          const ref = await tracker.create(draftFixture({ opt: 0 }));
+
+          expect((await editMembersOf(tracker).editable(ref)).priority).toBeUndefined();
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'editable answers the priority of a created issue, and null before triage sets one',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const set = await tracker.create(draftFixture({ opt: 0, title: 'Replay window', priority: 'high' }));
+        const unset = await tracker.create(draftFixture({ opt: 0, title: 'Signing keys', priority: null }));
+        const { editable } = editMembersOf(tracker);
+
+        expect([(await editable(set)).priority, (await editable(unset)).priority]).toEqual(['high', null]);
+      },
+    },
+    {
+      name: 'edit writes a priority read back by editable and get, leaving the title, the body and every other issue',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const edited = await tracker.create(draftFixture({
+          opt: 0,
+          title: 'Replay window',
+          body: 'Codes stay valid.\n',
+          priority: null,
+        }));
+        const other = await tracker.create(draftFixture({ opt: 0, title: 'Signing keys', priority: 'low' }));
+        const { editable, edit } = editMembersOf(tracker);
+
+        await edit(edited, { priority: 'high' });
+
+        expect(await editable(edited)).toMatchObject({ priority: 'high', title: 'Replay window', body: 'Codes stay valid.\n' });
+        expect((await tracker.get(edited)).priority).toBe('high');
+        expect((await editable(other)).priority).toBe('low');
+      },
+    },
+    {
+      name: 'edit swaps one priority for another',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const ref = await tracker.create(draftFixture({ opt: 0, priority: 'urgent' }));
+        const { editable, edit } = editMembersOf(tracker);
+
+        await edit(ref, { priority: 'low' });
+
+        expect((await editable(ref)).priority).toBe('low');
+        expect((await tracker.get(ref)).priority).toBe('low');
+      },
+    },
+    {
+      name: 'edit writes a priority beside a title, leaving the body',
+      run: async () => {
+        const tracker = await create();
+        await tracker.preflight();
+        const ref = await tracker.create(draftFixture({
+          opt: 0,
+          title: 'Replay window',
+          body: 'Codes stay valid.\n',
+          priority: null,
+        }));
+        const { editable, edit } = editMembersOf(tracker);
+
+        await edit(ref, { title: 'Narrow the replay window', priority: 'medium' });
+
+        expect(await editable(ref)).toMatchObject({ title: 'Narrow the replay window', priority: 'medium' });
+        expect((await editable(ref)).body).toBe('Codes stay valid.\n');
+      },
+    },
+  ];
+}
+
+/**
+ * The cases of the optional `editable` and `edit` pair with those of a
+ * priority through it, or the one case holding the pair left out.
+ */
 function editCases(options: TrackerContractOptions): readonly TrackerContractCase[] {
   const { create } = options;
   if (options.editsIssues !== true) {
@@ -359,6 +465,7 @@ function editCases(options: TrackerContractOptions): readonly TrackerContractCas
         await expect(edit(unknown, { body: EDITED_BODY })).rejects.toThrow();
       },
     },
+    ...priorityCases(options),
   ];
 }
 
