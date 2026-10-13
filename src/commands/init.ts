@@ -497,7 +497,11 @@ function trackingWrites(applied: TrackingApplied, digestExisted: boolean): reado
 
 /** What the scopes came to, with the config they were written from. */
 interface ScopesWritten {
-  /** The result, but for the two steps that run once these are on disk. */
+  /**
+   * The result, but for the fields of the steps that run once these are
+   * on disk: `release`, `board`, `epicGuard`, `relationsMove` and
+   * `project`.
+   */
   readonly written: Omit<InitResult, 'board' | 'epicGuard' | 'project' | 'relationsMove' | 'release'>;
   /** The config as it resolved for the root, which the provider is read from. */
   readonly config: RafaConfig;
