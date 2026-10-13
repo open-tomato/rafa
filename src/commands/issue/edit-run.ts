@@ -139,17 +139,17 @@ import {
 } from './issue-tracker.js';
 
 /** The usage line a line refusal names. */
-export const EDIT_USAGE = 'rafa issue edit <n> (--append-file=<file> | --append=<text>) --reason=<text>'
+export const EDIT_USAGE: string = 'rafa issue edit <n> (--append-file=<file> | --append=<text>) --reason=<text>'
   + ' [--while-in-development] | ((--replace-file=<file> | --priority=<priority>) [--title=<text>] | --title=<text>) [--dry-run]';
 
 /** The exit code every gate refusal ends with: `TRUST_REFUSAL_EXIT`, `LEAK_REFUSAL_EXIT` and `BOARD_REFUSAL_EXIT` are all 2. */
-export const EDIT_REFUSAL_EXIT = TRUST_REFUSAL_EXIT;
+export const EDIT_REFUSAL_EXIT: number = TRUST_REFUSAL_EXIT;
 
 /** The exit code a `conflict` ends with. */
 export const EDIT_CONFLICT_EXIT = 1;
 
 /** Where a conflict's two bodies are saved, under the project root. */
-export const EDIT_SCRATCH_DIR = join('.rafa', 'scratch');
+export const EDIT_SCRATCH_DIR: string = join('.rafa', 'scratch');
 
 /** The file value that reads standard input. */
 const STDIN_PATH = '-';

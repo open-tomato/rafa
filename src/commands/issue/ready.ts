@@ -564,4 +564,5 @@ export function createIssueReadyCommand(seams: ReadySeams = DEFAULT_READY_SEAMS)
   return Object.freeze(command);
 }
 
-export default createIssueReadyCommand();
+const command: RafaCommand = createIssueReadyCommand();
+export default command;

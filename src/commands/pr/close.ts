@@ -315,4 +315,5 @@ export function createPrCloseCommand(seams: CloseSeams = DEFAULT_CLOSE_SEAMS): R
   return Object.freeze(command);
 }
 
-export default createPrCloseCommand();
+const command: RafaCommand = createPrCloseCommand();
+export default command;

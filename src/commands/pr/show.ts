@@ -131,7 +131,7 @@ const PULL_URL_REPOSITORY = /^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+\/?$/u;
  * description names them: {@link PrShowResult}'s own keys, which
  * `show.test.ts` holds this list to.
  */
-export const PR_SHOW_JSON_FIELDS = Object.freeze([
+export const PR_SHOW_JSON_FIELDS: readonly ['detail', 'bodyCloses', 'checks', 'checksProblem', 'triage', 'triageProblem', 'text'] = Object.freeze([
   'detail',
   'bodyCloses',
   'checks',
@@ -413,4 +413,5 @@ export function createPrShowCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
   return Object.freeze(command);
 }
 
-export default createPrShowCommand();
+const command: RafaCommand = createPrShowCommand();
+export default command;

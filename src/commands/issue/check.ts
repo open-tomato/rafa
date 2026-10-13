@@ -348,4 +348,5 @@ export function createIssueCheckCommand(seams: IssueCheckSeams = {}): RafaComman
   return Object.freeze(command);
 }
 
-export default createIssueCheckCommand();
+const command: RafaCommand = createIssueCheckCommand();
+export default command;

@@ -155,4 +155,5 @@ export function createPrViewCommand(seams: PrSeams = DEFAULT_PR_SEAMS): RafaComm
   return Object.freeze(command);
 }
 
-export default createPrViewCommand();
+const command: RafaCommand = createPrViewCommand();
+export default command;

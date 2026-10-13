@@ -744,4 +744,5 @@ export function createPrMergeCommand(seams: MergeSeams = DEFAULT_MERGE_SEAMS): R
   return Object.freeze(command);
 }
 
-export default createPrMergeCommand();
+const command: RafaCommand = createPrMergeCommand();
+export default command;

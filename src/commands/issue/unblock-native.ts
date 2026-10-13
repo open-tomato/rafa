@@ -51,7 +51,7 @@ import type { ProjectFound } from '../../project/scope.js';
 import { issueSubjectConfig } from './issue-tracker.js';
 
 /** What `rafa issue unblock` prints in native mode, and all it does there. */
-export const NATIVE_UNBLOCK_LINE = 'board.relationships is native: GitHub clears a blocker by itself when the'
+export const NATIVE_UNBLOCK_LINE: string = 'board.relationships is native: GitHub clears a blocker by itself when the'
   + ' blocking issue closes, so rafa issue unblock has nothing to write';
 
 /**

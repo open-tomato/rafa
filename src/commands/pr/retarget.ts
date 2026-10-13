@@ -143,4 +143,5 @@ export function createPrRetargetCommand(seams: PrSeams = DEFAULT_PR_SEAMS): Rafa
   return Object.freeze(command);
 }
 
-export default createPrRetargetCommand();
+const command: RafaCommand = createPrRetargetCommand();
+export default command;

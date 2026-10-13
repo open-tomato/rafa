@@ -137,7 +137,7 @@ import {
 } from './roadmap-table.js';
 
 /** The six columns, in order, as the header line spells them. */
-export const EPIC_COLUMNS = Object.freeze(['#', 'state', 'done/total', 'blocked', 'date', 'title'] as const);
+export const EPIC_COLUMNS: readonly ['#', 'state', 'done/total', 'blocked', 'date', 'title'] = Object.freeze(['#', 'state', 'done/total', 'blocked', 'date', 'title'] as const);
 
 /** What the table is printed from: the reading's shown parts, `specs` as the caller narrowed them. */
 export type EpicTableRows = Pick<RoadmapEpicRows, 'roadmap' | 'groups' | 'hidden' | 'unknown' | 'specs'>
