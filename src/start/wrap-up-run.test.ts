@@ -10,10 +10,12 @@
  * step 3 after it returns, and all three BEFORE the CI gate. A second
  * claim is which directory each of those calls is pointed at.
  *
- * `runWrapUp` itself is not driven: it spawns a real Claude session, a
- * real `git push` and the real CI gate with no seam, as the wrap-up
- * branch did while it sat in `start.ts`, whose suite explains the same
- * choice. So the wiring is read off the source instead, and read
+ * `runWrapUp` itself is driven only for the prompt its session is handed
+ * (the last `describe`, over stand-in `claude` and `gh` executables on a
+ * scratch PATH): it spawns a real Claude session, a real `git push` and
+ * the real CI gate with no injected seam, as the wrap-up branch did
+ * while it sat in `start.ts`, whose suite explains the same choice. So
+ * the wiring is read off the source instead, and read
  * STRUCTURALLY: the module is parsed with TypeScript, `runWrapUp`'s body
  * is located, and every call inside it is collected in source order
  * with its arguments as written. A substring check could not tell a
@@ -90,7 +92,8 @@ import type { CliEvent } from '../ports/index.js';
 import type { FakePrGh } from '../pr/gh-fake.js';
 import type { PullRequests, PullRequestSummary } from '../pr/index.js';
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -99,8 +102,11 @@ import ts from 'typescript';
 
 import { setActiveOutput } from '../adapters/output/active.js';
 import { assumptionsHeading } from '../board/review-stamp.js';
+import { loadConfig } from '../config-load.js';
 import { createFakePrGh } from '../pr/gh-fake.js';
 import { createGhPullRequests } from '../pr/gh.js';
+import { plantProjectConfig, plantScratchRepo } from '../tests/cli-capture.js';
+import { gitIdentityEnv } from '../tests/git-identity.js';
 import { sinkOutput } from '../tests/output-sinks.js';
 import { COMMITTED, FORECAST_LINE, prepared, PROVIDER_GH, SETTINGS, stub, VERIFIED } from '../tests/release-stage-fixtures.js';
 
@@ -108,7 +114,7 @@ import { bindEventsFile, unbindEventsFile } from './loop-events.js';
 import { retargetPullRequest } from './pr-retarget.js';
 import { carryReleaseIntoPullRequest } from './release-body.js';
 import { finishRelease } from './release-stage.js';
-import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor } from './wrap-up-run.js';
+import { DELIVERY_BLOCKED_TAIL, deliverPullRequest, emitPullRequestEvent, planIssueNumber, runnerPrInputFor, runWrapUp } from './wrap-up-run.js';
 
 /** One call inside `runWrapUp`, as the source writes it. */
 interface BodyCall {
@@ -1069,5 +1075,102 @@ describe('the release written into the delivered pull request', () => {
     expect(finish.written?.block).toContain(FORECAST_LINE);
     expect(finish.body?.number).toBeNull();
     expect(bodyEdits(fake)).toEqual([]);
+  });
+});
+
+/**
+ * `runWrapUp` driven in a scratch checkout, through the one place a
+ * wrap-up session is spawned: a stand-in `claude` on the PATH that
+ * keeps the prompt it was handed on stdin, and a stand-in `gh` that
+ * logs every call and fails it. So what is read is the prompt the
+ * session got, and which `gh` calls the run made on the way to it.
+ */
+describe('runWrapUp over the spawn seam', () => {
+  const BASE = 'trunk';
+  const saved = { PATH: process.env.PATH, HOME: process.env.HOME };
+  let scratchRoot = '';
+
+  beforeEach(() => {
+    setActiveOutput(sinkOutput({}));
+  });
+
+  afterEach(() => {
+    setActiveOutput(null);
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    if (scratchRoot !== '') rmSync(scratchRoot, { recursive: true, force: true });
+    scratchRoot = '';
+  });
+
+  /** Runs the wrap-up under `provider` and answers the first prompt the session got and the `gh` calls. */
+  async function wrapUpUnder(provider: 'none' | 'gh'): Promise<{ prompt: string; ghCalls: string }> {
+    const scratch = plantScratchRepo(tmpdir());
+    scratchRoot = join(scratch.repo, '..');
+    plantProjectConfig(scratch.repo, `pr:\n  provider: ${provider}\n  base: ${BASE}\nrelease:\n  enabled: false\n`);
+    const git = (...args: string[]): string => execFileSync('git', args, {
+      cwd: scratch.repo,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: scratch.path, HOME: scratch.home, GIT_CONFIG_GLOBAL: join(scratch.home, '.gitconfig'), GIT_CONFIG_NOSYSTEM: '1', ...gitIdentityEnv() },
+    }).trim();
+    git('checkout', '-q', '-b', 'feat/wrap-up-prompt');
+    git('commit', '-q', '--allow-empty', '-m', 'chore: start');
+    const head = git('rev-parse', 'HEAD');
+    const promptFile = join(scratch.bin, 'prompt.txt');
+    const ghLog = join(scratch.bin, 'gh.log');
+    writeFileSync(join(scratch.bin, 'claude'), `#!/bin/sh\n[ -e '${promptFile}' ] || cat > '${promptFile}'\nexit 0\n`, 'utf8');
+    writeFileSync(join(scratch.bin, 'gh'), `#!/bin/sh\necho "$@" >> '${ghLog}'\nexit 1\n`, 'utf8');
+    chmodSync(join(scratch.bin, 'claude'), 0o755);
+    chmodSync(join(scratch.bin, 'gh'), 0o755);
+    process.env.PATH = scratch.path;
+    process.env.HOME = scratch.home;
+    const { config } = loadConfig({ root: scratch.repo, home: scratch.home });
+    const noop = (): void => {};
+    try {
+      await runWrapUp({
+        session: { id: 'run-1', wrapUpStarted: noop, pullRequestStarted: noop, ciStarted: noop, repairStarted: noop, finished: noop },
+        repoRoot: scratch.repo,
+        checkout: scratch.repo,
+        settings: config,
+        planStub: null,
+        planContent: '# Plan\n\n- [x] A task\n',
+        settingSources: ['project'],
+        serving: { root: scratch.repo, home: scratch.home, settings: config, run: 'run-1' },
+        wrapUpLearning: { kind: 'local', home: scratch.home, blessMinConfidence: 0.5, repoRoot: scratch.repo, promoteAfter: 3, promoteMinConfidence: 0.7 },
+        expected: { projectRoot: scratch.repo, checkout: scratch.repo, branch: 'feat/wrap-up-prompt', head },
+        ciWait: false,
+        ciTimeoutMin: 1,
+        ciAttempts: 0,
+        isInterrupted: () => false,
+      });
+    } catch {
+      // Under `gh` the stand-in refuses every call, so the delivery after
+      // the session may end the run; only the first prompt is read.
+    }
+    return {
+      prompt: readFileSync(promptFile, 'utf8'),
+      ghCalls: existsSync(ghLog)
+        ? readFileSync(ghLog, 'utf8')
+        : '',
+    };
+  }
+
+  it('hands the session no pull request step under pr.provider none, and looks none up', async () => {
+    const { prompt, ghCalls } = await wrapUpUnder('none');
+
+    expect(prompt).not.toContain('gh pr create');
+    expect(prompt).not.toContain('gh pr edit');
+    expect(prompt).not.toContain('Closes #');
+    expect(prompt).toContain('`pr.provider` is `none`');
+    expect(prompt).toContain('this run ends with the branch pushed and no pull request is opened');
+    expect(ghCalls).toBe('');
+  });
+
+  it('hands the session the create bullet naming the base under pr.provider gh', async () => {
+    const { prompt } = await wrapUpUnder('gh');
+
+    expect(prompt).toContain(`gh pr create --base ${BASE}`);
+    expect(prompt).not.toContain('`pr.provider` is `none`');
   });
 });
