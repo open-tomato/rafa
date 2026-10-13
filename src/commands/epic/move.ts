@@ -785,4 +785,5 @@ export function createEpicMoveCommand(seams: EpicMoveSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createEpicMoveCommand();
+const command: RafaCommand = createEpicMoveCommand();
+export default command;

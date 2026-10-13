@@ -275,4 +275,5 @@ export function createMergeCommand(seams: MergeCommandSeams = {}): RafaCommand {
   return Object.freeze(command);
 }
 
-export default createMergeCommand();
+const command: RafaCommand = createMergeCommand();
+export default command;

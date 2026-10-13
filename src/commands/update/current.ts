@@ -335,4 +335,5 @@ export function createUpdateCurrentCommand(seams: UpdateCurrentSeams = DEFAULT_U
   return Object.freeze(command);
 }
 
-export default createUpdateCurrentCommand();
+const command: RafaCommand = createUpdateCurrentCommand();
+export default command;

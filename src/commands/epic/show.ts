@@ -481,4 +481,5 @@ export function createEpicShowCommand(seams: EpicShowSeams = DEFAULT_ISSUE_SEAMS
   return Object.freeze(command);
 }
 
-export default createEpicShowCommand();
+const command: RafaCommand = createEpicShowCommand();
+export default command;
