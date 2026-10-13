@@ -252,7 +252,7 @@
  * {@link retakeOnErrors} and the two JUnit file paths, exported for it.
  */
 import type { LintOutcome, LintRunner } from './lint-step.js';
-import type { RepairStepKind, StepVerdict } from './suite-blocker.js';
+import type { RepairSite, StepVerdict } from './suite-blocker.js';
 import type { AloneReading } from './suite-retake-alone.js';
 import type { TypeOutcome, TypeRunner } from './type-step.js';
 import type { GhRunner } from '../adapters/tracker/github.js';
@@ -639,9 +639,9 @@ export interface Settling {
   readonly baseline: SuiteBaseline | null;
   /**
    * What a red step's repair task is for (`suite-blocker.ts`): its kind
-   * and, for a task step, the task's sentence; null when it writes none.
+   * and the task step's task or the stage step's stage; null when it writes none.
    */
-  readonly repair: { readonly kind: RepairStepKind; readonly task?: string } | null;
+  readonly repair: Omit<RepairSite, 'commit'> | null;
   /** The task step's lint, when it ran; see the module note. */
   readonly lint?: LintOutcome;
   /** The task step's type step, when it ran; see the module note. */

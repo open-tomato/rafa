@@ -335,11 +335,12 @@ The strip happens where the loop reads the next task, `findNextTask` in `src/uti
   holding no nested braces and at least one recognised key, and it is
   never the whole task text. Two spaces separate it from the text.
   Anything failing one of those rules stays task text — a task ending on
-  a code span carrying `{ "a": 1 }` is not a declaration. The one thing
-  that may follow the block is the loop's own: on a blocked task's
-  tracker line it writes `<!-- blocked: <text> -->` after the block, and
-  takes that comment off before the block is read. The plan itself never
-  holds one.
+  a code span carrying `{ "a": 1 }` is not a declaration. What may
+  follow the block is the loop's own: on a blocked task's tracker line
+  it writes `<!-- blocked: <text> -->` after the block, and on a repair
+  task's line `<!-- repairs: <text> -->` before that, naming the plan
+  task repaired. It takes both comments off before the block is read.
+  The plan itself never holds either.
 * Its tokens are space-separated `key=value` pairs, of the recognised keys
   in the table below; an unrecognised key is kept for telemetry and maps
   to no flag.

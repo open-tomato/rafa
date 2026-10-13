@@ -530,6 +530,8 @@ describe('a red step\'s repair task', () => {
     const next = findNextTask(after);
     expect(next).toMatchObject({ lineNum: 9, status: 'blocked', task: `Repair the red task step at commit ${HEAD}  {agent=build-error-resolver}` });
     expect(next?.blocker).toBe(outcome.blocker ?? '');
+    // The repair names the task whose step was red.
+    expect(next?.repairs).toBe(input.task);
     expect(parsePlan(after).tasks.find((task) => task.lineNum === 9)).toMatchObject({ stage: 1, declaration: { agent: 'build-error-resolver' } });
   });
 
@@ -545,6 +547,9 @@ describe('a red step\'s repair task', () => {
     const next = findNextTask(after);
     expect(next?.task).toBe(`Repair the red stage step at commit ${HEAD}  {agent=build-error-resolver}`);
     expect(next?.blocker).toContain('stage step for "One"');
+    // The repair names the last task of the stage the step was taken for;
+    // a stage step told no stage names nothing (`suite-blocker.test.ts`).
+    expect(next?.repairs).toBe('second task');
   });
 
   it('takes the blocker of its own red task step on its line, inserting no second line', async () => {

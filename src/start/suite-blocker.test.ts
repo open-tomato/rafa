@@ -10,6 +10,10 @@
  * repair {@link writeRepairTask} writes, over a real tracker file under a
  * temporary directory: inserted after the last task, or the ticked one
  * blocked again on a second red, each claim paired with its control.
+ * Then the plan task a repair's line names in its `<!-- repairs: -->`
+ * comment, read back through `findNextTask` as the dispatch reads it: a
+ * task step's task, a stage step's last task, nothing for a pre-wrap-up
+ * step, and the same name on a repair blocked again.
  */
 import type { StepVerdict } from './suite-blocker.js';
 import type { SuiteFailure } from '../suite/run.js';
@@ -21,7 +25,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { parsePlan } from '../plan/parse.js';
-import { findNextTask } from '../utils/tracker.js';
+import { findNextTask, updateTrackerLine } from '../utils/tracker.js';
 
 import {
   blockerText,
@@ -259,5 +263,149 @@ describe('writeRepairTask for a pre-wrap-up step', () => {
   it('takes no blocked or open pre-wrap-up repair for the ticked one', () => {
     writeFileSync(trackerPath, finished([`- [ ] ${PRE_WRAP_UP_REPAIR}  {agent=build-error-resolver}`]), 'utf8');
     expect(writeRepairTask(trackerPath, 'the blocker', { kind: 'pre-wrap-up', commit: COMMIT })).toEqual({ line: 6, inserted: true });
+  });
+});
+
+describe('writeRepairTask and the task a repair names', () => {
+  const TASK_REPAIR = 'Repair the red task step at commit 0123456789ab';
+  const STAGE_REPAIR = 'Repair the red stage step at commit 0123456789ab';
+  const DECLARED = '{agent=build-error-resolver}';
+
+  /** Two stages: the first done, its last task declared; the second open. `extra` follows stage one's last task. */
+  function staged(extra: readonly string[] = []): string {
+    return [
+      '# Plan: fixture',
+      '',
+      '# Stage: One',
+      '',
+      '- [x] first task',
+      '- [x] second task  {tests=related}',
+      ...extra,
+      '',
+      '# Stage: Two',
+      '',
+      '- [ ] third task',
+      '- [ ] fourth task',
+      '',
+    ].join('\n');
+  }
+
+  /** The line of the first open task in {@link staged}, which a repair is inserted above. */
+  const FIRST_OPEN = 9;
+
+  let dir: string;
+  let trackerPath: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'suite-blocker-repairs-'));
+    trackerPath = join(dir, 'PLAN_TRACKER-fixture.md');
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const read = (): string => readFileSync(trackerPath, 'utf8');
+  const lineAt = (line: number): string => read().split('\n')[line] ?? '';
+
+  it('names the task whose step was red on a task step\'s repair', () => {
+    writeFileSync(trackerPath, staged(), 'utf8');
+    const written = writeRepairTask(trackerPath, 'the blocker', { kind: 'task', commit: COMMIT, task: 'second task' });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: true });
+    expect(lineAt(FIRST_OPEN)).toBe(`- [BLOCKED] ${TASK_REPAIR}  ${DECLARED}  <!-- repairs: second task -->  <!-- blocked: the blocker -->`);
+    expect(findNextTask(read())).toEqual({
+      task: `${TASK_REPAIR}  ${DECLARED}`,
+      lineNum: FIRST_OPEN,
+      status: 'blocked',
+      blocker: 'the blocker',
+      repairs: 'second task',
+    });
+    // The line is still a repair's to every reader of its text.
+    const modelled = parsePlan(read()).tasks.find((task) => task.lineNum === FIRST_OPEN);
+    expect(modelled?.text).toBe(TASK_REPAIR);
+    expect(isRepairTask(modelled?.text ?? '')).toBe(true);
+    expect(modelled?.declaration?.agent).toBe('build-error-resolver');
+  });
+
+  it('names the last task of its stage on a stage step\'s repair, declaration off', () => {
+    writeFileSync(trackerPath, staged(), 'utf8');
+    const written = writeRepairTask(trackerPath, 'the blocker', { kind: 'stage', commit: COMMIT, stage: 0 });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: true });
+    expect(lineAt(FIRST_OPEN)).toBe(`- [BLOCKED] ${STAGE_REPAIR}  ${DECLARED}  <!-- repairs: second task -->  <!-- blocked: the blocker -->`);
+    expect(findNextTask(read())?.repairs).toBe('second task');
+
+    // Control: the same step for the second stage names that stage's last task.
+    writeFileSync(trackerPath, staged(), 'utf8');
+    writeRepairTask(trackerPath, 'the blocker', { kind: 'stage', commit: COMMIT, stage: 1 });
+    expect(findNextTask(read())?.repairs).toBe('fourth task');
+  });
+
+  it('passes over a repair line closing the stage, and names nothing for a stage it is not told', () => {
+    const repaired = staged([`- [x] Repair the red task step at commit aaaaaaaaaaaa  ${DECLARED}  <!-- repairs: first task -->`]);
+    writeFileSync(trackerPath, repaired, 'utf8');
+    writeRepairTask(trackerPath, 'the blocker', { kind: 'stage', commit: COMMIT, stage: 0 });
+    expect(findNextTask(read())?.repairs).toBe('second task');
+
+    writeFileSync(trackerPath, staged(), 'utf8');
+    writeRepairTask(trackerPath, 'the blocker', { kind: 'stage', commit: COMMIT });
+    const untold = findNextTask(read());
+    expect(untold?.task).toBe(`${STAGE_REPAIR}  ${DECLARED}`);
+    expect(untold?.repairs).toBeUndefined();
+    expect(read()).not.toContain('<!-- repairs: ');
+  });
+
+  it('writes no repairs comment on a pre-wrap-up step\'s repair', () => {
+    writeFileSync(trackerPath, finished(), 'utf8');
+    const written = writeRepairTask(trackerPath, 'the blocker', { kind: 'pre-wrap-up', commit: COMMIT });
+
+    expect(written).toEqual({ line: 6, inserted: true });
+    expect(lineAt(6)).toBe(`- [BLOCKED] ${PRE_WRAP_UP_REPAIR}  ${DECLARED}  <!-- blocked: the blocker -->`);
+    expect(findNextTask(read())).toEqual({ task: `${PRE_WRAP_UP_REPAIR}  ${DECLARED}`, lineNum: 6, status: 'blocked', blocker: 'the blocker' });
+
+    // Control: a task step's repair on the same tracker names its task.
+    writeFileSync(trackerPath, finished(), 'utf8');
+    writeRepairTask(trackerPath, 'the blocker', { kind: 'task', commit: COMMIT, task: 'second task' });
+    expect(findNextTask(read())?.repairs).toBe('second task');
+  });
+
+  it('keeps the name on a repair whose own step is red, blocked again on its line', () => {
+    writeFileSync(trackerPath, staged(), 'utf8');
+    writeRepairTask(trackerPath, 'the blocker', { kind: 'task', commit: COMMIT, task: 'second task' });
+    const tasks = parsePlan(read()).tasks.length;
+    updateTrackerLine(trackerPath, FIRST_OPEN, 'done');
+    expect(lineAt(FIRST_OPEN)).toBe(`- [x] ${TASK_REPAIR}  ${DECLARED}  <!-- repairs: second task -->`);
+
+    const written = writeRepairTask(trackerPath, 'red again', { kind: 'task', commit: 'fedcba9876543210', task: TASK_REPAIR });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: false });
+    expect(parsePlan(read()).tasks).toHaveLength(tasks);
+    expect(lineAt(FIRST_OPEN)).toBe(`- [BLOCKED] ${TASK_REPAIR}  ${DECLARED}  <!-- repairs: second task -->  <!-- blocked: red again -->`);
+    expect(findNextTask(read())).toEqual({
+      task: `${TASK_REPAIR}  ${DECLARED}`,
+      lineNum: FIRST_OPEN,
+      status: 'blocked',
+      blocker: 'red again',
+      repairs: 'second task',
+    });
+  });
+
+  it('reads a repair written with no comment as naming nothing, blocked again or not', () => {
+    writeFileSync(trackerPath, staged().replace('- [ ] third task', `- [x] ${TASK_REPAIR}  ${DECLARED}\n- [ ] third task`), 'utf8');
+
+    const written = writeRepairTask(trackerPath, 'red again', { kind: 'task', commit: COMMIT, task: TASK_REPAIR });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: false });
+    expect(findNextTask(read())).toEqual({ task: `${TASK_REPAIR}  ${DECLARED}`, lineNum: FIRST_OPEN, status: 'blocked', blocker: 'red again' });
+  });
+
+  it('names nothing on a repair inserted for a repair whose line the tracker no longer holds', () => {
+    writeFileSync(trackerPath, staged(), 'utf8');
+    const written = writeRepairTask(trackerPath, 'red again', { kind: 'task', commit: COMMIT, task: 'Repair the red task step at commit aaaaaaaaaaaa' });
+
+    expect(written).toEqual({ line: FIRST_OPEN, inserted: true });
+    expect(findNextTask(read())?.repairs).toBeUndefined();
+    expect(read()).not.toContain('<!-- repairs: ');
   });
 });
