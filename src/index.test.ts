@@ -39,20 +39,21 @@
  * a command registered and not spelled goes red. Each of those modules
  * wrapping a phase 0 command takes it as its one default import, and
  * that binding is held to be a root export's value, so a command the
- * terminal runs and a service cannot import goes red. `describe`, `init`,
- * `doctor`, `cleanup`, `status`, `self-update`, `roadmap`, `epic show`, `epic new`, `epic defer`, `epic promote`, `epic move`, `epic close`, `epic cancel`, `switch`, `board list`, `board sync`, the five plan readers, `plan list`, `plan show`,
- * `plan validate`, `plan risk` and `plan needs`, the six `loop` session actions, `loop stop`,
- * `loop pause`, `loop resume`, `loop status`, `loop list` and `loop wait`, the five
- * `issue` actions, and `module list` and `module exec` from the registry are held to be
- * the command modules wrapping none. `describe` runs the roster builder
- * of `src/cli/describe.ts`, which is no root export, and each of the first
- * three plan readers imports `parsePlan` from the `./plan` entry, which is
- * one, where `plan risk` and `plan needs` import their readings from
- * `src/plan/risk.ts` and `src/plan/needs.ts`, which are not. A binding a module
- * takes by name, as `loop start` takes the CI defaults its flags show,
- * is a value and not a command, and is not held. Every parsed import list
- * is also held to the spelled one, which is what keeps a parser that
- * matched nothing from passing vacuously.
+ * terminal runs and a service cannot import goes red. The command
+ * modules wrapping none are held too: the case that reaches the phase 0
+ * commands spells them path by path, every module of `COMMAND_MODULES`
+ * whose import list lacks `wrapPhaseZeroCommand`, and that list of paths
+ * is the one to read, where a list kept in this note fell behind it.
+ * `describe` runs the roster builder of `src/cli/describe.ts`, which is
+ * no root export. `plan show` imports `parsePlan` from the `./plan`
+ * entry, which is one, where `plan list`, `plan validate`, `plan risk`
+ * and `plan needs` import their readings from `src/plan/list.ts`,
+ * `src/plan/validate.ts`, `src/plan/risk.ts` and `src/plan/needs.ts`,
+ * which are not. A binding a module takes by name, as `loop start`
+ * takes the CI defaults its flags show, is a value and not a command,
+ * and is not held. Every parsed import list is also held to the spelled
+ * one, which is what keeps a parser that matched nothing from passing
+ * vacuously.
  *
  * The import cases run a probe in a fresh process, from an empty
  * directory outside any repository: import one module by absolute path,
