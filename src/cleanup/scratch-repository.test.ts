@@ -3,15 +3,26 @@
  * every branch lands in the group, with the reason and the default tick,
  * the design table names, and every worktree is marked by the rule that
  * holds for it.
+ *
+ * Then the fixture's remote-only option: the three branches it puts on
+ * the remote with no local copy, what `git cherry` reads of each, and
+ * the default build read side by side with it, so the option is shown
+ * to add those three and move nothing else.
  */
 import type { CleanupRead } from './index.js';
-import type { ScratchRepository } from './scratch-repository.js';
+import type { ScratchOptions, ScratchRepository } from './scratch-repository.js';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { createPullRequestsDouble } from '../pr/pull-requests-double.js';
 
-import { createScratchRepository, LOCK_REASON, SCRATCH_NOW } from './scratch-repository.js';
+import {
+  createScratchRepository,
+  LOCK_REASON,
+  REMOTE_ONLY_BRANCHES,
+  REMOTE_ONLY_COMMITS,
+  SCRATCH_NOW,
+} from './scratch-repository.js';
 
 import { defaultCleanupSeams, cleanupCounts, readCleanup } from './index.js';
 
@@ -124,5 +135,163 @@ describe('readCleanup over a scratch repository', () => {
 
   it('counts each group', () => {
     expect(cleanupCounts(read)).toEqual({ merged: 4, stale: 1, notPushed: 1, worktrees: 3 });
+  });
+});
+
+/** The branches the default build leaves on the bare remote. */
+const DEFAULT_REMOTE_BRANCHES = ['main', 'merged', 'squashed', 'stale', 'wt-clean', 'wt-dirty', 'wt-locked'];
+
+/** The local branches of the default build. */
+const DEFAULT_LOCAL_BRANCHES = [
+  'gone',
+  'main',
+  'merged',
+  'squashed',
+  'stale',
+  'unpushed',
+  'wt-clean',
+  'wt-dirty',
+  'wt-locked',
+];
+
+/** The short names `for-each-ref` lists under `prefix`, sorted. */
+function refNames(repo: ScratchRepository, prefix: string, cwd: string = repo.clone): string[] {
+  return repo.git(['for-each-ref', `--format=%(refname:lstrip=${String(prefix.split('/').length)})`, prefix], cwd)
+    .split('\n')
+    .filter((name) => name !== '')
+    .sort();
+}
+
+/**
+ * The clone's remote-tracking branches. `origin/HEAD` is left out: it
+ * is a name for `main` and not a branch, and whether a clone of an
+ * empty remote ends up holding it depends on the git that fetched.
+ */
+function remoteTracking(repo: ScratchRepository): string[] {
+  return refNames(repo, 'refs/remotes/origin').filter((name) => name !== 'HEAD');
+}
+
+/** The `+` and `-` marks `git cherry` writes for `origin/<name>` against `origin/main`, in order. */
+function cherryMarks(repo: ScratchRepository, name: string): string[] {
+  return repo.git(['cherry', 'refs/remotes/origin/main', `refs/remotes/origin/${name}`])
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => line.slice(0, 1));
+}
+
+/** The five groups of a reading, as the names in each and the ticks. */
+async function groupsOf(options: ScratchOptions): Promise<{ repo: ScratchRepository; groups: unknown }> {
+  const repo = createScratchRepository(options);
+  try {
+    const reading = await readCleanup(defaultCleanupSeams(repo.clone, null), {
+      fetch: true,
+      base: null,
+      keep: [],
+      staleDays: 30,
+      worktreeIdleDays: 0,
+      now: SCRATCH_NOW,
+      home: repo.home,
+      cwd: repo.clone,
+      projectRoot: repo.clone,
+      worktreeDir: '.rafa/worktrees',
+    });
+    if (!reading.ok) throw new Error(reading.detail);
+    const groups = {
+      base: reading.base,
+      notes: reading.notes,
+      merged: reading.merged.map((row) => [row.branch, row.ticked, row.reason]),
+      stale: reading.stale.map((row) => [row.branch, row.ticked, row.reason]),
+      notPushed: reading.notPushed.map((row) => [row.branch, row.ticked, row.commits]),
+      worktrees: reading.worktrees.map((row) => [row.branch, row.tickable, row.ticked]),
+      counts: cleanupCounts(reading),
+    };
+    return { repo, groups };
+  } catch (error) {
+    repo.dispose();
+    throw error;
+  }
+}
+
+describe('the scratch repository with its remote-only option', () => {
+  let plain: { repo: ScratchRepository; groups: unknown };
+  let withSet: { repo: ScratchRepository; groups: unknown };
+  const added = Object.values(REMOTE_ONLY_BRANCHES);
+
+  beforeAll(async () => {
+    plain = await groupsOf({});
+    withSet = await groupsOf({ remoteOnly: true });
+  });
+
+  afterAll(() => {
+    plain.repo.dispose();
+    withSet.repo.dispose();
+  });
+
+  it('names one unmerged branch, one copied branch and one stretch branch', () => {
+    expect(REMOTE_ONLY_BRANCHES).toEqual({
+      unmerged: 'remote-unmerged',
+      copied: 'remote-copied',
+      stretch: 'stretch/9',
+    });
+  });
+
+  it('leaves the default build with no branch that is only on the remote', () => {
+    expect(refNames(plain.repo, 'refs/heads', plain.repo.bare)).toEqual(DEFAULT_REMOTE_BRANCHES);
+    expect(refNames(plain.repo, 'refs/heads')).toEqual(DEFAULT_LOCAL_BRANCHES);
+    const local = new Set(DEFAULT_LOCAL_BRANCHES);
+    expect(DEFAULT_REMOTE_BRANCHES.filter((name) => !local.has(name))).toEqual([]);
+  });
+
+  it('adds the three branches to the remote and to the remote-tracking refs, and nothing else', () => {
+    const expected = [...DEFAULT_REMOTE_BRANCHES, ...added].sort();
+    expect(refNames(withSet.repo, 'refs/heads', withSet.repo.bare)).toEqual(expected);
+    expect(remoteTracking(withSet.repo)).toEqual(expected);
+  });
+
+  it('gives none of the three a local copy', () => {
+    expect(refNames(withSet.repo, 'refs/heads')).toEqual(DEFAULT_LOCAL_BRANCHES);
+  });
+
+  it('keeps every one of the three out of reach of the base', () => {
+    const merged = remoteTracking(withSet.repo).filter((name) => (
+      withSet.repo.git(['rev-list', '--count', `refs/remotes/origin/main..refs/remotes/origin/${name}`]).trim() === '0'
+    ));
+    // The control: the listing does find the branches the base reaches.
+    expect(merged).toEqual(['main', 'merged', 'wt-clean']);
+    for (const name of added) {
+      expect(withSet.repo.git(['rev-list', '--count', `refs/remotes/origin/main..refs/remotes/origin/${name}`]).trim())
+        .toBe(String(REMOTE_ONLY_COMMITS));
+    }
+  });
+
+  it('reads no patch-equal copy of the unmerged and stretch commits, and one of every copied commit', () => {
+    const none = Array.from({ length: REMOTE_ONLY_COMMITS }, () => '+');
+    const every = Array.from({ length: REMOTE_ONLY_COMMITS }, () => '-');
+    expect(cherryMarks(withSet.repo, REMOTE_ONLY_BRANCHES.unmerged)).toEqual(none);
+    expect(cherryMarks(withSet.repo, REMOTE_ONLY_BRANCHES.stretch)).toEqual(none);
+    expect(cherryMarks(withSet.repo, REMOTE_ONLY_BRANCHES.copied)).toEqual(every);
+  });
+
+  it('moves main by the copies only', () => {
+    const count = (repo: ScratchRepository): number => (
+      Number(repo.git(['rev-list', '--count', 'refs/remotes/origin/main']).trim())
+    );
+    expect(count(withSet.repo) - count(plain.repo)).toBe(REMOTE_ONLY_COMMITS);
+    expect(withSet.repo.git(['rev-list', '--count', 'refs/remotes/origin/main..refs/heads/main']).trim()).toBe('0');
+  });
+
+  it('leaves the five groups of the default build as they read without it', () => {
+    expect(withSet.groups).toEqual(plain.groups);
+    expect(withSet.repo.pastHead).toBeNull();
+  });
+
+  it('leaves every local branch but main on the commit the default build puts it on', () => {
+    const tips = (repo: ScratchRepository): string[] => (
+      repo.git(['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads'])
+        .split('\n')
+        .filter((line) => line !== '' && !line.startsWith('main '))
+    );
+    expect(tips(plain.repo)).toHaveLength(DEFAULT_LOCAL_BRANCHES.length - 1);
+    expect(tips(withSet.repo)).toEqual(tips(plain.repo));
   });
 });
