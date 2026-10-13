@@ -143,8 +143,9 @@ on that repair's line and halts.
 `.github/workflows/verify.yml` runs one job, `verify`, with two triggers
 and three gates. **Triggers:** pull requests into `main` or `integration`,
 and pushes to `stretch/**`. **Gates** (each step runs unless the job was
-cancelled): `bun test`, `bunx eslint .`, and `bunx tsc --noEmit`. **Two
-cases for `gh pr checks <n>`:** A pull request into `main` or
+cancelled): `bun test`, `bunx eslint .`, and `bun run check-types`, the
+root config and both workspace packages. **Two cases for
+`gh pr checks <n>`:** A pull request into `main` or
 `integration` reports the `verify` check (merge with `rafa pr wait <n>`
 then `rafa pr merge <n>`); a pull request into `stretch/**` reports no
 check (merge with `rafa pr merge <n> --skip-checks`). One more gate runs

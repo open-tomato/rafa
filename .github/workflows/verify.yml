@@ -38,4 +38,4 @@ jobs:
 
       - name: Types
         if: ${{ !cancelled() }}
-        run: bunx tsc --noEmit
+        run: bun run check-types
