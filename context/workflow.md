@@ -351,11 +351,14 @@ root, and you run the loop where you already are.
 **The base is read one way, by the start and by the wrap-up.** It is
 `pr.base` when the config sets it (`rafa config set pr.base=<branch>`), else
 the branch `origin/HEAD` names, else `main`. `resolveBaseBranch`
-(`src/cleanup/branches.ts`) reads it in the project root for both: the start
-for the branch it cuts and the worktree it adds, the wrap-up for the pull
-request. The base is an address written on the plan. The branch checked out
-where the run was started is never the base, and where the person stands
-when they start the run is no part of it.
+(`src/cleanup/branches.ts`) reads it: the start reads it in the project root
+for the branch it cuts and the worktree it adds, the wrap-up reads it in the
+run's own checkout (`src/start/wrap-up-run.ts`) for the pull request. A
+repository with no `origin/HEAD` and no `pr.base` gets `main`. To name another
+base, set `pr.base`, or run `git remote set-head origin -a` so that
+`origin/HEAD` names the remote's default branch. The base is an address written
+on the plan. The branch checked out where the run was started is never the
+base, and where the person stands when they start the run is no part of it.
 
 **`loop start --create-branch` creates the feature branch automatically**
 when run on `main` or `master`, instead of printing a checkout instruction.
@@ -605,6 +608,9 @@ the report, and closes the issue. This establishes a clear pipeline from
 tooling promise (the hook's denial) to tooling completion (the rafa
 command) to closure (the verification sweep), and leaves no gap report
 buried in a list of general bugs.
+
+A stale line found during other work is corrected in that work, in the same
+commit, and is not filed as a bug.
 
 ### Files beside the tree
 
