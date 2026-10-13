@@ -778,24 +778,25 @@ describe('with suite-step.ts\'s own steps', () => {
     expect(linesAt('error')).toEqual([]);
   });
 
-  it('writes the baseline of a project with no test file as before, and the next run records it again', async () => {
-    // Bun exits 1 for it and lists nothing; the mark that tells it apart is not kept in the file.
+  it('writes the baseline of a project with no test file with its mark, and the next run reuses it quietly (#1053)', async () => {
+    // Bun exits 1 for it and lists nothing; the mark that tells it apart is kept in the file.
     const none: SuiteResult = { ...suiteResult(), exitCode: 1, summary: null, errors: null, junit: 'missing', outputTail: ['error: 0 test files matching **{.test,.spec}.ts'], noTestFiles: true };
     const first = realSteps([none]);
 
     expect(await first.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
+    expect(first.runs).toHaveLength(1);
     expect(storedBaseline()?.exitCode).toBe(1);
-    expect(storedBaseline()?.noTestFiles).toBeUndefined();
+    expect(storedBaseline()?.noTestFiles).toBe(true);
     expect(linesAt('error')).toEqual([]);
     expect(linesAt('warn')).toEqual([]);
+    const written = readFileSync(baselinePathFor(trackerPath), 'utf8');
 
     const second = realSteps([none]);
     expect(await second.steps.beforeSession(findNextTask(TRACKER))).toBe('go-on');
-    expect(second.runs).toHaveLength(1);
+    expect(second.runs).toHaveLength(0);
+    expect(readFileSync(baselinePathFor(trackerPath), 'utf8')).toBe(written);
     expect(linesAt('error')).toEqual([]);
-    expect(linesAt('warn')).toEqual([
-      `⚠️  SUITE_BASELINE-fixture.json holds a run that exited 1 and listed no failing test (${OUTSIDE_CASE_REASON}); recording the baseline again.`,
-    ]);
+    expect(linesAt('warn')).toEqual([]);
   });
 
   it('halts when a stored baseline of that shape is recorded again and fails the same way, leaving the stored file', async () => {

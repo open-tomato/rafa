@@ -88,16 +88,21 @@
  * The cause is said as likely and never read off the output, as the
  * reading itself is not.
  *
- * A baseline file written before this rule can hold such a run. The
- * file keeps no `noTestFiles` mark (`baselineOf`, `suite/baseline.ts`)
- * and no SIGINT stop is ever written, so the stored shape is a nonzero
- * `exitCode` beside an empty `failures`, which is what
- * {@link failedOutsideAnyCase} reads of it. `ensureBaseline` records
- * such a file again and says why with {@link storedOutsideCaseLine},
- * which states what the file holds. That takes in the baseline of a
- * project Bun finds no test file in, which also exits 1 and lists
- * nothing: it is written as before, and recorded again by every run
- * after it, each a `bun test` with no file to run.
+ * A baseline file written before this rule can hold such a run. No
+ * SIGINT stop is ever written, so the stored shape is a nonzero
+ * `exitCode` beside an empty `failures` and no `noTestFiles` mark, which
+ * is what {@link failedOutsideAnyCase} reads of it. `ensureBaseline`
+ * records such a file again and says why with
+ * {@link storedOutsideCaseLine}, which states what the file holds.
+ *
+ * The baseline of a project Bun finds no test file in also exits 1 and
+ * lists nothing, and is told apart by its mark: the file keeps
+ * `noTestFiles: true` (`baselineOf`, `suite/baseline.ts`), so
+ * {@link failedOutsideAnyCase} answers false for it and every later run
+ * reuses it, with no warning and no `bun test`. A file of that project
+ * written before the mark was kept has no key and reads as the shape
+ * above: it is warned about and recorded again once, and the file
+ * written then carries the mark (#1053).
  *
  * ## The SIGINT exit code
  *
